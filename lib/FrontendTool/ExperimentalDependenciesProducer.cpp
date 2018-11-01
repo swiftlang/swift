@@ -77,6 +77,11 @@ bool swift::experimental_dependencies::emitReferenceDependencies(
   });
 }
 
+using StringVec = std::vector<std::string>;
+template <typename T> using CPVec = std::vector<const T*>;
+template <typename T1 = std::string, typename T2 = std::string> using PairVec = std::vector<std::pair<T1, T2>>;
+template <typename T1, typename T2> using CPPairVec = std::vector<std::pair<const T1*, const T2*>>;
+
 // Status quo
 namespace SQ {
 class YAMLEmitter {
@@ -106,48 +111,47 @@ public:
 
   class ProviderDeclarations {
   public:
-    const std::vector<const PrecedenceGroupDecl *> precedenceGroups;
-    const std::vector<const NominalTypeDecl *> topLevelVisibleNominals;
-    const std::vector<const ValueDecl *> topLevelVisibleValues;
-    const std::vector<const OperatorDecl *> topLevelOperators;
-    const std::vector<const FuncDecl *> nestedOperators;
+    const CPVec<PrecedenceGroupDecl> precedenceGroups;
+    const CPVec<NominalTypeDecl> topLevelVisibleNominals;
+    const CPVec<ValueDecl> topLevelVisibleValues;
+    const CPVec<OperatorDecl> topLevelOperators;
+    const CPVec<FuncDecl> nestedOperators;
 
     /// Records every nominal declaration, and whether or not the declaration
     /// changes the externally-observable shape of the type.
     llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
-    const std::vector<std::pair<const NominalTypeDecl *, const ValueDecl *>>
-        holdersAndMembers;
+    const CPPairVec<NominalTypeDecl, ValueDecl> holdersAndMembers;
 
-    const std::vector<const ValueDecl *> classMembers;
+    const CPVec<ValueDecl> classMembers;
 
   public:
     ProviderDeclarations(const SourceFile *SF);
 
   private:
-    static std::vector<const ValueDecl *> getClassMembers(const SourceFile *);
+    static CPVec<ValueDecl> getClassMembers(const SourceFile *);
 
     static llvm::MapVector<const NominalTypeDecl *, bool>
     getExtendedNominals(const SourceFile *);
 
-    static std::vector<std::pair<const NominalTypeDecl *, const ValueDecl *>>
+    static  CPPairVec<NominalTypeDecl, ValueDecl>
     getHoldersAndMembers(const SourceFile *);
 
-    static std::vector<const ExtensionDecl *>
+    static CPVec<ExtensionDecl>
     getExtensionsWithJustMembers(const SourceFile *);
 
-    static std::vector<const ExtensionDecl *>
+    static CPVec<ExtensionDecl>
     getTopLevelVisibleExtensions(const SourceFile *SF);
 
-    static std::vector<const NominalTypeDecl *>
+    static CPVec<NominalTypeDecl>
     getTopLevelVisibleNominals(const SourceFile *SF);
 
-    static std::vector<const ValueDecl *>
+    static CPVec<ValueDecl>
     getTopLevelVisibleValues(const SourceFile *SF);
 
-    static std::vector<const OperatorDecl *>
+    static CPVec<OperatorDecl>
     getTopLevelOperators(const SourceFile *SF);
 
-    static std::vector<const FuncDecl *>
+    static CPVec<FuncDecl>
     getNestedOperators(const SourceFile *SF);
 
     static void addExtendedNominalMembers(
@@ -156,10 +160,10 @@ public:
 
     static void
     addNestedOperators(const DeclRange members,
-                       std::vector<const FuncDecl *> &nestedOperators);
+                       CPVec<FuncDecl> &nestedOperators);
 
     template <DeclKind, typename DeclT>
-    static std::vector<const DeclT *> getTopLevelDecls(const SourceFile *);
+    static CPVec<DeclT> getTopLevelDecls(const SourceFile *);
 
     static bool isVisibleOutsideItsFile(const ValueDecl *const VD) {
       return VD->getFormalAccess() > AccessLevel::FilePrivate;
@@ -174,28 +178,27 @@ public:
 
   class ProviderNames {
   public:
-    const std::vector<std::string> topLevelNames;
-    const std::vector<std::string>
+    const StringVec topLevelNames;
+    const StringVec
         extendedNominalContextualNamesThatCouldAddMembers;
-    const std::vector<std::pair<std::string, std::string>>
-        holdersAndMaybeMembers;
-    const std::vector<std::string> dynamicLookupNames;
+    const PairVec<> holdersAndMaybeMembers;
+    const StringVec dynamicLookupNames;
 
   private:
-    static std::vector<std::string>
+    static StringVec
     getTopLevelNames(const ProviderDeclarations &);
 
-    static std::vector<std::string>
+    static StringVec
     getExtendedNominalContextualNames(const ProviderDeclarations &,
                                       bool onlyCouldAddMembers);
 
-    static std::vector<std::pair<std::string, std::string>>
+    static PairVec<>
     getHoldersAndMembers(const ProviderDeclarations &);
 
-    static std::vector<std::pair<std::string, std::string>>
+    static PairVec<>
     getHoldersAndMaybeMembers(const ProviderDeclarations &);
 
-    static std::vector<std::string>
+    static StringVec
     getDynamicLookupNames(const ProviderDeclarations &);
 
     static std::string getContextualName(const NominalTypeDecl *const NTD) {
@@ -203,8 +206,8 @@ public:
       return Mangler.mangleTypeAsContextUSR(NTD);
     }
     
-    template<typename DeclT> static void addTopLevelNamesFromDecls(std::vector<std::string>::iterator,
-                                                                   const std::vector<const DeclT*>&
+    template<typename DeclT> static void addTopLevelNamesFromDecls(StringVec::iterator,
+                                                                   const CPVec<DeclT>&
                                                                    );
 
   public:
@@ -326,9 +329,9 @@ SQ::ProviderDeclarations::ProviderDeclarations(const SourceFile *SF)
       holdersAndMembers(getHoldersAndMembers(SF)),
       classMembers(getClassMembers(SF)) {}
 
-std::vector<const NominalTypeDecl *>
+CPVec<NominalTypeDecl>
 SQ::ProviderDeclarations::getTopLevelVisibleNominals(const SourceFile *SF) {
-  std::vector<const NominalTypeDecl *> nominals;
+  CPVec<NominalTypeDecl> nominals;
   for (const Decl *const D : SF->Decls)
     switch (D->getKind()) {
     default:
@@ -338,7 +341,7 @@ SQ::ProviderDeclarations::getTopLevelVisibleNominals(const SourceFile *SF) {
     case DeclKind::Struct:
     case DeclKind::Class:
     case DeclKind::Protocol: {
-      const NominalTypeDecl *const NTD = cast<NominalTypeDecl>(D);
+      const auto *const NTD = cast<NominalTypeDecl>(D);
       if (NTD->hasName() && isVisibleOutsideItsFile(NTD))
         nominals.push_back(NTD);
       break;
@@ -347,10 +350,10 @@ SQ::ProviderDeclarations::getTopLevelVisibleNominals(const SourceFile *SF) {
   return nominals;
 }
 
-std::vector<const ValueDecl *>
+CPVec<ValueDecl>
 SQ::ProviderDeclarations::getTopLevelVisibleValues(const SourceFile *SF) {
-  std::vector<const ValueDecl *> values;
-  for (const Decl *const D : SF->Decls)
+  CPVec<ValueDecl> values;
+  for (const auto *const D : SF->Decls)
     switch (D->getKind()) {
     default:
       break;
@@ -359,7 +362,7 @@ SQ::ProviderDeclarations::getTopLevelVisibleValues(const SourceFile *SF) {
     case DeclKind::Var:
     case DeclKind::Func:
     case DeclKind::Accessor: {
-      const ValueDecl *const VD = cast<ValueDecl>(D);
+      const auto *const VD = cast<ValueDecl>(D);
       if (VD->hasName() && isVisibleOutsideItsFile(VD))
         values.push_back(VD);
       break;
@@ -368,10 +371,10 @@ SQ::ProviderDeclarations::getTopLevelVisibleValues(const SourceFile *SF) {
   return values;
 }
 
-std::vector<const OperatorDecl *>
+CPVec<OperatorDecl>
 SQ::ProviderDeclarations::getTopLevelOperators(const SourceFile *SF) {
-  std::vector<const OperatorDecl *> operators;
-  for (const Decl *const D : SF->Decls)
+  CPVec<OperatorDecl> operators;
+  for (const auto *const D : SF->Decls)
     switch (D->getKind()) {
     default:
       break;
@@ -385,12 +388,12 @@ SQ::ProviderDeclarations::getTopLevelOperators(const SourceFile *SF) {
   return operators;
 }
 
-std::vector<const FuncDecl *>
+CPVec<FuncDecl>
 SQ::ProviderDeclarations::getNestedOperators(const SourceFile *SF) {
-  std::vector<const FuncDecl *> nestedOps;
-  for (const ExtensionDecl *const ED : getTopLevelVisibleExtensions(SF))
+  CPVec<FuncDecl> nestedOps;
+  for (const auto *const ED : getTopLevelVisibleExtensions(SF))
     addNestedOperators(ED->getMembers(), nestedOps);
-  for (const NominalTypeDecl *const NTD : getTopLevelVisibleNominals(SF))
+  for (const auto *const NTD : getTopLevelVisibleNominals(SF))
     addNestedOperators(NTD->getMembers(), nestedOps);
   return nestedOps;
 }
@@ -398,7 +401,7 @@ SQ::ProviderDeclarations::getNestedOperators(const SourceFile *SF) {
 llvm::MapVector<const NominalTypeDecl *, bool>
 SQ::ProviderDeclarations::getExtendedNominals(const SourceFile *SF) {
   llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
-  for (const ExtensionDecl *const ED : getTopLevelVisibleExtensions(SF)) {
+  for (const auto *const ED : getTopLevelVisibleExtensions(SF)) {
     const bool extendsVisibleTypes =
         areAnyExtendedTypesVisibleOutsideThisFile(ED);
     if (!extendsVisibleTypes && !areAnyMembersVisibleOutsideThisFile(ED))
@@ -406,20 +409,19 @@ SQ::ProviderDeclarations::getExtendedNominals(const SourceFile *SF) {
     extendedNominals[ED->getExtendedNominal()] |= extendsVisibleTypes;
     addExtendedNominalMembers(ED->getMembers(), extendedNominals);
   }
-  for (const NominalTypeDecl *const NTD : getTopLevelVisibleNominals(SF)) {
+  for (const auto *const NTD : getTopLevelVisibleNominals(SF)) {
     extendedNominals[NTD] |= true;
     addExtendedNominalMembers(NTD->getMembers(), extendedNominals);
   }
   return extendedNominals;
 }
 
-std::vector<std::pair<const NominalTypeDecl *, const ValueDecl *>>
+ CPPairVec<NominalTypeDecl, ValueDecl>
 SQ::ProviderDeclarations::getHoldersAndMembers(const SourceFile *SF) {
-  std::vector<std::pair<const NominalTypeDecl *, const ValueDecl *>>
-      holdersAndMembers;
-  for (const ExtensionDecl *const ED : getExtensionsWithJustMembers(SF)) {
-    for (const Decl *const D : ED->getMembers())
-      if (const ValueDecl *const VD = dyn_cast<ValueDecl>(D))
+   CPPairVec<NominalTypeDecl, ValueDecl>  holdersAndMembers;
+  for (const auto *const ED : getExtensionsWithJustMembers(SF)) {
+    for (const auto *const D : ED->getMembers())
+      if (const auto *const VD = dyn_cast<ValueDecl>(D))
         if (VD->hasName() && isVisibleOutsideItsFile(VD))
           holdersAndMembers.push_back(
               std::make_pair(ED->getExtendedNominal(), VD));
@@ -427,10 +429,10 @@ SQ::ProviderDeclarations::getHoldersAndMembers(const SourceFile *SF) {
   return holdersAndMembers;
 }
 
-std::vector<const ValueDecl *>
+CPVec<ValueDecl>
 SQ::ProviderDeclarations::getClassMembers(const SourceFile *SF) {
   struct NameCollector : public VisibleDeclConsumer {
-    std::vector<const ValueDecl *> classMembers;
+    CPVec<ValueDecl> classMembers;
     void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
       classMembers.push_back(VD);
     }
@@ -442,7 +444,7 @@ SQ::ProviderDeclarations::getClassMembers(const SourceFile *SF) {
 void SQ::ProviderDeclarations::addExtendedNominalMembers(
     const DeclRange members,
     llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals) {
-  for (const Decl *D : members) {
+  for (const auto *D : members) {
     if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
       extendedNominals[NTD] |= true;
       addExtendedNominalMembers(NTD->getMembers(), extendedNominals);
@@ -451,9 +453,9 @@ void SQ::ProviderDeclarations::addExtendedNominalMembers(
 }
 
 void SQ::ProviderDeclarations::addNestedOperators(
-    const DeclRange members, std::vector<const FuncDecl *> &nestedOperators) {
-  for (const Decl *D : members) {
-    if (const ValueDecl *const VD = dyn_cast<ValueDecl>(D)) {
+    const DeclRange members, CPVec<FuncDecl> &nestedOperators) {
+  for (const auto *D : members) {
+    if (const auto *const VD = dyn_cast<ValueDecl>(D)) {
       if (isVisibleOutsideItsFile(VD) && VD->getFullName().isOperator()) {
         nestedOperators.push_back(cast<FuncDecl>(VD));
         continue;
@@ -465,22 +467,22 @@ void SQ::ProviderDeclarations::addNestedOperators(
   }
 }
 
-std::vector<const ExtensionDecl *>
+CPVec<ExtensionDecl>
 SQ::ProviderDeclarations::getTopLevelVisibleExtensions(const SourceFile *SF) {
-  std::vector<const ExtensionDecl *> extensions;
-  for (const ExtensionDecl *const ED :
+  CPVec<ExtensionDecl> extensions;
+  for (const auto *const ED :
        getTopLevelDecls<DeclKind::Extension, ExtensionDecl>(SF))
-    if (const NominalTypeDecl *const NTD = ED->getExtendedNominal())
+    if (const auto *const NTD = ED->getExtendedNominal())
       if (isVisibleOutsideItsFile(NTD))
         extensions.push_back(ED);
   return extensions;
 }
 
 
-std::vector<const ExtensionDecl *>
+CPVec<ExtensionDecl>
 SQ::ProviderDeclarations::getExtensionsWithJustMembers(const SourceFile *SF) {
-  std::vector<const ExtensionDecl *> extensionsWithJustMembers;
-  for (const ExtensionDecl *const ED :
+  CPVec<ExtensionDecl> extensionsWithJustMembers;
+  for (const auto *const ED :
        getTopLevelDecls<DeclKind::Extension, ExtensionDecl>(SF))
     if (!areAnyExtendedTypesVisibleOutsideThisFile(ED) &&
         areAnyMembersVisibleOutsideThisFile(ED))
@@ -546,10 +548,10 @@ bool SQ::ProviderDeclarations::isMemberVisibleOutsideThisFile(
 }
 
 template <DeclKind kind, typename DeclT>
-std::vector<const DeclT *>
+CPVec<DeclT>
 SQ::ProviderDeclarations::getTopLevelDecls(const SourceFile *const SF) {
-  std::vector<const DeclT *> tops;
-  for (const Decl *const D : SF->Decls) {
+  CPVec<DeclT> tops;
+  for (const auto *const D : SF->Decls) {
     if (D->getKind() == kind) {
       assert(cast<DeclT>(D));
       tops.push_back(cast<DeclT>(D));
@@ -566,23 +568,23 @@ SQ::ProviderNames::ProviderNames(const SQ::ProviderDeclarations &pd)
       dynamicLookupNames(getDynamicLookupNames(pd)) {}
 
 template<>
-void SQ::ProviderNames::addTopLevelNamesFromDecls<ValueDecl>(std::vector<std::string>::iterator dest,
-                                                             const std::vector<const ValueDecl*> &decls) {
-  for (const ValueDecl *const D : decls)
+void SQ::ProviderNames::addTopLevelNamesFromDecls<ValueDecl>(StringVec::iterator dest,
+                                                             const CPVec<ValueDecl> &decls) {
+  for (const auto *const D : decls)
     *dest++ = DeclBaseName(D->getBaseName()).userFacingName();
 }
 
 template<typename DeclT>
-void SQ::ProviderNames::addTopLevelNamesFromDecls(std::vector<std::string>::iterator dest,
-                                                  const std::vector<const DeclT*> &decls
+void SQ::ProviderNames::addTopLevelNamesFromDecls(StringVec::iterator dest,
+                                                  const CPVec<DeclT> &decls
                                                   ) {
-  for (const DeclT *const D : decls)
+  for (const auto *const D : decls)
     *dest++ = DeclBaseName(D->getName()).userFacingName();
 }
 
-std::vector<std::string>
+StringVec
 SQ::ProviderNames::getTopLevelNames(const ProviderDeclarations &pd) {
-  std::vector<std::string> tops;
+  StringVec tops;
   addTopLevelNamesFromDecls(tops.end(), pd.precedenceGroups);
   addTopLevelNamesFromDecls(tops.end(), pd.topLevelVisibleNominals);
   addTopLevelNamesFromDecls(tops.end(), pd.topLevelVisibleValues);
@@ -596,9 +598,9 @@ SQ::ProviderNames::getTopLevelNames(const ProviderDeclarations &pd) {
 
 
 
-std::vector<std::string> SQ::ProviderNames::getExtendedNominalContextualNames(
+StringVec SQ::ProviderNames::getExtendedNominalContextualNames(
     const ProviderDeclarations &pd, const bool onlyIfCouldAddMembers) {
-  std::vector<std::string> extendedNominalContextualNames;
+  StringVec extendedNominalContextualNames;
   for (const auto &p : pd.extendedNominals) {
     if (!onlyIfCouldAddMembers || p.second)
       extendedNominalContextualNames.push_back(getContextualName(p.first));
@@ -606,19 +608,19 @@ std::vector<std::string> SQ::ProviderNames::getExtendedNominalContextualNames(
   return extendedNominalContextualNames;
 }
 
-std::vector<std::pair<std::string, std::string>>
+PairVec<>
 SQ::ProviderNames::getHoldersAndMaybeMembers(const ProviderDeclarations &pd) {
-  std::vector<std::pair<std::string, std::string>> holdersAndMaybeMembers;
-  for (std::string n : getExtendedNominalContextualNames(pd, false))
+  PairVec<> holdersAndMaybeMembers;
+  for (auto n : getExtendedNominalContextualNames(pd, false))
     holdersAndMaybeMembers.push_back(std::make_pair(n, ""));
   for (auto p : getHoldersAndMembers(pd))
     holdersAndMaybeMembers.push_back(p);
   return holdersAndMaybeMembers;
 }
 
-std::vector<std::pair<std::string, std::string>>
+PairVec<>
 SQ::ProviderNames::getHoldersAndMembers(const ProviderDeclarations &pd) {
-  std::vector<std::pair<std::string, std::string>> holdersAndMembers;
+  PairVec<> holdersAndMembers;
   
   for (auto p : pd.holdersAndMembers)
     holdersAndMembers.push_back(std::make_pair(
@@ -635,7 +637,7 @@ SQ::ProviderNames::getHoldersAndMembers(const ProviderDeclarations &pd) {
   return holdersAndMembers;
 }
 
-std::vector<std::string>
+StringVec
 SQ::ProviderNames::getDynamicLookupNames(const ProviderDeclarations &pd) {
   std::vector<DeclBaseName> names;
   for (const auto *VD : pd.classMembers)
@@ -645,7 +647,7 @@ SQ::ProviderNames::getDynamicLookupNames(const ProviderDeclarations &pd) {
                          return lhs->compare(*rhs);
                        });
   names.erase(std::unique(names.begin(), names.end()), names.end());
-  std::vector<std::string> nameStrings;
+  StringVec nameStrings;
   for (auto &dbn : names)
     nameStrings.push_back(dbn.userFacingName().str());
   return nameStrings;
@@ -683,14 +685,16 @@ namespace SQ2 {
     }
     std::vector<OutputT> output() const { return _output; }
     typename std::vector<OutputT>::const_iterator begin() { return output().begin(); }
-    typename std::vector<OutputT>::const_iterator end() { return output().end(); }
+//    typename std::vector<OutputT>::const_iterator end() { return output().end(); }
+    
+//    operator +(
  };
   
   template <typename SubsectionT, typename DeclT>
   class DeclarationGatherer:
   Stage<SubsectionT, const SourceFile*, std::forward_iterator_tag> {};
   
-  template <typename SubsectionT> class Namer: Stage<SubsectionT> {};
+//  template <typename SubsectionT> class Namer: Stage<SubsectionT> {};
   
   
   
