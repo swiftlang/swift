@@ -26,6 +26,10 @@ Func _stdlib_NSSet_allObjects(_:) has been removed
 Protocol _HeapBufferHeader_ has been removed
 Struct _ConcreteHashableBox has been removed
 Struct _HeapBufferHeader has been removed
+Struct _SipHash13 has been removed
+Struct _SipHash13Core has been removed
+Struct _SipHash24 has been removed
+Struct _SipHashState has been removed
 Subscript ManagedBufferPointer.subscript(_:) has been removed
 Var ManagedBufferPointer.baseAddress has been removed
 Var ManagedBufferPointer.storage has been removed
@@ -40,6 +44,7 @@ Var _CocoaDictionary.Index._object has been removed
 Var _CocoaSet.Index._object has been removed
 Var __SwiftDeferredNSArray._heapBufferBridged has been removed
 Var __SwiftDeferredNSArray._heapBufferBridgedPtr has been removed
+Var Hasher._core has declared type change from _BufferingHasher<_SipHash13Core> to _BufferingHasher<Hasher._Core>
 
 /* Moved Decls */
 
@@ -52,10 +57,6 @@ Var _CocoaDictionary.Index._offset is added to a non-resilient type
 Var _CocoaDictionary.Index._storage in a non-resilient type changes position from 1 to 0
 Var _CocoaSet.Index._offset is added to a non-resilient type
 Var _CocoaSet.Index._storage in a non-resilient type changes position from 1 to 0
-Var _SipHashState.v4 is added to a non-resilient type
-Var _SipHashState.v5 is added to a non-resilient type
-Var _SipHashState.v6 is added to a non-resilient type
-Var _SipHashState.v7 is added to a non-resilient type
 
 /* Decl Attribute changes */
 
