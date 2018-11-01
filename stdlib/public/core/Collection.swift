@@ -477,108 +477,6 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
   var indices: Indices { get }
 
-  /// Returns a subsequence from the start of the collection up to, but not
-  /// including, the specified position.
-  ///
-  /// The resulting subsequence *does not include* the element at the position
-  /// `end`. The following example searches for the index of the number `40`
-  /// in an array of integers, and then prints the prefix of the array up to,
-  /// but not including, that index:
-  ///
-  ///     let numbers = [10, 20, 30, 40, 50, 60]
-  ///     if let i = numbers.firstIndex(of: 40) {
-  ///         print(numbers.prefix(upTo: i))
-  ///     }
-  ///     // Prints "[10, 20, 30]"
-  ///
-  /// Passing the collection's starting index as the `end` parameter results in
-  /// an empty subsequence.
-  ///
-  ///     print(numbers.prefix(upTo: numbers.startIndex))
-  ///     // Prints "[]"
-  ///
-  /// Using the `prefix(upTo:)` method is equivalent to using a partial
-  /// half-open range as the collection's subscript. The subscript notation is
-  /// preferred over `prefix(upTo:)`.
-  ///
-  ///     if let i = numbers.firstIndex(of: 40) {
-  ///         print(numbers[..<i])
-  ///     }
-  ///     // Prints "[10, 20, 30]"
-  ///
-  /// - Parameter end: The "past the end" index of the resulting subsequence.
-  ///   `end` must be a valid index of the collection.
-  /// - Returns: A subsequence up to, but not including, the `end` position.
-  ///
-  /// - Complexity: O(1)
-  __consuming func prefix(upTo end: Index) -> SubSequence
-
-  /// Returns a subsequence from the specified position to the end of the
-  /// collection.
-  ///
-  /// The following example searches for the index of the number `40` in an
-  /// array of integers, and then prints the suffix of the array starting at
-  /// that index:
-  ///
-  ///     let numbers = [10, 20, 30, 40, 50, 60]
-  ///     if let i = numbers.firstIndex(of: 40) {
-  ///         print(numbers.suffix(from: i))
-  ///     }
-  ///     // Prints "[40, 50, 60]"
-  ///
-  /// Passing the collection's `endIndex` as the `start` parameter results in
-  /// an empty subsequence.
-  ///
-  ///     print(numbers.suffix(from: numbers.endIndex))
-  ///     // Prints "[]"
-  ///
-  /// Using the `suffix(from:)` method is equivalent to using a partial range
-  /// from the index as the collection's subscript. The subscript notation is
-  /// preferred over `suffix(from:)`.
-  ///
-  ///     if let i = numbers.firstIndex(of: 40) {
-  ///         print(numbers[i...])
-  ///     }
-  ///     // Prints "[40, 50, 60]"
-  ///
-  /// - Parameter start: The index at which to start the resulting subsequence.
-  ///   `start` must be a valid index of the collection.
-  /// - Returns: A subsequence starting at the `start` position.
-  ///
-  /// - Complexity: O(1)
-  __consuming func suffix(from start: Index) -> SubSequence
-
-  /// Returns a subsequence from the start of the collection through the
-  /// specified position.
-  ///
-  /// The resulting subsequence *includes* the element at the position `end`. 
-  /// The following example searches for the index of the number `40` in an
-  /// array of integers, and then prints the prefix of the array up to, and
-  /// including, that index:
-  ///
-  ///     let numbers = [10, 20, 30, 40, 50, 60]
-  ///     if let i = numbers.firstIndex(of: 40) {
-  ///         print(numbers.prefix(through: i))
-  ///     }
-  ///     // Prints "[10, 20, 30, 40]"
-  ///
-  /// Using the `prefix(through:)` method is equivalent to using a partial
-  /// closed range as the collection's subscript. The subscript notation is
-  /// preferred over `prefix(through:)`.
-  ///
-  ///     if let i = numbers.firstIndex(of: 40) {
-  ///         print(numbers[...i])
-  ///     }
-  ///     // Prints "[10, 20, 30, 40]"
-  ///
-  /// - Parameter end: The index of the last element to include in the
-  ///   resulting subsequence. `end` must be a valid index of the collection
-  ///   that is not equal to the `endIndex` property.
-  /// - Returns: A subsequence up to, and including, the `end` position.
-  ///
-  /// - Complexity: O(1)
-  __consuming func prefix(through position: Index) -> SubSequence
-
   /// A Boolean value indicating whether the collection is empty.
   ///
   /// When you need to check whether your collection is empty, use the
@@ -631,22 +529,6 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///
   /// - Complexity: Hopefully less than O(`count`).
   func _customLastIndexOfEquatableElement(_ element: Element) -> Index??
-
-  // FIXME(move-only types): `first` might not be implementable by collections
-  // with move-only elements, since they would need to be able to somehow form
-  // a temporary `Optional<Element>` value from a non-optional Element without
-  // modifying the collection.
-
-  /// The first element of the collection.
-  ///
-  /// If the collection is empty, the value of this property is `nil`.
-  /// 
-  ///     let numbers = [10, 20, 30, 40, 50]
-  ///     if let firstNumber = numbers.first {
-  ///         print(firstNumber)
-  ///     }
-  ///     // Prints "10"
-  var first: Element? { get }
 
   /// Returns an index that is the specified distance from the given index.
   ///
@@ -1346,8 +1228,7 @@ extension Collection {
   @inlinable
   public __consuming func dropFirst(_ k: Int) -> SubSequence {
     _precondition(k >= 0, "Can't drop a negative number of elements from a collection")
-    let start = index(startIndex,
-      offsetBy: k, limitedBy: endIndex) ?? endIndex
+    let start = index(startIndex, offsetBy: k, limitedBy: endIndex) ?? endIndex
     return self[start..<endIndex]
   }
 
