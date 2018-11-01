@@ -843,6 +843,7 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
     // Update loop info if this belongs to a parent loop.
     SILLoop *outsideBlockLoop = LI->getLoopFor(outsideBlock);
     if (outsideBlockLoop == nullptr) {
+      // outsideBlock is not part of any other loop. Simply add it to our loop.
       loop->addBasicBlockToLoop(outsideBlock, LI->getBase());
     } else {
       // We deal with the case where the nodes being moved in
@@ -854,13 +855,17 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
       //   }
       // }
       if (outsideBlockLoop->contains(loop)) {
-        // `loop` is nested within `outsideBlockLoop`.  Move the node from
-        // `outsideBlockLoop` into our `loop`.
+        // If our `loop` is nested within `outsideBlockLoop`.  Move the node
+        // from `outsideBlockLoop` into our `loop`.
         outsideBlockLoop->removeBlockFromLoop(outsideBlock);
         LI->changeLoopFor(outsideBlock, nullptr);
         loop->addBasicBlockToLoop(outsideBlock, LI->getBase());
       } else {
+        // We should only nest `outsideBlockLoop` into our `loop` when we
+        // process the very first node of the `outsideBlockLoop`. Check that we
+        // have not already nested the `outsideBlockLoop` into our `loop`.
         if (!loop->contains(outsideBlockLoop)) {
+          // Not yet nested, adjust the LoopInfo w.r.t nesting.
           if (outsideBlockLoop->getParentLoop() == nullptr) {
             // Remove from top-level loops as we are nesting it in `loop`.
             LI->removeLoop(llvm::find(*LI, outsideBlockLoop));
@@ -877,7 +882,6 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
       // top-level loop is already correct.
     }
   }
-
   if (cloner.hasCloned()) {
     // TODO(https://bugs.swift.org/browse/SR-8336): the transformations here are
     // simple that we should be able to incrementally update the DI & PDI.
