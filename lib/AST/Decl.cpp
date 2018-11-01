@@ -1699,13 +1699,8 @@ bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
   if (isDynamic())
     return false;
 
-  // We only need the modify coroutine in type contexts.
-  // TODO: resilient global variables?
-  auto *dc = getDeclContext();
-  if (!dc->isTypeContext())
-    return false;
-
   // Requirements of ObjC protocols don't support the modify coroutine.
+  auto *dc = getDeclContext();
   if (auto protoDecl = dyn_cast<ProtocolDecl>(dc))
     if (protoDecl->isObjC())
       return false;
