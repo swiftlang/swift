@@ -55,7 +55,7 @@ extension _StringGuts {
     self.init(_StringObject(immortal: bufPtr, isASCII: isASCII))
   }
 
-  @inlinable @inline(__always)
+  @inline(__always)
   internal init(_ storage: _StringStorage) {
     self.init(_StringObject(storage))
   }
