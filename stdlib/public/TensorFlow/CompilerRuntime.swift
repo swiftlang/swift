@@ -1177,12 +1177,12 @@ func _TFCOpAddInputFromTensorHandle(_ op: CTFEOp,
 /// Adds `t` as an input or inputs to `op`. Returns the number of inputs added.
 @usableFromInline
 @_silgen_name("_swift_tfc_OpAddInputFromTensorGroup")
-func _TFCOpAddInputFromTensorGroup<T : TensorGroup>(
+func _TFCOpAddInputFromTensorGroup<T : InputTensorGroup>(
     _ op: CTFEOp, _ t: T, _ status: CTFStatus
 ) -> Int32 {
-  let count = Int(T._tensorHandleCount)
+  let count = t._inputTensorHandleCount
   let buffer =
-      UnsafeMutableBufferPointer<CTensorHandle>.allocate(capacity: count)
+      UnsafeMutableBufferPointer<CTensorHandle>.allocate(capacity: Int(count))
   defer { buffer.deallocate() }
   t._unpackTensorHandles(into: buffer.baseAddress)
   for handle in buffer {
@@ -1191,14 +1191,14 @@ func _TFCOpAddInputFromTensorGroup<T : TensorGroup>(
       return 0
     }
   }
-  return T._tensorHandleCount
+  return count
 }
 
 /// Initializes a TensorGroup value, taking ownership of all the tensor
 /// handles in `tensorHandles`.
 @usableFromInline
 @_silgen_name("_swift_tfc_InitTensorGroup")
-func _TFCInitTensorGroup<T : TensorGroup>(
+func _TFCInitTensorGroup<T : OutputTensorGroup>(
     _ tensorHandles: UnsafeMutablePointer<CTensorHandle>
 ) -> T {
   return T(_owning: tensorHandles)
@@ -1223,10 +1223,10 @@ func _TFCDeallocateCHandleBuffer(
 
 /// Returns the number of CTensorHandles in a TensorGroup of type T.
 @_silgen_name("_swift_tfc_GetTensorGroupCHandleCount")
-public func _TFCGetTensorGroupCHandleCount<T : TensorGroup>(
+public func _TFCGetTensorGroupCHandleCount<T : OutputTensorGroup>(
     _ type: T.Type
 ) -> Int32 {
-  return T._tensorHandleCount
+  return T._outputTensorHandleCount
 }
 
 @inlinable

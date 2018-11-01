@@ -2198,14 +2198,20 @@ static bool unpackTensorAggregates(
 
   auto tfModule = ctx.getLoadedModule(ctx.Id_TensorFlow);
   assert(tfModule && "could not find TensorFlow module");
-  auto tensorGroupProto =
-      ctx.getProtocol(KnownProtocolKind::TensorGroup);
-  assert(tensorGroupProto && "could not find TensorGroup protocol");
+  auto inputTensorGroupProto =
+      ctx.getProtocol(KnownProtocolKind::InputTensorGroup);
+  assert(inputTensorGroupProto && "could not find TensorGroup protocol");
 
   std::function<bool(SILValue)> recurse;
   recurse = [&](SILValue aggregate) -> bool {
     auto aggregateTy = aggregate->getType();
     if (isTensorFlowValue(aggregateTy)) {
+      inputList.push_back(aggregate);
+      return false;
+    }
+    if (acceptTensorGroupConformingLeaves &&
+        tfModule->lookupConformance(aggregateTy.getASTType(),
+                                    inputTensorGroupProto)) {
       inputList.push_back(aggregate);
       return false;
     }
@@ -2235,12 +2241,6 @@ static bool unpackTensorAggregates(
         if (recurse(fieldValue))
           return true;
       }
-      return false;
-    }
-    if (acceptTensorGroupConformingLeaves &&
-        tfModule->lookupConformance(aggregateTy.getASTType(),
-                                    tensorGroupProto)) {
-      inputList.push_back(aggregate);
       return false;
     }
     return true;
