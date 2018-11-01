@@ -17,9 +17,10 @@
 public protocol StringProtocol
   : BidirectionalCollection,
   TextOutputStream, TextOutputStreamable,
-  LosslessStringConvertible, ExpressibleByStringLiteral,
+  LosslessStringConvertible, ExpressibleByStringInterpolation,
   Hashable, Comparable
-  where Iterator.Element == Character, SubSequence : StringProtocol {
+  where Iterator.Element == Character, SubSequence : StringProtocol,
+        StringInterpolation == DefaultStringInterpolation {
 
   associatedtype UTF8View : /*Bidirectional*/Collection
   where UTF8View.Element == UInt8 // Unicode.UTF8.CodeUnit

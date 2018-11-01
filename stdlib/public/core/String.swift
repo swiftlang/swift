@@ -836,6 +836,7 @@ extension String {
   ///     // Prints "Hello, friend"
   ///
   /// - Parameter other: Another string.
+  @inlinable
   public mutating func append(_ other: String) {
     self._guts.append(other._guts)
   }
