@@ -423,17 +423,23 @@ static llvm::Value *computeExtraTagBytes(IRGenFunction &IGF, IRBuilder &Builder,
   return phi;
 }
 
-static Address alignAddress(IRGenFunction &IGF,
-		            Address originAddress,
-			    llvm::Value *shift){
+static Address alignAddress(IRGenFunction &IGF, Address originAddress,
+			    llvm::Value *shift) {
   auto &Builder = IGF.Builder;
   auto &IGM = IGF.IGM;
-  auto *alignedAddress = Builder.CreateBitCast(originAddress, IGM.Int8PtrTy).getAddress();
-  if (IGM.Triple.getOS() == llvm::Triple::Linux && !IGM.Triple.isLittleEndian()) {
-    alignedAddress = Builder.CreateConstGEP1_32(alignedAddress, 4);
-    alignedAddress = Builder.CreateGEP(alignedAddress, Builder.CreateNeg(shift));
+  auto *alignedAddressValue =
+      Builder.CreateBitCast(originAddress, IGM.Int8PtrTy).getAddress();
+  Address alignedAddress = Builder.CreateBitCast(originAddress, IGM.Int8PtrTy);
+  if (IGM.Triple.getOS() == llvm::Triple::Linux &&
+      !IGM.Triple.isLittleEndian()) {
+    alignedAddress = Builder.CreateConstByteArrayGEP(alignedAddress, Size(4));
+    alignedAddressValue = alignedAddress.getAddress();
+    alignedAddressValue =
+	Builder.CreateGEP(alignedAddressValue, Builder.CreateNeg(shift));
+    alignedAddress =
+	Address(alignedAddressValue, alignedAddress.getAlignment()); 
   }
-  return Address(alignedAddress, Alignment(0));
+  return alignedAddress;
 }
 
 llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
@@ -486,11 +492,13 @@ llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
       Builder.CreateConstInBoundsGEP1_32(IGM.Int8Ty, valueAddr,
                                          fixedSize.getValue());
 
-  Address alignedExtraTagBitsSlot = alignAddress(IGF, extraTagBitsSlot, numExtraTagBytes);
+  Address alignedExtraTagBitsSlot =
+      alignAddress(IGF, extraTagBitsSlot, numExtraTagBytes);
   numExtraTagBytes = IGF.Builder.CreateZExt(numExtraTagBytes, IGM.SizeTy);
   Builder.CreateMemCpy(
-      Builder.CreateBitCast(alignedExtraTagBitsSlot, IGM.Int8PtrTy).getAddress(), 1,
-      extraTagBitsAddr, 1, numExtraTagBytes);
+      Builder.CreateBitCast(alignedExtraTagBitsSlot, IGM.Int8PtrTy)
+          .getAddress(),
+      1, extraTagBitsAddr, 1, numExtraTagBytes);
   auto extraTagBits = Builder.CreateLoad(extraTagBitsSlot);
 
   extraTagBitsBB = llvm::BasicBlock::Create(Ctx);
@@ -510,11 +518,12 @@ llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
       Builder.CreateShl(Builder.CreateSub(extraTagBits, one),
                         Builder.CreateMul(eight, truncSize)));
 
-  Address alignedCaseIndex = alignAddress(IGF, caseIndexFromValueSlot, llvm::ConstantInt::getSigned(IGM.Int32Ty, std::min(Size(4U).getValue(), fixedSize.getValue())));
-  Builder.CreateMemCpy(
-      alignedCaseIndex,
-      Address(valueAddr, Alignment(1)),
-      std::min(Size(4U), fixedSize));
+  Address alignedCaseIndex = alignAddress(
+      IGF, caseIndexFromValueSlot,
+      llvm::ConstantInt::getSigned(
+	  IGM.Int32Ty, std::min(Size(4U).getValue(), fixedSize.getValue())));
+  Builder.CreateMemCpy(alignedCaseIndex, Address(valueAddr, Alignment(1)),
+                       std::min(Size(4U), fixedSize));
   auto caseIndexFromValue = Builder.CreateLoad(caseIndexFromValueSlot);
 
   auto *result1 = Builder.CreateAdd(
@@ -727,11 +736,12 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
   Address extraTagIndexAddr = IGF.createAlloca(int32Ty, Alignment(4));
   Builder.CreateStore(extraTagIndex, extraTagIndexAddr);
 
-  Address alignedPayloadIndexAddr = alignAddress(IGF, payloadIndexAddr, llvm::ConstantInt::getSigned(IGM.Int32Ty, std::min(Size(4U).getValue(), fixedSize.getValue())));
-  Builder.CreateMemCpy(
-      valueAddr,
-      alignedPayloadIndexAddr,
-      std::min(Size(4U), fixedSize));
+  Address alignedPayloadIndexAddr = alignAddress(
+      IGF, payloadIndexAddr,
+      llvm::ConstantInt::getSigned(
+	  IGM.Int32Ty, std::min(Size(4U).getValue(), fixedSize.getValue())));
+  Builder.CreateMemCpy(valueAddr, alignedPayloadIndexAddr,
+                       std::min(Size(4U), fixedSize));
   Address extraZeroAddr = Builder.CreateConstByteArrayGEP(valueAddr, Size(4));
   if (fixedSize > Size(4))
     Builder.CreateMemSet(
