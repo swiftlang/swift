@@ -1771,8 +1771,11 @@ function set_swiftpm_bootstrap_command() {
 
 function set_swiftsyntax_build_command() {
     if [ "${SKIP_BUILD_SWIFTPM}" ]; then
-        echo "Error: Cannot build swiftsyntax without swiftpm."
-        exit 1
+        SWIFT_BUILD="$(xcrun_find_tool swift-build)"
+        SWIFT_TEST="$(xcrun_find_tool swift-test)"
+    else
+        SWIFT_BUILD="$(build_directory_bin ${LOCAL_HOST} swiftpm)/swift-build"
+        SWIFT_TEST="$(build_directory_bin ${LOCAL_HOST} swiftpm)/swift-test"
     fi
 
     swiftsyntax_build_command=("${SWIFTSYNTAX_SOURCE_DIR}/build-script.py")
@@ -1785,8 +1788,8 @@ function set_swiftsyntax_build_command() {
     fi
     swiftsyntax_build_command+=(
         --build-dir="${build_dir}"
-        --swift-build-exec="$(build_directory_bin ${LOCAL_HOST} swiftpm)/swift-build"
-        --swift-test-exec="$(build_directory_bin ${LOCAL_HOST} swiftpm)/swift-test"
+        --swift-build-exec="${SWIFT_BUILD}"
+        --swift-test-exec="${SWIFT_TEST}"
         --swiftc-exec="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
         --swift-syntax-test-exec="$(build_directory_bin ${LOCAL_HOST} swift)/swift-syntax-test"
         --filecheck-exec="$(build_directory_bin ${LOCAL_HOST} llvm)/FileCheck")
