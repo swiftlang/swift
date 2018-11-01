@@ -1,5 +1,5 @@
 // RUN: %target-run-simple-swift
-// RUN: %target-run-dynamic-compilation-swift
+// RUN: %target-run-disable-deabstraction-swift
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 //
@@ -76,18 +76,6 @@ DatasetAPITests.testAllBackends("SingleValueBatched") {
   expectEqual([4], iterator.next()!.scalars)
 }
 
-DatasetAPITests.testAllBackends("DoubleValueDatasetIteration") {
-  let scalars1 = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
-  let scalars2 = Tensor<Float>(rangeFrom: 5, to: 10, stride: 1)
-  let datasetLeft = Dataset(elements: scalars1)
-  let datasetRight = Dataset(elements: scalars2)
-  var i: Int32 = 0
-  for (item1, item2) in zip(datasetLeft, datasetRight) {
-    expectEqual(scalars1[i].array, item1.array)
-    expectEqual(scalars2[i].array, item2.array)
-    i += 1
-  }
-}
 #endif //!CUDA
 
 runAllTests()

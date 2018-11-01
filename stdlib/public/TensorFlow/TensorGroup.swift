@@ -41,6 +41,14 @@ public protocol OutputTensorGroup {
   /// The types of the tensor stored properties in this type.
   static var _outputTypeList: [TensorDataType] { get }
 
+  /// An array of `nil`s with the same number of elements as `_outputTypeList`.
+  /// The `nil` represents unknown shape.
+  // TODO: This is a protocol requirement so that conformances can provide
+  // custom const-evaluable implementations. When the const-evaluator is
+  // powerful enough to evaluate the default implementation, remove this
+  // requirement.
+  static var _unknownShapeList: [TensorShape?] { get }
+
   /// Initializes a value of this type, taking ownership of the
   /// `_tensorHandleCount` tensors that are at `tensorHandles`.
   init(_owning tensorHandles: UnsafePointer<CTensorHandle>?)
@@ -52,8 +60,8 @@ public extension OutputTensorGroup {
     return Int32(_outputTypeList.count)
   }
 
-  /// An array of `nil`s with size equal to `_tensorHandleCount`. The `nil`
-  /// represents unknown shape.
+  /// An array of `nil`s with the same number of elements as `_outputTypeList`.
+  /// The `nil` represents unknown shape.
   static var _unknownShapeList: [TensorShape?] {
     return Array(repeating: nil, count: Int(_outputTensorHandleCount))
   }
@@ -74,12 +82,18 @@ public protocol TensorGroup : InputTensorGroup & OutputTensorGroup {}
 //===----------------------------------------------------------------------===//
 
 extension TensorHandle : TensorGroup {
+  @inlinable
   public static var _outputTypeList: [TensorDataType] {
     return [Scalar.tensorFlowDataType]
   }
 
+  @inlinable
+  public static var _unknownShapeList: [TensorShape?] {
+    return [nil]
+  }
+
   public var _inputTensorHandleCount : Int32 {
-    get { return Int32(TensorHandle._outputTypeList.count) }
+    return Int32(TensorHandle._outputTypeList.count)
   }
 
   public func _unpackTensorHandles(
@@ -93,12 +107,18 @@ extension TensorHandle : TensorGroup {
 }
 
 extension ResourceHandle : TensorGroup {
+  @inlinable
   public static var _outputTypeList: [TensorDataType] {
     return [TensorDataType(TF_RESOURCE)]
   }
 
+  @inlinable
+  public static var _unknownShapeList: [TensorShape?] {
+    return [nil]
+  }
+
   public var _inputTensorHandleCount : Int32 {
-    get { return Int32(ResourceHandle._outputTypeList.count) }
+    return Int32(ResourceHandle._outputTypeList.count)
   }
 
   public func _unpackTensorHandles(
@@ -112,12 +132,18 @@ extension ResourceHandle : TensorGroup {
 }
 
 extension VariantHandle : TensorGroup {
+  @inlinable
   public static var _outputTypeList: [TensorDataType] {
     return [TensorDataType(TF_VARIANT)]
   }
 
+  @inlinable
+  public static var _unknownShapeList: [TensorShape?] {
+    return [nil]
+  }
+
   public var _inputTensorHandleCount : Int32 {
-    get { return Int32(VariantHandle._outputTypeList.count) }
+    return Int32(VariantHandle._outputTypeList.count)
   }
 
   public func _unpackTensorHandles(
@@ -131,12 +157,18 @@ extension VariantHandle : TensorGroup {
 }
 
 extension Tensor : TensorGroup {
+  @inlinable
   public static var _outputTypeList: [TensorDataType] {
     return [Scalar.tensorFlowDataType]
   }
 
+  @inlinable
+  public static var _unknownShapeList: [TensorShape?] {
+    return [nil]
+  }
+
   public var _inputTensorHandleCount : Int32 {
-    get { return Int32(Tensor._outputTypeList.count) }
+    return Int32(Tensor._outputTypeList.count)
   }
 
   public func _unpackTensorHandles(
@@ -150,12 +182,18 @@ extension Tensor : TensorGroup {
 }
 
 extension TensorElementLiteral : TensorGroup {
+  @inlinable
   public static var _outputTypeList: [TensorDataType] {
     return [Scalar.tensorFlowDataType]
   }
 
+  @inlinable
+  public static var _unknownShapeList: [TensorShape?] {
+    return [nil]
+  }
+
   public var _inputTensorHandleCount : Int32 {
-    get { return Int32(TensorElementLiteral._outputTypeList.count) }
+    return Int32(TensorElementLiteral._outputTypeList.count)
   }
 
   public func _unpackTensorHandles(
@@ -176,9 +214,9 @@ extension Array : InputTensorGroup where Element : InputTensorGroup {
       ptr = ptr!.advanced(by: Int(elem._inputTensorHandleCount))
     }
   }
-  public var _inputTensorHandleCount : Int32 { get {
+  public var _inputTensorHandleCount : Int32 {
     var count: Int32 = 0
     for elem in self { count += elem._inputTensorHandleCount }
     return count
-  } }
+  }
 }

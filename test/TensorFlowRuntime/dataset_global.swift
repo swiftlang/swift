@@ -1,6 +1,6 @@
 // TODO: Revert to %target-run-simple-swift once we complete send/recv support for resource/variant tensors.
 // RUN: %target-run-send-recv-handle-swift
-// RUN: %target-run-dynamic-compilation-swift
+// RUN: %target-run-disable-deabstraction-swift
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 

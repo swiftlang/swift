@@ -77,22 +77,6 @@ public:
     /// Written as named argument with "$shape" suffix.
     ShapeAttribute,
 
-    /// A metatype of a TensorFlow value type or aggregate of TensorFlow value
-    /// types that should be lowered into a list of unknown shape attributes.
-    ///
-    /// Written as named argument with "$unknownShapeList" suffix.
-    ///
-    /// TODO(SR-8830): Remove this when we have a TensorAggregate protocol.
-    UnknownShapeListAttribute,
-
-    /// A metatype of a TensorFlow value type or aggregate of TensorFlow value
-    /// types. Deabstraction lowers this to TFDataTypeAttribute.
-    ///
-    /// Written as named argument with "$typeList" suffix.
-    ///
-    /// TODO(SR-8830): Remove this when we have a TensorAggregate protocol.
-    TypeListAttribute,
-
     /// A TensorDataType (which is two nested structs wrapping a UInt32), a
     /// UInt32 representing a TensorDataType, or a list of such elements.
     /// Should be lowered to a type attribute or type list attribute.

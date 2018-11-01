@@ -57,7 +57,8 @@ struct Example {
 extension Example : TensorGroup {
   static let _outputTypeList: [TensorDataType] =
       [Float.tensorFlowDataType, Float.tensorFlowDataType]
-  var _inputTensorHandleCount: Int32 { get { return Int32(Example._outputTypeList.count) } }
+  static let _unknownShapeList: [TensorShape?] = [nil, nil]
+  var _inputTensorHandleCount: Int32 { return Int32(Example._outputTypeList.count) }
   func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>?) {
    address!.advanced(by: 0).initialize(to: x.handle._cTensorHandle)
    address!.advanced(by: 1).initialize(to: y.handle._cTensorHandle)
@@ -71,8 +72,10 @@ extension Example : TensorGroup {
 struct EmptyExample : Equatable {}
 
 extension EmptyExample : TensorGroup {
+  static let _typeList: [TensorDataType] = []
+  static let _unknownShapeList: [TensorShape?] = []
   static let _outputTypeList: [TensorDataType] = []
-  var _inputTensorHandleCount: Int32 { get { return Int32(EmptyExample._outputTypeList.count) } }
+  var _inputTensorHandleCount: Int32 { return Int32(EmptyExample._outputTypeList.count) }
   func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>?) {}
   init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {}
 }

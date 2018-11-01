@@ -1931,12 +1931,6 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       TF_SetAttrShape(op, name.c_str(), shape.data(), rank);
       break;
     }
-    case GraphOperationInfo::ArgumentLowering::UnknownShapeListAttribute:
-      llvm_unreachable("UnknownShapeListAttribute should have been eliminated "
-                       "by deabstraction");
-    case GraphOperationInfo::ArgumentLowering::TypeListAttribute:
-      llvm_unreachable("TypeListAttribute should have been eliminated by "
-                       "deabstraction");
     case GraphOperationInfo::ArgumentLowering::TFDataTypeAttribute:
       switch (attrValue.getKind()) {
       case SymbolicValue::Integer:

@@ -256,41 +256,6 @@ public func testTensorFlowClosures(_ a: Float) -> Tensor<Int32>{
 //   return [[B]] : $TensorHandle<Int32>
 // } // end sil function '[[NAME]]'
 
-public func testExtractDTypeList() {
-  struct Foo { let a, b: Tensor<Float> }
-  let elements = Foo(a: Tensor([1]), b: Tensor([2]))
-  // TODO: Support heterogeneous input lists so that we can replace b's dtype with something else.
-  // TODO: Support unpacking a struct value into an input list so that we can replace
-  // `[elements.a, elements.b]` with `elements`.
-  let _: VariantHandle = #tfop("TensorSliceDataset", [elements.a, elements.b],
-                               Toutput_types$typeList: Foo.self,
-                               output_shapes: [TensorShape()])
-}
-
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExtractDTypeList{{.*}}
-// CHECK: graph_op "TensorSliceDataset"([{{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>]) {Toutput_types$dtype: [$UInt32: i32 1, i32 1], output_shapes: [$TensorShape: ([$Int32: ])], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $VariantHandle
-
-public func testExtractTupleDTypeList() {
-    let bar: (a: Tensor<Int32>, b: Tensor<Int32>) = (Tensor(0), Tensor(1))
-    let _: VariantHandle = #tfop("TensorSliceDataset", [bar.a, bar.b],
-                                 Toutput_types$typeList: type(of: bar),
-                                 output_shapes: [TensorShape()])
-}
-
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExtractTupleDTypeList{{.*}}
-// CHECK: graph_op "TensorSliceDataset"([{{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>]) {Toutput_types$dtype: [$UInt32: i32 3, i32 3], output_shapes: [$TensorShape: ([$Int32: ])], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $VariantHandle
-
-public func testExtractUnknownShapeList() {
-  struct Foo { let a, b: Tensor<Float> }
-  let elements = Foo(a: Tensor([1]), b: Tensor([2]))
-  let _: VariantHandle = #tfop("TensorSliceDataset", [elements.a, elements.b],
-                               Toutput_types$dtype: [Float.tensorFlowDataType, Float.tensorFlowDataType],
-                               output_shapes$unknownShapeList: Foo.self)
-}
-
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExtractUnknownShapeList{{.*}}
-// CHECK: graph_op "TensorSliceDataset"([{{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>]) {Toutput_types$dtype: [$TensorDataType: (((i32 1))), (((i32 1)))], output_shapes: [$Optional<TensorShape>: #Optional.none!enumelt, #Optional.none!enumelt], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $VariantHandle
-
 // Tests that private functions operating on Tensors are partitioned
 // if they are only referred in code.  In this case, addOne should be
 // partitioned, but not getZero.

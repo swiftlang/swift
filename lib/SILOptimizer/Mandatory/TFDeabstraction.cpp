@@ -2475,7 +2475,7 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
     constValue = constValue.cloneInto(allocator);
 
     auto attrIdentifier = context.getIdentifier(argument.getArgumentNameWithSuffix());
-    auto &currentAttr = opBuilder.addAttribute({ attrIdentifier, constValue });
+    opBuilder.addAttribute({ attrIdentifier, constValue });
 
     // FIXME: Do we detect and reject duplicate attribute names already?
 
@@ -2579,54 +2579,11 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
       if (verifyNormalAttr(constValue))
         return; // error already emitted.
       break;
-    case GraphOperationInfo::ArgumentLowering::TypeListAttribute: {
-      if (constValue.getKind() != SymbolicValue::Metatype)
-        return diagnoseInvalidAttr("requires a metatype");
-      SmallVector<SymbolicValue, 8> dtypes;
-      if (!collectInnermostTensorFlowDTypes(constValue.getMetatypeValue(),
-                                            dtypes))
-        return diagnoseInvalidAttr("requires a TensorFlow value or an "
-                                   "aggregate of TensorFlow values");
-      // Change "$typeList" to "$dtype".
-      currentAttr.name = context.getIdentifier(
-          (std::get<0>(argumentNameAndLowering) + "$dtype").str());
-      // Replace the single metatype with a list of UInt32s each representing a
-      // TF_DataType.
-      currentAttr.value = SymbolicValue::getArray(
-          dtypes,
-          context.getUInt32Decl()->getDeclaredType()->getCanonicalType(),
-          context.getAllocator());
-      break;
-    }
     case GraphOperationInfo::ArgumentLowering::ShapeAttribute:
       // A shape attr must be an int array.
       if (getIntArrayProduct(constValue) < 0)
         return; // error already emitted.
       break;
-    case GraphOperationInfo::ArgumentLowering::UnknownShapeListAttribute: {
-      if (constValue.getKind() != SymbolicValue::Metatype)
-        return diagnoseInvalidAttr("requires a metatype");
-      auto type = constValue.getMetatypeValue();
-      SmallVector<Type, 8> tfValueTypes;
-      if (!tf::flattenTensorFlowValueAggregate(type, tfValueTypes))
-        return diagnoseInvalidAttr("requires a TensorFlow value or an "
-                                   "aggregate or TensorFlow values");
-      // Drop '$unknownShapeList' from the attribute name.
-      currentAttr.name = context.getIdentifier(
-          std::get<0>(argumentNameAndLowering));
-      auto tensorShapeType =
-          context.getTensorShapeDecl()->getDeclaredInterfaceType();
-      auto tensorShapeOptional =
-          BoundGenericType::get(context.getOptionalDecl(), Type(),
-                                {tensorShapeType})->getCanonicalType();
-      // Create a list of nils representing unknown shape.
-      SmallVector<SymbolicValue, 8> nils(
-          tfValueTypes.size(),
-          SymbolicValue::getEnum(context.getOptionalNoneDecl()));
-      currentAttr.value = SymbolicValue::getArray(nils, tensorShapeOptional,
-                                                  context.getAllocator());
-      break;
-    }
     case GraphOperationInfo::ArgumentLowering::TensorAttribute: {
       if (constValue.getKind() == SymbolicValue::Integer ||
           constValue.getKind() == SymbolicValue::Float   ||

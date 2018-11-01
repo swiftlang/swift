@@ -57,6 +57,19 @@ enum class UnknownReason {
   Trap,
 };
 
+/// Determines how to substitute the function's generic arguments when
+/// evaluating an apply of the function.
+enum class FunctionSubstitutionConvention {
+  /// Use the apply instruction's subtitution map.
+  Normal,
+
+  /// Transform the apply instruction's subtitution map that is written in terms
+  /// of the requirement's generic signature to a substitution map that is
+  /// written in terms of the witness signature. (See
+  /// `getWitnessMethodSubstitutions` in Devirtualize.cpp for more information).
+  Witness
+};
+
 /// This is the symbolic value tracked for each SILValue in a scope.  We
 /// support multiple representational forms for the constant node in order to
 /// avoid pointless memory bloat + copying.  This is intended to be a
@@ -202,6 +215,10 @@ private:
 
     /// This is the number of elements for an RK_Aggregate representation.
     unsigned aggregate_numElements;
+
+    /// This is the FunctionSubstitutionConvention for an RK_Function
+    /// representation.
+    FunctionSubstitutionConvention function_subConvention;
   } aux;
 
 public:
@@ -291,17 +308,24 @@ public:
     return CanType(value.metatype);
   }
 
-  static SymbolicValue getFunction(SILFunction *fn) {
+  static SymbolicValue getFunction(SILFunction *fn,
+                                   FunctionSubstitutionConvention fnSubConv) {
     assert(fn && "Function cannot be null");
     SymbolicValue result;
     result.representationKind = RK_Function;
     result.value.function = fn;
+    result.aux.function_subConvention = fnSubConv;
     return result;
   }
 
   SILFunction *getFunctionValue() const {
     assert(getKind() == Function);
     return value.function;
+  }
+
+  FunctionSubstitutionConvention getFunctionSubstitutionConvention() const {
+    assert(getKind() == Function);
+    return aux.function_subConvention;
   }
 
   static SymbolicValue getInteger(int64_t value, unsigned bitWidth);
