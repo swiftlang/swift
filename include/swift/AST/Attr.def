@@ -359,9 +359,8 @@ DECL_ATTR(_clangImporterSynthesizedType, ClangImporterSynthesizedType,
   LongAttribute | RejectByParser | UserInaccessible |
   NotSerialized, 74)
 SIMPLE_DECL_ATTR(_weakLinked, WeakLinked,
-  OnNominalType | OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor |
-  OnEnumElement |
-  UserInaccessible,
+  OnNominalType | OnAssociatedType | OnFunc | OnAccessor | OnVar |
+  OnSubscript | OnConstructor | OnEnumElement | UserInaccessible,
   75)
 SIMPLE_DECL_ATTR(_frozen, Frozen,
   OnEnum |
