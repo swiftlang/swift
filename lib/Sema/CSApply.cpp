@@ -4370,11 +4370,6 @@ namespace {
 
           auto dc = subscript->getInnermostDeclContext();
 
-          // FIXME: It's not correct to turn the subscript's parameter list
-          // into a single type here. Further down we pass it to coerceToType(),
-          // but the rules for argument list conversions are different than
-          // tuple conversions, and coerceToType() doesn't handle varargs or
-          // default arguments.
           auto indexType = AnyFunctionType::composeInput(
             cs.TC.Context,
             subscript->getInterfaceType()
@@ -4409,19 +4404,18 @@ namespace {
                                      /*trailingClosure*/nullptr);
             cs.setType(origComponent.getIndexExpr(), index->getType());
           }
-          
-          auto resolvedTy = foundDecl->openedType->castTo<AnyFunctionType>()
-            ->getResult();
-          
-          resolvedTy = simplifyType(resolvedTy);
-          
+
+          auto subscriptType =
+              simplifyType(foundDecl->openedType)->castTo<AnyFunctionType>();
+          auto resolvedTy = subscriptType->getResult();
           auto ref = ConcreteDeclRef(subscript, subs);
-          
+
           // Coerce the indices to the type the subscript expects.
-          auto indexExpr = coerceToType(origComponent.getIndexExpr(),
-                                        indexType,
-                                        locator);
-          
+          auto indexExpr = coerceCallArguments(
+              origComponent.getIndexExpr(), subscriptType,
+              /*applyExpr*/ nullptr, origComponent.getSubscriptLabels(),
+              /* hasTrailingClosure */ false, locator);
+
           component = KeyPathExpr::Component
             ::forSubscriptWithPrebuiltIndexExpr(ref, indexExpr,
                                             origComponent.getSubscriptLabels(),
@@ -5645,9 +5639,29 @@ Expr *ExprRewriter::coerceCallArguments(
       continue;
     }
 
-    // Convert the argument.
-    auto convertedArg = coerceToType(arg, paramType,
-                                     getArgLocator(argIdx, paramIdx));
+    Expr *convertedArg = nullptr;
+
+    // Since it was allowed to pass function types to @autoclosure
+    // parameters in Swift versions < 5, it has to be handled as
+    // a regular function coversion by `coerceToType`.
+    if (param.isAutoClosure() && !argType->is<FunctionType>()) {
+      // If parameter is an autoclosure, we need to make sure that:
+      //   - argument type is coerced to parameter result type
+      //   - impilict autoclosure is created to wrap argument expression
+      //   - new types are propagated to constraint system
+      auto *closureType = param.getPlainType()->castTo<FunctionType>();
+
+      arg = coerceToType(
+          arg, closureType->getResult(),
+          locator.withPathElement(ConstraintLocator::AutoclosureResult));
+
+      convertedArg = cs.TC.buildAutoClosureExpr(dc, arg, closureType);
+      cs.cacheExprTypes(convertedArg);
+    } else {
+      convertedArg =
+          coerceToType(arg, paramType, getArgLocator(argIdx, paramIdx));
+    }
+
     if (!convertedArg)
       return nullptr;
 
@@ -6536,59 +6550,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       isInDefaultArgumentContext = (initalizerCtx->getInitializerKind() ==
                                     InitializerKind::DefaultArgument);
     auto toEI = toFunc->getExtInfo();
-
-    auto fromFunc = fromType->getAs<FunctionType>();
-
-    // Coercion to an autoclosure type produces an implicit closure.
-    // The constraint solver only performs this conversion when the source
-    // type is not an autoclosure function type.  That's a weird rule in
-    // some rules, but it's easy to follow here.  Really we just shouldn't
-    // represent autoclosures as a bit on function types.
-    // FIXME: The type checker is more lenient, and allows @autoclosures to
-    // be subtypes of non-@autoclosures, which is bogus.
-    if (toFunc->isAutoClosure() &&
-        (!fromFunc || !fromFunc->isAutoClosure())) {
-      // The function type without @noescape if we are in the default argument
-      // context.
-      auto newToFuncType = toFunc;
-
-      // Remove the noescape attribute so that we can apply a separate function
-      // conversion instruction if we are in a default argument context.
-      if (isInDefaultArgumentContext && toEI.isNoEscape())
-        newToFuncType = toFunc->withExtInfo(toEI.withNoEscape(false))
-                            ->castTo<FunctionType>();
-
-      // Convert the value to the expected result type of the function.
-      expr = coerceToType(
-          expr, toFunc->getResult(),
-          locator.withPathElement(ConstraintLocator::AutoclosureResult));
-
-      // We'll set discriminator values on all the autoclosures in a
-      // later pass.
-      auto discriminator = AutoClosureExpr::InvalidDiscriminator;
-      auto closure = cs.cacheType(new (tc.Context) AutoClosureExpr(
-          expr, newToFuncType, discriminator, dc));
-      closure->setParameterList(ParameterList::createEmpty(tc.Context));
-
-      // Compute the capture list, now that we have analyzed the expression.
-      tc.ClosuresWithUncomputedCaptures.push_back(closure);
-
-      // Apply the noescape conversion.
-      if (!newToFuncType->isEqual(toFunc)) {
-        assert(isInDefaultArgumentContext);
-        assert(newToFuncType
-                   ->withExtInfo(newToFuncType->getExtInfo().withNoEscape(true))
-                   ->isEqual(toFunc));
-        return cs.cacheType(new (tc.Context)
-                                FunctionConversionExpr(closure, toFunc));
-      }
-
-      return closure;
-    }
-
     // Coercion from one function type to another, this produces a
     // FunctionConversionExpr in its full generality.
-    if (fromFunc) {
+    if (auto fromFunc = fromType->getAs<FunctionType>()) {
+      assert(toType->is<FunctionType>());
       // If we have a ClosureExpr, then we can safely propagate the 'no escape'
       // bit to the closure without invalidating prior analysis.
       auto fromEI = fromFunc->getExtInfo();

@@ -19,6 +19,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/Parse/Lexer.h"
 using namespace swift;
 
@@ -537,6 +538,38 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
                                                     functionRefKind,
                                                     Implicit);
   return result;
+}
+
+Expr *TypeChecker::buildAutoClosureExpr(DeclContext *DC, Expr *expr,
+                                        FunctionType *closureType) {
+  bool isInDefaultArgumentContext = false;
+  if (auto *init = dyn_cast<Initializer>(DC))
+    isInDefaultArgumentContext =
+        init->getInitializerKind() == InitializerKind::DefaultArgument;
+
+  auto info = closureType->getExtInfo();
+  auto newClosureType = closureType;
+
+  if (isInDefaultArgumentContext && info.isNoEscape())
+    newClosureType = closureType->withExtInfo(info.withNoEscape(false))
+                         ->castTo<FunctionType>();
+
+  auto *closure = new (Context) AutoClosureExpr(
+      expr, newClosureType, AutoClosureExpr::InvalidDiscriminator, DC);
+
+  closure->setParameterList(ParameterList::createEmpty(Context));
+
+  ClosuresWithUncomputedCaptures.push_back(closure);
+
+  if (!newClosureType->isEqual(closureType)) {
+    assert(isInDefaultArgumentContext);
+    assert(newClosureType
+               ->withExtInfo(newClosureType->getExtInfo().withNoEscape(true))
+               ->isEqual(closureType));
+    return new (Context) FunctionConversionExpr(closure, closureType);
+  }
+
+  return closure;
 }
 
 static Type lookupDefaultLiteralType(TypeChecker &TC, DeclContext *dc,

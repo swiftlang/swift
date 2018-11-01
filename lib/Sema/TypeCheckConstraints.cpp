@@ -2093,33 +2093,8 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       Expr *appliedSolution(constraints::Solution &solution,
                             Expr *expr) override {
         auto &cs = solution.getConstraintSystem();
-        auto &ctx = cs.getASTContext();
-
-        bool isInDefaultArgumentContext = isInDefaultArgContext();
-
-        auto paramInfo = ParamType->getExtInfo();
-        auto newParamType = ParamType;
-
-        if (isInDefaultArgumentContext && paramInfo.isNoEscape())
-          newParamType = ParamType->withExtInfo(paramInfo.withNoEscape(false))
-                             ->castTo<FunctionType>();
-
-        auto *closure = cs.cacheType(new (ctx) AutoClosureExpr(
-            expr, newParamType, AutoClosureExpr::InvalidDiscriminator, DC));
-        closure->setParameterList(ParameterList::createEmpty(ctx));
-
-        cs.TC.ClosuresWithUncomputedCaptures.push_back(closure);
-
-        if (!newParamType->isEqual(ParamType)) {
-          assert(isInDefaultArgumentContext);
-          assert(
-              newParamType
-                  ->withExtInfo(newParamType->getExtInfo().withNoEscape(true))
-                  ->isEqual(ParamType));
-          return cs.cacheType(new (ctx)
-                                  FunctionConversionExpr(closure, ParamType));
-        }
-
+        auto *closure = cs.TC.buildAutoClosureExpr(DC, expr, ParamType);
+        cs.cacheExprTypes(closure);
         return closure;
       }
 
