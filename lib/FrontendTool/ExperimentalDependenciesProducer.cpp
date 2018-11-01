@@ -82,6 +82,22 @@ template <typename T> using CPVec = std::vector<const T*>;
 template <typename T1 = std::string, typename T2 = std::string> using PairVec = std::vector<std::pair<T1, T2>>;
 template <typename T1, typename T2> using CPPairVec = std::vector<std::pair<const T1*, const T2*>>;
 
+namespace {
+  template <typename ElemT>
+  void for_each(const std::vector<ElemT> &v, llvm::function_ref<void(const ElemT&)> fn) {
+    std::for_each(v.begin(), v.end(), fn);
+  }
+  
+  template <typename In, typename Out>
+  CPVec<Out> compactMapCPVec(const std::vector<In*> &v, llvm::function_ref<const Out*(const In*)> fn) {
+    CPVec<Out> results;
+    for( const auto *p: v)
+      if (auto r = fn(p))
+        results.push_back(r);
+    return results;
+  }
+}
+
 // Status quo
 namespace SQ {
 class YAMLEmitter {
@@ -174,7 +190,11 @@ public:
     static bool
     areAnyExtendedTypesVisibleOutsideThisFile(const ExtensionDecl *const);
     static bool areAnyMembersVisibleOutsideThisFile(const ExtensionDecl *const);
-  };
+    
+    static const NominalTypeDecl* topLevelVisibleNominal(const Decl*);
+    static const ValueDecl* topLevelVisibleValue(const Decl*);
+    static const OperatorDecl* topLevelOperator(const Decl*);
+ };
 
   class ProviderNames {
   public:
@@ -306,15 +326,14 @@ void SQ::Provides::emitInterfaceHash() const {
 void SQ::Provides::emitSectionOfIndividualNames(
     StringRef sectionKey, ArrayRef<std::string> names) const {
   emitter.emitSectionStart(sectionKey);
-  for (StringRef n : names)
-    emitter.emitName(n);
+  for_each(names, [&](StringRef n) {emitter.emitName(n);});
 }
 
 void SQ::Provides::emitSectionOfNamePairs(
     StringRef sectionKey,
     ArrayRef<std::pair<std::string, std::string>> pairs) const {
   emitter.emitSectionStart(sectionKey);
-  for (std::pair<StringRef, StringRef> p : pairs)
+  for (const auto& p : pairs)
     emitter.emitDoubleNameLine(p.first, p.second);
 }
 
@@ -331,61 +350,57 @@ SQ::ProviderDeclarations::ProviderDeclarations(const SourceFile *SF)
 
 CPVec<NominalTypeDecl>
 SQ::ProviderDeclarations::getTopLevelVisibleNominals(const SourceFile *SF) {
-  CPVec<NominalTypeDecl> nominals;
-  for (const Decl *const D : SF->Decls)
-    switch (D->getKind()) {
-    default:
-      break;
+  return compactMapCPVec<Decl, NominalTypeDecl>(SF->Decls,topLevelVisibleNominal);
+}
+CPVec<ValueDecl>
+SQ::ProviderDeclarations::getTopLevelVisibleValues(const SourceFile *SF) {
+  return compactMapCPVec<Decl, ValueDecl>(SF->Decls, topLevelVisibleValue);
+}
+CPVec<OperatorDecl>
+SQ::ProviderDeclarations::getTopLevelOperators(const SourceFile *SF) {
+  return compactMapCPVec<Decl, OperatorDecl>(SF->Decls, topLevelOperator);
+}
 
+const NominalTypeDecl* SQ::ProviderDeclarations::topLevelVisibleNominal(const Decl *const D) {
+  switch (D->getKind()) {
+    default:
+      return nullptr;
+      
     case DeclKind::Enum:
     case DeclKind::Struct:
     case DeclKind::Class:
-    case DeclKind::Protocol: {
-      const auto *const NTD = cast<NominalTypeDecl>(D);
-      if (NTD->hasName() && isVisibleOutsideItsFile(NTD))
-        nominals.push_back(NTD);
+    case DeclKind::Protocol:
       break;
-    }
-    }
-  return nominals;
+  }
+  const auto *const NTD = cast<NominalTypeDecl>(D);
+  return NTD->hasName() && isVisibleOutsideItsFile(NTD) ? NTD : nullptr;
 }
 
-CPVec<ValueDecl>
-SQ::ProviderDeclarations::getTopLevelVisibleValues(const SourceFile *SF) {
-  CPVec<ValueDecl> values;
-  for (const auto *const D : SF->Decls)
-    switch (D->getKind()) {
+const ValueDecl* SQ::ProviderDeclarations::topLevelVisibleValue(const Decl *const D) {
+  switch (D->getKind()) {
     default:
-      break;
-
+      return nullptr;
+      
     case DeclKind::TypeAlias:
     case DeclKind::Var:
     case DeclKind::Func:
-    case DeclKind::Accessor: {
-      const auto *const VD = cast<ValueDecl>(D);
-      if (VD->hasName() && isVisibleOutsideItsFile(VD))
-        values.push_back(VD);
+    case DeclKind::Accessor:
       break;
-    }
-    }
-  return values;
+  }
+  const auto *const VD = cast<ValueDecl>(D);
+  return VD->hasName() && isVisibleOutsideItsFile(VD) ? VD : nullptr;
 }
 
-CPVec<OperatorDecl>
-SQ::ProviderDeclarations::getTopLevelOperators(const SourceFile *SF) {
-  CPVec<OperatorDecl> operators;
-  for (const auto *const D : SF->Decls)
-    switch (D->getKind()) {
+const OperatorDecl* SQ::ProviderDeclarations::topLevelOperator(const Decl *const D) {
+  switch (D->getKind()) {
     default:
-      break;
-
+      return nullptr;
+      
     case DeclKind::InfixOperator:
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
-      operators.push_back(cast<OperatorDecl>(D));
-      break;
-    }
-  return operators;
+      return cast<OperatorDecl>(D);
+  }
 }
 
 CPVec<FuncDecl>
