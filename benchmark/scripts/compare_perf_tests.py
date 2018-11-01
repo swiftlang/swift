@@ -477,12 +477,10 @@ class ReportFormatter(object):
     GitHub), `git` and `html`.
     """
 
-    def __init__(self, comparator, old_branch, new_branch, changes_only,
+    def __init__(self, comparator, changes_only,
                  single_table=False):
         """Initialize with `TestComparator` and names of branches."""
         self.comparator = comparator
-        self.old_branch = old_branch
-        self.new_branch = new_branch
         self.changes_only = changes_only
         self.single_table = single_table
 
@@ -600,7 +598,6 @@ class ReportFormatter(object):
                 ])
 
         return ''.join([
-            # FIXME print self.old_branch, self.new_branch
             table('Regression', self.comparator.decreased, True, True),
             table('Improvement', self.comparator.increased, True),
             ('' if self.changes_only else
@@ -675,7 +672,6 @@ class ReportFormatter(object):
 
         return self.HTML.format(
             ''.join([
-                # FIXME print self.old_branch, self.new_branch
                 table('Regression', self.comparator.decreased, 'red'),
                 table('Improvement', self.comparator.increased, 'green'),
                 ('' if self.changes_only else
@@ -705,31 +701,33 @@ def parse_args(args):
         '--single-table',
         help='Combine data in a single table in git and markdown formats',
         action='store_true')
-    parser.add_argument('--new-branch',
-                        help='Name of the new branch', default='NEW_MIN')
-    parser.add_argument('--old-branch',
-                        help='Name of the old branch', default='OLD_MIN')
     parser.add_argument('--delta-threshold',
                         help='Delta threshold. Default 0.05.',
                         type=float, default=0.05)
     return parser.parse_args(args)
 
 
-def main():
-    """Compare benchmarks for changes in a formatted report."""
-    args = parse_args(sys.argv[1:])
-    comparator = TestComparator(LogParser.results_from_file(args.old_file),
-                                LogParser.results_from_file(args.new_file),
-                                args.delta_threshold)
-    formatter = ReportFormatter(comparator, args.old_branch, args.new_branch,
-                                args.changes_only, args.single_table)
+def create_report(old_results, new_results, delta_threshold, format,
+                  changes_only=True, single_table=True):
+    comparator = TestComparator(old_results, new_results, delta_threshold)
+    formatter = ReportFormatter(comparator, changes_only, single_table)
     formats = {
         'markdown': formatter.markdown,
         'git': formatter.git,
         'html': formatter.html
     }
 
-    report = formats[args.format]()
+    report = formats[format]()
+    return report
+
+
+def main():
+    """Compare benchmarks for changes in a formatted report."""
+    args = parse_args(sys.argv[1:])
+    report = create_report(LogParser.results_from_file(args.old_file),
+                           LogParser.results_from_file(args.new_file),
+                           args.delta_threshold, args.format,
+                           args.changes_only, args.single_table)
     print(report)
 
     if args.output:
