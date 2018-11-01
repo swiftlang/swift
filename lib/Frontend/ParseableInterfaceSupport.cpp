@@ -141,6 +141,7 @@ ParseableInterfaceModuleLoader::configureSubInvocationAndOutputPaths(
 
   auto &FEOpts = SubInvocation.getFrontendOptions();
   FEOpts.RequestedAction = FrontendOptions::ActionType::EmitModuleOnly;
+  FEOpts.EnableParseableModuleInterface = true;
   FEOpts.InputsAndOutputs.addPrimaryInputFile(InPath);
   SupplementaryOutputPaths SOPs;
   SOPs.ModuleOutputPath = OutPath.str();
