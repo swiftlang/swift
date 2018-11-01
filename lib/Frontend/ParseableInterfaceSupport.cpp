@@ -122,6 +122,12 @@ ParseableInterfaceModuleLoader::configureSubInvocationAndOutputPaths(
   SubInvocation.setRuntimeResourcePath(SearchPathOpts.RuntimeResourcePath);
   SubInvocation.setTargetTriple(LangOpts.Target);
 
+  if (auto ClangLoader = Ctx.getClangModuleLoader()) {
+    auto const &Clang = ClangLoader->getClangInstance();
+    std::string ModuleCachePath = getModuleCachePathFromClang(Clang);
+    SubInvocation.setClangModuleCachePath(ModuleCachePath);
+  }
+
   // Calculate an output filename that includes a hash of relevant key data, and
   // wire up the SubInvocation's InputsAndOutputs to contain both input and
   // output filenames.
