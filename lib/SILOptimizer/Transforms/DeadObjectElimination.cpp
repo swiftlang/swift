@@ -191,9 +191,37 @@ removeInstructions(ArrayRef<SILInstruction*> UsersToRemove) {
 //                             Use Graph Analysis
 //===----------------------------------------------------------------------===//
 
+static bool mutatesOnlyExpectedSelf(ApplyInst *Apply, SILInstruction *ExpectedSelf) {
+  if (!Apply->hasSemantics("interpolation.selfEffectsOnly"))
+    return false;
+  assert(Apply->hasSelfArgument() && "interpolation.selfEffectsOnly on non-method");
+
+  SILInstruction *ActualSelf = Apply->getSelfArgument()->getDefiningInstruction();
+  return ActualSelf == ExpectedSelf;
+}
+
+// FIXME: This is blatantly awful and needs to be better.
+static bool isStringObjectReleaseLoad(LoadInst *Load) {
+  // Are we dereferencing a pointer stored in _StringGuts._object?
+  if (auto *StructLookup = dyn_cast<StructElementAddrInst>(Load->getOperand()->getDefiningInstruction())) {
+    if (StructLookup->getField()->getName().is("_object") && StructLookup->getStructDecl()->getName().is("_StringObject")) {
+
+      // Are the only uses strong_release?
+      for (auto Use : Load->getUses()) {
+        if (!isa<StrongReleaseInst>(Use->getUser()))
+          return false;
+      }
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /// Returns false if Inst is an instruction that would require us to keep the
 /// alloc_ref alive.
-static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts) {
+static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
+                              SILInstruction *AllocInst) {
   if (isa<SetDeallocatingInst>(Inst) || isa<FixLifetimeInst>(Inst))
     return true;
 
@@ -224,6 +252,16 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts) {
   if (isa<DestroyAddrInst>(Inst))
     return true;
 
+  // We can remove applies of certain interpolation-related methods.
+  if (auto *Apply = dyn_cast<ApplyInst>(Inst))
+    if (mutatesOnlyExpectedSelf(Apply, AllocInst))
+      return true;
+
+  // FIXME: Necessary for string interpolation, but is it correct?
+  if (auto *Load = dyn_cast<LoadInst>(Inst))
+    if (isStringObjectReleaseLoad(Load))
+      return true;
+
   // Otherwise we do not know how to handle this instruction. Be conservative
   // and don't zap it.
   return false;
@@ -252,7 +290,7 @@ hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users,
     }
 
     // If we can't zap this instruction... bail...
-    if (!canZapInstruction(I, acceptRefCountInsts)) {
+    if (!canZapInstruction(I, acceptRefCountInsts, AllocRef)) {
       LLVM_DEBUG(llvm::dbgs() << "        Found instruction we can't zap...\n");
       return true;
     }
@@ -715,10 +753,24 @@ bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
   return true;
 }
 
+static bool isDefaultStringInterpolation(SILType silTy) {
+  auto astTy = silTy.getASTType();
+  if (!astTy) return false;
+
+  auto nomTy = astTy.getNominalOrBoundGenericNominal();
+  if (!nomTy) return false;
+
+  // FIXME: Do this in a non-horrible way.
+  return nomTy->getName().is("DefaultStringInterpolation");
+}
+
 bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
   // Trivial types don't have destructors. Let's try to zap this AllocStackInst.
-  if (!ASI->getElementType().isTrivial(ASI->getModule()))
+  if (!ASI->getElementType().isTrivial(ASI->getModule()) &&
+      !isDefaultStringInterpolation(ASI->getElementType())) {
+    LLVM_DEBUG(llvm::dbgs() << "    Skipping due to non-trivial type:" << *ASI);
     return false;
+  }
 
   UserList UsersToRemove;
   if (hasUnremovableUsers(ASI, UsersToRemove, /*acceptRefCountInsts=*/ true)) {

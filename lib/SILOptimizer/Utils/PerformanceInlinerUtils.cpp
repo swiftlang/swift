@@ -611,7 +611,8 @@ static bool shouldSkipApplyDuringEarlyInlining(FullApplySite AI) {
     return false;
 
   if (Callee->hasSemanticsAttr("self_no_escaping_closure") ||
-      Callee->hasSemanticsAttr("pair_no_escaping_closure"))
+      Callee->hasSemanticsAttr("pair_no_escaping_closure") ||
+      Callee->hasSemanticsAttr("interpolation.selfEffectsOnly"))
     return true;
 
   // Add here the checks for any specific @_effects attributes that need

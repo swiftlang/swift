@@ -83,6 +83,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
   /// Do not call this method directly. It is used by the compiler when
   /// interpreting string interpolations.
   @inlinable
+  @_semantics("interpolation.selfEffectsOnly")
   public mutating func appendLiteral(_ literal: String) {
     literal.write(to: &self)
   }
@@ -105,6 +106,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
   ///     print(message)
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   @inlinable
+  @_semantics("interpolation.selfEffectsOnly")
   public mutating func appendInterpolation<T>(_ value: T)
     where T: TextOutputStreamable, T: CustomStringConvertible
   {
@@ -127,6 +129,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
   ///     print(message)
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   @inlinable
+  @_semantics("interpolation.selfEffectsOnly")
   public mutating func appendInterpolation<T>(_ value: T)
     where T: TextOutputStreamable
   {
@@ -151,6 +154,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
   ///     print(message)
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   @inlinable
+  @_semantics("interpolation.selfEffectsOnly")
   public mutating func appendInterpolation<T>(_ value: T)
     where T: CustomStringConvertible
   {
@@ -175,6 +179,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
   ///     print(message)
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   @inlinable
+  @_semantics("interpolation.selfEffectsOnly")
   public mutating func appendInterpolation<T>(_ value: T) {
     _print_unlocked(value, &self)
   }
