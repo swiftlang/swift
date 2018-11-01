@@ -56,4 +56,13 @@ SimpleMathTests.test("ResultSelection") {
   expectEqual((0, 1), #gradient(foo, result: .1)(3, 3))
 }
 
+
+SimpleMathTests.test("CaptureGlobal") {
+  let z: Float = 10
+  func foo(_ x: Float) -> Float {
+    return z * x
+  }
+  expectEqual(10, #gradient(foo)(0))
+}
+
 runAllTests()
