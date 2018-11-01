@@ -1,20 +1,22 @@
-// This test file has various test cases to check that cloning preserves the
-// loop nesting.  Note that we use -Onone to preserve the structure of control
-// flow for tests.
+// This test file has various test cases to check that unrollng the loop body
+// preserves the loop nesting.  Note that we use -Onone to preserve the
+// structure of control flow for tests.
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Onone -emit-sil %s -verify | %FileCheck %s
 
 import TensorFlow
 
-// This example checks that the loop structure is preserved when we clone
+// This example checks that the loop structure is preserved when we unroll
 // the body of a loop during canonicalization.
 //expected-warning @+1 {{value implicitly copied to the host}}
-public func testLoopWithNestedLoopsRequiringCloning(
+public func testLoopWithNestedLoopsRequiringUnrolling(
   _ breakIndex:Int32, _ repetitions: Int32) -> Tensor<Int32> {
 	var result = Tensor<Int32>(0)
 	for _ in 1...repetitions {
 		var i = result
 		// On all exits of this loop, `result` is assigned a value that is computed
-		// in the loop. Therefore, we cannot avoid undefs unless we clone the body.
+		// in the loop. Therefore, we cannot avoid undefs unless we unroll the body
+		// once.  This corresponds to the loop at depth 2 in the dump of loop info
+		// before canonicalization.
 		repeat {
 			// expected-warning @+1 {{value implicitly copied to the host}}
 			if i > breakIndex {
@@ -41,19 +43,22 @@ public func testLoopWithNestedLoopsRequiringCloning(
 	return result
 }
 
-// CHECK-LABEL: --- XLA CFG Loops Before Canonicalize: {{.*}}LoopWithNestedLoopsRequiringCloning{{.*}}
+// CHECK-LABEL: --- XLA CFG Loops Before Canonicalize: {{.*}}LoopWithNestedLoopsRequiringUnrolling{{.*}}
 // CHECK: Loop at depth 1 containing: {{.*}}
 // CHECK:     Loop at depth 2 containing: {{.*}}
 // CHECK:         Loop at depth 3 containing: {{.*}}
 
-// CHECK-LABEL: --- XLA CFG Loops After Canonicalize: {{.*}}LoopWithNestedLoopsRequiringCloning{{.*}}
+// CHECK-LABEL: --- XLA CFG Loops After Canonicalize: {{.*}}LoopWithNestedLoopsRequiringUnrolling{{.*}}
 // CHECK: Loop at depth 1 containing: {{.*}}
 // CHECK:     Loop at depth 2 containing: {{.*}}
 // CHECK:         Loop at depth 3 containing: {{.*}}
+//--- The following loop is created as a result of unrolling body of the loop at
+//--- depth 2 above and corresponds to loop at depth 3 above. Since we are
+//--- nesting the inner loops into the outer loop of depth 1, the depth is 2 now.
 // CHECK:     Loop at depth 2 containing: {{.*}}
 
-//-- Check the structure of the SESE region. (Note the cloned loop.)
-// CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}LoopWithNestedLoopsRequiringCloning{{.*}}
+//-- Check the structure of the SESE region. (Note the unrolled loop.)
+// CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}LoopWithNestedLoopsRequiringUnrolling{{.*}}
 // CHECK: [sequence
 // CHECK:   <while Preheader: {{.*}}, Header: {{.*}}, exit: {{.*}}
 // CHECK:     [sequence
@@ -71,7 +76,7 @@ public func testLoopWithNestedLoopsRequiringCloning(
 // CHECK:               {condition Header: {{.*}}
 // CHECK:                 block {{.*}}
 // CHECK:                 block {{.*}}}]}
-// ---The body of this loop is cloned above---
+// ---The body of this loop is unrolled above---
 // CHECK:           <while Preheader: {{.*}}, Header: {{.*}}, exit: {{.*}}
 // CHECK:             [sequence
 // CHECK:               {condition Header: {{.*}}
@@ -93,16 +98,18 @@ public func testLoopWithNestedLoopsRequiringCloning(
 // CHECK:   block {{.*}}]
 // CHECK: --- XLA CFG Canonicalize end
 
-// This example checks that the loop structure is preserved when we clone
+// This example checks that the loop structure is preserved when we unroll
 // the body of a loop during canonicalization.
 //expected-warning @+1 {{value implicitly copied to the host}}
-public func testLoopWithDoublyNestedLoopsRequiringCloning(
+public func testLoopWithDoublyNestedLoopsRequiringUnrolling(
 	_ breakIndex:Int32, _ repetitions: Int32) -> Tensor<Int32> {
 	var result = Tensor<Int32>(0)
 	for _ in 1...repetitions {
 		var i = result
 		// On all exits of this loop, `result` is assigned a value that is computed
-		// in the loop. Therefore, we cannot avoid undefs unless we clone the body.
+		// in the loop. Therefore, we cannot avoid undefs unless we unroll the body
+		// once.  This corresponds to the loop at depth 2 in the dump of loop info
+		// before canonicalization.
 		repeat {
 			// expected-warning @+1 {{value implicitly copied to the host}}
 			if i > breakIndex {
@@ -136,22 +143,25 @@ public func testLoopWithDoublyNestedLoopsRequiringCloning(
 }
 
 
-// CHECK-LABEL: --- XLA CFG Loops Before Canonicalize: {{.*}}LoopWithDoublyNestedLoopsRequiringCloning{{.*}}
+// CHECK-LABEL: --- XLA CFG Loops Before Canonicalize: {{.*}}LoopWithDoublyNestedLoopsRequiringUnrolling{{.*}}
 // CHECK: Loop at depth 1 containing: {{.*}}
 // CHECK:     Loop at depth 2 containing: {{.*}}
 // CHECK:         Loop at depth 3 containing: {{.*}}
 // CHECK:             Loop at depth 4 containing: {{.*}}
 
-// CHECK-LABEL: --- XLA CFG Loops Before Canonicalize end
+// CHECK-LABEL: --- XLA CFG Loops After Canonicalize: {{.*}}LoopWithDoublyNestedLoopsRequiringUnrolling{{.*}}
 // CHECK: Loop at depth 1 containing: {{.*}}
 // CHECK:     Loop at depth 2 containing: {{.*}}
 // CHECK:         Loop at depth 3 containing: {{.*}}
 // CHECK:             Loop at depth 4 containing: {{.*}}
+//--- The following loop is created as a result of unrolling body of the loop at
+//--- depth 2 above and corresponds to loop at depth 3 above. Since we are nesting
+//--- the inner loops into the outer loop of depth 1, the depths are 2 and 3 nnow.
 // CHECK:     Loop at depth 2 containing: {{.*}}
 // CHECK:         Loop at depth 3 containing: {{.*}}
 
-//-- Check the structure of the SESE region. (Note the cloned doubly nested loop.)
-// CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}LoopWithDoublyNestedLoopsRequiringCloning{{.*}}
+//-- Check the structure of the SESE region. (Note the unrolled doubly nested loop.)
+// CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}LoopWithDoublyNestedLoopsRequiringUnrolling{{.*}}
 // CHECK: [sequence
 // CHECK:   <while Preheader: {{.*}}, Header: {{.*}}, exit: {{.*}}
 // CHECK:     [sequence
@@ -176,7 +186,7 @@ public func testLoopWithDoublyNestedLoopsRequiringCloning(
 // CHECK:               {condition Header: {{.*}}
 // CHECK:                 block {{.*}}
 // CHECK:                 block {{.*}}}]}
-// ---The body of this loop is cloned above---
+// ---The body of this loop is unrolled above---
 // CHECK:           <while Preheader: {{.*}}, Header: {{.*}}, exit: {{.*}}
 // CHECK:             [sequence
 // CHECK:               {condition Header: {{.*}}
