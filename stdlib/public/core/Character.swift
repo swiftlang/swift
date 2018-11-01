@@ -448,7 +448,6 @@ internal var _minASCIICharReprBuiltin: Builtin.Int63 {
 
 extension Character : Equatable {
   @inlinable
-  @inline(__always)
   public static func == (lhs: Character, rhs: Character) -> Bool {
     let l0 = lhs._smallUTF16
     if _fastPath(l0 != nil), let l = l0?._storage {
@@ -467,7 +466,6 @@ extension Character : Equatable {
 
 extension Character : Comparable {
   @inlinable
-  @inline(__always)
   public static func < (lhs: Character, rhs: Character) -> Bool {
     let l0 = lhs._smallUTF16
     if _fastPath(l0 != nil), let l = l0?._storage {
