@@ -2267,6 +2267,9 @@ emitBoolDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     SILBasicBlock *caseBB = caseBBs[i].second;
     SGF.B.setInsertionPoint(caseBB);
 
+    // We're in conditionally-executed code; enter a scope.
+    Scope scope(SGF.Cleanups, CleanupLocation::get(loc));
+
     SILValue result
       = SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.SGM.M);
     ConsumableManagedValue CMV =
