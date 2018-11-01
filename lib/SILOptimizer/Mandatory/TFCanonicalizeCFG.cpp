@@ -160,6 +160,10 @@ namespace {
 
     /// Process all of the top-level loops in the function in post-order.
     void processLoops() {
+      if (auto outs = getTFDumpIntermediateStream()) {
+        dumpTopLevelLoopInfo(outs, "Before");
+      }
+
       // Apply the standard SIL loop canonicalization transformations.  This
       // automatically gives us the following invariants: loops are guaranteed
       // to have a single preheader, a single backedge block, and exit??
@@ -180,6 +184,11 @@ namespace {
 
       for (auto *loop : LI)
         processLoop(loop);
+
+      if (auto outs = getTFDumpIntermediateStream()) {
+        dumpTopLevelLoopInfo(outs, "After");
+      }
+
     }
 
 
@@ -189,6 +198,18 @@ namespace {
                                      SILBasicBlock *endBB);
     void processLoop(SILLoop *loop);
     void ensureSingleExitFromLoops();
+
+    // Dump top-level loop information for debugging purposes.
+    void dumpTopLevelLoopInfo(llvm::raw_ostream* outs, const char* stage) {
+      *outs << "--- XLA CFG Loops " << stage << " Canonicalize: " << F->getName()
+            << "\n";
+      for (auto *loop : LI.getTopLevelLoops()) {
+        loop->print(*outs);
+      }
+      *outs << "\n--- XLA CFG Loops " << stage << " Canonicalize end\n";
+      outs->flush();
+    }
+
   };
 } // end anonymous namespace
 
@@ -391,12 +412,101 @@ public:
     return Value;
   }
 
-  // Update ValueMap so that occurrences of `oldValue` are replaced with
-  // `newValue` when cloning.
+  /// Update ValueMap so that occurrences of `oldValue` are replaced with
+  /// `newValue` when cloning.
   void updateValueMap(SILValue oldValue, SILValue newValue)  {
     auto emplaceResult = ValueMap.try_emplace(oldValue, newValue);
     assert(emplaceResult.second && "Updating the same key in ValueMap multiple "
                                    "times during SESE cloning.");
+  }
+
+  /// Clone the body of `loop` starting from `startBlock` and nest the cloned
+  /// fragment into the parent loop. If `startBlock` is the same as the header
+  /// of `loop`, we clone the entire loop including the back edge.  Otherwise,
+  /// we clone one iteration of the loop body without the back edge.
+  SILLoop *cloneLoop(SILLoopInfo *LI, SILLoop *loop, SILBasicBlock *startBlock) {
+    llvm::DenseMap<SILLoop*, SILLoop*> loopClones;
+    // This is for convenience as top-level loops have nullptr for parent loop.
+    loopClones[nullptr] = nullptr;
+
+    SmallVector<SILLoop *, 4> loops = LI->getBase().getLoopsInPreorder();
+    auto loopIter = loops.begin();
+
+    // Skip until we get to our loop in the pre-order.
+    while (loopIter != loops.end() && *loopIter != loop) {
+      loopIter++;
+    }
+    auto nestingLoop = loop->getParentLoop();
+    if (loop->getHeader() == startBlock) {
+      // If header is the start block, we are cloning the entire
+      // loop. Therefore, we should create a new SILLoop.
+      SILLoop *loopClone = LI->getBase().AllocateLoop();
+      if (nestingLoop) {
+        nestingLoop->addChildLoop(loopClone);
+      } else {
+        LI->addTopLevelLoop(loopClone);
+      }
+      loopClones[loop] = loopClone;
+    } else {
+      // We are not cloning the entire loop. Place cloned blocks in the
+      // `outerLoop` instead.
+      loopClones[loop] = nestingLoop;
+    }
+
+    // Move to the next loop.
+    ++loopIter;
+
+    // Create the loop nesting structure of the current loop's body by iterating
+    // over all the loops nested within `loop` and creating empty clones. We
+    // need do this first so that when we add a block to an inner loop using
+    // `addBasicBlockToLoop`, it gets added to the parent loops as well.
+    for (/*iterators initialized*/; loopIter != loops.end(); ++loopIter) {
+      SILLoop *curLoop = *loopIter;
+      SILLoop *parentLoop = curLoop->getParentLoop();
+      // Break if we have reached the same nesting depth as `loop`, which
+      // implies that we have visited all the subloops of `loop`.
+      if (parentLoop == nestingLoop) break;
+      SILLoop *loopClone = LI->getBase().AllocateLoop();
+      SILLoop *parentLoopClone = loopClones[parentLoop];
+      if (parentLoopClone) {
+        parentLoopClone->addChildLoop(loopClone);
+      } else {
+        LI->addTopLevelLoop(loopClone);
+      }
+      loopClones[curLoop] = loopClone;
+    }
+
+    // Clone the body of the loop starting from the given startBlock.  We should
+    // traverse the blocks in depth first order to ensure values are cloned
+    // before they are used.
+    SmallPtrSet<SILBasicBlock *, 32> worklist;
+    SmallVector<SILBasicBlock *, 32> initializedBlocks;
+    worklist.insert(startBlock);
+    while (!worklist.empty()) {
+      SILBasicBlock *current = *worklist.begin();
+      worklist.erase(current);
+      initBlock(current);
+      initializedBlocks.push_back(current);
+      for (SILBasicBlock *succ : current->getSuccessorBlocks()) {
+        // Skip if succ is not a part of the loop, is already initialized, or
+        // is the header.
+        if (!loop->contains(succ) || remapBasicBlock(succ) != succ ||
+            succ == loop->getHeader()) {
+          continue;
+        }
+        worklist.insert(succ);
+      }
+    }
+    for (SILBasicBlock *bb : initializedBlocks) {
+      SILBasicBlock *clonedBlock = cloneBlock(bb);
+      if (SILLoop *loopClone = loopClones[LI->getLoopFor(bb)]) {
+        loopClone->addBasicBlockToLoop(clonedBlock, LI->getBase());
+        if (LI->getLoopFor(bb)->getHeader() == bb) {
+          loopClone->moveToHeader(clonedBlock);
+        }
+      }
+    }
+    return loopClones[loop];
   }
 };
 
@@ -1302,34 +1412,9 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
     auto newHeaderArg = newHeader->getArgument(argIndex);
     cloner.updateValueMap(newHeaderArg, preheaderArg);
   }
-  // Clone everything except the new header. We should traverse the
-  // blocks in depth first order to ensure values are cloned before they are used.
-  SmallPtrSet<SILBasicBlock *, 32> worklist;
-  SmallVector<SILBasicBlock *, 32> initializedBlocks;
-  worklist.insert(header);
-  while (!worklist.empty()) {
-    SILBasicBlock *current = *worklist.begin();
-    worklist.erase(current);
-    cloner.initBlock(current);
-    initializedBlocks.push_back(current);
-    for (SILBasicBlock *succ : current->getSuccessorBlocks()) {
-      // Skip if succ is not a part of the loop, is already cloned, or
-      // is the new preheader.
-      if (!loop->contains(succ) || cloner.remapBasicBlock(succ) != succ ||
-          succ == newHeader) {
-        continue;
-      }
-      worklist.insert(succ);
-    }
-  }
 
-  SILLoop *parentLoop = loop->getParentLoop();
-  for (SILBasicBlock *bb : initializedBlocks) {
-    SILBasicBlock *clonedBlock = cloner.cloneBlock(bb);
-    if (parentLoop) {
-      parentLoop->addBasicBlockToLoop(clonedBlock, LI->getBase());
-    }
-  }
+  // Clone everything starting from the old header.
+  cloner.cloneLoop(LI, loop, header);
 
   // Get the clone for old header.
   SILBasicBlock *clonedOldHeader = cloner.remapBasicBlock(header);
