@@ -2807,6 +2807,12 @@ private:
     /// Whether the bindings of this type involve other type variables.
     bool InvolvesTypeVariables = false;
 
+    /// Whether the bindings represent (potentially) incomplete set,
+    /// there is no way to say with absolute certainty if that's the
+    /// case, but that could happen when certain constraints like
+    /// `bind param` are present in the system.
+    bool PotentiallyIncomplete = false;
+
     /// Whether this type variable has literal bindings.
     LiteralBindingKind LiteralBinding = LiteralBindingKind::None;
 
@@ -2851,9 +2857,14 @@ private:
       if (formBindingScore(y) < formBindingScore(x))
         return false;
 
-      // If the only difference is default types,
+      // If there is a difference in number of default types,
       // prioritize bindings with fewer of them.
-      return x.NumDefaultableBindings < y.NumDefaultableBindings;
+      if (x.NumDefaultableBindings != y.NumDefaultableBindings)
+        return x.NumDefaultableBindings < y.NumDefaultableBindings;
+
+      // As a last resort, let's check if the bindings are
+      // potentially incomplete, and if so, let's de-prioritize them.
+      return x.PotentiallyIncomplete < y.PotentiallyIncomplete;
     }
 
     void foundLiteralBinding(ProtocolDecl *proto) {
@@ -2886,6 +2897,8 @@ private:
     void dump(llvm::raw_ostream &out,
               unsigned indent = 0) const LLVM_ATTRIBUTE_USED {
       out.indent(indent);
+      if (PotentiallyIncomplete)
+        out << "potentially_incomplete ";
       if (FullyBound)
         out << "fully_bound ";
       if (SubtypeOfExistentialType)
