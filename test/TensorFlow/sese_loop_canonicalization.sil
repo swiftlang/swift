@@ -292,6 +292,19 @@ bb3 (%9 : $Builtin.Int32):
 //   sum += sum
 //   return sum
 // }
+// The CFG is shown below:
+//
+//  [0]-----+
+//  |         \
+// [1]       [2]
+//  |          |
+//  |   +--- [4]
+//  |   |    /   \
+//  |   | [6]    [5]
+//  |   +/ \      |
+// [3]----[8]     |
+//  |             |
+//  +-->[9]<------+
 //
 // This is an example where the nodes that lead to the common post dominator of all exit nodes
 // is also reachable from nodes outside of the loop. The key issue is that bb9 is the common
