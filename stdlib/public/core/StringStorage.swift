@@ -16,8 +16,9 @@ import SwiftShims
 @usableFromInline
 internal class _AbstractStringStorage: __SwiftNativeNSString, _NSStringCore {
   // Abstract interface
-  internal var asString: String { get { Builtin.unreachable() } }
-  internal var count: Int { get { Builtin.unreachable() } }
+  internal var asString: String { @_effects(readonly) get { Builtin.unreachable() } }
+  internal var asGuts: _StringGuts { @_effects(readonly) get { Builtin.unreachable() } }
+  internal var count: Int { @_effects(readonly) get { Builtin.unreachable() } }
   internal func getOrComputeBreadcrumbs() -> _StringBreadcrumbs {
     Builtin.unreachable()
   }
@@ -26,16 +27,23 @@ internal class _AbstractStringStorage: __SwiftNativeNSString, _NSStringCore {
 // ObjC interfaces
 #if _runtime(_ObjC)
 extension _AbstractStringStorage {
-  @objc(length)
-  final internal var length: Int { return asString.utf16.count }
 
+  @objc(length)
+  final internal var length: Int {
+    @_effects(readonly) get { 
+      return asString.utf16.count
+    }
+  }
+  
   @objc(characterAtIndex:)
+  @_effects(readonly)
   final internal func character(at offset: Int) -> UInt16 {
     let str = asString
     return str.utf16[str._toUTF16Index(offset)]
   }
 
   @objc(getCharacters:range:)
+  @_effects(releasenone)
   final internal func getCharacters(
    _ buffer: UnsafeMutablePointer<UInt16>,
    range aRange: _SwiftNSRange) {
@@ -52,22 +60,104 @@ extension _AbstractStringStorage {
       range: range)
   }
 
-  @objc(_fastCharacterContents)
-  final internal func _fastCharacterContents() -> UnsafePointer<UInt16>? {
-    return nil
-  }
-
-  @objc(_fastCStringContents)
-  final internal func _fastCStringContents() -> UnsafePointer<CChar>? {
+  @objc(_fastCStringContents:)
+  @_effects(readonly)
+  final internal func _fastCStringContents(_ requiresNulTermination:Int8) -> UnsafePointer<CChar>? {
     if let native = self as? _StringStorage, native.isASCII {
       return native.start._asCChar
     }
 
     // TODO(String performance): Check for nul-terminated shared strings, which
-    // could be from bridged literals two/from ObjC (alternatively: reconsider
+    // could be from bridged literals to/from ObjC (alternatively: reconsider
     // our bridging model for literals).
 
     return nil
+  }
+  
+  @objc(UTF8String)
+  final internal var utf8String: UnsafePointer<UInt8>? {
+    @_effects(readonly) get { return asGuts.withFastUTF8 { $0 }.baseAddress }
+  }
+  
+  @objc
+  internal var fastestEncoding: Int {
+    @_effects(readonly) get {
+      if let native = self as? _StringStorage, native.isASCII {
+        return 1 /* NSASCIIStringEncoding */
+      }
+      return 4 /* NSUTF8StringEncoding */
+    }
+  }
+
+  @inline(never) //hide the shim call so we can use @_effects
+  @_effects(readonly)
+  private final func _isNSString(_ str:AnyObject) -> UInt8 {
+    return _swift_stdlib_isNSString(str)
+  }
+  
+  @objc(isEqualToString:)
+  @_effects(readonly)
+  internal final func isEqual(to other:AnyObject?) -> Int8 {
+    guard let other = other else {
+      return 0
+    }
+
+    if self === other {
+      return 1
+    }
+   
+    let ourGuts = self.asGuts
+    defer { _fixLifetime(ourGuts) }
+
+    //Handle the case where both strings were bridged from Swift.
+    //We can't use String.== because it doesn't match NSString semantics.
+    if let otherGuts = (other as? _AbstractStringStorage)?.asGuts {
+      if otherGuts.count != ourGuts.count {
+        return 0
+      }
+      return ourGuts.withFastUTF8 { ourBytes in
+        defer {
+          _fixLifetime(otherGuts)
+        }
+        return otherGuts.withFastUTF8 { otherBytes in
+          return (ourBytes.baseAddress == otherBytes.baseAddress ||
+            (memcmp(ourBytes.baseAddress!, otherBytes.baseAddress!, ourBytes.count) == 0)) ? 1 : 0
+        }
+      }
+    }
+    
+    //we're allowed to crash, but for compatibility reasons NSCFString allows non-strings here
+    if _isNSString(other) != 1 {
+      return 0
+    }
+    
+    //At this point we've proven that it is an NSString of some sort, but not one of ours
+    if length != _stdlib_binary_CFStringGetLength(other) {
+      return 0
+    }
+    
+    defer {
+      _fixLifetime(other)
+    }
+
+    //CFString will only give us ASCII bytes here, but that's fine
+    //We already handled non-ASCII UTF8 strings earlier since they're Swift
+    if let otherBytes = _cocoaUTF8Pointer(other) {
+      return ourGuts.withFastUTF8 { ourBytes in
+        return (ourBytes.baseAddress == otherBytes ||
+          (memcmp(ourBytes.baseAddress!, otherBytes, ourBytes.count) == 0)) ? 1 : 0
+      }
+    }
+    
+    return _cocoaStringCompare(self, other) == 0 ? 1 : 0
+  }
+
+  @objc internal var hash: UInt {
+    if let native = self as? _StringStorage, native.isASCII {
+      return _cocoaHashASCIIBytes(native.start, length: native.count)
+    } else {
+      return _cocoaHashString(self)
+    }
   }
 
   @objc(copyWithZone:)
@@ -141,7 +231,11 @@ final internal class _StringStorage: _AbstractStringStorage {
 #endif
 
   override internal var asString: String {
-    @inline(__always) get { return String(_StringGuts(self)) }
+    @inline(__always) @_effects(readonly)  get { return String(_StringGuts(self)) }
+  }
+  
+  override internal var asGuts: _StringGuts {
+    @inline(__always) @_effects(readonly) get { return _StringGuts(self) }
   }
 
   private init(_doNotCallMe: ()) {
@@ -545,7 +639,10 @@ final internal class _SharedStringStorage: _AbstractStringStorage {
     self._invariantCheck()
   }
 
-  override internal var asString: String { return String(_StringGuts(self)) }
+  override internal var asString: String { @_effects(readonly) get { return String(_StringGuts(self)) } }
+  
+  override internal var asGuts: _StringGuts { @_effects(readonly) get { return _StringGuts(self) } }
+
 }
 
 extension _SharedStringStorage {

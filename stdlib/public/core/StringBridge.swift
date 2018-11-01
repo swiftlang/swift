@@ -68,6 +68,30 @@ internal func _cocoaStringSubscript(
   return _swift_stdlib_CFStringGetCharacterAtIndex(cfSelf, position)
 }
 
+@_effects(readonly)
+internal func _cocoaStringCompare(
+  _ string: _CocoaString, _ other: _CocoaString
+) -> Int {
+  let cfSelf: _swift_shims_CFStringRef = string
+  let cfOther: _swift_shims_CFStringRef = other
+  return _swift_stdlib_CFStringCompare(cfSelf, cfOther)
+}
+
+@_effects(readonly)
+internal func _cocoaHashString(
+  _ string: _CocoaString
+  ) -> UInt {
+  return _swift_stdlib_CFStringHashNSString(string)
+}
+
+@_effects(readonly)
+internal func _cocoaHashASCIIBytes(
+  _ bytes: UnsafePointer<UInt8>,
+  length: Int
+  ) -> UInt {
+  return _swift_stdlib_CFStringHashCString(bytes, length)
+}
+
 //
 // Conversion from NSString to Swift's native representation
 //
@@ -239,19 +263,6 @@ public protocol _NSStringCore : _NSCopying /* _NSFastEnumeration */ {
 
   @objc(characterAtIndex:)
   func character(at index: Int) -> UInt16
-
- // We also override the following methods for efficiency.
-
-  @objc(getCharacters:range:)
-  func getCharacters(
-   _ buffer: UnsafeMutablePointer<UInt16>,
-   range aRange: _SwiftNSRange)
-
-  @objc(_fastCharacterContents)
-  func _fastCharacterContents() -> UnsafePointer<UInt16>?
-
-  @objc(_fastCStringContents)
-  func _fastCStringContents() -> UnsafePointer<CChar>?
 }
 
 // Called by the SwiftObject implementation to get the description of a value
