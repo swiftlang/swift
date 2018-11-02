@@ -67,6 +67,7 @@ void SESERegionTree::print(llvm::raw_ostream &OS, unsigned indent) const {
   case Sequence:    return cast<SequenceSESERegion>(this)->print(OS, indent);
   case WhileLoop:   return cast<WhileLoopSESERegion>(this)->print(OS, indent);
   case Conditional: return cast<ConditionalSESERegion>(this)->print(OS, indent);
+  case Function:    return cast<FunctionSESERegion>(this)->print(OS, indent);
   }
 };
 
@@ -83,6 +84,13 @@ void SequenceSESERegion::print(llvm::raw_ostream &OS, unsigned indent) const {
     n->print(OS, indent+2);
   }
   OS << "]";
+}
+
+void FunctionSESERegion::print(llvm::raw_ostream &OS, unsigned indent) const {
+  OS.indent(indent) << "{function\n";
+  functionRegionTree->print(OS, indent + 2);
+  OS << "\n";
+  OS.indent(indent) << "}";
 }
 
 void WhileLoopSESERegion::print(llvm::raw_ostream &OS, unsigned indent) const {
@@ -152,6 +160,12 @@ namespace {
     /// processLoops fills in this mapping: it is keyed by the preheader block
     /// of each loop, and points to the region produced for it.
     llvm::DenseMap<SILBasicBlock*, WhileLoopSESERegion*> loopPreheaders;
+
+    /// Function blocks.
+    llvm::DenseMap<SILBasicBlock *,
+                   std::pair<std::shared_ptr<SESERegionTree>, SILBasicBlock *>>
+        functionRegions;
+
   public:
     SESERegionBuilder(SILFunction *F) : DI(F), PDI(F), LI(F, &DI), F(F) {}
 
@@ -257,40 +271,75 @@ SESERegionBuilder::processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
          "endBB is required to post-dominate startBB");
   SmallVector<std::unique_ptr<SESERegionTree>, 4> results;
 
-  // Iteratively work our way up the post-dominator tree (moving startBB until
+  // Iteratively work our way up the post-dominator tree (moving currentBB until
   // we reach the endBB), producing a sequence of loops, diamonds, and single
   // block nodes as we go.
-  while (startBB != endBB) {
+  SILBasicBlock *currentBB = startBB;
+  while (currentBB != endBB) {
+    // If currentBB is not dominated by startBB, we create a function region.
+    if (!DI.dominates(startBB, currentBB)) {
+      auto iter = functionRegions.find(currentBB);
+      if (iter == functionRegions.end()) {
+        // Create and cache the function region.
+        llvm::SmallVector<SILBasicBlock *, 32> descendants;
+        DI.getDescendants(currentBB, descendants);
+        SILBasicBlock *subRegionEndBB = startBB;
+        for (SILBasicBlock *otherBB : descendants) {
+          subRegionEndBB = PDI.findNearestCommonDominator(subRegionEndBB, otherBB);
+        }
+        // We need to create a new SESE Region so that this will end up as a
+        // separate function in the lowered graph.
+        std::shared_ptr<SESERegionTree> subSESERegion(
+            processAcyclicRegion(currentBB, subRegionEndBB).release());
+        // results.push_back(llvm::make_unique<FunctionSESERegion>(subSESERegion));
+        SILBasicBlock *nextBB = nullptr;
+        if (subRegionEndBB == endBB) {
+          nextBB = endBB;
+        } else {
+          auto *branch = dyn_cast<BranchInst>(subRegionEndBB->getTerminator());
+          assert(branch &&
+                 "Function region should end with an unconditional branch");
+          nextBB = branch->getDestBB();
+        }
+        iter =
+            functionRegions
+                .try_emplace(currentBB, std::make_pair(subSESERegion, nextBB))
+                .first;
+      }
+      results.push_back(llvm::make_unique<FunctionSESERegion>(iter->second.first));
+      currentBB = iter->second.second;
+      continue;
+    }
     // If this ends with a loop, it will already have been processed and
     // collapsed into a single node.  Just use it.
-    auto loopIt = loopPreheaders.find(startBB);
+    auto loopIt = loopPreheaders.find(currentBB);
     if (loopIt != loopPreheaders.end()) {
       auto whileNode = loopIt->second;
       loopPreheaders.erase(loopIt);
 
       results.push_back(std::unique_ptr<SESERegionTree>(whileNode));
-      startBB = whileNode->getExit();
+      currentBB = whileNode->getExit();
       continue;
     }
 
-    // If startBB ends with an unconditional branch, then just add it to the
+    // If currentBB ends with an unconditional branch, then just add it to the
     // sequence and keep going.  The destination of the branch may have multiple
     // successors in the case where the destination is endBB.  The successors
     // could be coming from a parent conditional region.
-    if (auto *branch = dyn_cast<BranchInst>(startBB->getTerminator())) {
-      auto startRegion = new SingleBlockSESERegion(startBB);
+    if (auto *branch = dyn_cast<BranchInst>(currentBB->getTerminator())) {
+      auto startRegion = new SingleBlockSESERegion(currentBB);
       results.push_back(std::unique_ptr<SESERegionTree>(startRegion));
-      startBB = branch->getDestBB();
+      currentBB = branch->getDestBB();
       continue;
     }
 
-    // Otherwise, we know that startBB ends with a conditional branch.
-    auto *condBr = cast<CondBranchInst>(startBB->getTerminator());
+    // Otherwise, we know that currentBB ends with a conditional branch.
+    auto *condBr = cast<CondBranchInst>(currentBB->getTerminator());
 
     // Get the immediate postdominator of endBB, which defines a SESE
-    // subregion postdominated by startBB and postdominating endBB.  Note that
+    // subregion postdominated by currentBB and postdominating endBB.  Note that
     // the postidom may in fact be endBB.
-    auto postidom = PDI[startBB]->getIDom()->getBlock();
+    auto postidom = PDI[currentBB]->getIDom()->getBlock();
 
     // Analyze the successors of the branch: each of them is post dominated by
     // endBB (and any of the successors may be exactly endBB).
@@ -300,10 +349,10 @@ SESERegionBuilder::processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
       processAcyclicRegionExcludingEnd(condBr->getFalseBB(), postidom);
 
     // Finally, form our conditional region.
-    auto condRegion = new ConditionalSESERegion(startBB, std::move(trueRegion),
+    auto condRegion = new ConditionalSESERegion(currentBB, std::move(trueRegion),
                                                 std::move(falseRegion));
     results.push_back(std::unique_ptr<SESERegionTree>(condRegion));
-    startBB = postidom;
+    currentBB = postidom;
   }
 
   switch (results.size()) {

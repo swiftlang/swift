@@ -33,7 +33,8 @@ namespace tf {
       SingleBlock,
       Sequence,
       WhileLoop,
-      Conditional
+      Conditional,
+      Function
     };
   protected:
     KindTy kind;
@@ -92,6 +93,25 @@ namespace tf {
 
     static bool classof(const SESERegionTree *n) {
       return n->getKind() == Sequence;
+    }
+  };
+
+  /// This region represents a sequence region that is shared between different
+  /// nodes.
+  class FunctionSESERegion : public SESERegionTree {
+    std::shared_ptr<SESERegionTree> functionRegionTree;
+
+  public:
+    FunctionSESERegion(
+        const std::shared_ptr<SESERegionTree> &functionRegionTree)
+        : SESERegionTree(Function), functionRegionTree(functionRegionTree) {}
+
+    SESERegionTree* getFunctionRegion() const { return functionRegionTree.get(); }
+
+    void print(llvm::raw_ostream &OS, unsigned indent = 0) const;
+
+    static bool classof(const SESERegionTree *n) {
+      return n->getKind() == Function;
     }
   };
 

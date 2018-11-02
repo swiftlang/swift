@@ -2507,6 +2507,8 @@ GLStatus TFGraphFunctionLowering::lowerRegion(SESERegionTree *region) {
     return lowerBasicBlock(cast<SingleBlockSESERegion>(region)->getBB());
   case SESERegionTree::Sequence:
     return lowerSequenceRegion(cast<SequenceSESERegion>(region));
+  case SESERegionTree::Function:
+    return lowerRegion(cast<FunctionSESERegion>(region)->getFunctionRegion());
   case SESERegionTree::WhileLoop:
     return lowerWhileLoopRegion(cast<WhileLoopSESERegion>(region));
   case SESERegionTree::Conditional:
