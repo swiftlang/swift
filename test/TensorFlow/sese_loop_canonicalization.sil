@@ -294,17 +294,17 @@ bb3 (%9 : $Builtin.Int32):
 // }
 // The CFG is shown below:
 //
-//  [0]-----+
+// [0]-------+
 //  |         \
 // [1]       [2]
-//  |          |
-//  |   +--- [4]
-//  |   |    /   \
-//  |   | [6]    [5]
-//  |   +/ \      |
-// [3]----[8]     |
-//  |             |
-//  +-->[9]<------+
+//  |         |
+//  |   +--->[4]
+//  |  [7]   /  \
+//  |   |  [6]  [5]
+//  V   +-+ \    |
+// [3]<-----[8]  |
+//  |            |
+//  +-->[9]<-----+
 //
 // This is an example where the nodes that lead to the common post dominator of all exit nodes
 // is also reachable from nodes outside of the loop. The key issue is that bb9 is the common
@@ -380,8 +380,20 @@ bb9(%18 : $Builtin.Int32):
 // reachable from nodes outside of the loop. The only difference in this example
 // is that some of these nodes also belong to a loop. Therefore, it is required
 // for us to update the LoopInfo in addition to cloning. The loop in question
-// consists of the single node bb3.
-
+// consists of the single node bb3. The CFG is shown below:
+//
+//     [0]-------+
+//      |         \
+//     [1]       [2]
+//      |         |
+//      |   +--->[4]
+//      |  [7]   /  \
+//      |   |  [6]  [5]
+//      V   +--+ \   |
+// +-->[3]<-----[8]  |
+// | /  |            |
+// +    +-->[9]<-----+
+//
 // CHECK-LABEL:--- XLA CFG Loops Before Canonicalize: $loopThatRequiresNodeAndLoopCloning
 //----The following loop will be cloned in the second loop.
 // CHECK:Loop at depth 1 containing: {{bb[0-9]+}}<header><latch><exiting>

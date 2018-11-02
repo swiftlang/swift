@@ -420,11 +420,13 @@ public:
                                    "times during SESE cloning.");
   }
 
-  /// Clone the body of `loop` starting from `startBlock` and nest the cloned
-  /// fragment into the parent loop. If `startBlock` is the same as the header
-  /// of `loop`, we clone the entire loop including the back edge.  Otherwise,
-  /// we clone one iteration of the loop body without the back edge.
-  SILLoop *cloneLoop(SILLoopInfo *LI, SILLoop *loop, SILBasicBlock *startBlock) {
+  /// Utility to unroll one iteration of the loop or to clone the entire loop.
+  ///   - If `startBlock` is the same as the header of `loop`, we clone the
+  ///     entire loop including the back edge.
+  ///   - Otherwise, we unroll one iteration of the loop body starting from
+  ///     `startBlock' to the latch.
+  /// The unrolled or cloned version is nested into the parent loop.
+  SILLoop *cloneOrUnrollLoop(SILLoopInfo *LI, SILLoop *loop, SILBasicBlock *startBlock) {
     llvm::DenseMap<SILLoop*, SILLoop*> loopClones;
     // This is for convenience as top-level loops have nullptr for parent loop.
     loopClones[nullptr] = nullptr;
@@ -515,6 +517,8 @@ public:
 // A helper class to transform a loop to have a single exit from the header.
 class SingleExitLoopTransformer {
   public:
+    // Convert the given loop into a SESE form. Returns false if the loop was
+    // already in SESE form. Otherwise, returns true.
     static bool doIt(GraphFunctionDeviceInfo *deviceInfo, SILLoopInfo *LI,
                      DominanceInfo *DI, SILLoop *loop, PostDominanceInfo *PDI) {
       SingleExitLoopTransformer transformer(deviceInfo, LI, DI, loop, PDI);
@@ -528,7 +532,7 @@ class SingleExitLoopTransformer {
 #ifndef NDEBUG
       {
         // Verify that the loop is OK after all the transformations.
-        llvm::DenseSet<const SILLoop*> nestedLoops;
+        llvm::DenseSet<const SILLoop *> nestedLoops;
         loop->verifyLoopNest(&nestedLoops);
       }
 #endif
@@ -742,9 +746,9 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
   //       break;
   //     }
   //   }
+  // The unrelated loops are those that are not contained within each other.
   SmallPtrSet<SILBasicBlock *, 32> unrelatedPreheaders;
   for (auto *otherLoop : *LI) {
-    // If loop and otherLoop are not nested into either, remember the preheader.
     if (!otherLoop->contains(loop) && !loop->contains(otherLoop)) {
       unrelatedPreheaders.insert(otherLoop->getLoopPreheader());
     }
@@ -808,8 +812,8 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
         // If `succ` is a preheader of an unrelated loop, we will have to clone
         // the entire loop now so that we can also incrementally update LoopInfo.
         if (succBlockLoop) {
-          SILLoop *clonedLoop =
-              cloner.cloneLoop(LI, succBlockLoop, succBlockLoop->getHeader());
+          SILLoop *clonedLoop = cloner.cloneOrUnrollLoop(
+              LI, succBlockLoop, succBlockLoop->getHeader());
           changeBranchTarget(clonedSucc->getTerminator(), 0,
                              clonedLoop->getHeader(), /*preserveArgs*/ true);
           // Note that all the nodes of `clonedLoop` should be moved into the
@@ -1501,7 +1505,7 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
   }
 
   // Clone everything starting from the old header.
-  cloner.cloneLoop(LI, loop, header);
+  cloner.cloneOrUnrollLoop(LI, loop, header);
 
   // Get the clone for old header.
   SILBasicBlock *clonedOldHeader = cloner.remapBasicBlock(header);
