@@ -1349,39 +1349,43 @@ extension BinaryInteger {
 //===--- Wrapping operators -----------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-//  Default implementations, which make sense only for arbitrary-size integers.
-//  These are then made unavailable on FixedWidthInteger, and concrete fixed-
-//  width types should implement them.
+  //  Default implementations of overflow arithmetic functions to preserve
+  //  source-compatability. These simply fatalError() because it's impossible
+  //  to provide an implementation that's always correct with the semantics of
+  //  BinaryInteger.
+  //
+  //  If called concretely, these will produce a warning at compile-time and an
+  //  error at run-time. If called from code generic on BinaryInteger, they will
+  //  only produce a run-time error.
+  
   @available(*, deprecated, message:
-  "Types conforming to BinaryInteger should provide an implementation of this operation.")
+  "Types conforming to BinaryInteger should implement addingReportingOverflow(_:Self).")
   public func addingReportingOverflow(_ rhs: Self) -> (partialValue: Self, overflow: Bool) {
-    return (self + rhs, false)
+    fatalError("Types conforming to BinaryInteger should implement addingReportingOverflow(_:Self).")
   }
   
   @available(*, deprecated, message:
-  "Types conforming to BinaryInteger should provide an implementation of this operation.")
+  "Types conforming to BinaryInteger should implement subtractingReportingOverflow(_:Self).")
   public func subtractingReportingOverflow(_ rhs: Self) -> (partialValue: Self, overflow: Bool) {
-    return (self - rhs, false)
+    fatalError("Types conforming to BinaryInteger should implement subtractingReportingOverflow(_:Self).")
   }
   
   @available(*, deprecated, message:
-  "Types conforming to BinaryInteger should provide an implementation of this operation.")
+  "Types conforming to BinaryInteger should implement multipliedReportingOverflow(by:Self).")
   public func multipliedReportingOverflow(by rhs: Self) -> (partialValue: Self, overflow: Bool) {
-    return (self * rhs, false)
+    fatalError("Types conforming to BinaryInteger should implement multipliedReportingOverflow(by:Self).")
   }
   
   @available(*, deprecated, message:
-  "Types conforming to BinaryInteger should provide an implementation of this operation.")
+  "Types conforming to BinaryInteger should implement dividedReportingOverflow(by:Self).")
   public func dividedReportingOverflow(by rhs: Self) -> (partialValue: Self, overflow: Bool) {
-    guard rhs != 0 else { return (self, true) }
-    return (self / rhs, false)
+    fatalError("Types conforming to BinaryInteger should implement dividedReportingOverflow(by:Self).")
   }
   
   @available(*, deprecated, message:
-  "Types conforming to BinaryInteger should provide an implementation of this operation.")
+  "Types conforming to BinaryInteger should implement remainderReportingOverflow(dividingBy:Self).")
   public func remainderReportingOverflow(dividingBy rhs: Self) -> (partialValue: Self, overflow: Bool) {
-    guard rhs != 0 else { return (self, true) }
-    return (self % rhs, false)
+    fatalError("Types conforming to BinaryInteger should implement remainderReportingOverflow(dividingBy:Self).")
   }
 
   /// Returns the sum of the two given values, wrapping the result in case of
