@@ -438,6 +438,16 @@ public:
     return createNominalType(typeDecl, /*parent*/ Type());
   }
 
+  ProtocolDecl *createObjCProtocolDecl(StringRef name) {
+    auto typeDecl =
+        findForeignNominalTypeDecl(name, /*relatedEntityKind*/{},
+                                   ForeignModuleKind::Imported,
+                                   Demangle::Node::Kind::Protocol);
+    if (auto *protocolDecl = dyn_cast_or_null<ProtocolDecl>(typeDecl))
+      return protocolDecl;
+    return nullptr;
+  }
+
   Type createForeignClassType(StringRef mangledName) {
     auto typeDecl = createNominalTypeDecl(mangledName);
     if (!typeDecl) return Type();

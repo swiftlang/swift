@@ -509,6 +509,8 @@ public:
           if (!Demangled)
             return BuiltType();
 
+          // FIXME: Imported protocols?
+
           auto Protocol = Builder.createProtocolDecl(Demangled);
           if (!Protocol)
             return BuiltType();
