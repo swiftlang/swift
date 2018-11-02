@@ -13,6 +13,7 @@
 #include "XMLValidator.h"
 #include "ModuleAPIDiff.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Comment.h"
@@ -2634,17 +2635,15 @@ private:
     std::string mangledName(Mangler.mangleTypeForDebugger(
                               T->mapTypeOutOfContext(), DC,
         DC->getGenericEnvironmentOfContext()));
-    std::string Error;
     Type ReconstructedType = DC->mapTypeIntoContext(
-        getTypeFromMangledSymbolname(Ctx, mangledName, Error));
+        Demangle::getTypeForMangling(Ctx, mangledName));
     Stream << "type: ";
     if (ReconstructedType) {
       ReconstructedType->print(Stream);
     } else {
       Stream << "FAILURE";
     }
-    Stream << "\tfor '" << range.str() << "' mangled=" << mangledName << " "
-           << Error << "\n";
+    Stream << "\tfor '" << range.str() << "' mangled=" << mangledName << "\n";
   }
 
   void tryDemangleDecl(ValueDecl *VD, CharSourceRange range, bool isRef) {
