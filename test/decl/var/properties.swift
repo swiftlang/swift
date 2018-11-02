@@ -1270,6 +1270,10 @@ class WeakFixItTest {
 
 // SR-8811 (Warning)
 
-let sr8811x = fatalError() // expected-warning {{variable 'sr8811x' inferred to have type 'Never', which may be unexpected}} expected-note {{add an explicit type annotation to silence this warning}}
+let sr8811a = fatalError() // expected-warning {{constant 'sr8811a' inferred to have type 'Never', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}
 
-let sr8811y: Never = fatalError() // Ok
+let sr8811b: Never = fatalError() // Ok
+
+let sr8811c = (16, fatalError()) // expected-warning {{constant 'sr8811c' inferred to have type '(Int, Never)', which contains an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}
+
+let sr8811d: (Int, Never) = (16, fatalError()) // Ok
