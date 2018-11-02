@@ -215,10 +215,10 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
 TEST(TypeRefTest, UniqueProtocolTypeRef) {
   TypeRefBuilder Builder;
 
-  Optional<std::string> P1 = ABC;
-  Optional<std::string> P2 = ABC;
-  Optional<std::string> P3 = ABCD;
-  Optional<std::string> P4 = XYZ;
+  TypeRefBuilder::BuiltProtocolDecl P1 = std::make_pair(ABC, false);
+  TypeRefBuilder::BuiltProtocolDecl P2 = std::make_pair(ABC, false);
+  TypeRefBuilder::BuiltProtocolDecl P3 = std::make_pair(ABCD, false);
+  TypeRefBuilder::BuiltProtocolDecl P4 = std::make_pair(XYZ, false);
 
   EXPECT_EQ(P1, P2);
   EXPECT_NE(P2, P3);
@@ -280,8 +280,8 @@ TEST(TypeRefTest, UniqueDependentMemberTypeRef) {
 
   auto N1 = Builder.createNominalType(ABC, nullptr);
   auto N2 = Builder.createNominalType(XYZ, nullptr);
-  Optional<std::string> P1 = ABC;
-  Optional<std::string> P2 = ABCD;
+  TypeRefBuilder::BuiltProtocolDecl P1 = std::make_pair(ABC, false);
+  TypeRefBuilder::BuiltProtocolDecl P2 = std::make_pair(ABCD, false);
 
   auto DM1 = Builder.createDependentMemberType("Index", N1, P1);
   auto DM2 = Builder.createDependentMemberType("Index", N1, P1);

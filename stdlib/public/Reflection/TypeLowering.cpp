@@ -197,7 +197,7 @@ BuiltinTypeInfo::BuiltinTypeInfo(const BuiltinTypeDescriptor *descriptor)
 /// Utility class for building values that contain witness tables.
 class ExistentialTypeInfoBuilder {
   TypeConverter &TC;
-  std::vector<const NominalTypeRef *> Protocols;
+  std::vector<const TypeRef *> Protocols;
   const TypeRef *Superclass = nullptr;
   ExistentialTypeRepresentation Representation;
   ReferenceCounting Refcounting;
@@ -218,8 +218,9 @@ class ExistentialTypeInfoBuilder {
       return false;
 
     for (auto *P : Protocols) {
-      if (P->isErrorProtocol())
-        return true;
+      if (auto *NTD = dyn_cast<NominalTypeRef>(P))
+        if (NTD->isErrorProtocol())
+          return true;
     }
     return false;
   }
@@ -232,6 +233,20 @@ class ExistentialTypeInfoBuilder {
     }
 
     for (auto *P : Protocols) {
+      auto *NTD = dyn_cast<NominalTypeRef>(P);
+      auto *OP = dyn_cast<ObjCProtocolTypeRef>(P);
+      if (!NTD && !OP) {
+        DEBUG_LOG(std::cerr << "Bad protocol: "; P->dump())
+        Invalid = true;
+        continue;
+      }
+
+      // Don't look up field info for imported Objective-C protocols.
+      if (OP) {
+        ObjC = true;
+        continue;
+      }
+
       std::pair<const FieldDescriptor *, const ReflectionInfo *> FD =
           TC.getBuilder().getFieldTypeInfo(P);
       if (FD.first == nullptr) {
@@ -270,7 +285,7 @@ public:
       ObjC(false), WitnessTableCount(0),
       Invalid(false) {}
 
-  void addProtocol(const NominalTypeRef *P) {
+  void addProtocol(const TypeRef *P) {
     Protocols.push_back(P);
   }
 
@@ -286,11 +301,19 @@ public:
       // Anything else should either be a superclass constraint, or
       // we have an invalid typeref.
       if (!isa<NominalTypeRef>(T) &&
-          !isa<BoundGenericTypeRef>(T)) {
+          !isa<BoundGenericTypeRef>(T) &&
+          !isa<ObjCClassTypeRef>(T)) {
         DEBUG_LOG(std::cerr << "Bad existential member: "; T->dump())
         Invalid = true;
         return;
       }
+
+      // Don't look up field info for imported Objective-C classes.
+      if (auto *OC = dyn_cast<ObjCClassTypeRef>(T)) {
+        addAnyObject();
+        return;
+      }
+
       const auto &FD = TC.getBuilder().getFieldTypeInfo(T);
       if (FD.first == nullptr) {
         DEBUG_LOG(std::cerr << "No field descriptor: "; T->dump())
@@ -721,6 +744,10 @@ public:
     return true;
   }
 
+  bool visitObjCProtocolTypeRef(const ObjCProtocolTypeRef *OP) {
+    return true;
+  }
+
 #define REF_STORAGE(Name, ...) \
   bool \
   visit##Name##StorageTypeRef(const Name##StorageTypeRef *US) { \
@@ -845,6 +872,10 @@ public:
   }
 
   MetatypeRepresentation visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
+    return MetatypeRepresentation::Unknown;
+  }
+
+  MetatypeRepresentation visitObjCProtocolTypeRef(const ObjCProtocolTypeRef *OP) {
     return MetatypeRepresentation::Unknown;
   }
 
@@ -1193,6 +1224,11 @@ public:
   }
 
   const TypeInfo *visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
+    return TC.getReferenceTypeInfo(ReferenceKind::Strong,
+                                   ReferenceCounting::Unknown);
+  }
+
+  const TypeInfo *visitObjCProtocolTypeRef(const ObjCProtocolTypeRef *OP) {
     return TC.getReferenceTypeInfo(ReferenceKind::Strong,
                                    ReferenceCounting::Unknown);
   }
