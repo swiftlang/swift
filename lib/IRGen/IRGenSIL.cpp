@@ -1987,8 +1987,10 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
          "could not find TensorArrayProtocol protocol");
   assert(outputTensorGroupProto && "could not find TensorGroup protocol");
 
-  // Sets the results of this op to undef.
-  auto lowerResultsToUndef = [&]() {
+  // Makes this op cause a runtime error, and sets an (undef) lowered explosion
+  // for this op so that IRGen can proceed.
+  auto lowerOpToError = [&](const char *errorMessage) {
+    abortOnGraphOp(*this, errorMessage);
     for (auto result : i->getResults()) {
       ExplosionSchema schema = getTypeInfo(result->getType()).getSchema();
       Explosion e;
@@ -1998,20 +2000,18 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     }
   };
 
-  // Makes this op cause a runtime error.
-  auto lowerOpToError = [&](const char *errorMessage) {
-    abortOnGraphOp(*this, errorMessage);
-    lowerResultsToUndef();
-  };
-
   // These ops configure the `deviceInfo`. They do not do anything
-  // at runtime, so do not lower them.
+  // at runtime, so lower them to a no-op.
   // This must be above the GraphFunctionDeviceInfo::getForFunction() call,
   // because GraphFunctionDeviceInfo::getForFunction() crashes when called in
   // the `enableTPU` function, because the enableInfeed operand isn't an integer
   // literal instruction.
   if (GraphFunctionDeviceInfo::isConfigOp(opInfo)) {
-    lowerResultsToUndef();
+    assert(i->getNumResults() == 1 && "config op should have one Void result");
+
+    // A Void result is lowered as an empty Explosion.
+    Explosion e;
+    setLoweredExplosion(i->getResults()[0], e);
     return;
   }
 
