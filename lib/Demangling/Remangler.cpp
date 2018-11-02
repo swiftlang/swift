@@ -681,6 +681,8 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
     Buffer << 'p';
   } else if (text == BUILTIN_TYPE_NAME_SILTOKEN) {
     Buffer << 't';
+  } else if (text == BUILTIN_TYPE_NAME_INTLITERAL) {
+    Buffer << 'I';
   } else if (text == BUILTIN_TYPE_NAME_WORD) {
     Buffer << 'w';
   } else if (text.consume_front(BUILTIN_TYPE_NAME_INT)) {

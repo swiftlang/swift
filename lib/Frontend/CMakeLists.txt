@@ -1,4 +1,4 @@
-add_swift_library(swiftFrontend STATIC
+add_swift_host_library(swiftFrontend STATIC
   ArgsToFrontendInputsConverter.cpp
   ArgsToFrontendOptionsConverter.cpp
   ArgsToFrontendOutputsConverter.cpp
@@ -12,7 +12,7 @@ add_swift_library(swiftFrontend STATIC
   SerializedDiagnosticConsumer.cpp
   DEPENDS
     SwiftOptions
-  LINK_LIBRARIES
+  LINK_LIBS
     swiftSIL
     swiftMigrator
     swiftOption

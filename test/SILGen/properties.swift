@@ -648,6 +648,14 @@ var global_observing_property : Int = zero {
   // CHECK: properties.zero.unsafeMutableAddressor
   // CHECK: return
 
+  // global_observing_property's setter needs to call didSet.
+
+  // CHECK-LABEL: sil hidden @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vs
+  // CHECK: function_ref properties.global_observing_property.unsafeMutableAddressor
+  // CHECK-NEXT:  function_ref @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vau
+  // CHECK: function_ref properties.global_observing_property.didset
+  // CHECK-NEXT: function_ref @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vW
+
   // CHECK-LABEL: sil private @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vW
   didSet {
     // The didSet implementation needs to call takeInt.
@@ -682,15 +690,6 @@ func force_global_observing_property_setter() {
   let x = global_observing_property
   global_observing_property = x
 }
-
-// global_observing_property's setter needs to call didSet.
-
-// CHECK-LABEL: sil hidden @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vs
-// CHECK: function_ref properties.global_observing_property.unsafeMutableAddressor
-// CHECK-NEXT:  function_ref @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vau
-// CHECK: function_ref properties.global_observing_property.didset
-// CHECK-NEXT: function_ref @$s10properties25global_observing_property{{[_0-9a-zA-Z]*}}vW
-
 
 // Test local observing properties.
 

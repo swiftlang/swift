@@ -58,6 +58,8 @@ PASS(AccessEnforcementDom, "access-enforcement-dom",
      "Remove dominated access checks with no nested conflict")
 PASS(AccessEnforcementOpts, "access-enforcement-opts",
      "Access Enforcement Optimization")
+PASS(AccessEnforcementReleaseSinking, "access-enforcement-release",
+     "Access Enforcement Release Sinking")
 PASS(AccessEnforcementSelection, "access-enforcement-selection",
      "Access Enforcement Selection")
 PASS(AccessEnforcementWMO, "access-enforcement-wmo",

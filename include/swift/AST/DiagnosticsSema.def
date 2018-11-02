@@ -1865,9 +1865,6 @@ NOTE(declared_protocol_conformance_here,none,
      "%0 implicitly conforms to protocol %2}1 here",
      (Type, unsigned, DeclName, DeclName))
 
-WARNING(witness_unavailable_warn,none,
-        "unavailable %0 %1 was used to satisfy a requirement of protocol %2",
-        (DescriptiveDeclKind, DeclName, DeclName))
 ERROR(witness_unavailable,none,
         "unavailable %0 %1 was used to satisfy a requirement of protocol %2",
         (DescriptiveDeclKind, DeclName, DeclName))
@@ -2622,8 +2619,6 @@ NOTE(found_candidate,none,
 NOTE(found_candidate_type,none,
      "found candidate with type %0", (Type))
 
-ERROR(no_MaxBuiltinIntegerType_found,none,
-   "standard library error: _MaxBuiltinIntegerType is not properly defined", ())
 ERROR(no_MaxBuiltinFloatType_found,none,
    "standard library error: _MaxBuiltinFloatType is not properly defined", ())
 ERROR(integer_literal_overflows_maxwidth, none,

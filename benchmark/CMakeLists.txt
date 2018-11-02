@@ -84,6 +84,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Exclusivity
     single-source/ExistentialPerformance
     single-source/Fibonacci
+    single-source/FlattenList
     single-source/FloatingPointPrinting
     single-source/Hanoi
     single-source/Hash

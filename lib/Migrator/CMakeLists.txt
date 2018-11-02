@@ -42,14 +42,15 @@ swift_install_in_component(compiler
   FILES ${datafiles}
 DESTINATION "lib/swift/migrator")
 
-add_swift_library(swiftMigrator STATIC
+add_swift_host_library(swiftMigrator STATIC
   APIDiffMigratorPass.cpp
   EditorAdapter.cpp
   FixitApplyDiagnosticConsumer.cpp
   Migrator.cpp
   MigrationState.cpp
   RewriteBufferEditsReceiver.cpp
-  LINK_LIBRARIES swiftSyntax swiftIDE)
+  LINK_LIBS
+    swiftSyntax swiftIDE)
 
 add_dependencies(swiftMigrator
   "symlink_migrator_data")

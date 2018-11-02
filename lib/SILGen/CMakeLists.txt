@@ -1,4 +1,4 @@
-add_swift_library(swiftSILGen STATIC
+add_swift_host_library(swiftSILGen STATIC
   ArgumentSource.cpp
   Cleanup.cpp
   Condition.cpp
@@ -30,6 +30,6 @@ add_swift_library(swiftSILGen STATIC
   SILGenStmt.cpp
   SILGenThunk.cpp
   SILGenType.cpp
-  LINK_LIBRARIES
+  LINK_LIBS
     swiftSIL
 )

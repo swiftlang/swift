@@ -1,4 +1,4 @@
-add_swift_library(swiftSIL STATIC
+add_swift_host_library(swiftSIL STATIC
   AbstractionPattern.cpp
   BasicBlockUtils.cpp
   Bridging.cpp
@@ -43,8 +43,8 @@ add_swift_library(swiftSIL STATIC
   SILVTable.cpp
   SILWitnessTable.cpp
   TypeLowering.cpp
-  ValueOwnershipKindClassifier.cpp
-  LINK_LIBRARIES
+  ValueOwnership.cpp
+  LINK_LIBS
     swiftSerialization
     swiftSema
 )

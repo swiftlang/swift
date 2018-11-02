@@ -728,19 +728,6 @@ extension Dictionary: Collection {
   public var isEmpty: Bool {
     return count == 0
   }
-
-  /// The first element of the dictionary.
-  ///
-  /// The first element of the dictionary is not necessarily the first element
-  /// added to the dictionary. Don't expect any particular ordering of
-  /// dictionary elements.
-  ///
-  /// If the dictionary is empty, the value of this property is `nil`.
-  @inlinable
-  public var first: Element? {
-    var it = makeIterator()
-    return it.next()
-  }
 }
 
 extension Dictionary {

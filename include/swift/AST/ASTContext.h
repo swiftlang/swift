@@ -612,6 +612,7 @@ public:
   const CanType TheRawPointerType;        /// Builtin.RawPointer
   const CanType TheUnsafeValueBufferType; /// Builtin.UnsafeValueBuffer
   const CanType TheSILTokenType;          /// Builtin.SILToken
+  const CanType TheIntegerLiteralType;    /// Builtin.IntegerLiteralType
   
   const CanType TheIEEE32Type;            /// 32-bit IEEE floating point
   const CanType TheIEEE64Type;            /// 64-bit IEEE floating point
@@ -923,9 +924,6 @@ public:
   /// to the given existential type.
   CanGenericSignature getExistentialSignature(CanType existential,
                                               ModuleDecl *mod);
-
-  /// Whether our effective Swift version is in the Swift 3 family.
-  bool isSwiftVersion3() const { return LangOpts.isSwiftVersion3(); }
 
   /// Whether our effective Swift version is at least 'major'.
   ///

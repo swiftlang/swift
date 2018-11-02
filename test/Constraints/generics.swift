@@ -618,8 +618,8 @@ func rdar40537858() {
   }
 
   var s = S(id: S.Id())
-  let _: E = .foo(s)   // expected-error {{generic enum 'E' requires that 'S' conform to 'P'}}
-  let _: E = .bar([s]) // expected-error {{generic enum 'E' requires that 'S' conform to 'P'}}
+  let _: E = .foo(s)   // expected-error {{enum case 'foo' requires that 'S' conform to 'P'}}
+  let _: E = .bar([s]) // expected-error {{enum case 'bar' requires that 'S' conform to 'P'}}
 }
 
 // SR-8934
@@ -629,3 +629,5 @@ struct BottleLayout {
 let arr = [BottleLayout]()
 let layout = BottleLayout(count:1)
 let ix = arr.firstIndex(of:layout) // expected-error {{argument type 'BottleLayout' does not conform to expected type 'Equatable'}}
+
+let _: () -> UInt8 = { .init("a" as Unicode.Scalar) } // expected-error {{initializer 'init(_:)' requires that 'Unicode.Scalar' conform to 'BinaryInteger'}}

@@ -72,6 +72,7 @@ import ErrorHandling
 import Exclusivity
 import ExistentialPerformance
 import Fibonacci
+import FlattenList
 import FloatingPointPrinting
 import Hanoi
 import Hash
@@ -95,10 +96,12 @@ import NSError
 import NSStringConversion
 import NopDeinit
 import ObjectAllocation
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import ObjectiveCBridging
 import ObjectiveCBridgingStubs
 #if !(SWIFT_PACKAGE || Xcode)
 import ObjectiveCNoBridgingStubs
+#endif
 #endif
 import ObserverClosure
 import ObserverForwarderStruct
@@ -239,6 +242,8 @@ registerBenchmark(ErrorHandling)
 registerBenchmark(Exclusivity)
 registerBenchmark(ExistentialPerformance)
 registerBenchmark(Fibonacci)
+registerBenchmark(FlattenListLoop)
+registerBenchmark(FlattenListFlatMap)
 registerBenchmark(FloatingPointPrinting)
 registerBenchmark(Hanoi)
 registerBenchmark(HashTest)
@@ -262,10 +267,12 @@ registerBenchmark(NSStringConversion)
 registerBenchmark(NibbleSort)
 registerBenchmark(NopDeinit)
 registerBenchmark(ObjectAllocation)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 registerBenchmark(ObjectiveCBridging)
 registerBenchmark(ObjectiveCBridgingStubs)
 #if !(SWIFT_PACKAGE || Xcode)
 registerBenchmark(ObjectiveCNoBridgingStubs)
+#endif
 #endif
 registerBenchmark(ObserverClosure)
 registerBenchmark(ObserverForwarderStruct)

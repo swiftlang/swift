@@ -763,6 +763,94 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   }
 }
 
+bool LinkEntity::isWeakImported(ModuleDecl *module) const {
+  switch (getKind()) {
+  case Kind::SILGlobalVariable:
+    if (getSILGlobalVariable()->getDecl())
+      return getSILGlobalVariable()->getDecl()->isWeakImported(module);
+    return false;
+
+  case Kind::SILFunction: {
+    // For imported functions check the Clang declaration.
+    if (auto clangOwner = getSILFunction()->getClangNodeOwner())
+      return clangOwner->isWeakImported(module);
+
+    // For native functions check a flag on the SILFunction
+    // itself.
+    if (getSILFunction()->isWeakLinked())
+      return getSILFunction()->isAvailableExternally();
+    return false;
+  }
+
+  case Kind::AssociatedConformanceDescriptor:
+  case Kind::DefaultAssociatedConformanceAccessor: {
+    // Associated conformance descriptors use the protocol as
+    // their declaration, but are weak linked if the associated
+    // type stored in extra storage area is weak linked.
+    auto assocConformance = getAssociatedConformance();
+    auto *depMemTy = assocConformance.first->castTo<DependentMemberType>();
+    return depMemTy->getAssocType()->isWeakImported(module);
+  }
+
+  case Kind::TypeMetadata:
+  case Kind::TypeMetadataAccessFunction: {
+    if (auto *nominalDecl = getType()->getAnyNominal())
+      return nominalDecl->isWeakImported(module);
+    return false;
+  }
+
+  case Kind::DispatchThunk:
+  case Kind::DispatchThunkInitializer:
+  case Kind::DispatchThunkAllocator:
+  case Kind::MethodDescriptor:
+  case Kind::MethodDescriptorInitializer:
+  case Kind::MethodDescriptorAllocator:
+  case Kind::MethodLookupFunction:
+  case Kind::EnumCase:
+  case Kind::FieldOffset:
+  case Kind::ObjCClass:
+  case Kind::ObjCClassRef:
+  case Kind::ObjCMetaclass:
+  case Kind::SwiftMetaclassStub:
+  case Kind::ObjCMetadataUpdateFunction:
+  case Kind::ClassMetadataBaseOffset:
+  case Kind::PropertyDescriptor:
+  case Kind::NominalTypeDescriptor:
+  case Kind::ModuleDescriptor:
+  case Kind::ProtocolDescriptor:
+  case Kind::ProtocolRequirementsBaseDescriptor:
+  case Kind::AssociatedTypeDescriptor:
+    return getDecl()->isWeakImported(module);
+
+  // TODO: Revisit some of the below, for weak conformances.
+  case Kind::TypeMetadataPattern:
+  case Kind::TypeMetadataInstantiationCache:
+  case Kind::TypeMetadataInstantiationFunction:
+  case Kind::TypeMetadataSingletonInitializationCache:
+  case Kind::TypeMetadataCompletionFunction:
+  case Kind::ExtensionDescriptor:
+  case Kind::AnonymousDescriptor:
+  case Kind::DirectProtocolWitnessTable:
+  case Kind::ProtocolWitnessTablePattern:
+  case Kind::GenericProtocolWitnessTableInstantiationFunction:
+  case Kind::AssociatedTypeWitnessTableAccessFunction:
+  case Kind::ReflectionAssociatedTypeDescriptor:
+  case Kind::ProtocolConformanceDescriptor:
+  case Kind::ProtocolWitnessTableLazyAccessFunction:
+  case Kind::ProtocolWitnessTableLazyCacheVariable:
+  case Kind::ValueWitness:
+  case Kind::ValueWitnessTable:
+  case Kind::TypeMetadataLazyCacheVariable:
+  case Kind::ForeignTypeMetadataCandidate:
+  case Kind::ReflectionBuiltinDescriptor:
+  case Kind::ReflectionFieldDescriptor:
+  case Kind::CoroutineContinuationPrototype:
+    return false;
+  }
+
+  llvm_unreachable("Bad link entity kind");
+}
+
 const SourceFile *LinkEntity::getSourceFileForEmission() const {
   const SourceFile *sf;
   

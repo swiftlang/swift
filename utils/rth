@@ -165,7 +165,8 @@ class ResilienceTest(object):
             config2_lower = config2.lower()
             output_obj = os.path.join(self.tmp_dir,
                                       config1_lower + '_' + config2_lower)
-            tmp_dir_contents = glob.glob(os.path.join(self.tmp_dir, '*', '*'))
+            tmp_dir_contents = glob.glob(
+                os.path.join(self.tmp_dir, self.config_dir_map[config1], '*'))
             command = self.target_run + [output_obj] + tmp_dir_contents
             verbose_print_command(command)
             returncode = subprocess.call(command)

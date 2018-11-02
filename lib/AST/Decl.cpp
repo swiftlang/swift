@@ -551,6 +551,12 @@ bool Decl::isWeakImported(ModuleDecl *fromModule) const {
   if (getAttrs().hasAttribute<WeakLinkedAttr>())
     return true;
 
+  if (auto *accessor = dyn_cast<AccessorDecl>(this))
+    return accessor->getStorage()->isWeakImported(fromModule);
+
+  if (auto *dtor = dyn_cast<DestructorDecl>(this))
+    return cast<ClassDecl>(dtor->getDeclContext())->isWeakImported(fromModule);
+
   // FIXME: Also check availability when containingModule is resilient.
   return false;
 }
@@ -1693,13 +1699,8 @@ bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
   if (isDynamic())
     return false;
 
-  // We only need the modify coroutine in type contexts.
-  // TODO: resilient global variables?
-  auto *dc = getDeclContext();
-  if (!dc->isTypeContext())
-    return false;
-
   // Requirements of ObjC protocols don't support the modify coroutine.
+  auto *dc = getDeclContext();
   if (auto protoDecl = dyn_cast<ProtocolDecl>(dc))
     if (protoDecl->isObjC())
       return false;

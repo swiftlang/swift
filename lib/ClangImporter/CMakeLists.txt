@@ -4,7 +4,7 @@ set(SWIFT_GYB_FLAGS
 add_gyb_target(generated_sorted_cf_database
     SortedCFDatabase.def.gyb)
 
-add_swift_library(swiftClangImporter STATIC
+add_swift_host_library(swiftClangImporter STATIC
   CFTypeInfo.cpp
   ClangAdapter.cpp
   ClangDiagnosticConsumer.cpp
@@ -16,7 +16,7 @@ add_swift_library(swiftClangImporter STATIC
   ImportName.cpp
   ImportType.cpp
   SwiftLookupTable.cpp
-  LINK_LIBRARIES
+  LINK_LIBS
     swiftAST
     swiftParse
 )

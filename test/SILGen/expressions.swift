@@ -82,7 +82,7 @@ func literals() {
   var e:SillyString = "foo"
 }
 // CHECK-LABEL: sil hidden @$s11expressions8literalsyyF
-// CHECK: integer_literal $Builtin.Int2048, 1
+// CHECK: integer_literal $Builtin.IntLiteral, 1
 // CHECK: float_literal $Builtin.FPIEEE{{64|80}}, {{0x3FF4000000000000|0x3FFFA000000000000000}}
 // CHECK: string_literal utf16 "foö"
 // CHECK: string_literal utf8 "foo"
@@ -506,13 +506,13 @@ func magic_identifier_expansion(_ a: Int = #column) {
   
   // This should expand to the column number of the first _.
   var tmp = #column
-  // CHECK: integer_literal $Builtin.Int2048, 13
+  // CHECK: integer_literal $Builtin.IntLiteral, 13
 
   // This should expand to the column number of the (, not to the column number
   // of #column in the default argument list of this function.
   // rdar://14315674
   magic_identifier_expansion()
-  // CHECK: integer_literal $Builtin.Int2048, 29
+  // CHECK: integer_literal $Builtin.IntLiteral, 29
 }
 
 func print_string() {

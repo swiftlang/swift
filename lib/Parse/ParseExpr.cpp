@@ -960,8 +960,8 @@ ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
 
 /// Copy a numeric literal value into AST-owned memory, stripping underscores
 /// so the semantic part of the value can be parsed by APInt/APFloat parsers.
-static StringRef copyAndStripUnderscores(ASTContext &C, StringRef orig) {
-  char *start = static_cast<char*>(C.Allocate(orig.size(), 1));
+StringRef Parser::copyAndStripUnderscores(StringRef orig) {
+  char *start = static_cast<char*>(Context.Allocate(orig.size(), 1));
   char *p = start;
 
   if (p) {
@@ -1111,6 +1111,18 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
     if (Result.isNull())
       return Result;
 
+    if (Result.hasCodeCompletion() &&
+        SourceMgr.getCodeCompletionLoc() == PreviousLoc) {
+      // Don't parse suffixes if the expression ended with code completion
+      // token. Because, for example, given:
+      //   [.foo(), .bar()]
+      // If user want to insert another element in between:
+      //   [.foo(), <HERE> .bar()]
+      // '.bar()' is probably not a part of the inserting element. Moreover,
+      // having suffixes doesn't help type inference in any way.
+      return Result;
+    }
+
     // Check for a .foo suffix.
     SourceLoc TokLoc = Tok.getLoc();
     if (Tok.is(tok::period) || Tok.is(tok::period_prefix)) {
@@ -1232,12 +1244,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
           /*isPostfix=*/true, isExprBasic, lSquareLoc, indexArgs,
           indexArgLabels, indexArgLabelLocs, rSquareLoc, trailingClosure,
           SyntaxKind::FunctionCallArgumentList);
-      if (status.hasCodeCompletion())
-        return makeParserCodeCompletionResult<Expr>();
-      if (status.isError() || Result.isNull())
-        return nullptr;
       Result = makeParserResult(
-          Result,
+          status | Result,
           SubscriptExpr::create(Context, Result.get(), lSquareLoc, indexArgs,
                                 indexArgLabels, indexArgLabelLocs, rSquareLoc,
                                 trailingClosure, ConcreteDeclRef(),
@@ -1443,7 +1451,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   SyntaxParsingContext ExprContext(SyntaxContext, SyntaxContextKind::Expr);
   switch (Tok.getKind()) {
   case tok::integer_literal: {
-    StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
+    StringRef Text = copyAndStripUnderscores(Tok.getText());
     SourceLoc Loc = consumeToken(tok::integer_literal);
     ExprContext.setCreateSyntax(SyntaxKind::IntegerLiteralExpr);
     return makeParserResult(new (Context)
@@ -1451,7 +1459,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                                                    /*Implicit=*/false));
   }
   case tok::floating_literal: {
-    StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
+    StringRef Text = copyAndStripUnderscores(Tok.getText());
     SourceLoc Loc = consumeToken(tok::floating_literal);
     ExprContext.setCreateSyntax(SyntaxKind::FloatLiteralExpr);
     return makeParserResult(new (Context) FloatLiteralExpr(Text, Loc,
@@ -1602,7 +1610,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       memcpy(Ptr, "0.", 2);
       memcpy(Ptr+2, Tok.getText().data(), Tok.getLength());
       auto FltText = StringRef(Ptr, Tok.getLength()+2);
-      FltText = copyAndStripUnderscores(Context, FltText);
+      FltText = copyAndStripUnderscores(FltText);
       
       consumeToken(tok::integer_literal);
       return makeParserResult(new (Context)

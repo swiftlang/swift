@@ -40,6 +40,11 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_31 | %FileCheck %s -check-prefix=UNRESOLVED_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_32 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_33 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_34 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_35 | %FileCheck %s -check-prefix=UNRESOLVED_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_36 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_37 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_38 | %FileCheck %s -check-prefix=UNRESOLVED_3
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_AVAIL_1 | %FileCheck %s -check-prefix=ENUM_AVAIL_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OPTIONS_AVAIL_1 | %FileCheck %s -check-prefix=OPTIONS_AVAIL_1
@@ -65,8 +70,13 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_1 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_2 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_3 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_U
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_4 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_INT
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_CLOSURE_1 | %FileCheck %s -check-prefix=STATIC_CLOSURE_1
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOADED_METHOD_1 | %FileCheck %s -check-prefix=OVERLOADED_METHOD_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOADED_INIT_1 | %FileCheck %s -check-prefix=OVERLOADED_METHOD_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOADED_INIT_2 | %FileCheck %s -check-prefix=OVERLOADED_METHOD_1
 
 enum SomeEnum1 {
   case South
@@ -312,7 +322,12 @@ let TopLevelVar4 = OptionSetTaker7([.Option1], Op2: [.Option4, .#^UNRESOLVED_31^
 
 let _: [SomeEnum1] = [.#^UNRESOLVED_32^#]
 let _: [SomeEnum1] = [.South, .#^UNRESOLVED_33^#]
-let _: [SomeEnum1:SomeEnum2] = [.South:.West, .#^UNRESOLVED_34^#:]
+let _: [SomeEnum1] = [.South, .#^UNRESOLVED_34^# .South]
+
+let _: [SomeEnum1:SomeOptions1] = [.South:.Option1, .South:.#^UNRESOLVED_35^#]
+let _: [SomeEnum1:SomeOptions1] = [.South:.Option1, .#^UNRESOLVED_36^#:.Option1]
+let _: [SomeEnum1:SomeOptions1] = [.South:.Option1, .#^UNRESOLVED_37^#]
+let _: [SomeEnum1:SomeOptions1] = [.South:.Option1, .#^UNRESOLVED_38^#:]
 
 func testAvail1(_ x: EnumAvail1) {
   testAvail1(.#^ENUM_AVAIL_1^#)
@@ -474,6 +489,10 @@ func testGeneric() {
   takeGenericInt(.#^GENERIC_2^#)
   takeGenericU(.#^GENERIC_3^#)
 }
+
+switch Generic<Int>.empty {
+case let .#^GENERIC_4^#
+}
 // GENERIC_1: Begin completions
 // GENERIC_1:     Decl[EnumElement]/ExprSpecific:     contains({#content: T#})[#(T) -> Generic<T>#];
 // GENERIC_1:     Decl[EnumElement]/ExprSpecific:     empty[#Generic<T>#];
@@ -494,3 +513,25 @@ func testHasStaticClosure() {
 // STATIC_CLOSURE_1-DAG: Decl[StaticVar]/CurrNominal:        create[#() -> HasCreator#];
 // STATIC_CLOSURE_1-NOT: create_curried
 // STATIC_CLOSURE_1: End completions
+
+struct HasOverloaded {
+  init(e: SomeEnum1) {}
+  init(e: SomeEnum2) {}
+  func takeEnum(_ e: SomeEnum1) -> Int { return 0 }
+  func takeEnum(_ e: SomeEnum2) -> Int { return 0 }
+}
+func testOverload(val: HasOverloaded) {
+  let _ = val.takeEnum(.#^OVERLOADED_METHOD_1^#)
+// OVERLOADED_METHOD_1: Begin completions, 4 items
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#]; name=South
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#]; name=North
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific:     East[#SomeEnum2#]; name=East
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific:     West[#SomeEnum2#]; name=West
+// OVERLOADED_METHOD_1: End completions
+
+  let _ = HasOverloaded.init(e: .#^OVERLOADED_INIT_1^#)
+// Same as OVERLOADED_METHOD_1.
+
+  let _ = HasOverloaded(e: .#^OVERLOADED_INIT_2^#)
+// Same as OVERLOADED_METHOD_1.
+}

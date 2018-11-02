@@ -984,13 +984,13 @@ func testOptionalEnumMix(_ a : Int?) -> Int {
 
   // CHECK: [[SOMEBB]](%3 : @trivial $Int):
   // CHECK-NEXT: debug_value %3 : $Int, let, name "x"
-  // CHECK: integer_literal $Builtin.Int2048, 0
+  // CHECK: integer_literal $Builtin.IntLiteral, 0
 
   case .none:
     return 42
 
   // CHECK: [[NILBB]]:
-  // CHECK: integer_literal $Builtin.Int2048, 42
+  // CHECK: integer_literal $Builtin.IntLiteral, 42
   }
 }
 
@@ -1006,13 +1006,13 @@ func testOptionalEnumMixWithNil(_ a : Int?) -> Int {
 
   // CHECK: [[SOMEBB]](%3 : @trivial $Int):
   // CHECK-NEXT: debug_value %3 : $Int, let, name "x"
-  // CHECK: integer_literal $Builtin.Int2048, 0
+  // CHECK: integer_literal $Builtin.IntLiteral, 0
 
   case nil:
     return 42
 
   // CHECK: [[NILBB]]:
-  // CHECK: integer_literal $Builtin.Int2048, 42
+  // CHECK: integer_literal $Builtin.IntLiteral, 42
   }
 }
 

@@ -201,12 +201,6 @@ extension LazyCollection : Collection {
     return _base._customLastIndexOfEquatableElement(element)
   }
 
-  /// Returns the first element of `self`, or `nil` if `self` is empty.
-  @inlinable
-  public var first: Element? {
-    return _base.first
-  }
-
   // TODO: swift-3-indexing-model - add docs
   @inlinable
   public func index(_ i: Index, offsetBy n: Int) -> Index {
@@ -234,11 +228,6 @@ extension LazyCollection : BidirectionalCollection
   @inlinable
   public func index(before i: Index) -> Index {
     return _base.index(before: i)
-  }
-
-  @inlinable
-  public var last: Element? {
-    return _base.last
   }
 }
 

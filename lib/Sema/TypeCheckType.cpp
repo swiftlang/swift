@@ -149,6 +149,9 @@ Type TypeResolution::resolveDependentMemberType(
   }
 
   assert(stage == TypeResolutionStage::Interface);
+  if (!getGenericSignature())
+    return ErrorType::get(baseTy);
+
   auto builder = getGenericSignatureBuilder();
   auto baseEquivClass =
     builder->resolveEquivalenceClass(
@@ -427,31 +430,6 @@ Type TypeChecker::getInt8Type(DeclContext *dc) {
 }
 Type TypeChecker::getUInt8Type(DeclContext *dc) {
   return ::getStdlibType(*this, UInt8Type, dc, "UInt8");
-}
-
-/// Returns the maximum-sized builtin integer type.
-Type TypeChecker::getMaxIntegerType(DeclContext *dc) {
-  if (!MaxIntegerType.isNull())
-    return MaxIntegerType;
-
-  SmallVector<ValueDecl *, 1> lookupResults;
-  getStdlibModule(dc)->lookupValue(/*AccessPath=*/{},
-                                   Context.Id_MaxBuiltinIntegerType,
-                                   NLKind::QualifiedLookup, lookupResults);
-  if (lookupResults.size() != 1)
-    return MaxIntegerType;
-
-  auto *maxIntegerTypeDecl = dyn_cast<TypeAliasDecl>(lookupResults.front());
-  if (!maxIntegerTypeDecl)
-    return MaxIntegerType;
-
-  validateDecl(maxIntegerTypeDecl);
-  if (!maxIntegerTypeDecl->hasInterfaceType() ||
-      !maxIntegerTypeDecl->getDeclaredInterfaceType()->is<BuiltinIntegerType>())
-    return MaxIntegerType;
-
-  MaxIntegerType = maxIntegerTypeDecl->getUnderlyingTypeLoc().getType();
-  return MaxIntegerType;
 }
 
 /// Find the standard type of exceptions.

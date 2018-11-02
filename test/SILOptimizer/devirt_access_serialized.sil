@@ -20,7 +20,7 @@ class Y : X
 }
 
 sil [serialized] @_TFC14devirt_access21X4pingfS0_FT_Si : $@convention(method) (@guaranteed X) -> Int
-sil public_external [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+sil public_external [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBI_Si : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int
 sil @_TFC14devirt_access21Xd : $@convention(method) (@guaranteed X) -> @owned Builtin.NativeObject
 sil @_TFC14devirt_access21XD : $@convention(method) (@guaranteed X) -> ()
 sil @_TFC14devirt_access21XcfMS0_FT_S0_ : $@convention(method) (@owned X) -> @owned X

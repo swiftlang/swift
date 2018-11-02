@@ -187,6 +187,7 @@ namespace {
     }
 
     IMPL(BuiltinInteger, Trivial)
+    IMPL(BuiltinIntegerLiteral, Trivial)
     IMPL(BuiltinFloat, Trivial)
     IMPL(BuiltinRawPointer, Trivial)
     IMPL(BuiltinNativeObject, Reference)

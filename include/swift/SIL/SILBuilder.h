@@ -172,7 +172,7 @@ public:
   /// Build instructions before the given insertion point, inheriting the debug
   /// location.
   ///
-  /// Clients should prefer this constructor.
+  /// SILBuilderContext must outlive this SILBuilder instance.
   SILBuilder(SILInstruction *I, const SILDebugScope *DS, SILBuilderContext &C)
       : TempContext(C.getModule()), C(C), F(I->getFunction()) {
     assert(DS && "instruction has no debug scope");
@@ -180,6 +180,10 @@ public:
     setInsertionPoint(I);
   }
 
+  /// Build instructions before the given insertion point, inheriting the debug
+  /// location.
+  ///
+  /// SILBuilderContext must outlive this SILBuilder instance.
   SILBuilder(SILBasicBlock *BB, const SILDebugScope *DS, SILBuilderContext &C)
       : TempContext(C.getModule()), C(C), F(BB->getParent()) {
     assert(DS && "block has no debug scope");
@@ -370,6 +374,16 @@ public:
   /// instruction) then split the block at that instruction and return the
   /// continuation block.
   SILBasicBlock *splitBlockForFallthrough();
+
+  /// Convenience for creating a fall-through basic block on-the-fly without
+  /// affecting the insertion point.
+  SILBasicBlock *createFallthroughBlock(SILLocation loc,
+                                        SILBasicBlock *targetBB) {
+    auto *newBB = F->createBasicBlock();
+    SILBuilder(newBB, this->getCurrentDebugScope(), this->getBuilderContext())
+        .createBranch(loc, targetBB);
+    return newBB;
+  }
 
   //===--------------------------------------------------------------------===//
   // SILInstruction Creation Methods

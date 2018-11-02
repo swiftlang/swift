@@ -362,8 +362,24 @@ bool swift::_conformsToProtocol(const OpaqueValue *value,
 #endif
 
   
-  case MetadataKind::Existential: // FIXME
-  case MetadataKind::ExistentialMetatype: // FIXME
+  case MetadataKind::Existential: {
+#if SWIFT_OBJC_INTEROP
+    // If all protocols are @objc and at least one of them conforms to the
+    // protocol, succeed.
+    auto existential = cast<ExistentialTypeMetadata>(type);
+    if (!existential->isObjC())
+      return false;
+    for (auto existentialProto : existential->getProtocols()) {
+      if (protocol_conformsToProtocol(existentialProto.getObjCProtocol(),
+                                      protocol.getObjCProtocol()))
+        return true;
+    }
+#endif
+
+    return false;
+  }
+
+  case MetadataKind::ExistentialMetatype:
   default:
     return false;
   }

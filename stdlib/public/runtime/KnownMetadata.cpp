@@ -16,6 +16,7 @@
 
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/Numeric.h"
 #include "MetadataImpl.h"
 #include "Private.h"
 #include <cstring>
@@ -38,10 +39,11 @@ namespace {
     char data[16];
   };
 
-  struct alignas(32) int256_like {
+  static_assert(MaximumAlignment == 16, "max alignment was hardcoded");
+  struct alignas(16) int256_like {
     char data[32];
   };
-  struct alignas(64) int512_like {
+  struct alignas(16) int512_like {
     char data[64];
   };
 
@@ -65,6 +67,7 @@ namespace ctypes {
     using Bi512_ = int512_like;
 
     using Bw = intptr_t;
+    using BL_ = IntegerLiteral;
 
     using Bf16_ = uint16_t;
     using Bf32_ = float;
@@ -104,43 +107,62 @@ namespace pointer_types {
 }
 
 namespace {
-  template<typename T>
-  constexpr size_t getAlignment() { return alignof(T); }
+  template <typename T>
+  struct BuiltinType {
+    static constexpr const size_t Alignment = alignof(T);
+  };
 
-#define SET_FIXED_ALIGNMENT(Type, Align) \
-template<> constexpr size_t getAlignment<Type>() { return Align; }
+#define SET_FIXED_ALIGNMENT(Type, Align)                                       \
+  template <>                                                                  \
+  struct BuiltinType<Type> {                                                   \
+    static constexpr const size_t Alignment = Align;                           \
+  };
 
   SET_FIXED_ALIGNMENT(uint8_t, 1)
   SET_FIXED_ALIGNMENT(uint16_t, 2)
   SET_FIXED_ALIGNMENT(uint32_t, 4)
   SET_FIXED_ALIGNMENT(uint64_t, 8)
   SET_FIXED_ALIGNMENT(int128_like, 16)
-  SET_FIXED_ALIGNMENT(int256_like, 32)
-  SET_FIXED_ALIGNMENT(int512_like, 64)
+  static_assert(MaximumAlignment == 16, "max alignment was hardcoded");
+  SET_FIXED_ALIGNMENT(int256_like, 16)
+  SET_FIXED_ALIGNMENT(int512_like, 16)
 
 #undef SET_FIXED_ALIGNMENT
 
-  template<typename T, unsigned N>
-  struct SwiftVecT {
-    typedef T type __attribute__((ext_vector_type(N)));
+  template <typename T, unsigned N>
+  struct SIMDVector {
+    using Type = T __attribute__((__ext_vector_type__(N)));
   };
 
-  template<typename T, unsigned N>
-  using SwiftVec = typename SwiftVecT<T, N>::type;
+  template <>
+  struct SIMDVector<float, 3> {
+    using Type = float __attribute__((__ext_vector_type__(4)));
+  };
+
+  template <>
+  struct SIMDVector<double, 3> {
+    using Type = double __attribute__((__ext_vector_type__(4)));
+  };
+
+  template <typename T, unsigned N>
+  using SIMDVectorType = typename SIMDVector<T, N>::Type;
 }
 
-#define BUILTIN_TYPE(Symbol, Name)                         \
-const ValueWitnessTable swift::VALUE_WITNESS_SYM(Symbol) = \
-  ValueWitnessTableForBox<NativeBox<ctypes::Symbol,        \
-                                    getAlignment<ctypes::Symbol>()>>::table;
+#define BUILTIN_TYPE(Symbol, Name)                                             \
+const ValueWitnessTable swift::VALUE_WITNESS_SYM(Symbol) =                     \
+  ValueWitnessTableForBox<NativeBox<ctypes::Symbol,                            \
+                                    BuiltinType<ctypes::Symbol>::Alignment>>::table;
+
 #define BUILTIN_POINTER_TYPE(Symbol, Name)                 \
-const ExtraInhabitantsValueWitnessTable swift::VALUE_WITNESS_SYM(Symbol) = \
+const ExtraInhabitantsValueWitnessTable swift::VALUE_WITNESS_SYM(Symbol) =     \
   ValueWitnessTableForBox<pointer_types::Symbol>::table;
-#define BUILTIN_VECTOR_TYPE(ElementSymbol, _, Width)                          \
-  const ValueWitnessTable                                                     \
-  swift::VALUE_WITNESS_SYM(VECTOR_BUILTIN_SYMBOL_NAME(ElementSymbol,Width)) = \
-  ValueWitnessTableForBox<NativeBox<SwiftVec<ctypes::ElementSymbol,           \
-                                             Width>>>::table;
+
+#define BUILTIN_VECTOR_TYPE(ElementSymbol, _, Width)                           \
+  const ValueWitnessTable                                                      \
+  swift::VALUE_WITNESS_SYM(VECTOR_BUILTIN_SYMBOL_NAME(ElementSymbol,Width)) =  \
+  ValueWitnessTableForBox<NativeBox<SIMDVectorType<ctypes::ElementSymbol,      \
+                                                   Width>>>::table;
+
 #include "swift/Runtime/BuiltinTypes.def"
 
 /// The value-witness table for pointer-aligned unmanaged pointer types.

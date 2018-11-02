@@ -920,7 +920,9 @@ Driver::buildCompilation(const ToolChain &TC,
         ArgList->hasArg(options::OPT_driver_time_compilation);
     std::unique_ptr<UnifiedStatsReporter> StatsReporter =
         createStatsReporter(ArgList.get(), Inputs, OI, DefaultTargetTriple);
-    
+    const bool EnableExperimentalDependencies =
+        ArgList->hasArg(options::OPT_enable_experimental_dependencies);
+
     C = llvm::make_unique<Compilation>(
         Diags, TC, OI, Level,
         std::move(ArgList),
@@ -939,7 +941,8 @@ Driver::buildCompilation(const ToolChain &TC,
         DriverBatchSizeLimit,
         SaveTemps,
         ShowDriverTimeCompilation,
-        std::move(StatsReporter));
+        std::move(StatsReporter),
+        EnableExperimentalDependencies);
   }
 
   // Construct the graph of Actions.

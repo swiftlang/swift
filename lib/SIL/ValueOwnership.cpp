@@ -1,8 +1,8 @@
-//===--- ValueOwnershipKindClassifier.cpp ---------------------------------===//
+//===--- ValueOwnership.cpp -----------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,12 +10,38 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ValueOwnershipKindClassifier.h"
+#include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILModule.h"
 
 using namespace swift;
-using namespace sil;
+
+//===----------------------------------------------------------------------===//
+//                                 Interface
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class ValueOwnershipKindClassifier
+    : public SILValueVisitor<ValueOwnershipKindClassifier, ValueOwnershipKind> {
+
+public:
+  ValueOwnershipKindClassifier() = default;
+  ~ValueOwnershipKindClassifier() = default;
+  ValueOwnershipKindClassifier(const ValueOwnershipKindClassifier &) = delete;
+  ValueOwnershipKindClassifier(ValueOwnershipKindClassifier &&) = delete;
+
+  ValueOwnershipKind visitForwardingInst(SILInstruction *I,
+                                         ArrayRef<Operand> Ops);
+  ValueOwnershipKind visitForwardingInst(SILInstruction *I) {
+    return visitForwardingInst(I, I->getAllOperands());
+  }
+
+#define VALUE(Id, Parent) ValueOwnershipKind visit##Id(Id *ID);
+#include "swift/SIL/SILNodes.def"
+};
+
+} // end anonymous namespace
 
 #define CONSTANT_OWNERSHIP_INST(OWNERSHIP, INST)                               \
   ValueOwnershipKind ValueOwnershipKindClassifier::visit##INST##Inst(          \
@@ -27,8 +53,6 @@ using namespace sil;
     }                                                                          \
     return ValueOwnershipKind::OWNERSHIP;                                      \
   }
-
-
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   CONSTANT_OWNERSHIP_INST(Owned, Load##Name)
@@ -550,4 +574,14 @@ ValueOwnershipKindClassifier::visitBuiltinInst(BuiltinInst *BI) {
   // For now, just conservatively say builtins are None. We need to use a
   // builtin in here to guarantee correctness.
   return ValueOwnershipKindBuiltinVisitor().visit(BI);
+}
+
+//===----------------------------------------------------------------------===//
+//                            Top Level Entrypoint
+//===----------------------------------------------------------------------===//
+
+ValueOwnershipKind SILValue::getOwnershipKind() const {
+  // Once we have multiple return values, this must be changed.
+  ValueOwnershipKindClassifier Classifier;
+  return Classifier.visit(const_cast<ValueBase *>(Value));
 }

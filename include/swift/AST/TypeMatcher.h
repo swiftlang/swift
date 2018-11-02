@@ -102,6 +102,7 @@ class TypeMatcher {
 
     TRIVIAL_CASE(ErrorType)
     TRIVIAL_CASE(BuiltinIntegerType)
+    TRIVIAL_CASE(BuiltinIntegerLiteralType)
     TRIVIAL_CASE(BuiltinFloatType)
     TRIVIAL_CASE(BuiltinRawPointerType)
     TRIVIAL_CASE(BuiltinNativeObjectType)

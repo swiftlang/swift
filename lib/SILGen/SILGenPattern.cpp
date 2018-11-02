@@ -989,6 +989,11 @@ chooseNecessaryColumn(const ClauseMatrix &matrix, unsigned firstRow) {
 /// Recursively emit a decision tree from the given pattern matrix.
 void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
                                         const FailureHandler &outerFailure) {
+  if (clauses.rows() == 0) {
+    SGF.B.createUnreachable(SILLocation(PatternMatchStmt));
+    return;
+  }
+
   unsigned firstRow = 0;
   while (true) {
     // If there are no rows remaining, then we fail.
@@ -2261,6 +2266,9 @@ emitBoolDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
 
     SILBasicBlock *caseBB = caseBBs[i].second;
     SGF.B.setInsertionPoint(caseBB);
+
+    // We're in conditionally-executed code; enter a scope.
+    Scope scope(SGF.Cleanups, CleanupLocation::get(loc));
 
     SILValue result
       = SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.SGM.M);

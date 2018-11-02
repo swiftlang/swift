@@ -204,6 +204,110 @@ class TestPerformanceTestResult(unittest.TestCase):
         r = PerformanceTestResult(log_line.split(','))
         self.assertEquals(r.max_rss, 10510336)
 
+    def test_init_quantiles(self):
+        # #,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs)
+        log = '1,Ackermann,3,54383,54512,54601'
+        r = PerformanceTestResult(log.split(','), quantiles=True)
+        self.assertEquals(r.test_num, '1')
+        self.assertEquals(r.name, 'Ackermann')
+        self.assertEquals((r.num_samples, r.min, r.median, r.max),
+                          (3, 54383, 54512, 54601))
+        self.assertAlmostEquals(r.mean, 54498.67, places=2)
+        self.assertAlmostEquals(r.sd, 109.61, places=2)
+        self.assertEquals(r.samples.count, 3)
+        self.assertEquals(r.samples.num_samples, 3)
+        self.assertEquals([s.runtime for s in r.samples.all_samples],
+                          [54383, 54512, 54601])
+
+        # #,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs),MAX_RSS(B)
+        log = '1,Ackermann,3,54529,54760,55807,266240'
+        r = PerformanceTestResult(log.split(','), quantiles=True, memory=True)
+        self.assertEquals((r.samples.count, r.max_rss), (3, 266240))
+        # #,TEST,SAMPLES,MIN(μs),Q1(μs),Q2(μs),Q3(μs),MAX(μs)
+        log = '1,Ackermann,5,54570,54593,54644,57212,58304'
+        r = PerformanceTestResult(log.split(','), quantiles=True, memory=False)
+        self.assertEquals((r.num_samples, r.min, r.median, r.max),
+                          (5, 54570, 54644, 58304))
+        self.assertEquals((r.samples.q1, r.samples.q3), (54593, 57212))
+        self.assertEquals(r.samples.count, 5)
+        # #,TEST,SAMPLES,MIN(μs),Q1(μs),Q2(μs),Q3(μs),MAX(μs),MAX_RSS(B)
+        log = '1,Ackermann,5,54686,54731,54774,55030,63466,270336'
+        r = PerformanceTestResult(log.split(','), quantiles=True, memory=True)
+        self.assertEquals(r.samples.num_samples, 5)
+        self.assertEquals(r.samples.count, 4)  # outlier was excluded
+        self.assertEquals(r.max_rss, 270336)
+
+    def test_init_delta_quantiles(self):
+        # #,TEST,SAMPLES,MIN(μs),𝚫MEDIAN,𝚫MAX
+        # 2-quantile from 2 samples in repeated min, when delta encoded,
+        # the difference is 0, which is ommited -- only separator remains
+        log = '202,DropWhileArray,2,265,,22'
+        r = PerformanceTestResult(log.split(','), quantiles=True, delta=True)
+        self.assertEquals((r.num_samples, r.min, r.median, r.max),
+                          (2, 265, 265, 287))
+        self.assertEquals(r.samples.count, 2)
+        self.assertEquals(r.samples.num_samples, 2)
+
+    def test_init_oversampled_quantiles(self):
+        """When num_samples is < quantile + 1, some of the measurements are
+        repeated in the report summary. Samples should contain only true
+        values, discarding the repetated artifacts from quantile estimation.
+
+        The test string is slightly massaged output of the following R script:
+        subsample <- function(x, q) {
+          quantile(1:x, probs=((0:(q-1))/(q-1)), type=1)}
+        tbl <- function(s) t(sapply(1:s, function(x) {
+          qs <- subsample(x, s); c(qs[1], diff(qs)) }))
+        sapply(c(3, 5, 11, 21), tbl)
+        """
+        def validatePTR(deq):  # construct from delta encoded quantiles string
+            deq = deq.split(',')
+            num_samples = deq.count('1')
+            r = PerformanceTestResult(['0', 'B', str(num_samples)] + deq,
+                                      quantiles=True, delta=True)
+            self.assertEquals(r.samples.num_samples, num_samples)
+            self.assertEquals([s.runtime for s in r.samples.all_samples],
+                              range(1, num_samples + 1))
+
+        delta_encoded_quantiles = """
+1,,
+1,,1
+1,,,,
+1,,,1,
+1,,1,1,
+1,,1,1,1
+1,,,,,,,,,,
+1,,,,,,1,,,,
+1,,,,1,,,1,,,
+1,,,1,,,1,,1,,
+1,,,1,,1,,1,,1,
+1,,1,,1,,1,1,,1,
+1,,1,1,,1,1,,1,1,
+1,,1,1,1,,1,1,1,1,
+1,,1,1,1,1,1,1,1,1,
+1,,1,1,1,1,1,1,1,1,1
+1,,,,,,,,,,,,,,,,,,,,
+1,,,,,,,,,,,1,,,,,,,,,
+1,,,,,,,1,,,,,,,1,,,,,,
+1,,,,,,1,,,,,1,,,,,1,,,,
+1,,,,,1,,,,1,,,,1,,,,1,,,
+1,,,,1,,,1,,,,1,,,1,,,1,,,
+1,,,1,,,1,,,1,,,1,,,1,,,1,,
+1,,,1,,,1,,1,,,1,,1,,,1,,1,,
+1,,,1,,1,,1,,1,,,1,,1,,1,,1,,
+1,,,1,,1,,1,,1,,1,,1,,1,,1,,1,
+1,,1,,1,,1,,1,,1,1,,1,,1,,1,,1,
+1,,1,,1,,1,1,,1,,1,1,,1,,1,1,,1,
+1,,1,,1,1,,1,1,,1,1,,1,1,,1,1,,1,
+1,,1,1,,1,1,,1,1,,1,1,1,,1,1,,1,1,
+1,,1,1,,1,1,1,,1,1,1,,1,1,1,,1,1,1,
+1,,1,1,1,,1,1,1,1,,1,1,1,1,,1,1,1,1,
+1,,1,1,1,1,1,,1,1,1,1,1,1,,1,1,1,1,1,
+1,,1,1,1,1,1,1,1,1,,1,1,1,1,1,1,1,1,1,
+1,,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1"""
+        map(validatePTR, delta_encoded_quantiles.split('\n')[1:])
+
     def test_repr(self):
         log_line = '1,AngryPhonebook,20,10664,12933,11035,576,10884'
         r = PerformanceTestResult(log_line.split(','))
@@ -214,29 +318,32 @@ class TestPerformanceTestResult(unittest.TestCase):
         )
 
     def test_merge(self):
-        tests = """1,AngryPhonebook,1,12045,12045,12045,0,12045,10510336
+        tests = """
+1,AngryPhonebook,1,12045,12045,12045,0,12045
 1,AngryPhonebook,1,12325,12325,12325,0,12325,10510336
 1,AngryPhonebook,1,11616,11616,11616,0,11616,10502144
-1,AngryPhonebook,1,12270,12270,12270,0,12270,10498048""".split('\n')
+1,AngryPhonebook,1,12270,12270,12270,0,12270,10498048""".split('\n')[1:]
         results = map(PerformanceTestResult,
                       [line.split(',') for line in tests])
+        results[2].setup = 9
+        results[3].setup = 7
 
         def as_tuple(r):
             return (r.num_samples, r.min, r.max, round(r.mean, 2),
-                    r.sd, r.median, r.max_rss)
+                    r.sd, r.median, r.max_rss, r.setup)
 
         r = results[0]
         self.assertEquals(as_tuple(r),
-                          (1, 12045, 12045, 12045, 0, 12045, 10510336))
+                          (1, 12045, 12045, 12045, 0, 12045, None, None))
         r.merge(results[1])
-        self.assertEquals(as_tuple(r),  # drops SD and median
-                          (2, 12045, 12325, 12185, 0, 0, 10510336))
+        self.assertEquals(as_tuple(r),  # drops SD and median, +max_rss
+                          (2, 12045, 12325, 12185, None, None, 10510336, None))
         r.merge(results[2])
-        self.assertEquals(as_tuple(r),  # picks smaller of the MAX_RSS
-                          (3, 11616, 12325, 11995.33, 0, 0, 10502144))
+        self.assertEquals(as_tuple(r),  # picks smaller of the MAX_RSS, +setup
+                          (3, 11616, 12325, 11995.33, None, None, 10502144, 9))
         r.merge(results[3])
-        self.assertEquals(as_tuple(r),
-                          (4, 11616, 12325, 12064, 0, 0, 10498048))
+        self.assertEquals(as_tuple(r),  # picks smaller of the setup values
+                          (4, 11616, 12325, 12064, None, None, 10498048, 7))
 
 
 class TestResultComparison(unittest.TestCase):
@@ -336,7 +443,7 @@ class OldAndNewLog(unittest.TestCase):
 
 class TestLogParser(unittest.TestCase):
     def test_parse_results_csv(self):
-        """Ignores header row, empty lines and Totals row."""
+        """Ignores uknown lines, extracts data from supported formats."""
         log = """#,TEST,SAMPLES,MIN(us),MAX(us),MEAN(us),SD(us),MEDIAN(us)
 34,BitCount,20,3,4,4,0,4
 
@@ -369,6 +476,41 @@ Total performance tests executed: 1
         self.assertEquals(r.name, 'Array2D')
         self.assertEquals(r.max_rss, 20915200)
 
+    def test_parse_quantiles(self):
+        """Gathers samples from reported quantiles. Handles optional memory."""
+        r = LogParser.results_from_string(
+            """#,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs)
+1,Ackermann,3,54383,54512,54601""")['Ackermann']
+        self.assertEquals([s.runtime for s in r.samples.all_samples],
+                          [54383, 54512, 54601])
+        r = LogParser.results_from_string(
+            """#,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs),MAX_RSS(B)
+1,Ackermann,3,54529,54760,55807,266240""")['Ackermann']
+        self.assertEquals([s.runtime for s in r.samples.all_samples],
+                          [54529, 54760, 55807])
+        self.assertEquals(r.max_rss, 266240)
+
+    def test_parse_delta_quantiles(self):
+        r = LogParser.results_from_string(  # 2-quantile aka. median
+            '#,TEST,SAMPLES,MIN(μs),𝚫MEDIAN,𝚫MAX\n0,B,1,101,,')['B']
+        self.assertEquals(
+            (r.num_samples, r.min, r.median, r.max, r.samples.count),
+            (1, 101, 101, 101, 1))
+        r = LogParser.results_from_string(
+            '#,TEST,SAMPLES,MIN(μs),𝚫MEDIAN,𝚫MAX\n0,B,2,101,,1')['B']
+        self.assertEquals(
+            (r.num_samples, r.min, r.median, r.max, r.samples.count),
+            (2, 101, 101, 102, 2))
+        r = LogParser.results_from_string(  # 20-quantiles aka. ventiles
+            '#,TEST,SAMPLES,MIN(μs),𝚫V1,𝚫V2,𝚫V3,𝚫V4,𝚫V5,𝚫V6,𝚫V7,𝚫V8,' +
+            '𝚫V9,𝚫VA,𝚫VB,𝚫VC,𝚫VD,𝚫VE,𝚫VF,𝚫VG,𝚫VH,𝚫VI,𝚫VJ,𝚫MAX\n' +
+            '202,DropWhileArray,200,214,,,,,,,,,,,,1,,,,,,2,16,464'
+        )['DropWhileArray']
+        self.assertEquals(
+            (r.num_samples, r.min, r.max, r.samples.count),
+            # last 3 ventiles were outliers and were excluded from the sample
+            (200, 214, 215, 18))
+
     def test_parse_results_verbose(self):
         """Parse multiple performance test results with 2 sample formats:
         single line for N = 1; two lines for N > 1.
@@ -383,8 +525,11 @@ Running AngryPhonebook for 3 samples.
     Sample 2,11467
 1,AngryPhonebook,3,11467,13898,12392,1315,11812
 Running Array2D for 3 samples.
+    SetUp 14444
     Sample 0,369900
+    Yielding after ~369918 μs
     Sample 1,381039
+    Yielding after ~381039 μs
     Sample 2,371043
 3,Array2D,3,369900,381039,373994,6127,371043
 
@@ -400,15 +545,21 @@ Totals,2"""
         self.assertEquals(r.num_samples, r.samples.num_samples)
         self.assertEquals(results[0].samples.all_samples,
                           [(0, 78, 11812), (1, 90, 13898), (2, 90, 11467)])
+        self.assertEquals(r.yields, None)
 
         r = results[1]
         self.assertEquals(
             (r.name, r.min, r.max, int(r.mean), int(r.sd), r.median),
             ('Array2D', 369900, 381039, 373994, 6127, 371043)
         )
+        self.assertEquals(r.setup, 14444)
         self.assertEquals(r.num_samples, r.samples.num_samples)
         self.assertEquals(results[1].samples.all_samples,
                           [(0, 1, 369900), (1, 1, 381039), (2, 1, 371043)])
+        yielded = r.yields[0]
+        self.assertEquals(yielded.before_sample, 1)
+        self.assertEquals(yielded.after, 369918)
+        self.assertEquals(r.yields, [(1, 369918), (2, 381039)])
 
     def test_parse_environment_verbose(self):
         """Parse stats about environment in verbose mode."""

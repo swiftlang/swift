@@ -865,6 +865,12 @@ namespace {
     }
 
     MetadataResponse
+    visitBuiltinIntegerLiteralType(CanBuiltinIntegerLiteralType type,
+                                   DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
     visitBuiltinNativeObjectType(CanBuiltinNativeObjectType type,
                                  DynamicMetadataRequest request) {
       return emitDirectMetadataRef(type);

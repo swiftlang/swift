@@ -2026,6 +2026,7 @@ void Serializer::writeCrossReference(const Decl *D) {
            "Cannot cross reference a generic type decl at module scope.");
     abbrCode = DeclTypeAbbrCodes[XRefGenericParamPathPieceLayout::Code];
     XRefGenericParamPathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                                genericParam->getDepth(),
                                                 genericParam->getIndex());
     return;
   }
@@ -3631,6 +3632,7 @@ void Serializer::writeType(Type ty) {
     llvm_unreachable("should not serialize an invalid type");
 
   case TypeKind::BuiltinInteger:
+  case TypeKind::BuiltinIntegerLiteral:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinNativeObject:
