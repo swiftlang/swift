@@ -3303,6 +3303,12 @@ ERROR(ambiguous_enum_pattern_type,none,
 WARNING(type_inferred_to_undesirable_type,none,
         "%select{variable|constant}2 %0 inferred to have type %1, "
         "which may be unexpected", (Identifier, Type, bool))
+WARNING(type_inferred_to_uninhabited_type,none,
+        "%select{variable|constant}2 %0 inferred to have type %1, "
+        "which is an enum with no cases", (Identifier, Type, bool))
+WARNING(type_inferred_to_uninhabited_tuple_type,none,
+        "%select{variable|constant}2 %0 inferred to have type %1, "
+        "which contains an enum with no cases", (Identifier, Type, bool))
 NOTE(add_explicit_type_annotation_to_silence,none,
      "add an explicit type annotation to silence this warning", ())
 

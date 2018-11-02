@@ -1100,6 +1100,7 @@ recur:
     Type diagTy = type->getOptionalObjectType();
     if (!diagTy) diagTy = type;
     
+    auto diag = diag::type_inferred_to_undesirable_type;
     bool shouldRequireType = false;
     if (NP->isImplicit()) {
       // If the whole pattern is implicit, the user didn't write it.
@@ -1111,14 +1112,22 @@ recur:
         shouldRequireType = true;
     } else if (diagTy->isStructurallyUninhabited()) {
       shouldRequireType = true;
+      diag = diag::type_inferred_to_uninhabited_type;
+      
+      if (diagTy->is<TupleType>()) {
+        diag = diag::type_inferred_to_uninhabited_tuple_type;
+      } else {
+        assert((diagTy->is<EnumType>() || diagTy->is<BoundGenericEnumType>()) &&
+          "unknown structurally uninhabited type");
+      }
     }
     
     if (shouldRequireType &&
         !options.is(TypeResolverContext::ForEachStmt) &&
         !options.is(TypeResolverContext::EditorPlaceholderExpr) &&
         !(options & TypeResolutionFlags::FromNonInferredPattern)) {
-      diagnose(NP->getLoc(), diag::type_inferred_to_undesirable_type,
-               NP->getDecl()->getName(), type, NP->getDecl()->isLet());
+      diagnose(NP->getLoc(), diag, NP->getDecl()->getName(), type,
+               NP->getDecl()->isLet());
       diagnose(NP->getLoc(), diag::add_explicit_type_annotation_to_silence);
     }
 
