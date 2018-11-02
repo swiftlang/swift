@@ -2550,6 +2550,20 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
 
+                if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
+                    ICU_ROOT=$(build_directory ${host} libicu)/tmp_install
+                    LIBICU_BUILD_ARGS=(
+                        -DICU_ROOT:PATH=${ICU_ROOT}
+                        -DICU_INCLUDE_DIR:PATH=${ICU_ROOT}/include
+                        -DICU_UC_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
+                        -DICU_UC_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
+                        -DICU_I18N_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
+                        -DICU_I18N_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
+                    )
+                else
+                    LIBICU_BUILD_ARGS=()
+                fi
+
                 # Staging: require opt-in for building with dispatch
                 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
                     LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
@@ -2574,6 +2588,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DCMAKE_SWIFT_COMPILER:PATH=${SWIFTC_BIN}
                   -DCMAKE_INSTALL_PREFIX:PATH=$(get_host_install_prefix ${host})
 
+                  ${LIBICU_BUILD_ARGS[@]}
                   ${LIBDISPATCH_BUILD_ARGS[@]}
 
                   # NOTE(compnerd) we disable tests because XCTest is not ready
@@ -3125,6 +3140,20 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
 
+                if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
+                    ICU_ROOT=$(build_directory ${host} libicu)/tmp_install
+                    LIBICU_BUILD_ARGS=(
+                        -DICU_ROOT:PATH=${ICU_ROOT}
+                        -DICU_INCLUDE_DIR:PATH=${ICU_ROOT}/include
+                        -DICU_UC_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
+                        -DICU_UC_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicuucswift.so
+                        -DICU_I18N_LIBRARIES:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
+                        -DICU_I18N_LIBRARY:FILEPATH=${ICU_LIBDIR}/libicui18nswift.so
+                    )
+                else
+                    LIBICU_BUILD_ARGS=()
+                fi
+
                 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
                     LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
                     LIBDISPATCH_BUILD_ARGS=(
@@ -3143,6 +3172,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DCMAKE_SWIFT_COMPILER:PATH=${SWIFTC_BIN}
                   -DCMAKE_INSTALL_PREFIX:PATH=$(get_host_install_prefix ${host})
 
+                  ${LIBICU_BUILD_ARGS[@]}
                   ${LIBDISPATCH_BUILD_ARGS[@]}
 
                   # NOTE(compnerd) the time has come to enable tests now
@@ -3453,7 +3483,8 @@ for host in "${ALL_HOSTS[@]}"; do
                 ICU_TMP_INSTALL_DIR="${ICU_BUILD_DIR}/tmp_install"
                 mkdir -p  "${ICU_INSTALL_DIR}include"
                 cp -a "${ICU_TMP_INSTALL_DIR}/include/unicode" "${ICU_INSTALL_DIR}include"
-
+                mkdir -p "${ICU_INSTALL_DIR}share/icuswift"
+                cp -a "${ICU_TMP_INSTALL_DIR}/share/icuswift" "${ICU_INSTALL_DIR}share"
                 continue
                 ;;
             playgroundsupport)
