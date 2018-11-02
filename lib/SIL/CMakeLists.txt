@@ -44,7 +44,7 @@ add_swift_host_library(swiftSIL STATIC
   SILWitnessTable.cpp
   TypeLowering.cpp
   ValueOwnership.cpp
-  LINK_LIBRARIES
+  LINK_LIBS
     swiftSerialization
     swiftSema
 )
