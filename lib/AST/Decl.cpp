@@ -2257,7 +2257,6 @@ void ValueDecl::setInterfaceType(Type type) {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
     assert(!type->is<InOutType>() && "Interface type must be materializable");
 
-    // lldb creates global typealiases with archetypes in them.
     // FIXME: Add an isDebugAlias() flag, like isDebugVar().
     //
     // Also, ParamDecls in closure contexts can have type variables
@@ -3041,12 +3040,6 @@ SourceRange TypeAliasDecl::getSourceRange() const {
 
 void TypeAliasDecl::setUnderlyingType(Type underlying) {
   setValidationToChecked();
-
-  // lldb creates global typealiases containing archetypes
-  // sometimes...
-  if (underlying->hasArchetype() && isGenericContext())
-    underlying = underlying->mapTypeOutOfContext();
-  UnderlyingTy.setType(underlying);
 
   // FIXME -- if we already have an interface type, we're changing the
   // underlying type. See the comment in the ProtocolDecl case of
