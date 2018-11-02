@@ -368,7 +368,7 @@ struct RequirementMatch {
 
   /// Substitutions mapping the type of the witness to the requirement
   /// environment.
-  SmallVector<Substitution, 2> WitnessSubstitutions;
+  SubstitutionMap WitnessSubstitutions;
 
   /// \brief Determine whether this match is viable.
   bool isViable() const {
@@ -830,14 +830,14 @@ public:
 RequirementMatch matchWitness(
              TypeChecker &tc,
              DeclContext *dc, ValueDecl *req, ValueDecl *witness,
-             const std::function<
+             llvm::function_ref<
                      std::tuple<Optional<RequirementMatch>, Type, Type>(void)>
-               &setup,
-             const std::function<Optional<RequirementMatch>(Type, Type)>
-               &matchTypes,
-             const std::function<
+               setup,
+             llvm::function_ref<Optional<RequirementMatch>(Type, Type)>
+               matchTypes,
+             llvm::function_ref<
                      RequirementMatch(bool, ArrayRef<OptionalAdjustment>)
-                   > &finalize);
+                   > finalize);
 
 RequirementMatch matchWitness(TypeChecker &tc,
                               ProtocolDecl *proto,
@@ -857,6 +857,28 @@ AssociatedTypeDecl *getReferencedAssocTypeOfProtocol(Type type,
 /// \param noescapeToEscaping Will be set \c true if this operation performed
 /// the noescape-to-escaping adjustment.
 Type adjustInferredAssociatedType(Type type, bool &noescapeToEscaping);
+
+/// Find the @objc requirement that are witnessed by the given
+/// declaration.
+///
+/// \param anySingleRequirement If true, returns at most a single requirement,
+/// which might be any of the requirements that match.
+///
+/// \returns the set of requirements to which the given witness is a
+/// witness.
+llvm::TinyPtrVector<ValueDecl *> findWitnessedObjCRequirements(
+                                     const ValueDecl *witness,
+                                     bool anySingleRequirement = false);
+
+/// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
+void useObjectiveCBridgeableConformances(
+                      DeclContext *dc, Type type);
+
+/// If this bound-generic type is bridged, mark any
+/// _ObjectiveCBridgeable conformances in the generic arguments of
+/// the given type as "used".
+void useObjectiveCBridgeableConformancesOfArgs(
+                      DeclContext *dc, BoundGenericType *bound);
 
 }
 

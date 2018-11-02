@@ -28,5 +28,5 @@ Windows.
 
 On the [Windows Subsystem for
 Linux](https://docs.microsoft.com/en-us/windows/wsl/about), it's possible to
-build and run Swift in a Linux-like environment, on Windows. See [Getting
-Started with Swift on Windows](./WindowsSubsystemForLinux.md) for details.
+build and run Swift in a Linux-like environment, on Windows. See [Swift on 
+the Windows Subsystem for Linux](./WindowsSubsystemForLinux.md) for details.

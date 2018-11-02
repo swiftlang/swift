@@ -96,35 +96,120 @@ enum IsDependent_t : unsigned {
   IsNotDependent = false,
   IsDependent = true
 };
-  
+
+/// Is a lowered SIL type trivial?  That is, are copies ultimately just
+/// bit-copies, and it takes no work to destroy a value?
+enum IsTrivial_t : bool {
+  IsNotTrivial = false,
+  IsTrivial = true
+};
+
+/// Is a lowered SIL type fixed-ABI?  That is, can the current context
+/// assign it a fixed size and alignment and perform value operations on it
+/// (such as copies, destroys, constructions, and projections) without
+/// metadata?
+///
+/// Note that a fully concrete type can be non-fixed-ABI without being
+/// itself resilient if it contains a subobject which is not fixed-ABI.
+///
+/// Also note that we're only concerned with the external value ABI here:
+/// resilient class types are still fixed-ABI, indirect enum cases do not
+/// affect the fixed-ABI-ness of the enum, and so on.
+enum IsFixedABI_t : bool {
+  IsNotFixedABI = false,
+  IsFixedABI = true
+};
+
+/// Is a lowered SIL type address-only?  That is, is the current context
+/// required to keep the value in memory for some reason?
+///
+/// A type might be address-only because:
+///
+///   - it is not fixed-size (e.g. because it is a resilient type) and
+///     therefore cannot be loaded into a statically-boundable set of
+///     registers; or
+///
+///   - it is semantically bound to memory, either because its storage
+///     address is used by the language runtime to implement its semantics
+///     (as with a weak reference) or because its representation is somehow
+///     address-dependent (as with something like a relative pointer).
+///
+/// An address-only type can be fixed-layout and/or trivial.
+/// A non-fixed-layout type is always address-only.
+enum IsAddressOnly_t : bool {
+  IsNotAddressOnly = false,
+  IsAddressOnly = true
+};
+
+/// Is this type somewhat like a reference-counted type?
+enum IsReferenceCounted_t : bool {
+  IsNotReferenceCounted = false,
+  IsReferenceCounted = true
+};
+
 /// Extended type information used by SIL.
 class TypeLowering {
 public:
-  enum IsTrivial_t : bool { IsNotTrivial, IsTrivial };
-  enum IsAddressOnly_t : bool { IsNotAddressOnly, IsAddressOnly };
-  enum IsReferenceCounted_t : bool {
-    IsNotReferenceCounted,
-    IsReferenceCounted
+  class RecursiveProperties {
+    // These are chosen so that bitwise-or merges the flags properly.
+    enum : unsigned {
+      NonTrivialFlag     = 1 << 0,
+      NonFixedABIFlag    = 1 << 1,
+      AddressOnlyFlag    = 1 << 2,
+    };
+
+    uint8_t Flags;
+  public:
+    /// Construct a default RecursiveProperties, which corresponds to
+    /// a trivial, loadable, fixed-layout type.
+    constexpr RecursiveProperties() : Flags(0) {}
+
+    constexpr RecursiveProperties(IsTrivial_t isTrivial,
+                                  IsFixedABI_t isFixedABI,
+                                  IsAddressOnly_t isAddressOnly)
+      : Flags((isTrivial ? 0U : NonTrivialFlag) | 
+              (isAddressOnly ? AddressOnlyFlag : 0U) |
+              (isFixedABI ? 0U : NonFixedABIFlag)) {}
+
+    static constexpr RecursiveProperties forReference() {
+      return {IsNotTrivial, IsFixedABI, IsNotAddressOnly};
+    }
+
+    static constexpr RecursiveProperties forOpaque() {
+      return {IsNotTrivial, IsNotFixedABI, IsAddressOnly};
+    }
+
+    void addSubobject(RecursiveProperties other) {
+      Flags |= other.Flags;
+    }
+
+    IsTrivial_t isTrivial() const {
+      return IsTrivial_t((Flags & NonTrivialFlag) == 0);
+    }
+    IsFixedABI_t isFixedABI() const {
+      return IsFixedABI_t((Flags & NonFixedABIFlag) == 0);
+    }
+    IsAddressOnly_t isAddressOnly() const {
+      return IsAddressOnly_t((Flags & AddressOnlyFlag) != 0);
+    }
+
+    void setNonTrivial() { Flags |= NonTrivialFlag; }
+    void setNonFixedABI() { Flags |= NonFixedABIFlag; }
+    void setAddressOnly() { Flags |= AddressOnlyFlag; }
   };
 
 private:
   /// The SIL type of values with this Swift type.
   SILType LoweredType;
 
-  enum : unsigned {
-    IsTrivialFlag     = 0x1,
-    IsAddressOnlyFlag = 0x2,
-    IsReferenceCountedFlag = 0x4,
-  };
-  unsigned Flags;
+  RecursiveProperties Properties;
+  unsigned ReferenceCounted : 1;
 
 protected:  
-  TypeLowering(SILType type, IsTrivial_t isTrivial,
-               IsAddressOnly_t isAddressOnly,
+  TypeLowering(SILType type, RecursiveProperties properties,
                IsReferenceCounted_t isRefCounted)
-    : LoweredType(type), Flags((isTrivial ? IsTrivialFlag : 0U) | 
-                               (isAddressOnly ? IsAddressOnlyFlag : 0U) |
-                               (isRefCounted ? IsReferenceCountedFlag : 0U)) {}
+    : LoweredType(type), Properties(properties),
+      ReferenceCounted(isRefCounted) {}
 
 public:
   TypeLowering(const TypeLowering &) = delete;
@@ -143,12 +228,16 @@ public:
   /// This is independent of whether the SIL result is address type.
   bool isFormallyReturnedIndirectly() const { return isAddressOnly(); }
 
+  RecursiveProperties getRecursiveProperties() const {
+    return Properties;
+  }
+
   /// isAddressOnly - Returns true if the type is an address-only type. A type
   /// is address-only if it is a resilient value type, or if it is a fragile
   /// value type with a resilient member. In either case, the full layout of
   /// values of the type is unavailable to the compiler.
   bool isAddressOnly() const {
-    return Flags & IsAddressOnlyFlag;
+    return Properties.isAddressOnly();
   }
   /// isLoadable - Returns true if the type is loadable, in other words, its
   /// full layout is available to the compiler. This is the inverse of
@@ -156,17 +245,24 @@ public:
   bool isLoadable() const {
     return !isAddressOnly();
   }
+
+  /// isFixedABI - Returns true if the type has a known fixed layout.
+  /// If this is true, value operations on the type can be performed even if
+  /// the type is inaccessible.
+  bool isFixedABI() const {
+    return Properties.isFixedABI();
+  }
   
   /// Returns true if the type is trivial, meaning it is a loadable
   /// value type with no reference type members that require releasing.
   bool isTrivial() const {
-    return Flags & IsTrivialFlag;
+    return Properties.isTrivial();
   }
   
   /// Returns true if the type is a scalar reference-counted reference, which
   /// can be retained and released.
   bool isReferenceCounted() const {
-    return Flags & IsReferenceCountedFlag;
+    return ReferenceCounted;
   }
 
   /// getLoweredType - Get the type used to represent values of the Swift type
@@ -187,7 +283,7 @@ public:
   /// return on a variable of this type.
   SILType getSemanticType() const {
     // If you change this, change getSemanticTypeLowering() too.
-    auto storageType = getLoweredType().getSwiftRValueType();
+    auto storageType = getLoweredType().getASTType();
     if (auto refType = dyn_cast<ReferenceStorageType>(storageType))
       return SILType::getPrimitiveType(refType.getReferentType(),
                                        SILValueCategory::Object);
@@ -639,7 +735,7 @@ public:
   }
   
   static bool isIndirectPlusZeroSelfParameter(SILType T) {
-    return isIndirectPlusZeroSelfParameter(T.getSwiftRValueType());
+    return isIndirectPlusZeroSelfParameter(T.getASTType());
   }
   
   /// Lowers a Swift type to a SILType, and returns the SIL TypeLowering
@@ -887,6 +983,8 @@ public:
   CanSILBoxType getBoxTypeForEnumElement(SILType enumType,
                                          EnumElementDecl *elt);
 
+  bool canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl);
+  
 private:
   CanType getLoweredRValueType(AbstractionPattern origType, CanType substType);
 
@@ -907,7 +1005,7 @@ private:
 inline const TypeLowering &
 TypeLowering::getSemanticTypeLowering(TypeConverter &TC) const {
   // If you change this, change getSemanticType() too.
-  auto storageType = getLoweredType().getSwiftRValueType();
+  auto storageType = getLoweredType().getASTType();
   if (auto refType = dyn_cast<ReferenceStorageType>(storageType))
     return TC.getTypeLowering(refType.getReferentType());
   return *this;

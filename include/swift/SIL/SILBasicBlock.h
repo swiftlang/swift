@@ -163,10 +163,10 @@ public:
 
   ArrayRef<SILArgument *> getArguments() const { return ArgumentList; }
   using PHIArgumentArrayRefTy =
-      TransformArrayRef<std::function<SILPHIArgument *(SILArgument *)>>;
+      TransformArrayRef<SILPHIArgument *(*)(SILArgument *)>;
   PHIArgumentArrayRefTy getPHIArguments() const;
   using FunctionArgumentArrayRefTy =
-      TransformArrayRef<std::function<SILFunctionArgument *(SILArgument *)>>;
+      TransformArrayRef<SILFunctionArgument *(*)(SILArgument *)>;
   FunctionArgumentArrayRefTy getFunctionArguments() const;
 
   unsigned getNumArguments() const { return ArgumentList.size(); }

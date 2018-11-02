@@ -141,9 +141,9 @@ namespace {
 
     unsigned NumInherited = 0;
 
-    // If the class has @objc ancestry, we lay out resiliently-typed fields
-    // as if they were fragile.
-    bool CompletelyFragileLayout = false;
+    // For now we always lay out resiliently-typed fields as if they
+    // were fragile.
+    bool CompletelyFragileLayout;
 
     // Does the class metadata require dynamic initialization above and
     // beyond what the runtime can automatically achieve?
@@ -171,6 +171,11 @@ namespace {
                        ReferenceCounting refcounting)
       : StructLayoutBuilder(IGM)
     {
+      // Perform fragile layout if Objective-C interop is enabled.
+      CompletelyFragileLayout =
+        (IGM.Context.LangOpts.EnableObjCInterop &&
+         !IGM.IRGen.Opts.EnableClassResilience);
+
       // Start by adding a heap header.
       switch (refcounting) {
       case ReferenceCounting::Native:
@@ -249,10 +254,6 @@ namespace {
         }
 
         if (superclass->hasClangNode()) {
-          // Perform fragile layout if the class has @objc ancestry.
-          if (!IGM.IRGen.Opts.EnableClassResilience)
-            CompletelyFragileLayout = true;
-
           // If the superclass was imported from Objective-C, its size is
           // not known at compile time. However, since the field offset
           // vector only stores offsets of stored properties defined in
@@ -421,7 +422,7 @@ void ClassTypeInfo::generateLayout(IRGenModule &IGM, SILType classType) const {
   builder.setAsBodyOfStruct(classTy);
   
   // Record the layout.
-  Layout = new StructLayout(builder, classType.getSwiftRValueType(), classTy,
+  Layout = new StructLayout(builder, classType.getASTType(), classTy,
                             builder.getElements());
   FieldLayout = builder.getClassLayout();
 }
@@ -453,7 +454,7 @@ ClassTypeInfo::createLayoutWithTailElems(IRGenModule &IGM,
 
   // Create the StructLayout, which is transfered to the caller (the caller is
   // responsible for deleting it).
-  return new StructLayout(builder, classType.getSwiftRValueType(), ResultTy,
+  return new StructLayout(builder, classType.getASTType(), ResultTy,
                           builder.getElements());
 }
 
@@ -771,7 +772,7 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
                                         bool objc, int &StackAllocSize,
                                         TailArraysRef TailArrays) {
   auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
-  auto classType = selfType.getSwiftRValueType();
+  auto classType = selfType.getASTType();
 
   // If we need to use Objective-C allocation, do so.
   // If the root class isn't known to use the Swift allocator, we need
@@ -920,7 +921,7 @@ static void getInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                         llvm::Value *&alignMask) {
   // Use the magic __getInstanceSizeAndAlignMask method if we can
   // see a declaration of it
-  if (getInstanceSizeByMethod(IGF, selfType.getSwiftRValueType(),
+  if (getInstanceSizeByMethod(IGF, selfType.getASTType(),
                               selfClass, selfValue, size, alignMask))
     return;
 
@@ -1337,7 +1338,7 @@ namespace {
       if (getClass()->hasClangNode())
         fields.add(IGM.getAddrOfObjCClass(getClass(), NotForDefinition));
       else {
-        auto type = getSelfType(getClass()).getSwiftRValueType();
+        auto type = getSelfType(getClass()).getASTType();
         llvm::Constant *metadata =
           tryEmitConstantHeapMetadataRef(IGM, type, /*allowUninit*/ true);
         assert(metadata &&
@@ -1643,19 +1644,19 @@ namespace {
         return emitObjCMethodDescriptor(IGM, descriptors, method);
 
       switch (accessor->getAccessorKind()) {
-      case AccessorKind::IsGetter:
+      case AccessorKind::Get:
         return emitObjCGetterDescriptor(IGM, descriptors,
                                         accessor->getStorage());
 
-      case AccessorKind::IsSetter:
+      case AccessorKind::Set:
         return emitObjCSetterDescriptor(IGM, descriptors,
                                         accessor->getStorage());
 
-      case AccessorKind::IsWillSet:
-      case AccessorKind::IsDidSet:
-      case AccessorKind::IsMaterializeForSet:
-      case AccessorKind::IsAddressor:
-      case AccessorKind::IsMutableAddressor:
+      case AccessorKind::WillSet:
+      case AccessorKind::DidSet:
+      case AccessorKind::MaterializeForSet:
+      case AccessorKind::Address:
+      case AccessorKind::MutableAddress:
         llvm_unreachable("shouldn't be trying to build this accessor");
       }
       llvm_unreachable("bad accessor kind");
@@ -2249,7 +2250,7 @@ ClassDecl *IRGenModule::getObjCRuntimeBaseClass(Identifier name,
                                            /*generics*/ nullptr,
                                            Context.TheBuiltinModule);
   SwiftRootClass->computeType();
-  SwiftRootClass->setIsObjC(true);
+  SwiftRootClass->setIsObjC(Context.LangOpts.EnableObjCInterop);
   SwiftRootClass->getAttrs().add(ObjCAttr::createNullary(Context, objcName,
     /*isNameImplicit=*/true));
   SwiftRootClass->setImplicit();
@@ -2455,7 +2456,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   llvm::Value *metadata;
   if (useSuperVTable) {
     auto instanceTy = baseType;
-    if (auto metaTy = dyn_cast<MetatypeType>(baseType.getSwiftRValueType()))
+    if (auto metaTy = dyn_cast<MetatypeType>(baseType.getASTType()))
       instanceTy = SILType::getPrimitiveObjectType(metaTy.getInstanceType());
 
     if (IGF.IGM.isResilient(instanceTy.getClassOrBoundGenericClass(),
@@ -2465,7 +2466,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
       // resilience domain. So, we need to load the superclass metadata
       // dynamically.
 
-      metadata = emitClassHeapMetadataRef(IGF, instanceTy.getSwiftRValueType(),
+      metadata = emitClassHeapMetadataRef(IGF, instanceTy.getASTType(),
                                           MetadataValueType::TypeMetadata,
                                           MetadataState::Complete);
       auto superField = emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
@@ -2474,7 +2475,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
       // Otherwise, we can directly load the statically known superclass's
       // metadata.
       auto superTy = instanceTy.getSuperclass();
-      metadata = emitClassHeapMetadataRef(IGF, superTy.getSwiftRValueType(),
+      metadata = emitClassHeapMetadataRef(IGF, superTy.getASTType(),
                                           MetadataValueType::TypeMetadata,
                                           MetadataState::Complete);
     }

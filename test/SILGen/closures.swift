@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-frontend -module-name closures -enable-sil-ownership -parse-stdlib -parse-as-library -emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-frontend -module-name closures -enable-sil-ownership -parse-stdlib -parse-as-library -emit-silgen  %s | %FileCheck %s --check-prefix=GUARANTEED
+// RUN: %target-swift-emit-silgen -module-name closures -enable-sil-ownership -parse-stdlib -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name closures -enable-sil-ownership -parse-stdlib -parse-as-library  %s | %FileCheck %s --check-prefix=GUARANTEED
 
 import Swift
 
@@ -380,13 +380,11 @@ func closeOverLetLValue() {
 // CHECK:   [[TMP_CLASS_ADDR:%.*]] = alloc_stack $ClassWithIntProperty, let, name "a", argno 1
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
 // CHECK:   store [[COPY_ARG]] to [init] [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
-// CHECK:   [[LOADED_CLASS:%.*]] = load [copy] [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
-// CHECK:   [[BORROWED_LOADED_CLASS:%.*]] = begin_borrow [[LOADED_CLASS]]
+// CHECK:   [[BORROWED_LOADED_CLASS:%.*]] = load_borrow [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
 // CHECK:   [[INT_IN_CLASS_ADDR:%.*]] = ref_element_addr [[BORROWED_LOADED_CLASS]] : $ClassWithIntProperty, #ClassWithIntProperty.x
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[INT_IN_CLASS_ADDR]] : $*Int
 // CHECK:   [[INT_IN_CLASS:%.*]] = load [trivial] [[ACCESS]] : $*Int
-// CHECK:   end_borrow [[BORROWED_LOADED_CLASS]] from [[LOADED_CLASS]]
-// CHECK:   destroy_value [[LOADED_CLASS]]
+// CHECK:   end_borrow [[BORROWED_LOADED_CLASS]] from [[TMP_CLASS_ADDR]]
 // CHECK:   destroy_addr [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
 // CHECK:   dealloc_stack %1 : $*ClassWithIntProperty
 // CHECK:   return [[INT_IN_CLASS]]
@@ -397,10 +395,8 @@ func closeOverLetLValue() {
 // GUARANTEED:   [[TMP:%.*]] = alloc_stack $ClassWithIntProperty
 // GUARANTEED:   [[COPY:%.*]] = copy_value %0 : $ClassWithIntProperty
 // GUARANTEED:   store [[COPY]] to [init] [[TMP]] : $*ClassWithIntProperty
-// GUARANTEED:   [[LOADED_COPY:%.*]] = load [copy] [[TMP]]
-// GUARANTEED:   [[BORROWED:%.*]] = begin_borrow [[LOADED_COPY]]
-// GUARANTEED:   end_borrow [[BORROWED]] from [[LOADED_COPY]]
-// GUARANTEED:   destroy_value [[LOADED_COPY]]
+// GUARANTEED:   [[BORROWED:%.*]] = load_borrow [[TMP]]
+// GUARANTEED:   end_borrow [[BORROWED]] from [[TMP]]
 // GUARANTEED:   destroy_addr [[TMP]]
 // GUARANTEED: } // end sil function '$S8closures18closeOverLetLValueyyFSiyXEfU_'
 
@@ -765,7 +761,7 @@ class GenericDerived<Ocean> : ConcreteBase {
 // Don't crash on this
 func r25993258_helper(_ fn: (inout Int, Int) -> ()) {}
 func r25993258() {
-  r25993258_helper { _ in () }
+  r25993258_helper { _, _ in () }
 }
 
 // rdar://29810997

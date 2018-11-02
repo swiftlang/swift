@@ -104,7 +104,7 @@ private:
   /// directly. If the adjacency becomes empty afterward, it will be
   /// removed.
   void modifyAdjacency(TypeVariableType *typeVar,
-                       std::function<void(Adjacency& adj)> modify);
+                       llvm::function_ref<void(Adjacency &adj)> modify);
 
   /// Add an adjacency to the list of adjacencies.
   void addAdjacency(TypeVariableType *typeVar);
@@ -331,6 +331,10 @@ private:
 
   /// Constraints that are "orphaned" because they contain no type variables.
   SmallVector<Constraint *, 4> OrphanedConstraints;
+
+  /// Increment the number of constraints considered per attempt
+  /// to contract constrant graph edges.
+  void incrementConstraintsPerContractionCounter();
 
   /// The kind of change made to the graph.
   enum class ChangeKind {

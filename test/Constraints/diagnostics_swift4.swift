@@ -6,7 +6,7 @@ func sr_2505(_ a: Any) {} // expected-note {{}}
 sr_2505()          // expected-error {{missing argument for parameter #1 in call}}
 sr_2505(a: 1)      // expected-error {{extraneous argument label 'a:' in call}}
 sr_2505(1, 2)      // expected-error {{extra argument in call}}
-sr_2505(a: 1, 2)   // expected-error {{extra argument in call}}
+sr_2505(a: 1, 2)   // expected-error {{extra argument 'a' in call}}
 
 struct C_2505 {
   init(_ arg: Any) {
@@ -24,7 +24,8 @@ extension C_2505 {
 class C2_2505: P_2505 {
 }
 
-let c_2505 = C_2505(arg: [C2_2505()]) // expected-error {{argument labels '(arg:)' do not match any available overloads}} expected-note {{overloads for 'C_2505' exist}}
+let c_2505 = C_2505(arg: [C2_2505()]) // expected-error {{argument labels '(arg:)' do not match any available overloads}}
+// expected-note@-1 {{overloads for 'C_2505' exist with these partially matching parameter lists: (Any), (from: [T])}}
 
 // rdar://problem/31898542 - Swift 4: 'type of expression is ambiguous without more context' errors, without a fixit
 

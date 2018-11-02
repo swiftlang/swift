@@ -172,6 +172,3 @@ extension EmptyCollection : Equatable {
     return true
   }
 }
-
-// @available(*, deprecated, renamed: "EmptyCollection.Iterator")
-public typealias EmptyIterator<T> = EmptyCollection<T>.Iterator

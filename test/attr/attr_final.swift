@@ -40,8 +40,8 @@ protocol SomeProtocol {
 }
 
 extension SomeProtocol {
-  final var i: Int { return 1 } // expected-warning {{functions in a protocol extension do not need to be marked with 'final'}}
-  final func protoExtensionFunc() {}  // expected-warning {{functions in a protocol extension do not need to be marked with 'final'}} {{3-9=}}
+  final var i: Int { return 1 } // expected-error {{only classes and class members may be marked with 'final'}} {{3-9=}}
+  final func protoExtensionFunc() {}  // expected-error {{only classes and class members may be marked with 'final'}} {{3-9=}}
 }
 
 extension SomeStruct {

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -43,6 +43,15 @@ extension Gizmo : Bells {
 // CHECK:   [[INIT:%[0-9]+]] = function_ref @$SSo5GizmoC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Int, @thick Gizmo.Type) -> @owned Optional<Gizmo>
 // CHECK:   [[IUO_RESULT:%[0-9]+]] = apply [[INIT]]([[I]], [[META]]) : $@convention(method) (Int, @thick Gizmo.Type) -> @owned Optional<Gizmo>
 // CHECK:   switch_enum [[IUO_RESULT]]
+// CHECK: bb1:
+// CHECK-NEXT:   [[FILESTR:%.*]] = string_literal utf8 "
+// CHECK-NEXT:   [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
+// CHECK-NEXT:   [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
+// CHECK-NEXT:   [[LINE:%.*]] = integer_literal $Builtin.Word, 
+// CHECK-NEXT:   [[COLUMN:%.*]] = integer_literal $Builtin.Word, 
+// CHECK-NEXT:   [[IMPLICIT:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK:   [[PRECOND:%.*]] = function_ref @$Ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
+// CHECK:   apply [[PRECOND]]([[FILESTR]], [[FILESIZ]], [[FILEASC]], [[LINE]], [[IMPLICIT]])
 // CHECK: bb2([[UNWRAPPED_RESULT:%.*]] : @owned $Gizmo):
 // CHECK:   store [[UNWRAPPED_RESULT]] to [init] [[SELF]] : $*Gizmo
 
@@ -66,7 +75,7 @@ protocol Orbital {
 }
 
 class Electron : Orbital {
-  dynamic var quantumNumber: Int = 0
+  @objc dynamic var quantumNumber: Int = 0
 }
 
 // CHECK-LABEL: sil private [transparent] [thunk] @$S14objc_witnesses8ElectronCAA7OrbitalA2aDP13quantumNumberSivgTW
@@ -82,7 +91,7 @@ public protocol Lepton {
 }
 
 public class Positron : Lepton {
-  public dynamic var spin: Float = 0.5
+  @objc public dynamic var spin: Float = 0.5
 }
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @$S14objc_witnesses8PositronCAA6LeptonA2aDP4spinSfvgTW
@@ -91,13 +100,13 @@ public class Positron : Lepton {
 // Override of property defined in @objc extension
 
 class Derived : NSObject {
-  override var valence: Int {
+  @objc override var valence: Int {
     get { return 2 } set { }
   }
 }
 
 extension NSObject : Atom {
-  var valence: Int { get { return 1 } set { } }
+  @objc var valence: Int { get { return 1 } set { } }
 }
 
 // CHECK-LABEL: sil private @$SSo8NSObjectC14objc_witnessesE7valenceSivmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed NSObject, @thick NSObject.Type) -> () {

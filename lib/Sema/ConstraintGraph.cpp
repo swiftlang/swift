@@ -18,6 +18,7 @@
 #include "ConstraintGraph.h"
 #include "ConstraintGraphScope.h"
 #include "ConstraintSystem.h"
+#include "swift/Basic/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
@@ -26,6 +27,8 @@
 
 using namespace swift;
 using namespace constraints;
+
+#define DEBUG_TYPE "ConstraintGraph"
 
 #pragma mark Graph construction/destruction
 
@@ -145,7 +148,7 @@ ConstraintGraphNode::getAdjacency(TypeVariableType *typeVar) {
 
 void ConstraintGraphNode::modifyAdjacency(
        TypeVariableType *typeVar,
-       std::function<void(Adjacency& adj)> modify) {
+       llvm::function_ref<void(Adjacency& adj)> modify) {
    // Find the adjacency information.
   auto pos = AdjacencyInfo.find(typeVar);
   assert(pos != AdjacencyInfo.end() && "Type variables not adjacent");
@@ -649,93 +652,89 @@ static bool shouldContractEdge(ConstraintKind kind) {
 }
 
 bool ConstraintGraph::contractEdges() {
-  llvm::SetVector<std::pair<TypeVariableType *,
-                            TypeVariableType *>> contractions;
+  SmallVector<Constraint *, 16> constraints;
+  CS.findConstraints(constraints, [&](const Constraint &constraint) {
+    // Track how many constraints did contraction algorithm iterated over.
+    incrementConstraintsPerContractionCounter();
+    return shouldContractEdge(constraint.getKind());
+  });
 
-  auto tyvars = getTypeVariables();
-  auto didContractEdges = false;
+  bool didContractEdges = false;
+  for (auto *constraint : constraints) {
+    auto kind = constraint->getKind();
 
-  for (auto tyvar : tyvars) {
-    SmallVector<Constraint *, 4> constraints;
-    gatherConstraints(tyvar, constraints,
-                      ConstraintGraph::GatheringKind::EquivalenceClass);
+    // Contract binding edges between type variables.
+    assert(shouldContractEdge(kind));
 
-    for (auto constraint : constraints) {
-      auto kind = constraint->getKind();
-      // Contract binding edges between type variables.
-      if (shouldContractEdge(kind)) {
-        auto t1 = constraint->getFirstType()->getDesugaredType();
-        auto t2 = constraint->getSecondType()->getDesugaredType();
+    auto t1 = constraint->getFirstType()->getDesugaredType();
+    auto t2 = constraint->getSecondType()->getDesugaredType();
 
-        auto tyvar1 = t1->getAs<TypeVariableType>();
-        auto tyvar2 = t2->getAs<TypeVariableType>();
+    auto tyvar1 = t1->getAs<TypeVariableType>();
+    auto tyvar2 = t2->getAs<TypeVariableType>();
 
-        if (!(tyvar1 && tyvar2))
-          continue;
+    if (!(tyvar1 && tyvar2))
+      continue;
 
-        auto isParamBindingConstraint = kind == ConstraintKind::BindParam;
+    auto isParamBindingConstraint = kind == ConstraintKind::BindParam;
 
-        // If the argument is allowed to bind to `inout`, in general,
-        // it's invalid to contract the edge between argument and parameter,
-        // but if we can prove that there are no possible bindings
-        // which result in attempt to bind `inout` type to argument
-        // type variable, we should go ahead and allow (temporary)
-        // contraction, because that greatly helps with performance.
-        // Such action is valid because argument type variable can
-        // only get its bindings from related overload, which gives
-        // us enough information to decided on l-valueness.
-        if (isParamBindingConstraint && tyvar1->getImpl().canBindToInOut()) {
-          bool isNotContractable = true;
-          if (auto bindings = CS.getPotentialBindings(tyvar1)) {
-            for (auto &binding : bindings.Bindings) {
-              auto type = binding.BindingType;
-              isNotContractable = type.findIf([&](Type nestedType) -> bool {
-                if (auto tv = nestedType->getAs<TypeVariableType>()) {
-                  if (!tv->getImpl().mustBeMaterializable())
-                    return true;
-                }
-
-                return nestedType->is<InOutType>();
-              });
-
-              // If there is at least one non-contractable binding, let's
-              // not risk contracting this edge.
-              if (isNotContractable)
-                break;
+    // If the argument is allowed to bind to `inout`, in general,
+    // it's invalid to contract the edge between argument and parameter,
+    // but if we can prove that there are no possible bindings
+    // which result in attempt to bind `inout` type to argument
+    // type variable, we should go ahead and allow (temporary)
+    // contraction, because that greatly helps with performance.
+    // Such action is valid because argument type variable can
+    // only get its bindings from related overload, which gives
+    // us enough information to decided on l-valueness.
+    if (isParamBindingConstraint && tyvar1->getImpl().canBindToInOut()) {
+      bool isNotContractable = true;
+      if (auto bindings = CS.getPotentialBindings(tyvar1)) {
+        for (auto &binding : bindings.Bindings) {
+          auto type = binding.BindingType;
+          isNotContractable = type.findIf([&](Type nestedType) -> bool {
+            if (auto tv = nestedType->getAs<TypeVariableType>()) {
+              if (!tv->getImpl().mustBeMaterializable())
+                return true;
             }
-          }
 
+            return nestedType->is<InOutType>();
+          });
+
+          // If there is at least one non-contractable binding, let's
+          // not risk contracting this edge.
           if (isNotContractable)
-            continue;
-        }
-
-        auto rep1 = CS.getRepresentative(tyvar1);
-        auto rep2 = CS.getRepresentative(tyvar2);
-
-        if (((rep1->getImpl().canBindToLValue() ==
-              rep2->getImpl().canBindToLValue()) ||
-              // Allow l-value contractions when binding parameter types.
-              isParamBindingConstraint)) {
-          if (CS.TC.getLangOpts().DebugConstraintSolver) {
-            auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
-            if (CS.solverState)
-              log.indent(CS.solverState->depth * 2);
-
-            log << "Contracting constraint ";
-            constraint->print(log, &CS.getASTContext().SourceMgr);
-            log << "\n";
-          }
-
-          // Merge the edges and remove the constraint.
-          removeEdge(constraint);
-          if (rep1 != rep2)
-            CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
-          didContractEdges = true;
+            break;
         }
       }
+
+      if (isNotContractable)
+        continue;
+    }
+
+    auto rep1 = CS.getRepresentative(tyvar1);
+    auto rep2 = CS.getRepresentative(tyvar2);
+
+    if (((rep1->getImpl().canBindToLValue() ==
+          rep2->getImpl().canBindToLValue()) ||
+         // Allow l-value contractions when binding parameter types.
+         isParamBindingConstraint)) {
+      if (CS.TC.getLangOpts().DebugConstraintSolver) {
+        auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+        if (CS.solverState)
+          log.indent(CS.solverState->depth * 2);
+
+        log << "Contracting constraint ";
+        constraint->print(log, &CS.getASTContext().SourceMgr);
+        log << "\n";
+      }
+
+      // Merge the edges and remove the constraint.
+      removeEdge(constraint);
+      if (rep1 != rep2)
+        CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
+      didContractEdges = true;
     }
   }
-
   return didContractEdges;
 }
 
@@ -771,6 +770,14 @@ void ConstraintGraph::removeEdge(Constraint *constraint) {
 void ConstraintGraph::optimize() {
   // Merge equivalence classes until a fixed point is reached.
   while (contractEdges()) {}
+}
+
+void ConstraintGraph::incrementConstraintsPerContractionCounter() {
+  SWIFT_FUNC_STAT;
+  auto &context = CS.getASTContext();
+  if (context.Stats)
+    context.Stats->getFrontendCounters()
+        .NumConstraintsConsideredForEdgeContraction++;
 }
 
 #pragma mark Debugging output

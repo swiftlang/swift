@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -318,8 +318,11 @@ private:
 class ClangImporterDependencyCollector : public clang::DependencyCollector
 {
   llvm::StringSet<> ExcludedPaths;
+  const bool TrackSystemDeps;
+
 public:
-  ClangImporterDependencyCollector() = default;
+  ClangImporterDependencyCollector(bool TrackSystemDeps)
+    : TrackSystemDeps(TrackSystemDeps) {}
 
   void excludePath(StringRef filename) {
     ExcludedPaths.insert(filename);
@@ -331,9 +334,7 @@ public:
             || Filename == ImporterImpl::bridgingHeaderBufferName);
   }
 
-  // Currently preserving older ClangImporter behavior of ignoring system
-  // dependencies, but possibly revisit?
-  bool needSystemDependencies() override { return false; }
+  bool needSystemDependencies() override { return TrackSystemDeps; }
 
   bool sawDependency(StringRef Filename, bool FromClangModule,
                      bool IsSystem, bool IsClangModuleFile,
@@ -354,9 +355,9 @@ public:
 } // end anonymous namespace
 
 std::shared_ptr<clang::DependencyCollector>
-ClangImporter::createDependencyCollector()
+ClangImporter::createDependencyCollector(bool TrackSystemDeps)
 {
-  return std::make_shared<ClangImporterDependencyCollector>();
+  return std::make_shared<ClangImporterDependencyCollector>(TrackSystemDeps);
 }
 
 void ClangImporter::Implementation::addBridgeHeaderTopLevelDecls(
@@ -464,6 +465,19 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     if (!triple.isOSDarwin())
       invocationArgStrs.insert(invocationArgStrs.end(),
                                {"-fobjc-runtime=ios-7.0"});
+
+    // Define macros that Swift bridging headers use.
+    invocationArgStrs.insert(invocationArgStrs.end(), {
+          "-DSWIFT_CLASS_EXTRA=__attribute__((__annotate__("
+          "\"" SWIFT_NATIVE_ANNOTATION_STRING "\")))",
+          "-DSWIFT_PROTOCOL_EXTRA=__attribute__((__annotate__("
+          "\"" SWIFT_NATIVE_ANNOTATION_STRING "\")))",
+          "-DSWIFT_EXTENSION_EXTRA=__attribute__((__annotate__("
+          "\"" SWIFT_NATIVE_ANNOTATION_STRING "\")))",
+          "-DSWIFT_ENUM_EXTRA=__attribute__((__annotate__("
+          "\"" SWIFT_NATIVE_ANNOTATION_STRING "\")))",
+      });
+
   } else {
     invocationArgStrs.insert(invocationArgStrs.end(), {"-x", "c", "-std=gnu11"});
   }
@@ -471,16 +485,6 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
   // Set C language options.
   if (triple.isOSDarwin()) {
     invocationArgStrs.insert(invocationArgStrs.end(), {
-      // Define macros that Swift bridging headers use.
-      "-DSWIFT_CLASS_EXTRA=__attribute__((annotate(\""
-        SWIFT_NATIVE_ANNOTATION_STRING "\")))",
-      "-DSWIFT_PROTOCOL_EXTRA=__attribute__((annotate(\""
-        SWIFT_NATIVE_ANNOTATION_STRING "\")))",
-      "-DSWIFT_EXTENSION_EXTRA=__attribute__((annotate(\""
-        SWIFT_NATIVE_ANNOTATION_STRING "\")))",
-      "-DSWIFT_ENUM_EXTRA=__attribute__((annotate(\""
-        SWIFT_NATIVE_ANNOTATION_STRING "\")))",
-
       // Avoid including the iso646.h header because some headers from OS X
       // frameworks are broken by it.
       "-D_ISO646_H_", "-D__ISO646_H",
@@ -609,12 +613,6 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
   // Enable API notes alongside headers/in frameworks.
   invocationArgStrs.push_back("-fapinotes-modules");
-
-  // Add API notes paths.
-  for (const auto &searchPath : searchPathOpts.ImportSearchPaths) {
-    invocationArgStrs.push_back("-iapinotes-modules");
-    invocationArgStrs.push_back(searchPath);
-  }
   invocationArgStrs.push_back("-iapinotes-modules");
   invocationArgStrs.push_back(searchPathOpts.RuntimeLibraryImportPath);
   invocationArgStrs.push_back("-fapinotes-swift-version=" +
@@ -1083,6 +1081,7 @@ ClangImporter::create(ASTContext &ctx,
   importer->Impl.ImportedHeaderUnit =
     new (ctx) ClangModuleUnit(*importedHeaderModule, importer->Impl, nullptr);
   importedHeaderModule->addFile(*importer->Impl.ImportedHeaderUnit);
+  importedHeaderModule->setHasResolvedImports();
 
   importer->Impl.IsReadingBridgingPCH = false;
 
@@ -1586,6 +1585,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     result = ModuleDecl::create(name, SwiftContext);
     // Silence error messages about testably importing a Clang module.
     result->setTestingEnabled();
+    result->setHasResolvedImports();
 
     wrapperUnit =
       new (SwiftContext) ClangModuleUnit(*result, *this, clangModule);
@@ -1728,6 +1728,7 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   auto wrapper = ModuleDecl::create(name, SwiftContext);
   // Silence error messages about testably importing a Clang module.
   wrapper->setTestingEnabled();
+  wrapper->setHasResolvedImports();
 
   auto file = new (SwiftContext) ClangModuleUnit(*wrapper, *this,
                                                  underlying);
@@ -2455,6 +2456,15 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
         results.push_back(extension);
     }
 
+    auto findEnclosingExtension = [](Decl *importedDecl) -> ExtensionDecl * {
+      for (auto importedDC = importedDecl->getDeclContext();
+           !importedDC->isModuleContext();
+           importedDC = importedDC->getParent()) {
+        if (auto ext = dyn_cast<ExtensionDecl>(importedDC))
+          return ext;
+      }
+      return nullptr;
+    };
     // Retrieve all of the globals that will be mapped to members.
 
     // FIXME: Since we don't represent Clang submodules as Swift
@@ -2462,21 +2472,33 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
     llvm::SmallPtrSet<ExtensionDecl *, 8> knownExtensions;
     for (auto entry : lookupTable->allGlobalsAsMembers()) {
       auto decl = entry.get<clang::NamedDecl *>();
-      auto importedDecl =
-          owner.importDecl(decl, owner.CurrentVersion);
+      auto importedDecl = owner.importDecl(decl, owner.CurrentVersion);
       if (!importedDecl) continue;
 
       // Find the enclosing extension, if there is one.
-      ExtensionDecl *ext = nullptr;
-      for (auto importedDC = importedDecl->getDeclContext();
-           !importedDC->isModuleContext();
-           importedDC = importedDC->getParent()) {
-        ext = dyn_cast<ExtensionDecl>(importedDC);
-        if (ext) break;
-      }
-      if (!ext) continue;
+      ExtensionDecl *ext = findEnclosingExtension(importedDecl);
+      if (ext && knownExtensions.insert(ext).second)
+        results.push_back(ext);
 
-      if (knownExtensions.insert(ext).second)
+      // If this is a compatibility typealias, the canonical type declaration
+      // may exist in another extension.
+      auto alias = dyn_cast<TypeAliasDecl>(importedDecl);
+      if (!alias || !alias->isCompatibilityAlias()) continue;
+
+      auto aliasedTy = alias->getUnderlyingTypeLoc().getType();
+      ext = nullptr;
+      importedDecl = nullptr;
+
+      // Note: We can't use getAnyGeneric() here because `aliasedTy`
+      // might be typealias.
+      if (auto Ty = dyn_cast<NameAliasType>(aliasedTy.getPointer()))
+        importedDecl = Ty->getDecl();
+      else if (auto Ty = dyn_cast<AnyGenericType>(aliasedTy.getPointer()))
+        importedDecl = Ty->getDecl();
+      if (!importedDecl) continue;
+
+      ext = findEnclosingExtension(importedDecl);
+      if (ext && knownExtensions.insert(ext).second)
         results.push_back(ext);
     }
   }
@@ -2747,6 +2769,11 @@ void ClangImporter::loadObjCMethods(
     // we're looking for.
     if (objcMethod->getClassInterface() != objcClass)
       continue;
+
+    // If we found a property accessor, import the property.
+    if (objcMethod->isPropertyAccessor())
+      (void)Impl.importDecl(objcMethod->findPropertyDecl(true),
+                            Impl.CurrentVersion);
 
     if (auto method = dyn_cast_or_null<AbstractFunctionDecl>(
                         Impl.importDecl(objcMethod, Impl.CurrentVersion))) {
@@ -3039,43 +3066,70 @@ ModuleDecl *ClangModuleUnit::getAdapterModule() const {
 void ClangModuleUnit::getImportedModules(
     SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
     ModuleDecl::ImportFilter filter) const {
-  if (filter != ModuleDecl::ImportFilter::Public)
+  switch (filter) {
+  case ModuleDecl::ImportFilter::All:
+  case ModuleDecl::ImportFilter::Private:
     imports.push_back({ModuleDecl::AccessPathTy(), owner.getStdlibModule()});
+    break;
+  case ModuleDecl::ImportFilter::Public:
+    break;
+  }
 
   SmallVector<clang::Module *, 8> imported;
   if (!clangModule) {
     // This is the special "imported headers" module.
-    if (filter != ModuleDecl::ImportFilter::Private) {
+    switch (filter) {
+    case ModuleDecl::ImportFilter::All:
+    case ModuleDecl::ImportFilter::Public:
       imported.append(owner.ImportedHeaderExports.begin(),
                       owner.ImportedHeaderExports.end());
+      break;
+
+    case ModuleDecl::ImportFilter::Private:
+      break;
     }
 
   } else {
     clangModule->getExportedModules(imported);
-    if (filter != ModuleDecl::ImportFilter::Public) {
-      if (filter == ModuleDecl::ImportFilter::All) {
-        llvm::SmallPtrSet<clang::Module *, 8> knownModules;
-        imported.append(clangModule->Imports.begin(), clangModule->Imports.end());
-        imported.erase(std::remove_if(imported.begin(), imported.end(),
-                                      [&](clang::Module *mod) -> bool {
-                                        return !knownModules.insert(mod).second;
-                                      }),
-                       imported.end());
-      } else {
-        llvm::SmallPtrSet<clang::Module *, 8> knownModules(imported.begin(),
-                                                           imported.end());
-        SmallVector<clang::Module *, 8> privateImports;
-        std::copy_if(clangModule->Imports.begin(), clangModule->Imports.end(),
-                     std::back_inserter(privateImports), [&](clang::Module *mod) {
-                       return knownModules.count(mod) == 0;
-        });
-        imported.swap(privateImports);
-      }
+
+    switch (filter) {
+    case ModuleDecl::ImportFilter::All: {
+      llvm::SmallPtrSet<clang::Module *, 8> knownModules;
+      imported.append(clangModule->Imports.begin(), clangModule->Imports.end());
+      imported.erase(std::remove_if(imported.begin(), imported.end(),
+                                    [&](clang::Module *mod) -> bool {
+                                      return !knownModules.insert(mod).second;
+                                    }),
+                     imported.end());
 
       // FIXME: The parent module isn't exactly a private import, but it is
       // needed for link dependencies.
       if (clangModule->Parent)
         imported.push_back(clangModule->Parent);
+
+      break;
+    }
+
+    case ModuleDecl::ImportFilter::Private: {
+      llvm::SmallPtrSet<clang::Module *, 8> knownModules(imported.begin(),
+                                                         imported.end());
+      SmallVector<clang::Module *, 8> privateImports;
+      std::copy_if(clangModule->Imports.begin(), clangModule->Imports.end(),
+                   std::back_inserter(privateImports), [&](clang::Module *mod) {
+                     return knownModules.count(mod) == 0;
+                   });
+      imported.swap(privateImports);
+
+      // FIXME: The parent module isn't exactly a private import, but it is
+      // needed for link dependencies.
+      if (clangModule->Parent)
+        imported.push_back(clangModule->Parent);
+
+      break;
+    }
+
+    case ModuleDecl::ImportFilter::Public:
+      break;
     }
   }
 
@@ -3489,10 +3543,6 @@ EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
     return EffectiveClangContext();
   }
 
-  // Resolve the type.
-  if (auto typeResolver = getTypeResolver())
-    typeResolver->resolveDeclSignature(const_cast<NominalTypeDecl *>(nominal));
-
   // If it's an @objc entity, go look for it.
   if (nominal->isObjC()) {
     // Map the name. If we can't represent the Swift name in Clang.
@@ -3550,13 +3600,14 @@ importName(const clang::NamedDecl *D,
     getDeclName();
 }
 
-bool swift::isInOverlayModuleForImportedModule(const DeclContext *overlayDC,
+bool ClangImporter::isInOverlayModuleForImportedModule(
+                                               const DeclContext *overlayDC,
                                                const DeclContext *importedDC) {
   overlayDC = overlayDC->getModuleScopeContext();
   importedDC = importedDC->getModuleScopeContext();
 
   auto importedClangModuleUnit = dyn_cast<ClangModuleUnit>(importedDC);
-  if (!importedClangModuleUnit)
+  if (!importedClangModuleUnit || !importedClangModuleUnit->getClangModule())
     return false;
 
   auto overlayModule = overlayDC->getParentModule();
@@ -3565,7 +3616,7 @@ bool swift::isInOverlayModuleForImportedModule(const DeclContext *overlayDC,
 
   // Is this a private module that's re-exported to the public (overlay) name?
   auto clangModule =
-    importedClangModuleUnit->getClangModule()->getTopLevelModule();
+  importedClangModuleUnit->getClangModule()->getTopLevelModule();
   return !clangModule->ExportAsModule.empty() &&
     clangModule->ExportAsModule == overlayModule->getName().str();
 }

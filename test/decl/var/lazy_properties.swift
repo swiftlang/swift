@@ -86,7 +86,7 @@ class CaptureListInLazyProperty {
 // property type and also as part of the getter
 class WeShouldNotReTypeCheckStatements {
   lazy var firstCase = {
-    _ = nil // expected-error {{'nil' requires a contextual type}}
+    _ = nil // expected-error{{'nil' requires a contextual type}}
     _ = ()
   }
 

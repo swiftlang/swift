@@ -101,10 +101,11 @@ ABSTRACT_TYPE(Builtin, Type)
   TYPE_RANGE(Builtin, BuiltinInteger, BuiltinVector)
 TYPE(Tuple, Type)
 ABSTRACT_TYPE(ReferenceStorage, Type)
-  ARTIFICIAL_TYPE(UnownedStorage, ReferenceStorageType)
-  ARTIFICIAL_TYPE(UnmanagedStorage, ReferenceStorageType)
-  ARTIFICIAL_TYPE(WeakStorage, ReferenceStorageType)
-  TYPE_RANGE(ReferenceStorage, UnownedStorage, WeakStorage)
+#define REF_STORAGE(Name, ...) \
+  ARTIFICIAL_TYPE(Name##Storage, ReferenceStorageType)
+#define REF_STORAGE_RANGE(First, Last) \
+  TYPE_RANGE(ReferenceStorage, First##Storage, Last##Storage)
+#include "swift/AST/ReferenceStorage.def"
 ABSTRACT_TYPE(AnyGeneric, Type)
   ABSTRACT_TYPE(NominalOrBoundGenericNominal, Type)
     ABSTRACT_TYPE(Nominal, Type)

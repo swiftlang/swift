@@ -174,7 +174,7 @@ internal func _getErrorDefaultUserInfo<T: Error>(_ error: T) -> AnyObject?
 /// Provided by the ErrorObject implementation.
 /// Called by the casting machinery and by the Foundation overlay.
 @_silgen_name("_swift_stdlib_bridgeErrorToNSError")
-public func _bridgeErrorToNSError(_ error: Error) -> AnyObject
+public func _bridgeErrorToNSError(_ error: __owned Error) -> AnyObject
 #endif
 
 /// Invoked by the compiler when the subexpression of a `try!` expression

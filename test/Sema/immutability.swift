@@ -2,6 +2,9 @@
 
 func markUsed<T>(_ t: T) {}
 
+prefix operator ++
+public prefix func ++ <T>(rhs: inout T) -> T { fatalError() }
+
 let bad_property_1: Int {    // expected-error {{'let' declarations cannot be computed properties}} {{1-4=var}}
   get {
     return 42
@@ -246,9 +249,9 @@ protocol MutatingTestProto {
   mutating
   func mutatingfunc()
   
-  func nonmutatingfunc()  // expected-note 2 {{protocol requires}}
+  func nonmutatingfunc() // expected-note {{protocol requires}}
   __consuming
-  func consuming_nonmutating_func()  // expected-note 2 {{protocol requires}}
+  func consuming_nonmutating_func() // expected-note {{protocol requires}}
 }
 
 class TestClass : MutatingTestProto {
@@ -281,18 +284,18 @@ struct TestStruct3 : MutatingTestProto {   // expected-error {{type 'TestStruct3
   func consuming_nonmutating_func() {} // expected-note {{candidate is marked 'mutating' but protocol does not allow it}}
 }
 
-struct TestStruct4 : MutatingTestProto { // expected-error {{type 'TestStruct4' does not conform to protocol 'MutatingTestProto'}}
+struct TestStruct4 : MutatingTestProto {
   mutating
   func mutatingfunc() {}  // Ok, can be mutating.
   func nonmutatingfunc() {}
-  nonmutating func consuming_nonmutating_func() {}  // expected-note {{candidate is marked 'nonmutating' but protocol does not allow it}}
+  nonmutating func consuming_nonmutating_func() {}
 }
 
-struct TestStruct5 : MutatingTestProto { // expected-error {{type 'TestStruct5' does not conform to protocol 'MutatingTestProto'}}
+struct TestStruct5 : MutatingTestProto {
   mutating
   func mutatingfunc() {}  // Ok, can be mutating.
   __consuming
-  func nonmutatingfunc() {} // expected-note {{candidate is marked '__consuming' but protocol does not allow it}}
+  func nonmutatingfunc() {}
   __consuming func consuming_nonmutating_func() {}
 }
 
@@ -430,7 +433,25 @@ func QoI() {
   get_only = 92            // expected-error {{cannot assign to value: 'get_only' is a get-only property}}
 }
 
+func func1() -> Int { return 7 }
 
+func func2() {
+  func func3() {}
+
+  func3() = 0 // expected-error {{expression is not assignable: 'func3' returns immutable value}}
+}
+
+func assignmentsToFuncs() {
+
+  LetClassMembers(arg: 7).f() = 5  // expected-error {{expression is not assignable: function call returns immutable value}}
+  LetStructMembers(arg: 7).f() = 5 // expected-error {{expression is not assignable: function call returns immutable value}}
+
+  func1() = 9     // expected-error {{expression is not assignable: 'func1' returns immutable value}}
+  func2() = "rrr" // expected-error {{expression is not assignable: 'func2' returns immutable value}}
+
+  var x = 0
+  (x, func1() = 0) = (4, 5) // expected-error {{expression is not assignable: 'func1' returns immutable value}}
+}
 
 // <rdar://problem/17051675> Structure initializers in an extension cannot assign to constant properties
 struct rdar17051675_S {
@@ -600,10 +621,9 @@ func testConditional(b : Bool) {
 
 
 
-// <rdar://problem/27384685> QoI: Poor diagnostic when assigning a value to a method
 func f(a : FooClass, b : LetStructMembers) {
-  a.baz = 1 // expected-error {{cannot assign to property: 'baz' is a method}}
-  b.f = 42     // expected-error {{cannot assign to property: 'f' is a method}}
+  a.baz = 1   // expected-error {{cannot assign to value: 'baz' is a method}}
+  b.f = 42    // expected-error {{cannot assign to value: 'f' is a method}}
 }
 
 // SR-2354: Reject subscript declarations with mutable parameters.

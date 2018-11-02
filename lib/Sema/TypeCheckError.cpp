@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -41,31 +41,26 @@ private:
   };
   unsigned TheKind : 2;
   unsigned IsRethrows : 1;
-  unsigned IsProtocolMethod : 1;
-  unsigned ParamCount : 28;
+  unsigned ParamCount : 2;
 
 public:
   explicit AbstractFunction(Kind kind, Expr *fn)
     : TheKind(kind),
       IsRethrows(false),
-      IsProtocolMethod(false),
       ParamCount(1) {
     TheExpr = fn;
   }
 
-  explicit AbstractFunction(AbstractFunctionDecl *fn,
-                            bool isProtocolMethod)
+  explicit AbstractFunction(AbstractFunctionDecl *fn)
     : TheKind(Kind::Function),
       IsRethrows(fn->getAttrs().hasAttribute<RethrowsAttr>()),
-      IsProtocolMethod(isProtocolMethod),
-      ParamCount(fn->getNumParameterLists()) {
+      ParamCount(fn->hasImplicitSelfDecl() ? 2 : 1) {
     TheFunction = fn;
   }
 
   explicit AbstractFunction(AbstractClosureExpr *closure)
     : TheKind(Kind::Closure),
       IsRethrows(false),
-      IsProtocolMethod(false),
       ParamCount(1) {
     TheClosure = closure;
   }
@@ -73,7 +68,6 @@ public:
   explicit AbstractFunction(ParamDecl *parameter)
     : TheKind(Kind::Parameter),
       IsRethrows(false),
-      IsProtocolMethod(false),
       ParamCount(1) {
     TheParameter = parameter;
   }
@@ -84,7 +78,7 @@ public:
   bool isBodyRethrows() const { return IsRethrows; }
 
   unsigned getNumArgumentsForFullApply() const {
-    return (ParamCount - unsigned(IsProtocolMethod));
+    return ParamCount;
   }
 
   Type getType() const {
@@ -120,10 +114,6 @@ public:
     return TheExpr;
   }
 
-  bool isProtocolMethod() const {
-    return IsProtocolMethod;
-  }
-
   static AbstractFunction decomposeApply(ApplyExpr *apply,
                                          SmallVectorImpl<Expr*> &args) {
     Expr *fn;
@@ -144,12 +134,18 @@ public:
         fn = conversion->getSubExpr()->getValueProvidingExpr();
       } else if (auto conversion = dyn_cast<BindOptionalExpr>(fn)) {
         fn = conversion->getSubExpr()->getValueProvidingExpr();
+      // Look through optional injections.
+      } else if (auto injection = dyn_cast<InjectIntoOptionalExpr>(fn)) {
+        fn = injection->getSubExpr()->getValueProvidingExpr();
       // Look through function conversions.
       } else if (auto conversion = dyn_cast<FunctionConversionExpr>(fn)) {
         fn = conversion->getSubExpr()->getValueProvidingExpr();
       // Look through base-ignored qualified references (Module.methodName).
       } else if (auto baseIgnored = dyn_cast<DotSyntaxBaseIgnoredExpr>(fn)) {
         fn = baseIgnored->getRHS();
+      // Look through closure capture lists.
+      } else if (auto captureList = dyn_cast<CaptureListExpr>(fn)) {
+        fn = captureList->getClosureBody();
       } else {
         break;
       }
@@ -159,16 +155,9 @@ public:
     if (auto declRef = dyn_cast<DeclRefExpr>(fn)) {
       ValueDecl *decl = declRef->getDecl();
       if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
-        return AbstractFunction(fn, false);
+        return AbstractFunction(fn);
       } else if (auto param = dyn_cast<ParamDecl>(decl)) {
         return AbstractFunction(param);
-      }
-
-    // Archetype function references.
-    } else if (auto memberRef = dyn_cast<MemberRefExpr>(fn)) {
-      if (auto fn = dyn_cast<AbstractFunctionDecl>(
-                                          memberRef->getMember().getDecl())) {
-        return AbstractFunction(fn, true);
       }
 
     // Closures.
@@ -459,21 +448,15 @@ public:
       Type type = fnRef.getType();
       if (!type) return Classification::forInvalidCode();
 
-      if (fnRef.isProtocolMethod()) {
-        if (auto fnType = type->getAs<AnyFunctionType>()) {
-          type = fnType->getResult();
-        } else {
-          Classification::forInvalidCode();
-        }
-      }
-
       // Use the most significant result from the arguments.
       Classification result;
       for (auto arg : reversed(args)) {
         auto fnType = type->getAs<AnyFunctionType>();
         if (!fnType) return Classification::forInvalidCode();
 
-        result.merge(classifyRethrowsArgument(arg, fnType->getInput()));
+        auto paramType = FunctionType::composeInput(fnType->getASTContext(),
+                                                    fnType->getParams(), false);
+        result.merge(classifyRethrowsArgument(arg, paramType));
         type = fnType->getResult();
       }
       return result;
@@ -790,7 +773,7 @@ private:
 
     auto mapping = shuffle->getElementMapping();
     for (unsigned destIndex = 0; destIndex != mapping.size(); ++destIndex) {
-      auto srcIndex = shuffle->getElementMapping()[destIndex];
+      auto srcIndex = mapping[destIndex];
       if (srcIndex >= 0) {
         origSrcElts[srcIndex] = origParamTupleType->getElement(destIndex);
       } else if (srcIndex == TupleShuffleExpr::DefaultInitialize ||
@@ -805,9 +788,6 @@ private:
           origSrcElts[srcIndex] =
             origParamTupleType->getASTContext().TheRawPointerType;
         }
-
-        // We're done iterating these elements.
-        break;
       } else {
         llvm_unreachable("bad source-element mapping!");
       }
@@ -898,6 +878,14 @@ private:
     llvm_unreachable("invalid classify result");
   }
 
+  static Context getContextForPatternBinding(PatternBindingDecl *pbd) {
+    if (!pbd->isStatic() && pbd->getDeclContext()->isTypeContext()) {
+      return Context(Kind::IVarInitializer);
+    } else {
+      return Context(Kind::GlobalVarInitializer);
+    }
+  }
+
   Kind TheKind;
   bool DiagnoseErrorOnTry = false;
   DeclContext *RethrowsDC = nullptr;
@@ -920,8 +908,25 @@ public:
       result.RethrowsDC = D;
       return result;
     }
+
+    // HACK: If the decl is the synthesized getter for a 'lazy' property, then
+    // treat the context as a property initializer in order to produce a better
+    // diagnostic; the only code we should be diagnosing on is within the
+    // initializer expression that has been transplanted from the var's pattern
+    // binding decl. We don't perform the analysis on the initializer while it's
+    // still a part of that PBD, as it doesn't get a solution applied there.
+    if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
+      if (auto *var = dyn_cast<VarDecl>(accessor->getStorage())) {
+        if (accessor->isGetter() && var->getAttrs().hasAttribute<LazyAttr>()) {
+          auto *pbd = var->getParentPatternBinding();
+          assert(pbd && "lazy var didn't have a pattern binding decl");
+          return getContextForPatternBinding(pbd);
+        }
+      }
+    }
+
     return Context(getKindForFunctionBody(
-        D->getInterfaceType(), D->getNumParameterLists()));
+        D->getInterfaceType(), D->hasImplicitSelfDecl() ? 2 : 1));
   }
 
   static Context forInitializer(Initializer *init) {
@@ -929,14 +934,10 @@ public:
       return Context(Kind::DefaultArgument);
     }
 
-    auto binding = cast<PatternBindingInitializer>(init)->getBinding();
+    auto *binding = cast<PatternBindingInitializer>(init)->getBinding();
     assert(!binding->getDeclContext()->isLocalContext() &&
            "setting up error context for local pattern binding?");
-    if (!binding->isStatic() && binding->getDeclContext()->isTypeContext()) {
-      return Context(Kind::IVarInitializer);
-    } else {
-      return Context(Kind::GlobalVarInitializer);
-    }
+    return getContextForPatternBinding(binding);
   }
 
   static Context forEnumElementInitializer(EnumElementDecl *elt) {
@@ -1434,7 +1435,8 @@ private:
 
     // HACK: functions can get queued multiple times in
     // definedFunctions, so be sure to be idempotent.
-    if (!E->isThrowsSet()) {
+    if (!E->isThrowsSet() &&
+        classification.getResult() != ThrowingKind::Invalid) {
       E->setThrows(classification.getResult() == ThrowingKind::RethrowingOnly ||
                    classification.getResult() == ThrowingKind::Throws);
     }
@@ -1508,6 +1510,9 @@ private:
       Flags.set(ContextFlags::HasAnyThrowSite);
       if (requiresTry) Flags.set(ContextFlags::HasTryThrowSite);
 
+      // We set the throwing bit of an apply expr after performing this
+      // analysis, so ensure we don't emit duplicate diagnostics for functions
+      // that have been queued multiple times.
       if (auto expr = E.dyn_cast<Expr*>())
         if (auto apply = dyn_cast<ApplyExpr>(expr))
           if (apply->isThrowsSet())

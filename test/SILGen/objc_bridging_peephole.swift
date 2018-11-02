@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name objc_bridging_peephole -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -module-name objc_bridging_peephole -enable-sil-ownership %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -75,7 +75,7 @@ func testNonNullMethodResult(dummy: DummyClass) {
   // CHECK-NEXT: switch_enum [[RESULT]]
   //
   // CHECK:    bb1:
-  // CHECK:      function_ref @$Ss30_diagnoseUnexpectedNilOptional14_filenameStart01_E6Length01_E7IsASCII5_lineyBp_BwBi1_BwtF
+  // CHECK:      function_ref @$Ss30_diagnoseUnexpectedNilOptional14_filenameStart01_E6Length01_E7IsASCII5_line17_isImplicitUnwrapyBp_BwBi1_BwBi1_tF
   // CHECK:    bb2([[RESULT:%.*]] : @owned $NSString):
   // CHECK:      [[BORROWED_RESULT:%.*]] = begin_borrow [[RESULT]]
   // CHECK:      [[USE:%.*]] = function_ref @$S22objc_bridging_peephole5useNSyySo8NSStringCF
@@ -86,7 +86,7 @@ func testNonNullMethodResult(dummy: DummyClass) {
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[SELF]])
   // CHECK-NEXT: switch_enum [[RESULT]]
   // CHECK:    bb3:
-  // CHECK:      function_ref @$Ss30_diagnoseUnexpectedNilOptional14_filenameStart01_E6Length01_E7IsASCII5_lineyBp_BwBi1_BwtF
+  // CHECK:      function_ref @$Ss30_diagnoseUnexpectedNilOptional14_filenameStart01_E6Length01_E7IsASCII5_line17_isImplicitUnwrapyBp_BwBi1_BwBi1_tF
   // CHECK:    bb4([[RESULT:%.*]] : @owned $NSString):
   // CHECK-NEXT: [[ANYOBJECT:%.*]] = init_existential_ref [[RESULT]] : $NSString : $NSString, $AnyObject
   // CHECK-NEXT: [[BORROWED_ANYOBJECT:%.*]] = begin_borrow [[ANYOBJECT]]
@@ -104,7 +104,7 @@ func testForcedMethodResult(dummy: DummyClass) {
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[SELF]])
   // CHECK-NEXT: switch_enum [[RESULT]]
   // CHECK:    bb1:
-  // CHECK:      function_ref @$Ss30_diagnoseUnexpectedNilOptional14_filenameStart01_E6Length01_E7IsASCII5_lineyBp_BwBi1_BwtF
+  // CHECK:      function_ref @$Ss30_diagnoseUnexpectedNilOptional14_filenameStart01_E6Length01_E7IsASCII5_line17_isImplicitUnwrapyBp_BwBi1_BwBi1_tF
   // CHECK:    bb2([[RESULT:%.*]] : @owned $NSString):
   // CHECK:      [[BORROWED_RESULT:%.*]] = begin_borrow [[RESULT]]
   // CHECK:      [[USE:%.*]] = function_ref @$S22objc_bridging_peephole5useNSyySo8NSStringCF
@@ -197,7 +197,7 @@ func testNonNullPropertyValue(dummy: DummyClass) {
   // CHECK:       [[RESULT:%.*]] = apply [[METHOD]]([[SELF]])
   // CHECK:       switch_enum [[RESULT]]
   // CHECK:    bb1:
-  // CHECK:      function_ref @$Ss30_diagnoseUnexpectedNilOptional14_filenameStart01_E6Length01_E7IsASCII5_lineyBp_BwBi1_BwtF
+  // CHECK:      function_ref @$Ss30_diagnoseUnexpectedNilOptional14_filenameStart01_E6Length01_E7IsASCII5_line17_isImplicitUnwrapyBp_BwBi1_BwBi1_tF
   // CHECK:    bb2([[RESULT:%.*]] : @owned $NSString):
   // CHECK:      [[BORROWED_RESULT:%.*]] = begin_borrow [[RESULT]]
   // CHECK:      [[USE:%.*]] = function_ref @$S22objc_bridging_peephole5useNSyySo8NSStringCF
@@ -208,7 +208,7 @@ func testNonNullPropertyValue(dummy: DummyClass) {
   // CHECK:      [[RESULT:%.*]] = apply [[METHOD]]([[SELF]])
   // CHECK:      switch_enum [[RESULT]]
   // CHECK:    bb3:
-  // CHECK:      function_ref @$Ss30_diagnoseUnexpectedNilOptional14_filenameStart01_E6Length01_E7IsASCII5_lineyBp_BwBi1_BwtF
+  // CHECK:      function_ref @$Ss30_diagnoseUnexpectedNilOptional14_filenameStart01_E6Length01_E7IsASCII5_line17_isImplicitUnwrapyBp_BwBi1_BwBi1_tF
   // CHECK:    bb4([[RESULT:%.*]] : @owned $NSString):
   // CHECK:      [[ANYOBJECT:%.*]] = init_existential_ref [[RESULT]] : $NSString : $NSString, $AnyObject
   // CHECK:      [[BORROWED_ANYOBJECT:%.*]] = begin_borrow [[ANYOBJECT]]
@@ -226,7 +226,7 @@ func testForcedPropertyValue(dummy: DummyClass) {
   // CHECK:      [[RESULT:%.*]] = apply [[METHOD]]([[SELF]])
   // CHECK:      switch_enum [[RESULT]]
   // CHECK:    bb1:
-  // CHECK:      function_ref @$Ss30_diagnoseUnexpectedNilOptional14_filenameStart01_E6Length01_E7IsASCII5_lineyBp_BwBi1_BwtF
+  // CHECK:      function_ref @$Ss30_diagnoseUnexpectedNilOptional14_filenameStart01_E6Length01_E7IsASCII5_line17_isImplicitUnwrapyBp_BwBi1_BwBi1_tF
   // CHECK:    bb2([[RESULT:%.*]] : @owned $NSString):
   // CHECK:      [[BORROWED_RESULT:%.*]] = begin_borrow [[RESULT]]
   // CHECK:      [[USE:%.*]] = function_ref @$S22objc_bridging_peephole5useNSyySo8NSStringCF
@@ -281,7 +281,7 @@ func testNonnullSubscriptGet(object: NonnullSubscript, index: AnyObject) {
   // CHECK:      [[RESULT:%.*]] = apply [[METHOD]]([[INDEX]], [[SELF]])
   // CHECK-NEXT: destroy_value [[INDEX]] : $AnyObject
   // CHECK-NEXT: switch_enum [[RESULT]]
-  // CHECK:      function_ref @$Ss30_diagnoseUnexpectedNilOptional14_filenameStart01_E6Length01_E7IsASCII5_lineyBp_BwBi1_BwtF
+  // CHECK:      function_ref @$Ss30_diagnoseUnexpectedNilOptional14_filenameStart01_E6Length01_E7IsASCII5_line17_isImplicitUnwrapyBp_BwBi1_BwBi1_tF
   // CHECK:    bb{{[0-9]+}}([[RESULT:%.*]] : @owned $NSString):
   // CHECK:      [[BORROWED_RESULT:%.*]] = begin_borrow [[RESULT]]
   // CHECK:      [[USE:%.*]] = function_ref @$S22objc_bridging_peephole5useNSyySo8NSStringCF
@@ -326,7 +326,7 @@ func testNullproneSubscriptGet(object: NullproneSubscript, index: AnyObject) {
   // CHECK:      [[RESULT:%.*]] = apply [[METHOD]]([[INDEX]], [[SELF]])
   // CHECK-NEXT: destroy_value [[INDEX]] : $AnyObject
   // CHECK-NEXT: switch_enum [[RESULT]]
-  // CHECK:      function_ref @$Ss30_diagnoseUnexpectedNilOptional14_filenameStart01_E6Length01_E7IsASCII5_lineyBp_BwBi1_BwtF
+  // CHECK:      function_ref @$Ss30_diagnoseUnexpectedNilOptional14_filenameStart01_E6Length01_E7IsASCII5_line17_isImplicitUnwrapyBp_BwBi1_BwBi1_tF
   // CHECK:    bb{{[0-9]+}}([[RESULT:%.*]] : @owned $NSString):
   // CHECK:      [[BORROWED_RESULT:%.*]] = begin_borrow [[RESULT]]
   // CHECK:      [[USE:%.*]] = function_ref @$S22objc_bridging_peephole5useNSyySo8NSStringCF

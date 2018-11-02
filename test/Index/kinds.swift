@@ -185,6 +185,7 @@ prefix func -(a: AStruct) -> AStruct { return a }
 // CHECK: [[@LINE-1]]:13 | function/prefix-operator/Swift | -(_:) | s:14swift_ide_test1sopyAA7AStructVADF | Def | rel: 0
 
 // PostfixOperator
+postfix operator ++
 postfix func ++(a: AStruct) -> AStruct { return a }
 // CHECK: [[@LINE-1]]:14 | function/postfix-operator/Swift | ++(_:) | s:14swift_ide_test2ppoPyAA7AStructVADF | Def | rel: 0
 
@@ -222,18 +223,6 @@ extension SubTestCase {
 class NonTestCase {
   func testMeNot() {}
   // CHECK: [[@LINE-1]]:8 | instance-method/Swift | testMeNot() |
-}
-
-@objc class TargetForIBAction {}
-// CHECK: [[@LINE-1]]:13 | class/Swift | TargetForIBAction | [[TargetForIBAction_USR:.*]] | Def |
-class AttrAnnots {
-  @IBOutlet var iboutletString: AnyObject?
-  // CHECK: [[@LINE-1]]:17 | instance-property(IB)/Swift | iboutletString |
-  @IBAction func someibaction(o: TargetForIBAction) {}
-  // CHECK: [[@LINE-1]]:18 | instance-method(IB)/Swift | someibaction(o:) | {{.*}} | Def,Dyn,RelChild,RelIBType | rel: 2
-  // CHECK-NEXT: RelIBType | class/Swift | TargetForIBAction | [[TargetForIBAction_USR]]
-  @GKInspectable var gkString = "gk"
-  // CHECK: [[@LINE-1]]:22 | instance-property(GKI)/Swift | gkString |
 }
 
 // CHECK: [[@LINE+1]]:7 | class/Swift | C1 | [[C1_USR:.*]] | Def | rel: 0

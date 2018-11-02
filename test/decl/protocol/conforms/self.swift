@@ -18,13 +18,13 @@ extension P {
 
   func hasDefaultTakesT(_: T) {}
 
-  func returnsSelfTakesT(_: T) -> Self { // expected-error {{method 'returnsSelfTakesT' in non-final class 'Class' cannot be implemented in a protocol extension because it returns `Self` and has associated type requirements}}
+  func returnsSelfTakesT(_: T) -> Self { // expected-note {{'returnsSelfTakesT' declared here}}
     return self
   }
 }
 
 // This fails
-class Class : P {}
+class Class : P {} // expected-error {{method 'returnsSelfTakesT' in non-final class 'Class' cannot be implemented in a protocol extension because it returns 'Self' and has associated type requirements}}
 
 // This succeeds, because the class is final
 final class FinalClass : P {}

@@ -18,6 +18,7 @@
 
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/Punycode.h"
+#include "swift/AST/Ownership.h"
 #include "swift/Strings.h"
 #include <vector>
 #include <cstdio>
@@ -641,6 +642,9 @@ void Remangler::mangleFunctionSignatureSpecializationParam(Node *node) {
     if (kindValue &
         unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed))
       Out << 'g';
+    if (kindValue &
+        unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned))
+      Out << 'o';
     if (kindValue & unsigned(FunctionSigSpecializationParamKind::SROA))
       Out << 's';
     Out << '_';
@@ -1240,11 +1244,7 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
 }
 
 void Remangler::mangleTypeAlias(Node *node, EntityContext &ctx) {
-  SubstitutionEntry entry;
-  if (trySubstitution(node, entry)) return;
-  Out << 'a';
-  mangleChildNodes(node); // context, identifier
-  addSubstitution(entry);
+  mangleAnyNominalType(node, ctx);
 }
 
 void Remangler::mangleFunctionType(Node *node) {
@@ -1467,20 +1467,12 @@ void Remangler::mangleProtocolListWithoutPrefix(Node *node,
   Out << '_';
 }
 
-void Remangler::mangleUnowned(Node *node) {
-  Out << "Xo";
-  mangleSingleChildNode(node); // type
-}
-
-void Remangler::mangleUnmanaged(Node *node) {
-  Out << "Xu";
-  mangleSingleChildNode(node); // type
-}
-
-void Remangler::mangleWeak(Node *node) {
-  Out << "Xw";
-  mangleSingleChildNode(node); // type
-}
+#define REF_STORAGE(Name, ...) \
+  void Remangler::mangle##Name(Node *node) { \
+    Out << manglingOf(ReferenceOwnership::Name); \
+    mangleSingleChildNode(node); /* type */ \
+  }
+#include "swift/AST/ReferenceStorage.def"
 
 void Remangler::mangleShared(Node *node) {
   Out << 'h';
@@ -1625,11 +1617,6 @@ void Remangler::mangleAssociatedType(Node *node) {
   }
 }
 
-void Remangler::mangleQualifiedArchetype(Node *node) {
-  Out << "Qq";
-  mangleChildNodes(node); // index, declcontext
-}
-
 void Remangler::mangleDeclContext(Node *node) {
   mangleSingleChildNode(node);
 }
@@ -1754,6 +1741,9 @@ void Remangler::mangleProtocol(Node *node, EntityContext &ctx) {
 }
 
 void Remangler::mangleProtocolWithoutPrefix(Node *node) {
+  if (mangleStandardSubstitution(node))
+    return;
+
   if (node->getKind() == Node::Kind::Type) {
     assert(node->getNumChildren() == 1);
     node = node->begin()[0];
@@ -1823,6 +1813,9 @@ void Remangler::mangleAnyNominalType(Node *node, EntityContext &ctx) {
   case Node::Kind::Class:
     mangleNominalType(node, 'C', ctx);
     break;
+  case Node::Kind::TypeAlias:
+    mangleNominalType(node, 'a', ctx);
+    break;
   default:
     unreachable("bad nominal type kind");
   }
@@ -1868,6 +1861,16 @@ void Remangler::mangleBoundGenericEnum(Node *node) {
 }
 
 void Remangler::mangleBoundGenericOtherNominalType(Node *node) {
+  EntityContext ctx;
+  mangleAnyNominalType(node, ctx);
+}
+
+void Remangler::mangleBoundGenericProtocol(Node *node) {
+  EntityContext ctx;
+  mangleAnyNominalType(node, ctx);
+}
+
+void Remangler::mangleBoundGenericTypeAlias(Node *node) {
   EntityContext ctx;
   mangleAnyNominalType(node, ctx);
 }

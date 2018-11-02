@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -verify %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -verify %s | %FileCheck %s
 
 func values(_ arg: @escaping @convention(c) (Int) -> Int) -> @convention(c) (Int) -> Int {
   return arg

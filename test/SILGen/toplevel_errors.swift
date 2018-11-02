@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 enum MyError : Error {
   case A, B

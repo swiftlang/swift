@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name unmanaged -enable-sil-ownership -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -module-name unmanaged -enable-sil-ownership %s | %FileCheck %s
 
 class C {}
 

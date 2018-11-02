@@ -29,7 +29,7 @@ namespace Demangle {
 
 /// Strip generic arguments from the "spine" of a context node, producing a
 /// bare context to be used in (e.g.) forming nominal type descriptors.
-NodePointer stripGenericArgsFromContextNode(const NodePointer &node,
+NodePointer stripGenericArgsFromContextNode(NodePointer node,
                                             NodeFactory &factory);
 
 /// Describe a function parameter, parameterized on the type
@@ -127,7 +127,7 @@ class TypeDecoder {
     case NodeKind::BoundGenericEnum:
     case NodeKind::BoundGenericStructure:
     case NodeKind::BoundGenericOtherNominalType: {
-      if (Node->getNumChildren() != 2)
+      if (Node->getNumChildren() < 2)
         return BuiltType();
 
       BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
@@ -161,7 +161,7 @@ class TypeDecoder {
       // Handle lowered metatypes in a hackish way. If the representation
       // was not thin, force the resulting typeref to have a non-empty
       // representation.
-      if (Node->getNumChildren() == 2) {
+      if (Node->getNumChildren() >= 2) {
         auto repr = Node->getChild(i++);
         if (repr->getKind() != NodeKind::MetatypeRepresentation ||
             !repr->hasText())
@@ -482,7 +482,7 @@ private:
       if (node->getNumChildren() < 2)
         return false;
 
-      auto moduleOrParentType = node->getChild(0);
+      auto parentContext = node->getChild(0);
 
       // Nested types are handled a bit funny here because a
       // nominal typeref always stores its full mangled name,
@@ -490,14 +490,22 @@ private:
       // mangled name already includes the module and parent
       // types, if any.
       nominalNode = node;
-      if (moduleOrParentType->getKind() != NodeKind::Module) {
-        parent = decodeMangledType(moduleOrParentType);
-        if (!parent) return false;
-
+      switch (parentContext->getKind()) {
+      case Node::Kind::Module:
+        break;
+      case Node::Kind::Extension:
+        // Decode the type being extended.
+        if (parentContext->getNumChildren() < 2)
+          return false;
+        parentContext = parentContext->getChild(1);
+        LLVM_FALLTHROUGH;
+      default:
+        parent = decodeMangledType(parentContext);
         // Remove any generic arguments from the context node, producing a
-        // node that reference the nominal type declaration.
+        // node that references the nominal type declaration.
         nominalNode =
           stripGenericArgsFromContextNode(node, Builder.getNodeFactory());
+        break;
       }
     }
     typeDecl = Builder.createNominalTypeDecl(nominalNode);
@@ -507,7 +515,7 @@ private:
   }
 
   BuiltProtocolDecl decodeMangledProtocolType(
-                                           const Demangle::NodePointer &node) {
+                                            const Demangle::NodePointer &node) {
     if (node->getKind() == NodeKind::Type)
       return decodeMangledProtocolType(node->getChild(0));
 

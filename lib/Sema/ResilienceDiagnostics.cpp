@@ -86,6 +86,13 @@ void TypeChecker::diagnoseInlinableLocalType(const NominalTypeDecl *NTD) {
   }
 }
 
+/// A uniquely-typed boolean to reduce the chances of accidentally inverting
+/// a check.
+enum class DowngradeToWarning: bool {
+  No,
+  Yes
+};
+
 bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
                                            const ValueDecl *D,
                                            const DeclContext *DC,
@@ -119,11 +126,21 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
   if (D->isDynamic())
     return false;
 
-  // FIXME: Figure out what to do with typealiases
-  if (isa<TypeAliasDecl>(D))
-    return false;
+  DowngradeToWarning downgradeToWarning = DowngradeToWarning::No;
 
-  diagnose(loc, diag::resilience_decl_unavailable,
+  // Swift 4.2 did not perform any checks for type aliases.
+  if (isa<TypeAliasDecl>(D)) {
+    if (!Context.isSwiftVersionAtLeast(4, 2))
+      return false;
+    if (!Context.isSwiftVersionAtLeast(5))
+      downgradeToWarning = DowngradeToWarning::Yes;
+  }
+
+  auto diagID = diag::resilience_decl_unavailable;
+  if (downgradeToWarning == DowngradeToWarning::Yes)
+    diagID = diag::resilience_decl_unavailable_warn;
+
+  diagnose(loc, diagID,
            D->getDescriptiveKind(), D->getFullName(),
            D->getFormalAccessScope().accessLevelForDiagnostics(),
            static_cast<unsigned>(Kind));
@@ -136,6 +153,6 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
              D->getDescriptiveKind(), D->getFullName());
   }
 
-  return true;
+  return (downgradeToWarning == DowngradeToWarning::No);
 }
 

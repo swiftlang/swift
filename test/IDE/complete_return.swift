@@ -54,6 +54,7 @@ func testReturnInt1() {
 func testReturnInt2(_ fooObject: FooStruct) {
   return fooObject.#^RETURN_INT_2^#
 // RETURN_INT_2: Begin completions
+// RETURN_INT_2-NEXT: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
 // RETURN_INT_2-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{; name=.+$}}
 // RETURN_INT_2-NEXT: End completions
 }

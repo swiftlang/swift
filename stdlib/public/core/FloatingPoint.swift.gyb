@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -167,12 +167,8 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 ///     print("Average: \(average)°F in \(validTemps.count) " +
 ///           "out of \(tempsFahrenheit.count) observations.")
 ///     // Prints "Average: 74.84°F in 5 out of 7 observations."
-public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
-
-  // For the minimumMagnitude and maximumMagnitude methods
-  /// A type that can represent the absolute value of any possible value of the
-  /// conforming type.
-  associatedtype Magnitude = Self
+public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
+                                where Magnitude == Self {
 
   /// A type that can represent any written exponent.
   associatedtype Exponent: SignedInteger
@@ -1419,31 +1415,26 @@ public enum FloatingPointRoundingRule {
 }
 
 extension FloatingPoint {
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func == (lhs: Self, rhs: Self) -> Bool {
     return lhs.isEqual(to: rhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func < (lhs: Self, rhs: Self) -> Bool {
     return lhs.isLess(than: rhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func <= (lhs: Self, rhs: Self) -> Bool {
     return lhs.isLessThanOrEqualTo(rhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func > (lhs: Self, rhs: Self) -> Bool {
     return rhs.isLess(than: lhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func >= (lhs: Self, rhs: Self) -> Bool {
     return rhs.isLessThanOrEqualTo(lhs)
@@ -1672,7 +1663,6 @@ extension FloatingPoint {
   ///
   /// - Parameter rule: The rounding rule to use.
   /// - Returns: The integral value found by rounding using `rule`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func rounded(_ rule: FloatingPointRoundingRule) -> Self {
     var lhs = self
@@ -1702,7 +1692,6 @@ extension FloatingPoint {
   ///
   /// - Returns: The nearest integral value, or, if two integral values are
   ///   equally close, the integral value with greater magnitude.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func rounded() -> Self {
     return rounded(.toNearestOrAwayFromZero)
@@ -1727,7 +1716,6 @@ extension FloatingPoint {
   ///
   /// To specify an alternative rule for rounding, use the `round(_:)` method
   /// instead.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public mutating func round() {
     round(.toNearestOrAwayFromZero)
@@ -1743,7 +1731,6 @@ extension FloatingPoint {
   /// - If `x` is `leastNonzeroMagnitude`, then `x.nextDown` is `0.0`.
   /// - If `x` is zero, then `x.nextDown` is `-leastNonzeroMagnitude`.
   /// - If `x` is `-greatestFiniteMagnitude`, then `x.nextDown` is `-infinity`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public var nextDown: Self {
     return -(-self).nextUp
@@ -1780,7 +1767,6 @@ extension FloatingPoint {
   /// - Parameter other: The value to use when dividing this value.
   /// - Returns: The remainder of this value divided by `other` using
   ///   truncating division.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func truncatingRemainder(dividingBy other: Self) -> Self {
     var lhs = self
@@ -1820,7 +1806,6 @@ extension FloatingPoint {
   ///
   /// - Parameter other: The value to use when dividing this value.
   /// - Returns: The remainder of this value divided by `other`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func remainder(dividingBy other: Self) -> Self {
     var lhs = self
@@ -1842,7 +1827,6 @@ extension FloatingPoint {
   ///     // distance == 5.0
   ///
   /// - Returns: The square root of the value.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func squareRoot( ) -> Self {
     var lhs = self
@@ -1863,7 +1847,6 @@ extension FloatingPoint {
   ///   - lhs: One of the values to multiply before adding to this value.
   ///   - rhs: The other value to multiply.
   /// - Returns: The product of `lhs` and `rhs`, added to this value.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func addingProduct(_ lhs: Self, _ rhs: Self) -> Self {
     var addend = self
@@ -2189,7 +2172,9 @@ extension BinaryFloatingPoint {
           sign: source.sign,
           exponentBitPattern: Self.nan.exponentBitPattern,
           significandBitPattern: payload | Self.nan.significandBitPattern)
-      return payload_ == payload ? (value, true) : (value, false)
+      // We define exactness by equality after roundtripping; since NaN is never
+      // equal to itself, it can never be converted exactly.
+      return (value, false)
     }
 
     let exponent = source.exponent
@@ -2303,8 +2288,7 @@ extension BinaryFloatingPoint {
   /// exactly.
   ///
   /// If the given floating-point value cannot be represented exactly, the
-  /// result is `nil`. A value that is NaN ("not a number") cannot be
-  /// represented exactly if its payload cannot be encoded exactly.
+  /// result is `nil`.
   ///
   /// - Parameter value: A floating-point value to be converted.
   @inlinable // FIXME(sil-serialize-all)
@@ -2399,96 +2383,128 @@ extension BinaryFloatingPoint {
   */
 }
 
-/// Returns the absolute value of `x`.
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
-public func abs<T : FloatingPoint>(_ x: T) -> T where T.Magnitude == T {
-  return x.magnitude
+% for Range in ['Range', 'ClosedRange']:
+%   exampleRange = '10.0..<20.0' if Range == 'Range' else '10.0...20.0'
+extension BinaryFloatingPoint
+where Self.RawSignificand : FixedWidthInteger {
+
+  /// Returns a random value within the specified range, using the given
+  /// generator as a source for randomness.
+  ///
+  /// Use this method to generate a floating-point value within a specific
+  /// range when you are using a custom random number generator. This example
+  /// creates three new values in the range `${exampleRange}`.
+  ///
+  ///     for _ in 1...3 {
+  ///         print(Double.random(in: ${exampleRange}, using: &myGenerator))
+  ///     }
+  ///     // Prints "18.1900709259179"
+  ///     // Prints "14.2286325689993"
+  ///     // Prints "13.1485686260762"
+  ///
+  /// The `random(in:using:)` static method chooses a random value from a
+  /// continuous uniform distribution in `range`, and then converts that value
+  /// to the nearest representable value in this type. Depending on the size and
+  /// span of `range`, some concrete values may be represented more frequently
+  /// than others.
+  ///
+  /// - Parameters:
+  ///   - range: The range in which to create a random value.
+%   if Range == 'Range':
+  ///     `range` must not be empty and finite.
+%   end
+  ///   - generator: The random number generator to use when creating the
+  ///     new random value.
+  /// - Returns: A random value within the bounds of `range`.
+  @inlinable
+  public static func random<T: RandomNumberGenerator>(
+    in range: ${Range}<Self>,
+    using generator: inout T
+  ) -> Self {
+    _precondition(
+      !range.isEmpty,
+      "Can't get random value with an empty range"
+    )
+    let delta = range.upperBound - range.lowerBound
+    //  TODO: this still isn't quite right, because the computation of delta
+    //  can overflow (e.g. if .upperBound = .maximumFiniteMagnitude and
+    //  .lowerBound = -.upperBound); this should be re-written with an
+    //  algorithm that handles that case correctly, but this precondition
+    //  is an acceptable short-term fix.
+    _precondition(
+      delta.isFinite,
+      "There is no uniform distribution on an infinite range"
+    )
+    let rand: Self.RawSignificand
+    if Self.RawSignificand.bitWidth == Self.significandBitCount + 1 {
+      rand = generator.next()
+%     if 'Closed' in Range:
+      let tmp: UInt8 = generator.next() & 1
+      if rand == Self.RawSignificand.max && tmp == 1 {
+        return range.upperBound
+      }
+%     end
+    } else {
+      let significandCount = Self.significandBitCount + 1
+      let maxSignificand: Self.RawSignificand = 1 << significandCount
+%     if 'Closed' not in Range:
+      // Rather than use .next(upperBound:), which has to work with arbitrary
+      // upper bounds, and therefore does extra work to avoid bias, we can take
+      // a shortcut because we know that maxSignificand is a power of two.
+      rand = generator.next() & (maxSignificand - 1)
+%     else:
+      rand = generator.next(upperBound: maxSignificand + 1)
+      if rand == maxSignificand {
+        return range.upperBound
+      }
+%     end
+    }
+    let unitRandom = Self.init(rand) * (Self.ulpOfOne / 2)
+    let randFloat = delta * unitRandom + range.lowerBound
+%   if 'Closed' not in Range:
+    if randFloat == range.upperBound {
+      return Self.random(in: range, using: &generator)
+    }
+%   end
+    return randFloat
+  }
+
+  /// Returns a random value within the specified range.
+  ///
+  /// Use this method to generate a floating-point value within a specific
+  /// range. This example creates three new values in the range
+  /// `${exampleRange}`.
+  ///
+  ///     for _ in 1...3 {
+  ///         print(Double.random(in: ${exampleRange}))
+  ///     }
+  ///     // Prints "18.1900709259179"
+  ///     // Prints "14.2286325689993"
+  ///     // Prints "13.1485686260762"
+  ///
+  /// The `random()` static method chooses a random value from a continuous
+  /// uniform distribution in `range`, and then converts that value to the
+  /// nearest representable value in this type. Depending on the size and span
+  /// of `range`, some concrete values may be represented more frequently than
+  /// others.
+  ///
+  /// This method is equivalent to calling the version that takes a generator, 
+  /// passing in the system's default random generator.
+  ///
+  /// - Parameter range: The range in which to create a random value.
+%   if Range == 'Range':
+  ///   `range` must not be empty and finite.
+%   end
+  /// - Returns: A random value within the bounds of `range`.
+  @inlinable
+  public static func random(in range: ${Range}<Self>) -> Self {
+    var g = SystemRandomNumberGenerator()
+    return Self.random(in: range, using: &g)
+  }
 }
 
-extension FloatingPoint {
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4, message: "Please use operators instead.")
-  public func negated() -> Self {
-    return -self
-  }
+% end
 
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4, message: "Please use operators instead.")
-  public func adding(_ other: Self) -> Self {
-    return self + other
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4, message: "Please use operators instead.")
-  public mutating func add(_ other: Self) {
-    self += other
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4, message: "Please use operators instead.")
-  public func subtracting(_ other: Self) -> Self {
-    return self - other
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4, message: "Please use operators instead.")
-  public mutating func subtract(_ other: Self) {
-    self -= other
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4, message: "Please use operators instead.")
-  public func multiplied(by other: Self) -> Self {
-    return self * other
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4, message: "Please use operators instead.")
-  public mutating func multiply(by other: Self) {
-    self *= other
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4, message: "Please use operators instead.")
-  public func divided(by other: Self) -> Self {
-    return self / other
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4, message: "Please use operators instead.")
-  public mutating func divide(by other: Self) {
-    self /= other
-  }
-}
-
-extension FloatingPoint {
-  @available(*, unavailable, message: "Use bitPattern property instead")
-  public func _toBitPattern() -> UInt {
-    fatalError("unavailable")
-  }
-
-  @available(*, unavailable, message: "Use init(bitPattern:) instead")
-  public static func _fromBitPattern(_ bits: UInt) -> Self {
-    fatalError("unavailable")
-  }
-}
-
-extension BinaryFloatingPoint {
-  @available(*, unavailable, renamed: "isSignalingNaN")
-  public var isSignaling: Bool {
-    fatalError("unavailable")
-  }
-
-  @available(*, unavailable, renamed: "nan")
-  public var NaN: Bool {
-    fatalError("unavailable")
-  }
-  @available(*, unavailable, renamed: "nan")
-  public var quietNaN: Bool {
-    fatalError("unavailable")
-  }
-}
-
-@available(*, unavailable, renamed: "FloatingPoint")
-public typealias FloatingPointType = FloatingPoint
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

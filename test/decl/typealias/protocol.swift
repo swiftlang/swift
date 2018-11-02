@@ -290,3 +290,12 @@ struct Y11: P11 { }
 extension P11 {
   func foo(_: X11<Self.A>) { }
 }
+
+// Ordering issue
+struct SomeConformingType : UnboundGenericAliasProto {
+  func f(_: G<Int>) {}
+}
+
+protocol UnboundGenericAliasProto {
+  typealias G = X
+}

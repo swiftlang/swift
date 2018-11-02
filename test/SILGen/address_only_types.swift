@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name address_only_types -enable-sil-ownership -parse-as-library -parse-stdlib -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name address_only_types -enable-sil-ownership -parse-as-library -parse-stdlib %s | %FileCheck %s
 
 precedencegroup AssignmentPrecedence { assignment: true }
 

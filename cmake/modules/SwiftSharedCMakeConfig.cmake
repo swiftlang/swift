@@ -90,6 +90,7 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   # selectively add it to the per-target link flags; this is currently done
   # in add_swift_library within AddSwift.cmake.
   string(REGEX REPLACE "-Wl,-z,defs" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
+  string(REGEX REPLACE "-Wl,-z,nodelete" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
 
   set(PACKAGE_VERSION "${LLVM_PACKAGE_VERSION}")
   string(REGEX REPLACE "([0-9]+)\\.[0-9]+(\\.[0-9]+)?" "\\1" PACKAGE_VERSION_MAJOR

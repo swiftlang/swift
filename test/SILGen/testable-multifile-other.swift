@@ -4,13 +4,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %S/Inputs/TestableMultifileHelper.swift -enable-testing -o %t
 
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -I %t %s %S/testable-multifile.swift -module-name main | %FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -I %t %S/testable-multifile.swift %s -module-name main | %FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -I %t -primary-file %s %S/testable-multifile.swift -module-name main | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -I %t %s %S/testable-multifile.swift -module-name main | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -I %t %S/testable-multifile.swift %s -module-name main | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -I %t -primary-file %s %S/testable-multifile.swift -module-name main | %FileCheck %s
 
 // Just make sure we don't crash later on.
-// RUN: %target-swift-frontend -emit-ir -enable-sil-ownership -I %t -primary-file %s %S/testable-multifile.swift -module-name main -o /dev/null
-// RUN: %target-swift-frontend -emit-ir -enable-sil-ownership -I %t -O -primary-file %s %S/testable-multifile.swift -module-name main -o /dev/null
+// RUN: %target-swift-emit-ir -enable-sil-ownership -I %t -primary-file %s %S/testable-multifile.swift -module-name main -o /dev/null
+// RUN: %target-swift-emit-ir -enable-sil-ownership -I %t -O -primary-file %s %S/testable-multifile.swift -module-name main -o /dev/null
 
 @testable import TestableMultifileHelper
 

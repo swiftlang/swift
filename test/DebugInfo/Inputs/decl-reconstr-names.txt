@@ -1,2 +1,5 @@
 $S12DeclReconstr8patatinoSiyF ---> func patatino() -> Int
 $S12DeclReconstr1SVACycfC ---> init()
+$S12DeclReconstr8PatatinoaySiGD ---> typealias Patatino<T> = Foo<T>
+$S12DeclReconstr5OuterV3Fooayx_SiGD ---> Can't resolve decl of $S12DeclReconstr5OuterV3Fooayx_SiGD
+$S12DeclReconstr5OuterV12GenericInnerV3Barayx_qd___GD ---> typealias Bar = Int

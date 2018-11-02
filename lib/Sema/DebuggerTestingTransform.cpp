@@ -74,12 +74,19 @@ public:
   bool walkToDeclPre(Decl *D) override {
     pushLocalDeclContext(D);
 
+    // Skip implicit decls, because the debugger isn't used to step through
+    // these.
+    if (D->isImplicit())
+      return false;
+
     // Whitelist the kinds of decls to transform.
     // TODO: Expand the set of decls visited here.
     if (auto *FD = dyn_cast<AbstractFunctionDecl>(D))
-      return !FD->isImplicit() && FD->getBody();
+      return FD->getBody();
     if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
-      return !TLCD->isImplicit() && TLCD->getBody();
+      return TLCD->getBody();
+    if (isa<NominalTypeDecl>(D))
+      return true;
     return false;
   }
 
@@ -130,18 +137,20 @@ private:
     return LocalDeclContextStack.back();
   }
 
-  /// Try to extract a DeclRefExpr from the expression.
-  DeclRefExpr *extractDecl(Expr *E) {
-    while (!isa<DeclRefExpr>(E)) {
+  /// Try to extract a DeclRefExpr or MemberRefExpr from the expression.
+  Expr *extractDeclOrMemberRef(Expr *E) {
+    while (!isa<DeclRefExpr>(E) && !isa<MemberRefExpr>(E)) {
       // TODO: Try more ways to extract interesting decl refs.
       if (auto *Subscript = dyn_cast<SubscriptExpr>(E))
         E = Subscript->getBase();
       else if (auto *InOut = dyn_cast<InOutExpr>(E))
         E = InOut->getSubExpr();
+      else if (auto *MemberRef = dyn_cast<MemberRefExpr>(E))
+        E = MemberRef->getBase();
       else
         return nullptr;
     }
-    return cast<DeclRefExpr>(E);
+    return E;
   }
 
   /// Attempt to create a functionally-equivalent replacement for OriginalExpr,
@@ -152,11 +161,17 @@ private:
   /// recursively transform the children of the transformed expression, and 2)
   /// the transformed expression itself.
   std::pair<bool, Expr *> insertCheckExpect(Expr *OriginalExpr, Expr *DstExpr) {
-    auto *DstDRE = extractDecl(DstExpr);
-    if (!DstDRE)
+    auto *DstRef = extractDeclOrMemberRef(DstExpr);
+    if (!DstRef)
       return {true, OriginalExpr};
 
-    ValueDecl *DstDecl = DstDRE->getDecl();
+    ValueDecl *DstDecl;
+    if (auto *DRE = dyn_cast<DeclRefExpr>(DstRef))
+      DstDecl = DRE->getDecl();
+    else {
+      auto *MRE = cast<MemberRefExpr>(DstRef);
+      DstDecl = MRE->getMember().getDecl();
+    }
     if (!DstDecl->hasName())
       return {true, OriginalExpr};
 
@@ -184,7 +199,7 @@ private:
     auto *PODeclRef = new (Ctx)
         UnresolvedDeclRefExpr(Ctx.getIdentifier("_stringForPrintObject"),
                               DeclRefKind::Ordinary, DeclNameLoc());
-    Expr *POArgs[] = {DstDRE};
+    Expr *POArgs[] = {DstRef};
     Identifier POLabels[] = {Identifier()};
     auto *POCall = CallExpr::createImplicit(Ctx, PODeclRef, POArgs, POLabels);
     POCall->setThrows(false);

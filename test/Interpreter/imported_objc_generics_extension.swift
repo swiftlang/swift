@@ -14,8 +14,8 @@ import ObjCClasses
 
 var ImportedObjCGenericExtension = TestSuite("ImportedObjCGenericExtension")
 
-extension Container {
-  func returnSelf() -> Self {
+@objc extension Container {
+  @objc func returnSelf() -> Self {
     return self
   }
 }

@@ -377,6 +377,7 @@ static void copyOrInitValuesInto(Initialization *init,
   init->finishInitialization(SGF);
 }
 
+LLVM_ATTRIBUTE_UNUSED
 static unsigned
 expectedExplosionSize(CanType type) {
   auto tuple = dyn_cast<TupleType>(type);

@@ -168,17 +168,17 @@ class HostSpecificConfiguration(object):
             if build_benchmarks:
                 self.swift_benchmark_build_targets.append(
                     "swift-benchmark-" + name)
-                # FIXME: This probably should respect `args.benchmark`, but
-                # a typo in build-script-impl meant we always would do this.
-                self.swift_benchmark_run_targets.append(
-                    "check-swift-benchmark-" + name)
+                if args.benchmark:
+                    self.swift_benchmark_run_targets.append(
+                        "check-swift-benchmark-" + name)
 
             if build_external_benchmarks:
                 # Add support for the external benchmarks.
                 self.swift_benchmark_build_targets.append(
                     "swift-benchmark-{}-external".format(name))
-                self.swift_benchmark_run_targets.append(
-                    "check-swift-benchmark-{}-external".format(name))
+                if args.benchmark:
+                    self.swift_benchmark_run_targets.append(
+                        "check-swift-benchmark-{}-external".format(name))
             if test:
                 if test_host_only:
                     suffix = "-non-executable"
@@ -415,13 +415,10 @@ class BuildScriptInvocation(object):
         # Set an appropriate default umask.
         os.umask(0o022)
 
-        if 'SDKROOT' in os.environ:
-            print('NOTE: Environment variable SDKROOT is set to "{}"'
-                  .format(os.environ['SDKROOT']))
-
         # Unset environment variables that might affect how tools behave.
         for v in [
                 'MAKEFLAGS',
+                'SDKROOT',
                 'MACOSX_DEPLOYMENT_TARGET',
                 'IPHONEOS_DEPLOYMENT_TARGET',
                 'TVOS_DEPLOYMENT_TARGET',

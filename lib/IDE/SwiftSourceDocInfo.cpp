@@ -380,11 +380,8 @@ bool NameMatcher::walkToDeclPre(Decl *D) {
   } else if (AbstractFunctionDecl *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
     std::vector<CharSourceRange> LabelRanges;
     if (AFD->getNameLoc() == nextLoc()) {
-      for(auto ParamList: AFD->getParameterLists()) {
-        LabelRanges = getLabelRanges(ParamList, getSourceMgr());
-        if (LabelRanges.size() == ParamList->size())
-          break;
-      }
+      auto ParamList = AFD->getParameters();
+      LabelRanges = getLabelRanges(ParamList, getSourceMgr());
     }
     tryResolve(ASTWalker::ParentTy(D), D->getLoc(), LabelRangeType::Param,
                LabelRanges);
@@ -581,7 +578,7 @@ std::pair<bool, Pattern*> NameMatcher::walkToPatternPre(Pattern *P) {
   if (isDone() || shouldSkip(P->getSourceRange()))
     return std::make_pair(false, P);
 
-  tryResolve(ASTWalker::ParentTy(P), P->getLoc());
+  tryResolve(ASTWalker::ParentTy(P), P->getStartLoc());
   return std::make_pair(!isDone(), P);
 }
 

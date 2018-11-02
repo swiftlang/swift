@@ -83,11 +83,6 @@ func test2() {
   }
   b4 = 7
   
-  let b5: Any
-  b5 = "x"   
-  { takes_inout_any(&b5) }()   // expected-error {{immutable value 'b5' must not be passed inout}}
-  ({ takes_inout_any(&b5) })()   // expected-error {{immutable value 'b5' must not be passed inout}}
-
   // Structs
   var s1 : SomeStruct
   s1 = SomeStruct()   // ok
@@ -1359,4 +1354,181 @@ class ClassWithUnownedProperties {
     let tmp = SomeClass()
     c2 = tmp
   }
+}
+
+// Tests for DI when optionals are defined using unchecked_take_enum_data_addr
+// <rdar://38624845>
+
+func testOptionalDoubleWrite() -> String? {
+  let sConst: String? // expected-note {{change 'let' to 'var' to make it mutable}}
+  sConst = ""
+  sConst? = "v2" // expected-error {{immutable value 'sConst' may only be initialized once}}
+  return sConst
+}
+
+func testOptionalDoubleWrite2() -> Int? {
+  let x: Int? // expected-note {{change 'let' to 'var' to make it mutable}}
+  x = 0
+  x? = 0 // expected-error {{immutable value 'x' may only be initialized once}}
+  return x
+}
+
+protocol DIOptionalTestProtocol {
+  var f: Int { get set }
+}
+
+func testOptionalDoubleWrite3(p1: DIOptionalTestProtocol) -> DIOptionalTestProtocol? {
+  let x: DIOptionalTestProtocol? // expected-note {{change 'let' to 'var' to make it mutable}}
+  x = p1
+  x? = p1 // expected-error {{immutable value 'x' may only be initialized once}}
+  return x
+}
+
+func testOptionalWrite() {
+  let x: Int? // expected-note {{constant defined here}}
+              // expected-warning@-1 {{immutable value 'x' was never used; consider removing it}}
+  x? = 0 // expected-error {{constant 'x' used before being initialized}}
+}
+
+func testOptionalWriteGenerics<T>(p: T) -> T? {
+  let x: T? // expected-note {{constant defined here}}
+            // expected-note@-1 {{change 'let' to 'var' to make it mutable}}
+  x? = p  // expected-error {{constant 'x' used before being initialized}}
+  x = p   // expected-error {{immutable value 'x' may only be initialized once}}
+  return x
+}
+
+func testOptionalWriteGenerics2<T>(p: T) -> T? {
+  let x: T? // expected-note {{change 'let' to 'var' to make it mutable}}
+  x = p
+  x? = p  // expected-error {{immutable value 'x' may only be initialized once}}
+  return x
+}
+
+enum TestOptionalEnum {
+  case Cons(Int)
+  case Nil()
+}
+
+func testOptionalWithEnum(p: TestOptionalEnum) -> TestOptionalEnum? {
+  let x: TestOptionalEnum? // expected-note {{change 'let' to 'var' to make it mutable}}
+  x = p
+  x? = p  // expected-error {{immutable value 'x' may only be initialized once}}
+  return x
+}
+
+// Tests for optional chaining
+
+class DIOptionalTestClass {
+  var r: DIOptionalTestClass? = nil
+  var f: Int = 0;
+  let g: Int = 0;
+}
+
+func testOptionalChaining(p: DIOptionalTestClass?) {
+  p?.f = 2
+}
+
+func testOptionalChaining2(p: DIOptionalTestClass?) -> DIOptionalTestClass? {
+  let x: DIOptionalTestClass?
+  x = p
+  x?.f = 1
+  p?.r?.f = 2
+  return x
+}
+
+struct DIOptionalTestStruct {
+  var f: Int
+}
+
+func testOptionalChaining3() -> DIOptionalTestStruct? {
+  let x: DIOptionalTestStruct?  // expected-note {{change 'let' to 'var' to make it mutable}}
+  x = DIOptionalTestStruct(f: 0)
+  x?.f = 2  // expected-error {{immutable value 'x' may only be initialized once}}
+  return x
+}
+
+extension DIOptionalTestStruct {
+  public init?() {
+    self.f = 0
+  }
+}
+
+func testOptionalChaining4() -> DIOptionalTestStruct? {
+  let x: DIOptionalTestStruct?  // expected-note {{change 'let' to 'var' to make it mutable}}
+  x = DIOptionalTestStruct()
+  x?.f = 2  // expected-error {{immutable value 'x' may only be initialized once}}
+  return x
+}
+
+struct DIOptionalTestStructPair {
+  var pair: (Int, Int)
+}
+
+func test6() -> DIOptionalTestStructPair? {
+  let x: DIOptionalTestStructPair?  // expected-note {{change 'let' to 'var' to make it mutable}}
+  x = DIOptionalTestStructPair(pair: (0, 0))
+  x?.pair.0 = 1 // expected-error {{immutable value 'x' may only be initialized once}}
+  return x
+}
+
+func testOptionalChainingWithGenerics<T: DIOptionalTestProtocol>(p: T) -> T? {
+  let x: T? // expected-note {{constant defined here}}
+            // expected-note@-1 {{constant defined here}}
+            // expected-note@-2 {{constant defined here}}
+
+  // note that here assignment to 'f' is a call to the setter.
+  x?.f = 0  // expected-error {{constant 'x' used before being initialized}}
+            // expected-error@-1 {{constant 'x' passed by reference before being initialized}}
+  return x  // expected-error {{constant 'x' used before being initialized}}
+}
+
+// Test optional tuples
+
+func testOptionalTupleUse(x: Bool) -> Int? {
+  let optTuple: (Int, Int)? // expected-note {{constant defined here}}
+                            // expected-note@-1 {{constant defined here}}
+  return optTuple?.1 // expected-error {{constant 'optTuple' used before being initialized}}
+                     // expected-error@-1 {{constant 'optTuple' used before being initialized}}
+}
+
+func testOptionalTupleOverwrite(x: Bool) -> (Int, Int)? {
+  let tupleVar: (Int, Int)? // expected-note {{change 'let' to 'var' to make it mutable}}
+  tupleVar = (0, 0)
+  tupleVar?.1 = 1           // expected-error {{immutable value 'tupleVar' may only be initialized once}}
+  return tupleVar
+}
+
+func testOptionalTupleNoError(x: Bool) -> Int? {
+  let optTuple: (Int, Int)?
+  optTuple = (0, 0)
+  return optTuple?.1
+}
+
+func testOptionalTupleNoError2(x: Bool) -> (Int, Int)? {
+  var tupleVar: (Int, Int)?
+  tupleVar = (0, 0)
+  tupleVar?.1 = 1
+  return tupleVar
+}
+
+// Test forced unwrapping of optionals
+
+func testOptionalUseByUnwrap() {
+  let x: Int? // expected-note {{constant defined here}}
+              // expected-warning@-1 {{immutable value 'x' was never used; consider removing it}}
+  x! = 0      // expected-error {{constant 'x' used before being initialized}}
+}
+
+func testOptionalWriteByUnwrap() -> Int? {
+  let x: Int? // expected-note {{change 'let' to 'var' to make it mutable}}
+  x = 0
+  x! = 0      // expected-error {{immutable value 'x' may only be initialized once}}
+  return x
+}
+
+func testOptionalUnwrapNoError() -> Int? {
+  let x: Int?
+  x = 0
+  return x!
 }

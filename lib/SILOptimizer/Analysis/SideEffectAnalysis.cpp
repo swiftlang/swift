@@ -12,10 +12,11 @@
 
 #define DEBUG_TYPE "sil-sea"
 #include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
+#include "swift/SIL/SILArgument.h"
+#include "swift/SILOptimizer/Analysis/AccessedStorageAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
-#include "swift/SIL/SILArgument.h"
 
 using namespace swift;
 
@@ -33,14 +34,14 @@ template <typename FunctionEffects>
 void GenericFunctionEffectAnalysis<FunctionEffects>::invalidate() {
   functionInfoMap.clear();
   allocator.DestroyAll();
-  DEBUG(llvm::dbgs() << "invalidate all\n");
+  LLVM_DEBUG(llvm::dbgs() << "invalidate all\n");
 }
 
 template <typename FunctionEffects>
 void GenericFunctionEffectAnalysis<FunctionEffects>::invalidate(
     SILFunction *F, InvalidationKind K) {
   if (FunctionInfo *FInfo = functionInfoMap.lookup(F)) {
-    DEBUG(llvm::dbgs() << "  invalidate " << FInfo->F->getName() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "  invalidate " << FInfo->F->getName() << '\n');
     invalidateIncludingAllCallers(FInfo);
   }
 }
@@ -79,7 +80,7 @@ void GenericFunctionEffectAnalysis<FunctionEffects>::analyzeFunction(
   if (functionInfo->functionEffects.summarizeFunction(F))
     return;
 
-  DEBUG(llvm::dbgs() << "  >> analyze " << F->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "  >> analyze " << F->getName() << '\n');
 
   // Check all instructions of the function
   for (auto &BB : *F) {
@@ -90,7 +91,7 @@ void GenericFunctionEffectAnalysis<FunctionEffects>::analyzeFunction(
         functionInfo->functionEffects.analyzeInstruction(&I);
     }
   }
-  DEBUG(llvm::dbgs() << "  << finished " << F->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "  << finished " << F->getName() << '\n');
 }
 
 template <typename FunctionEffects>
@@ -135,8 +136,8 @@ void GenericFunctionEffectAnalysis<FunctionEffects>::recompute(
     FunctionInfo *initialInfo) {
   allocNewUpdateID();
 
-  DEBUG(llvm::dbgs() << "recompute function-effect analysis with UpdateID "
-                     << getCurrentUpdateID() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "recompute function-effect analysis with UpdateID "
+                          << getCurrentUpdateID() << '\n');
 
   // Collect and analyze all functions to recompute, starting at initialInfo.
   FunctionOrder bottomUpOrder(getCurrentUpdateID());
@@ -150,15 +151,15 @@ void GenericFunctionEffectAnalysis<FunctionEffects>::recompute(
   // it stabilizes.
   bool needAnotherIteration;
   do {
-    DEBUG(llvm::dbgs() << "new iteration\n");
+    LLVM_DEBUG(llvm::dbgs() << "new iteration\n");
     needAnotherIteration = false;
 
     for (FunctionInfo *functionInfo : bottomUpOrder) {
       if (!functionInfo->needUpdateCallers)
         continue;
 
-      DEBUG(llvm::dbgs() << "  update callers of " << functionInfo->F->getName()
-                         << '\n');
+      LLVM_DEBUG(llvm::dbgs() << "  update callers of "
+                              << functionInfo->F->getName() << '\n');
       functionInfo->needUpdateCallers = false;
 
       // Propagate the function effects to all callers.
@@ -169,8 +170,8 @@ void GenericFunctionEffectAnalysis<FunctionEffects>::recompute(
         if (!bottomUpOrder.wasRecomputedWithCurrentUpdateID(E.Caller))
           continue;
 
-        DEBUG(llvm::dbgs() << "    merge into caller " << E.Caller->F->getName()
-                           << '\n');
+        LLVM_DEBUG(llvm::dbgs() << "    merge into caller "
+                                << E.Caller->F->getName() << '\n');
 
         if (E.Caller->functionEffects.mergeFromApply(
                 functionInfo->functionEffects, FullApplySite(E.FAS))) {
@@ -187,6 +188,7 @@ void GenericFunctionEffectAnalysis<FunctionEffects>::recompute(
 
 // Instantiate template members.
 template class swift::GenericFunctionEffectAnalysis<FunctionSideEffects>;
+template class swift::GenericFunctionEffectAnalysis<FunctionAccessedStorage>;
 
 // -----------------------------------------------------------------------------
 // FunctionSideEffects
@@ -332,7 +334,7 @@ bool FunctionSideEffects::setDefinedEffects(SILFunction *F) {
     case EffectsKind::ReadNone:
       return true;
     case EffectsKind::ReadOnly:
-      // @effects(readonly) is worthless if we have owned parameters, because
+      // @_effects(readonly) is worthless if we have owned parameters, because
       // the release inside the callee may call a deinit, which itself can do
       // anything.
       if (!F->hasOwnedParameters()) {
@@ -354,15 +356,16 @@ bool FunctionSideEffects::summarizeFunction(SILFunction *F) {
   if (!F->empty())
     ParamEffects.resize(F->getArguments().size());
 
-  // Handle @effects attributes
+  // Handle @_effects attributes
   if (setDefinedEffects(F)) {
-    DEBUG(llvm::dbgs() << "  -- has defined effects " << F->getName() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "  -- has defined effects " << F->getName()
+                            << '\n');
     return true;
   }
 
   if (!F->isDefinition()) {
     // We can't assume anything about external functions.
-    DEBUG(llvm::dbgs() << "  -- is external " << F->getName() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "  -- is external " << F->getName() << '\n');
     setWorstEffects();
     return true;
   }
@@ -461,7 +464,7 @@ bool FunctionSideEffects::summarizeCall(FullApplySite fullApply) {
   }
 
   if (SILFunction *SingleCallee = fullApply.getReferencedFunction()) {
-    // Does the function have any @effects?
+    // Does the function have any @_effects?
     if (setDefinedEffects(SingleCallee))
       return true;
   }
@@ -479,15 +482,20 @@ void FunctionSideEffects::analyzeInstruction(SILInstruction *I) {
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::DeallocStackInst:
     return;
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Name##RetainInst: \
+  case SILInstructionKind::StrongRetain##Name##Inst: \
+  case SILInstructionKind::Copy##Name##ValueInst:
+#include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StrongRetainInst:
-  case SILInstructionKind::StrongRetainUnownedInst:
   case SILInstructionKind::RetainValueInst:
-  case SILInstructionKind::UnownedRetainInst:
     getEffectsOn(I->getOperand(0))->Retains = true;
     return;
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Name##ReleaseInst:
+#include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StrongReleaseInst:
   case SILInstructionKind::ReleaseValueInst:
-  case SILInstructionKind::UnownedReleaseInst:
     getEffectsOn(I->getOperand(0))->Releases = true;
     return;
   case SILInstructionKind::UnconditionalCheckedCastInst:

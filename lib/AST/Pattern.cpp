@@ -190,7 +190,7 @@ namespace {
 
 /// \brief apply the specified function to all variables referenced in this
 /// pattern.
-void Pattern::forEachVariable(const std::function<void(VarDecl*)> &fn) const {
+void Pattern::forEachVariable(llvm::function_ref<void(VarDecl *)> fn) const {
   switch (getKind()) {
   case PatternKind::Any:
   case PatternKind::Bool:
@@ -235,7 +235,7 @@ void Pattern::forEachVariable(const std::function<void(VarDecl*)> &fn) const {
 
 /// \brief apply the specified function to all pattern nodes recursively in
 /// this pattern.  This is a pre-order traversal.
-void Pattern::forEachNode(const std::function<void(Pattern*)> &f) {
+void Pattern::forEachNode(llvm::function_ref<void(Pattern*)> f) {
   f(this);
 
   switch (getKind()) {

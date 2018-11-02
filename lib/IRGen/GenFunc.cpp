@@ -198,18 +198,13 @@ namespace {
     }
     
     // Function types do not satisfy allowsOwnership.
-    const WeakTypeInfo *
-    createWeakStorageType(TypeConverter &TC) const override {
-      llvm_unreachable("[weak] function type");
+#define REF_STORAGE(Name, name, ...) \
+    const TypeInfo * \
+    create##Name##StorageType(TypeConverter &TC, \
+                              bool isOptional) const override { \
+      llvm_unreachable("[" #name "] function type"); \
     }
-    const TypeInfo *
-    createUnownedStorageType(TypeConverter &TC) const override {
-      llvm_unreachable("[unowned] function type");
-    }
-    const TypeInfo *
-    createUnmanagedStorageType(TypeConverter &TC) const override {
-      llvm_unreachable("@unowned(unsafe) function type");
-    }
+#include "swift/AST/ReferenceStorage.def"
 
     llvm::StructType *getStorageType() const {
       return cast<llvm::StructType>(TypeInfo::getStorageType());
@@ -335,46 +330,45 @@ namespace {
         IGF.emitNativeStrongRelease(context, atomicity);
     }
 
-    void strongRetainUnowned(IRGenFunction &IGF, Explosion &e,
-                             Atomicity atomicity) const override {
-      llvm_unreachable("unowned references to functions are not supported");
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+    void name##LoadStrong(IRGenFunction &IGF, Address src, \
+                          Explosion &out, bool isOptional) const override { \
+      llvm_unreachable(#name " references to functions are not supported"); \
+    } \
+    void name##TakeStrong(IRGenFunction &IGF, Address src, \
+                          Explosion &out, bool isOptional) const override { \
+      llvm_unreachable(#name " references to functions are not supported"); \
+    } \
+    void name##Init(IRGenFunction &IGF, Explosion &in, \
+                    Address dest, bool isOptional) const override { \
+      llvm_unreachable(#name " references to functions are not supported"); \
+    } \
+    void name##Assign(IRGenFunction &IGF, Explosion &in, \
+                       Address dest, bool isOptional) const override { \
+      llvm_unreachable(#name " references to functions are not supported"); \
     }
-
-    void strongRetainUnownedRelease(IRGenFunction &IGF,
-                                    Explosion &e,
-                                    Atomicity atomicity) const override {
-      llvm_unreachable("unowned references to functions are not supported");
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+    void strongRetain##Name(IRGenFunction &IGF, Explosion &e, \
+                            Atomicity atomicity) const override { \
+      llvm_unreachable(#name " references to functions are not supported"); \
+    } \
+    void strongRetain##Name##Release(IRGenFunction &IGF, \
+                                     Explosion &e, \
+                                     Atomicity atomicity) const override { \
+      llvm_unreachable(#name " references to functions are not supported"); \
+    } \
+    void name##Retain(IRGenFunction &IGF, Explosion &e, \
+                       Atomicity atomicity) const override { \
+      llvm_unreachable(#name " references to functions are not supported"); \
+    } \
+    void name##Release(IRGenFunction &IGF, Explosion &e, \
+                        Atomicity atomicity) const override { \
+      llvm_unreachable(#name " references to functions are not supported"); \
     }
-
-    void unownedRetain(IRGenFunction &IGF, Explosion &e,
-                       Atomicity atomicity) const override {
-      llvm_unreachable("unowned references to functions are not supported");
-    }
-
-    void unownedRelease(IRGenFunction &IGF, Explosion &e,
-                        Atomicity atomicity) const override {
-      llvm_unreachable("unowned references to functions are not supported");
-    }
-
-    void unownedLoadStrong(IRGenFunction &IGF, Address src,
-                           Explosion &out) const override {
-      llvm_unreachable("unowned references to functions are not supported");
-    }
-
-    void unownedTakeStrong(IRGenFunction &IGF, Address src,
-                           Explosion &out) const override {
-      llvm_unreachable("unowned references to functions are not supported");
-    }
-
-    void unownedInit(IRGenFunction &IGF, Explosion &in,
-                     Address dest) const override {
-      llvm_unreachable("unowned references to functions are not supported");
-    }
-
-    void unownedAssign(IRGenFunction &IGF, Explosion &in,
-                       Address dest) const override {
-      llvm_unreachable("unowned references to functions are not supported");
-    }
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+    NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \
+    ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...")
+#include "swift/AST/ReferenceStorage.def"
 
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
                  bool isOutlined) const override {
@@ -717,8 +711,7 @@ static bool isABIIgnoredParameterWithoutStorage(IRGenModule &IGM,
                                                 unsigned paramIdx) {
   auto param = substType->getParameters()[paramIdx];
   SILType argType = IGM.silConv.getSILType(param);
-  auto argLoweringTy =
-    getArgumentLoweringType(argType.getSwiftRValueType(), param);
+  auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param);
   auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
   // Empty values don't matter.
   return ti.getSchema().empty() && !param.isFormalIndirect();
@@ -758,7 +751,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                    CanSILFunctionType origType,
                                    CanSILFunctionType substType,
                                    CanSILFunctionType outType,
-                                   SubstitutionList subs,
+                                   SubstitutionMap subs,
                                    HeapLayout const *layout,
                                    ArrayRef<ParameterConvention> conventions) {
   auto outSig = IGM.getSignature(outType);
@@ -948,8 +941,9 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   Explosion polyArgs;
 
   // Emit the polymorphic arguments.
-  assert((subs.empty() != hasPolymorphicParameters(origType) ||
-         (subs.empty() && origType->getRepresentation() ==
+  assert((subs.hasAnySubstitutableParams()
+            == hasPolymorphicParameters(origType) ||
+         (!subs.hasAnySubstitutableParams() && origType->getRepresentation() ==
              SILFunctionTypeRepresentation::WitnessMethod))
          && "should have substitutions iff original function is generic");
   WitnessMetadata witnessMetadata;
@@ -985,10 +979,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       (void)param.claimAll();
     }
 
-    SubstitutionMap subMap;
-    if (auto genericSig = origType->getGenericSignature())
-      subMap = genericSig->getSubstitutionMap(subs);
-    emitPolymorphicArguments(subIGF, origType, subMap,
+    emitPolymorphicArguments(subIGF, origType, subs,
                              &witnessMetadata, polyArgs);
   }
 
@@ -1185,10 +1176,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // Now that we have bound generic parameters from the captured arguments
     // emit the polymorphic arguments.
     if (hasPolymorphicParameters(origType)) {
-      SubstitutionMap subMap;
-      if (auto genericSig = origType->getGenericSignature())
-        subMap = genericSig->getSubstitutionMap(subs);
-      emitPolymorphicArguments(subIGF, origType, subMap,
+      emitPolymorphicArguments(subIGF, origType, subs,
                                &witnessMetadata, polyArgs);
     }
   }
@@ -1334,7 +1322,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 void irgen::emitFunctionPartialApplication(
     IRGenFunction &IGF, SILFunction &SILFn, const FunctionPointer &fn,
     llvm::Value *fnContext, Explosion &args, ArrayRef<SILParameterInfo> params,
-    SubstitutionList subs, CanSILFunctionType origType,
+    SubstitutionMap subs, CanSILFunctionType origType,
     CanSILFunctionType substType, CanSILFunctionType outType, Explosion &out,
     bool isOutlined) {
   // If we have a single Swift-refcounted context value, we can adopt it
@@ -1350,11 +1338,8 @@ void irgen::emitFunctionPartialApplication(
   assert(!outType->isNoEscape());
 
   // Reserve space for polymorphic bindings.
-  SubstitutionMap subMap;
-  if (auto genericSig = origType->getGenericSignature())
-    subMap = genericSig->getSubstitutionMap(subs);
   auto bindings = NecessaryBindings::forFunctionInvocations(IGF.IGM,
-                                                            origType, subMap);
+                                                            origType, subs);
   if (!bindings.empty()) {
     hasSingleSwiftRefcountedContext = No;
     auto bindingsSize = bindings.getBufferSize(IGF.IGM);
@@ -1369,8 +1354,7 @@ void irgen::emitFunctionPartialApplication(
   for (auto param : params) {
     SILType argType = IGF.IGM.silConv.getSILType(param);
 
-    auto argLoweringTy =
-        getArgumentLoweringType(argType.getSwiftRValueType(), param);
+    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param);
 
     auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
 

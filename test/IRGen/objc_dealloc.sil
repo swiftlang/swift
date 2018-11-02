@@ -109,7 +109,7 @@ bb0(%0 : @unowned $SwiftGizmo):
   // CHECK-NEXT: store %objc_class* [[T1]], %objc_class** [[OBJC_SUPER_CLASS]], align 8
   // CHECK-NEXT: [[DEALLOC_SEL:%[a-zA-Z0-9]+]] = load i8*, i8** @"\01L_selector(dealloc)", align 8
   // CHECK-NEXT: call void bitcast (void ()* @objc_msgSendSuper2 to void (%objc_super*, i8*)*)(%objc_super* [[OBJC_SUPER]], i8* [[DEALLOC_SEL]])
-  %5 = objc_super_method %0 : $SwiftGizmo, #Gizmo.deinit!deallocator.foreign : (Gizmo) -> () -> (), $@convention(objc_method) (Gizmo) -> () // user: %7
+  %5 = objc_super_method %0 : $SwiftGizmo, #Gizmo.deinit!deallocator.1.foreign : (Gizmo) -> () -> (), $@convention(objc_method) (Gizmo) -> () // user: %7
   %6 = upcast %0 : $SwiftGizmo to $Gizmo          // user: %7
   %7 = apply %5(%6) : $@convention(objc_method) (Gizmo) -> ()
 

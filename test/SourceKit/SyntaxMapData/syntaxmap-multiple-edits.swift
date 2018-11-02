@@ -1,5 +1,7 @@
 // RUN: %sourcekitd-test -req=open -print-raw-response %S/Inputs/syntaxmap-multiple-edits.swift == -req=edit -print-raw-response -pos=6:13 -length=1 -replace=" " %S/Inputs/syntaxmap-multiple-edits.swift == -req="edit" -pos=14:1 -length=0 -replace="let y = 2" -print-raw-response %S/Inputs/syntaxmap-multiple-edits.swift == -req="edit" -pos=8:10 -length=7 -replace='Int64 = 3; let z = 2' -print-raw-response %S/Inputs/syntaxmap-multiple-edits.swift == -req="edit" -pos=4:9 -length=2 -replace='50 * 95 - 100' -print-raw-response %S/Inputs/syntaxmap-multiple-edits.swift == -req="edit" -pos=1:1 -length=0 -replace='func firstFunc(x: Int) {}' -print-raw-response %S/Inputs/syntaxmap-multiple-edits.swift | %sed_clean > %t.response
-// RUN: %FileCheck -input-file=%t.response %s
+// RUN: %FileCheck -input-file=%t.response %s --check-prefixes CHECK,CHECK-OLD
+// RUN: %sourcekitd-test -req=open -print-raw-response %S/Inputs/syntaxmap-multiple-edits.swift -force-libsyntax-based-processing == -req=edit -print-raw-response -pos=6:13 -length=1 -replace=" " %S/Inputs/syntaxmap-multiple-edits.swift -force-libsyntax-based-processing == -req="edit" -pos=14:1 -length=0 -replace="let y = 2" -print-raw-response %S/Inputs/syntaxmap-multiple-edits.swift -force-libsyntax-based-processing == -req="edit" -pos=8:10 -length=7 -replace='Int64 = 3; let z = 2' -print-raw-response %S/Inputs/syntaxmap-multiple-edits.swift -force-libsyntax-based-processing == -req="edit" -pos=4:9 -length=2 -replace='50 * 95 - 100' -print-raw-response %S/Inputs/syntaxmap-multiple-edits.swift -force-libsyntax-based-processing == -req="edit" -pos=1:1 -length=0 -replace='func firstFunc(x: Int) {}' -print-raw-response %S/Inputs/syntaxmap-multiple-edits.swift -force-libsyntax-based-processing | %sed_clean > %t.libsyntax.response
+// RUN: %FileCheck -input-file=%t.libsyntax.response %s --check-prefixes CHECK,CHECK-NEW
 
 // Initial syntax map
 
@@ -11,23 +13,29 @@
 // CHECK-NEXT:   {
 // CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.doccomment,
 // CHECK-NEXT:     key.offset: 2,
-// CHECK-NEXT:     key.length: 14
+// CHECK-OLD-NEXT:     key.length: 14
+// CHECK-NEW-NEXT:     key.length: 13
 // CHECK-NEXT:   },
-// CHECK-NEXT:   {
-// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.doccomment,
-// CHECK-NEXT:     key.offset: 16,
-// CHECK-NEXT:     key.length: 6
-// CHECK-NEXT:   },
-// CHECK-NEXT:   {
-// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.doccomment.field,
-// CHECK-NEXT:     key.offset: 22,
-// CHECK-NEXT:     key.length: 4
-// CHECK-NEXT:   },
-// CHECK-NEXT:   {
-// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.doccomment,
-// CHECK-NEXT:     key.offset: 26,
-// CHECK-NEXT:     key.length: 19
-// CHECK-NEXT:   },
+// CHECK-OLD-NEXT:   {
+// CHECK-OLD-NEXT:     key.kind: source.lang.swift.syntaxtype.doccomment,
+// CHECK-OLD-NEXT:     key.offset: 16,
+// CHECK-OLD-NEXT:     key.length: 6
+// CHECK-OLD-NEXT:   },
+// CHECK-OLD-NEXT:   {
+// CHECK-OLD-NEXT:     key.kind: source.lang.swift.syntaxtype.doccomment.field,
+// CHECK-OLD-NEXT:     key.offset: 22,
+// CHECK-OLD-NEXT:     key.length: 4
+// CHECK-OLD-NEXT:   },
+// CHECK-OLD-NEXT:   {
+// CHECK-OLD-NEXT:     key.kind: source.lang.swift.syntaxtype.doccomment,
+// CHECK-OLD-NEXT:     key.offset: 26,
+// CHECK-OLD-NEXT:     key.length: 19
+// CHECK-OLD-NEXT:   },
+// CHECK-NEW-NEXT:   {
+// CHECK-NEW-NEXT:     key.kind: source.lang.swift.syntaxtype.doccomment,
+// CHECK-NEW-NEXT:     key.offset: 16,
+// CHECK-NEW-NEXT:     key.length: 28
+// CHECK-NEW-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.keyword,
 // CHECK-NEXT:     key.offset: 45,

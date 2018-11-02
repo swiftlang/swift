@@ -247,8 +247,7 @@ extension _StringObject {
   internal
   static var _variantMask: UInt {
     @inline(__always)
-    get { return UInt(Builtin.stringObjectOr_Int64(
-      _isValueBit._value, _subVariantBit._value)) }
+    get { return _isValueBit | _subVariantBit }
   }
 
   @inlinable
@@ -293,7 +292,7 @@ extension _StringObject {
     @inline(__always)
     get {
 #if arch(i386) || arch(arm)
-      if case .strong(_) = _variant {
+      if case .strong = _variant {
         _sanityCheckFailure("internal error: expected a tagged String")
       }
       return _bits
@@ -558,7 +557,7 @@ extension _StringObject {
     @inline(__always)
     get {
 #if arch(i386) || arch(arm)
-      guard case .strong(_) = _variant else { return false }
+      guard case .strong = _variant else { return false }
       return _bits & _StringObject._isCocoaBit == 0
 #else
       return _variantBits == 0
@@ -572,7 +571,7 @@ extension _StringObject {
     @inline(__always)
     get {
 #if arch(i386) || arch(arm)
-      guard case .strong(_) = _variant else { return false }
+      guard case .strong = _variant else { return false }
       return _bits & _StringObject._isCocoaBit != 0
 #else
       return _variantBits == _StringObject._subVariantBit
@@ -600,7 +599,7 @@ extension _StringObject {
     get {
 #if arch(i386) || arch(arm)
       switch _variant {
-      case .strong(_): return false
+      case .strong: return false
       default:
         return true
       }
@@ -674,7 +673,7 @@ extension _StringObject {
     get {
 #if arch(i386) || arch(arm)
       switch _variant {
-      case .strong(_):
+      case .strong:
         return _bits & _StringObject._isOpaqueBit == 0
       case .unmanagedSingleByte, .unmanagedDoubleByte:
         return true
@@ -709,13 +708,12 @@ extension _StringObject {
   }
 
   @inlinable
-  public // @testable
   var isSingleByte: Bool {
     @inline(__always)
     get {
 #if arch(i386) || arch(arm)
       switch _variant {
-      case .strong(_):
+      case .strong:
         return _bits & _StringObject._twoByteBit == 0
       case .unmanagedSingleByte, .smallSingleByte:
         return true
@@ -729,7 +727,6 @@ extension _StringObject {
   }
 
   @inlinable
-  public // @testable
   var byteWidth: Int {
     @inline(__always)
     get { return isSingleByte ? 1 : 2 }
@@ -742,14 +739,12 @@ extension _StringObject {
   }
 
   @inlinable
-  public // @testable
   var isContiguousASCII: Bool {
     @inline(__always)
     get { return isContiguous && isSingleByte }
   }
 
   @inlinable
-  public // @testable
   var isContiguousUTF16: Bool {
     @inline(__always)
     get { return isContiguous && !isSingleByte }
@@ -770,7 +765,6 @@ extension _StringObject {
   }
 
   @inlinable
-  public // @testable
   var nativeRawStorage: _SwiftRawStringStorage {
     @inline(__always) get {
       _sanityCheck(isNative)
@@ -866,7 +860,7 @@ extension _StringObject {
     self.init(.strong(Builtin.reinterpretCast(_payloadBits)), bits)
 #else
     _sanityCheck(_payloadBits & ~_StringObject._payloadMask == 0)
-    var rawBits = _payloadBits & _StringObject._payloadMask
+    var rawBits = _payloadBits
     if isValue {
       var rawBitsBuiltin = Builtin.stringObjectOr_Int64(
         rawBits._value, _StringObject._isValueBit._value)

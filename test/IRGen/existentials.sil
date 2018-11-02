@@ -5,6 +5,14 @@
 sil_stage canonical
 
 import Swift
+protocol P {}
+
+// NonBitwiseTakableBit = 0x00100000. This struct is bitwise takable because
+// 0x30007 = 196615.
+// CHECK: @"$S12existentials14BitwiseTakableVWV" = internal constant [11 x i8*] {{.*}} i8* inttoptr (i64 196615 to i8*)
+struct BitwiseTakable {
+  var p: P
+}
 
 protocol CP: class {}
 

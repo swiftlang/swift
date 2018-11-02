@@ -429,9 +429,9 @@ static bool canPromoteAllocBox(AllocBoxInst *ABI,
                                         PromotedOperands)) {
     (void)User;
     // Otherwise, we have an unexpected use.
-    DEBUG(llvm::dbgs() << "*** Failed to promote alloc_box in @"
-          << ABI->getFunction()->getName() << ": " << *ABI
-          << "    Due to user: " << *User << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "*** Failed to promote alloc_box in @"
+               << ABI->getFunction()->getName() << ": " << *ABI
+               << "    Due to user: " << *User << "\n");
 
     return false;
   }
@@ -478,7 +478,7 @@ static void replaceProjectBoxUsers(SILValue HeapBox, SILValue StackBox) {
 /// rewriteAllocBoxAsAllocStack - Replace uses of the alloc_box with a
 /// new alloc_stack, but do not delete the alloc_box yet.
 static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
-  DEBUG(llvm::dbgs() << "*** Promoting alloc_box to stack: " << *ABI);
+  LLVM_DEBUG(llvm::dbgs() << "*** Promoting alloc_box to stack: " << *ABI);
 
   SILValue HeapBox = ABI;
   Optional<MarkUninitializedInst::Kind> Kind;
@@ -642,7 +642,7 @@ SILFunction *PromotedParamCloner::initCloned(SILFunction *Orig,
                                             OrigFTI->getGenericSignature());
         paramTy = boxTy->getFieldType(Orig->getModule(), 0);
       }
-      auto promotedParam = SILParameterInfo(paramTy.getSwiftRValueType(),
+      auto promotedParam = SILParameterInfo(paramTy.getASTType(),
                                   ParameterConvention::Indirect_InoutAliasable);
       ClonedInterfaceArgTys.push_back(promotedParam);
     } else {
@@ -871,7 +871,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
   SILValue FunctionRef = Builder.createFunctionRef(PartialApply->getLoc(),
                                                    ClonedFn);
   return Builder.createPartialApply(
-      PartialApply->getLoc(), FunctionRef, PartialApply->getSubstitutions(),
+      PartialApply->getLoc(), FunctionRef, PartialApply->getSubstitutionMap(),
       Args,
       PartialApply->getType().getAs<SILFunctionType>()->getCalleeConvention());
 }

@@ -18,7 +18,6 @@ extension String {
   ///   instance.
   ///
   /// - Complexity: O(*n*), where *n* is the length of `substring`.
-  @inlinable // FIXME(sil-serialize-all)
   public init(_ substring: Substring) {
     let wholeGuts = substring._wholeString._guts
     self.init(wholeGuts._extractSlice(substring._encodedOffsetRange))
@@ -326,17 +325,8 @@ extension Substring : _SwiftStringView {
 }
 
 extension Substring : CustomReflectable {
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return String(self).customMirror
-  }
-}
-
-extension Substring : CustomPlaygroundQuickLookable {
-  @inlinable // FIXME(sil-serialize-all)
-  @available(*, deprecated, message: "Substring.customPlaygroundQuickLook will be removed in a future Swift version")
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return String(self).customPlaygroundQuickLook
   }
 }
 
@@ -348,7 +338,6 @@ extension Substring : CustomStringConvertible {
 }
 
 extension Substring : CustomDebugStringConvertible {
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return String(self).debugDescription
   }
@@ -366,34 +355,28 @@ extension Substring : LosslessStringConvertible {
 %   ('utf8', 'UTF8'),
 %   ('utf16', 'UTF16'),
 %   ('unicodeScalars', 'UnicodeScalar'),
-%   ('characters', 'Character')
 % ]:
 %   View = ViewPrefix + 'View'
-%   _View = '_CharacterView' if property == 'characters' else View
-%   _property = '_characters' if property == 'characters' else property
-% 
+%
 extension Substring {
-  % if View == 'CharacterView':
-  @available(swift, deprecated: 3.2, message:
-    "Please use String or Substring directly")
-  public typealias CharacterView = _CharacterView
-  % end
-
   @_fixed_layout // FIXME(sil-serialize-all)
-  public struct ${_View} {
+  public struct ${View} {
     @usableFromInline // FIXME(sil-serialize-all)
-    internal var _slice: Slice<String.${_View}>
+    internal var _slice: Slice<String.${View}>
   }
 }
 
-extension Substring.${_View} : BidirectionalCollection {
-  public typealias Index = String.Index
+extension Substring.${View} : BidirectionalCollection {
+  public typealias Index = String.${View}.Index
+  public typealias Indices = String.${View}.Indices
+  public typealias Element = String.${View}.Element
+  public typealias SubSequence = Substring.${View}
 
   /// Creates an instance that slices `base` at `_bounds`.
   @inlinable // FIXME(sil-serialize-all)
-  internal init(_ base: String.${_View}, _bounds: Range<Index>) {
+  internal init(_ base: String.${View}, _bounds: Range<Index>) {
     _slice = Slice(
-      base: String(base._guts).${_property},
+      base: String(base._guts).${property},
       bounds: _bounds)
   }
 
@@ -408,54 +391,80 @@ extension Substring.${_View} : BidirectionalCollection {
     return startIndex.encodedOffset..<endIndex.encodedOffset
   }
 
+  //
+  // Plumb slice operations through
+  //
   @inlinable // FIXME(sil-serialize-all)
   public var startIndex: Index { return _slice.startIndex }
+
   @inlinable // FIXME(sil-serialize-all)
   public var endIndex: Index { return _slice.endIndex }
+
   @inlinable // FIXME(sil-serialize-all)
-  public func index(after i: Index) -> Index {
-    return _slice.index(after: i)
+  public subscript(index: Index) -> Element { return _slice[index] }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public var indices: Indices { return _slice.indices }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public func index(after i: Index) -> Index { return _slice.index(after: i) }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public func formIndex(after i: inout Index) {
+    _slice.formIndex(after: &i)
   }
+
   @inlinable // FIXME(sil-serialize-all)
-  public func index(before i: Index) -> Index {
-    return _slice.index(before: i)
+  public func index(_ i: Index, offsetBy n: Int) -> Index {
+    return _slice.index(i, offsetBy: n)
   }
+
   @inlinable // FIXME(sil-serialize-all)
-  public subscript(i: Index) -> String.${View}.Element {
-    return _slice[i]
+  public func index(
+    _ i: Index, offsetBy n: Int, limitedBy limit: Index
+  ) -> Index? {
+    return _slice.index(i, offsetBy: n, limitedBy: limit)
   }
+
   @inlinable // FIXME(sil-serialize-all)
-  % if property == 'characters':
-  @available(swift, deprecated: 3.2, message:
-    "Please use String or Substring directly")
-  % end
+  public func distance(from start: Index, to end: Index) -> Int {
+    return _slice.distance(from: start, to: end)
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
+    _slice._failEarlyRangeCheck(index, bounds: bounds)
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public func _failEarlyRangeCheck(
+    _ range: Range<Index>, bounds: Range<Index>
+  ) {
+    _slice._failEarlyRangeCheck(range, bounds: bounds)
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public func index(before i: Index) -> Index { return _slice.index(before: i) }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public func formIndex(before i: inout Index) {
+    _slice.formIndex(before: &i)
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
   public subscript(r: Range<Index>) -> Substring.${View} {
     // FIXME(strings): tests.
     _precondition(r.lowerBound >= startIndex && r.upperBound <= endIndex,
       "${View} index range out of bounds")
-    return Substring.${_View}(_wholeString.${_property}, _bounds: r)
+    return Substring.${View}(_wholeString.${property}, _bounds: r)
   }
 }
 
 extension Substring {
-  % if View == 'CharacterView':
   @inlinable // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.2, message:
-    "Please use String or Substring directly")
-  public var characters: CharacterView {
+  public var ${property}: ${View} {
     get {
-      return _characters
-    }
-    set {
-      _characters = newValue
-    }
-  }
-  % end
-
-  @inlinable // FIXME(sil-serialize-all)
-  public var ${_property}: ${_View} {
-    get {
-      return ${_View}(_wholeString.${_property}, _bounds: startIndex..<endIndex)
+      return ${View}(_wholeString.${property}, _bounds: startIndex..<endIndex)
     }
     set {
       self = Substring(newValue)
@@ -494,10 +503,6 @@ extension String {
   /// - Complexity: O(N), where N is the length of the resulting `String`'s
   ///   UTF-16.
   @inlinable // FIXME(sil-serialize-all)
-  % if property == 'characters':
-  @available(swift, deprecated: 3.2, message:
-    "Please use String or Substring directly")
-  % end
   public init(_ content: Substring.${View}) {
     self = String(Substring(content))
   }
@@ -529,7 +534,7 @@ extension Substring : RangeReplaceableCollection {
       self.init(String(elements))
     }
   }
-  
+
   @inlinable // FIXME(sil-serialize-all)
   public mutating func append<S : Sequence>(contentsOf elements: S)
   where S.Element == Character {
@@ -550,7 +555,7 @@ extension Substring {
   public func uppercased() -> String {
     return String(self).uppercased()
   }
-  
+
   @inlinable // FIXME(sil-serialize-all)
   public func filter(
     _ isIncluded: (Element) throws -> Bool
@@ -609,22 +614,6 @@ extension String {
     return Substring(
       _slice: Slice(base: self, bounds: r))
   }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: Range<Index>) -> String {
-    _boundsCheck(bounds)
-    return String(Substring(_slice: Slice(base: self, bounds: bounds)))
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: ClosedRange<Index>) -> String {
-    _boundsCheck(bounds)
-    return String(Substring(_slice: Slice(
-          base: self,
-          bounds: bounds.relative(to: self))))
-  }
 }
 
 extension Substring {
@@ -633,56 +622,8 @@ extension Substring {
   public subscript(r: Range<Index>) -> Substring {
     return Substring(_slice: _slice[r])
   }
+}
 
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: Range<Index>) -> String {
-    return String(Substring(_slice: _slice[bounds]))
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: ClosedRange<Index>) -> String {
-    return self[bounds.relative(to: self)]
-  }
-}
-//===----------------------------------------------------------------------===//
-
-// popFirst() is only present when a collection is its own subsequence. This was
-// dropped in Swift 4.
-extension String {
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.2, obsoleted: 4, message:
-    "Please use 'first', 'dropFirst()', or 'Substring.popFirst()'.")
-  public mutating func popFirst() -> String.Element? {
-    guard !isEmpty else { return nil }
-    let element = first!
-    let nextIdx = self.index(after: self.startIndex)
-    self = String(self[nextIdx...])
-    return element
-  }
-}
-extension String._CharacterView {
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.2, obsoleted: 4, message:
-    "Please use 'first', 'dropFirst()', or 'Substring.CharacterView.popFirst()'.")
-  public mutating func popFirst() -> String._CharacterView.Element? {
-    guard !isEmpty else { return nil }
-    let element = first!
-    let nextIdx = self.index(after: self.startIndex)
-    self = String(self[nextIdx...])._characters
-    return element
-  }
-}
-extension String.UnicodeScalarView {
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.2, obsoleted: 4, message:
-    "Please use 'first', 'dropFirst()', or 'Substring.UnicodeScalarView.popFirst()'.")
-  public mutating func popFirst() -> String.UnicodeScalarView.Element? {
-    guard !isEmpty else { return nil }
-    let element = first!
-    let nextIdx = self.index(after: self.startIndex)
-    self = String(self[nextIdx...]).unicodeScalars
-    return element
-  }
-}
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -import-objc-header %S/Inputs/nested_imported_type_context_descriptor.h | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -enable-objc-interop -import-objc-header %S/Inputs/nested_imported_type_context_descriptor.h | %FileCheck %s
 
 // Nominal type descriptors for the imported type X and both of its nested
 // anonymous struct should get emitted as ODR.

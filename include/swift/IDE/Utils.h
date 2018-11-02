@@ -87,7 +87,7 @@ bool initInvocationByClangArguments(ArrayRef<const char *> ArgList,
 /// Visits all overridden declarations exhaustively from VD, including protocol
 /// conformances and clang declarations.
 void walkOverriddenDecls(const ValueDecl *VD,
-                         std::function<void(llvm::PointerUnion<
+                         llvm::function_ref<void(llvm::PointerUnion<
                              const ValueDecl*, const clang::NamedDecl*>)> Fn);
 
 void collectModuleNames(StringRef SDKPath, std::vector<std::string> &Modules);

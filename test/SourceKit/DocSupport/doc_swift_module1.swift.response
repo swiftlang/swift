@@ -397,14 +397,14 @@ extension Dictionary.Keys where Key : Hashable {
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Dictionary",
-    key.usr: "s:s10DictionaryV",
+    key.usr: "s:SD",
     key.offset: 465,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Keys",
-    key.usr: "s:s10DictionaryV4KeysV",
+    key.usr: "s:SD4KeysV",
     key.offset: 476,
     key.length: 4
   },
@@ -421,7 +421,7 @@ extension Dictionary.Keys where Key : Hashable {
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Hashable",
-    key.usr: "s:s8HashableP",
+    key.usr: "s:SH",
     key.offset: 493,
     key.length: 8
   },
@@ -682,13 +682,13 @@ extension Dictionary.Keys where Key : Hashable {
     key.extends: {
       key.kind: source.lang.swift.ref.struct,
       key.name: "Keys",
-      key.usr: "s:s10DictionaryV4KeysV"
+      key.usr: "s:SD4KeysV"
     },
     key.entities: [
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "foo()",
-        key.usr: "s:s10DictionaryV4KeysV5cake1E3fooyyF",
+        key.usr: "s:SD4KeysV5cake1E3fooyyF",
         key.offset: 509,
         key.length: 10,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>()</decl.function.method.instance>"

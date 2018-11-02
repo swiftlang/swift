@@ -15,7 +15,6 @@
 // FIXME: Once we have an FFI interface, make these have proper function bodies
 
 /// Returns if `x` is a power of 2.
-@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _isPowerOf2(_ x: UInt) -> Bool {
@@ -28,7 +27,6 @@ func _isPowerOf2(_ x: UInt) -> Bool {
 }
 
 /// Returns if `x` is a power of 2.
-@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _isPowerOf2(_ x: Int) -> Bool {
@@ -41,7 +39,6 @@ func _isPowerOf2(_ x: Int) -> Bool {
 }
 
 #if _runtime(_ObjC)
-@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public func _autorelease(_ x: AnyObject) {
   Builtin.retain(x)

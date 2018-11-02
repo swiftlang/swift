@@ -33,7 +33,7 @@ namespace swift {
   class CanType;
   class ClusteredBitVector;
   enum ForDefinition_t : bool;
-  
+
 namespace irgen {
   using Lowering::AbstractionPattern;
   using clang::CodeGen::ConstantInitFuture;
@@ -76,6 +76,11 @@ inline IsBitwiseTakable_t operator&(IsBitwiseTakable_t l, IsBitwiseTakable_t r) 
 inline IsBitwiseTakable_t &operator&=(IsBitwiseTakable_t &l, IsBitwiseTakable_t r) {
   return (l = (l & r));
 }
+
+enum IsABIAccessible_t : bool {
+  IsNotABIAccessible = false,
+  IsABIAccessible = true  
+};
 
 /// The kind of reference counting implementation a heap object uses.
 enum class ReferenceCounting : uint8_t {

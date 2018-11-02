@@ -41,8 +41,8 @@ var p = Pair(a: 1, b: 2.5)
 p.first = 2
 p.second = 5.0
 
-var gc = GenericCtor<Int>()
-gc.doSomething()
+var gc = GenericCtor<Int>(42)
+gc.doSomething(42)
 
 var wrappedTypeVar : ComputableWrapper<AnotherIntWrapper>.ComputableType
 wrappedTypeVar = intWrapper2

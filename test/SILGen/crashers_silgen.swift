@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -o /dev/null %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -o /dev/null %s
 
 // <rdar://22000564> Crash on Subscript taking a tuple argument list
 class r22000564 {

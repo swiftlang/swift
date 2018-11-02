@@ -11,12 +11,13 @@ open class Cities {
   open func maroochy(x: Int?, y: Int?) {}
   public struct CityKind {
     public static let Town = 1
+    public static let Village = 1
   }
 }
 
 public protocol ExtraCities {
   func coolum(x: [String : [Int : [(((String))?)]]])
-  func blibli(x: (String?, String) -> String!)
+  func blibli(x: (String?, String) -> String?)
   func currimundi(x: (Int, (Int, Int))!)
 }
 
@@ -34,23 +35,63 @@ public func globalCityFunc4(_ c : Cities, _ p : Int, _ q: Int) -> Int { return 0
 public func globalCityFunc5() -> Int { return 0 }
 public func globalCityPointerTaker(_ c : UnsafePointer<Cities>, _ p : Int, _ q: Int) -> Int { return 0 }
 
-public class Container {
-  public var Value: String = ""
-  public var attrDict: [String: Any] = [:]
-  public var attrArr: [String] = []
-  public var optionalAttrDict: [String: Any]? = nil
-  public func addingAttributes(_ input: [String: Any]) {}
-  public func adding(attributes: [String: Any]) {}
-  public func adding(optionalAttributes: [String: Any]?) {}
+open class Container {
   public init(optionalAttributes: [String: Any]?) {}
-  public func adding(attrArray: [String]) {}
   public init(optionalAttrArray: [String]?) {}
-  public func add(single: String) {}
-  public func add(singleOptional: String?) {}
-  public func getAttrArray() -> [String] { return [] }
-  public func getOptionalAttrArray() -> [String]? { return [] }
-  public func getAttrDictionary() -> [String: Any] { return [:] }
-  public func getOptionalAttrDictionary() -> [String: Any]? { return nil }
-  public func getSingleAttr() -> String { return "" }
-  public func getOptionalSingleAttr() -> String? { return nil }
+
+  open func adding(attrArray: [String]) {}
+  open var Value: String = ""
+  open var attrDict: [String: Any] = [:]
+  open var attrArr: [String] = []
+  open var optionalAttrDict: [String: Any]? = nil
+  open func addingAttributes(_ input: [String: Any]) {}
+  open func adding(attributes: [String: Any]) {}
+  open func adding(optionalAttributes: [String: Any]?) {}
+  open func add(single: String) {}
+  open func add(singleOptional: String?) {}
+  open func getAttrArray() -> [String] { return [] }
+  open func getOptionalAttrArray() -> [String]? { return [] }
+  open func getAttrDictionary() -> [String: Any] { return [:] }
+  open func getOptionalAttrDictionary() -> [String: Any]? { return nil }
+  open func getSingleAttr() -> String { return "" }
+  open func getOptionalSingleAttr() -> String? { return nil }
 }
+
+open class ToplevelType {
+  public init() {}
+  public init(recordName: String) {}
+  open func member(_ x: @escaping ([Any]?) -> Void) {}
+}
+
+public var GlobalAttribute: String = ""
+
+public enum FontWeighting: Int {
+  case Light = 0
+  case Regular
+  case Bold
+}
+
+public enum FontWeight: Int {
+  case Light = 0
+  case Regular
+  case Bold
+}
+
+public struct AwesomeCityAttribute: RawRepresentable {
+  public init(rawValue: String) { self.rawValue = rawValue }
+  public init(_ rawValue: String) { self.rawValue = rawValue }
+  public var rawValue: String
+  public typealias RawValue = String
+}
+
+public class Wrapper {
+  public struct Attribute: RawRepresentable {
+    public static let KnownAttr = Wrapper.Attribute(rawValue: "")
+    public init(rawValue: String) { self.rawValue = rawValue }
+    public init(_ rawValue: String) { self.rawValue = rawValue }
+    public var rawValue: String
+    public typealias RawValue = String
+  }
+}
+
+public typealias AliasAttribute = String

@@ -32,7 +32,7 @@ internal class _MinimalIteratorSharedState<T> {
 ///
 /// This generator will return `nil` only once.
 public struct MinimalIterator<T> : IteratorProtocol {
-  public init<S : Sequence>(_ s: S) where S.Iterator.Element == T {
+  public init<S : Sequence>(_ s: S) where S.Element == T {
     self._sharedState = _MinimalIteratorSharedState(Array(s))
   }
 
@@ -86,7 +86,7 @@ public struct MinimalSequence<T> : Sequence, CustomDebugStringConvertible {
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     let data = Array(elements)
     self._sharedState = _MinimalIteratorSharedState(data)
 
@@ -594,7 +594,7 @@ public struct MinimalCollection<T> : Collection {
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     self._elements = Array(elements)
 
     self._collectionState = _CollectionState(
@@ -756,7 +756,7 @@ public struct MinimalRangeReplaceableCollection<T> : Collection, RangeReplaceabl
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     self._elements = Array(elements)
 
     self._collectionState = _CollectionState(
@@ -784,7 +784,7 @@ public struct MinimalRangeReplaceableCollection<T> : Collection, RangeReplaceabl
       _CollectionState(name: "\(type(of: self))", elementCount: 0)
   }
 
-  public init<S : Sequence>(_ elements: S) where S.Iterator.Element == T {
+  public init<S : Sequence>(_ elements: S) where S.Element == T {
     self.underestimatedCount = 0
     self._elements = Array(elements)
     self._collectionState =
@@ -928,7 +928,7 @@ public struct MinimalRangeReplaceableCollection<T> : Collection, RangeReplaceabl
   }
 
   public mutating func append<S : Sequence>(contentsOf newElements: S)
-    where S.Iterator.Element == T {
+    where S.Element == T {
     let oldCount = count
     _elements.append(contentsOf: newElements)
     let newCount = count
@@ -938,7 +938,7 @@ public struct MinimalRangeReplaceableCollection<T> : Collection, RangeReplaceabl
   public mutating func replaceSubrange<C>(
     _ subRange: Range<MinimalIndex>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == T {
+  ) where C : Collection, C.Element == T {
     let oldCount = count
     _elements.replaceSubrange(
       subRange.lowerBound.position..<subRange.upperBound.position,
@@ -958,7 +958,7 @@ public struct MinimalRangeReplaceableCollection<T> : Collection, RangeReplaceabl
 
   public mutating func insert<S : Collection>(
     contentsOf newElements: S, at i: MinimalIndex
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     let oldCount = count
     _elements.insert(contentsOf: newElements, at: i.position)
     let newCount = count
@@ -1019,7 +1019,7 @@ public struct MinimalMutableCollection<T> : Collection, MutableCollection {
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     self._elements = Array(elements)
 
     self._collectionState = _CollectionState(
@@ -1189,7 +1189,7 @@ public struct MinimalMutableRangeReplaceableCollection<T> : Collection, MutableC
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     self._elements = Array(elements)
 
     self._collectionState = _CollectionState(
@@ -1217,7 +1217,7 @@ public struct MinimalMutableRangeReplaceableCollection<T> : Collection, MutableC
       _CollectionState(name: "\(type(of: self))", elementCount: 0)
   }
 
-  public init<S : Sequence>(_ elements: S) where S.Iterator.Element == T {
+  public init<S : Sequence>(_ elements: S) where S.Element == T {
     self.underestimatedCount = 0
     self._elements = Array(elements)
     self._collectionState =
@@ -1369,7 +1369,7 @@ public struct MinimalMutableRangeReplaceableCollection<T> : Collection, MutableC
   }
 
   public mutating func append<S : Sequence>(contentsOf newElements: S)
-    where S.Iterator.Element == T {
+    where S.Element == T {
     let oldCount = count
     _elements.append(contentsOf: newElements)
     let newCount = count
@@ -1379,7 +1379,7 @@ public struct MinimalMutableRangeReplaceableCollection<T> : Collection, MutableC
   public mutating func replaceSubrange<C>(
     _ subRange: Range<MinimalIndex>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == T {
+  ) where C : Collection, C.Element == T {
     let oldCount = count
     _elements.replaceSubrange(
       subRange.lowerBound.position..<subRange.upperBound.position,
@@ -1399,7 +1399,7 @@ public struct MinimalMutableRangeReplaceableCollection<T> : Collection, MutableC
 
   public mutating func insert<S : Collection>(
     contentsOf newElements: S, at i: MinimalIndex
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     let oldCount = count
     _elements.insert(contentsOf: newElements, at: i.position)
     let newCount = count
@@ -1460,7 +1460,7 @@ public struct MinimalBidirectionalCollection<T> : BidirectionalCollection {
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     self._elements = Array(elements)
 
     self._collectionState = _CollectionState(
@@ -1623,7 +1623,7 @@ public struct MinimalRangeReplaceableBidirectionalCollection<T> : BidirectionalC
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     self._elements = Array(elements)
 
     self._collectionState = _CollectionState(
@@ -1651,7 +1651,7 @@ public struct MinimalRangeReplaceableBidirectionalCollection<T> : BidirectionalC
       _CollectionState(name: "\(type(of: self))", elementCount: 0)
   }
 
-  public init<S : Sequence>(_ elements: S) where S.Iterator.Element == T {
+  public init<S : Sequence>(_ elements: S) where S.Element == T {
     self.underestimatedCount = 0
     self._elements = Array(elements)
     self._collectionState =
@@ -1796,7 +1796,7 @@ public struct MinimalRangeReplaceableBidirectionalCollection<T> : BidirectionalC
   }
 
   public mutating func append<S : Sequence>(contentsOf newElements: S)
-    where S.Iterator.Element == T {
+    where S.Element == T {
     let oldCount = count
     _elements.append(contentsOf: newElements)
     let newCount = count
@@ -1806,7 +1806,7 @@ public struct MinimalRangeReplaceableBidirectionalCollection<T> : BidirectionalC
   public mutating func replaceSubrange<C>(
     _ subRange: Range<MinimalIndex>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == T {
+  ) where C : Collection, C.Element == T {
     let oldCount = count
     _elements.replaceSubrange(
       subRange.lowerBound.position..<subRange.upperBound.position,
@@ -1826,7 +1826,7 @@ public struct MinimalRangeReplaceableBidirectionalCollection<T> : BidirectionalC
 
   public mutating func insert<S : Collection>(
     contentsOf newElements: S, at i: MinimalIndex
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     let oldCount = count
     _elements.insert(contentsOf: newElements, at: i.position)
     let newCount = count
@@ -1887,7 +1887,7 @@ public struct MinimalMutableBidirectionalCollection<T> : BidirectionalCollection
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     self._elements = Array(elements)
 
     self._collectionState = _CollectionState(
@@ -2058,7 +2058,7 @@ public struct MinimalMutableRangeReplaceableBidirectionalCollection<T> : Bidirec
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     self._elements = Array(elements)
 
     self._collectionState = _CollectionState(
@@ -2086,7 +2086,7 @@ public struct MinimalMutableRangeReplaceableBidirectionalCollection<T> : Bidirec
       _CollectionState(name: "\(type(of: self))", elementCount: 0)
   }
 
-  public init<S : Sequence>(_ elements: S) where S.Iterator.Element == T {
+  public init<S : Sequence>(_ elements: S) where S.Element == T {
     self.underestimatedCount = 0
     self._elements = Array(elements)
     self._collectionState =
@@ -2239,7 +2239,7 @@ public struct MinimalMutableRangeReplaceableBidirectionalCollection<T> : Bidirec
   }
 
   public mutating func append<S : Sequence>(contentsOf newElements: S)
-    where S.Iterator.Element == T {
+    where S.Element == T {
     let oldCount = count
     _elements.append(contentsOf: newElements)
     let newCount = count
@@ -2249,7 +2249,7 @@ public struct MinimalMutableRangeReplaceableBidirectionalCollection<T> : Bidirec
   public mutating func replaceSubrange<C>(
     _ subRange: Range<MinimalIndex>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == T {
+  ) where C : Collection, C.Element == T {
     let oldCount = count
     _elements.replaceSubrange(
       subRange.lowerBound.position..<subRange.upperBound.position,
@@ -2269,7 +2269,7 @@ public struct MinimalMutableRangeReplaceableBidirectionalCollection<T> : Bidirec
 
   public mutating func insert<S : Collection>(
     contentsOf newElements: S, at i: MinimalIndex
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     let oldCount = count
     _elements.insert(contentsOf: newElements, at: i.position)
     let newCount = count
@@ -2330,7 +2330,7 @@ public struct MinimalRandomAccessCollection<T> : RandomAccessCollection {
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     self._elements = Array(elements)
 
     self._collectionState = _CollectionState(
@@ -2495,7 +2495,7 @@ public struct MinimalRandomAccessCollectionWithStrideableIndex<T> : RandomAccess
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     self._elements = Array(elements)
 
     self._collectionState = _CollectionState(
@@ -2659,7 +2659,7 @@ public struct MinimalRangeReplaceableRandomAccessCollection<T> : RandomAccessCol
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     self._elements = Array(elements)
 
     self._collectionState = _CollectionState(
@@ -2687,7 +2687,7 @@ public struct MinimalRangeReplaceableRandomAccessCollection<T> : RandomAccessCol
       _CollectionState(name: "\(type(of: self))", elementCount: 0)
   }
 
-  public init<S : Sequence>(_ elements: S) where S.Iterator.Element == T {
+  public init<S : Sequence>(_ elements: S) where S.Element == T {
     self.underestimatedCount = 0
     self._elements = Array(elements)
     self._collectionState =
@@ -2834,7 +2834,7 @@ public struct MinimalRangeReplaceableRandomAccessCollection<T> : RandomAccessCol
   }
 
   public mutating func append<S : Sequence>(contentsOf newElements: S)
-    where S.Iterator.Element == T {
+    where S.Element == T {
     let oldCount = count
     _elements.append(contentsOf: newElements)
     let newCount = count
@@ -2844,7 +2844,7 @@ public struct MinimalRangeReplaceableRandomAccessCollection<T> : RandomAccessCol
   public mutating func replaceSubrange<C>(
     _ subRange: Range<MinimalIndex>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == T {
+  ) where C : Collection, C.Element == T {
     let oldCount = count
     _elements.replaceSubrange(
       subRange.lowerBound.position..<subRange.upperBound.position,
@@ -2864,7 +2864,7 @@ public struct MinimalRangeReplaceableRandomAccessCollection<T> : RandomAccessCol
 
   public mutating func insert<S : Collection>(
     contentsOf newElements: S, at i: MinimalIndex
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     let oldCount = count
     _elements.insert(contentsOf: newElements, at: i.position)
     let newCount = count
@@ -2925,7 +2925,7 @@ public struct MinimalRangeReplaceableRandomAccessCollectionWithStrideableIndex<T
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     self._elements = Array(elements)
 
     self._collectionState = _CollectionState(
@@ -2953,7 +2953,7 @@ public struct MinimalRangeReplaceableRandomAccessCollectionWithStrideableIndex<T
       _CollectionState(name: "\(type(of: self))", elementCount: 0)
   }
 
-  public init<S : Sequence>(_ elements: S) where S.Iterator.Element == T {
+  public init<S : Sequence>(_ elements: S) where S.Element == T {
     self.underestimatedCount = 0
     self._elements = Array(elements)
     self._collectionState =
@@ -3099,7 +3099,7 @@ public struct MinimalRangeReplaceableRandomAccessCollectionWithStrideableIndex<T
   }
 
   public mutating func append<S : Sequence>(contentsOf newElements: S)
-    where S.Iterator.Element == T {
+    where S.Element == T {
     let oldCount = count
     _elements.append(contentsOf: newElements)
     let newCount = count
@@ -3109,7 +3109,7 @@ public struct MinimalRangeReplaceableRandomAccessCollectionWithStrideableIndex<T
   public mutating func replaceSubrange<C>(
     _ subRange: Range<MinimalStrideableIndex>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == T {
+  ) where C : Collection, C.Element == T {
     let oldCount = count
     _elements.replaceSubrange(
       subRange.lowerBound.position..<subRange.upperBound.position,
@@ -3129,7 +3129,7 @@ public struct MinimalRangeReplaceableRandomAccessCollectionWithStrideableIndex<T
 
   public mutating func insert<S : Collection>(
     contentsOf newElements: S, at i: MinimalStrideableIndex
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     let oldCount = count
     _elements.insert(contentsOf: newElements, at: i.position)
     let newCount = count
@@ -3190,7 +3190,7 @@ public struct MinimalMutableRandomAccessCollection<T> : RandomAccessCollection, 
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     self._elements = Array(elements)
 
     self._collectionState = _CollectionState(
@@ -3363,7 +3363,7 @@ public struct MinimalMutableRangeReplaceableRandomAccessCollection<T> : RandomAc
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     self._elements = Array(elements)
 
     self._collectionState = _CollectionState(
@@ -3391,7 +3391,7 @@ public struct MinimalMutableRangeReplaceableRandomAccessCollection<T> : RandomAc
       _CollectionState(name: "\(type(of: self))", elementCount: 0)
   }
 
-  public init<S : Sequence>(_ elements: S) where S.Iterator.Element == T {
+  public init<S : Sequence>(_ elements: S) where S.Element == T {
     self.underestimatedCount = 0
     self._elements = Array(elements)
     self._collectionState =
@@ -3546,7 +3546,7 @@ public struct MinimalMutableRangeReplaceableRandomAccessCollection<T> : RandomAc
   }
 
   public mutating func append<S : Sequence>(contentsOf newElements: S)
-    where S.Iterator.Element == T {
+    where S.Element == T {
     let oldCount = count
     _elements.append(contentsOf: newElements)
     let newCount = count
@@ -3556,7 +3556,7 @@ public struct MinimalMutableRangeReplaceableRandomAccessCollection<T> : RandomAc
   public mutating func replaceSubrange<C>(
     _ subRange: Range<MinimalIndex>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == T {
+  ) where C : Collection, C.Element == T {
     let oldCount = count
     _elements.replaceSubrange(
       subRange.lowerBound.position..<subRange.upperBound.position,
@@ -3576,7 +3576,7 @@ public struct MinimalMutableRangeReplaceableRandomAccessCollection<T> : RandomAc
 
   public mutating func insert<S : Collection>(
     contentsOf newElements: S, at i: MinimalIndex
-  ) where S.Iterator.Element == T {
+  ) where S.Element == T {
     let oldCount = count
     _elements.insert(contentsOf: newElements, at: i.position)
     let newCount = count
@@ -3642,7 +3642,7 @@ public struct DefaultedSequence<Element> : Sequence {
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == Element {
+  ) where S.Element == Element {
     self.init(base: MinimalSequence(
       elements: elements, underestimatedCount: underestimatedCount))
   }
@@ -3682,7 +3682,7 @@ public struct DefaultedCollection<Element> : Collection {
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == Element {
+  ) where S.Element == Element {
     self.init(base:
       MinimalCollection(elements: elements, underestimatedCount: underestimatedCount))
   }
@@ -3809,7 +3809,7 @@ public struct DefaultedForwardRangeReplaceableSlice<Element>
   >(
     _ subRange: Range<Index>,
     with newElements: C
-  ) where C.Iterator.Element == Element {
+  ) where C.Element == Element {
     let startOffset = startIndex.position
     let endOffset =
       endIndex.position
@@ -3853,7 +3853,7 @@ public struct DefaultedRangeReplaceableCollection<Element> : Collection, RangeRe
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == Element {
+  ) where S.Element == Element {
     self.init(base:
       MinimalRangeReplaceableCollection(elements: elements, underestimatedCount: underestimatedCount))
   }
@@ -3917,7 +3917,7 @@ public struct DefaultedRangeReplaceableCollection<Element> : Collection, RangeRe
   public mutating func replaceSubrange<C>(
     _ subRange: Range<DefaultedRangeReplaceableCollection<Element>.Index>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == Element {
+  ) where C : Collection, C.Element == Element {
     base.replaceSubrange(subRange, with: newElements)
   }
 }
@@ -3990,7 +3990,7 @@ public struct DefaultedForwardRangeReplaceableSlice<Element>
   >(
     _ subRange: Range<Index>,
     with newElements: C
-  ) where C.Iterator.Element == Element {
+  ) where C.Element == Element {
     let startOffset = startIndex.position
     let endOffset =
       endIndex.position
@@ -4034,7 +4034,7 @@ public struct DefaultedMutableCollection<Element> : Collection, MutableCollectio
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == Element {
+  ) where S.Element == Element {
     self.init(base:
       MinimalMutableCollection(elements: elements, underestimatedCount: underestimatedCount))
   }
@@ -4167,7 +4167,7 @@ public struct DefaultedForwardRangeReplaceableSlice<Element>
   >(
     _ subRange: Range<Index>,
     with newElements: C
-  ) where C.Iterator.Element == Element {
+  ) where C.Element == Element {
     let startOffset = startIndex.position
     let endOffset =
       endIndex.position
@@ -4211,7 +4211,7 @@ public struct DefaultedMutableRangeReplaceableCollection<Element> : Collection, 
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == Element {
+  ) where S.Element == Element {
     self.init(base:
       MinimalMutableRangeReplaceableCollection(elements: elements, underestimatedCount: underestimatedCount))
   }
@@ -4281,7 +4281,7 @@ public struct DefaultedMutableRangeReplaceableCollection<Element> : Collection, 
   public mutating func replaceSubrange<C>(
     _ subRange: Range<DefaultedMutableRangeReplaceableCollection<Element>.Index>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == Element {
+  ) where C : Collection, C.Element == Element {
     base.replaceSubrange(subRange, with: newElements)
   }
 }
@@ -4354,7 +4354,7 @@ public struct DefaultedForwardRangeReplaceableSlice<Element>
   >(
     _ subRange: Range<Index>,
     with newElements: C
-  ) where C.Iterator.Element == Element {
+  ) where C.Element == Element {
     let startOffset = startIndex.position
     let endOffset =
       endIndex.position
@@ -4398,7 +4398,7 @@ public struct DefaultedBidirectionalCollection<Element> : BidirectionalCollectio
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == Element {
+  ) where S.Element == Element {
     self.init(base:
       MinimalBidirectionalCollection(elements: elements, underestimatedCount: underestimatedCount))
   }
@@ -4531,7 +4531,7 @@ public struct DefaultedBidirectionalRangeReplaceableSlice<Element>
   >(
     _ subRange: Range<Index>,
     with newElements: C
-  ) where C.Iterator.Element == Element {
+  ) where C.Element == Element {
     let startOffset = startIndex.position
     let endOffset =
       endIndex.position
@@ -4575,7 +4575,7 @@ public struct DefaultedRangeReplaceableBidirectionalCollection<Element> : Bidire
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == Element {
+  ) where S.Element == Element {
     self.init(base:
       MinimalRangeReplaceableBidirectionalCollection(elements: elements, underestimatedCount: underestimatedCount))
   }
@@ -4645,7 +4645,7 @@ public struct DefaultedRangeReplaceableBidirectionalCollection<Element> : Bidire
   public mutating func replaceSubrange<C>(
     _ subRange: Range<DefaultedRangeReplaceableBidirectionalCollection<Element>.Index>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == Element {
+  ) where C : Collection, C.Element == Element {
     base.replaceSubrange(subRange, with: newElements)
   }
 }
@@ -4718,7 +4718,7 @@ public struct DefaultedBidirectionalRangeReplaceableSlice<Element>
   >(
     _ subRange: Range<Index>,
     with newElements: C
-  ) where C.Iterator.Element == Element {
+  ) where C.Element == Element {
     let startOffset = startIndex.position
     let endOffset =
       endIndex.position
@@ -4762,7 +4762,7 @@ public struct DefaultedMutableBidirectionalCollection<Element> : BidirectionalCo
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == Element {
+  ) where S.Element == Element {
     self.init(base:
       MinimalMutableBidirectionalCollection(elements: elements, underestimatedCount: underestimatedCount))
   }
@@ -4901,7 +4901,7 @@ public struct DefaultedBidirectionalRangeReplaceableSlice<Element>
   >(
     _ subRange: Range<Index>,
     with newElements: C
-  ) where C.Iterator.Element == Element {
+  ) where C.Element == Element {
     let startOffset = startIndex.position
     let endOffset =
       endIndex.position
@@ -4945,7 +4945,7 @@ public struct DefaultedMutableRangeReplaceableBidirectionalCollection<Element> :
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == Element {
+  ) where S.Element == Element {
     self.init(base:
       MinimalMutableRangeReplaceableBidirectionalCollection(elements: elements, underestimatedCount: underestimatedCount))
   }
@@ -5021,7 +5021,7 @@ public struct DefaultedMutableRangeReplaceableBidirectionalCollection<Element> :
   public mutating func replaceSubrange<C>(
     _ subRange: Range<DefaultedMutableRangeReplaceableBidirectionalCollection<Element>.Index>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == Element {
+  ) where C : Collection, C.Element == Element {
     base.replaceSubrange(subRange, with: newElements)
   }
 }
@@ -5094,7 +5094,7 @@ public struct DefaultedBidirectionalRangeReplaceableSlice<Element>
   >(
     _ subRange: Range<Index>,
     with newElements: C
-  ) where C.Iterator.Element == Element {
+  ) where C.Element == Element {
     let startOffset = startIndex.position
     let endOffset =
       endIndex.position
@@ -5140,7 +5140,7 @@ public struct DefaultedRandomAccessCollection<Element> : RandomAccessCollection 
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == Element {
+  ) where S.Element == Element {
     self.init(base:
       MinimalRandomAccessCollection(elements: elements, underestimatedCount: underestimatedCount))
   }
@@ -5281,7 +5281,7 @@ public struct DefaultedRandomAccessRangeReplaceableSlice<Element>
   >(
     _ subRange: Range<Index>,
     with newElements: C
-  ) where C.Iterator.Element == Element {
+  ) where C.Element == Element {
     let startOffset = startIndex.position
     let endOffset =
       endIndex.position
@@ -5326,7 +5326,7 @@ public struct DefaultedRandomAccessCollectionWithStrideableIndex<Element> : Rand
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == Element {
+  ) where S.Element == Element {
     self.init(base:
       MinimalRandomAccessCollectionWithStrideableIndex(elements: elements, underestimatedCount: underestimatedCount))
   }
@@ -5443,7 +5443,7 @@ public struct DefaultedRandomAccessRangeReplaceableSlice<Element>
   >(
     _ subRange: Range<Index>,
     with newElements: C
-  ) where C.Iterator.Element == Element {
+  ) where C.Element == Element {
     let startOffset = startIndex.position
     let endOffset =
       endIndex.position
@@ -5489,7 +5489,7 @@ public struct DefaultedRangeReplaceableRandomAccessCollection<Element> : RandomA
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == Element {
+  ) where S.Element == Element {
     self.init(base:
       MinimalRangeReplaceableRandomAccessCollection(elements: elements, underestimatedCount: underestimatedCount))
   }
@@ -5567,7 +5567,7 @@ public struct DefaultedRangeReplaceableRandomAccessCollection<Element> : RandomA
   public mutating func replaceSubrange<C>(
     _ subRange: Range<DefaultedRangeReplaceableRandomAccessCollection<Element>.Index>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == Element {
+  ) where C : Collection, C.Element == Element {
     base.replaceSubrange(subRange, with: newElements)
   }
 }
@@ -5640,7 +5640,7 @@ public struct DefaultedRandomAccessRangeReplaceableSlice<Element>
   >(
     _ subRange: Range<Index>,
     with newElements: C
-  ) where C.Iterator.Element == Element {
+  ) where C.Element == Element {
     let startOffset = startIndex.position
     let endOffset =
       endIndex.position
@@ -5686,7 +5686,7 @@ public struct DefaultedMutableRandomAccessCollection<Element> : RandomAccessColl
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == Element {
+  ) where S.Element == Element {
     self.init(base:
       MinimalMutableRandomAccessCollection(elements: elements, underestimatedCount: underestimatedCount))
   }
@@ -5833,7 +5833,7 @@ public struct DefaultedRandomAccessRangeReplaceableSlice<Element>
   >(
     _ subRange: Range<Index>,
     with newElements: C
-  ) where C.Iterator.Element == Element {
+  ) where C.Element == Element {
     let startOffset = startIndex.position
     let endOffset =
       endIndex.position
@@ -5879,7 +5879,7 @@ public struct DefaultedMutableRangeReplaceableRandomAccessCollection<Element> : 
   public init<S : Sequence>(
     elements: S,
     underestimatedCount: UnderestimatedCountBehavior = .value(0)
-  ) where S.Iterator.Element == Element {
+  ) where S.Element == Element {
     self.init(base:
       MinimalMutableRangeReplaceableRandomAccessCollection(elements: elements, underestimatedCount: underestimatedCount))
   }
@@ -5963,7 +5963,7 @@ public struct DefaultedMutableRangeReplaceableRandomAccessCollection<Element> : 
   public mutating func replaceSubrange<C>(
     _ subRange: Range<DefaultedMutableRangeReplaceableRandomAccessCollection<Element>.Index>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == Element {
+  ) where C : Collection, C.Element == Element {
     base.replaceSubrange(subRange, with: newElements)
   }
 }
@@ -6036,7 +6036,7 @@ public struct DefaultedRandomAccessRangeReplaceableSlice<Element>
   >(
     _ subRange: Range<Index>,
     with newElements: C
-  ) where C.Iterator.Element == Element {
+  ) where C.Element == Element {
     let startOffset = startIndex.position
     let endOffset =
       endIndex.position
@@ -6053,8 +6053,3 @@ public struct DefaultedRandomAccessRangeReplaceableSlice<Element>
   }
 }
 */
-
-
-// Local Variables:
-// eval: (read-only-mode 1)
-// End:

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -81,6 +81,9 @@ def verify_generic_signatures : Separate<["-"], "verify-generic-signatures">,
   MetaVarName<"<module-name>">,
   HelpText<"Verify the generic signatures in the given module">;
 
+def verify_syntax_tree : Flag<["-"], "verify-syntax-tree">,
+  HelpText<"Verify that no unknown nodes exist in the libSyntax tree">;
+
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
 
@@ -154,9 +157,6 @@ def debug_constraints : Flag<["-"], "debug-constraints">,
 def debug_constraints_attempt : Separate<["-"], "debug-constraints-attempt">,
   HelpText<"Debug the constraint solver at a given attempt">;
 
-def iterative_type_checker : Flag<["-"], "iterative-type-checker">,
-  HelpText<"Enable the iterative type checker">;
-
 def disable_named_lazy_member_loading : Flag<["-"], "disable-named-lazy-member-loading">,
   HelpText<"Disable per-name lazy member loading">;
 
@@ -166,6 +166,11 @@ def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
 def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-prefix">,
   HelpText<"Triggers llvm fatal_error if typechecker tries to typecheck a decl "
            "with the provided prefix name">;
+
+def debug_cycles : Flag<["-"], "debug-cycles">,
+  HelpText<"Print out debug dumps when cycles are detected in evaluation">;
+def output_request_graphviz : Separate<["-"], "output-request-graphviz">,
+  HelpText<"Emit GraphViz output visualizing the request graph">;
 
 def debug_time_compilation : Flag<["-"], "debug-time-compilation">,
   HelpText<"Prints the time taken by each compilation phase">;
@@ -214,8 +219,8 @@ def disable_llvm_optzns : Flag<["-"], "disable-llvm-optzns">,
 def disable_sil_perf_optzns : Flag<["-"], "disable-sil-perf-optzns">,
   HelpText<"Don't run SIL performance optimization passes">;
 
-def disable_llvm_arc_opts : Flag<["-"], "disable-llvm-arc-opts">,
-  HelpText<"Don't run LLVM ARC optimization passes.">;
+def disable_swift_specific_llvm_optzns : Flag<["-"], "disable-swift-specific-llvm-optzns">,
+  HelpText<"Don't run Swift specific LLVM optimization passes.">;
 
 def disable_llvm_slp_vectorizer : Flag<["-"], "disable-llvm-slp-vectorizer">,
   HelpText<"Don't run LLVM SLP vectorizer">;
@@ -341,6 +346,13 @@ def warn_long_expression_type_checking_EQ : Joined<["-"], "warn-long-expression-
   Alias<warn_long_expression_type_checking>;
 
 def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">;
+
+def solver_disable_shrink :
+  Flag<["-"], "solver-disable-shrink">,
+  HelpText<"Disable the shrink phase of expression type checking">;
+
+def switch_checking_invocation_threshold_EQ : Joined<["-"],
+    "switch-checking-invocation-threshold=">;
 
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;

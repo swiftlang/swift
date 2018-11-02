@@ -28,5 +28,17 @@ class OtherClass {
   var computedVariable: Int {
     return 0
   }
+
+  var computedVariable2: Int {
+    get { return 0 }
+    set { }
+  }
+
+  deinit { print("deinit") }
+}
+
+enum MyEnum {
+  case foo, bar
+  case baz
 }
 

@@ -5,7 +5,7 @@
 //
 // Type parameters
 //
-infix operator ~> { precedence 255 }
+infix operator ~>
 
 func ~> <Target, Args, Result> (
   target: Target,

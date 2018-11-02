@@ -1,0 +1,118 @@
+%{
+  # -*- mode: C++ -*-
+  from gyb_syntax_support import *
+  NODE_MAP = create_node_map()
+  # Ignore the following admonition; it applies to the resulting .h file only
+}%
+//// Automatically Generated From SyntaxClassifier.h.gyb.
+//// Do Not Edit Directly!
+//===----------- SyntaxClassifier.h - SyntaxClassifier definitions --------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SWIFT_SYNTAX_CLASSIFIER_H
+#define SWIFT_SYNTAX_CLASSIFIER_H
+
+#include "swift/Syntax/SyntaxVisitor.h"
+#include <stack>
+
+namespace swift {
+namespace syntax {
+
+
+/// A classification that determines which color a token should be colored in
+/// for syntax coloring.
+enum class SyntaxClassification {
+  None,
+  Keyword,
+  Identifier,
+  DollarIdentifier,
+  IntegerLiteral,
+  FloatingLiteral,
+  StringLiteral,
+  /// Marks the parens for a string interpolation.
+  StringInterpolationAnchor,
+  TypeIdentifier,
+  /// #if/#else/#endif occurrence.
+  BuildConfigKeyword,
+  /// An identifier in a #if condition.
+  BuildConfigId,
+  /// #-keywords like #warning, #sourceLocation
+  PoundDirectiveKeyword,
+  /// Any occurrence of '@<attribute-name>' anywhere.
+  Attribute,
+  /// An editor placeholder string <#like this#>.
+  EditorPlaceholder,
+  ObjectLiteral
+};
+
+
+class SyntaxClassifier: public SyntaxVisitor {
+  struct ContextStackEntry {
+    /// The classification all identifiers shall inherit
+    SyntaxClassification Classification;
+    /// If set to \c true, all tokens will be forced to receive the above
+    /// classification, overriding their context-free classification
+    bool ForceClassification;
+
+    ContextStackEntry(SyntaxClassification Classification,
+                      bool ForceClassification)
+      : Classification(Classification),
+        ForceClassification(ForceClassification) {}
+  };
+
+  std::map<SyntaxNodeId, SyntaxClassification> ClassifiedTokens;
+  /// The top classification of this stack determines the color of identifiers
+  std::stack<ContextStackEntry, llvm::SmallVector<ContextStackEntry, 16>> ContextStack;
+
+  template<typename T>
+  void visit(T Node, SyntaxClassification Classification,
+             bool ForceClassification) {
+    ContextStack.emplace(Classification, ForceClassification);
+    visit(Node);
+    ContextStack.pop();
+  }
+
+  template<typename T>
+  void visit(llvm::Optional<T> OptNode) {
+    if (OptNode.hasValue()) {
+      static_cast<SyntaxVisitor *>(this)->visit(OptNode.getValue());
+    }
+  }
+
+  virtual void visit(TokenSyntax TokenNode) override;
+
+  virtual void visit(Syntax Node) override {
+    SyntaxVisitor::visit(Node);
+  }
+
+% for node in SYNTAX_NODES:
+%   if is_visitable(node):
+  virtual void visit(${node.name} Node) override;
+%   end
+% end
+
+public:
+  std::map<SyntaxNodeId, SyntaxClassification> classify(Syntax Node) {
+    // Clean up the environment
+    ContextStack = std::stack<ContextStackEntry, llvm::SmallVector<ContextStackEntry, 16>>();
+    ContextStack.push({SyntaxClassification::None, false});
+    ClassifiedTokens.clear();
+
+    Node.accept(*this);
+
+    return ClassifiedTokens;
+  }
+};
+} // namespace syntax
+} // namespace swift
+
+#endif // SWIFT_SYNTAX_CLASSIFIER_H

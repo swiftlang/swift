@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 
 @_cdecl("cdecl_foo") func foo(x: Int) -> Int { return x }
 

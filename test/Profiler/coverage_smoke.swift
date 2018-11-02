@@ -133,6 +133,40 @@ class Class3 {
              : "true"; // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
 }
 
+// rdar://34244637: Wrong coverage for do/catch sequence
+enum CustomError : Error {
+  case Err
+}
+func throwError(_ b: Bool) throws {
+  if b {
+    throw CustomError.Err
+  }
+}
+func catchError(_ b: Bool) -> Int {
+  do {
+    try throwError(b) // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
+  } catch {           // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
+    return 1          // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+  }                   // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+  let _ = 1 + 1       // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+  return 0            // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+}
+let _ = catchError(true)
+let _ = catchError(false)
+
+func catchError2(_ b: Bool) -> Int {
+  do {
+    throw CustomError.Err // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
+  } catch {
+    if b {                // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
+      return 1            // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+    }
+  }
+  return 0                // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+}
+let _ = catchError2(true)
+let _ = catchError2(false)
+
 main() // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
 foo()  // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
 call_closure()

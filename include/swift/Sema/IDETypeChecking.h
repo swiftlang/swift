@@ -36,9 +36,7 @@ namespace swift {
   class DeclName;
 
   /// \brief Typecheck a declaration parsed during code completion.
-  ///
-  /// \returns true on success, false on error.
-  bool typeCheckCompletionDecl(Decl *D);
+  void typeCheckCompletionDecl(Decl *D);
 
   /// \brief Check if T1 is convertible to T2.
   ///

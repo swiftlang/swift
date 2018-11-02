@@ -76,7 +76,7 @@ bb0:
 // CHECK-LABEL: sil @test_set_deallocating
 // CHECK: set_deallocating [nonatomic]
 // CHECK: return
-sil @test_set_deallocating : $C -> C {
+sil @test_set_deallocating : $(C) -> C {
 bb0(%0 : $C):
   set_deallocating [nonatomic] %0 : $C
   return %0 : $C
@@ -91,6 +91,6 @@ bb0(%0 : $C):
 }
 
 sil_vtable C {
-  #C.deinit!deallocator: @_TFC28nonatomic_reference_counting1CD  // C.__deallocating_deinit
+  #C.deinit!deallocator.1: @_TFC28nonatomic_reference_counting1CD  // C.__deallocating_deinit
 }
 

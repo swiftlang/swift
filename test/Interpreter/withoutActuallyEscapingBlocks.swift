@@ -5,6 +5,7 @@
 
 import StdlibUnittest
 import Foundation
+import Dispatch
 
 var WithoutEscapingSuite = TestSuite("WithoutActuallyEscapingBlock")
 
@@ -31,6 +32,13 @@ WithoutEscapingSuite.test("ExpectNoCrash") {
   var shouldBeTrue = false
   dontReallyEscape(f: { shouldBeTrue=true })
   expectTrue(shouldBeTrue)
+}
+
+WithoutEscapingSuite.test("ExpectNoCrash2") {
+  for _ in 1...10 {
+    let queue = DispatchQueue(label: "Foo")
+    queue.sync { }
+  }
 }
 
 runAllTests()

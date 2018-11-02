@@ -18,9 +18,8 @@
 #ifndef SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 #define SWIFT_REFLECTION_REFLECTIONCONTEXT_H
 
-#if defined(__APPLE__) && defined(__MACH__)
-#include <mach-o/getsect.h>
-#endif
+#include "llvm/BinaryFormat/MachO.h"
+#include "llvm/BinaryFormat/ELF.h"
 
 #include "swift/Remote/MemoryReader.h"
 #include "swift/Remote/MetadataReader.h"
@@ -36,30 +35,24 @@
 #include <unordered_map>
 #include <utility>
 
-#if defined(__APPLE__) && defined(__MACH__)
-#ifndef __LP64__
-using MachHeader = const struct mach_header;
-#else
-using MachHeader = const struct mach_header_64;
-#endif
-#endif
+namespace {
 
-#if defined(__APPLE__) && defined(__MACH__)
-template <typename Section>
-static std::pair<Section, bool> findSection(MachHeader *Header,
-                                            const char *Name) {
-  unsigned long Size;
-  auto Address = getsectiondata(Header, "__TEXT", Name, &Size);
-  if (!Address)
-    return {{nullptr, nullptr}, false};
+template <unsigned PointerSize> struct MachOTraits;
 
-  auto End = reinterpret_cast<uintptr_t>(Address) + Size;
+template <> struct MachOTraits<4> {
+  using Header = const struct llvm::MachO::mach_header;
+  using SegmentCmd = const struct llvm::MachO::segment_command;
+  using Section = const struct llvm::MachO::section;
+  static constexpr size_t MagicNumber = llvm::MachO::MH_MAGIC;
+};
 
-  return {{reinterpret_cast<const void *>(Address),
-           reinterpret_cast<const void *>(End)},
-          true};
-}
-#endif
+template <> struct MachOTraits<8> {
+  using Header = const struct llvm::MachO::mach_header_64;
+  using SegmentCmd = const struct llvm::MachO::segment_command_64;
+  using Section = const struct llvm::MachO::section_64;
+  static constexpr size_t MagicNumber = llvm::MachO::MH_MAGIC_64;
+};
+} // namespace
 
 namespace swift {
 namespace reflection {
@@ -108,90 +101,242 @@ public:
   }
 
   void dumpAllSections(std::ostream &OS) {
-    getBuilder().dumpAllSections();
+    getBuilder().dumpAllSections(OS);
   }
 
 #if defined(__APPLE__) && defined(__MACH__)
-  bool addImage(RemoteAddress ImageStart) {
-    auto Buf = this->getReader().readBytes(ImageStart, sizeof(MachHeader));
+  template <typename T> bool readMachOSections(RemoteAddress ImageStart) {
+    auto Buf =
+        this->getReader().readBytes(ImageStart, sizeof(typename T::Header));
     if (!Buf)
       return false;
+    auto Header = reinterpret_cast<typename T::Header *>(Buf.get());
+    assert(Header->magic == T::MagicNumber && "invalid MachO file");
 
-    auto Header = reinterpret_cast<MachHeader *>(Buf.get());
-    if (Header->magic != MH_MAGIC && Header->magic != MH_MAGIC_64) {
-      return false;
+    auto NumCommands = Header->sizeofcmds;
+
+    // The layout of the executable is such that the commands immediately follow
+    // the header.
+    auto CmdStartAddress =
+        RemoteAddress(ImageStart.getAddressData() + sizeof(typename T::Header));
+    uint32_t SegmentCmdHdrSize = sizeof(typename T::SegmentCmd);
+    uint64_t Offset = 0;
+
+    // Find the __TEXT segment.
+    typename T::SegmentCmd *Command = nullptr;
+    for (unsigned I = 0; I < NumCommands; ++I) {
+      auto CmdBuf = this->getReader().readBytes(
+          RemoteAddress(CmdStartAddress.getAddressData() + Offset),
+          SegmentCmdHdrSize);
+      auto CmdHdr = reinterpret_cast<typename T::SegmentCmd *>(CmdBuf.get());
+      if (strncmp(CmdHdr->segname, "__TEXT", sizeof(CmdHdr->segname)) == 0) {
+        Command = CmdHdr;
+        savedBuffers.push_back(std::move(CmdBuf));
+        break;
+      }
+      Offset += CmdHdr->cmdsize;
     }
-    auto Length = Header->sizeofcmds;
 
-    // Read the commands.
-    Buf = this->getReader().readBytes(ImageStart, Length);
-    if (!Buf)
+    // No __TEXT segment, bail out.
+    if (!Command)
       return false;
 
-    // Find the TEXT segment and figure out where the end is.
-    Header = reinterpret_cast<MachHeader *>(Buf.get());
-    unsigned long TextSize;
-    auto *TextSegment = getsegmentdata(Header, "__TEXT", &TextSize);
-    if (TextSegment == nullptr)
-      return false;
-    
-    auto TextEnd =
-        TextSegment - reinterpret_cast<const uint8_t *>(Buf.get()) + TextSize;
+    // Read everything including the __TEXT segment.
+    Buf = this->getReader().readBytes(ImageStart, Command->vmsize);
+    auto Start = reinterpret_cast<const char *>(Buf.get());
 
-    // Read everything including the TEXT segment.
-    Buf = this->getReader().readBytes(ImageStart, TextEnd);
-    if (!Buf)
-      return false;
+    auto findMachOSectionByName = [&](std::string Name)
+        -> std::pair<std::pair<const char *, const char *>, uint32_t> {
+      auto cmdOffset = Start + Offset + sizeof(typename T::Header);
+      auto SegCmd = reinterpret_cast<typename T::SegmentCmd *>(cmdOffset);
+      auto SectAddress = reinterpret_cast<const char *>(cmdOffset) +
+                         sizeof(typename T::SegmentCmd);
+      for (unsigned I = 0; I < SegCmd->nsects; ++I) {
+        auto S = reinterpret_cast<typename T::Section *>(
+            SectAddress + (I * sizeof(typename T::Section)));
+        if (strncmp(S->sectname, Name.c_str(), strlen(Name.c_str())) != 0)
+          continue;
+        auto SecStart = Start + S->offset;
+        auto SecSize = S->size;
+        return {{SecStart, SecStart + SecSize}, 0};
+      }
+      return {{nullptr, nullptr}, 0};
+    };
 
-    // Read all the metadata parts.
-    Header = reinterpret_cast<MachHeader *>(Buf.get());
+    auto FieldMdSec = findMachOSectionByName("__swift5_fieldmd");
+    auto AssocTySec = findMachOSectionByName("__swift5_assocty");
+    auto BuiltinTySec = findMachOSectionByName("__swift5_builtin");
+    auto CaptureSec = findMachOSectionByName("__swift5_capture");
+    auto TypeRefMdSec = findMachOSectionByName("__swift5_typeref");
+    auto ReflStrMdSec = findMachOSectionByName("__swift5_reflstr");
 
-    // The docs say "not all sections may be present." We'll succeed if ANY of
-    // them are present. Not sure if that's the right thing to do.
-    auto FieldMd = findSection<FieldSection>(Header, "__swift4_fieldmd");
-    auto AssocTyMd =
-        findSection<AssociatedTypeSection>(Header, "__swift4_assocty");
-    auto BuiltinTyMd =
-        findSection<BuiltinTypeSection>(Header, "__swift4_builtin");
-    auto CaptureMd = findSection<CaptureSection>(Header, "__swift4_capture");
-    auto TyperefMd = findSection<GenericSection>(Header, "__swift4_typeref");
-    auto ReflStrMd = findSection<GenericSection>(Header, "__swift4_reflstr");
-
-    bool success = FieldMd.second || AssocTyMd.second || BuiltinTyMd.second ||
-                   CaptureMd.second || TyperefMd.second || ReflStrMd.second;
-    if (!success)
+    if (FieldMdSec.first.first == nullptr &&
+        AssocTySec.first.first == nullptr &&
+        BuiltinTySec.first.first == nullptr &&
+        CaptureSec.first.first == nullptr &&
+        TypeRefMdSec.first.first == nullptr &&
+        ReflStrMdSec.first.first == nullptr)
       return false;
 
     auto LocalStartAddress = reinterpret_cast<uintptr_t>(Buf.get());
     auto RemoteStartAddress = static_cast<uintptr_t>(ImageStart.getAddressData());
 
     ReflectionInfo info = {
-        {{FieldMd.first.startAddress(), FieldMd.first.endAddress()}, 0},
-        {{AssocTyMd.first.startAddress(), AssocTyMd.first.endAddress()}, 0},
-        {{BuiltinTyMd.first.startAddress(), BuiltinTyMd.first.endAddress()}, 0},
-        {{CaptureMd.first.startAddress(), CaptureMd.first.endAddress()}, 0},
-        {{TyperefMd.first.startAddress(), TyperefMd.first.endAddress()}, 0},
-        {{ReflStrMd.first.startAddress(), ReflStrMd.first.endAddress()}, 0},
+        {{FieldMdSec.first.first, FieldMdSec.first.second}, 0},
+        {{AssocTySec.first.first, AssocTySec.first.second}, 0},
+        {{BuiltinTySec.first.first, BuiltinTySec.first.second}, 0},
+        {{CaptureSec.first.first, CaptureSec.first.second}, 0},
+        {{TypeRefMdSec.first.first, TypeRefMdSec.first.second}, 0},
+        {{ReflStrMdSec.first.first, ReflStrMdSec.first.second}, 0},
         LocalStartAddress,
         RemoteStartAddress};
 
     this->addReflectionInfo(info);
 
-    unsigned long DataSize;
-    auto *DataSegment = getsegmentdata(Header, "__DATA", &DataSize);
-    if (DataSegment != nullptr) {
-      auto DataSegmentStart = DataSegment - reinterpret_cast<const uint8_t *>(Buf.get())
-                            + ImageStart.getAddressData();
-      auto DataSegmentEnd = DataSegmentStart + DataSize;
-      imageRanges.push_back(std::make_tuple(ImageStart, RemoteAddress(DataSegmentEnd)));
+    // Find the __DATA segment.
+    for (unsigned I = 0; I < NumCommands; ++I) {
+      auto CmdBuf = this->getReader().readBytes(
+          RemoteAddress(CmdStartAddress.getAddressData() + Offset),
+          SegmentCmdHdrSize);
+      auto CmdHdr = reinterpret_cast<typename T::SegmentCmd *>(CmdBuf.get());
+      if (strncmp(CmdHdr->segname, "__DATA", sizeof(CmdHdr->segname)) == 0) {
+        auto DataSegmentEnd =
+            ImageStart.getAddressData() + CmdHdr->vmaddr + CmdHdr->vmsize;
+        assert(DataSegmentEnd > ImageStart.getAddressData() &&
+               "invalid range for __DATA");
+        imageRanges.push_back(
+            std::make_tuple(ImageStart, RemoteAddress(DataSegmentEnd)));
+        break;
+      }
+      Offset += CmdHdr->cmdsize;
     }
-    
-    savedBuffers.push_back(std::move(Buf));
 
+    savedBuffers.push_back(std::move(Buf));
     return true;
   }
-#endif // defined(__APPLE__) && defined(__MACH__)
-  
+
+  bool addImage(RemoteAddress ImageStart) {
+    // We start reading 4 bytes. The first 4 bytes are supposed to be
+    // the magic, so we understand whether this is a 32-bit executable or
+    // a 64-bit one.
+    auto Buf = this->getReader().readBytes(ImageStart, sizeof(uint32_t));
+    if (!Buf)
+      return false;
+    auto HeaderMagic = reinterpret_cast<const uint32_t *>(Buf.get());
+    if (*HeaderMagic == llvm::MachO::MH_MAGIC)
+      return readMachOSections<MachOTraits<4>>(ImageStart);
+    if (*HeaderMagic == llvm::MachO::MH_MAGIC_64)
+      return readMachOSections<MachOTraits<8>>(ImageStart);
+    return false;
+  }
+#else // ELF platforms.
+  bool addImage(RemoteAddress ImageStart) {
+    auto Buf =
+        this->getReader().readBytes(ImageStart, sizeof(llvm::ELF::Elf64_Ehdr));
+
+    // Read the header.
+    auto Hdr = reinterpret_cast<const llvm::ELF::Elf64_Ehdr *>(Buf.get());
+
+    if (!Hdr->checkMagic())
+      return false;
+
+    // From the header, grab informations about the section header table.
+    auto SectionHdrAddress = ImageStart.getAddressData() + Hdr->e_shoff;
+    auto SectionHdrNumEntries = Hdr->e_shnum;
+    auto SectionEntrySize = Hdr->e_shentsize;
+
+    // Collect all the section headers, we need them to look up the
+    // reflection sections (by name) and the string table.
+    std::vector<const llvm::ELF::Elf64_Shdr *> SecHdrVec;
+    for (unsigned I = 0; I < SectionHdrNumEntries; ++I) {
+      auto SecBuf = this->getReader().readBytes(
+          RemoteAddress(SectionHdrAddress + (I * SectionEntrySize)),
+          SectionEntrySize);
+      auto SecHdr =
+          reinterpret_cast<const llvm::ELF::Elf64_Shdr *>(SecBuf.get());
+      SecHdrVec.push_back(SecHdr);
+    }
+
+    // This provides quick access to the section header string table index.
+    // We also here handle the unlikely even where the section index overflows
+    // and it's just a pointer to secondary storage (SHN_XINDEX).
+    uint32_t SecIdx = Hdr->e_shstrndx;
+    if (SecIdx == llvm::ELF::SHN_XINDEX) {
+      assert(!SecHdrVec.empty() && "malformed ELF object");
+      SecIdx = SecHdrVec[0]->sh_link;
+    }
+
+    assert(SecIdx < SecHdrVec.size() && "malformed ELF object");
+
+    const llvm::ELF::Elf64_Shdr *SecHdrStrTab = SecHdrVec[SecIdx];
+    llvm::ELF::Elf64_Off StrTabOffset = SecHdrStrTab->sh_offset;
+    llvm::ELF::Elf64_Xword StrTabSize = SecHdrStrTab->sh_size;
+
+    auto StrTabStart =
+        RemoteAddress(ImageStart.getAddressData() + StrTabOffset);
+    auto StrTabBuf = this->getReader().readBytes(StrTabStart, StrTabSize);
+    auto StrTab = reinterpret_cast<const char *>(StrTabBuf.get());
+
+    auto findELFSectionByName = [&](std::string Name)
+        -> std::pair<std::pair<const char *, const char *>, uint32_t> {
+      // Now for all the sections, find their name.
+      for (const llvm::ELF::Elf64_Shdr *Hdr : SecHdrVec) {
+        uint32_t Offset = Hdr->sh_name;
+        auto SecName = std::string(StrTab + Offset);
+        if (SecName != Name)
+          continue;
+        auto SecStart =
+            RemoteAddress(ImageStart.getAddressData() + Hdr->sh_offset);
+        auto SecSize = Hdr->sh_size;
+        auto SecBuf = this->getReader().readBytes(SecStart, SecSize);
+        auto SecContents = reinterpret_cast<const char *>(SecBuf.get());
+        return {{SecContents, SecContents + SecSize},
+                Hdr->sh_addr - Hdr->sh_offset};
+      }
+      return {{nullptr, nullptr}, 0};
+    };
+
+    auto FieldMdSec = findELFSectionByName("swift5_fieldmd");
+    auto AssocTySec = findELFSectionByName("swift5_assocty");
+    auto BuiltinTySec = findELFSectionByName("swift5_builtin");
+    auto CaptureSec = findELFSectionByName("swift5_capture");
+    auto TypeRefMdSec = findELFSectionByName("swift5_typeref");
+    auto ReflStrMdSec = findELFSectionByName("swift5_reflstr");
+
+    // We succeed if at least one of the sections is present in the
+    // ELF executable.
+    if (FieldMdSec.first.first == nullptr &&
+        AssocTySec.first.first == nullptr &&
+        BuiltinTySec.first.first == nullptr &&
+        CaptureSec.first.first == nullptr &&
+        TypeRefMdSec.first.first == nullptr &&
+        ReflStrMdSec.first.first == nullptr)
+      return false;
+
+    auto LocalStartAddress = reinterpret_cast<uintptr_t>(Buf.get());
+    auto RemoteStartAddress =
+        static_cast<uintptr_t>(ImageStart.getAddressData());
+
+    ReflectionInfo info = {
+        {{FieldMdSec.first.first, FieldMdSec.first.second}, FieldMdSec.second},
+        {{AssocTySec.first.first, AssocTySec.first.second}, AssocTySec.second},
+        {{BuiltinTySec.first.first, BuiltinTySec.first.second},
+         BuiltinTySec.second},
+        {{CaptureSec.first.first, CaptureSec.first.second}, CaptureSec.second},
+        {{TypeRefMdSec.first.first, TypeRefMdSec.first.second},
+         TypeRefMdSec.second},
+        {{ReflStrMdSec.first.first, ReflStrMdSec.first.second},
+         ReflStrMdSec.second},
+        LocalStartAddress,
+        RemoteStartAddress};
+
+    this->addReflectionInfo(info);
+
+    savedBuffers.push_back(std::move(Buf));
+    return true;
+  }
+#endif
+
   void addReflectionInfo(ReflectionInfo I) {
     getBuilder().addReflectionInfo(I);
   }

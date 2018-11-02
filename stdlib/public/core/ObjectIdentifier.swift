@@ -63,7 +63,6 @@ public struct ObjectIdentifier {
 
 extension ObjectIdentifier : CustomDebugStringConvertible {
   /// A textual representation of the identifier, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return "ObjectIdentifier(\(_rawPointerToString(_value)))"
   }
@@ -84,15 +83,14 @@ extension ObjectIdentifier: Comparable {
 }
 
 extension ObjectIdentifier: Hashable {
-  // FIXME: Better hashing algorithm
-  /// The identifier's hash value.
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
   ///
-  /// The hash value is not guaranteed to be stable across different
-  /// invocations of the same program.  Do not persist the hash value across
-  /// program runs.
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return Int(Builtin.ptrtoint_Word(_value))
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(Int(Builtin.ptrtoint_Word(_value)))
   }
 }
 

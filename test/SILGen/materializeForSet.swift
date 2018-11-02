@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-frontend -module-name materializeForSet -emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-frontend -module-name materializeForSet -emit-silgen -enforce-exclusivity=unchecked %s | %FileCheck --check-prefix=UNCHECKED %s
+// RUN: %target-swift-emit-silgen -module-name materializeForSet %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name materializeForSet -enforce-exclusivity=unchecked %s | %FileCheck --check-prefix=UNCHECKED %s
 
 class Base {
   var stored: Int = 0
@@ -309,9 +309,11 @@ class HasStoredDidSet {
 // CHECK-LABEL: sil hidden [transparent] @$S17materializeForSet012HasStoredDidC0C6storedSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasStoredDidSet) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $HasStoredDidSet):
 // CHECK:   [[T2:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Int
-// CHECK:   [[T0:%.*]] = function_ref @$S17materializeForSet012HasStoredDidC0C6storedSivg
-// CHECK:   [[T1:%.*]] = apply [[T0]]([[SELF]])
-// CHECK:   store [[T1]] to [trivial] [[T2]] : $*Int
+// CHECK:   [[T0:%.*]] = ref_element_addr [[SELF]] : $HasStoredDidSet, #HasStoredDidSet.stored
+// CHECK:   [[T1:%.*]] = begin_access [read] [dynamic] [[T0]] : $*Int
+// CHECK:   [[VALUE:%.*]] = load [trivial] [[T1]] : $*Int
+// CHECK:   end_access [[T1]] : $*Int
+// CHECK:   store [[VALUE]] to [trivial] [[T2]] : $*Int
 // CHECK:   [[BUFFER:%.*]] = address_to_pointer [[T2]]
 // CHECK:   [[CALLBACK_FN:%.*]] = function_ref @$S17materializeForSet012HasStoredDidC0C6storedSivmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed HasStoredDidSet, @thick HasStoredDidSet.Type) -> ()
 // CHECK:   [[CALLBACK_ADDR:%.*]] = thin_function_to_pointer [[CALLBACK_FN]]

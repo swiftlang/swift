@@ -104,23 +104,17 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 bool
-swift_stdlib_NSObject_isEqual(NSObject *SWIFT_NS_RELEASES_ARGUMENT lhs,
-                              NSObject *SWIFT_NS_RELEASES_ARGUMENT rhs) {
-  bool Result = (lhs == rhs) || [lhs isEqual:rhs];
-  SWIFT_CC_PLUSONE_GUARD(swift_unknownRelease(lhs));
-  SWIFT_CC_PLUSONE_GUARD(swift_unknownRelease(rhs));
-  return Result;
+swift_stdlib_NSObject_isEqual(NSObject *lhs,
+                              NSObject *rhs) {
+  return (lhs == rhs) || [lhs isEqual:rhs];
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 int32_t swift_stdlib_compareNSStringDeterministicUnicodeCollation(
-    NSString *SWIFT_NS_RELEASES_ARGUMENT lhs, NSString *SWIFT_NS_RELEASES_ARGUMENT rhs) {
+    NSString *lhs, NSString *rhs) {
   // 'kCFCompareNonliteral' actually means "normalize to NFD".
-  int Result = CFStringCompare((__bridge CFStringRef)lhs,
-                               (__bridge CFStringRef)rhs, kCFCompareNonliteral);
-  SWIFT_CC_PLUSONE_GUARD(swift_unknownRelease(lhs));
-  SWIFT_CC_PLUSONE_GUARD(swift_unknownRelease(rhs));
-  return Result;
+  return CFStringCompare((__bridge CFStringRef)lhs,
+                         (__bridge CFStringRef)rhs, kCFCompareNonliteral);
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
@@ -145,10 +139,9 @@ swift_stdlib_CFStringHashCString(const uint8_t *bytes, CFIndex len) {
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-void swift_stdlib_CFSetGetValues(NSSet *SWIFT_NS_RELEASES_ARGUMENT set,
+void swift_stdlib_CFSetGetValues(NSSet *set,
                                  const void **values) {
   CFSetGetValues((__bridge CFSetRef)set, values);
-  SWIFT_CC_PLUSONE_GUARD(swift_unknownRelease(set));
 }
 #endif
 

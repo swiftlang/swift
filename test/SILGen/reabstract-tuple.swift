@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen -verify %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -verify %s | %FileCheck %s
 
 // SR-3090:
 

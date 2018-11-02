@@ -263,7 +263,14 @@ class ASTProducer : public ThreadSafeRefCountedBase<ASTProducer> {
   SmallVector<BufferStamp, 8> Stamps;
   ThreadSafeRefCntPtr<ASTUnit> AST;
   SmallVector<std::pair<std::string, BufferStamp>, 8> DependencyStamps;
-  std::vector<std::pair<SwiftASTConsumerRef, const void*>> QueuedConsumers;
+
+  struct QueuedConsumer {
+    SwiftASTConsumerRef consumer;
+    std::vector<ImmutableTextSnapshotRef> snapshots;
+    const void *oncePerASTToken;
+  };
+
+  std::vector<QueuedConsumer> QueuedConsumers;
   llvm::sys::Mutex Mtx;
 
 public:
@@ -282,8 +289,13 @@ public:
   bool shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
                      ArrayRef<ImmutableTextSnapshotRef> Snapshots);
 
-  void enqueueConsumer(SwiftASTConsumerRef Consumer, const void *OncePerASTToken);
-  std::vector<SwiftASTConsumerRef> popQueuedConsumers();
+  void enqueueConsumer(SwiftASTConsumerRef Consumer,
+                       ArrayRef<ImmutableTextSnapshotRef> Snapshots,
+                       const void *OncePerASTToken);
+
+  using ConsumerPredicate = llvm::function_ref<bool(
+      SwiftASTConsumer *, ArrayRef<ImmutableTextSnapshotRef>)>;
+  std::vector<SwiftASTConsumerRef> takeConsumers(ConsumerPredicate predicate);
 
   size_t getMemoryCost() const {
     // FIXME: Report the memory cost of the overall CompilerInstance.
@@ -414,10 +426,14 @@ resolveSymbolicLinksInInputs(FrontendInputsAndOutputs &inputsAndOutputs,
 }
 
 bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
-                                             ArrayRef<const char *> Args,
+                                             ArrayRef<const char *> OrigArgs,
                                              DiagnosticEngine &Diags,
                                              StringRef UnresolvedPrimaryFile,
                                              std::string &Error) {
+  SmallVector<const char *, 16> Args(OrigArgs.begin(), OrigArgs.end());
+  Args.push_back("-resource-dir");
+  Args.push_back(Impl.RuntimeResourcePath.c_str());
+
   if (auto driverInvocation = driver::createCompilerInvocation(Args, Diags)) {
     Invocation = *driverInvocation;
   } else {
@@ -425,8 +441,6 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
     Error = "error when parsing the compiler arguments";
     return true;
   }
-
-  Invocation.setRuntimeResourcePath(Impl.RuntimeResourcePath);
 
   Invocation.getFrontendOptions().InputsAndOutputs =
       resolveSymbolicLinksInInputs(
@@ -461,6 +475,9 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
 
   // We don't care about LLVMArgs
   FrontendOpts.LLVMArgs.clear();
+
+  // Disable expensive SIL options to reduce time spent in SILGen.
+  disableExpensiveSILOptions(Invocation.getSILOptions());
 
   return false;
 }
@@ -510,8 +527,26 @@ SwiftInvocationRef
 SwiftASTManager::getInvocation(ArrayRef<const char *> OrigArgs,
                                StringRef PrimaryFile,
                                std::string &Error) {
+
+  DiagnosticEngine Diags(Impl.SourceMgr);
+  EditorDiagConsumer CollectDiagConsumer;
+  Diags.addConsumer(CollectDiagConsumer);
+
   CompilerInvocation CompInvok;
-  if (initCompilerInvocation(CompInvok, OrigArgs, PrimaryFile, Error)) {
+  if (initCompilerInvocation(CompInvok, OrigArgs, Diags, PrimaryFile, Error)) {
+    // We create a traced operation here to represent the failure to parse
+    // arguments since we cannot reach `createAST` where that would normally
+    // happen.
+    trace::TracedOperation TracedOp(trace::OperationKind::PerformSema);
+    if (TracedOp.enabled()) {
+      trace::SwiftInvocation TraceInfo;
+      trace::initTraceInfo(TraceInfo, PrimaryFile, OrigArgs);
+      TracedOp.setDiagnosticProvider(
+        [&CollectDiagConsumer](SmallVectorImpl<DiagnosticEntryInfo> &diags) {
+          CollectDiagConsumer.getAllDiagnostics(diags);
+        });
+      TracedOp.start(TraceInfo);
+    }
     return nullptr;
   }
 
@@ -534,19 +569,27 @@ void SwiftASTManager::processASTAsync(SwiftInvocationRef InvokRef,
     }
   }
 
-  Producer->enqueueConsumer(std::move(ASTConsumer), OncePerASTToken);
+  Producer->enqueueConsumer(ASTConsumer, Snapshots, OncePerASTToken);
 
-  Producer->getASTUnitAsync(Impl, Snapshots,
-    [Producer](ASTUnitRef Unit, StringRef Error) {
-      auto Consumers = Producer->popQueuedConsumers();
+  auto handleAST = [this, Producer, ASTConsumer](ASTUnitRef unit,
+                                                 StringRef error) {
+    auto consumers = Producer->takeConsumers(
+        [&](SwiftASTConsumer *consumer,
+            ArrayRef<ImmutableTextSnapshotRef> snapshots) {
+          return consumer == ASTConsumer.get() ||
+                 !Producer->shouldRebuild(Impl, snapshots) ||
+                 (unit && consumer->canUseASTWithSnapshots(snapshots));
+        });
 
-      for (auto &Consumer : Consumers) {
-        if (Unit)
-          Unit->Impl.consumeAsync(std::move(Consumer), Unit);
-        else
-          Consumer->failed(Error);
-      }
-    });
+    for (auto &consumer : consumers) {
+      if (unit)
+        unit->Impl.consumeAsync(std::move(consumer), unit);
+      else
+        consumer->failed(error);
+    }
+  };
+
+  Producer->getASTUnitAsync(Impl, Snapshots, std::move(handleAST));
 }
 
 void SwiftASTManager::removeCachedAST(SwiftInvocationRef Invok) {
@@ -666,30 +709,37 @@ ASTUnitRef ASTProducer::getASTUnitImpl(SwiftASTManager::Implementation &MgrImpl,
   return AST;
 }
 
-void ASTProducer::enqueueConsumer(SwiftASTConsumerRef Consumer,
-                                  const void *OncePerASTToken) {
+void ASTProducer::enqueueConsumer(SwiftASTConsumerRef consumer,
+                                  ArrayRef<ImmutableTextSnapshotRef> snapshots,
+                                  const void *oncePerASTToken) {
   llvm::sys::ScopedLock L(Mtx);
-  if (OncePerASTToken) {
+  if (oncePerASTToken) {
     for (auto I = QueuedConsumers.begin(),
               E = QueuedConsumers.end(); I != E; ++I) {
-      if (I->second == OncePerASTToken) {
-        I->first->cancelled();
+      if (I->oncePerASTToken == oncePerASTToken) {
+        I->consumer->cancelled();
         QueuedConsumers.erase(I);
         break;
       }
     }
   }
-  QueuedConsumers.push_back({ std::move(Consumer), OncePerASTToken });
+  QueuedConsumers.push_back({std::move(consumer), snapshots, oncePerASTToken});
 }
 
-std::vector<SwiftASTConsumerRef> ASTProducer::popQueuedConsumers() {
+std::vector<SwiftASTConsumerRef>
+ASTProducer::takeConsumers(ConsumerPredicate predicate) {
   llvm::sys::ScopedLock L(Mtx);
-  std::vector<SwiftASTConsumerRef> Consumers;
-  Consumers.reserve(QueuedConsumers.size());
-  for (auto &C : QueuedConsumers)
-    Consumers.push_back(std::move(C.first));
-  QueuedConsumers.clear();
-  return Consumers;
+  std::vector<SwiftASTConsumerRef> consumers;
+
+  QueuedConsumers.erase(std::remove_if(QueuedConsumers.begin(),
+      QueuedConsumers.end(), [&](QueuedConsumer &qc) {
+    if (predicate(qc.consumer.get(), qc.snapshots)) {
+      consumers.push_back(std::move(qc.consumer));
+      return true;
+    }
+    return false;
+  }), QueuedConsumers.end());
+  return consumers;
 }
 
 bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
@@ -792,13 +842,6 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   for (auto &Content : Contents)
     Stamps.push_back(Content.Stamp);
 
-  trace::TracedOperation TracedOp(trace::OperationKind::PerformSema);
-  trace::SwiftInvocation TraceInfo;
-  if (TracedOp.enabled()) {
-    trace::initTraceInfo(TraceInfo, InvokRef->Impl.Opts.PrimaryFile,
-                         InvokRef->Impl.Opts.Args);
-  }
-
   ASTUnitRef ASTRef = new ASTUnit(++ASTUnitGeneration, MgrImpl.Stats);
   for (auto &Content : Contents) {
     if (Content.Snapshot)
@@ -806,9 +849,19 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   }
   auto &CompIns = ASTRef->Impl.CompInst;
   auto &Consumer = ASTRef->Impl.CollectDiagConsumer;
-
   // Display diagnostics to stderr.
   CompIns.addDiagnosticConsumer(&Consumer);
+
+  trace::TracedOperation TracedOp(trace::OperationKind::PerformSema);
+  trace::SwiftInvocation TraceInfo;
+  if (TracedOp.enabled()) {
+    trace::initTraceInfo(TraceInfo, InvokRef->Impl.Opts.PrimaryFile,
+                         InvokRef->Impl.Opts.Args);
+    TracedOp.setDiagnosticProvider(
+        [&Consumer](SmallVectorImpl<DiagnosticEntryInfo> &diags) {
+          Consumer.getAllDiagnostics(diags);
+        });
+  }
 
   CompilerInvocation Invocation;
   InvokRef->Impl.Opts.applyToSubstitutingInputs(
@@ -872,12 +925,6 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   // processing. This is to avoid unnecessary typechecking that can occur if the
   // TypeResolver is set before.
   ASTRef->Impl.TypeResolver = createLazyResolver(CompIns.getASTContext());
-
-  if (TracedOp.enabled()) {
-    SmallVector<DiagnosticEntryInfo, 8> Diagnostics;
-    Consumer.getAllDiagnostics(Diagnostics);
-    TracedOp.finish(Diagnostics);
-  }
 
   return ASTRef;
 }

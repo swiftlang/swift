@@ -217,6 +217,8 @@ struct InheritEqual<T> {}
 extension InheritEqual: P2 where T: P1 {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritEqual<T>
 // CHECK-NEXT:  (normal_conformance type=InheritEqual<T> protocol=P5
+// CHECK-NEXT:    (normal_conformance type=InheritEqual<T> protocol=P2
+// CHECK-NEXT:      conforms_to: T P1)
 // CHECK-NEXT:    conforms_to: T P1)
 extension InheritEqual: P5 where T: P1 {}
 func inheritequal_good<U: P1>(_: U) {
@@ -249,6 +251,8 @@ struct InheritMore<T> {}
 extension InheritMore: P2 where T: P1 {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritMore<T>
 // CHECK-NEXT:  (normal_conformance type=InheritMore<T> protocol=P5
+// CHECK-NEXT:    (normal_conformance type=InheritMore<T> protocol=P2
+// CHECK-NEXT:      conforms_to: T P1)
 // CHECK-NEXT:    conforms_to: T P4)
 extension InheritMore: P5 where T: P4 {}
 func inheritequal_good_good<U: P4>(_: U) {
@@ -322,13 +326,13 @@ struct TwoConformances<T> {}
 extension TwoConformances: P2 where T: P1 {}
 // expected-note@-1{{'TwoConformances<T>' declares conformance to protocol 'P2' here}}
 extension TwoConformances: P2 where T: P3 {}
-// expected-error@-1{{redundant conformance of 'TwoConformances<T>' to protocol 'P2'}}
+// expected-error@-1{{conflicting conformance of 'TwoConformances<T>' to protocol 'P2'; there cannot be more than one conformance, even with different conditional bounds}}
 
 struct TwoDisjointConformances<T> {}
 extension TwoDisjointConformances: P2 where T == Int {}
 // expected-note@-1{{'TwoDisjointConformances<T>' declares conformance to protocol 'P2' here}}
 extension TwoDisjointConformances: P2 where T == String {}
-// expected-error@-1{{redundant conformance of 'TwoDisjointConformances<T>' to protocol 'P2'}}
+// expected-error@-1{{conflicting conformance of 'TwoDisjointConformances<T>' to protocol 'P2'; there cannot be more than one conformance, even with different conditional bounds}}
 
 
 // FIXME: these cases should be equivalent (and both with the same output as the
@@ -391,4 +395,21 @@ extension SR6990: Sequence where T == Int {
     public typealias Element = Float
     public typealias Iterator = IndexingIterator<[Float]>
     public func makeIterator() -> Iterator { fatalError() }
+}
+
+// SR-8324
+protocol ElementProtocol {
+  associatedtype BaseElement: BaseElementProtocol = Self
+}
+protocol BaseElementProtocol: ElementProtocol where BaseElement == Self {}
+protocol ArrayProtocol {
+  associatedtype Element: ElementProtocol
+}
+protocol NestedArrayProtocol: ArrayProtocol where Element: ArrayProtocol, Element.Element.BaseElement == Element.BaseElement {
+  associatedtype BaseElement = Element.BaseElement
+}
+extension Array: ArrayProtocol where Element: ElementProtocol {}
+extension Array: NestedArrayProtocol where Element: ElementProtocol, Element: ArrayProtocol, Element.Element.BaseElement == Element.BaseElement {
+  // with the typealias uncommented you do not get a crash.
+  // typealias BaseElement = Element.BaseElement
 }

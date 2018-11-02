@@ -126,7 +126,10 @@ public:
 
   /// Set the type of this pattern, given that it was previously not
   /// type-checked.
-  void setType(Type ty) { Ty = ty; }
+  void setType(Type ty) {
+    assert(!ty || !ty->hasTypeVariable());
+    Ty = ty;
+  }
 
   /// Retrieve the delayed interface type of this pattern, if it has one.
   ///
@@ -163,14 +166,14 @@ public:
 
   /// \brief apply the specified function to all variables referenced in this
   /// pattern.
-  void forEachVariable(const std::function<void(VarDecl*)> &f) const;
+  void forEachVariable(llvm::function_ref<void(VarDecl *)> f) const;
 
   /// \brief apply the specified function to all pattern nodes recursively in
   /// this pattern.  This is a pre-order traversal.
-  void forEachNode(const std::function<void(Pattern*)> &f);
+  void forEachNode(llvm::function_ref<void(Pattern *)> f);
 
-  void forEachNode(const std::function<void(const Pattern*)> &f) const {
-    const std::function<void(Pattern*)> &f2 = f;
+  void forEachNode(llvm::function_ref<void(const Pattern *)> f) const {
+    llvm::function_ref<void(Pattern *)> f2 = f;
     const_cast<Pattern *>(this)->forEachNode(f2);
   }
 

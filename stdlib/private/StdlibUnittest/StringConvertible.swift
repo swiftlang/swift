@@ -168,7 +168,3 @@ public func expectDumped<T>(
   expectEqual(expected, actual, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 }
-
-// Local Variables:
-// eval: (read-only-mode 1)
-// End:

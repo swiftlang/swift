@@ -235,3 +235,7 @@ public func run_SuffixArrayLazy(_ N: Int) {
     CheckResults(result == sumCount)
   }
 }
+
+// Local Variables:
+// eval: (read-only-mode 1)
+// End:

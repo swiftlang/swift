@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name result_abstraction -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name result_abstraction -enable-sil-ownership %s | %FileCheck %s
 
 struct S {}
 struct R {}

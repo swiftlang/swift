@@ -61,7 +61,7 @@ public:
     // isn't necessary.
     // FIXME: Figure out what can be removed altogether in non-objc-interop
     // mode and remove it. rdar://problem/18801263
-    asImpl().addSuperClass();
+    asImpl().addSuperclass();
     asImpl().addClassCacheData();
     asImpl().addClassDataPointer();
 
@@ -171,7 +171,7 @@ public:
   void addIVarDestroyer() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
   void addDestructorFunction() { addPointer(); }
-  void addSuperClass() { addPointer(); }
+  void addSuperclass() { addPointer(); }
   void addClassFlags() { addInt32(); }
   void addInstanceAddressPoint() { addInt32(); }
   void addInstanceSize() { addInt32(); }

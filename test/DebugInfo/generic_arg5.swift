@@ -14,9 +14,10 @@ public func foo<Type>(_ values : [S<Type>])
   // CHECK: store %[[TY]]* %1, %[[TY]]** %[[ALLOCA]], align
   // The argument is a by-ref struct and thus needs to be dereferenced.
   // CHECK: ![[ARG]] = !DILocalVariable(name: "arg", arg: 1,
-  // CHECK-SAME:                        line: [[@LINE+3]],
+  // CHECK-SAME:                        line: [[@LINE+4]],
   // CHECK-SAME:     type: ![[TY:.*]])
-  // CHECK: ![[TY]] = !DICompositeType({{.*}}identifier: "$S12generic_arg51SVyAA3fooyySayACyxGGlFQq_GD")
+  // CHECK: ![[TY]] = !DICompositeType(
+  // CHECK-SAME:              identifier: "$S12generic_arg51SVyxGD")
   let _ = values.flatMap { arg in
     return .some(arg)
   }

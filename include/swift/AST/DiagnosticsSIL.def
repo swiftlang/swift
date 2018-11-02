@@ -137,6 +137,9 @@ ERROR(variable_inout_before_initialized,none,
 ERROR(variable_closure_use_uninit,none,
       "%select{variable|constant}1 '%0' captured by a closure before being"
       " initialized", (StringRef, bool))
+ERROR(variable_defer_use_uninit,none,
+      "%select{variable|constant}1 '%0' used in defer before being"
+      " initialized", (StringRef, bool))
 ERROR(self_closure_use_uninit,none,
       "'self' captured by a closure before all members were initialized", ())
 
@@ -311,6 +314,36 @@ ERROR(non_borrowed_indirect_addressof,none,
 
 REMARK(opt_remark_passed, none, "%0", (StringRef))
 REMARK(opt_remark_missed, none, "%0", (StringRef))
+
+// Float-point to integer conversions
+ERROR(float_to_int_overflow, none,
+  "invalid%select{| implicit}2 conversion: '%0' overflows %1", (StringRef, Type, bool))
+
+ERROR(negative_fp_literal_overflow_unsigned, none,
+  "negative literal '%0' cannot be converted to %select{|unsigned }2%1",
+  (StringRef, Type, bool))
+
+// Overflow and underflow warnings for floating-point truncation
+WARNING(warning_float_trunc_overflow, none,
+  "'%0' overflows to %select{|-}2inf during conversion to %1",
+  (StringRef, Type, bool))
+
+WARNING(warning_float_trunc_underflow, none,
+  "'%0' underflows and loses precision during conversion to %1",
+  (StringRef, Type, bool))
+
+WARNING(warning_float_trunc_hex_inexact, none,
+  "'%0' loses precision during conversion to %1",
+  (StringRef, Type, bool))
+
+WARNING(warning_float_overflows_maxbuiltin, none,
+  "'%0' overflows to %select{|-}1inf because its magnitude exceeds "
+  "the limits of a float literal", (StringRef, bool))
+
+// Integer to floating-point conversions
+WARNING(warning_int_to_fp_inexact, none,
+  "'%1' is not exactly representable as %0; it becomes '%2'",
+  (Type, StringRef, StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

@@ -13,7 +13,7 @@ func checkThatBridgingIsWorking(fridge: Refrigerator) {
   _ = bridgedFridge as Refrigerator // no-warning
 }
 
-class Base : NSObject {
+@objcMembers class Base : NSObject {
   func test(a: Refrigerator, b: Refrigerator) -> Refrigerator? { // expected-note {{potential overridden instance method 'test(a:b:)' here}}
     return nil
   }
@@ -42,7 +42,7 @@ class Base : NSObject {
   var propGeneric: ManufacturerInfo<NSString> // expected-note {{attempt to override property here}}
 }
 
-class Sub : Base {
+@objcMembers class Sub : Base {
   // expected-note@+1 {{type does not match superclass instance method with type '(Refrigerator, Refrigerator) -> Refrigerator?'}} {{25-40=Refrigerator}} {{45-61=Refrigerator?}} {{66-81=Refrigerator}}
   override func test(a: APPRefrigerator, b: APPRefrigerator?) -> APPRefrigerator { // expected-error {{method does not override any method from its superclass}} {{none}}
     return a
@@ -108,7 +108,7 @@ protocol TestProto {
   var propGeneric: ManufacturerInfo<NSString>? { get } // expected-note {{protocol requires}}
 }
 
-class TestProtoImpl : NSObject, TestProto { // expected-error {{type 'TestProtoImpl' does not conform to protocol 'TestProto'}}
+@objcMembers class TestProtoImpl : NSObject, TestProto { // expected-error {{type 'TestProtoImpl' does not conform to protocol 'TestProto'}}
   // expected-note@+1 {{candidate has non-matching type '(APPRefrigerator, APPRefrigerator?) -> APPRefrigerator'}} {{16-31=Refrigerator}} {{36-52=Refrigerator?}} {{57-72=Refrigerator}}
   func test(a: APPRefrigerator, b: APPRefrigerator?) -> APPRefrigerator {
     return a
@@ -166,7 +166,7 @@ class TestProtoImpl : NSObject, TestProto { // expected-error {{type 'TestProtoI
   @objc optional var propGeneric: ManufacturerInfo<NSString>? { get } // expected-note {{here}} {{none}}
 }
 
-class TestObjCProtoImpl : NSObject, TestObjCProto {
+@objcMembers class TestObjCProtoImpl : NSObject, TestObjCProto {
   // expected-note@+2 {{private}} expected-note@+2 {{@nonobjc}} expected-note@+2 {{extension}}
   // expected-note@+1 {{candidate has non-matching type '(APPRefrigerator, APPRefrigerator?) -> APPRefrigerator'}} {{16-31=Refrigerator}} {{36-52=Refrigerator?}} {{57-72=Refrigerator}}
   func test(a: APPRefrigerator, b: APPRefrigerator?) -> APPRefrigerator { // expected-warning {{instance method 'test(a:b:)' nearly matches optional requirement 'test(a:b:)' of protocol 'TestObjCProto'}}

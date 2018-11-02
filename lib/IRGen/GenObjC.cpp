@@ -307,11 +307,12 @@ const TypeInfo &IRGenModule::getObjCClassPtrTypeInfo() {
   return Types.getObjCClassPtrTypeInfo();
 }
 
-const LoadableTypeInfo &TypeConverter::getObjCClassPtrTypeInfo() {
+const TypeInfo &TypeConverter::getObjCClassPtrTypeInfo() {
   // ObjC class pointers look like unmanaged (untagged) object references.
   if (ObjCClassPtrTI) return *ObjCClassPtrTI;
   ObjCClassPtrTI =
-    createUnmanagedStorageType(IGM.ObjCClassPtrTy);
+    createUnmanagedStorageType(IGM.ObjCClassPtrTy, ReferenceCounting::ObjC,
+                               /*isOptional*/false);
   ObjCClassPtrTI->NextConverted = FirstType;
   FirstType = ObjCClassPtrTI;
   return *ObjCClassPtrTI;
@@ -687,7 +688,7 @@ Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
   if (auto searchType = methodInfo.getSearchType()) {
     receiverValue =
       emitSuperArgument(IGF, isInstanceMethod, selfValue,
-                        searchType.getSwiftRValueType());
+                        searchType.getASTType());
   } else {
     receiverValue = selfValue;
   }
@@ -1064,7 +1065,7 @@ static clang::CanQualType getObjCPropertyType(IRGenModule &IGM,
   assert(getter);
   CanSILFunctionType methodTy = getObjCMethodType(IGM, getter);
   return IGM.getClangType(
-      methodTy->getFormalCSemanticResult().getSwiftRValueType());
+      methodTy->getFormalCSemanticResult().getASTType());
 }
 
 void irgen::getObjCEncodingForPropertyType(IRGenModule &IGM,
@@ -1096,7 +1097,7 @@ static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
 
   // Return type.
   {
-    auto clangType = IGM.getClangType(resultType.getSwiftRValueType());
+    auto clangType = IGM.getClangType(resultType.getASTType());
     if (clangType.isNull())
       return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     HelperGetObjCEncodingForType(clangASTContext, clangType, encodingString,
@@ -1158,7 +1159,9 @@ void irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
   /// The first element is the selector.
   selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
   
-  /// The second element is the type @encoding.
+  /// The second element is the method signature. A method signature is made of
+  /// the return type @encoding and every parameter type @encoding, glued with
+  /// numbers that used to represent stack offsets for each of these elements.
   CanSILFunctionType methodType = getObjCMethodType(IGM, method);
   atEncoding = getObjCEncodingForMethodType(IGM, methodType, extendedEncoding);
   
@@ -1348,9 +1351,13 @@ void irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM,
   Selector selector(declRef);
   auto selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
   
-  /// The second element is the type @encoding, which is always "@?"
-  /// for a function type.
-  auto atEncoding = IGM.getAddrOfGlobalString("@?");
+  /// The second element is the method signature. A method signature is made of
+  /// the return type @encoding and every parameter type @encoding, glued with
+  /// numbers that used to represent stack offsets for each of these elements.
+  auto ptrSize = IGM.getPointerSize().getValue();
+  llvm::SmallString<8> signature;
+  signature = "v" + llvm::itostr(ptrSize * 2) + "@0:" + llvm::itostr(ptrSize);
+  auto atEncoding = IGM.getAddrOfGlobalString(signature);
 
   /// The third element is the method implementation pointer.
   auto impl = llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);

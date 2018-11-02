@@ -62,12 +62,6 @@ public:
     getCaptureInfo().getLocalCaptures(Result);
   }
 
-  ArrayRef<ParameterList *> getParameterLists() const {
-    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
-      return AFD->getParameterLists();
-    return TheFunction.get<AbstractClosureExpr *>()->getParameterLists();
-  }
-  
   bool hasType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->hasInterfaceType();

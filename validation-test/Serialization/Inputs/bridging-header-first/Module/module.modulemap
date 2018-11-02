@@ -1,0 +1,4 @@
+module Module {
+    umbrella header "modular.h"
+    module * { export * }
+}

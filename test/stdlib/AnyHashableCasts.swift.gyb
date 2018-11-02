@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 //
 // RUN: %gyb %s -o %t/AnyHashableCasts.swift
-// RUN: %target-build-swift -g -module-name a %t/AnyHashableCasts.swift -o %t.out
-// RUN: %target-run %t.out
-// RUN: %target-build-swift -g -O -module-name a %t/AnyHashableCasts.swift -o %t.out.optimized
-// RUN: %target-run %t.out.optimized
+// RUN: %line-directive %t/AnyHashableCasts.swift -- %target-build-swift -g -module-name a %t/AnyHashableCasts.swift -o %t.out
+// RUN: %line-directive %t/AnyHashableCasts.swift -- %target-run %t.out
+// RUN: %line-directive %t/AnyHashableCasts.swift -- %target-build-swift -g -O -module-name a %t/AnyHashableCasts.swift -o %t.out.optimized
+// RUN: %line-directive %t/AnyHashableCasts.swift -- %target-run %t.out.optimized
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -117,34 +117,129 @@ AnyHashableCasts.test("${valueExpr} as ${coercedType} as? ${castType}") {
 % end
 
 #if _runtime(_ObjC)
+// A wrapper type around Int that bridges to NSNumber.
+struct IntWrapper1: _SwiftNewtypeWrapper, Hashable, _ObjectiveCBridgeable {
+  let rawValue: Int
+}
+
+// A wrapper type around Int that bridges to NSNumber.
+struct IntWrapper2: _SwiftNewtypeWrapper, Hashable, _ObjectiveCBridgeable {
+  let rawValue: Int
+}
+
+AnyHashableCasts.test("Wrappers around bridged integers") {
+  let wrapper1: AnyHashable = IntWrapper1(rawValue: 42)
+  let wrapper2: AnyHashable = IntWrapper2(rawValue: 42)
+  let integer: AnyHashable = 42 as Int
+  let byte: AnyHashable = 42 as UInt8
+  let double: AnyHashable = 42.0 as Double
+  let number: AnyHashable = 42 as NSNumber
+
+  // Wrappers compare equal to their wrapped value as AnyHashable.
+  expectEqual(wrapper1, wrapper2)
+  expectEqual(wrapper1, integer)
+  expectEqual(wrapper1, byte)
+  expectEqual(wrapper1, double)
+  expectEqual(wrapper1, number)
+
+  // Original types are preserved in the base property.
+  expectTrue(wrapper1.base is IntWrapper1)
+  expectTrue(wrapper2.base is IntWrapper2)
+  expectTrue(integer.base is Int)
+  expectTrue(byte.base is UInt8)
+  expectTrue(double.base is Double)
+  expectTrue(number.base is NSNumber) // Through bridging
+
+  // AnyHashable forms can be casted to any standard numeric type that can hold
+  // their value.
+  expectNotNil(wrapper1 as? IntWrapper1)
+  expectNotNil(wrapper1 as? IntWrapper2)
+  expectNotNil(wrapper1 as? Int)
+  expectNotNil(wrapper1 as? UInt8)
+  expectNotNil(wrapper1 as? Double)
+  expectNotNil(wrapper1 as? NSNumber)
+
+  expectNotNil(byte as? IntWrapper1)
+  expectNotNil(byte as? IntWrapper2)
+  expectNotNil(byte as? Int)
+  expectNotNil(byte as? UInt8)
+  expectNotNil(byte as? Double)
+  expectNotNil(byte as? NSNumber)
+
+  expectNotNil(integer as? IntWrapper1)
+  expectNotNil(integer as? IntWrapper2)
+  expectNotNil(integer as? Int)
+  expectNotNil(integer as? UInt8)
+  expectNotNil(integer as? Double)
+  expectNotNil(integer as? NSNumber)
+
+  expectNotNil(double as? IntWrapper1)
+  expectNotNil(double as? IntWrapper2)
+  expectNotNil(double as? Int)
+  expectNotNil(double as? UInt8)
+  expectNotNil(double as? Double)
+  expectNotNil(double as? NSNumber)
+
+  expectNotNil(number as? IntWrapper1)
+  expectNotNil(number as? IntWrapper2)
+  expectNotNil(number as? Int)
+  expectNotNil(number as? UInt8)
+  expectNotNil(number as? Double)
+  expectNotNil(number as? NSNumber)
+
+  // We can't cast to a numeric type that can't hold the value.
+  let big: AnyHashable = Int32.max
+  expectNotNil(big as? IntWrapper1)
+  expectNotNil(big as? IntWrapper2)
+  expectNotNil(big as? Int)
+  expectNil(big as? UInt8) // <--
+  expectNotNil(big as? Double)
+  expectNotNil(big as? NSNumber)
+}
+
 // A wrapper type around a String that bridges to NSString.
-struct StringWrapper1 : _SwiftNewtypeWrapper, Hashable, _ObjectiveCBridgeable {
+struct StringWrapper1: _SwiftNewtypeWrapper, Hashable, _ObjectiveCBridgeable {
   let rawValue: String
 }
 
 // A wrapper type around a String that bridges to NSString.
-struct StringWrapper2 : _SwiftNewtypeWrapper, Hashable, _ObjectiveCBridgeable {
+struct StringWrapper2: _SwiftNewtypeWrapper, Hashable, _ObjectiveCBridgeable {
   let rawValue: String
 }
 
-AnyHashableCasts.test("Wrappers around bridged types") {
+AnyHashableCasts.test("Wrappers around bridged strings") {
   let wrapper1Hello: AnyHashable = StringWrapper1(rawValue: "hello")
+  let wrapper2Hello: AnyHashable = StringWrapper2(rawValue: "hello")
   let stringHello: AnyHashable = "hello" as String
   let nsStringHello: AnyHashable = "hello" as NSString
 
-  // Casting from Swift wrapper maintains type identity
+  // Wrappers compare equal to their wrapped value as AnyHashable.
+  expectEqual(wrapper1Hello, wrapper2Hello)
+  expectEqual(wrapper1Hello, stringHello)
+  expectEqual(wrapper1Hello, nsStringHello)
+  expectEqual(wrapper2Hello, stringHello)
+  expectEqual(wrapper2Hello, nsStringHello)
+  expectEqual(stringHello, nsStringHello)
+
+  // Type identity is maintained through the base property.
+  expectTrue(wrapper1Hello.base is StringWrapper1)
+  expectTrue(wrapper2Hello.base is StringWrapper2)
+  expectTrue(stringHello.base is String)
+  expectTrue(nsStringHello.base is NSString) // Through bridging
+
+  // Swift wrapper's AnyHashable form doesn't enfore type identity.
   expectNotNil(wrapper1Hello as? StringWrapper1)
-  expectNil(wrapper1Hello as? StringWrapper2)
-  expectNil(wrapper1Hello as? String)
+  expectNotNil(wrapper1Hello as? StringWrapper2)
+  expectNotNil(wrapper1Hello as? String)
   expectNotNil(wrapper1Hello as? NSString)
 
-  // Casting from String maintains type identity
-  expectNil(stringHello as? StringWrapper1)
-  expectNil(stringHello as? StringWrapper2)
+  // String's AnyHashable form doesn't enfore type identity.
+  expectNotNil(stringHello as? StringWrapper1)
+  expectNotNil(stringHello as? StringWrapper2)
   expectNotNil(stringHello as? String)
   expectNotNil(stringHello as? NSString)
 
-  // Casting form NSString works with anything.
+  // NSString's AnyHashable form doesn't enfore type identity.
   expectNotNil(nsStringHello as? StringWrapper1)
   expectNotNil(nsStringHello as? StringWrapper2)
   expectNotNil(nsStringHello as? String)

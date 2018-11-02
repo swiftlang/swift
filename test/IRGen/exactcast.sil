@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-objc-interop -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -109,15 +109,15 @@ sil @$S5test110DerivedIntCfD : $@convention(method) (@owned DerivedInt) -> ()
 
 sil_vtable BaseBase {
   #BaseBase.foo!1: (BaseBase) -> () -> () : @$S5test104BaseB0C3fooyyF
-  #BaseBase.deinit!deallocator: @$S5test104BaseB0CfD
+  #BaseBase.deinit!deallocator.1: @$S5test104BaseB0CfD
 }
 
 sil_vtable Base {
   #BaseBase.foo!1: (BaseBase) -> () -> () : @$S5test104BaseB0C3fooyyF [inherited]
-  #Base.deinit!deallocator: @$S5test14BaseCfD
+  #Base.deinit!deallocator.1: @$S5test14BaseCfD
 }
 
 sil_vtable DerivedInt {
   #BaseBase.foo!1: (BaseBase) -> () -> () : @$S5test110DerivedIntC3fooyyF [override]
-  #DerivedInt.deinit!deallocator: @$S5test110DerivedIntCfD
+  #DerivedInt.deinit!deallocator.1: @$S5test110DerivedIntCfD
 }

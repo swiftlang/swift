@@ -78,6 +78,11 @@ module ucrt [system] {
     }
 
     module POSIX {
+      module fcntl {
+        header "fcntl.h"
+        export *
+      }
+
       module sys {
         export *
 
@@ -99,9 +104,14 @@ module ucrt [system] {
     }
   }
 
-  module io {
-    header "corecrt_io.h"
+  module corecrt {
+    header "corecrt.h"
     export *
+
+    module io {
+      header "corecrt_io.h"
+      export *
+    }
   }
 }
 

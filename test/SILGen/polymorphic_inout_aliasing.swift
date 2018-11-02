@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s
+// RUN: %target-swift-emit-sil -verify %s
 
 struct Block {}
 
@@ -11,7 +11,7 @@ class Story {
   }
 
   func test() {
-    // expected-warning@+2 {{overlapping accesses to 'finalStored', but modification requires exclusive access; consider calling MutableCollection.swapAt(_:_:)}}
+    // expected-error@+2 {{overlapping accesses to 'finalStored', but modification requires exclusive access; consider calling MutableCollection.swapAt(_:_:)}}
     // expected-note@+1 {{conflicting access is here}}
     swap(&self.finalStored[0], &self.finalStored[1])
     swap(&self.overridableStored[0], &self.overridableStored[1])
@@ -24,7 +24,7 @@ protocol Storied {
 }
 
 func testProtocol<T: Storied>(x: inout T) {
-  // expected-warning@+2 {{overlapping accesses to 'x', but modification requires exclusive access; consider calling MutableCollection.swapAt(_:_:)}}
+  // expected-error@+2 {{overlapping accesses to 'x', but modification requires exclusive access; consider calling MutableCollection.swapAt(_:_:)}}
   // expected-note@+1 {{conflicting access is here}}
   swap(&x.protocolRequirement[0], &x.protocolRequirement[1])
 }

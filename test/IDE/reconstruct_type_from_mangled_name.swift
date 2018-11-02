@@ -327,8 +327,8 @@ struct HasGenericSubscript<T> {
 private
 // CHECK: decl: private func patatino<T>(_ vers1: T, _ vers2: T) -> Bool where T : Comparable for
 func patatino<T: Comparable>(_ vers1: T, _ vers2: T) -> Bool {
-  // CHECK: decl: FAILURE   for 'T' usr=s:14swift_ide_test8patatino33_D7B956AE2D93947DFA67A1ECF93EF238LLySbx_xts10ComparableRzlF1TL_xmfp decl
-  // CHECK: decl: let vers1: T      for 'vers1' usr=s:14swift_ide_test8patatino33_D7B956AE2D93947DFA67A1ECF93EF238LLySbx_xts10ComparableRzlF5vers1L_xvp
-  // CHECK: decl: let vers2: T      for 'vers2' usr=s:14swift_ide_test8patatino33_D7B956AE2D93947DFA67A1ECF93EF238LLySbx_xts10ComparableRzlF5vers2L_xvp
+  // CHECK: decl: FAILURE   for 'T' usr=s:14swift_ide_test8patatino33_D7B956AE2D93947DFA67A1ECF93EF238LLySbx_xtSLRzlF1TL_xmfp decl
+  // CHECK: decl: let vers1: T      for 'vers1' usr=s:14swift_ide_test8patatino33_D7B956AE2D93947DFA67A1ECF93EF238LLySbx_xtSLRzlF5vers1L_xvp
+  // CHECK: decl: let vers2: T      for 'vers2' usr=s:14swift_ide_test8patatino33_D7B956AE2D93947DFA67A1ECF93EF238LLySbx_xtSLRzlF5vers2L_xvp
   return vers1 < vers2;
 }

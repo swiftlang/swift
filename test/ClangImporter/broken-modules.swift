@@ -1,18 +1,8 @@
-// RUN: %empty-directory(%t)
+// RUN: not %target-swift-frontend -typecheck %s -I %S/Inputs/custom-modules/ -enable-objc-interop -show-diagnostics-after-fatal -D MISSING_FROM_MODULE -o /dev/null 2>&1 | %FileCheck -check-prefix CHECK-MODULE-MAP %s
+// RUN: not %target-swift-frontend -typecheck %s -I %S/Inputs/custom-modules/ -enable-objc-interop -show-diagnostics-after-fatal -o /dev/null 2>&1 | %FileCheck -check-prefix CHECK -check-prefix CHECK-DIRECT %s
+// RUN: not %target-swift-frontend -typecheck %s -I %S/Inputs/custom-modules/ -enable-objc-interop -show-diagnostics-after-fatal -D INDIRECT -o /dev/null 2>&1 | %FileCheck -check-prefix CHECK -check-prefix CHECK-INDIRECT %s
 
-// RUN: not %target-swift-frontend -typecheck %s -I %S/Inputs/custom-modules/ -show-diagnostics-after-fatal -D MISSING_FROM_MODULE 2> %t/err.txt
-// RUN: %FileCheck -check-prefix CHECK-MODULE-MAP %s < %t/err.txt
-
-// RUN: not %target-swift-frontend -typecheck %s -I %S/Inputs/custom-modules/ -show-diagnostics-after-fatal 2> %t/err.txt
-// RUN: %FileCheck -check-prefix CHECK -check-prefix CHECK-DIRECT %s < %t/err.txt
-
-// RUN: not %target-swift-frontend -typecheck %s -I %S/Inputs/custom-modules/ -show-diagnostics-after-fatal -D INDIRECT 2> %t/err.txt
-// RUN: %FileCheck -check-prefix CHECK -check-prefix CHECK-INDIRECT %s < %t/err.txt
-
-// FIXME: not every test here depends on Objective-C syntax, this test can be
-// split.
-//
-// REQUIRES: objc_interop
+// FIXME: not every test here depends on Objective-C syntax, this test can be split.
 
 #if MISSING_FROM_MODULE
 import MissingHeader

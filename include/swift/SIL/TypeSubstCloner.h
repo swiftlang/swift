@@ -40,21 +40,13 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
     llvm_unreachable("Clients need to explicitly call a base class impl!");
   }
 
-  void computeSubsMap() {
-    if (auto genericSig = Original.getLoweredFunctionType()
-          ->getGenericSignature()) {
-      SubsMap = genericSig->getSubstitutionMap(ApplySubs);
-    }
-  }
-
   // A helper class for cloning different kinds of apply instructions.
   // Supports cloning of self-recursive functions.
   class ApplySiteCloningHelper {
     SILValue Callee;
-    SubstitutionList Subs;
+    SubstitutionMap Subs;
     SmallVector<SILValue, 8> Args;
-    SmallVector<Substitution, 8> NewSubsList;
-    SmallVector<Substitution, 8> RecursiveSubsList;
+    SubstitutionMap RecursiveSubs;
 
   public:
     ApplySiteCloningHelper(ApplySite AI, TypeSubstCloner &Cloner)
@@ -66,13 +58,12 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
       Builder.setCurrentDebugScope(Cloner.super::getOpScope(AI.getDebugScope()));
 
       // Remap substitutions.
-      NewSubsList = Cloner.getOpSubstitutions(AI.getSubstitutions());
-      Subs = NewSubsList;
+      Subs = Cloner.getOpSubstitutionMap(AI.getSubstitutionMap());
 
       if (!Cloner.Inlining) {
         FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI.getCallee());
         if (FRI && FRI->getReferencedFunction() == AI.getFunction() &&
-            Subs == Cloner.ApplySubs) {
+            Subs == Cloner.SubsMap) {
           // Handle recursions by replacing the apply to the callee with an
           // apply to the newly specialized function, but only if substitutions
           // are the same.
@@ -83,24 +74,24 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
             // Compute substitutions for the specialized function. These
             // substitutions may be different from the original ones, e.g.
             // there can be less substitutions.
-            GenSig->getSubstitutions(AI.getFunction()
-                                         ->getLoweredFunctionType()
-                                         ->getGenericSignature()
-                                         ->getSubstitutionMap(Subs),
-                                     RecursiveSubsList);
+            RecursiveSubs = SubstitutionMap::get(
+              AI.getFunction()
+                ->getLoweredFunctionType()
+                ->getGenericSignature(),
+              Subs);
+
             // Use the new set of substitutions to compute the new
             // substituted callee type.
             RecursiveSubstCalleeSILType = LoweredFnTy->substGenericArgs(
-                AI.getModule(), RecursiveSubsList);
+                AI.getModule(), RecursiveSubs);
           }
 
           // The specialized recursive function may have different calling
           // convention for parameters. E.g. some of former indirect parameters
           // may become direct. Some of indirect return values may become
           // direct. Do not replace the callee in that case.
-          if (SubstCalleeSILType.getSwiftRValueType() ==
-              RecursiveSubstCalleeSILType) {
-            Subs = RecursiveSubsList;
+          if (SubstCalleeSILType.getASTType() == RecursiveSubstCalleeSILType) {
+            Subs = RecursiveSubs;
             Callee = Builder.createFunctionRef(
                 Cloner.getOpLocation(AI.getLoc()), &Builder.getFunction());
             SubstCalleeSILType =
@@ -122,7 +113,7 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
       return Callee;
     }
 
-    SubstitutionList getSubstitutions() const {
+    SubstitutionMap getSubstitutions() const {
       return Subs;
     }
   };
@@ -144,27 +135,25 @@ public:
 
   TypeSubstCloner(SILFunction &To,
                   SILFunction &From,
-                  SubstitutionList ApplySubs,
+                  SubstitutionMap ApplySubs,
                   SILOpenedArchetypesTracker &OpenedArchetypesTracker,
                   bool Inlining = false)
     : SILClonerWithScopes<ImplClass>(To, OpenedArchetypesTracker, Inlining),
       SwiftMod(From.getModule().getSwiftModule()),
+      SubsMap(ApplySubs),
       Original(From),
-      ApplySubs(ApplySubs),
       Inlining(Inlining) {
-    computeSubsMap();
   }
 
   TypeSubstCloner(SILFunction &To,
                   SILFunction &From,
-                  SubstitutionList ApplySubs,
+                  SubstitutionMap ApplySubs,
                   bool Inlining = false)
     : SILClonerWithScopes<ImplClass>(To, Inlining),
       SwiftMod(From.getModule().getSwiftModule()),
+      SubsMap(ApplySubs),
       Original(From),
-      ApplySubs(ApplySubs),
       Inlining(Inlining) {
-    computeSubsMap();
   }
 
 
@@ -183,9 +172,11 @@ protected:
 
   ProtocolConformanceRef remapConformance(Type type,
                                           ProtocolConformanceRef conf) {
-    return conf.subst(type,
-                      QuerySubstitutionMap{SubsMap},
-                      LookUpConformanceInSubstitutionMap(SubsMap));
+    return conf.subst(type, SubsMap);
+  }
+
+  SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
+    return Subs.subst(SubsMap);
   }
 
   void visitApplyInst(ApplyInst *Inst) {
@@ -294,8 +285,6 @@ protected:
   llvm::DenseMap<SILType, SILType> TypeCache;
   /// The original function to specialize.
   SILFunction &Original;
-  /// The substitutions used at the call site.
-  SubstitutionList ApplySubs;
   /// True, if used for inlining.
   bool Inlining;
 };

@@ -1,6 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend -typecheck -verify -primary-file %t/main.swift %S/Inputs/struct_equatable_hashable_other.swift -verify-ignore-unknown
+// RUN: %target-swift-frontend -typecheck -verify -primary-file %s %S/Inputs/struct_equatable_hashable_other.swift -verify-ignore-unknown -swift-version 4
 
 var hasher = Hasher()
 
@@ -9,11 +7,13 @@ struct Point: Hashable {
   let y: Int
 }
 
-if Point(x: 1, y: 2) == Point(x: 2, y: 1) { }
-let pointHash: Int = Point(x: 3, y: 5).hashValue
-Point(x: 3, y: 5).hash(into: &hasher)
+func point() {
+  if Point(x: 1, y: 2) == Point(x: 2, y: 1) { }
+  let _: Int = Point(x: 3, y: 5).hashValue
+  Point(x: 3, y: 5).hash(into: &hasher)
 
-Point(x: 1, y: 2) == Point(x: 2, y: 1) // expected-warning {{result of operator '==' is unused}}
+  Point(x: 1, y: 2) == Point(x: 2, y: 1) // expected-warning {{result of operator '==' is unused}}
+}
 
 struct Pair<T: Hashable>: Hashable {
   let first: T
@@ -24,11 +24,13 @@ struct Pair<T: Hashable>: Hashable {
   }
 }
 
-let p1 = Pair(first: "a", second: "b")
-let p2 = Pair(first: "a", second: "c")
-if p1 == p2 { }
-let _: Int = p1.hashValue
-p1.hash(into: &hasher)
+func pair() {
+  let p1 = Pair(first: "a", second: "b")
+  let p2 = Pair(first: "a", second: "c")
+  if p1 == p2 { }
+  let _: Int = p1.hashValue
+  p1.hash(into: &hasher)
+}
 
 func localStruct() -> Bool {
   struct Local: Equatable {
@@ -48,12 +50,14 @@ struct CustomHashValue: Hashable {
 
   var hashValue: Int { return 0 }
 
-  static func ==(x: CustomHashValue, y: CustomHashValue) -> Bool { return true } // expected-note 2 {{non-matching type}}
+  static func ==(x: CustomHashValue, y: CustomHashValue) -> Bool { return true } // expected-note 3 {{non-matching type}}
 }
 
-if CustomHashValue(x: 1, y: 2) == CustomHashValue(x: 2, y: 3) { }
-let _: Int = CustomHashValue(x: 1, y: 2).hashValue
-CustomHashValue(x: 1, y: 2).hash(into: &hasher)
+func customHashValue() {
+  if CustomHashValue(x: 1, y: 2) == CustomHashValue(x: 2, y: 3) { }
+  let _: Int = CustomHashValue(x: 1, y: 2).hashValue
+  CustomHashValue(x: 1, y: 2).hash(into: &hasher)
+}
 
 
 //------------------------------------------------------------------------------
@@ -68,13 +72,14 @@ struct CustomHashInto: Hashable {
     hasher.combine(y)
   }
 
-  static func ==(x: CustomHashInto, y: CustomHashInto) -> Bool { return true } // expected-note 2 {{non-matching type}}
+  static func ==(x: CustomHashInto, y: CustomHashInto) -> Bool { return true } // expected-note 3 {{non-matching type}}
 }
 
-if CustomHashInto(x: 1, y: 2) == CustomHashInto(x: 2, y: 3) { }
-let _: Int = CustomHashInto(x: 1, y: 2).hashValue
-CustomHashInto(x: 1, y: 2).hash(into: &hasher)
-
+func customHashInto() {
+  if CustomHashInto(x: 1, y: 2) == CustomHashInto(x: 2, y: 3) { }
+  let _: Int = CustomHashInto(x: 1, y: 2).hashValue
+  CustomHashInto(x: 1, y: 2).hash(into: &hasher)
+}
 
 // Check use of an struct's synthesized members before the struct is actually declared.
 struct UseStructBeforeDeclaration {
@@ -86,17 +91,20 @@ struct StructToUseBeforeDeclaration: Hashable {
   let v: Int
 }
 
-// Check structs from another file in the same module.
-if FromOtherFile(v: "a") == FromOtherFile(v: "b") {}
-let _: Int = FromOtherFile(v: "c").hashValue
-FromOtherFile(v: "d").hash(into: &hasher)
-
 func getFromOtherFile() -> AlsoFromOtherFile { return AlsoFromOtherFile(v: 4) }
-if AlsoFromOtherFile(v: 3) == getFromOtherFile() {}
-
 func overloadFromOtherFile() -> YetAnotherFromOtherFile { return YetAnotherFromOtherFile(v: 1.2) }
 func overloadFromOtherFile() -> Bool { return false }
-if YetAnotherFromOtherFile(v: 1.9) == overloadFromOtherFile() {}
+
+func useStructBeforeDeclaration() {
+  // Check structs from another file in the same module.
+  if FromOtherFile(v: "a") == FromOtherFile(v: "b") {}
+  let _: Int = FromOtherFile(v: "c").hashValue
+  FromOtherFile(v: "d").hash(into: &hasher)
+
+  if AlsoFromOtherFile(v: 3) == getFromOtherFile() {}
+
+  if YetAnotherFromOtherFile(v: 1.9) == overloadFromOtherFile() {}
+}
 
 
 // Even if the struct has only equatable/hashable members, it's not synthesized
@@ -106,9 +114,10 @@ struct StructWithoutExplicitConformance {
   let b: String
 }
 
-if StructWithoutExplicitConformance(a: 1, b: "b") == StructWithoutExplicitConformance(a: 2, b: "a") { } // expected-error{{binary operator '==' cannot be applied to two 'StructWithoutExplicitConformance' operands}}
-// expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists: }}
-
+func structWithoutExplicitConformance() {
+  if StructWithoutExplicitConformance(a: 1, b: "b") == StructWithoutExplicitConformance(a: 2, b: "a") { } // expected-error{{binary operator '==' cannot be applied to two 'StructWithoutExplicitConformance' operands}}
+  // expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists: }}
+}
 
 // Structs with non-hashable/equatable stored properties don't derive conformance.
 struct NotHashable {}
@@ -123,42 +132,47 @@ struct StructIgnoresComputedProperties: Hashable {
   static var staticComputed = NotHashable()
   var computed: NotHashable { return NotHashable() }
 }
-if StructIgnoresComputedProperties(a: 1, b: "a") == StructIgnoresComputedProperties(a: 2, b: "c") {}
-let _: Int = StructIgnoresComputedProperties(a: 3, b: "p").hashValue
-StructIgnoresComputedProperties(a: 4, b: "q").hash(into: &hasher)
+func structIgnoresComputedProperties() {
+  if StructIgnoresComputedProperties(a: 1, b: "a") == StructIgnoresComputedProperties(a: 2, b: "c") {}
+  let _: Int = StructIgnoresComputedProperties(a: 3, b: "p").hashValue
+  StructIgnoresComputedProperties(a: 4, b: "q").hash(into: &hasher)
+}
 
 // Structs should be able to derive conformances based on the conformances of
 // their generic arguments.
 struct GenericHashable<T: Hashable>: Hashable {
   let value: T
 }
-if GenericHashable<String>(value: "a") == GenericHashable<String>(value: "b") { }
-let _: Int = GenericHashable<String>(value: "c").hashValue
-GenericHashable<String>(value: "c").hash(into: &hasher)
+func genericHashable() {
+  if GenericHashable<String>(value: "a") == GenericHashable<String>(value: "b") { }
+  let _: Int = GenericHashable<String>(value: "c").hashValue
+  GenericHashable<String>(value: "c").hash(into: &hasher)
+}
 
 // But it should be an error if the generic argument doesn't have the necessary
 // constraints to satisfy the conditions for derivation.
 struct GenericNotHashable<T: Equatable>: Hashable { // expected-error 2 {{does not conform to protocol 'Hashable'}}
   let value: T
 }
-if GenericNotHashable<String>(value: "a") == GenericNotHashable<String>(value: "b") { }
-let gnh = GenericNotHashable<String>(value: "b")
-let _: Int = gnh.hashValue // No error. hashValue is always synthesized, even if Hashable derivation fails
-gnh.hash(into: &hasher) // expected-error {{value of type 'GenericNotHashable<String>' has no member 'hash'}}
+func genericNotHashable() {
+  if GenericNotHashable<String>(value: "a") == GenericNotHashable<String>(value: "b") { }
+  let gnh = GenericNotHashable<String>(value: "b")
+  let _: Int = gnh.hashValue // No error. hashValue is always synthesized, even if Hashable derivation fails
+  gnh.hash(into: &hasher) // expected-error {{value of type 'GenericNotHashable<String>' has no member 'hash'}}
+}
 
-
-// Conformance cannot be synthesized in an extension.
+// Synthesis can be from an extension...
 struct StructConformsInExtension {
   let v: Int
 }
-extension StructConformsInExtension : Equatable {} // expected-error {{cannot be automatically synthesized in an extension}}
+extension StructConformsInExtension : Equatable {}
 
-// But explicit conformance in an extension should work.
+// and explicit conformance in an extension should also work.
 public struct StructConformsAndImplementsInExtension {
   let v: Int
 }
 extension StructConformsAndImplementsInExtension : Equatable {
-  public static func ==(lhs: StructConformsAndImplementsInExtension, rhs: StructConformsAndImplementsInExtension) -> Bool {  // expected-note {{non-matching type}}
+  public static func ==(lhs: StructConformsAndImplementsInExtension, rhs: StructConformsAndImplementsInExtension) -> Bool {  // expected-note 3 {{non-matching type}}
     return true
   }  
 }
@@ -175,13 +189,13 @@ struct NoStoredProperties: Hashable {}
 // Verify that conformance (albeit manually implemented) can still be added to
 // a type in a different file.
 extension OtherFileNonconforming: Hashable {
-  static func ==(lhs: OtherFileNonconforming, rhs: OtherFileNonconforming) -> Bool { // expected-note {{non-matching type}}
+  static func ==(lhs: OtherFileNonconforming, rhs: OtherFileNonconforming) -> Bool { // expected-note 3 {{non-matching type}}
     return true
   }
   var hashValue: Int { return 0 }
 }
 // ...but synthesis in a type defined in another file doesn't work yet.
-extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension}}
+extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension in a different file to the type}}
 
 // Verify that we can add Hashable conformance in an extension by only
 // implementing hash(into:)
@@ -193,8 +207,10 @@ extension StructConformsAndImplementsHashIntoInExtension: Hashable {
     hasher.combine(v)
   }
 }
-let _: Int = StructConformsAndImplementsHashIntoInExtension(v: "a").hashValue
-StructConformsAndImplementsHashIntoInExtension(v: "b").hash(into: &hasher)
+func structConformsAndImplementsHashIntoInExtension() {
+  let _: Int = StructConformsAndImplementsHashIntoInExtension(v: "a").hashValue
+  StructConformsAndImplementsHashIntoInExtension(v: "b").hash(into: &hasher)
+}
 
 struct GenericHashIntoInExtension<T: Hashable>: Equatable {
   let value: T
@@ -204,8 +220,47 @@ extension GenericHashIntoInExtension: Hashable {
     hasher.combine(value)
   }
 }
-let _: Int = GenericHashIntoInExtension<String>(value: "a").hashValue
-GenericHashIntoInExtension(value: "b").hash(into: &hasher)
+func genericHashIntoInExtension() {
+  let _: Int = GenericHashIntoInExtension<String>(value: "a").hashValue
+  GenericHashIntoInExtension(value: "b").hash(into: &hasher)
+}
+
+// Conditional conformances should be able to be synthesized
+struct GenericDeriveExtension<T> {
+    let value: T
+}
+extension GenericDeriveExtension: Equatable where T: Equatable {}
+extension GenericDeriveExtension: Hashable where T: Hashable {}
+
+// Incorrectly/insufficiently conditional shouldn't work
+struct BadGenericDeriveExtension<T> {
+    let value: T
+}
+extension BadGenericDeriveExtension: Equatable {}
+// expected-error@-1 {{type 'BadGenericDeriveExtension<T>' does not conform to protocol 'Equatable'}}
+extension BadGenericDeriveExtension: Hashable where T: Equatable {}
+// expected-error@-1 {{type 'BadGenericDeriveExtension' does not conform to protocol 'Hashable'}}
+
+// But some cases don't need to be conditional, even if they look similar to the
+// above
+struct AlwaysHashable<T>: Hashable {}
+struct UnusedGenericDeriveExtension<T> {
+    let value: AlwaysHashable<T>
+}
+extension UnusedGenericDeriveExtension: Hashable {}
+
+// Cross-file synthesis is still disallowed for conditional cases
+extension GenericOtherFileNonconforming: Equatable where T: Equatable {}
+// expected-error@-1{{implementation of 'Equatable' cannot be automatically synthesized in an extension in a different file to the type}}
+
+// rdar://problem/41852654
+
+// There is a conformance to Equatable (or at least, one that implies Equatable)
+// in the same file as the type, so the synthesis is okay. Both orderings are
+// tested, to catch choosing extensions based on the order of the files, etc.
+protocol ImplierMain: Equatable {}
+struct ImpliedMain: ImplierMain {}
+extension ImpliedOther: ImplierMain {}
 
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'

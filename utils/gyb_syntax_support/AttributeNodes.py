@@ -2,9 +2,13 @@ from Child import Child
 from Node import Node  # noqa: I201
 
 ATTRIBUTE_NODES = [
-    # token-list -> token token-list?
+    # token-list -> token? token-list?
     Node('TokenList', kind='SyntaxCollection',
          element='Token'),
+
+    # token-list -> token token-list?
+    Node('NonEmptyTokenList', kind='SyntaxCollection',
+         element='Token', omit_when_empty=True),
 
     # attribute -> '@' identifier '('? 
     #              ( identifier 
@@ -21,7 +25,7 @@ ATTRIBUTE_NODES = [
          children=[
              Child('AtSignToken', kind='AtSignToken', 
                    description='The `@` sign.'),
-             Child('AttributeName', kind='Token', 
+             Child('AttributeName', kind='Token', classification='Attribute',
                    description='The name of the attribute.'),
              Child('LeftParen', kind='LeftParenToken', is_optional=True,
                    description='''

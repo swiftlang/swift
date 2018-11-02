@@ -16,7 +16,7 @@ public func foo2<S:P>(_ s: S) {
   // CHECK-SAME:                     metadata ![[META:[0-9]+]]
   foo1(s, s.getDT())
   // T.DT1 should get substituted with S.DT1.
-  // CHECK: ![[META]] = !DILocalVariable(name: "$swift.type.S.DT1"
+  // CHECK: ![[META]] = !DILocalVariable(name: "$\CF\84_0_0.DT1"
 }
 
 

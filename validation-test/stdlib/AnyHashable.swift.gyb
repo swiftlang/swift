@@ -510,14 +510,15 @@ class ${Self.full_name} : ${Super.full_name} {}
 
 AnyHashableTests.test("AnyHashable containing classes from the ${prefix} hierarchy") {
   typealias T = Int
+% bunch = 2
   let xs = [
 % for (i, (Self, _)) in enumerate(types):
 %   ConcreteSelf = Self
 %   if ConcreteSelf.is_generic:
 %     ConcreteSelf = ConcreteSelf.specialize_with({'T':'Int'})
 %   end
-    ${Self.full_name}(${len(types) + i}),
-%   for j in range(0, len(types)):
+    ${Self.full_name}(${bunch + i}),
+%   for j in range(0, bunch):
     ${Self.full_name}(${j}),
 %   end
 % end
@@ -526,7 +527,7 @@ AnyHashableTests.test("AnyHashable containing classes from the ${prefix} hierarc
     if lhs == rhs {
       return true
     }
-    let p = ${len(types) + 1}
+    let p = ${bunch + 1}
     if lhs % p == 0 || rhs % p == 0 {
       return false
     }
@@ -767,6 +768,132 @@ AnyHashableTests.test("AnyHashable(MinimalHashableRCSwiftError).base") {
   expectEqual(MinimalHashableRCSwiftError.self, type(of: ah.base))
 }
 
+AnyHashableTests.test("AnyHashable(NumericTypes)/Hashable") {
+  // Numeric types holding mathematically equal values must compare equal and
+  // hash the same way when converted to AnyHashable.
+  let groups: [[AnyHashable]] = [
+    [
+      1 as Int,
+      1 as UInt,
+      1 as Int8,
+      1 as UInt8,
+      1 as Int16,
+      1 as UInt16,
+      1 as Int32,
+      1 as UInt32,
+      1 as Int64,
+      1 as UInt64,
+      1 as Float,
+      1 as Double,
+    ],
+    [
+      42 as Int,
+      42 as UInt,
+      42 as Int8,
+      42 as UInt8,
+      42 as Int16,
+      42 as UInt16,
+      42 as Int32,
+      42 as UInt32,
+      42 as Int64,
+      42 as UInt64,
+      42 as Float,
+      42 as Double,
+    ],
+    [
+      Int(Int32.max),
+      UInt(Int32.max),
+      Int32.max,
+      UInt32(Int32.max),
+      Int64(Int32.max),
+      UInt64(Int32.max),
+      Double(Int32.max),
+    ],
+    [
+      Float.infinity,
+      Double.infinity,
+    ],
+    [
+      0x1.aP1 as Float, // 3.25
+      0x1.aP1 as Double,
+    ],
+    [
+      0x1.a000000000001P1, // 3.25.nextUp, not representable by a Float
+    ]
+  ]
+  checkHashableGroups(groups)
+}
+
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+AnyHashableTests.test("AnyHashable(Float80)/Hashable") {
+  let groups: [[AnyHashable]] = [
+    [
+      42 as Int,
+      42 as Float,
+      42 as Double,
+      42 as Float80,
+    ],
+    [
+      Float.infinity,
+      Double.infinity,
+      Float80.infinity,
+    ],
+    [
+      3.25 as Float,
+      3.25 as Double,
+      3.25 as Float80,
+    ],
+    [
+      0x1.a000000000001P1 as Double, // 3.25.nextUp
+      0x1.a000000000001P1 as Float80,
+    ],
+    [
+      0x1.a000000000000002p1 as Float80, // (3.25 as Float80).nextUp
+    ],
+  ]
+  checkHashableGroups(groups)
+}
+#endif
+
+#if _runtime(_ObjC)
+// A wrapper type around an Int that bridges to NSNumber.
+struct IntWrapper1 : _SwiftNewtypeWrapper, Hashable, _ObjectiveCBridgeable {
+  let rawValue: Int
+}
+
+// A wrapper type around an Int that bridges to NSNumber.
+struct IntWrapper2 : _SwiftNewtypeWrapper, Hashable, _ObjectiveCBridgeable {
+  let rawValue: Int
+}
+
+// A wrapper type around an Int that bridges to NSNumber.
+struct Int8Wrapper : _SwiftNewtypeWrapper, Hashable, _ObjectiveCBridgeable {
+  let rawValue: Int8
+}
+
+AnyHashableTests.test("AnyHashable(IntWrappers)/Hashable") {
+  let groups: [[AnyHashable]] = [
+    [
+      IntWrapper1(rawValue: 42),
+      IntWrapper2(rawValue: 42),
+      Int8Wrapper(rawValue: 42),
+      42,
+      42 as Double,
+      42 as NSNumber,
+    ],
+    [
+      IntWrapper1(rawValue: -23),
+      IntWrapper2(rawValue: -23),
+      Int8Wrapper(rawValue: -23),
+      -23,
+      -23 as Double,
+      -23 as NSNumber,
+    ],
+  ]
+  checkHashableGroups(groups)
+}
+#endif
+
 #if _runtime(_ObjC)
 // A wrapper type around a String that bridges to NSString.
 struct StringWrapper1 : _SwiftNewtypeWrapper, Hashable, _ObjectiveCBridgeable {
@@ -778,126 +905,101 @@ struct StringWrapper2 : _SwiftNewtypeWrapper, Hashable, _ObjectiveCBridgeable {
   let rawValue: String
 }
 
-AnyHashableTests.test("AnyHashable(Wrappers)/Hashable") {
-  let values: [AnyHashable] = [
-    StringWrapper1(rawValue: "hello"),
-    StringWrapper2(rawValue: "hello"),
-    "hello" as String,
-    "hello" as NSString,
-    StringWrapper1(rawValue: "world"),
-    StringWrapper2(rawValue: "world"),
-    "world" as String,
-    "world" as NSString,
+AnyHashableTests.test("AnyHashable(StringWrappers)/Hashable") {
+  let groups: [[AnyHashable]] = [
+    [
+      StringWrapper1(rawValue: "hello"),
+      StringWrapper2(rawValue: "hello"),
+      "hello" as String,
+      "hello" as NSString,
+    ],
+    [
+      StringWrapper1(rawValue: "world"),
+      StringWrapper2(rawValue: "world"),
+      "world" as String,
+      "world" as NSString,
+    ]
   ]
-
-  func equalityOracle(_ lhs: Int, _ rhs: Int) -> Bool {
-    // Elements in [0, 3] match 3.
-    if lhs == 3 { return rhs >= 0 && rhs <= 3 }
-    if rhs == 3 { return lhs >= 0 && lhs <= 3 }
-
-    // Elements in [4, 7] match 7.
-    if lhs == 7 { return rhs >= 4 && rhs <= 7 }
-    if rhs == 7 { return lhs >= 4 && lhs <= 7 }
-
-    return lhs == rhs
-  }
-
-  func hashEqualityOracle(_ lhs: Int, _ rhs: Int) -> Bool {
-    // Elements in [0, 3] hash the same, as do elements in [4, 7].
-    return lhs / 4 == rhs / 4
-  }
-
-  checkHashable(
-    values,
-    equalityOracle: equalityOracle,
-    hashEqualityOracle: hashEqualityOracle,
-    allowBrokenTransitivity: true)
+  checkHashableGroups(groups)
 }
 
 AnyHashableTests.test("AnyHashable(Set)/Hashable") {
-  let values: [AnyHashable] = [
-    Set([1, 2, 3]),
-    NSSet(set: [1, 2, 3]),
-    Set([2, 3, 4]),
-    NSSet(set: [2, 3, 4]),
-    Set([Set([1, 2]), Set([3, 4])]),
-    NSSet(set: [NSSet(set: [1, 2]), NSSet(set: [3, 4])]),
-    Set([Set([1, 3]), Set([2, 4])]),
-    NSSet(set: [NSSet(set: [1, 3]), NSSet(set: [2, 4])]),
+  let groups: [[AnyHashable]] = [
+    [
+      Set([1, 2, 3]),
+      Set([1, 2, 3] as [Int8]),
+      Set([1, 2, 3] as [Float]),
+      NSSet(set: [1, 2, 3]),
+    ],
+    [
+      Set([2, 3, 4]),
+      NSSet(set: [2, 3, 4]),
+    ],
+    [
+      Set([Set([1, 2]), Set([3, 4])]),
+      NSSet(set: [NSSet(set: [1, 2]), NSSet(set: [3, 4])]),
+    ],
+    [
+      Set([Set([1, 3]), Set([2, 4])]),
+      NSSet(set: [NSSet(set: [1, 3]), NSSet(set: [2, 4])]),
+    ],
   ]
-
-  func equalityOracle(_ lhs: Int, _ rhs: Int) -> Bool {
-    switch (lhs, rhs) {
-    case (0...1, 0...1): return true
-    case (2...3, 2...3): return true
-    case (4...5, 4...5): return true
-    case (6...7, 6...7): return true
-    default: return false
-    }
-  }
-
-  checkHashable(
-    values,
-    equalityOracle: equalityOracle,
-    allowBrokenTransitivity: true)
+  checkHashableGroups(groups)
 }
 
 AnyHashableTests.test("AnyHashable(Array)/Hashable") {
-  let values: [AnyHashable] = [
-    [1, 2, 3],
-    NSArray(array: [1, 2, 3]),
-    [3, 2, 1],
-    NSArray(array: [3, 2, 1]),
-    [[1, 2], [3, 4]],
-    NSArray(array: [NSArray(array: [1, 2]), NSArray(array: [3, 4])]),
-    [[3, 4], [1, 2]],
-    NSArray(array: [NSArray(array: [3, 4]), NSArray(array: [1, 2])]),
+  let groups: [[AnyHashable]] = [
+    [
+      [1, 2, 3],
+      [1, 2, 3] as [Int8],
+      [1, 2, 3] as [Double],
+      NSArray(array: [1, 2, 3]),
+    ],
+    [
+      [3, 2, 1],
+      [3, 2, 1] as [AnyHashable],
+      NSArray(array: [3, 2, 1]),
+    ],
+    [
+      [[1, 2], [3, 4]],
+      NSArray(array: [NSArray(array: [1, 2]), NSArray(array: [3, 4])]),
+    ],
+    [
+      [[3, 4], [1, 2]],
+      NSArray(array: [NSArray(array: [3, 4]), NSArray(array: [1, 2])]),
+    ]
   ]
-
-  func equalityOracle(_ lhs: Int, _ rhs: Int) -> Bool {
-    switch (lhs, rhs) {
-    case (0...1, 0...1): return true
-    case (2...3, 2...3): return true
-    case (4...5, 4...5): return true
-    case (6...7, 6...7): return true
-    default: return false
-    }
-  }
-
-  checkHashable(values, equalityOracle: equalityOracle,
-                allowBrokenTransitivity: true)
+  checkHashableGroups(groups)
 }
 
 AnyHashableTests.test("AnyHashable(Dictionary)/Hashable") {
-  let values: [AnyHashable] = [
-    ["hello": 1, "world": 2],
-    NSDictionary(dictionary: ["hello": 1, "world": 2]),
-    ["hello": 2, "world": 1],
-    NSDictionary(dictionary: ["hello": 2, "world": 1]),
-    ["hello": ["foo": 1, "bar": 2],
-     "world": ["foo": 2, "bar": 1]],
-    NSDictionary(dictionary: [
-        "hello": ["foo": 1, "bar": 2],
-        "world": ["foo": 2, "bar": 1]]),
-    ["hello": ["foo": 2, "bar": 1],
-     "world": ["foo": 1, "bar": 2]],
-    NSDictionary(dictionary: [
-        "hello": ["foo": 2, "bar": 1],
-        "world": ["foo": 1, "bar": 2]]),
+  let groups: [[AnyHashable]] = [
+    [
+      ["hello": 1, "world": 2] as [String: Int],
+      ["hello": 1, "world": 2] as [String: Int16],
+      ["hello": 1, "world": 2] as [String: Float],
+      NSDictionary(dictionary: ["hello": 1, "world": 2]),
+    ],
+    [
+      ["hello": 2, "world": 1],
+      NSDictionary(dictionary: ["hello": 2, "world": 1]),
+    ],
+    [
+      ["hello": ["foo": 1, "bar": 2],
+        "world": ["foo": 2, "bar": 1]],
+      NSDictionary(dictionary: [
+          "hello": ["foo": 1, "bar": 2],
+          "world": ["foo": 2, "bar": 1]]),
+    ],
+    [
+      ["hello": ["foo": 2, "bar": 1],
+        "world": ["foo": 1, "bar": 2]],
+      NSDictionary(dictionary: [
+          "hello": ["foo": 2, "bar": 1],
+          "world": ["foo": 1, "bar": 2]]),
+    ],
   ]
-
-  func equalityOracle(_ lhs: Int, _ rhs: Int) -> Bool {
-    switch (lhs, rhs) {
-    case (0...1, 0...1): return true
-    case (2...3, 2...3): return true
-    case (4...5, 4...5): return true
-    case (6...7, 6...7): return true
-    default: return false
-    }
-  }
-
-  checkHashable(values, equalityOracle: equalityOracle,
-                allowBrokenTransitivity: true)
+  checkHashableGroups(groups)
 }
 
 AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashablePODSwiftError))/Hashable") {

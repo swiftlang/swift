@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
 ////
 // Members of structs
@@ -28,7 +28,7 @@ func g0(_: (inout X) -> (Float) -> ()) {}
 _ = x.f0(i)
 x.f0(i).f1(i)
 
-g0(X.f1)
+g0(X.f1) // expected-error{{partial application of 'mutating' method}}
 
 _ = x.f0(x.f2(1))
 _ = x.f0(1).f2(i)
@@ -58,10 +58,10 @@ struct GZ<T> {
   var i : T
   func getI() -> T { return i }
 
-  func f1<U>(_ a: T, b: U) -> (T, U) { 
+  func f1<U>(_ a: T, b: U) -> (T, U) {
     return (a, b)
   }
-  
+
   func f2() {
     var f : Float
     var t = f1(i, b: f)
@@ -119,7 +119,7 @@ var wcurriedFull : () = w.curried(0)(1)
 
 // Member of enum type
 func enumMetatypeMember(_ opt: Int?) {
-  opt.none // expected-error{{enum element 'none' cannot be referenced as an instance member}}
+  opt.none // expected-error{{enum case 'none' cannot be used as an instance member}}
 }
 
 ////
@@ -315,7 +315,7 @@ struct S22490787 {
 
 func f22490787() {
   var path: S22490787 = S22490787()
-  
+
   for p in path {  // expected-error {{type 'S22490787' does not conform to protocol 'Sequence'}}
   }
 }
@@ -348,7 +348,7 @@ enum SR_2193_Error: Error {
 
 do {
   throw SR_2193_Error.Boom
-} catch let e as SR_2193_Error.Boom { // expected-error {{enum element 'Boom' is not a member type of 'SR_2193_Error'}}
+} catch let e as SR_2193_Error.Boom { // expected-error {{enum case 'Boom' is not a member type of 'SR_2193_Error'}}
 }
 
 // rdar://problem/25341015

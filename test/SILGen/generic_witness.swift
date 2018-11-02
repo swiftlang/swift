@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-frontend -module-name generic_witness -emit-silgen -enable-sil-ownership %s | %FileCheck %s
-// RUN: %target-swift-frontend -module-name generic_witness -emit-ir -enable-sil-ownership %s
+// RUN: %target-swift-emit-silgen -module-name generic_witness -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-ir -module-name generic_witness -enable-sil-ownership %s
 
 protocol Runcible {
   func runce<A>(_ x: A)

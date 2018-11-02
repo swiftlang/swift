@@ -33,7 +33,6 @@ class NominalTypeDecl;
 class NormalProtocolConformance;
 class ProtocolConformance;
 class ProtocolDecl;
-class Substitution;
 class TypeDecl;
 class ValueDecl;
 class VarDecl;
@@ -54,11 +53,6 @@ public:
   virtual void resolveWitness(const NormalProtocolConformance *conformance,
                               ValueDecl *requirement) = 0;
 
-  /// Resolve the access of a value.
-  ///
-  /// It does no type-checking.
-  virtual void resolveAccessControl(ValueDecl *VD) = 0;
-
   /// Resolve the type and declaration attributes of a value.
   ///
   /// This can be called when the type or signature of a value is needed.
@@ -66,20 +60,8 @@ public:
   /// consistency and provides the value a type.
   virtual void resolveDeclSignature(ValueDecl *VD) = 0;
 
-  /// Resolve the types in the inheritance clause of the given
-  /// declaration context, which will be a type declaration or
-  /// extension declaration.
-  virtual void resolveInheritanceClause(
-                 llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) = 0;
-
-  /// Resolve the superclass of the given class.
-  virtual void resolveSuperclass(ClassDecl *classDecl) = 0;
-
-  /// Resolve the raw type of the given enum.
-  virtual void resolveRawType(EnumDecl *enumDecl) = 0;
-
-  /// Resolve the inherited protocols of a given protocol.
-  virtual void resolveInheritedProtocols(ProtocolDecl *protocol) = 0;
+  /// Resolve the trailing where clause of the given protocol in-place.
+  virtual void resolveTrailingWhereClause(ProtocolDecl *proto) = 0;
 
   /// Bind an extension to its extended type.
   virtual void bindExtension(ExtensionDecl *ext) = 0;

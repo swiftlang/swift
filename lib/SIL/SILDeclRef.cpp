@@ -145,8 +145,6 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
   } else if (auto *ACE = baseLoc.dyn_cast<AbstractClosureExpr *>()) {
     loc = ACE;
     kind = Kind::Func;
-    assert(ACE->getParameterLists().size() >= 1 &&
-           "no param patterns for function?!");
   } else {
     llvm_unreachable("impossible SILDeclRef loc");
   }
@@ -653,7 +651,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 
   case SILDeclRef::Kind::GlobalAccessor:
     assert(!isCurried);
-    return mangler.mangleAccessorEntity(AccessorKind::IsMutableAddressor,
+    return mangler.mangleAccessorEntity(AccessorKind::MutableAddress,
                                         AddressorKind::Unsafe,
                                         cast<AbstractStorageDecl>(getDecl()),
                                         /*isStatic*/ false,
@@ -771,6 +769,14 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   if (context->isExtensionContext())
     return SubclassScope::NotApplicable;
 
+  // Various forms of thunks don't either.
+  if (isThunk() || isForeign)
+    return SubclassScope::NotApplicable;
+
+  // Default arg generators only need to be visible in Swift 3.
+  if (isDefaultArgGenerator() && !context->getASTContext().isSwiftVersion3())
+    return SubclassScope::NotApplicable;
+
   auto *classType = context->getAsClassOrClassExtensionContext();
   if (!classType || classType->isFinal())
     return SubclassScope::NotApplicable;
@@ -802,11 +808,9 @@ unsigned SILDeclRef::getParameterListCount() const {
   auto *vd = getDecl();
 
   if (auto *func = dyn_cast<AbstractFunctionDecl>(vd)) {
-    return func->getParameterLists().size();
+    return func->hasImplicitSelfDecl() ? 2 : 1;
   } else if (auto *ed = dyn_cast<EnumElementDecl>(vd)) {
     return ed->hasAssociatedValues() ? 2 : 1;
-  } else if (isa<DestructorDecl>(vd)) {
-    return 1;
   } else if (isa<ClassDecl>(vd)) {
     return 2;
   } else if (isa<VarDecl>(vd)) {

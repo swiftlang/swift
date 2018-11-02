@@ -24,3 +24,8 @@ typedef enum __attribute__((ns_error_domain(SKWidgetErrorDomain))) __attribute__
 @end
 
 extern void someKitGlobalFunc(void);
+
+static inline void someKitOtherGlobalFunc(void) { }
+
+extern NSString * _Nonnull someKitGetWidgetName(SKWidget * _Nonnull)
+  __attribute__((swift_name("getter:SKWidget.name(self:)")));

@@ -415,8 +415,8 @@ internal func _print_unlocked<T, TargetStream : TextOutputStream>(
 ///
 /// This function is forbidden from being inlined because when building the
 /// standard library inlining makes us drop the special semantics.
-@inlinable
-@inline(never) @effects(readonly)
+@inline(never) @_effects(readonly)
+@usableFromInline
 internal func _toStringReadOnlyStreamable<
   T : TextOutputStreamable
 >(_ x: T) -> String {
@@ -425,8 +425,8 @@ internal func _toStringReadOnlyStreamable<
   return result
 }
 
-@inlinable
-@inline(never) @effects(readonly)
+@inline(never) @_effects(readonly)
+@usableFromInline
 internal func _toStringReadOnlyPrintable<
   T : CustomStringConvertible
 >(_ x: T) -> String {
@@ -437,7 +437,6 @@ internal func _toStringReadOnlyPrintable<
 // `debugPrint`
 //===----------------------------------------------------------------------===//
 
-@inlinable // FIXME(sil-serialize-all)
 @_semantics("optimize.sil.specialize.generic.never")
 @inline(never)
 public func _debugPrint_unlocked<T, TargetStream : TextOutputStream>(

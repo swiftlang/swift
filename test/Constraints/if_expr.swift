@@ -62,7 +62,9 @@ _ = (x: 1) ? true : false // expected-error {{'(x: Int)' is not convertible to '
 let ib: Bool! = false
 let eb: Bool? = .some(false)
 let conditional = ib ? "Broken" : "Heart" // should infer Bool!
-let conditional = eb ? "Broken" : "Heart" // expected-error {{value of optional type 'Bool?' not unwrapped; did you mean to use '!' or '?'?}}
+let conditional = eb ? "Broken" : "Heart" // expected-error {{value of optional type 'Bool?' must be unwrapped}}
+// expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+// expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
 
 // <rdar://problem/39586166> - crash when IfExpr has UnresolvedType in condition
 struct Delegate {

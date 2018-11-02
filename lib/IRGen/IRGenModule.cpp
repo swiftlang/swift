@@ -92,23 +92,33 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
   CGO.DisableFPElim = Opts.DisableFPElim;
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
-  switch (Opts.DebugInfoKind) {
-  case IRGenDebugInfoKind::None:
+  switch (Opts.DebugInfoLevel) {
+  case IRGenDebugInfoLevel::None:
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::NoDebugInfo);
     break;
-  case IRGenDebugInfoKind::LineTables:
+  case IRGenDebugInfoLevel::LineTables:
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
     break;
-  case IRGenDebugInfoKind::ASTTypes:
-  case IRGenDebugInfoKind::DwarfTypes:
+  case IRGenDebugInfoLevel::ASTTypes:
+  case IRGenDebugInfoLevel::DwarfTypes:
     CGO.DebugTypeExtRefs = true;
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::FullDebugInfo);
     break;
   }
-  if (Opts.DebugInfoKind > IRGenDebugInfoKind::None) {
+  switch (Opts.DebugInfoFormat) {
+  case IRGenDebugInfoFormat::None:
+    break;
+  case IRGenDebugInfoFormat::DWARF:
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
     CGO.DwarfVersion = Opts.DWARFVersion;
-    CGO.DwarfDebugFlags = Opts.DWARFDebugFlags;
+    CGO.DwarfDebugFlags = Opts.DebugFlags;
+    break;
+  case IRGenDebugInfoFormat::CodeView:
+    CGO.EmitCodeView = true;
+    CGO.DebugCompilationDir = Opts.DebugCompilationDir;
+    // This actually contains the debug flags for codeview.
+    CGO.DwarfDebugFlags = Opts.DebugFlags;
+    break;
   }
 
   auto &HSI = Importer->getClangPreprocessor()
@@ -131,7 +141,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       ClangCodeGen(createClangCodeGenerator(Context, LLVMContext, irgen.Opts,
                                             ModuleName)),
       Module(*ClangCodeGen->GetModule()), LLVMContext(Module.getContext()),
-      DataLayout(target->createDataLayout()),
+      DataLayout(irgen.getClangDataLayout()),
       Triple(irgen.getEffectiveClangTriple()), TargetMachine(std::move(target)),
       silConv(irgen.SIL), OutputFilename(OutputFilename),
       MainInputFilenameForDebugInfo(MainInputFilenameForDebugInfo),
@@ -169,13 +179,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   RefCountedPtrTy = RefCountedStructTy->getPointerTo(/*addrspace*/ 0);
   RefCountedNull = llvm::ConstantPointerNull::get(RefCountedPtrTy);
 
-  // For now, native weak references are just a pointer.
-  WeakReferencePtrTy =
-    createStructPointerType(*this, "swift.weak", { RefCountedPtrTy });
-
-  // Native unowned references are just a pointer.
-  UnownedReferencePtrTy =
-    createStructPointerType(*this, "swift.unowned", { RefCountedPtrTy });
+  // For now, references storage types are just pointers.
+#define CHECKED_REF_STORAGE(Name, name, ...) \
+  Name##ReferencePtrTy = \
+    createStructPointerType(*this, "swift." #name, { RefCountedPtrTy });
+#include "swift/AST/ReferenceStorage.def"
 
   // A type metadata record is the structure pointed to by the canonical
   // address point of a type metadata.  This is at least one word, and
@@ -413,7 +421,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DefaultCC = SWIFT_DEFAULT_LLVM_CC;
   SwiftCC = llvm::CallingConv::Swift;
 
-  if (IRGen.Opts.DebugInfoKind > IRGenDebugInfoKind::None)
+  if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
     DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
                                                      Module,
                                                  MainInputFilenameForDebugInfo);
@@ -466,6 +474,31 @@ static bool isReturnedAttribute(llvm::Attribute::AttrKind Attr) {
   return Attr == llvm::Attribute::Returned;
 }
 
+namespace {
+bool isStandardLibrary(const llvm::Module &M) {
+  if (auto *Flags = M.getNamedMetadata("swift.module.flags")) {
+    for (const auto *F : Flags->operands()) {
+      const auto *Key = dyn_cast_or_null<llvm::MDString>(F->getOperand(0));
+      if (!Key)
+        continue;
+
+      const auto *Value =
+          dyn_cast_or_null<llvm::ConstantAsMetadata>(F->getOperand(1));
+      if (!Value)
+        continue;
+
+      if (Key->getString() == "standard-library")
+        return cast<llvm::ConstantInt>(Value->getValue())->isOne();
+    }
+  }
+  return false;
+}
+}
+
+bool IRGenModule::isStandardLibrary() const {
+  return ::isStandardLibrary(Module);
+}
+
 llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
                       llvm::Constant *&cache,
                       const char *name,
@@ -493,10 +526,13 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
   if (auto fn = dyn_cast<llvm::Function>(cache)) {
     fn->setCallingConv(cc);
 
-    if (::useDllStorage(llvm::Triple(Module.getTargetTriple())) &&
-        ((fn->getLinkage() == llvm::GlobalValue::ExternalLinkage &&
-          fn->isDeclaration()) ||
-         fn->getLinkage() == llvm::GlobalValue::AvailableExternallyLinkage))
+    bool IsExternal =
+        fn->getLinkage() == llvm::GlobalValue::AvailableExternallyLinkage ||
+        (fn->getLinkage() == llvm::GlobalValue::ExternalLinkage &&
+         fn->isDeclaration());
+
+    if (!isStandardLibrary(Module) && IsExternal &&
+        ::useDllStorage(llvm::Triple(Module.getTargetTriple())))
       fn->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
 
     llvm::AttrBuilder buildFnAttr;
@@ -567,18 +603,16 @@ IRGenModule::createStringConstant(StringRef Str,
   return { global, address };
 }
 
-#define KNOWN_METADATA_ACCESSOR(NAME, SYM) \
-llvm::Constant *IRGenModule::get##NAME() { \
-  if (NAME) \
-    return NAME; \
-  NAME = Module.getOrInsertGlobal( \
-                          SYM, \
-                          FullTypeMetadataStructTy); \
-  if (useDllStorage()) \
-    cast<llvm::GlobalVariable>(NAME) \
-        ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass); \
-  return NAME; \
-}
+#define KNOWN_METADATA_ACCESSOR(NAME, SYM)                                     \
+  llvm::Constant *IRGenModule::get##NAME() {                                   \
+    if (NAME)                                                                  \
+      return NAME;                                                             \
+    NAME = Module.getOrInsertGlobal(SYM, FullTypeMetadataStructTy);            \
+    if (useDllStorage() && !isStandardLibrary())                               \
+      cast<llvm::GlobalVariable>(NAME)->setDLLStorageClass(                    \
+          llvm::GlobalValue::DLLImportStorageClass);                           \
+    return NAME;                                                               \
+  }
 
 KNOWN_METADATA_ACCESSOR(EmptyTupleMetadata,
                         MANGLE_AS_STRING(METADATA_SYM(EMPTY_TUPLE_MANGLING)))
@@ -793,8 +827,9 @@ static void appendEncodedName(llvm::SmallVectorImpl<char> &buf,
   appendEncodedName(os, name);
 }
 
-static StringRef encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,
-                                           StringRef name) {
+StringRef
+swift::irgen::encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,
+                                        StringRef name) {
   llvm::raw_svector_ostream os{buf};
   os << "_swift_FORCE_LOAD_$";
   appendEncodedName(os, name);
@@ -1047,8 +1082,10 @@ bool IRGenModule::finalize() {
       ModuleHash->setSection("__LLVM,__swift_modhash");
       break;
     case llvm::Triple::ELF:
-    case llvm::Triple::COFF:
       ModuleHash->setSection(".swift_modhash");
+      break;
+    case llvm::Triple::COFF:
+      ModuleHash->setSection(".sw5hash");
       break;
     default:
       llvm_unreachable("Don't know how to emit the module hash for the selected"
@@ -1151,3 +1188,10 @@ llvm::Triple IRGenerator::getEffectiveClangTriple() {
   assert(CI && "no clang module loader");
   return llvm::Triple(CI->getTargetInfo().getTargetOpts().Triple);
 }
+
+const llvm::DataLayout &IRGenerator::getClangDataLayout() {
+  return static_cast<ClangImporter *>(
+             SIL.getASTContext().getClangModuleLoader())
+      ->getTargetInfo()
+      .getDataLayout();
+  }

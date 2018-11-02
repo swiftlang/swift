@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift-swift3
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name vtable_thunks_reabstraction_final -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name vtable_thunks_reabstraction_final -enable-sil-ownership %s | %FileCheck %s
 
 protocol Fooable {
   func foo(_ x: Int) -> Int?

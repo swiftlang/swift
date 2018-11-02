@@ -236,10 +236,10 @@ SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage,
   Mod(M), StageName(Stage), isMandatoryPipeline(isMandatoryPipeline) {
   
 #define ANALYSIS(NAME) \
-  Analysis.push_back(create##NAME##Analysis(Mod));
+  Analyses.push_back(create##NAME##Analysis(Mod));
 #include "swift/SILOptimizer/Analysis/Analysis.def"
 
-  for (SILAnalysis *A : Analysis) {
+  for (SILAnalysis *A : Analyses) {
     A->initialize(this);
     M->registerDeleteNotificationHandler(A);
   }
@@ -258,7 +258,7 @@ bool SILPassManager::continueTransforming() {
 }
 
 bool SILPassManager::analysesUnlocked() {
-  for (auto *A : Analysis)
+  for (auto *A : Analyses)
     if (A->isLocked())
       return false;
 
@@ -498,8 +498,8 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
 void SILPassManager::execute() {
   const SILOptions &Options = getOptions();
 
-  DEBUG(llvm::dbgs() << "*** Optimizing the module (" << StageName
-        << ") *** \n");
+  LLVM_DEBUG(llvm::dbgs() << "*** Optimizing the module (" << StageName
+                          << ") *** \n");
   if (SILPrintAll) {
     llvm::dbgs() << "*** SIL module before "  << StageName << " ***\n";
     printModule(Mod, Options.EmitVerboseSIL);
@@ -516,6 +516,7 @@ void SILPassManager::execute() {
     SILTransform *Tr = Transformations[Idx];
     assert((isa<SILFunctionTransform>(Tr) || isa<SILModuleTransform>(Tr)) &&
            "Unexpected pass kind!");
+    (void)Tr;
 
     unsigned FirstFuncTrans = Idx;
     while (Idx < NumTransforms && isa<SILFunctionTransform>(Transformations[Idx]))
@@ -543,7 +544,7 @@ SILPassManager::~SILPassManager() {
     delete T;
 
   // delete the analysis.
-  for (auto *A : Analysis) {
+  for (auto *A : Analyses) {
     Mod->removeDeleteNotificationHandler(A);
     assert(!A->isLocked() &&
            "Deleting a locked analysis. Did we forget to unlock ?");

@@ -1,4 +1,3 @@
-// RUN: %target-typecheck-verify-swift -swift-version 3
 // RUN: %target-typecheck-verify-swift -swift-version 4
 
 // rdar://problem/31969605

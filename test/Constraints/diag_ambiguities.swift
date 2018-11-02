@@ -51,10 +51,7 @@ struct SR3715 {
   func take(_ a: [Any]) {}
 
   func test() {
-    take([overloaded]) // expected-warning {{expression implicitly coerced from 'Int?' to 'Any'}}
-  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
-  // expected-note@-2 {{provide a default value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
+    take([overloaded])
   }
 }
 

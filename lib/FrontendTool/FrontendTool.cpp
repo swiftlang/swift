@@ -61,6 +61,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
+#include "swift/TBDGen/TBDGen.h"
 
 // FIXME: We're just using CompilerInstance::createOutputFile.
 // This API should be sunk down to LLVM.
@@ -241,7 +242,8 @@ static bool emitLoadedModuleTraceIfNeeded(ASTContext &ctxt,
   std::string stringBuffer;
   {
     llvm::raw_string_ostream memoryBuffer(stringBuffer);
-    json::Output jsonOutput(memoryBuffer, /*PrettyPrint=*/false);
+    json::Output jsonOutput(memoryBuffer, /*UserInfo=*/{},
+                            /*PrettyPrint=*/false);
     json::jsonize(jsonOutput, trace, /*Required=*/true);
   }
   stringBuffer += "\n";
@@ -288,7 +290,7 @@ static bool emitSyntax(SourceFile *SF, LangOptions &LangOpts,
   auto os = getFileOutputStream(OutputFilename, SF->getASTContext());
   if (!os) return true;
 
-  json::Output jsonOut(*os, /*PrettyPrint=*/false);
+  json::Output jsonOut(*os, /*UserInfo=*/{}, /*PrettyPrint=*/false);
   auto Root = SF->getSyntaxRoot().getRaw();
   jsonOut << *Root;
   *os << "\n";
@@ -764,20 +766,28 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
 
 static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
                              CompilerInstance &Instance) {
-  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasTBDPath())
+  const auto &frontendOpts = Invocation.getFrontendOptions();
+  if (!frontendOpts.InputsAndOutputs.hasTBDPath())
     return false;
 
+  if (!frontendOpts.InputsAndOutputs.isWholeModule()) {
+    Instance.getDiags().diagnose(SourceLoc(),
+                                 diag::tbd_only_supported_in_whole_module);
+    return false;
+  }
+
   const std::string &TBDPath = Invocation.getTBDPathForWholeModule();
-  assert(!TBDPath.empty() &&
-         "If not WMO, getTBDPathForWholeModule should have failed");
 
-  auto installName = Invocation.getFrontendOptions().TBDInstallName.empty()
+  auto installName = frontendOpts.TBDInstallName.empty()
                          ? "lib" + Invocation.getModuleName().str() + ".dylib"
-                         : Invocation.getFrontendOptions().TBDInstallName;
+                         : frontendOpts.TBDInstallName;
 
-  return writeTBD(Instance.getMainModule(),
-                  Invocation.getSILOptions().hasMultipleIGMs(), TBDPath,
-                  installName);
+  TBDGenOptions opts;
+  opts.InstallName = installName;
+  opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
+  opts.ModuleLinkName = frontendOpts.ModuleLinkName;
+
+  return writeTBD(Instance.getMainModule(), TBDPath, opts);
 }
 
 static std::deque<PostSILGenInputs>
@@ -850,6 +860,13 @@ emitIndexData(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   return hadEmitIndexDataError;
 }
 
+/// Emits the request-evaluator graph to the given file in GraphViz format.
+void emitRequestEvaluatorGraphViz(ASTContext &ctx, StringRef graphVizPath) {
+  std::error_code error;
+  llvm::raw_fd_ostream out(graphVizPath, error, llvm::sys::fs::F_Text);
+  ctx.evaluator.printDependenciesGraphviz(out);
+}
+
 static bool performCompileStepsPostSILGen(
     CompilerInstance &Instance, CompilerInvocation &Invocation,
     std::unique_ptr<SILModule> SM, bool astGuaranteedToCorrespondToSIL,
@@ -883,14 +900,35 @@ static bool performCompile(CompilerInstance &Instance,
   if (Invocation.getInputKind() == InputFileKind::IFK_LLVM_IR)
     return compileLLVMIR(Invocation, Instance, Stats);
 
-  if (FrontendOptions::shouldActionOnlyParse(Action))
+  if (FrontendOptions::shouldActionOnlyParse(Action)) {
     Instance.performParseOnly(/*EvaluateConditionals*/
                     Action == FrontendOptions::ActionType::EmitImportedModules);
-  else
+  } else if (Action == FrontendOptions::ActionType::ResolveImports) {
+    Instance.performParseAndResolveImportsOnly();
+  } else {
     Instance.performSema();
+  }
 
+  SWIFT_DEFER {
+    // Emit request-evaluator graph via GraphViz, if requested.
+    if (!Invocation.getFrontendOptions().RequestEvaluatorGraphVizPath.empty() &&
+        Instance.hasASTContext()) {
+      ASTContext &ctx = Instance.getASTContext();
+      emitRequestEvaluatorGraphViz(
+        ctx,
+        Invocation.getFrontendOptions().RequestEvaluatorGraphVizPath);
+    }
+  };
+
+  ASTContext &Context = Instance.getASTContext();
   if (Action == FrontendOptions::ActionType::Parse)
-    return Instance.getASTContext().hadError();
+    return Context.hadError();
+
+  (void)emitMakeDependenciesIfNeeded(Context.Diags,
+                                     Instance.getDependencyTracker(), opts);
+
+  if (Action == FrontendOptions::ActionType::ResolveImports)
+    return Context.hadError();
 
   if (observer)
     observer->performedSemanticAnalysis(Instance);
@@ -905,8 +943,6 @@ static bool performCompile(CompilerInstance &Instance,
     else if (CrashMode == FrontendOptions::DebugCrashMode::CrashAfterParse)
       debugFailWithCrash();
   }
-
-  ASTContext &Context = Instance.getASTContext();
 
   verifyGenericSignaturesIfNeeded(Invocation, Context);
 
@@ -924,9 +960,6 @@ static bool performCompile(CompilerInstance &Instance,
   // If we were asked to print Clang stats, do so.
   if (opts.PrintClangStats && Context.getClangModuleLoader())
     Context.getClangModuleLoader()->printStatistics();
-
-  (void)emitMakeDependenciesIfNeeded(Context.Diags,
-                                     Instance.getDependencyTracker(), opts);
 
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Invocation, Instance);
 
@@ -948,9 +981,13 @@ static bool performCompile(CompilerInstance &Instance,
 
   // We've just been told to perform a typecheck, so we can return now.
   if (Action == FrontendOptions::ActionType::Typecheck) {
-    const bool hadPrintAsObjCError = printAsObjCIfNeeded(
-        Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
-        Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
+    const bool hadPrintAsObjCError =
+        Invocation.getFrontendOptions()
+            .InputsAndOutputs.hasObjCHeaderOutputPath() &&
+        printAsObjCIfNeeded(
+            Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
+            Instance.getMainModule(), opts.ImplicitObjCHeaderPath,
+            moduleIsPublic);
 
     const bool hadEmitIndexDataError = emitIndexData(Invocation, Instance);
 
@@ -1061,12 +1098,15 @@ static void performSILOptimizations(CompilerInvocation &Invocation,
 /// the compile unit's flags.
 static void setPrivateDiscriminatorIfNeeded(IRGenOptions &IRGenOpts,
                                             ModuleOrSourceFile MSF) {
-  if (IRGenOpts.DebugInfoKind == IRGenDebugInfoKind::None ||
+  if (IRGenOpts.DebugInfoLevel == IRGenDebugInfoLevel::None ||
       !MSF.is<SourceFile *>())
     return;
   Identifier PD = MSF.get<SourceFile *>()->getPrivateDiscriminator();
-  if (!PD.empty())
-    IRGenOpts.DWARFDebugFlags += (" -private-discriminator " + PD.str()).str();
+  if (!PD.empty()) {
+    if (!IRGenOpts.DebugFlags.empty())
+      IRGenOpts.DebugFlags += " ";
+    IRGenOpts.DebugFlags += ("-private-discriminator " + PD.str()).str();
+  }
 }
 
 static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
@@ -1113,7 +1153,8 @@ static bool processCommandLineAndRunImmediately(CompilerInvocation &Invocation,
   assert(!MSF.is<SourceFile *>() && "-i doesn't work in -primary-file mode");
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
   IRGenOpts.UseJIT = true;
-  IRGenOpts.DebugInfoKind = IRGenDebugInfoKind::Normal;
+  IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::Normal;
+  IRGenOpts.DebugInfoFormat = IRGenDebugInfoFormat::DWARF;
   const ProcessCmdLine &CmdLine =
       ProcessCmdLine(opts.ImmediateArgv.begin(), opts.ImmediateArgv.end());
   Instance.setSILModule(std::move(SM));
@@ -1134,21 +1175,35 @@ static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
       !inputFileKindCanHaveTBDValidated(Invocation.getInputKind()))
     return false;
 
-  const auto mode = Invocation.getFrontendOptions().ValidateTBDAgainstIR;
+  const auto &frontendOpts = Invocation.getFrontendOptions();
+  auto mode = frontendOpts.ValidateTBDAgainstIR;
   // Ensure all cases are covered by using a switch here.
   switch (mode) {
+  case FrontendOptions::TBDValidationMode::Default:
+#ifndef NDEBUG
+    // When a debug compiler is targeting an apple platform, we do some
+    // validation by default.
+    if (Invocation.getLangOptions().Target.getVendor() == llvm::Triple::Apple) {
+      mode = FrontendOptions::TBDValidationMode::MissingFromTBD;
+      break;
+    }
+#endif
+    // Otherwise, the default is to do nothing.
+    LLVM_FALLTHROUGH;
   case FrontendOptions::TBDValidationMode::None:
     return false;
   case FrontendOptions::TBDValidationMode::All:
   case FrontendOptions::TBDValidationMode::MissingFromTBD:
     break;
   }
-  const auto hasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
+  TBDGenOptions opts;
+  opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
+  opts.ModuleLinkName = frontendOpts.ModuleLinkName;
+
   const bool allSymbols = mode == FrontendOptions::TBDValidationMode::All;
-  return MSF.is<SourceFile *>() ? validateTBD(MSF.get<SourceFile *>(), IRModule,
-                                              hasMultipleIGMs, allSymbols)
-                                : validateTBD(MSF.get<ModuleDecl *>(), IRModule,
-                                              hasMultipleIGMs, allSymbols);
+  return MSF.is<SourceFile *>()
+             ? validateTBD(MSF.get<SourceFile *>(), IRModule, opts, allSymbols)
+             : validateTBD(MSF.get<ModuleDecl *>(), IRModule, opts, allSymbols);
 }
 
 static bool generateCode(CompilerInvocation &Invocation,
@@ -1527,6 +1582,19 @@ createDispatchingDiagnosticConsumerIfNeeded(
       subConsumers.emplace_back(input.file(), std::move(subConsumer));
     return false;
   });
+  // For batch mode, the compiler must swallow diagnostics pertaining to
+  // non-primary files in order to avoid Xcode showing the same diagnostic
+  // multiple times. So, create a diagnostic "eater" for those non-primary
+  // files.
+  // To avoid introducing bugs into WMO or single-file modes, test for multiple
+  // primaries.
+  if (inputsAndOutputs.hasMultiplePrimaryInputs()) {
+    inputsAndOutputs.forEachNonPrimaryInput(
+        [&](const InputFile &input) -> bool {
+          subConsumers.emplace_back(input.file(), nullptr);
+          return false;
+        });
+  }
 
   if (subConsumers.empty())
     return nullptr;
@@ -1696,7 +1764,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     std::unique_ptr<llvm::opt::OptTable> Options(createSwiftOptTable());
     Options->PrintHelp(llvm::outs(), displayName(MainExecutablePath).c_str(),
                        "Swift frontend", IncludedFlagsBitmask,
-                       ExcludedFlagsBitmask);
+                       ExcludedFlagsBitmask, /*ShowAllAliases*/false);
     return finishDiagProcessing(0);
   }
 
@@ -1739,15 +1807,10 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     enableDiagnosticVerifier(Instance->getSourceMgr());
   }
 
-  DependencyTracker depTracker;
-  {
-    const FrontendInputsAndOutputs &io =
-        Invocation.getFrontendOptions().InputsAndOutputs;
-    if (io.hasDependencyTrackerPath() ||
-        !Invocation.getFrontendOptions().IndexStorePath.empty()) {
-      Instance->setDependencyTracker(&depTracker);
-    }
-  }
+  if (Invocation.getFrontendOptions()
+          .InputsAndOutputs.hasDependencyTrackerPath() ||
+      !Invocation.getFrontendOptions().IndexStorePath.empty())
+    Instance->createDependencyTracker(Invocation.getFrontendOptions().TrackSystemDeps);
 
   if (Instance->setup(Invocation)) {
     return finishDiagProcessing(1);
@@ -1759,7 +1822,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     // Install stats-reporter somewhere visible for subsystems that
     // need to bump counters as they work, rather than measure
     // accumulated work on completion (mostly: TypeChecker).
-    Instance->getASTContext().Stats = StatsReporter.get();
+    Instance->getASTContext().setStatsReporter(StatsReporter.get());
   }
 
   // The compiler instance has been configured; notify our observer.

@@ -86,15 +86,15 @@ static void emitCompareBuiltin(IRGenFunction &IGF, Explosion &result,
 static void emitTypeTraitBuiltin(IRGenFunction &IGF,
                                  Explosion &out,
                                  Explosion &args,
-                                 SubstitutionList substitutions,
+                                 SubstitutionMap substitutions,
                                  TypeTraitResult (TypeBase::*trait)()) {
-  assert(substitutions.size() == 1
+  assert(substitutions.getReplacementTypes().size() == 1
          && "type trait should have gotten single type parameter");
   args.claimNext();
   
   // Lower away the trait to a tristate 0 = no, 1 = yes, 2 = maybe.
   unsigned result;
-  switch ((substitutions[0].getReplacement().getPointer()->*trait)()) {
+  switch ((substitutions.getReplacementTypes()[0].getPointer()->*trait)()) {
   case TypeTraitResult::IsNot:
     result = 0;
     break;
@@ -119,7 +119,7 @@ getLoweredTypeAndTypeInfo(IRGenModule &IGM, Type unloweredType) {
 void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
                             Identifier FnId, SILType resultType,
                             Explosion &args, Explosion &out,
-                            SubstitutionList substitutions) {
+                            SubstitutionMap substitutions) {
   if (Builtin.ID == BuiltinValueKind::UnsafeGuaranteedEnd) {
     // Just consume the incoming argument.
     assert(args.size() == 1 && "Expecting one incoming argument");
@@ -146,7 +146,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   if (Builtin.ID == BuiltinValueKind::Sizeof) {
     (void)args.claimAll();
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions[0].getReplacement());
+                                             substitutions.getReplacementTypes()[0]);
     out.add(valueTy.second.getSize(IGF, valueTy.first));
     return;
   }
@@ -154,7 +154,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   if (Builtin.ID == BuiltinValueKind::Strideof) {
     (void)args.claimAll();
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions[0].getReplacement());
+                                             substitutions.getReplacementTypes()[0]);
     out.add(valueTy.second.getStride(IGF, valueTy.first));
     return;
   }
@@ -162,7 +162,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   if (Builtin.ID == BuiltinValueKind::Alignof) {
     (void)args.claimAll();
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions[0].getReplacement());
+                                             substitutions.getReplacementTypes()[0]);
     // The alignof value is one greater than the alignment mask.
     out.add(IGF.Builder.CreateAdd(
                            valueTy.second.getAlignmentMask(IGF, valueTy.first),
@@ -173,7 +173,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   if (Builtin.ID == BuiltinValueKind::IsPOD) {
     (void)args.claimAll();
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions[0].getReplacement());
+                                             substitutions.getReplacementTypes()[0]);
     out.add(valueTy.second.getIsPOD(IGF, valueTy.first));
     return;
   }
@@ -206,7 +206,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   if (IID == llvm::Intrinsic::instrprof_increment) {
     // If we import profiling intrinsics from a swift module but profiling is
     // not enabled, ignore the increment.
-    if (!IGF.getSILModule().getOptions().GenerateProfile) {
+    SILModule &SILMod = IGF.getSILModule();
+    const auto &Opts = SILMod.getOptions();
+    if (!Opts.GenerateProfile) {
       (void)args.claimAll();
       return;
     }
@@ -246,6 +248,15 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     replacement.add(NameGEP);
     replacement.add(args.claimAll());
     args = std::move(replacement);
+
+    if (Opts.EmitProfileCoverageMapping) {
+      // Update the associated coverage mapping: it's now safe to emit, because
+      // a symtab entry for this function is guaranteed (r://39146527).
+      auto &coverageMaps = SILMod.getCoverageMaps();
+      auto CovMapIt = coverageMaps.find(PGOFuncName);
+      if (CovMapIt != coverageMaps.end())
+        CovMapIt->second->setSymtabEntryGuaranteed();
+    }
   }
 
   if (IID != llvm::Intrinsic::not_intrinsic) {
@@ -802,7 +813,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     llvm::Value *count = args.claimNext();
     
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions[0].getReplacement());
+                                             substitutions.getReplacementTypes()[0]);
     
     ptr = IGF.Builder.CreateBitCast(ptr,
                               valueTy.second.getStorageType()->getPointerTo());
@@ -828,7 +839,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     llvm::Value *count = args.claimNext();
     
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions[0].getReplacement());
+                                             substitutions.getReplacementTypes()[0]);
     
     dest = IGF.Builder.CreateBitCast(dest,
                                valueTy.second.getStorageType()->getPointerTo());
@@ -885,7 +896,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   if (Builtin.ID == BuiltinValueKind::ZeroInitializer) {
     // Build a zero initializer of the result type.
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions[0].getReplacement());
+                                             substitutions.getReplacementTypes()[0]);
     auto schema = valueTy.second.getSchema();
     for (auto &elt : schema) {
       out.add(llvm::Constant::getNullValue(elt.getScalarType()));
@@ -895,7 +906,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   
   if (Builtin.ID == BuiltinValueKind::GetObjCTypeEncoding) {
     (void)args.claimAll();
-    Type valueTy = substitutions[0].getReplacement();
+    Type valueTy = substitutions.getReplacementTypes()[0];
     // Get the type encoding for the associated clang type.
     auto clangTy = IGF.IGM.getClangType(valueTy->getCanonicalType());
     std::string encoding;

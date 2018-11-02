@@ -149,6 +149,11 @@ FRONTEND_STATISTIC(Sema, NumConformancesDeserialized)
 /// expression typechecker did".
 FRONTEND_STATISTIC(Sema, NumConstraintScopes)
 
+/// Number of constraints considered per attempt to
+/// contract constraint graph edges.
+/// This is a measure of complexity of the contraction algorithm.
+FRONTEND_STATISTIC(Sema, NumConstraintsConsideredForEdgeContraction)
+
 /// Number of declarations that were deserialized. A rough proxy for the amount
 /// of material loaded from other modules.
 FRONTEND_STATISTIC(Sema, NumDeclsDeserialized)
@@ -190,6 +195,12 @@ FRONTEND_STATISTIC(Sema, NumTypesValidated)
 /// Number of lazy iterable declaration contexts left unloaded.
 FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)
 
+/// All type check requests go into the Sema area.
+#define SWIFT_TYPEID(NAME) FRONTEND_STATISTIC(Sema, NAME)
+#include "swift/AST/AccessTypeIDZone.def"
+#include "swift/AST/TypeCheckerTypeIDZone.def"
+#undef SWIFT_TYPEID
+
 /// The next 10 statistics count 5 kinds of SIL entities present
 /// after the SILGen and SILOpt phases. The entities are functions,
 /// vtables, witness tables, default witness tables and global
@@ -224,4 +235,5 @@ FRONTEND_STATISTIC(IRModule, NumIRInsts)
 /// of the frontend job, which should be the same as the size of
 /// the .o file you find on disk after the frontend exits.
 FRONTEND_STATISTIC(LLVM, NumLLVMBytesOutput)
+
 #endif

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -I %S/../IDE/Inputs/custom-modules %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -I %S/../IDE/Inputs/custom-modules %s | %FileCheck %s
 // REQUIRES: objc_interop
 import ImportAsMember.A
 import ImportAsMember.Class

@@ -2,9 +2,9 @@
 
 // Check if SIL printing+parsing of a clang imported function works.
 
-// RUN: %target-swift-frontend -parse-as-library -module-name=static_inline -emit-sil %S/Inputs/static_inline.swift -import-objc-header %S/Inputs/static_inline.h -o %t/static_inline.sil
+// RUN: %target-swift-frontend -parse-as-library -module-name=static_inline -emit-sil %S/Inputs/static_inline.swift -enable-objc-interop -import-objc-header %S/Inputs/static_inline.h -o %t/static_inline.sil
 // RUN: %FileCheck < %t/static_inline.sil %s
-// RUN: %target-swift-frontend -parse-as-library -module-name=static_inline -O -emit-ir %t/static_inline.sil -import-objc-header %S/Inputs/static_inline.h | %FileCheck --check-prefix=CHECK-IR %s
+// RUN: %target-swift-frontend -parse-as-library -module-name=static_inline -O -emit-ir %t/static_inline.sil -enable-objc-interop -import-objc-header %S/Inputs/static_inline.h | %FileCheck --check-prefix=CHECK-IR %s
 
 // CHECK: sil shared [serializable] [clang c_inline_func] @c_inline_func : $@convention(c) (Int32) -> Int32
 

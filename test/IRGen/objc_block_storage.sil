@@ -1,6 +1,9 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -gnone -enable-objc-interop -sdk %S/Inputs %s -emit-ir | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %build-irgen-test-overlays
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -gnone -enable-objc-interop -sdk %S/Inputs -I %t %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
+// REQUIRES: objc_interop
 
 sil_stage canonical
 
@@ -8,7 +11,7 @@ import Builtin
 import Swift
 import gizmo
 
-// CHECK: [[BLOCK_ISA:@_NSConcreteStackBlock]] = external global %objc_class
+// CHECK: [[BLOCK_ISA:@_NSConcreteStackBlock]] = external global {{(dllimport )?}}%objc_class
 // CHECK: [[VOID_BLOCK_SIGNATURE:@.*]] = private unnamed_addr constant {{.*}} c"v8@?0\00"
 // CHECK: [[TRIVIAL_BLOCK_DESCRIPTOR:@.*]] = internal constant { {{.*}} } {
 // CHECK:   i64 0,

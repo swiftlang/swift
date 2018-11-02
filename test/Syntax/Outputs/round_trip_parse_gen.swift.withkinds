@@ -107,7 +107,12 @@ class C <MemberDeclBlock>{<MemberDeclListItem><FunctionDecl>
   private </DeclModifier>deinit <CodeBlock>{}</CodeBlock></DeinitializerDecl></MemberDeclListItem><MemberDeclListItem><SubscriptDecl><DeclModifier>
 
   internal </DeclModifier>subscript<ParameterClause>(<FunctionParameter>x: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause><AccessorBlock>{ <AccessorDecl>get <CodeBlock>{} </CodeBlock></AccessorDecl><AccessorDecl>set <CodeBlock>{} </CodeBlock></AccessorDecl>}</AccessorBlock></SubscriptDecl></MemberDeclListItem><MemberDeclListItem><SubscriptDecl>
-  subscript<ParameterClause>() </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause><AccessorBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</AccessorBlock></SubscriptDecl></MemberDeclListItem>
+  subscript<ParameterClause>() </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause><AccessorBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</AccessorBlock></SubscriptDecl></MemberDeclListItem><MemberDeclListItem><VariableDecl>
+
+  var <PatternBinding><IdentifierPattern>x</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><AccessorBlock>{<FunctionCallExpr><IdentifierExpr>
+    address </IdentifierExpr><ClosureExpr>{ <FunctionCallExpr><IdentifierExpr>fatalError</IdentifierExpr>() </FunctionCallExpr>}</ClosureExpr></FunctionCallExpr><FunctionCallExpr><IdentifierExpr>
+    unsafeMutableAddress </IdentifierExpr><ClosureExpr>{ <FunctionCallExpr><IdentifierExpr>fatalError</IdentifierExpr>() </FunctionCallExpr>}</ClosureExpr></FunctionCallExpr>
+  }</AccessorBlock></PatternBinding></VariableDecl></MemberDeclListItem>
 }</MemberDeclBlock></ClassDecl><ProtocolDecl>
 
 protocol PP <MemberDeclBlock>{<MemberDeclListItem><AssociatedtypeDecl>
@@ -441,6 +446,7 @@ func keypath<FunctionSignature><ParameterClause>() </ParameterClause></FunctionS
   _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><KeyPathExpr>\<MemberAccessExpr><MemberAccessExpr><IdentifierExpr>a</IdentifierExpr>.b</MemberAccessExpr>.c</MemberAccessExpr></KeyPathExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
   _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><KeyPathExpr>\<SubscriptExpr><MemberAccessExpr><IdentifierExpr>a</IdentifierExpr>.b</MemberAccessExpr>[<FunctionCallArgument><IntegerLiteralExpr>1</IntegerLiteralExpr></FunctionCallArgument>]</SubscriptExpr></KeyPathExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
   _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><KeyPathExpr>\<MemberAccessExpr><MemberAccessExpr>.a</MemberAccessExpr>.b</MemberAccessExpr></KeyPathExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
+  _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><KeyPathExpr>\<SpecializeExpr><IdentifierExpr>Array</IdentifierExpr><GenericArgumentClause><<GenericArgument><SimpleTypeIdentifier>Int</SimpleTypeIdentifier></GenericArgument>></GenericArgumentClause></SpecializeExpr><SubscriptExpr><KeyPathBaseExpr>.</KeyPathBaseExpr>[]</SubscriptExpr></KeyPathExpr></SequenceExpr><SequenceExpr><DiscardAssignmentExpr>
   _ </DiscardAssignmentExpr><AssignmentExpr>= </AssignmentExpr><ObjcKeyPathExpr>#keyPath(<ObjcNamePiece>a.</ObjcNamePiece><ObjcNamePiece>b.</ObjcNamePiece><ObjcNamePiece>c</ObjcNamePiece>)</ObjcKeyPathExpr></SequenceExpr>
 }</CodeBlock></FunctionDecl><FunctionDecl>
 func objcSelector<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<SequenceExpr><DiscardAssignmentExpr>
@@ -532,4 +538,12 @@ struct S <TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>Q</Simple
   fileprivate(set) </DeclModifier>var <PatternBinding><IdentifierPattern>x</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>String</SimpleTypeIdentifier></TypeAnnotation></PatternBinding></VariableDecl></MemberDeclListItem>
 }</MemberDeclBlock></StructDecl><StructDecl><Attribute>
 
-@_alignment(16) </Attribute><DeclModifier>public </DeclModifier>struct float3 <MemberDeclBlock>{ <MemberDeclListItem><VariableDecl><DeclModifier>public </DeclModifier>var <PatternBinding><IdentifierPattern>x</IdentifierPattern>, </PatternBinding><PatternBinding><IdentifierPattern>y</IdentifierPattern>, </PatternBinding><PatternBinding><IdentifierPattern>z</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Float </SimpleTypeIdentifier></TypeAnnotation></PatternBinding></VariableDecl></MemberDeclListItem>}</MemberDeclBlock></StructDecl>
+@_alignment(16) </Attribute><DeclModifier>public </DeclModifier>struct float3 <MemberDeclBlock>{ <MemberDeclListItem><VariableDecl><DeclModifier>public </DeclModifier>var <PatternBinding><IdentifierPattern>x</IdentifierPattern>, </PatternBinding><PatternBinding><IdentifierPattern>y</IdentifierPattern>, </PatternBinding><PatternBinding><IdentifierPattern>z</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Float </SimpleTypeIdentifier></TypeAnnotation></PatternBinding></VariableDecl></MemberDeclListItem>}</MemberDeclBlock></StructDecl><PoundSourceLocation>
+
+#sourceLocation(<PoundSourceLocationArgs>file: "otherFile.swift", line: 5</PoundSourceLocationArgs>)</PoundSourceLocation><FunctionDecl>
+
+func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl><PoundSourceLocation>
+
+#sourceLocation()</PoundSourceLocation>
+
+"<StringSegment>abc </StringSegment>\( } )<StringSegment> def</StringSegment>"

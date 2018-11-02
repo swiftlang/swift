@@ -633,10 +633,10 @@ do {
   _ = Enum.two((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
   _ = Enum.two(3 > 4 ? 3 : 4) // expected-error {{missing argument for parameter #2 in call}}
 
-  _ = Enum.tuple(3, 4) // expected-error {{enum element 'tuple' expects a single parameter of type '(Int, Int)'}} {{18-18=(}} {{22-22=)}}
+  _ = Enum.tuple(3, 4) // expected-error {{enum case 'tuple' expects a single parameter of type '(Int, Int)'}} {{18-18=(}} {{22-22=)}}
   _ = Enum.tuple((3, 4))
 
-  _ = Enum.labeledTuple(x: 3, 4) // expected-error {{enum element 'labeledTuple' expects a single parameter of type '(Int, Int)'}}
+  _ = Enum.labeledTuple(x: 3, 4) // expected-error {{enum case 'labeledTuple' expects a single parameter of type '(Int, Int)'}}
   _ = Enum.labeledTuple(x: (3, 4))
 }
 
@@ -649,7 +649,7 @@ do {
   _ = Enum.two((a, b)) // expected-error {{missing argument for parameter #2 in call}}
   _ = Enum.two(c) // expected-error {{missing argument for parameter #2 in call}}
 
-  _ = Enum.tuple(a, b) // expected-error {{enum element 'tuple' expects a single parameter of type '(Int, Int)'}} {{18-18=(}} {{22-22=)}}
+  _ = Enum.tuple(a, b) // expected-error {{enum case 'tuple' expects a single parameter of type '(Int, Int)'}} {{18-18=(}} {{22-22=)}}
   _ = Enum.tuple((a, b))
   _ = Enum.tuple(c)
 }
@@ -663,7 +663,7 @@ do {
   _ = Enum.two((a, b)) // expected-error {{missing argument for parameter #2 in call}}
   _ = Enum.two(c) // expected-error {{missing argument for parameter #2 in call}}
 
-  _ = Enum.tuple(a, b) // expected-error {{enum element 'tuple' expects a single parameter of type '(Int, Int)'}} {{18-18=(}} {{22-22=)}}
+  _ = Enum.tuple(a, b) // expected-error {{enum case 'tuple' expects a single parameter of type '(Int, Int)'}} {{18-18=(}} {{22-22=)}}
   _ = Enum.tuple((a, b))
   _ = Enum.tuple(c)
 }
@@ -1136,23 +1136,23 @@ do {
   _ = GenericEnum.two(3, 4)
   _ = GenericEnum.two((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
 
-  _ = GenericEnum.tuple(3, 4) // expected-error {{enum element 'tuple' expects a single parameter of type '(T, T)'}} {{25-25=(}} {{29-29=)}}
+  _ = GenericEnum.tuple(3, 4) // expected-error {{enum case 'tuple' expects a single parameter of type '(T, T)'}} {{25-25=(}} {{29-29=)}}
   _ = GenericEnum.tuple((3, 4))
 }
 
 do {
-  _ = GenericEnum<(Int, Int)>.one(3, 4) // expected-error {{enum element 'one' expects a single parameter of type '(Int, Int)'}} {{35-35=(}} {{39-39=)}}
+  _ = GenericEnum<(Int, Int)>.one(3, 4) // expected-error {{enum case 'one' expects a single parameter of type '(Int, Int)'}} {{35-35=(}} {{39-39=)}}
   _ = GenericEnum<(Int, Int)>.one((3, 4))
 
-  _ = GenericEnum<(Int, Int)>.labeled(x: 3, 4) // expected-error {{enum element 'labeled' expects a single parameter of type '(Int, Int)'}}
+  _ = GenericEnum<(Int, Int)>.labeled(x: 3, 4) // expected-error {{enum case 'labeled' expects a single parameter of type '(Int, Int)'}}
   _ = GenericEnum<(Int, Int)>.labeled(x: (3, 4))
-  _ = GenericEnum<(Int, Int)>.labeled(3, 4) // expected-error {{enum element 'labeled' expects a single parameter of type '(Int, Int)'}}
+  _ = GenericEnum<(Int, Int)>.labeled(3, 4) // expected-error {{enum case 'labeled' expects a single parameter of type '(Int, Int)'}}
   _ = GenericEnum<(Int, Int)>.labeled((3, 4)) // expected-error {{missing argument label 'x:' in call}}
 
   _ = GenericEnum<Int>.two(3, 4)
   _ = GenericEnum<Int>.two((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
 
-  _ = GenericEnum<Int>.tuple(3, 4) // expected-error {{enum element 'tuple' expects a single parameter of type '(Int, Int)'}} {{30-30=(}} {{34-34=)}}
+  _ = GenericEnum<Int>.tuple(3, 4) // expected-error {{enum case 'tuple' expects a single parameter of type '(Int, Int)'}} {{30-30=(}} {{34-34=)}}
   _ = GenericEnum<Int>.tuple((3, 4))
 }
 
@@ -1169,7 +1169,7 @@ do {
   _ = GenericEnum.two((a, b)) // expected-error {{missing argument for parameter #2 in call}}
   _ = GenericEnum.two(c) // expected-error {{missing argument for parameter #2 in call}}
 
-  _ = GenericEnum.tuple(a, b) // expected-error {{enum element 'tuple' expects a single parameter of type '(T, T)'}} {{25-25=(}} {{29-29=)}}
+  _ = GenericEnum.tuple(a, b) // expected-error {{enum case 'tuple' expects a single parameter of type '(T, T)'}} {{25-25=(}} {{29-29=)}}
   _ = GenericEnum.tuple((a, b))
   _ = GenericEnum.tuple(c)
 }
@@ -1179,7 +1179,7 @@ do {
   let b = 4
   let c = (a, b)
 
-  _ = GenericEnum<(Int, Int)>.one(a, b) // expected-error {{enum element 'one' expects a single parameter of type '(Int, Int)'}} {{35-35=(}} {{39-39=)}}
+  _ = GenericEnum<(Int, Int)>.one(a, b) // expected-error {{enum case 'one' expects a single parameter of type '(Int, Int)'}} {{35-35=(}} {{39-39=)}}
   _ = GenericEnum<(Int, Int)>.one((a, b))
   _ = GenericEnum<(Int, Int)>.one(c)
 
@@ -1187,7 +1187,7 @@ do {
   _ = GenericEnum<Int>.two((a, b)) // expected-error {{missing argument for parameter #2 in call}}
   _ = GenericEnum<Int>.two(c) // expected-error {{missing argument for parameter #2 in call}}
 
-  _ = GenericEnum<Int>.tuple(a, b) // expected-error {{enum element 'tuple' expects a single parameter of type '(Int, Int)'}} {{30-30=(}} {{34-34=)}}
+  _ = GenericEnum<Int>.tuple(a, b) // expected-error {{enum case 'tuple' expects a single parameter of type '(Int, Int)'}} {{30-30=(}} {{34-34=)}}
   _ = GenericEnum<Int>.tuple((a, b))
   _ = GenericEnum<Int>.tuple(c)
 }
@@ -1205,7 +1205,7 @@ do {
   _ = GenericEnum.two((a, b)) // expected-error {{missing argument for parameter #2 in call}}
   _ = GenericEnum.two(c) // expected-error {{missing argument for parameter #2 in call}}
 
-  _ = GenericEnum.tuple(a, b) // expected-error {{enum element 'tuple' expects a single parameter of type '(T, T)'}} {{25-25=(}} {{29-29=)}}
+  _ = GenericEnum.tuple(a, b) // expected-error {{enum case 'tuple' expects a single parameter of type '(T, T)'}} {{25-25=(}} {{29-29=)}}
   _ = GenericEnum.tuple((a, b))
   _ = GenericEnum.tuple(c)
 }
@@ -1215,7 +1215,7 @@ do {
   var b = 4
   var c = (a, b)
 
-  _ = GenericEnum<(Int, Int)>.one(a, b) // expected-error {{enum element 'one' expects a single parameter of type '(Int, Int)'}} {{35-35=(}} {{39-39=)}}
+  _ = GenericEnum<(Int, Int)>.one(a, b) // expected-error {{enum case 'one' expects a single parameter of type '(Int, Int)'}} {{35-35=(}} {{39-39=)}}
   _ = GenericEnum<(Int, Int)>.one((a, b))
   _ = GenericEnum<(Int, Int)>.one(c)
 
@@ -1223,7 +1223,7 @@ do {
   _ = GenericEnum<Int>.two((a, b)) // expected-error {{missing argument for parameter #2 in call}}
   _ = GenericEnum<Int>.two(c) // expected-error {{missing argument for parameter #2 in call}}
 
-  _ = GenericEnum<Int>.tuple(a, b) // expected-error {{enum element 'tuple' expects a single parameter of type '(Int, Int)'}} {{30-30=(}} {{34-34=)}}
+  _ = GenericEnum<Int>.tuple(a, b) // expected-error {{enum case 'tuple' expects a single parameter of type '(Int, Int)'}} {{30-30=(}} {{34-34=)}}
   _ = GenericEnum<Int>.tuple((a, b))
   _ = GenericEnum<Int>.tuple(c)
 }

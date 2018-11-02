@@ -1,0 +1,37 @@
+//===--- CTypeIDZone.def - Define the C++ TypeID Zone -----------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This definition file describes the types  in the "C++" TypeID zone,
+//  for use with the TypeID template.
+//
+//===----------------------------------------------------------------------===//
+
+// C types.
+SWIFT_TYPEID_NAMED(unsigned char, UnsignedChar)
+SWIFT_TYPEID_NAMED(signed char, SignedChar)
+SWIFT_TYPEID_NAMED(char, Char)
+SWIFT_TYPEID_NAMED(short, Short)
+SWIFT_TYPEID_NAMED(unsigned short, UnsignedShort)
+SWIFT_TYPEID_NAMED(int, Int)
+SWIFT_TYPEID_NAMED(unsigned int, UnsignedInt)
+SWIFT_TYPEID_NAMED(long, Long)
+SWIFT_TYPEID_NAMED(unsigned long, UnsignedLong)
+SWIFT_TYPEID_NAMED(long long, LongLong)
+SWIFT_TYPEID_NAMED(unsigned long long, UnsignedLongLong)
+SWIFT_TYPEID_NAMED(float, Float)
+SWIFT_TYPEID_NAMED(double, Double)
+SWIFT_TYPEID_NAMED(bool, Bool)
+SWIFT_TYPEID_NAMED(decltype(nullptr), NullPtr)
+SWIFT_TYPEID_NAMED(void, Void)
+
+// C++ standard library types.
+SWIFT_TYPEID_TEMPLATE1_NAMED(std::vector, Vector, typename T, T)

@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-frontend -module-name function_conversion -emit-silgen -enable-sil-ownership -primary-file %s | %FileCheck %s
-// RUN: %target-swift-frontend -module-name function_conversion -emit-ir -enable-sil-ownership -primary-file %s
+// RUN: %target-swift-emit-silgen -module-name function_conversion -enable-sil-ownership -primary-file %s | %FileCheck %s
+// RUN: %target-swift-emit-ir -module-name function_conversion -enable-sil-ownership -primary-file %s
 
 // Check SILGen against various FunctionConversionExprs emitted by Sema.
 
@@ -413,7 +413,7 @@ func convTupleScalar(_ f1: @escaping (Q) -> (),
                      f3: @escaping (_ tuple: (Int, Int)?) -> ()) {
   let _: (P) -> () = f1
   let _: (P) -> () = f2
-  let _: (Int, Int) -> () = f3
+  let _: ((Int, Int)) -> () = f3
 }
 
 func convTupleScalarOpaque<T>(_ f: @escaping (T...) -> ()) -> ((_ args: T...) -> ())? {
@@ -465,16 +465,16 @@ func convTupleToOptionalIndirect<T>(_ f: @escaping (T) -> (T, T)) -> (T) -> (T, 
 
 // ==== Make sure we support AnyHashable erasure
 
-// CHECK-LABEL: sil hidden @$S19function_conversion15convAnyHashable1tyx_ts0E0RzlF
-// CHECK:         function_ref @$S19function_conversion15convAnyHashable1tyx_ts0E0RzlFSbs0dE0V_AFtcfU_
-// CHECK:         function_ref @$Ss11AnyHashableVABSbIegnnd_xxSbIegnnd_s0B0RzlTR
+// CHECK-LABEL: sil hidden @$S19function_conversion15convAnyHashable1tyx_tSHRzlF
+// CHECK:         function_ref @$S19function_conversion15convAnyHashable1tyx_tSHRzlFSbs0dE0V_AEtcfU_
+// CHECK:         function_ref @$Ss11AnyHashableVABSbIegnnd_xxSbIegnnd_SHRzlTR
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$Ss11AnyHashableVABSbIegnnd_xxSbIegnnd_s0B0RzlTR : $@convention(thin) <T where T : Hashable> (@in_guaranteed T, @in_guaranteed T, @guaranteed @callee_guaranteed (@in_guaranteed AnyHashable, @in_guaranteed AnyHashable) -> Bool) -> Bool
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$Ss11AnyHashableVABSbIegnnd_xxSbIegnnd_SHRzlTR : $@convention(thin) <T where T : Hashable> (@in_guaranteed T, @in_guaranteed T, @guaranteed @callee_guaranteed (@in_guaranteed AnyHashable, @in_guaranteed AnyHashable) -> Bool) -> Bool
 // CHECK:         alloc_stack $AnyHashable
-// CHECK:         function_ref @$Ss21_convertToAnyHashableys0cD0Vxs0D0RzlF
+// CHECK:         function_ref @$Ss21_convertToAnyHashableys0cD0VxSHRzlF
 // CHECK:         apply {{.*}}<T>
 // CHECK:         alloc_stack $AnyHashable
-// CHECK:         function_ref @$Ss21_convertToAnyHashableys0cD0Vxs0D0RzlF
+// CHECK:         function_ref @$Ss21_convertToAnyHashableys0cD0VxSHRzlF
 // CHECK:         apply {{.*}}<T>
 // CHECK:         return
 
@@ -602,7 +602,7 @@ func rdar35702810() {
   // CHECK: apply %5<A, Z>(%6) : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
   foo_arr(type: A.self, fn_arr)
 
-  // CHECK: function_ref @$Ss17_dictionaryUpCastys10DictionaryVyq0_q1_GACyxq_Gs8HashableRzsAFR0_r2_lF : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
+  // CHECK: function_ref @$Ss17_dictionaryUpCastySDyq0_q1_GSDyxq_GSHRzSHR0_r2_lF : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
   // CHECK: apply %2<Int, A, Int, Z>(%0) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
   // CHECK: apply %1(%4) : $@callee_guaranteed (@guaranteed Dictionary<Int, Z>) -> ()
   foo_map(type: A.self, fn_map)
@@ -631,13 +631,55 @@ func rdar35702810_anyhashable() {
   // CHECK: convert_escape_to_noescape [not_guaranteed] [[PA]] : $@callee_guaranteed (@guaranteed Optional<Array<B>>) -> () to $@noescape @callee_guaranteed (@guaranteed Optional<Array<B>>) -> ()
   bar_arr(type: B.self, fn_arr)
 
-  // CHECK: [[FN:%.*]] = function_ref @$Ss10DictionaryVys11AnyHashableVSiGIegg_ABy19function_conversion1BCSiGIegg_TR : $@convention(thin) (@guaranteed Dictionary<B, Int>, @guaranteed @callee_guaranteed (@guaranteed Dictionary<AnyHashable, Int>) -> ()) -> ()
+  // CHECK: [[FN:%.*]] = function_ref @$SSDys11AnyHashableVSiGIegg_SDy19function_conversion1BCSiGIegg_TR : $@convention(thin) (@guaranteed Dictionary<B, Int>, @guaranteed @callee_guaranteed (@guaranteed Dictionary<AnyHashable, Int>) -> ()) -> ()
   // CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] [[FN]](%{{[0-9]+}}) : $@convention(thin) (@guaranteed Dictionary<B, Int>, @guaranteed @callee_guaranteed (@guaranteed Dictionary<AnyHashable, Int>) -> ()) -> ()
   // CHECK: convert_escape_to_noescape [not_guaranteed] [[PA]] : $@callee_guaranteed (@guaranteed Dictionary<B, Int>) -> () to $@noescape @callee_guaranteed (@guaranteed Dictionary<B, Int>) -> ()
   bar_map(type: B.self, fn_map)
 
-  // CHECK: [[FN:%.*]] = function_ref @$Ss3SetVys11AnyHashableVGIegg_ABy19function_conversion1BCGIegg_TR : $@convention(thin) (@guaranteed Set<B>, @guaranteed @callee_guaranteed (@guaranteed Set<AnyHashable>) -> ()) -> ()
+  // CHECK: [[FN:%.*]] = function_ref @$SShys11AnyHashableVGIegg_Shy19function_conversion1BCGIegg_TR : $@convention(thin) (@guaranteed Set<B>, @guaranteed @callee_guaranteed (@guaranteed Set<AnyHashable>) -> ()) -> ()
   // CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] [[FN]](%{{[0-9]+}}) : $@convention(thin) (@guaranteed Set<B>, @guaranteed @callee_guaranteed (@guaranteed Set<AnyHashable>) -> ()) -> ()
   // CHECK: convert_escape_to_noescape [not_guaranteed] [[PA]] : $@callee_guaranteed (@guaranteed Set<B>) -> () to $@noescape @callee_guaranteed (@guaranteed Set<B>) -> ()
   bar_set(type: B.self, fn_set)
+}
+
+// ==== Function conversion with parameter substToOrig reabstraction.
+
+struct FunctionConversionParameterSubstToOrigReabstractionTest {
+  typealias SelfTy = FunctionConversionParameterSubstToOrigReabstractionTest
+
+  class Klass: Error {}
+
+  struct Foo<T> {
+    static func enum1Func(_ : (T) -> Foo<Error>) -> Foo<Error> {
+      // Just to make it compile.
+      return Optional<Foo<Error>>.none!
+    }
+  }
+
+  static func bar<T>(t: T) -> Foo<T> {
+    // Just to make it compile.
+    return Optional<Foo<T>>.none!
+  }
+
+  static func testFunc() -> Foo<Error> {
+    return Foo<Klass>.enum1Func(SelfTy.bar)
+  }
+}
+
+// CHECK: sil {{.*}} @$SS4SIgggoo_S2Ss11AnyHashableVyps5Error_pIegggrrzo_TR
+// CHECK:  [[TUPLE:%.*]] = apply %4(%2, %3) : $@noescape @callee_guaranteed (@guaranteed String, @guaranteed String) -> (@owned String, @owned String)
+// CHECK:  [[BORROW:%.*]] = begin_borrow [[TUPLE]] : $(String, String)
+// CHECK:  [[FRST:%.*]] = tuple_extract [[BORROW]] : $(String, String), 0
+// CHECK:  [[COPY1:%.*]] = copy_value [[FRST]] : $String
+// CHECK:  [[SND:%.*]] = tuple_extract [[BORROW]] : $(String, String), 1
+// CHECK:  [[COPY2:%.*]] = copy_value [[SND]] : $String
+// CHECK:  end_borrow [[BORROW]] from [[TUPLE]] : $(String, String), $(String, String)
+// CHECK:  destroy_value [[TUPLE]] : $(String, String)
+// CHECK:  [[ADDR:%.*]] = alloc_stack $String
+// CHECK:  store [[COPY1]] to [init] [[ADDR]] : $*String
+// CHECK:  [[CVT:%.*]] = function_ref @$Ss21_convertToAnyHashableys0cD0VxSHRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0) -> @out AnyHashable
+// CHECK:  apply [[CVT]]<String>(%0, [[ADDR]])
+func dontCrash() {
+  let userInfo = ["hello": "world"]
+  let d = [AnyHashable: Any](uniqueKeysWithValues: userInfo.map { ($0.key, $0.value) })
 }

@@ -32,10 +32,10 @@ class SILLoopAnalysis : public FunctionAnalysisBase<SILLoopInfo> {
   DominanceAnalysis *DA;
 public:
   SILLoopAnalysis(SILModule *)
-      : FunctionAnalysisBase(AnalysisKind::Loop), DA(nullptr) {}
+      : FunctionAnalysisBase(SILAnalysisKind::Loop), DA(nullptr) {}
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::Loop;
+    return S->getKind() == SILAnalysisKind::Loop;
   }
 
   virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {

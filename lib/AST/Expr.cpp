@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -117,6 +117,11 @@ namespace {
   };
 } // end anonymous namespace
 
+void Expr::setType(Type T) {
+  assert(!T || !T->hasTypeVariable());
+  Ty = T;
+}
+
 template <class T> static SourceRange getSourceRangeImpl(const T *E) {
   static_assert(isOverriddenFromExpr(&T::getSourceRange) ||
                 (isOverriddenFromExpr(&T::getStartLoc) &&
@@ -215,178 +220,6 @@ DeclRefExpr *Expr::getMemberOperatorRef() {
   return operatorRef;
 }
 
-/// Propagate l-value use information to children.
-void Expr::propagateLValueAccessKind(AccessKind accessKind,
-                                     llvm::function_ref<Type(Expr *)> getType,
-                                     bool allowOverwrite) {
-  /// A visitor class which walks an entire l-value expression.
-  class PropagateAccessKind
-       : public ExprVisitor<PropagateAccessKind, void, AccessKind> {
-    llvm::function_ref<Type(Expr *)> GetType;
-#ifndef NDEBUG
-    bool AllowOverwrite;
-#endif
-  public:
-    PropagateAccessKind(llvm::function_ref<Type(Expr *)> getType,
-                        bool allowOverwrite) : GetType(getType)
-#ifndef NDEBUG
-                                               , AllowOverwrite(allowOverwrite)
-#endif
-    {}
-
-    void visit(Expr *E, AccessKind kind) {
-      assert((AllowOverwrite || !E->hasLValueAccessKind()) &&
-             "l-value access kind has already been set");
-
-      assert(GetType(E)->isAssignableType() &&
-             "setting access kind on non-l-value");
-      E->setLValueAccessKind(kind);
-
-      // Propagate this to sub-expressions.
-      ASTVisitor::visit(E, kind);
-    }
-
-#define NON_LVALUE_EXPR(KIND)                                           \
-    void visit##KIND##Expr(KIND##Expr *, AccessKind accessKind) {       \
-      llvm_unreachable("not an l-value");                               \
-    }
-#define LEAF_LVALUE_EXPR(KIND)                                          \
-    void visit##KIND##Expr(KIND##Expr *E, AccessKind accessKind) {}
-#define COMPLETE_PHYSICAL_LVALUE_EXPR(KIND, ACCESSOR)                   \
-    void visit##KIND##Expr(KIND##Expr *E, AccessKind accessKind) {      \
-      visit(E->ACCESSOR, accessKind);                                   \
-    }
-#define PARTIAL_PHYSICAL_LVALUE_EXPR(KIND, ACCESSOR)                    \
-    void visit##KIND##Expr(KIND##Expr *E, AccessKind accessKind) {      \
-      visit(E->ACCESSOR, getPartialAccessKind(accessKind));             \
-    }
-
-    void visitMemberRefExpr(MemberRefExpr *E, AccessKind accessKind) {
-      if (!GetType(E->getBase())->hasLValueType()) return;
-      visit(E->getBase(), getBaseAccessKind(E->getMember(), accessKind));
-    }
-    void visitSubscriptExpr(SubscriptExpr *E, AccessKind accessKind) {
-      if (!GetType(E->getBase())->hasLValueType()) return;
-      visit(E->getBase(), getBaseAccessKind(E->getDecl(), accessKind));
-    }
-    void visitKeyPathApplicationExpr(KeyPathApplicationExpr *E,
-                                     AccessKind accessKind) {
-      if (!GetType(E->getBase())->hasLValueType()) return;
-      auto kpDecl = GetType(E->getKeyPath())->castTo<BoundGenericType>()
-        ->getDecl();
-      AccessKind baseAccess;
-      // A ReferenceWritableKeyPath only reads its base.
-      if (kpDecl ==
-          GetType(E)->getASTContext().getReferenceWritableKeyPathDecl())
-        baseAccess = AccessKind::Read;
-      else
-        // Assuming a writable keypath projects a part of the base.
-        baseAccess = getPartialAccessKind(accessKind);
-      
-      visit(E->getBase(), baseAccess);
-    }
-
-    static AccessKind getPartialAccessKind(AccessKind accessKind) {
-      return (accessKind == AccessKind::Read
-                ? accessKind : AccessKind::ReadWrite);
-    }
-
-    static AccessKind getBaseAccessKind(ConcreteDeclRef member,
-                                        AccessKind accessKind) {
-      // We assume writes are partial writes, so the result is always
-      // either Read or ReadWrite.
-      auto memberDecl = cast<AbstractStorageDecl>(member.getDecl());
-
-      // If we're reading and the getter is mutating, or we're writing
-      // and the setter is mutating, this is readwrite.
-      if ((accessKind != AccessKind::Write &&
-           memberDecl->isGetterMutating()) ||
-          (accessKind != AccessKind::Read &&
-           memberDecl->isSetterMutating())) {
-        return AccessKind::ReadWrite;
-      }
-
-      return AccessKind::Read;
-    }
-
-    void visitTupleExpr(TupleExpr *E, AccessKind accessKind) {
-      for (auto elt : E->getElements()) {
-        visit(elt, accessKind);
-      }
-    }
-
-    void visitOpenExistentialExpr(OpenExistentialExpr *E,
-                                  AccessKind accessKind) {
-      AccessKind oldOpaqueValueAK;
-      bool opaqueValueHadAK;
-      if (E->getOpaqueValue()) {
-        opaqueValueHadAK = E->getOpaqueValue()->hasLValueAccessKind();
-        oldOpaqueValueAK =
-            (opaqueValueHadAK ? E->getOpaqueValue()->getLValueAccessKind()
-                              : AccessKind::Read);
-      }
-
-      visit(E->getSubExpr(), accessKind);
-
-      if (E->getOpaqueValue()) {
-        // Propagate the new access kind from the OVE to the original
-        // existential if we just set or changed it on the OVE.
-        if (E->getOpaqueValue()->hasLValueAccessKind()) {
-          auto newOpaqueValueAK = E->getOpaqueValue()->getLValueAccessKind();
-          if (!opaqueValueHadAK || newOpaqueValueAK != oldOpaqueValueAK)
-            visit(E->getExistentialValue(), newOpaqueValueAK);
-        }
-      }
-    }
-
-    LEAF_LVALUE_EXPR(DeclRef)
-    LEAF_LVALUE_EXPR(DiscardAssignment)
-    LEAF_LVALUE_EXPR(DynamicLookup)
-    LEAF_LVALUE_EXPR(OpaqueValue)
-    LEAF_LVALUE_EXPR(EditorPlaceholder)
-    LEAF_LVALUE_EXPR(Error)
-
-    COMPLETE_PHYSICAL_LVALUE_EXPR(AnyTry, getSubExpr())
-    PARTIAL_PHYSICAL_LVALUE_EXPR(BindOptional, getSubExpr())
-    COMPLETE_PHYSICAL_LVALUE_EXPR(DotSyntaxBaseIgnored, getRHS());
-    PARTIAL_PHYSICAL_LVALUE_EXPR(ForceValue, getSubExpr())
-    COMPLETE_PHYSICAL_LVALUE_EXPR(Identity, getSubExpr())
-    PARTIAL_PHYSICAL_LVALUE_EXPR(TupleElement, getBase())
-
-    NON_LVALUE_EXPR(Literal)
-    NON_LVALUE_EXPR(SuperRef)
-    NON_LVALUE_EXPR(Type)
-    NON_LVALUE_EXPR(OtherConstructorDeclRef)
-    NON_LVALUE_EXPR(Collection)
-    NON_LVALUE_EXPR(CaptureList)
-    NON_LVALUE_EXPR(AbstractClosure)
-    NON_LVALUE_EXPR(InOut)
-    NON_LVALUE_EXPR(DynamicType)
-    NON_LVALUE_EXPR(RebindSelfInConstructor)
-    NON_LVALUE_EXPR(Apply)
-    NON_LVALUE_EXPR(MakeTemporarilyEscapable)
-    NON_LVALUE_EXPR(ImplicitConversion)
-    NON_LVALUE_EXPR(ExplicitCast)
-    NON_LVALUE_EXPR(OptionalEvaluation)
-    NON_LVALUE_EXPR(If)
-    NON_LVALUE_EXPR(Assign)
-    NON_LVALUE_EXPR(CodeCompletion)
-    NON_LVALUE_EXPR(ObjCSelector)
-    NON_LVALUE_EXPR(KeyPath)
-    NON_LVALUE_EXPR(EnumIsCase)
-
-#define UNCHECKED_EXPR(KIND, BASE) \
-    NON_LVALUE_EXPR(KIND)
-#include "swift/AST/ExprNodes.def"
-
-#undef PHYSICAL_LVALUE_EXPR
-#undef LEAF_LVALUE_EXPR
-#undef NON_LVALUE_EXPR
-  };
-
-  PropagateAccessKind(getType, allowOverwrite).visit(this, accessKind);
-}
-
 ConcreteDeclRef Expr::getReferencedDecl() const {
   switch (getKind()) {
   // No declaration reference.
@@ -408,6 +241,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(ObjectLiteral);
   NO_REFERENCE(MagicIdentifierLiteral);
   NO_REFERENCE(DiscardAssignment);
+  NO_REFERENCE(LazyInitializer);
 
   SIMPLE_REFERENCE(DeclRef, getDeclRef);
   SIMPLE_REFERENCE(SuperRef, getSelf);
@@ -535,12 +369,12 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
 /// specific functor on it.  This ignores statements and other non-expression
 /// children.
 void Expr::
-forEachImmediateChildExpr(const std::function<Expr*(Expr*)> &callback) {
+forEachImmediateChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
   struct ChildWalker : ASTWalker {
-    const std::function<Expr*(Expr*)> &callback;
+    llvm::function_ref<Expr *(Expr *)> callback;
     Expr *ThisNode;
     
-    ChildWalker(const std::function<Expr*(Expr*)> &callback, Expr *ThisNode)
+    ChildWalker(llvm::function_ref<Expr *(Expr *)> callback, Expr *ThisNode)
       : callback(callback), ThisNode(ThisNode) {}
     
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -571,11 +405,11 @@ forEachImmediateChildExpr(const std::function<Expr*(Expr*)> &callback) {
 /// Enumerate each immediate child expression of this node, invoking the
 /// specific functor on it.  This ignores statements and other non-expression
 /// children.
-void Expr::forEachChildExpr(const std::function<Expr*(Expr*)> &callback) {
+void Expr::forEachChildExpr(llvm::function_ref<Expr *(Expr *)> callback) {
   struct ChildWalker : ASTWalker {
-    const std::function<Expr*(Expr*)> &callback;
+    llvm::function_ref<Expr *(Expr *)> callback;
 
-    ChildWalker(const std::function<Expr*(Expr*)> &callback)
+    ChildWalker(llvm::function_ref<Expr *(Expr *)> callback)
     : callback(callback) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -634,15 +468,24 @@ bool Expr::isTypeReference(
 
 bool Expr::isStaticallyDerivedMetatype(
     llvm::function_ref<Type(const Expr *)> getType) const {
-  // The type must first be a type reference.
+  // The expression must first be a type reference.
   if (!isTypeReference(getType))
     return false;
 
+  auto type = getType(this)
+    ->castTo<AnyMetatypeType>()
+    ->getInstanceType();
+
   // Archetypes are never statically derived.
-  return !getType(this)
-              ->getAs<AnyMetatypeType>()
-              ->getInstanceType()
-              ->is<ArchetypeType>();
+  if (type->is<ArchetypeType>())
+    return false;
+
+  // Dynamic Self is never statically derived.
+  if (type->is<DynamicSelfType>())
+    return false;
+
+  // Everything else is statically derived.
+  return true;
 }
 
 bool Expr::isSuperExpr() const {
@@ -670,6 +513,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   switch (getKind()) {
   case ExprKind::Error:
   case ExprKind::CodeCompletion:
+  case ExprKind::LazyInitializer:
     return false;
 
   case ExprKind::NilLiteral:
@@ -991,15 +835,26 @@ LiteralExpr *LiteralExpr::shallowClone(
   return Result;
 }
 
+IntegerLiteralExpr * IntegerLiteralExpr::createFromUnsigned(ASTContext &C, unsigned value) {
+  llvm::SmallString<8> Scratch;
+  llvm::APInt(sizeof(unsigned)*8, value).toString(Scratch, 10, /*signed*/ false);
+  auto Text = C.AllocateCopy(StringRef(Scratch));
+  return new (C) IntegerLiteralExpr(Text, SourceLoc(), /*implicit*/ true);
+}
 
-
+/// A wrapper around LLVM::getAsInteger that can be used on Swift interger
+/// literals. It avoids misinterpreting decimal numbers prefixed with 0 as
+/// octal numbers.
+static bool getAsInteger(StringRef Text, llvm::APInt &Value) {
+  // swift encodes octal differently from C
+  bool IsCOctal = Text.size() > 1 && Text[0] == '0' && isdigit(Text[1]);
+  return Text.getAsInteger(IsCOctal ? 10 : 0, Value);
+}
 
 static APInt getIntegerLiteralValue(bool IsNegative, StringRef Text,
                                     unsigned BitWidth) {
   llvm::APInt Value(BitWidth, 0);
-  // swift encodes octal differently from C
-  bool IsCOctal = Text.size() > 1 && Text[0] == '0' && isdigit(Text[1]);
-  bool Error = Text.getAsInteger(IsCOctal ? 10 : 0, Value);
+  bool Error = getAsInteger(Text, Value);
   assert(!Error && "Invalid IntegerLiteral formed"); (void)Error;
   if (IsNegative)
     Value = -Value;
@@ -1010,6 +865,15 @@ static APInt getIntegerLiteralValue(bool IsNegative, StringRef Text,
 
 APInt IntegerLiteralExpr::getValue(StringRef Text, unsigned BitWidth, bool Negative) {
   return getIntegerLiteralValue(Negative, Text, BitWidth);
+}
+
+/// Returns the raw magnitude of the literal text without any truncation.
+APInt IntegerLiteralExpr::getRawMagnitude() const {
+  llvm::APInt Value(64, 0);
+  bool Error = getAsInteger(getDigitsText(), Value);
+  assert(!Error && "Invalid IntegerLiteral formed");
+  (void)Error;
+  return Value;
 }
 
 APInt IntegerLiteralExpr::getValue() const {
@@ -1337,12 +1201,10 @@ ConstructorDecl *OtherConstructorDeclRefExpr::getDecl() const {
 MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
                              ConcreteDeclRef member, DeclNameLoc nameLoc,
                              bool Implicit, AccessSemantics semantics)
-  : Expr(ExprKind::MemberRef, Implicit), Base(base),
-    Member(member), DotLoc(dotLoc), NameLoc(nameLoc) {
+  : LookupExpr(ExprKind::MemberRef, base, member, Implicit),
+    DotLoc(dotLoc), NameLoc(nameLoc) {
    
   Bits.MemberRefExpr.Semantics = (unsigned) semantics;
-  Bits.MemberRefExpr.IsSuper = false;
-  assert(Member);
 }
 
 Type OverloadSetRefExpr::getBaseType() const {
@@ -1509,6 +1371,7 @@ TupleExpr *TupleExpr::create(ASTContext &ctx,
   assert((Implicit || ElementNames.size() == ElementNameLocs.size() ||
           (!hasNonEmptyIdentifier(ElementNames) && ElementNameLocs.empty())) &&
          "trying to create non-implicit tuple-expr without name locations");
+  (void)hasNonEmptyIdentifier;
 
   size_t size =
       totalSizeToAlloc<Expr *, Identifier, SourceLoc>(SubExprs.size(),
@@ -1559,8 +1422,17 @@ static ValueDecl *getCalledValue(Expr *E) {
   if (auto *DRE = dyn_cast<DeclRefExpr>(E))
     return DRE->getDecl();
 
+  if (auto *OCRE = dyn_cast<OtherConstructorDeclRefExpr>(E))
+    return OCRE->getDecl();
+
+  // Look through SelfApplyExpr.
+  if (auto *SAE = dyn_cast<SelfApplyExpr>(E))
+    return SAE->getCalledValue();
+
   Expr *E2 = E->getValueProvidingExpr();
-  if (E != E2) return getCalledValue(E2);
+  if (E != E2)
+    return getCalledValue(E2);
+
   return nullptr;
 }
 
@@ -1574,10 +1446,9 @@ SubscriptExpr::SubscriptExpr(Expr *base, Expr *index,
                              bool hasTrailingClosure,
                              ConcreteDeclRef decl,
                              bool implicit, AccessSemantics semantics)
-    : Expr(ExprKind::Subscript, implicit, Type()),
-      TheDecl(decl), Base(base), Index(index) {
+    : LookupExpr(ExprKind::Subscript, base, decl, implicit),
+      Index(index) {
   Bits.SubscriptExpr.Semantics = (unsigned) semantics;
-  Bits.SubscriptExpr.IsSuper = false;
   Bits.SubscriptExpr.NumArgLabels = argLabels.size();
   Bits.SubscriptExpr.HasArgLabelLocs = !argLabelLocs.empty();
   Bits.SubscriptExpr.HasTrailingClosure = hasTrailingClosure;
@@ -2150,6 +2021,23 @@ TypeExpr *TypeExpr::createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C) {
   return Res;
 }
 
+bool Expr::isSelfExprOf(const AbstractFunctionDecl *AFD, bool sameBase) const {
+  auto *E = getSemanticsProvidingExpr();
+
+  if (auto IOE = dyn_cast<InOutExpr>(E))
+    E = IOE->getSubExpr();
+
+  while (auto ICE = dyn_cast<ImplicitConversionExpr>(E)) {
+    if (sameBase && isa<DerivedToBaseExpr>(ICE))
+      return false;
+    E = ICE->getSubExpr();
+  }
+
+  if (auto DRE = dyn_cast<DeclRefExpr>(E))
+    return DRE->getDecl() == AFD->getImplicitSelfDecl();
+
+  return false;
+}
 
 ArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
   auto type = getOpaqueValue()->getType()->getRValueType();

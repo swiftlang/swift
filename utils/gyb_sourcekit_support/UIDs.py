@@ -47,7 +47,10 @@ UID_KEYS = [
     KEY('Length', 'key.length'),
     KEY('SourceFile', 'key.sourcefile'),
     KEY('SerializedSyntaxTree', 'key.serialized_syntax_tree'),
+    KEY('SyntaxReuseRegions', 'key.syntaxreuseregions'),
     KEY('SourceText', 'key.sourcetext'),
+    KEY('ForceLibSyntaxBasedProcessing', 'key.forcelibsyntaxbasedprocessing'),
+    KEY('EnableSyntaxReuseRegions', 'key.enablesyntaxreuseregions'),
     KEY('EnableSyntaxMap', 'key.enablesyntaxmap'),
     KEY('EnableSyntaxTree', 'key.enablesyntaxtree'),
     KEY('EnableStructure', 'key.enablesubstructure'),
@@ -207,6 +210,7 @@ UID_REQUESTS = [
     REQUEST('SemanticRefactoring', 'source.request.semantic.refactoring'),
     REQUEST('EnableCompileNotifications',
             'source.request.enable-compile-notifications'),
+    REQUEST('TestNotification', 'source.request.test_notification'),
 ]
 
 

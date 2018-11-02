@@ -819,17 +819,17 @@ public func expectNotNil<T>(_ value: T?,
   return value
 }
 
-public func expectCrashLater() {
+public func expectCrashLater(withMessage message: String = "") {
   print("\(_stdlibUnittestStreamPrefix);expectCrash;\(_anyExpectFailed)")
 
   var stderr = _Stderr()
-  print("\(_stdlibUnittestStreamPrefix);expectCrash", to: &stderr)
+  print("\(_stdlibUnittestStreamPrefix);expectCrash;\(message)", to: &stderr)
 
   _seenExpectCrash = true
 }
 
-public func expectCrash(executing: () -> Void) -> Never {
-  expectCrashLater()
+public func expectCrash(withMessage message: String = "", executing: () -> Void) -> Never {
+  expectCrashLater(withMessage: message)
   executing()
   expectUnreachable()
   fatalError()
@@ -865,7 +865,7 @@ extension ProcessTerminationStatus {
       // This default case is needed for standard library builds where
       // resilience is enabled.
       // FIXME: Add the .exit case when there is a way to suppress when not.
-      //   case .exit(_): return false
+      //   case .exit: return false
       return false
     }
   }
@@ -1080,6 +1080,7 @@ struct _ParentProcess {
 
     var stdoutSeenCrashDelimiter = false
     var stderrSeenCrashDelimiter = false
+    var expectingPreCrashMessage = ""
     var stdoutEnd = false
     var stderrEnd = false
     var capturedCrashStdout: [Substring] = []
@@ -1090,7 +1091,8 @@ struct _ParentProcess {
       var line = line[...]
       if let index = findSubstring(line, _stdlibUnittestStreamPrefix) {
         let controlMessage =
-            line[index..<line.endIndex].split(separator: ";")
+            line[index..<line.endIndex].split(separator: ";",
+                              omittingEmptySubsequences: false)
         switch controlMessage[1] {
         case "expectCrash":
           if isStdout {
@@ -1098,6 +1100,7 @@ struct _ParentProcess {
             anyExpectFailedInChild = controlMessage[2] == "true"
           } else {
             stderrSeenCrashDelimiter = true
+            expectingPreCrashMessage = String(controlMessage[2])
           }
         case "end":
           if isStdout {
@@ -1114,6 +1117,11 @@ struct _ParentProcess {
           return (done: stdoutEnd && stderrEnd, ())
         }
       }
+      if !expectingPreCrashMessage.isEmpty
+          && findSubstring(line, expectingPreCrashMessage) != nil {
+        line = "OK: saw expected pre-crash message in \"\(line)\""[...]
+        expectingPreCrashMessage = ""
+      }
       if isStdout {
         if stdoutSeenCrashDelimiter {
           capturedCrashStdout.append(line)
@@ -1122,7 +1130,16 @@ struct _ParentProcess {
         if stderrSeenCrashDelimiter {
           capturedCrashStderr.append(line)
           if findSubstring(line, _crashedPrefix) != nil {
-            line = "OK: saw expected \"\(line.lowercased())\""[...]
+            if !expectingPreCrashMessage.isEmpty {
+              line = """
+                      FAIL: saw expected "\(line.lowercased())", but without \
+                      message "\(expectingPreCrashMessage)" before it
+                      """[...]
+              anyExpectFailedInChild = true
+            }
+            else {
+              line = "OK: saw expected \"\(line.lowercased())\""[...]
+            }
           }
         }
       }
@@ -1152,8 +1169,8 @@ struct _ParentProcess {
       }
       return (
         anyExpectFailedInChild,
-        stdoutSeenCrashDelimiter || stderrSeenCrashDelimiter, status,
-        capturedCrashStdout, capturedCrashStderr)
+        stdoutSeenCrashDelimiter || stderrSeenCrashDelimiter,
+        status, capturedCrashStdout, capturedCrashStderr)
     }
 
     // We reached EOF on stdout and stderr and we did not see "end" markers, so
@@ -1163,8 +1180,8 @@ struct _ParentProcess {
     let status = _waitForChild()
     return (
       anyExpectFailedInChild,
-      stdoutSeenCrashDelimiter || stderrSeenCrashDelimiter, status,
-      capturedCrashStdout, capturedCrashStderr)
+      stdoutSeenCrashDelimiter || stderrSeenCrashDelimiter,
+      status, capturedCrashStdout, capturedCrashStderr)
   }
 
   internal mutating func _shutdownChild() -> (failed: Bool, Void) {
@@ -1255,11 +1272,11 @@ struct _ParentProcess {
       testPassed = false
       print("expecting a crash, but the test did not crash")
 
-    case (.some(_), false):
+    case (.some, false):
       testPassed = false
       print("the test crashed unexpectedly")
 
-    case (.some(_), true):
+    case (.some, true):
       testPassed = !_anyExpectFailed
     }
     if testPassed && t.crashOutputMatches.count > 0 {
@@ -1268,9 +1285,6 @@ struct _ParentProcess {
       let crashOutput = crashStdout + crashStderr
       for expectedSubstring in t.crashOutputMatches {
         var found = false
-        if crashOutput.isEmpty && expectedSubstring.isEmpty {
-          found = true
-        }
         for s in crashOutput {
           if findSubstring(s, expectedSubstring) != nil {
             found = true
@@ -1775,15 +1789,15 @@ public func _parseDottedVersionTriple(_ s: String) -> (Int, Int, Int) {
 }
 
 func _getOSVersion() -> OSVersion {
-#if os(iOS) && (arch(i386) || arch(x86_64))
+#if os(iOS) && targetEnvironment(simulator)
   // On simulator, the plist file that we try to read turns out to be host's
   // plist file, which indicates OS X.
   //
   // FIXME: how to get the simulator version *without* UIKit?
   return .iOSSimulator
-#elseif os(tvOS) && (arch(i386) || arch(x86_64))
+#elseif os(tvOS) && targetEnvironment(simulator)
   return .tvOSSimulator
-#elseif os(watchOS) && (arch(i386) || arch(x86_64))
+#elseif os(watchOS) && targetEnvironment(simulator)
   return .watchOSSimulator
 #elseif os(Linux)
   return .linux
@@ -2306,7 +2320,7 @@ public func checkEquatable<Instances : Collection>(
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Instances.Iterator.Element : Equatable
+  Instances.Element : Equatable
 {
   let indices = Array(instances.indices)
   _checkEquatableImpl(
@@ -2410,6 +2424,33 @@ internal func hash<H: Hashable>(_ value: H, seed: Int? = nil) -> Int {
   return hasher.finalize()
 }
 
+/// Test that the elements of `groups` consist of instances that satisfy the
+/// semantic requirements of `Hashable`, with each group defining a distinct
+/// equivalence class under `==`.
+public func checkHashableGroups<Groups: Collection>(
+  _ groups: Groups,
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
+) where Groups.Element: Collection, Groups.Element.Element: Hashable {
+  let instances = groups.flatMap { $0 }
+  // groupIndices[i] is the index of the element in groups that contains
+  // instances[i].
+  let groupIndices =
+    zip(0..., groups).flatMap { i, group in group.map { _ in i } }
+  func equalityOracle(_ lhs: Int, _ rhs: Int) -> Bool {
+    return groupIndices[lhs] == groupIndices[rhs]
+  }
+  checkHashable(
+    instances,
+    equalityOracle: equalityOracle,
+    hashEqualityOracle: equalityOracle,
+    allowBrokenTransitivity: false,
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line),
+    showFrame: false)
+}
+
 /// Test that the elements of `instances` satisfy the semantic requirements of
 /// `Hashable`, using `equalityOracle` to generate equality and hashing
 /// expectations from pairs of positions in `instances`.
@@ -2421,7 +2462,7 @@ public func checkHashable<Instances: Collection>(
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
-) where Instances.Iterator.Element: Hashable {
+) where Instances.Element: Hashable {
   checkHashable(
     instances,
     equalityOracle: equalityOracle,
@@ -2445,7 +2486,7 @@ public func checkHashable<Instances: Collection>(
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Instances.Iterator.Element : Hashable {
+  Instances.Element: Hashable {
   checkEquatable(
     instances,
     oracle: equalityOracle,
@@ -2489,6 +2530,14 @@ public func checkHashable<Instances: Collection>(
           rhs (at index \(j)): \(y)
           """,
           stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+        expectEqual(
+          x._rawHashValue(seed: (0, 0)), y._rawHashValue(seed: (0, 0)),
+          """
+          _rawHashValue expected to match, found to differ
+          lhs (at index \(i)): \(x)
+          rhs (at index \(j)): \(y)
+          """,
+          stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
       } else {
         // Try a few different seeds; at least one of them should discriminate
         // between the hashes. It is extremely unlikely this check will fail
@@ -2498,6 +2547,16 @@ public func checkHashable<Instances: Collection>(
           (0..<10).contains { hash(x, seed: $0) != hash(y, seed: $0) },
           """
           hash(into:) expected to differ, found to match
+          lhs (at index \(i)): \(x)
+          rhs (at index \(j)): \(y)
+          """,
+          stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+        expectTrue(
+          (0..<10 as Range<UInt64>).contains { i in
+            x._rawHashValue(seed: (0, i)) != y._rawHashValue(seed: (0, i))
+          },
+          """
+          _rawHashValue(seed:) expected to differ, found to match
           lhs (at index \(i)): \(x)
           rhs (at index \(j)): \(y)
           """,
@@ -2586,7 +2645,7 @@ public func checkComparable<Instances : Collection>(
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Instances.Iterator.Element : Comparable {
+  Instances.Element : Comparable {
 
   // Also checks that equality is consistent with comparison and that
   // the oracle obeys the equality laws
@@ -2693,17 +2752,17 @@ public func checkComparable<T : Comparable>(
 public func checkStrideable<Instances : Collection, Strides : Collection>(
   _ instances: Instances, strides: Strides,
   distanceOracle:
-    (Instances.Index, Instances.Index) -> Strides.Iterator.Element,
+    (Instances.Index, Instances.Index) -> Strides.Element,
   advanceOracle:
-    (Instances.Index, Strides.Index) -> Instances.Iterator.Element,
+    (Instances.Index, Strides.Index) -> Instances.Element,
 
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Instances.Iterator.Element : Strideable,
-  Instances.Iterator.Element.Stride == Strides.Iterator.Element {
+  Instances.Element : Strideable,
+  Instances.Element.Stride == Strides.Element {
 
   checkComparable(
     instances,
@@ -2740,7 +2799,7 @@ public func nthIndex<C: Collection>(_ x: C, _ n: Int) -> C.Index {
   return x.index(x.startIndex, offsetBy: numericCast(n))
 }
 
-public func nth<C: Collection>(_ x: C, _ n: Int) -> C.Iterator.Element {
+public func nth<C: Collection>(_ x: C, _ n: Int) -> C.Element {
   return x[nthIndex(x, n)]
 }
 
@@ -2754,8 +2813,8 @@ public func expectEqualSequence<
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Expected.Iterator.Element == Actual.Iterator.Element,
-  Expected.Iterator.Element : Equatable {
+  Expected.Element == Actual.Element,
+  Expected.Element : Equatable {
 
   expectEqualSequence(expected, actual, message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)) { $0 == $1 }
@@ -2773,8 +2832,8 @@ public func expectEqualSequence<
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Expected.Iterator.Element == Actual.Iterator.Element,
-  Expected.Iterator.Element == (T, U) {
+  Expected.Element == Actual.Element,
+  Expected.Element == (T, U) {
 
   expectEqualSequence(
     expected, actual, message(),
@@ -2793,9 +2852,9 @@ public func expectEqualSequence<
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line,
-  sameValue: (Expected.Iterator.Element, Expected.Iterator.Element) -> Bool
+  sameValue: (Expected.Element, Expected.Element) -> Bool
 ) where
-  Expected.Iterator.Element == Actual.Iterator.Element {
+  Expected.Element == Actual.Element {
 
   if !expected.elementsEqual(actual, by: sameValue) {
     expectationFailure("expected elements: \"\(expected)\"\n"
@@ -2814,14 +2873,14 @@ public func expectEqualsUnordered<
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line,
-  compare: @escaping (Expected.Iterator.Element, Expected.Iterator.Element)
+  compare: @escaping (Expected.Element, Expected.Element)
     -> ExpectedComparisonResult
 ) where
-  Expected.Iterator.Element == Actual.Iterator.Element {
+  Expected.Element == Actual.Element {
 
-  let x: [Expected.Iterator.Element] =
+  let x: [Expected.Element] =
     expected.sorted { compare($0, $1).isLT() }
-  let y: [Actual.Iterator.Element] =
+  let y: [Actual.Element] =
     actual.sorted { compare($0, $1).isLT() }
   expectEqualSequence(
     x, y, message(),
@@ -2838,8 +2897,8 @@ public func expectEqualsUnordered<
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Expected.Iterator.Element == Actual.Iterator.Element,
-  Expected.Iterator.Element : Comparable {
+  Expected.Element == Actual.Element,
+  Expected.Element : Comparable {
 
   expectEqualsUnordered(expected, actual, message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)) {
@@ -2917,8 +2976,8 @@ public func expectEqualsUnordered<
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Actual.Iterator.Element == (key: T, value: T),
-  Expected.Iterator.Element == (T, T) {
+  Actual.Element == (key: T, value: T),
+  Expected.Element == (T, T) {
 
   func comparePairLess(_ lhs: (T, T), rhs: (T, T)) -> Bool {
     return [lhs.0, lhs.1].lexicographicallyPrecedes([rhs.0, rhs.1])
@@ -2968,8 +3027,8 @@ public func expectEqualMethodsForDomain<
   }
 }
 
-public func expectEqualUnicodeScalars(
-  _ expected: [UInt32], _ actual: String,
+public func expectEqualUnicodeScalars<S: StringProtocol>(
+  _ expected: [UInt32], _ actual: S,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
@@ -2985,7 +3044,3 @@ public func expectEqualUnicodeScalars(
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
   }
 }
-
-// Local Variables:
-// eval: (read-only-mode 1)
-// End:

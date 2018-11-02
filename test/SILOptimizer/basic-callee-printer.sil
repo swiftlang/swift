@@ -9,7 +9,7 @@ bb0:
   return %0 : $()
 }
 
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   // function_ref private_bottom
 // CHECK:   %0 = function_ref @private_bottom : $@convention(thin) () -> (){{.*}} // user: %1
 // CHECK:   %1 = apply %0() : $@convention(thin) () -> ()
@@ -25,7 +25,7 @@ bb0:
 }
 
 
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   // function_ref private_middle
 // CHECK:   %0 = function_ref @private_middle : $@convention(thin) () -> (){{.*}} // user: %1
 // CHECK:   %1 = apply %0() : $@convention(thin) () -> ()
@@ -48,7 +48,7 @@ bb0:
 }
 
 
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   // function_ref internal_bottom
 // CHECK:   %0 = function_ref @internal_bottom : $@convention(thin) () -> (){{.*}} // user: %1
 // CHECK:   %1 = apply %0() : $@convention(thin) () -> ()
@@ -64,7 +64,7 @@ bb0:
 }
 
 
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   // function_ref internal_middle
 // CHECK:   %0 = function_ref @internal_middle : $@convention(thin) () -> (){{.*}} // user: %1
 // CHECK:   %1 = apply %0() : $@convention(thin) () -> ()
@@ -87,7 +87,7 @@ bb0:
 }
 
 
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   // function_ref public_bottom
 // CHECK:   %0 = function_ref @public_bottom : $@convention(thin) () -> (){{.*}} // user: %1
 // CHECK:   %1 = apply %0() : $@convention(thin) () -> ()
@@ -103,7 +103,7 @@ bb0:
 }
 
 
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   // function_ref public_middle
 // CHECK:   %0 = function_ref @public_middle : $@convention(thin) () -> (){{.*}} // user: %1
 // CHECK:   %1 = apply %0() : $@convention(thin) () -> ()
@@ -170,7 +170,7 @@ bb0(%0 : $private_derived):
 }
 
 
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   %2 = class_method %0 : $private_base, #private_base.foo!1 : (private_base) -> () -> (), $@convention(method) (@guaranteed private_base) -> (),{{.*}} // user: %3
 // CHECK:   %3 = apply %2(%0) : $@convention(method) (@guaranteed private_base) -> ()
 // CHECK: Incomplete callee list? : No
@@ -219,8 +219,16 @@ bb0(%0 : $internal_derived):
   return %2 : $()
 }
 
+// CHECK-LABEL: Function call site:
+// CHECK:     %2 = class_method %0 : $internal_base, #internal_base.foo!1 : (internal_base) -> () -> (), $@convention(method) (@guaranteed internal_base) -> ()
+// CHECK:     %3 = apply %2(%0) : $@convention(method) (@guaranteed internal_base) -> ()
+// CHECK-NOWMO: Incomplete callee list? : Yes
+// CHECK-WMO: Incomplete callee list? : No
+// CHECK:   Known callees:
+// CHECK:   internal_base_foo
+// CHECK:   internal_derived_foo
 
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   %4 = class_method %0 : $internal_base, #internal_base.bar!1 : (internal_base) -> () -> (), $@convention(method) (@guaranteed internal_base) -> (){{.*}} // user: %5
 // CHECK:   %5 = apply %4(%0) : $@convention(method) (@guaranteed internal_base) -> ()
 // CHECK-NOWMO: Incomplete callee list? : Yes
@@ -289,7 +297,7 @@ bb0(%0 : $public_derived):
 }
 
 
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   %2 = class_method %0 : $public_base, #public_base.foo!1 : (public_base) -> () -> (), $@convention(method) (@guaranteed public_base) -> (){{.*}} // user: %3
 // CHECK:   %3 = apply %2(%0) : $@convention(method) (@guaranteed public_base) -> ()
 // CHECK-NOWMO: Incomplete callee list? : Yes
@@ -298,7 +306,7 @@ bb0(%0 : $public_derived):
 // CHECK: public_base_foo
 // CHECK: public_derived_foo
 //
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   %4 = class_method %0 : $public_base, #public_base.bar!1 : (public_base) -> () -> (), $@convention(method) (@guaranteed public_base) -> (){{.*}} // user: %5
 // CHECK:   %5 = apply %4(%0) : $@convention(method) (@guaranteed public_base) -> ()
 // CHECK: Incomplete callee list? : Yes
@@ -306,7 +314,7 @@ bb0(%0 : $public_derived):
 // CHECK: public_base_bar
 // CHECK: public_derived_bar
 //
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   %6 = class_method %0 : $public_base, #public_base.baz!1 : (public_base) -> () -> (), $@convention(method) (@guaranteed public_base) -> (){{.*}} // user: %7
 // CHECK:   %7 = apply %6(%0) : $@convention(method) (@guaranteed public_base) -> ()
 // CHECK: Incomplete callee list? : Yes
@@ -405,7 +413,7 @@ bb0(%0 : $private_proto_private_class):
 }
 
 
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   %3 = class_method %1 : $private_proto_private_class, #private_proto_private_class.theMethod!1 : (private_proto_private_class) -> () -> (), $@convention(method) (@guaranteed private_proto_private_class) -> (){{.*}} // user: %4
 // CHECK:   %4 = apply %3(%1) : $@convention(method) (@guaranteed private_proto_private_class) -> (){{.*}} // user: %6
 // CHECK: Incomplete callee list? : No
@@ -422,7 +430,7 @@ bb0(%0 : $*private_proto_private_class):
 }
 
 
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   %2 = witness_method $T, #private_proto_1.theMethod!1 : {{.*}} : $@convention(witness_method: private_proto_1) <τ_0_0 where τ_0_0 : private_proto_1> (@in_guaranteed τ_0_0) -> (){{.*}} // user: %3
 // CHECK:   %3 = apply %2<T>(%0) : $@convention(witness_method: private_proto_1) <τ_0_0 where τ_0_0 : private_proto_1> (@in_guaranteed τ_0_0) -> ()
 // CHECK: Incomplete callee list? : No
@@ -447,7 +455,7 @@ bb0(%0 : $private_proto_internal_class):
 }
 
 
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   %3 = class_method %1 : $private_proto_internal_class, #private_proto_internal_class.theMethod!1 : (private_proto_internal_class) -> () -> (), $@convention(method) (@guaranteed private_proto_internal_class) -> (){{.*}} // user: %4
 // CHECK:   %4 = apply %3(%1) : $@convention(method) (@guaranteed private_proto_internal_class) -> (){{.*}} // user: %6
 // CHECK-NOWMO: Incomplete callee list? : Yes
@@ -465,7 +473,7 @@ bb0(%0 : $*private_proto_internal_class):
 }
 
 
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   %2 = witness_method $T, #private_proto_2.theMethod!1 : {{.*}} : $@convention(witness_method: private_proto_2) <τ_0_0 where τ_0_0 : private_proto_2> (@in_guaranteed τ_0_0) -> (){{.*}} // user: %3
 // CHECK:   %3 = apply %2<T>(%0) : $@convention(witness_method: private_proto_2) <τ_0_0 where τ_0_0 : private_proto_2> (@in_guaranteed τ_0_0) -> ()
 // CHECK-WMO: Incomplete callee list? : No
@@ -491,7 +499,7 @@ bb0(%0 : $private_proto_public_class):
 }
 
 
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   %3 = class_method %1 : $private_proto_public_class, #private_proto_public_class.theMethod!1 : (private_proto_public_class) -> () -> (), $@convention(method) (@guaranteed private_proto_public_class) -> (){{.*}} // user: %4
 // CHECK:   %4 = apply %3(%1) : $@convention(method) (@guaranteed private_proto_public_class) -> (){{.*}} // user: %6
 // CHECK: Incomplete callee list? : Yes
@@ -508,7 +516,7 @@ bb0(%0 : $*private_proto_public_class):
 }
 
 
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   %2 = witness_method $T, #private_proto_3.theMethod!1 : {{.*}} : $@convention(witness_method: private_proto_3) <τ_0_0 where τ_0_0 : private_proto_3> (@in_guaranteed τ_0_0) -> (){{.*}} // user: %3
 // CHECK:   %3 = apply %2<T>(%0) : $@convention(witness_method: private_proto_3) <τ_0_0 where τ_0_0 : private_proto_3> (@in_guaranteed τ_0_0) -> ()
 // CHECK: Incomplete callee list? : Yes
@@ -533,7 +541,7 @@ bb0(%0 : $private_proto_public_class_private_method):
 }
 
 
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   %3 = class_method %1 : $private_proto_public_class_private_method, #private_proto_public_class_private_method.theMethod!1 : (private_proto_public_class_private_method) -> () -> (), $@convention(method) (@guaranteed private_proto_public_class_private_method) -> (){{.*}} // user: %4
 // CHECK:   %4 = apply %3(%1) : $@convention(method) (@guaranteed private_proto_public_class_private_method) -> (){{.*}} // user: %6
 // CHECK: Incomplete callee list? : No
@@ -550,7 +558,7 @@ bb0(%0 : $*private_proto_public_class_private_method):
 }
 
 
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   %2 = witness_method $T, #private_proto_4.theMethod!1 : {{.*}} : $@convention(witness_method: private_proto_4) <τ_0_0 where τ_0_0 : private_proto_4> (@in_guaranteed τ_0_0) -> (){{.*}} // user: %3
 // CHECK:   %3 = apply %2<T>(%0) : $@convention(witness_method: private_proto_4) <τ_0_0 where τ_0_0 : private_proto_4> (@in_guaranteed τ_0_0) -> ()
 // CHECK: Incomplete callee list? : No
@@ -617,7 +625,7 @@ class SomeChildItem : SomeItem {
 sil @test_call_of_allocator_and_initializer : $@convention(thin) (@thick SomeItem.Type, InitVal) -> @owned SomeItem {
 bb0(%0 : $@thick SomeItem.Type, %1: $InitVal):
 
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   %2 = class_method %0 : $@thick SomeItem.Type, #SomeItem.init!allocator.1 : (SomeItem.Type) -> (InitVal) -> SomeItem, $@convention(method) (InitVal, @thick SomeItem.Type) -> @owned SomeItem
 // CHECK:   %3 = apply %2(%1, %0) : $@convention(method) (InitVal, @thick SomeItem.Type) -> @owned SomeItem
 // CHECK-NOWMO: Incomplete callee list? : Yes
@@ -629,7 +637,7 @@ bb0(%0 : $@thick SomeItem.Type, %1: $InitVal):
   %2 = class_method %0 : $@thick SomeItem.Type, #SomeItem.init!allocator.1 : (SomeItem.Type) -> (InitVal) -> SomeItem, $@convention(method) (InitVal, @thick SomeItem.Type) -> @owned SomeItem
   %3 = apply %2(%1, %0) : $@convention(method) (InitVal, @thick SomeItem.Type) -> @owned SomeItem
 
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   %4 = class_method %3 : $SomeItem, #SomeItem.init!initializer.1 : (SomeItem.Type) -> (InitVal) -> SomeItem, $@convention(method) (InitVal, @owned SomeItem) -> @owned SomeItem
 // CHECK:   %5 = apply %4(%1, %3) : $@convention(method) (InitVal, @owned SomeItem) -> @owned SomeItem
 // CHECK-NOWMO: Incomplete callee list? : Yes
@@ -658,13 +666,13 @@ sil @SomeChildItem_destructor : $@convention(method) (@owned SomeChildItem) -> (
 sil_vtable SomeItem {
   #SomeItem.init!allocator.1: @SomeItem_allocator
   #SomeItem.init!initializer.1: @SomeItem_initializer
-  #SomeItem.deinit!deallocator: @SomeItem_destructor
+  #SomeItem.deinit!deallocator.1: @SomeItem_destructor
 }
 
 sil_vtable SomeChildItem {
   #SomeItem.init!allocator.1: @SomeChildItem_allocator
   #SomeItem.init!initializer.1: @SomeChildItem_initializer
-  #SomeChildItem.deinit!deallocator: @SomeChildItem_destructor
+  #SomeChildItem.deinit!deallocator.1: @SomeChildItem_destructor
 }
 
 public protocol PublicProtocol {
@@ -683,7 +691,7 @@ bb0(%0 : $*SingleConformance):
   return %4 : $()
 }
 
-// CHECK: Function call site:
+// CHECK-LABEL: Function call site:
 // CHECK:   witness_method $@opened{{.*}} PublicProtocol
 // CHECK:   apply {{.*}} PublicProtocol
 // CHECK-NOWMO: Incomplete callee list? : Yes
@@ -703,3 +711,21 @@ sil_witness_table hidden SingleConformance: PublicProtocol module nix {
   method #PublicProtocol.foo!1: <Self where Self : PublicProtocol> (Self) -> () -> () : @foo_impl
 }
 
+sil @closureIntArg : $@convention(thin) (InitVal) -> ()
+
+// CHECK-LABEL-LABEL: Function call site:
+// CHECK: convert_escape_to_noescape
+// CHECK: apply %{{.*}}() : $@noescape @callee_guaranteed () -> ()
+// CHECK: Incomplete callee list? : No
+// CHECK: Known callees:
+// CHECK: closureIntArg
+sil @call_noescape_closure : $@convention(thin) (InitVal) -> () {
+entry(%0 : $InitVal):
+  %f = function_ref @closureIntArg : $@convention(thin) (InitVal) -> ()
+  %e = partial_apply [callee_guaranteed] %f(%0) : $@convention(thin) (InitVal) -> ()
+  %n = convert_escape_to_noescape %e : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  apply %n() : $@noescape @callee_guaranteed () -> ()
+  strong_release %e : $@callee_guaranteed () -> ()
+  %t = tuple ()
+  return %t : $()
+}

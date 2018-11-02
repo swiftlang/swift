@@ -14,8 +14,8 @@ import SwiftShims
 
 // Generic functions implementable directly on FloatingPoint.
 @_transparent
-public func fabs<T: FloatingPoint>(_ x: T) -> T
-  where T.Magnitude == T {
+@available(swift, deprecated: 4.2, renamed: "abs")
+public func fabs<T: FloatingPoint>(_ x: T) -> T {
   return x.magnitude
 }
 

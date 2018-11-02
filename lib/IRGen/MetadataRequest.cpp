@@ -432,9 +432,10 @@ llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
 ConstantReference
 irgen::tryEmitConstantTypeMetadataRef(IRGenModule &IGM, CanType type,
                                       SymbolReferenceKind refKind) {
+  if (IGM.isStandardLibrary())
+    return ConstantReference();
   if (!isTypeMetadataAccessTrivial(IGM, type))
     return ConstantReference();
-
   return IGM.getAddrOfTypeMetadata(type, refKind);
 }
 
@@ -560,8 +561,28 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
     if (nominalDecl->isGenericContext())
       return false;
 
+    auto expansion = ResilienceExpansion::Maximal;
+
+    // Normally, if a value type is known to have a fixed layout to us, we will
+    // have emitted fully initialized metadata for it, including a payload size
+    // field for enum metadata for example, allowing the type metadata to be
+    // used in other resilience domains without initialization.
+    //
+    // However, when -enable-resilience-bypass is on, we might be using a value
+    // type from another module built with resilience enabled. In that case, the
+    // type looks like it has fixed size to us, since we're bypassing resilience,
+    // but the metadata still requires runtime initialization, so its incorrect
+    // to reference it directly.
+    //
+    // While unconditionally using minimal expansion is correct, it is not as
+    // efficient as it should be, so only do so if -enable-resilience-bypass is on.
+    //
+    // FIXME: All of this goes away once lldb supports resilience.
+    if (IGM.IRGen.Opts.EnableResilienceBypass)
+      expansion = ResilienceExpansion::Minimal;
+
     // Resiliently-sized metadata access always requires an accessor.
-    return (IGM.getTypeInfoForUnlowered(type).isFixedSize());
+    return (IGM.getTypeInfoForUnlowered(type).isFixedSize(expansion));
   }
 
   // The empty tuple type has a singleton metadata.
@@ -890,9 +911,7 @@ namespace {
     }
 
     llvm::Value *getFunctionParameterRef(AnyFunctionType::CanParam &param) {
-      auto type = param.getType();
-      if (param.getParameterFlags().isInOut())
-        type = type->getInOutObjectType()->getCanonicalType();
+      auto type = param.getPlainType()->getCanonicalType();
       return IGF.emitAbstractTypeMetadataRef(type);
     }
 
@@ -1130,7 +1149,7 @@ namespace {
 
       // Collect references to the protocol descriptors.
       auto descriptorArrayTy
-        = llvm::ArrayType::get(IGF.IGM.ProtocolDescriptorPtrTy,
+        = llvm::ArrayType::get(IGF.IGM.ProtocolDescriptorRefTy,
                                protocols.size());
       Address descriptorArray = IGF.createAlloca(descriptorArrayTy,
                                                  IGF.IGM.getPointerAlignment(),
@@ -1138,12 +1157,13 @@ namespace {
       IGF.Builder.CreateLifetimeStart(descriptorArray,
                                    IGF.IGM.getPointerSize() * protocols.size());
       descriptorArray = IGF.Builder.CreateBitCast(descriptorArray,
-                               IGF.IGM.ProtocolDescriptorPtrTy->getPointerTo());
+                               IGF.IGM.ProtocolDescriptorRefTy->getPointerTo());
       
       unsigned index = 0;
       for (auto *protoTy : protocols) {
         auto *protoDecl = protoTy->getDecl();
         llvm::Value *ref = emitProtocolDescriptorRef(IGF, protoDecl);
+
         Address slot = IGF.Builder.CreateConstArrayGEP(descriptorArray,
                                                index, IGF.IGM.getPointerSize());
         IGF.Builder.CreateStore(ref, slot);
@@ -1156,9 +1176,9 @@ namespace {
                                !layout.requiresClass());
       llvm::Value *superclassConstraint =
         llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy);
-      if (layout.superclass) {
+      if (auto superclass = layout.explicitSuperclass) {
         superclassConstraint = IGF.emitAbstractTypeMetadataRef(
-          CanType(layout.superclass));
+          CanType(superclass));
       }
 
       auto call = IGF.Builder.CreateCall(IGF.IGM.getGetExistentialMetadataFn(),
@@ -1896,6 +1916,9 @@ namespace {
   /// not to cache the result as if it were the metadata for a formal type
   /// unless the type actually cannot possibly be a formal type, e.g. because
   /// it is one of the special lowered type kinds like SILFunctionType.
+  ///
+  /// NOTE: If you modify the special cases in this, you should update
+  /// isTypeMetadataForLayoutAccessible in SIL.cpp.
   class EmitTypeMetadataRefForLayout
     : public CanTypeVisitor<EmitTypeMetadataRefForLayout, llvm::Value *,
                             DynamicMetadataRequest> {
@@ -2046,7 +2069,7 @@ llvm::Value *
 IRGenFunction::emitTypeMetadataRefForLayout(SILType type,
                                             DynamicMetadataRequest request) {
   assert(request.canResponseStatusBeIgnored());
-  return EmitTypeMetadataRefForLayout(*this).visit(type.getSwiftRValueType(),
+  return EmitTypeMetadataRefForLayout(*this).visit(type.getASTType(),
                                                    request);
 }
 
@@ -2145,7 +2168,7 @@ namespace {
       // to the aggregate's.
       if (SILType singletonFieldTy = getSingletonAggregateFieldType(IGF.IGM,
                                              silTy, ResilienceExpansion::Maximal))
-        return visit(singletonFieldTy.getSwiftRValueType(), request);
+        return visit(singletonFieldTy.getASTType(), request);
 
       // If the type is fixed-layout, emit a copy of its layout.
       if (auto fixed = dyn_cast<FixedTypeInfo>(&ti))
@@ -2253,23 +2276,15 @@ namespace {
       // object.
 
       auto &C = IGF.IGM.Context;
-      CanType referent;
-      switch (type->getOwnership()) {
-      case ReferenceOwnership::Strong:
-        llvm_unreachable("shouldn't be a ReferenceStorageType");
-      case ReferenceOwnership::Weak:
-        referent = type.getReferentType().getOptionalObjectType();
-        break;
-      case ReferenceOwnership::Unmanaged:
-      case ReferenceOwnership::Unowned:
-        referent = type.getReferentType();
-        break;
-      }
+      CanType referent = type.getReferentType();
+      CanType underlyingTy = referent;
+      if (auto Ty = referent.getOptionalObjectType())
+        underlyingTy = Ty;
 
       // Reference storage types with witness tables need open-coded layouts.
       // TODO: Maybe we could provide prefabs for 1 witness table.
-      if (referent.isExistentialType()) {
-        auto layout = referent.getExistentialLayout();
+      if (underlyingTy.isExistentialType()) {
+        auto layout = underlyingTy.getExistentialLayout();
         for (auto *protoTy : layout.getProtocols()) {
           auto *protoDecl = protoTy->getDecl();
           if (IGF.getSILTypes().protocolRequiresWitnessTable(protoDecl))
@@ -2288,7 +2303,7 @@ namespace {
       }
 
       CanType valueWitnessReferent;
-      switch (getReferenceCountingForType(IGF.IGM, referent)) {
+      switch (getReferenceCountingForType(IGF.IGM, underlyingTy)) {
       case ReferenceCounting::Unknown:
       case ReferenceCounting::Block:
       case ReferenceCounting::ObjC:
@@ -2309,7 +2324,7 @@ namespace {
 
       // Get the reference storage type of the builtin object whose value
       // witness we can borrow.
-      if (type->getOwnership() == ReferenceOwnership::Weak)
+      if (referent->getOptionalObjectType())
         valueWitnessReferent = OptionalType::get(valueWitnessReferent)
           ->getCanonicalType();
 
@@ -2327,7 +2342,7 @@ llvm::Value *irgen::emitTypeLayoutRef(IRGenFunction &IGF, SILType type,
     DynamicMetadataRequest::getNonBlocking(MetadataState::LayoutComplete,
                                            collector);
   assert(request.canResponseStatusBeIgnored());
-  return EmitTypeLayoutRef(IGF).visit(type.getSwiftRValueType(), request);
+  return EmitTypeLayoutRef(IGF).visit(type.getASTType(), request);
 }
 
 /// Given a class metatype, produce the necessary heap metadata

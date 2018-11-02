@@ -21,7 +21,7 @@
 // CHECK-NEXT: # define __has_feature(x) 0
 // CHECK-NEXT: #endif
 
-// CHECK-LABEL: #include <objc/NSObject.h>
+// CHECK-LABEL: #include <Foundation/Foundation.h>
 // CHECK: #include <stdint.h>
 // CHECK: #include <stddef.h>
 // CHECK: #include <stdbool.h>

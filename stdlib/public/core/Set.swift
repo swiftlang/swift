@@ -152,7 +152,9 @@ import SwiftShims
 /// share buffer.
 @_fixed_layout
 public struct Set<Element: Hashable> {
+  @usableFromInline
   internal typealias _VariantBuffer = _VariantSetBuffer<Element>
+  @usableFromInline
   internal typealias _NativeBuffer = _NativeSetBuffer<Element>
 
   @usableFromInline
@@ -330,7 +332,7 @@ extension Set: Collection {
   /// Accesses the member at the given position.
   @inlinable // FIXME(sil-serialize-all)
   public subscript(position: Index) -> Element {
-    return _variantBuffer.assertingGet(position)
+    return _variantBuffer.assertingGet(at: position)
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -462,7 +464,7 @@ extension Set: Equatable {
       let endIndex = lhsNative.endIndex
       var i = lhsNative.startIndex
       while i != endIndex {
-        let key = lhsNative.assertingGet(i)
+        let key = lhsNative.assertingGet(at: i)
         let bridgedKey: AnyObject = _bridgeAnythingToObjectiveC(key)
         let optRhsValue: AnyObject? = rhsCocoa.maybeGet(bridgedKey)
         if let rhsValue = optRhsValue {
@@ -484,25 +486,75 @@ extension Set: Equatable {
 }
 
 extension Set: Hashable {
-  /// The hash value for the set.
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
   ///
-  /// Two sets that are equal will always have equal hash values.
-  ///
-  /// Hash values are not guaranteed to be equal across different executions of
-  /// your program. Do not save hash values to use during a future execution.
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    // FIXME(ABI)#177: <rdar://problem/18915294> Cache Set<T> hashValue
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
   public func hash(into hasher: inout Hasher) {
+    // FIXME(ABI)#177: <rdar://problem/18915294> Cache Set<T> hashValue
     var hash = 0
+    let seed = hasher._generateSeed()
     for member in self {
-      hash ^= _hashValue(for: member)
+      hash ^= member._rawHashValue(seed: seed)
     }
     hasher.combine(hash)
+  }
+}
+
+extension Set: _HasCustomAnyHashableRepresentation {
+  public func _toCustomAnyHashable() -> AnyHashable? {
+    return AnyHashable(_box: _SetAnyHashableBox(self))
+  }
+}
+
+internal struct _SetAnyHashableBox<Element: Hashable>: _AnyHashableBox {
+  internal let _value: Set<Element>
+  internal let _canonical: Set<AnyHashable>
+
+  internal init(_ value: Set<Element>) {
+    self._value = value
+    self._canonical = value as Set<AnyHashable>
+  }
+
+  internal var _base: Any {
+    return _value
+  }
+
+  internal var _canonicalBox: _AnyHashableBox {
+    return _SetAnyHashableBox<AnyHashable>(_canonical)
+  }
+
+  internal func _isEqual(to other: _AnyHashableBox) -> Bool? {
+    guard let other = other as? _SetAnyHashableBox<AnyHashable> else {
+      return nil
+    }
+    return _canonical == other._value
+  }
+
+  internal var _hashValue: Int {
+    return _canonical.hashValue
+  }
+
+  internal func _hash(into hasher: inout Hasher) {
+    _canonical.hash(into: &hasher)
+  }
+
+  func _rawHashValue(_seed: (UInt64, UInt64)) -> Int {
+    return _canonical._rawHashValue(seed: _seed)
+  }
+
+  internal func _unbox<T: Hashable>() -> T? {
+    return _value as? T
+  }
+
+  internal func _downCastConditional<T>(
+    into result: UnsafeMutablePointer<T>
+  ) -> Bool {
+    guard let value = _value as? T else { return false }
+    result.initialize(to: value)
+    return true
   }
 }
 
@@ -543,7 +595,7 @@ extension Set: SetAlgebra {
   public mutating func insert(
     _ newMember: Element
   ) -> (inserted: Bool, memberAfterInsert: Element) {
-    return _variantBuffer.insert(newMember, forKey: newMember)
+    return _variantBuffer.insert(newMember)
   }
 
   /// Inserts the given element into the set unconditionally.
@@ -569,7 +621,7 @@ extension Set: SetAlgebra {
   @inlinable // FIXME(sil-serialize-all)
   @discardableResult
   public mutating func update(with newMember: Element) -> Element? {
-    return _variantBuffer.updateValue(newMember, forKey: newMember)
+    return _variantBuffer.update(with: newMember)
   }
 
   /// Removes the specified element from the set.
@@ -589,7 +641,7 @@ extension Set: SetAlgebra {
   @inlinable // FIXME(sil-serialize-all)
   @discardableResult
   public mutating func remove(_ member: Element) -> Element? {
-    return _variantBuffer.removeValue(forKey: member)
+    return _variantBuffer.remove(member)
   }
 
   /// Removes the element at the given index of the set.
@@ -1041,7 +1093,6 @@ extension Set: CustomStringConvertible, CustomDebugStringConvertible {
   }
 
   /// A string that represents the contents of the set, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return _makeCollectionDescription(for: self, withTypeName: "Set")
   }
@@ -1447,6 +1498,23 @@ extension Set {
 
 //===--- APIs templated for Dictionary and Set ----------------------------===//
 
+/// This protocol is only used for compile-time checks that
+/// every buffer type implements all required operations.
+internal protocol _SetBuffer { // FIXME: Remove or refactor for Set.
+  associatedtype Element
+  associatedtype Index
+
+  var startIndex: Index { get }
+  var endIndex: Index { get }
+  func index(after i: Index) -> Index
+  func formIndex(after i: inout Index)
+  func index(forKey key: Element) -> Index?
+  var count: Int { get }
+
+  func assertingGet(at i: Index) -> Element
+  func maybeGet(_ key: Element) -> Element?
+}
+
 /// An instance of this class has all `Set` data tail-allocated.
 /// Enough bytes are allocated to hold the bitmap for marking valid entries,
 /// keys, and values. The data layout starts with the bitmap, followed by the
@@ -1460,11 +1528,7 @@ extension Set {
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
 @_objc_non_lazy_realization
-internal class _RawNativeSetStorage:
-  _SwiftNativeNSSet, _NSSetCore
-{
-  internal typealias RawStorage = _RawNativeSetStorage
-
+internal class _RawNativeSetStorage: _SwiftNativeNSSet, _NSSetCore {
   @usableFromInline // FIXME(sil-serialize-all)
   @nonobjc
   internal final var bucketCount: Int
@@ -1495,7 +1559,7 @@ internal class _RawNativeSetStorage:
   /// be mutated.
   @inlinable // FIXME(sil-serialize-all)
   @nonobjc
-  internal static var empty: RawStorage {
+  internal static var empty: _RawNativeSetStorage {
     return Builtin.bridgeFromRawPointer(
       Builtin.addressof(&_swiftEmptySetStorage))
   }
@@ -1516,7 +1580,6 @@ internal class _RawNativeSetStorage:
   /// Get the NSEnumerator implementation for self.
   /// _HashableTypedNativeSetStorage overloads this to give
   /// _NativeSelfNSEnumerator proper type parameters.
-  @inlinable // FIXME(sil-serialize-all)
   @objc
   internal func enumerator() -> _NSEnumerator {
     return _NativeSetNSEnumerator<AnyObject>(
@@ -1561,7 +1624,6 @@ internal class _RawNativeSetStorage:
     return nil
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc
   internal func objectEnumerator() -> _NSEnumerator {
     return enumerator()
@@ -1574,13 +1636,10 @@ internal class _RawNativeSetStorage:
 @usableFromInline
 internal class _TypedNativeSetStorage<Element>: _RawNativeSetStorage {
 
-  internal typealias Key = Element
-  internal typealias Value = Element
-
   deinit {
-    let keys = self.keys.assumingMemoryBound(to: Key.self)
+    let keys = self.keys.assumingMemoryBound(to: Element.self)
 
-    if !_isPOD(Key.self) {
+    if !_isPOD(Element.self) {
       for i in 0 ..< bucketCount {
         if initializedEntries[i] {
           (keys+i).deinitialize(count: 1)
@@ -1614,7 +1673,9 @@ internal class _TypedNativeSetStorage<Element>: _RawNativeSetStorage {
 final internal class _HashableTypedNativeSetStorage<Element: Hashable>
   : _TypedNativeSetStorage<Element> {
 
+  @usableFromInline
   internal typealias FullContainer = Set<Element>
+  @usableFromInline
   internal typealias Buffer = _NativeSetBuffer<Element>
 
   // This type is made with allocWithTailElems, so no init is ever called.
@@ -1641,7 +1702,7 @@ final internal class _HashableTypedNativeSetStorage<Element: Hashable>
     return FullContainer(_nativeBuffer: buffer)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @objc
   internal override func enumerator() -> _NSEnumerator {
     return _NativeSetNSEnumerator<Element>(
         Buffer(_storage: self))
@@ -1691,7 +1752,7 @@ final internal class _HashableTypedNativeSetStorage<Element: Hashable>
   @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal func getObjectFor(_ aKey: AnyObject) -> AnyObject? {
-    guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Key.self)
+    guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Element.self)
     else { return nil }
 
     let (i, found) = buffer._find(nativeKey,
@@ -1727,20 +1788,17 @@ final internal class _HashableTypedNativeSetStorage<Element: Hashable>
 @usableFromInline
 @_fixed_layout
 internal struct _NativeSetBuffer<Element> {
-
-  internal typealias RawStorage = _RawNativeSetStorage
+  @usableFromInline
   internal typealias TypedStorage = _TypedNativeSetStorage<Element>
+  @usableFromInline
   internal typealias Buffer = _NativeSetBuffer<Element>
+  @usableFromInline
   internal typealias Index = _NativeSetIndex<Element>
-
-  internal typealias Key = Element
-  internal typealias Value = Element
-  internal typealias SequenceElementWithoutLabels = Element
 
   /// See this comments on _RawNativeSetStorage and its subclasses to
   /// understand why we store an untyped storage here.
   @usableFromInline // FIXME(sil-serialize-all)
-  internal var _storage: RawStorage
+  internal var _storage: _RawNativeSetStorage
 
   /// Creates a Buffer with a storage that is typed, but doesn't understand
   /// Hashing. Mostly for bridging; prefer `init(minimumCapacity:)`.
@@ -1749,14 +1807,17 @@ internal struct _NativeSetBuffer<Element> {
     let bitmapWordCount = _UnsafeBitMap.sizeInWords(forSizeInBits: bucketCount)
     let storage = Builtin.allocWithTailElems_2(TypedStorage.self,
         bitmapWordCount._builtinWordValue, UInt.self,
-        bucketCount._builtinWordValue, Key.self)
+        bucketCount._builtinWordValue, Element.self)
     self.init(_exactBucketCount: bucketCount, storage: storage)
   }
 
-  /// Given a bucket count and uninitialized RawStorage, completes the
+  /// Given a bucket count and uninitialized _RawNativeSetStorage, completes the
   /// initialization and returns a Buffer.
   @inlinable // FIXME(sil-serialize-all)
-  internal init(_exactBucketCount bucketCount: Int, storage: RawStorage) {
+  internal init(
+    _exactBucketCount bucketCount: Int,
+    storage: _RawNativeSetStorage
+  ) {
     storage.bucketCount = bucketCount
     storage.count = 0
 
@@ -1771,7 +1832,7 @@ internal struct _NativeSetBuffer<Element> {
     let bitmapAddr = Builtin.projectTailElems(_storage, UInt.self)
     let bitmapWordCount = _UnsafeBitMap.sizeInWords(forSizeInBits: bucketCount)
     let keysAddr = Builtin.getTailAddr_Word(bitmapAddr,
-           bitmapWordCount._builtinWordValue, UInt.self, Key.self)
+           bitmapWordCount._builtinWordValue, UInt.self, Element.self)
 
     // Initialize header
     _storage.initializedEntries = initializedEntries
@@ -1816,28 +1877,28 @@ internal struct _NativeSetBuffer<Element> {
 
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   @inlinable // FIXME(sil-serialize-all)
-  internal var keys: UnsafeMutablePointer<Key> {
-    return _storage.keys.assumingMemoryBound(to: Key.self)
+  internal var keys: UnsafeMutablePointer<Element> {
+    return _storage.keys.assumingMemoryBound(to: Element.self)
   }
 
   /// Constructs a buffer adopting the given storage.
   @inlinable // FIXME(sil-serialize-all)
-  internal init(_storage: RawStorage) {
+  internal init(_storage: _RawNativeSetStorage) {
     self._storage = _storage
   }
 
   /// Constructs an instance from the empty singleton.
   @inlinable // FIXME(sil-serialize-all)
   internal init() {
-    self._storage = RawStorage.empty
+    self._storage = _RawNativeSetStorage.empty
   }
 
-  // Most of the implementation of the _HashBuffer protocol,
+  // Most of the implementation of the _SetBuffer protocol,
   // but only the parts that don't actually rely on hashing.
 
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
-  internal func key(at i: Int) -> Key {
+  internal func key(at i: Int) -> Element {
     _sanityCheck(i >= 0 && i < bucketCount)
     _sanityCheck(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
@@ -1874,8 +1935,7 @@ internal struct _NativeSetBuffer<Element> {
     return _storage.initializedEntries[i]
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal func destroyEntry(at i: Int) {
     _sanityCheck(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
@@ -1884,9 +1944,8 @@ internal struct _NativeSetBuffer<Element> {
     _storage.initializedEntries[i] = false
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  internal func initializeKey(_ k: Key, at i: Int) {
+  @usableFromInline @_transparent
+  internal func initializeKey(_ k: Element, at i: Int) {
     _sanityCheck(!isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
@@ -1894,8 +1953,7 @@ internal struct _NativeSetBuffer<Element> {
     _storage.initializedEntries[i] = true
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal func moveInitializeEntry(from: Buffer, at: Int, toEntryAt: Int) {
     _sanityCheck(!isInitializedEntry(at: toEntryAt))
 
@@ -1907,14 +1965,13 @@ internal struct _NativeSetBuffer<Element> {
   }
 
   /// Alias for key(at:) in Sets for better code reuse
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  internal func value(at i: Int) -> Value {
+  @usableFromInline @_transparent
+  internal func value(at i: Int) -> Element {
     return key(at: i)
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal func setKey(_ key: Key, at i: Int) {
+  internal func setKey(_ key: Element, at i: Int) {
     _sanityCheck(i >= 0 && i < bucketCount)
     _sanityCheck(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
@@ -1951,22 +2008,20 @@ internal struct _NativeSetBuffer<Element> {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal func assertingGet(_ i: Index) -> SequenceElement {
+  internal func assertingGet(at i: Index) -> Element {
     _precondition(i.offset >= 0 && i.offset < bucketCount)
     _precondition(
       isInitializedEntry(at: i.offset),
       "Attempting to access Set elements using an invalid Index")
     let key = self.key(at: i.offset)
     return key
-
   }
 }
 
-extension _NativeSetBuffer where Element: Hashable
-{
+extension _NativeSetBuffer/*: _SetBuffer*/ where Element: Hashable {
+  @usableFromInline
   internal typealias HashTypedStorage =
     _HashableTypedNativeSetStorage<Element>
-  internal typealias SequenceElement = Element
 
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
@@ -1994,12 +2049,12 @@ extension _NativeSetBuffer where Element: Hashable
     let bitmapWordCount = _UnsafeBitMap.sizeInWords(forSizeInBits: bucketCount)
     let storage = Builtin.allocWithTailElems_2(HashTypedStorage.self,
         bitmapWordCount._builtinWordValue, UInt.self,
-        bucketCount._builtinWordValue, Key.self)
+        bucketCount._builtinWordValue, Element.self)
     self.init(_exactBucketCount: bucketCount, storage: storage)
   }
 
 #if _runtime(_ObjC)
-  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline
   internal func bridged() -> _NSSet {
     // We can zero-cost bridge if our keys are verbatim
     // or if we're the empty singleton.
@@ -2007,9 +2062,8 @@ extension _NativeSetBuffer where Element: Hashable
     // Temporary var for SOME type safety before a cast.
     let nsSet: _NSSetCore
 
-    if (_isBridgedVerbatimToObjectiveC(Key.self) &&
-        _isBridgedVerbatimToObjectiveC(Value.self)) ||
-        self._storage === RawStorage.empty {
+    if _isBridgedVerbatimToObjectiveC(Element.self) ||
+      self._storage === _RawNativeSetStorage.empty {
       nsSet = self._storage
     } else {
       nsSet = _SwiftDeferredNSSet(nativeBuffer: self)
@@ -2048,10 +2102,8 @@ extension _NativeSetBuffer where Element: Hashable
 
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always) // For performance reasons.
-  internal func _bucket(_ k: Key) -> Int {
-    var hasher = Hasher(_seed: _storage.seed)
-    hasher.combine(k)
-    return hasher._finalize() & _bucketMask
+  internal func _bucket(_ k: Element) -> Int {
+    return k._rawHashValue(seed: _storage.seed) & _bucketMask
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2072,7 +2124,7 @@ extension _NativeSetBuffer where Element: Hashable
   /// inserted.
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
-  internal func _find(_ key: Key, startBucket: Int)
+  internal func _find(_ key: Element, startBucket: Int)
     -> (pos: Index, found: Bool) {
 
     var bucket = startBucket
@@ -2091,8 +2143,7 @@ extension _NativeSetBuffer where Element: Hashable
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal static func bucketCount(
     forCapacity capacity: Int,
     maxLoadFactorInverse: Double
@@ -2114,81 +2165,9 @@ extension _NativeSetBuffer where Element: Hashable
     initializeKey(newKey, at: i.offset)
   }
 
-  //
-  // _HashBuffer conformance
-  //
 
   @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
-  internal func index(forKey key: Key) -> Index? {
-    if count == 0 {
-      // Fast path that avoids computing the hash of the key.
-      return nil
-    }
-    let (i, found) = _find(key, startBucket: _bucket(key))
-    return found ? i : nil
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal func assertingGet(_ key: Key) -> Value {
-    let (i, found) = _find(key, startBucket: _bucket(key))
-    _precondition(found, "Key not found")
-    return self.key(at: i.offset)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
-  internal func maybeGet(_ key: Key) -> Value? {
-    if count == 0 {
-      // Fast path that avoids computing the hash of the key.
-      return nil
-    }
-
-    let (i, found) = _find(key, startBucket: _bucket(key))
-    if found {
-      return self.key(at: i.offset)
-    }
-    return nil
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @discardableResult
-  internal func updateValue(_ value: Value, forKey key: Key) -> Value? {
-    _sanityCheckFailure(
-      "don't call mutating methods on _NativeSetBuffer")
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @discardableResult
-  internal func insert(
-    _ value: Value, forKey key: Key
-  ) -> (inserted: Bool, memberAfterInsert: Value) {
-    _sanityCheckFailure(
-      "don't call mutating methods on _NativeSetBuffer")
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @discardableResult
-  internal func remove(at index: Index) -> SequenceElement {
-    _sanityCheckFailure(
-      "don't call mutating methods on _NativeSetBuffer")
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @discardableResult
-  internal func removeValue(forKey key: Key) -> Value? {
-    _sanityCheckFailure(
-      "don't call mutating methods on _NativeSetBuffer")
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal func removeAll(keepingCapacity keepCapacity: Bool) {
-    _sanityCheckFailure(
-      "don't call mutating methods on _NativeSetBuffer")
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func fromArray(_ elements: [SequenceElementWithoutLabels])
+  internal static func fromArray(_ elements: [Element])
     -> Buffer
   {
     if elements.isEmpty {
@@ -2213,34 +2192,59 @@ extension _NativeSetBuffer where Element: Hashable
   }
 }
 
+extension _NativeSetBuffer/*: _SetBuffer*/ where Element: Hashable {
+  //
+  // _SetBuffer conformance
+  //
+
+  @inlinable // FIXME(sil-serialize-all)
+  @inline(__always)
+  internal func index(forKey key: Element) -> Index? {
+    if count == 0 {
+      // Fast path that avoids computing the hash of the key.
+      return nil
+    }
+    let (i, found) = _find(key, startBucket: _bucket(key))
+    return found ? i : nil
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @inline(__always)
+  internal func maybeGet(_ key: Element) -> Element? {
+    if count == 0 {
+      // Fast path that avoids computing the hash of the key.
+      return nil
+    }
+
+    let (i, found) = _find(key, startBucket: _bucket(key))
+    if found {
+      return self.key(at: i.offset)
+    }
+    return nil
+  }
+}
+
 #if _runtime(_ObjC)
 /// An NSEnumerator that works with any NativeSetBuffer of
 /// verbatim bridgeable elements. Used by the various NSSet impls.
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 final internal class _NativeSetNSEnumerator<Element>
   : _SwiftNativeNSEnumerator, _NSEnumerator {
 
   internal typealias Buffer = _NativeSetBuffer<Element>
   internal typealias Index = _NativeSetIndex<Element>
 
-  @inlinable // FIXME(sil-serialize-all)
   internal override required init() {
     _sanityCheckFailure("don't call this designated initializer")
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   internal init(_ buffer: Buffer) {
     self.buffer = buffer
     nextIndex = buffer.startIndex
     endIndex = buffer.endIndex
   }
 
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var buffer: Buffer
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var nextIndex: Index
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var endIndex: Index
 
   //
@@ -2249,7 +2253,6 @@ final internal class _NativeSetNSEnumerator<Element>
   // Do not call any of these methods from the standard library!
   //
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc
   internal func nextObject() -> AnyObject? {
     if nextIndex == endIndex {
@@ -2260,7 +2263,6 @@ final internal class _NativeSetNSEnumerator<Element>
     return key
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc(countByEnumeratingWithState:objects:count:)
   internal func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
@@ -2298,28 +2300,10 @@ final internal class _NativeSetNSEnumerator<Element>
 /// This is the fallback implementation for situations where toll-free bridging
 /// isn't possible. On first access, a NativeSetBuffer of AnyObject will be
 /// constructed containing all the bridged elements.
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 final internal class _SwiftDeferredNSSet<Element: Hashable>
   : _SwiftNativeNSSet, _NSSetCore {
 
-  internal typealias NativeBuffer = _NativeSetBuffer<Element>
-  internal typealias BridgedBuffer = _NativeSetBuffer<AnyObject>
-  internal typealias NativeIndex = _NativeSetIndex<Element>
-  internal typealias BridgedIndex = _NativeSetIndex<AnyObject>
-
-  internal typealias Key = Element
-  internal typealias Value = Element
-
-  @inlinable // FIXME(sil-serialize-all)
-  @nonobjc
-  internal init(bucketCount: Int = 2) {
-    nativeBuffer = NativeBuffer(bucketCount: bucketCount)
-    super.init()
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal init(nativeBuffer: NativeBuffer) {
+  internal init(nativeBuffer: _NativeSetBuffer<Element>) {
     self.nativeBuffer = nativeBuffer
     super.init()
   }
@@ -2328,15 +2312,12 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
   // operations on it.
   //
   // Do not access this property directly.
-  @usableFromInline // FIXME(sil-serialize-all)
   @nonobjc
   internal var _heapStorageBridged_DoNotUse: AnyObject?
 
   /// The unbridged elements.
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal var nativeBuffer: NativeBuffer
+  internal var nativeBuffer: _NativeSetBuffer<Element>
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc(copyWithZone:)
   internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     // Instances of this class should be visible outside of standard library as
@@ -2351,19 +2332,26 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
   // `nativeBuffer`.
   //
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc
   internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
     _sanityCheckFailure("don't call this designated initializer")
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc
   internal func member(_ object: AnyObject) -> AnyObject? {
-    return bridgingObjectForKey(object)
+    guard let element =
+      _conditionallyBridgeFromObjectiveC(object, Element.self)
+    else { return nil }
+
+    let (i, found) = nativeBuffer._find(
+      element, startBucket: nativeBuffer._bucket(element))
+    if found {
+      bridgeEverything()
+      return bridgedBuffer.value(at: i.offset)
+    }
+    return nil
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc
   internal func objectEnumerator() -> _NSEnumerator {
     return enumerator()
@@ -2371,7 +2359,6 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
 
   /// Returns the pointer to the stored property, which contains bridged
   /// Set elements.
-  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal var _heapStorageBridgedPtr: UnsafeMutablePointer<AnyObject?> {
     return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
@@ -2379,20 +2366,17 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
   }
 
   /// The buffer for bridged Set elements, if present.
-  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
-  internal var _bridgedStorage:
-    BridgedBuffer.RawStorage? {
+  internal var _bridgedStorage: _RawNativeSetStorage? {
     get {
       if let ref = _stdlib_atomicLoadARCRef(object: _heapStorageBridgedPtr) {
-        return unsafeDowncast(ref, to: BridgedBuffer.RawStorage.self)
+        return unsafeDowncast(ref, to: _RawNativeSetStorage.self)
       }
       return nil
     }
   }
 
   /// Attach a buffer for bridged Set elements.
-  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal func _initializeHeapStorageBridged(_ newStorage: AnyObject) {
     _stdlib_atomicInitializeARCRef(
@@ -2400,12 +2384,10 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
   }
 
   /// Returns the bridged Set values.
-  @inlinable // FIXME(sil-serialize-all)
-  internal var bridgedBuffer: BridgedBuffer {
-    return BridgedBuffer(_storage: _bridgedStorage!)
+  internal var bridgedBuffer: _NativeSetBuffer<AnyObject> {
+    return _NativeSetBuffer(_storage: _bridgedStorage!)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal func bridgeEverything() {
     if _fastPath(_bridgedStorage != nil) {
@@ -2418,7 +2400,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     // Investigate only allocating the buffer for a Set in this case.
 
     // Create buffer for bridged data.
-    let bridged = BridgedBuffer(
+    let bridged = _NativeSetBuffer<AnyObject>(
       _exactBucketCount: nativeBuffer.bucketCount,
       unhashable: ())
 
@@ -2434,36 +2416,17 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     _initializeHeapStorageBridged(bridged._storage)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc
   internal var count: Int {
     return nativeBuffer.count
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @nonobjc
-  internal func bridgingObjectForKey(_ aKey: AnyObject)
-    -> AnyObject? {
-    guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Key.self)
-    else { return nil }
-
-    let (i, found) = nativeBuffer._find(
-      nativeKey, startBucket: nativeBuffer._bucket(nativeKey))
-    if found {
-      bridgeEverything()
-      return bridgedBuffer.value(at: i.offset)
-    }
-    return nil
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
   @objc
   internal func enumerator() -> _NSEnumerator {
     bridgeEverything()
     return _NativeSetNSEnumerator<AnyObject>(bridgedBuffer)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @objc(countByEnumeratingWithState:objects:count:)
   internal func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
@@ -2512,15 +2475,13 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
   }
 }
 #else
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 final internal class _SwiftDeferredNSSet<Element: Hashable> { }
 #endif
 
 #if _runtime(_ObjC)
 @usableFromInline
 @_fixed_layout
-internal struct _CocoaSetBuffer: _HashBuffer {
+internal struct _CocoaSetBuffer: _SetBuffer {
   @usableFromInline
   internal var cocoaSet: _NSSet
 
@@ -2529,12 +2490,8 @@ internal struct _CocoaSetBuffer: _HashBuffer {
     self.cocoaSet = cocoaSet
   }
 
+  @usableFromInline
   internal typealias Index = _CocoaSetIndex
-  internal typealias SequenceElement = AnyObject
-  internal typealias SequenceElementWithoutLabels = AnyObject
-
-  internal typealias Key = AnyObject
-  internal typealias Value = AnyObject
 
   @inlinable // FIXME(sil-serialize-all)
   internal var startIndex: Index {
@@ -2558,7 +2515,7 @@ internal struct _CocoaSetBuffer: _HashBuffer {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal func index(forKey key: Key) -> Index? {
+  internal func index(forKey key: AnyObject) -> Index? {
     // Fast path that does not involve creating an array of all keys.  In case
     // the key is present, this lookup is a penalty for the slow path, but the
     // potential savings are significant: we could skip a memory allocation and
@@ -2581,98 +2538,63 @@ internal struct _CocoaSetBuffer: _HashBuffer {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal func assertingGet(_ i: Index) -> SequenceElement {
-    let value: Value? = i.allKeys[i.currentKeyIndex]
-    _sanityCheck(value != nil, "Item not found in underlying NSSet")
-    return value!
-
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal func assertingGet(_ key: Key) -> Value {
-    let value: Value? = cocoaSet.member(key)
-    _precondition(value != nil, "Member not found in underlying NSSet")
-    return value!
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
-  internal func maybeGet(_ key: Key) -> Value? {
-
-  return cocoaSet.member(key)
-
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @discardableResult
-  internal mutating func updateValue(_ value: Value, forKey key: Key) -> Value? {
-    _sanityCheckFailure("cannot mutate NSSet")
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @discardableResult
-  internal mutating func insert(
-    _ value: Value, forKey key: Key
-  ) -> (inserted: Bool, memberAfterInsert: Value) {
-    _sanityCheckFailure("cannot mutate NSSet")
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @discardableResult
-  internal mutating func remove(at index: Index) -> SequenceElement {
-    _sanityCheckFailure("cannot mutate NSSet")
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @discardableResult
-  internal mutating func removeValue(forKey key: Key) -> Value? {
-    _sanityCheckFailure("cannot mutate NSSet")
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal mutating func removeAll(keepingCapacity keepCapacity: Bool) {
-    _sanityCheckFailure("cannot mutate NSSet")
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
   internal var count: Int {
     return cocoaSet.count
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal static func fromArray(_ elements: [SequenceElementWithoutLabels])
-    -> _CocoaSetBuffer {
+  internal func assertingGet(at i: Index) -> AnyObject {
+    let value: AnyObject? = i.allKeys[i.currentKeyIndex]
+    _sanityCheck(value != nil, "Item not found in underlying NSSet")
+    return value!
+  }
 
-    _sanityCheckFailure("this function should never be called")
+  @inlinable // FIXME(sil-serialize-all)
+  @inline(__always)
+  internal func maybeGet(_ key: AnyObject) -> AnyObject? {
+    return cocoaSet.member(key)
+  }
+
+  @usableFromInline
+  internal func _toNative<Element: Hashable>(
+    bucketCount: Int
+  ) -> _NativeSetBuffer<Element> {
+    let cocoaSet = self.cocoaSet
+    var newNativeBuffer = _NativeSetBuffer<Element>(bucketCount: bucketCount)
+    let oldCocoaIterator = _CocoaSetIterator(cocoaSet)
+    while let element = oldCocoaIterator.next() {
+      newNativeBuffer.unsafeAddNew(
+        key: _forceBridgeFromObjectiveC(element, Element.self))
+    }
+    newNativeBuffer.count = cocoaSet.count
+    return newNativeBuffer
   }
 }
 #endif
 
 @usableFromInline
 @_frozen
-internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
+internal enum _VariantSetBuffer<Element: Hashable>: _SetBuffer {
 
+  @usableFromInline
   internal typealias NativeBuffer = _NativeSetBuffer<Element>
+  @usableFromInline
   internal typealias NativeIndex = _NativeSetIndex<Element>
 #if _runtime(_ObjC)
+  @usableFromInline
   internal typealias CocoaBuffer = _CocoaSetBuffer
 #endif
-  internal typealias SequenceElement = Element
-  internal typealias SequenceElementWithoutLabels = Element
+  @usableFromInline
   internal typealias SelfType = _VariantSetBuffer
-
-  internal typealias Key = Element
-  internal typealias Value = Element
 
   case native(NativeBuffer)
 #if _runtime(_ObjC)
   case cocoa(CocoaBuffer)
 #endif
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal var guaranteedNative: Bool {
-    return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
+    return _canBeClass(Element.self) == 0
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2817,17 +2739,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
     case .native:
       fatalError("This should have been handled earlier")
     case .cocoa(let cocoaBuffer):
-      let cocoaSet = cocoaBuffer.cocoaSet
-      var newNativeBuffer = NativeBuffer(bucketCount: desiredBucketCount)
-      let oldCocoaIterator = _CocoaSetIterator(cocoaSet)
-      while let key = oldCocoaIterator.next() {
-        newNativeBuffer.unsafeAddNew(
-            key: _forceBridgeFromObjectiveC(key, Value.self))
-      }
-
-      newNativeBuffer.count = cocoaSet.count
-
-      self = .native(newNativeBuffer)
+      self = .native(cocoaBuffer._toNative(bucketCount: desiredBucketCount))
       return (reallocated: true, capacityChanged: true)
     }
 #else
@@ -2836,8 +2748,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
   }
 
 #if _runtime(_ObjC)
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(never)
+  @usableFromInline
   internal mutating func migrateDataToNativeBuffer(
     _ cocoaBuffer: _CocoaSetBuffer
   ) {
@@ -2875,9 +2786,10 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
   }
 
   //
-  // _HashBuffer conformance
+  // _SetBuffer conformance
   //
 
+  @usableFromInline
   internal typealias Index = SetIndex<Element>
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2936,7 +2848,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
 
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
-  internal func index(forKey key: Key) -> Index? {
+  internal func index(forKey key: Element) -> Index? {
     if _fastPath(guaranteedNative) {
       if let nativeIndex = asNative.index(forKey: key) {
         return ._native(nativeIndex)
@@ -2962,51 +2874,32 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal func assertingGet(_ i: Index) -> SequenceElement {
+  internal func assertingGet(at i: Index) -> Element {
     if _fastPath(guaranteedNative) {
-      return asNative.assertingGet(i._nativeIndex)
+      return asNative.assertingGet(at: i._nativeIndex)
     }
 
     switch self {
     case .native:
-      return asNative.assertingGet(i._nativeIndex)
+      return asNative.assertingGet(at: i._nativeIndex)
 #if _runtime(_ObjC)
     case .cocoa(let cocoaBuffer):
-      let anyObjectValue: AnyObject = cocoaBuffer.assertingGet(i._cocoaIndex)
-      let nativeValue = _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
+      let anyObjectValue = cocoaBuffer.assertingGet(at: i._cocoaIndex)
+      let nativeValue = _forceBridgeFromObjectiveC(anyObjectValue, Element.self)
       return nativeValue
 #endif
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  internal func assertingGet(_ key: Key) -> Value {
-    if _fastPath(guaranteedNative) {
-      return asNative.assertingGet(key)
-    }
-
-    switch self {
-    case .native:
-      return asNative.assertingGet(key)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoaBuffer):
-      // FIXME: This assumes that Key and Value are bridged verbatim.
-      let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
-      let anyObjectValue: AnyObject = cocoaBuffer.assertingGet(anyObjectKey)
-      return _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
-#endif
-    }
-  }
-
-#if _runtime(_ObjC)
-  @inlinable // FIXME(sil-serialize-all)
   @inline(never)
+  @usableFromInline
   internal static func maybeGetFromCocoaBuffer(
-    _ cocoaBuffer: CocoaBuffer, forKey key: Key
-  ) -> Value? {
+    _ cocoaBuffer: CocoaBuffer, forKey key: Element
+  ) -> Element? {
     let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
     if let anyObjectValue = cocoaBuffer.maybeGet(anyObjectKey) {
-      return _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
+      return _forceBridgeFromObjectiveC(anyObjectValue, Element.self)
     }
     return nil
   }
@@ -3014,7 +2907,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
 
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
-  internal func maybeGet(_ key: Key) -> Value? {
+  internal func maybeGet(_ key: Element) -> Element? {
     if _fastPath(guaranteedNative) {
       return asNative.maybeGet(key)
     }
@@ -3030,9 +2923,9 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal mutating func nativeUpdateValue(
-    _ value: Value, forKey key: Key
-  ) -> Value? {
+  internal mutating func nativeUpdate(
+    with key: Element
+  ) -> Element? {
     var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
 
     let minBuckets = found
@@ -3047,7 +2940,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
       i = asNative._find(key, startBucket: asNative._bucket(key)).pos
     }
 
-    let oldValue: Value? = found ? asNative.key(at: i.offset) : nil
+    let old: Element? = found ? asNative.key(at: i.offset) : nil
     if found {
       asNative.setKey(key, at: i.offset)
     } else {
@@ -3055,34 +2948,33 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
       asNative.count += 1
     }
 
-    return oldValue
+    return old
   }
 
   @inlinable // FIXME(sil-serialize-all)
   @discardableResult
-  internal mutating func updateValue(
-    _ value: Value, forKey key: Key
-  ) -> Value? {
-
+  internal mutating func update(with value: Element) -> Element? {
     if _fastPath(guaranteedNative) {
-      return nativeUpdateValue(value, forKey: key)
+      return nativeUpdate(with: value)
     }
 
     switch self {
     case .native:
-      return nativeUpdateValue(value, forKey: key)
+      return nativeUpdate(with: value)
 #if _runtime(_ObjC)
     case .cocoa(let cocoaBuffer):
       migrateDataToNativeBuffer(cocoaBuffer)
-      return nativeUpdateValue(value, forKey: key)
+      return nativeUpdate(with: value)
 #endif
     }
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal mutating func nativeInsert(
-    _ value: Value, forKey key: Key
-  ) -> (inserted: Bool, memberAfterInsert: Value) {
+  @discardableResult
+  internal mutating func insert(
+    _ key: Element
+  ) -> (inserted: Bool, memberAfterInsert: Element) {
+    ensureNativeBuffer()
 
     var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
     if found {
@@ -3100,16 +2992,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
     asNative.initializeKey(key, at: i.offset)
     asNative.count += 1
 
-    return (inserted: true, memberAfterInsert: value)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @discardableResult
-  internal mutating func insert(
-    _ value: Value, forKey key: Key
-  ) -> (inserted: Bool, memberAfterInsert: Value) {
-    ensureNativeBuffer()
-    return nativeInsert(value, forKey: key)
+    return (inserted: true, memberAfterInsert: key)
   }
 
   /// - parameter idealBucket: The ideal bucket for the element being deleted.
@@ -3180,7 +3063,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal mutating func nativeRemoveObject(forKey key: Key) -> Value? {
+  internal mutating func nativeRemove(_ key: Element) -> Element? {
     var idealBucket = asNative._bucket(key)
     var (index, found) = asNative._find(key, startBucket: idealBucket)
 
@@ -3214,9 +3097,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal mutating func nativeRemove(
-    at nativeIndex: NativeIndex
-  ) -> SequenceElement {
+  internal mutating func nativeRemove(at nativeIndex: NativeIndex) -> Element {
     // This is a performance optimization that was put in to ensure that we did
     // not make a copy of self to call asNative.bucketCount over
     // ensureUniqueNativeBefore causing at -Onone the uniqueness check to
@@ -3231,7 +3112,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
     _ = ensureUniqueNativeBuffer(withBucketCount: bucketCount)
     let nativeBuffer = asNative
 
-    let result = nativeBuffer.assertingGet(nativeIndex)
+    let result = nativeBuffer.assertingGet(at: nativeIndex)
     let key = result
 
     nativeDelete(nativeBuffer, idealBucket: nativeBuffer._bucket(key),
@@ -3241,7 +3122,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
 
   @inlinable // FIXME(sil-serialize-all)
   @discardableResult
-  internal mutating func remove(at index: Index) -> SequenceElement {
+  internal mutating func remove(at index: Index) -> Element {
     if _fastPath(guaranteedNative) {
       return nativeRemove(at: index._nativeIndex)
     }
@@ -3259,10 +3140,9 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
       let index = index._cocoaIndex
       let anyObjectKey: AnyObject = index.allKeys[index.currentKeyIndex]
       migrateDataToNativeBuffer(cocoaBuffer)
-      let key = _forceBridgeFromObjectiveC(anyObjectKey, Key.self)
-      let value = nativeRemoveObject(forKey: key)
-
-      _sanityCheck(key == value, "bridging did not preserve equality")
+      let key = _forceBridgeFromObjectiveC(anyObjectKey, Element.self)
+      let old = nativeRemove(key)
+      _sanityCheck(key == old, "bridging did not preserve equality")
       return key
 #endif
     }
@@ -3270,22 +3150,22 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
 
   @inlinable // FIXME(sil-serialize-all)
   @discardableResult
-  internal mutating func removeValue(forKey key: Key) -> Value? {
+  internal mutating func remove(_ member: Element) -> Element? {
     if _fastPath(guaranteedNative) {
-      return nativeRemoveObject(forKey: key)
+      return nativeRemove(member)
     }
 
     switch self {
     case .native:
-      return nativeRemoveObject(forKey: key)
+      return nativeRemove(member)
 #if _runtime(_ObjC)
     case .cocoa(let cocoaBuffer):
-      let anyObjectKey: AnyObject = _bridgeAnythingToObjectiveC(key)
-      if cocoaBuffer.maybeGet(anyObjectKey) == nil {
+      let cocoaMember = _bridgeAnythingToObjectiveC(member)
+      if cocoaBuffer.maybeGet(cocoaMember) == nil {
         return nil
       }
       migrateDataToNativeBuffer(cocoaBuffer)
-      return nativeRemoveObject(forKey: key)
+      return nativeRemove(member)
 #endif
     }
   }
@@ -3351,7 +3231,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
     }
   }
 
-  /// Returns an iterator over the `(Key, Value)` pairs.
+  /// Returns an iterator over the elements.
   ///
   /// - Complexity: O(1).
   @inlinable // FIXME(sil-serialize-all)
@@ -3363,16 +3243,9 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
         start: asNative.startIndex, end: asNative.endIndex, buffer: buffer)
 #if _runtime(_ObjC)
     case .cocoa(let cocoaBuffer):
-      return ._cocoa(_CocoaSetIterator(cocoaBuffer.cocoaSet))
+      return ._cocoa(cocoaBuffer)
 #endif
     }
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func fromArray(_ elements: [SequenceElement])
-    -> _VariantSetBuffer<Element> {
-
-    _sanityCheckFailure("this function should never be called")
   }
 }
 
@@ -3531,9 +3404,12 @@ extension _CocoaSetIndex {
 @_frozen // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
 internal enum SetIndexRepresentation<Element: Hashable> {
+  @usableFromInline
   typealias _Index = SetIndex<Element>
+  @usableFromInline
   typealias _NativeIndex = _Index._NativeIndex
 #if _runtime(_ObjC)
+  @usableFromInline
   typealias _CocoaIndex = _Index._CocoaIndex
 #endif
 
@@ -3554,13 +3430,12 @@ extension Set {
     // safe to copy the state.  So, we cannot implement Index that is a value
     // type for bridged NSSet in terms of Cocoa enumeration facilities.
 
+    @usableFromInline
     internal typealias _NativeIndex = _NativeSetIndex<Element>
 #if _runtime(_ObjC)
+    @usableFromInline
     internal typealias _CocoaIndex = _CocoaSetIndex
 #endif
-
-    internal typealias Key = Element
-    internal typealias Value = Element
 
     @inlinable // FIXME(sil-serialize-all)
     internal init(_value: SetIndexRepresentation<Element>) {
@@ -3581,14 +3456,12 @@ extension Set {
     }
 #endif
 
-    @inlinable // FIXME(sil-serialize-all)
-    @_transparent
+    @usableFromInline @_transparent
     internal var _guaranteedNative: Bool {
-      return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
+      return _canBeClass(Element.self) == 0
     }
 
-    @inlinable // FIXME(sil-serialize-all)
-    @_transparent
+    @usableFromInline @_transparent
     internal var _nativeIndex: _NativeIndex {
       switch _value {
       case ._native(let nativeIndex):
@@ -3601,8 +3474,7 @@ extension Set {
     }
 
 #if _runtime(_ObjC)
-    @inlinable // FIXME(sil-serialize-all)
-    @_transparent
+    @usableFromInline @_transparent
     internal var _cocoaIndex: _CocoaIndex {
       switch _value {
       case ._native:
@@ -3660,25 +3532,34 @@ extension Set.Index {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
+  #if _runtime(_ObjC)
     if _fastPath(_guaranteedNative) {
-      return _nativeIndex.offset
+      hasher.combine(0 as UInt8)
+      hasher.combine(_nativeIndex.offset)
+      return
     }
-
     switch _value {
     case ._native(let nativeIndex):
-      return nativeIndex.offset
-  #if _runtime(_ObjC)
+      hasher.combine(0 as UInt8)
+      hasher.combine(nativeIndex.offset)
     case ._cocoa(let cocoaIndex):
-      return cocoaIndex.currentKeyIndex
-  #endif
+      hasher.combine(1 as UInt8)
+      hasher.combine(cocoaIndex.currentKeyIndex)
     }
+  #else
+    hasher.combine(_nativeIndex.offset)
+  #endif
   }
 }
 
 #if _runtime(_ObjC)
-@_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 final internal class _CocoaSetIterator: IteratorProtocol {
   internal typealias Element = AnyObject
@@ -3689,26 +3570,21 @@ final internal class _CocoaSetIterator: IteratorProtocol {
 
   // This stored property should be stored at offset zero.  There's code below
   // relying on this.
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _fastEnumerationState: _SwiftNSFastEnumerationState =
     _makeSwiftNSFastEnumerationState()
 
   // This stored property should be stored right after `_fastEnumerationState`.
   // There's code below relying on this.
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _fastEnumerationStackBuf = _CocoaFastEnumerationStackBuf()
 
-  @usableFromInline // FIXME(sil-serialize-all)
   internal let cocoaSet: _NSSet
 
-  @inlinable // FIXME(sil-serialize-all)
   internal var _fastEnumerationStatePtr:
     UnsafeMutablePointer<_SwiftNSFastEnumerationState> {
     return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
       to: _SwiftNSFastEnumerationState.self)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   internal var _fastEnumerationStackBufPtr:
     UnsafeMutablePointer<_CocoaFastEnumerationStackBuf> {
     return UnsafeMutableRawPointer(_fastEnumerationStatePtr + 1)
@@ -3719,17 +3595,14 @@ final internal class _CocoaSetIterator: IteratorProtocol {
   // Int8 just because our storage holds 16 elements: fast enumeration is
   // allowed to return inner pointers to the container, which can be much
   // larger.
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var itemIndex: Int = 0
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var itemCount: Int = 0
 
-  @inlinable // FIXME(sil-serialize-all)
   internal init(_ cocoaSet: _NSSet) {
     self.cocoaSet = cocoaSet
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline
   internal func next() -> Element? {
     if itemIndex < 0 {
       return nil
@@ -3766,9 +3639,11 @@ final internal class _CocoaSetIterator: IteratorProtocol {
 @usableFromInline
 @_frozen // FIXME(sil-serialize-all)
 internal enum SetIteratorRepresentation<Element: Hashable> {
+  @usableFromInline
   internal typealias _Iterator = SetIterator<Element>
-  internal typealias _NativeBuffer =
-    _NativeSetBuffer<Element>
+  @usableFromInline
+  internal typealias _NativeBuffer = _NativeSetBuffer<Element>
+  @usableFromInline
   internal typealias _NativeIndex = _Iterator._NativeIndex
 
   // For native buffer, we keep two indices to keep track of the iteration
@@ -3797,8 +3672,9 @@ public struct SetIterator<Element: Hashable>: IteratorProtocol {
   // Index, which is multi-pass, it is suitable for implementing a
   // IteratorProtocol, which is being consumed as iteration proceeds.
 
-  internal typealias _NativeBuffer =
-    _NativeSetBuffer<Element>
+  @usableFromInline
+  internal typealias _NativeBuffer = _NativeSetBuffer<Element>
+  @usableFromInline
   internal typealias _NativeIndex = _NativeSetIndex<Element>
 
   @usableFromInline
@@ -3817,16 +3693,14 @@ public struct SetIterator<Element: Hashable>: IteratorProtocol {
       _state: ._native(start: start, end: end, buffer: buffer))
   }
 #if _runtime(_ObjC)
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func _cocoa(
-    _ iterator: _CocoaSetIterator
-  ) -> SetIterator{
+  @usableFromInline
+  internal static func _cocoa(_ buffer: _CocoaSetBuffer) -> SetIterator {
+    let iterator = _CocoaSetIterator(buffer.cocoaSet)
     return SetIterator(_state: ._cocoa(iterator))
   }
 #endif
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal var _guaranteedNative: Bool {
     return _canBeClass(Element.self) == 0
   }
@@ -3838,7 +3712,7 @@ public struct SetIterator<Element: Hashable>: IteratorProtocol {
       if startIndex == endIndex {
         return nil
       }
-      let result = buffer.assertingGet(startIndex)
+      let result = buffer.assertingGet(at: startIndex)
       _state =
         ._native(start: buffer.index(after: startIndex), end: endIndex, buffer: buffer)
       return result
@@ -3876,7 +3750,6 @@ public struct SetIterator<Element: Hashable>: IteratorProtocol {
 
 extension SetIterator: CustomReflectable {
   /// A mirror that reflects the iterator.
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(
       self,
@@ -3886,7 +3759,6 @@ extension SetIterator: CustomReflectable {
 
 extension Set: CustomReflectable {
   /// A mirror that reflects the set.
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     let style = Mirror.DisplayStyle.`set`
     return Mirror(self, unlabeledChildren: self, displayStyle: style)
@@ -3899,9 +3771,6 @@ extension Set: CustomReflectable {
 /// `Set`.
 @_fixed_layout // FIXME(sil-serialize-all)
 public struct _SetBuilder<Element: Hashable> {
-  public typealias Key = Element
-  public typealias Value = Element
-
   @usableFromInline // FIXME(sil-serialize-all)
   internal var _result: Set<Element>
   @usableFromInline // FIXME(sil-serialize-all)
@@ -3920,8 +3789,8 @@ public struct _SetBuilder<Element: Hashable> {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public mutating func add(member newKey: Key) {
-    _nativeBuffer.unsafeAddNew(key: newKey)
+  public mutating func add(member: Element) {
+    _nativeBuffer.unsafeAddNew(key: member)
     _actualCount += 1
   }
 
@@ -3952,20 +3821,6 @@ extension Set {
   public mutating func popFirst() -> Element? {
     guard !isEmpty else { return nil }
     return remove(at: startIndex)
-  }
-
-  @inlinable
-  @available(swift, obsoleted: 4.0)
-  public func filter(
-    _ isIncluded: (Element) throws -> Bool, obsoletedInSwift4: () = ()
-  ) rethrows -> [Element] {
-    var result: [Element] = []
-    for x in self {
-      if try isIncluded(x) {
-        result.append(x)
-      }
-    }
-    return result
   }
 
   /// The total number of elements that the set can contain without
@@ -4011,7 +3866,6 @@ extension Set {
 
   /// Returns the native Dictionary hidden inside this NSDictionary;
   /// returns nil otherwise.
-  @inlinable // FIXME(sil-serialize-all)
   public static func _bridgeFromObjectiveCAdoptingNativeStorageOf(
     _ s: AnyObject
   ) -> Set<Element>? {

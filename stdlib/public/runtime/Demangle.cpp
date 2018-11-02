@@ -160,8 +160,14 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
         
         auto typeNode = Dem.createNode(nodeKind);
         typeNode->addChild(node, Dem);
-        auto identifier = Dem.createNode(Node::Kind::Identifier, name);
-        typeNode->addChild(identifier, Dem);
+        auto nameNode = Dem.createNode(Node::Kind::Identifier, name);
+        if (type->isSynthesizedRelatedEntity()) {
+          auto relatedName = Dem.createNode(Node::Kind::RelatedEntityDeclName,
+                                    type->getSynthesizedDeclRelatedEntityTag());
+          relatedName->addChild(nameNode, Dem);
+          nameNode = relatedName;
+        }
+        typeNode->addChild(nameNode, Dem);
         node = typeNode;
         
         // Apply generic arguments if the context is generic.
@@ -375,11 +381,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
   }
   case MetadataKind::Existential: {
     auto exis = static_cast<const ExistentialTypeMetadata *>(type);
-    
-    std::vector<const ProtocolDescriptor *> protocols;
-    protocols.reserve(exis->Protocols.NumProtocols);
-    for (unsigned i = 0, e = exis->Protocols.NumProtocols; i < e; ++i)
-      protocols.push_back(exis->Protocols[i]);
+    auto protocols = exis->getProtocols();
 
     auto type_list = Dem.createNode(Node::Kind::TypeList);
     auto proto_list = Dem.createNode(Node::Kind::ProtocolList);
@@ -389,9 +391,9 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     // only ever make a swift_getExistentialTypeMetadata invocation using
     // its canonical ordering of protocols.
 
-    for (auto *protocol : protocols) {
+    for (auto protocol : protocols) {
       // The protocol name is mangled as a type symbol, with the _Tt prefix.
-      StringRef ProtoName(protocol->Name);
+      StringRef ProtoName(protocol.getName());
       NodePointer protocolNode = Dem.demangleSymbol(ProtoName);
 
       // ObjC protocol names aren't mangled.
@@ -400,8 +402,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
                                           MANGLING_MODULE_OBJC);
         auto node = Dem.createNode(Node::Kind::Protocol);
         node->addChild(module, Dem);
-        node->addChild(Dem.createNode(Node::Kind::Identifier,
-                                        llvm::StringRef(protocol->Name)), Dem);
+        node->addChild(Dem.createNode(Node::Kind::Identifier, ProtoName), Dem);
         auto typeNode = Dem.createNode(Node::Kind::Type);
         typeNode->addChild(node, Dem);
         type_list->addChild(typeNode, Dem);
@@ -441,9 +442,8 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
       // protocols.
       bool requiresClassImplicit = false;
 
-      for (auto *protocol : protocols) {
-        if (protocol->Flags.getClassConstraint()
-            == ProtocolClassConstraint::Class)
+      for (auto protocol : protocols) {
+        if (protocol.getClassConstraint() == ProtocolClassConstraint::Class)
           requiresClassImplicit = true;
       }
 
@@ -631,18 +631,19 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     }
     return tupleNode;
   }
-  case MetadataKind::Opaque: {
-    if (auto builtinType = _buildDemanglerForBuiltinType(type, Dem))
-      return builtinType;
-
-    // FIXME: Some opaque types do have manglings, but we don't have enough info
-    // to figure them out.
-    break;
-  }
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::HeapGenericLocalVariable:
   case MetadataKind::ErrorObject:
     break;
+  case MetadataKind::Opaque:
+  default: {
+    if (auto builtinType = _buildDemanglerForBuiltinType(type, Dem))
+      return builtinType;
+    
+    // FIXME: Some opaque types do have manglings, but we don't have enough info
+    // to figure them out.
+    break;
+  }
   }
   // Not a type.
   return nullptr;

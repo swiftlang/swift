@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name optional -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name optional -enable-sil-ownership %s | %FileCheck %s
 
 func testCall(_ f: (() -> ())?) {
   f?()
@@ -96,8 +96,49 @@ func tuple_bind(_ x: (Int, String)?) -> String? {
 
 // rdar://21883752 - We were crashing on this function because the deallocation happened
 // out of scope.
-// CHECK-LABEL: sil hidden @$S8optional16crash_on_deallocyys10DictionaryVySiSaySiGGFfA_
+// CHECK-LABEL: sil hidden @$S8optional16crash_on_deallocyySDySiSaySiGGFfA_
 func crash_on_dealloc(_ dict : [Int : [Int]] = [:]) {
   var dict = dict
   dict[1]?.append(2)
+}
+
+func use_unwrapped(_: Int) {}
+
+// CHECK-LABEL: sil hidden @$S8optional15explicit_unwrap{{[_0-9a-zA-Z]*}}F
+// CHECK:         [[FILESTR:%.*]] = string_literal utf8 "
+// CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
+// CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
+// CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word, 
+// CHECK-NEXT:         [[COLUMN:%.*]] = integer_literal $Builtin.Word, 
+// CHECK-NEXT:         [[IMPLICIT:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:         [[PRECOND:%.*]] = function_ref @$Ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
+// CHECK:         apply [[PRECOND]]([[FILESTR]], [[FILESIZ]], [[FILEASC]], [[LINE]], [[IMPLICIT]])
+func explicit_unwrap(_ value: Int?) {
+  use_unwrapped(value!)
+}
+
+// CHECK-LABEL: sil hidden @$S8optional19explicit_iuo_unwrap{{[_0-9a-zA-Z]*}}F
+// CHECK:         [[FILESTR:%.*]] = string_literal utf8 "
+// CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
+// CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
+// CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word, 
+// CHECK-NEXT:         [[COLUMN:%.*]] = integer_literal $Builtin.Word, 
+// CHECK-NEXT:         [[IMPLICIT:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:         [[PRECOND:%.*]] = function_ref @$Ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
+// CHECK:         apply [[PRECOND]]([[FILESTR]], [[FILESIZ]], [[FILEASC]], [[LINE]], [[IMPLICIT]])
+func explicit_iuo_unwrap(_ value: Int!) {
+  use_unwrapped(value!)
+}
+
+// CHECK-LABEL: sil hidden @$S8optional19implicit_iuo_unwrap{{[_0-9a-zA-Z]*}}F
+// CHECK:         [[FILESTR:%.*]] = string_literal utf8 "
+// CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
+// CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
+// CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word, 
+// CHECK-NEXT:         [[COLUMN:%.*]] = integer_literal $Builtin.Word, 
+// CHECK-NEXT:         [[IMPLICIT:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK:         [[PRECOND:%.*]] = function_ref @$Ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
+// CHECK:         apply [[PRECOND]]([[FILESTR]], [[FILESIZ]], [[FILEASC]], [[LINE]], [[IMPLICIT]])
+func implicit_iuo_unwrap(_ value: Int!) {
+  use_unwrapped(value)
 }

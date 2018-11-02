@@ -18,7 +18,7 @@ func dup<T>(_ x: T) -> (T, T) { var x = x; return (x,x) }
 // CHECK: [[TYPE_ADDR:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_ADDR]], i64 -1
 // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK: [[SIZE_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
+// CHECK: [[SIZE_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 8
 // CHECK: [[SIZE_WITNESS:%.*]] = load i8*, i8** [[SIZE_WITNESS_ADDR]]
 // CHECK: [[SIZE:%.*]] = ptrtoint i8* [[SIZE_WITNESS]]
 // CHECK: [[X_ALLOCA:%.*]] = alloca i8, {{.*}} [[SIZE]], align 16
@@ -62,7 +62,7 @@ func dupC<T : C>(_ x: T) -> (T, T) { return (x, x) }
 func callDupC(_ c: C) { _ = dupC(c) }
 // CHECK-LABEL: define hidden swiftcc void @"$S14generic_tuples8callDupCyyAA1CCF"(%T14generic_tuples1CC*)
 // CHECK-NEXT: entry:
-// CHECK-NEXT: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S14generic_tuples1CCMa"(i64 0)
+// CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S14generic_tuples1CCMa"(i64 0)
 // CHECK-NEXT: [[METATYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT: [[TUPLE:%.*]] = call swiftcc { %T14generic_tuples1CC*, %T14generic_tuples1CC* } @"$S14generic_tuples4dupCyx_xtxAA1CCRbzlF"(%T14generic_tuples1CC* %0, %swift.type* [[METATYPE]])
 // CHECK-NEXT: [[LEFT:%.*]] = extractvalue { %T14generic_tuples1CC*, %T14generic_tuples1CC* } [[TUPLE]], 0

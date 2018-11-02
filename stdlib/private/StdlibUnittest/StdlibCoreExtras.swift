@@ -227,7 +227,7 @@ public func forAllPermutations(_ size: Int, _ body: ([Int]) -> Void) {
 
 /// Generate all permutations.
 public func forAllPermutations<S : Sequence>(
-  _ sequence: S, _ body: ([S.Iterator.Element]) -> Void
+  _ sequence: S, _ body: ([S.Element]) -> Void
 ) {
   let data = Array(sequence)
   forAllPermutations(data.count) {
@@ -239,8 +239,8 @@ public func forAllPermutations<S : Sequence>(
 
 public func cartesianProduct<C1 : Collection, C2 : Collection>(
   _ c1: C1, _ c2: C2
-) -> [(C1.Iterator.Element, C2.Iterator.Element)] {
-  var result: [(C1.Iterator.Element, C2.Iterator.Element)] = []
+) -> [(C1.Element, C2.Element)] {
+  var result: [(C1.Element, C2.Element)] = []
   for e1 in c1 {
     for e2 in c2 {
       result.append((e1, e2))

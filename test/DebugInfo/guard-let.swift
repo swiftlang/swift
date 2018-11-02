@@ -21,9 +21,13 @@ public func f(_ i : Int?)
   use(val)
 }
 
-// With large type optimizations the string is passed indirectly on i386 so
-// there is no shadow copy happening.
+// With large type optimizations the string is passed indirectly on the
+// following architectures so there is no shadow copy happening. As this
+// tests that we're emitting the DI correctly, we can skip running on them.
 // UNSUPPORTED: CPU=i386
+// UNSUPPORTED: CPU=armv7
+// UNSUPPORTED: CPU=armv7s
+// UNSUPPORTED: CPU=armv7k
 
 public func g(_ s : String?)
 {
@@ -32,9 +36,9 @@ public func g(_ s : String?)
   // CHECK2: @llvm.dbg.declare(metadata %TSSSg*
   // CHECK2: %debug.copy1 = alloca %TSS
   // CHECK2: @llvm.dbg.declare(metadata %TSS*
-  // CHECK2: %4 = bitcast %TSSSg* %debug.copy to { i64, i64 }*, !dbg
-  // CHECK2: %5 = getelementptr inbounds { i64, i64 }, { i64, i64 }* %4, i32 0, i32 0, !dbg
-  // CHECK2: store i64 %0, i64* %5, align 8, !dbg
+  // CHECK2: %4 = bitcast %TSSSg* %debug.copy to {{.*}}*, !dbg
+  // CHECK2: %5 = getelementptr inbounds {{.*}}, {{.*}}* %4, i32 0, i32 0, !dbg
+  // CHECK2: store {{.*}} %0, {{.*}}* %5, align 8, !dbg
   // CHECK2: ![[G:.*]] = distinct !DISubprogram(name: "g"
   guard let val = s else { return }
   use(val)

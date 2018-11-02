@@ -27,6 +27,23 @@ using namespace sil;
     }                                                                          \
     return ValueOwnershipKind::OWNERSHIP;                                      \
   }
+
+
+
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  CONSTANT_OWNERSHIP_INST(Owned, Load##Name)
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  CONSTANT_OWNERSHIP_INST(Unowned, RefTo##Name) \
+  CONSTANT_OWNERSHIP_INST(Unowned, Name##ToRef) \
+  CONSTANT_OWNERSHIP_INST(Owned, Copy##Name##Value)
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#define UNCHECKED_REF_STORAGE(Name, ...) \
+  CONSTANT_OWNERSHIP_INST(Trivial, RefTo##Name) \
+  CONSTANT_OWNERSHIP_INST(Unowned, Name##ToRef)
+#include "swift/AST/ReferenceStorage.def"
+
 CONSTANT_OWNERSHIP_INST(Guaranteed, BeginBorrow)
 CONSTANT_OWNERSHIP_INST(Guaranteed, LoadBorrow)
 CONSTANT_OWNERSHIP_INST(Owned, AllocBox)
@@ -35,10 +52,8 @@ CONSTANT_OWNERSHIP_INST(Owned, AllocRef)
 CONSTANT_OWNERSHIP_INST(Owned, AllocRefDynamic)
 CONSTANT_OWNERSHIP_INST(Trivial, AllocValueBuffer)
 CONSTANT_OWNERSHIP_INST(Owned, CopyBlock)
+CONSTANT_OWNERSHIP_INST(Owned, CopyBlockWithoutEscaping)
 CONSTANT_OWNERSHIP_INST(Owned, CopyValue)
-CONSTANT_OWNERSHIP_INST(Owned, CopyUnownedValue)
-CONSTANT_OWNERSHIP_INST(Owned, LoadUnowned)
-CONSTANT_OWNERSHIP_INST(Owned, LoadWeak)
 CONSTANT_OWNERSHIP_INST(Owned, KeyPath)
 CONSTANT_OWNERSHIP_INST(Owned, PartialApply)
 CONSTANT_OWNERSHIP_INST(Owned, StrongPin)
@@ -91,7 +106,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, ProjectValueBuffer)
 CONSTANT_OWNERSHIP_INST(Trivial, RefElementAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, RefTailAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, RefToRawPointer)
-CONSTANT_OWNERSHIP_INST(Trivial, RefToUnmanaged)
 CONSTANT_OWNERSHIP_INST(Trivial, SelectEnumAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, StringLiteral)
 CONSTANT_OWNERSHIP_INST(Trivial, ConstStringLiteral)
@@ -112,9 +126,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, ConvertEscapeToNoEscape)
 CONSTANT_OWNERSHIP_INST(Unowned, InitBlockStorageHeader)
 // TODO: It would be great to get rid of these.
 CONSTANT_OWNERSHIP_INST(Unowned, RawPointerToRef)
-CONSTANT_OWNERSHIP_INST(Unowned, RefToUnowned)
-CONSTANT_OWNERSHIP_INST(Unowned, UnmanagedToRef)
-CONSTANT_OWNERSHIP_INST(Unowned, UnownedToRef)
 CONSTANT_OWNERSHIP_INST(Unowned, ObjCProtocol)
 CONSTANT_OWNERSHIP_INST(Unowned, ValueToBridgeObject)
 #undef CONSTANT_OWNERSHIP_INST

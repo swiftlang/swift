@@ -463,7 +463,7 @@ unsigned OpaqueStorageAllocation::insertIndirectReturnArgs() {
         ParamDecl(VarDecl::Specifier::InOut, SourceLoc(), SourceLoc(),
                   ctx.getIdentifier("$return_value"), SourceLoc(),
                   ctx.getIdentifier("$return_value"),
-                  bodyResultTy.getSwiftRValueType(), pass.F->getDeclContext());
+                  bodyResultTy.getASTType(), pass.F->getDeclContext());
 
     pass.F->begin()->insertFunctionArgument(argIdx,
                                             bodyResultTy.getAddressType(),
@@ -655,7 +655,7 @@ SILValue AddressMaterialization::materializeProjection(Operand *operand) {
 
   switch (user->getKind()) {
   default:
-    DEBUG(user->dump());
+    LLVM_DEBUG(user->dump());
     llvm_unreachable("Unexpected subobject composition.");
   case SILInstructionKind::EnumInst: {
     auto *enumInst = cast<EnumInst>(user);
@@ -981,7 +981,7 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
   switch (origCallInst->getKind()) {
   case SILInstructionKind::ApplyInst:
     newCallInst = callBuilder.createApply(
-        loc, apply.getCallee(), apply.getSubstitutions(), newCallArgs,
+        loc, apply.getCallee(), apply.getSubstitutionMap(), newCallArgs,
         cast<ApplyInst>(origCallInst)->isNonThrowing(), nullptr);
     break;
   case SILInstructionKind::TryApplyInst:
@@ -1188,14 +1188,14 @@ protected:
   }
 
   void beforeVisit(SILInstruction *I) {
-    DEBUG(llvm::dbgs() << "  REWRITE USE "; I->dump());
+    LLVM_DEBUG(llvm::dbgs() << "  REWRITE USE "; I->dump());
 
     B.setInsertionPoint(I);
     B.setCurrentDebugScope(I->getDebugScope());
   }
 
   void visitSILInstruction(SILInstruction *I) {
-    DEBUG(I->dump());
+    LLVM_DEBUG(I->dump());
     llvm_unreachable("Unimplemented?!");
   }
 
@@ -1322,16 +1322,16 @@ protected:
     // the value storage map.
     storage = &pass.valueStorageMap.getStorage(cast<SingleValueInstruction>(I));
 
-    DEBUG(llvm::dbgs() << "REWRITE DEF "; I->dump());
+    LLVM_DEBUG(llvm::dbgs() << "REWRITE DEF "; I->dump());
     if (storage->storageAddress)
-      DEBUG(llvm::dbgs() << "  STORAGE "; storage->storageAddress->dump());
+      LLVM_DEBUG(llvm::dbgs() << "  STORAGE "; storage->storageAddress->dump());
 
     B.setInsertionPoint(I);
     B.setCurrentDebugScope(I->getDebugScope());
   }
 
   void visitSILInstruction(SILInstruction *I) {
-    DEBUG(I->dump());
+    LLVM_DEBUG(I->dump());
     llvm_unreachable("Unimplemented?!");
   }
 
@@ -1495,7 +1495,7 @@ void AddressLowering::runOnFunction(SILFunction *F) {
   OpaqueStorageAllocation allocator(pass);
   allocator.allocateOpaqueStorage();
 
-  DEBUG(llvm::dbgs() << "\nREWRITING: " << F->getName(); F->dump());
+  LLVM_DEBUG(llvm::dbgs() << "\nREWRITING: " << F->getName(); F->dump());
 
   // Rewrite instructions with address-only operands or results.
   rewriteFunction(pass);
@@ -1513,7 +1513,7 @@ void AddressLowering::runOnFunction(SILFunction *F) {
     if (!deadInst)
       continue;
 
-    DEBUG(llvm::dbgs() << "DEAD "; deadInst->dump());
+    LLVM_DEBUG(llvm::dbgs() << "DEAD "; deadInst->dump());
 #ifndef NDEBUG
     for (auto result : deadInst->getResults())
       for (Operand *operand : result->getUses())

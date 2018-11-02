@@ -14,6 +14,7 @@
 #define SWIFT_IRGEN_LINKING_H
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ProtocolAssociations.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
@@ -879,6 +880,9 @@ public:
                      llvm::GlobalValue::VisibilityTypes Visibility,
                      llvm::GlobalValue::DLLStorageClassTypes DLLStorage);
 };
+
+StringRef encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,
+                                    StringRef name);
 }
 }
 
@@ -909,5 +913,4 @@ template <> struct llvm::DenseMapInfo<swift::irgen::LinkEntity> {
            LHS.SecondaryPointer == RHS.SecondaryPointer && LHS.Data == RHS.Data;
   }
 };
-
 #endif

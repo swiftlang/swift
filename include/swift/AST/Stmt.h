@@ -20,7 +20,6 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/Expr.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/NullablePtr.h"
@@ -129,7 +128,7 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
-  void print(raw_ostream &OS, unsigned Indent = 0) const;
+  void print(raw_ostream &OS, const ASTContext *Ctx = nullptr, unsigned Indent = 0) const;
 
   // Only allow allocation of Exprs using the allocator in ASTContext
   // or by doing a placement new.

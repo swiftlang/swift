@@ -822,9 +822,11 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
   Info.FixIts = diagnostic.getFixIts();
   for (auto &Consumer : Consumers) {
     Consumer->handleDiagnostic(SourceMgr, loc, toDiagnosticKind(behavior),
-                               diagnosticStrings[(unsigned)Info.ID],
-                               diagnostic.getArgs(),
-                               Info);
+                               diagnosticStringFor(Info.ID),
+                               diagnostic.getArgs(), Info);
   }
 }
 
+const char *DiagnosticEngine::diagnosticStringFor(const DiagID id) {
+  return diagnosticStrings[(unsigned)id];
+}

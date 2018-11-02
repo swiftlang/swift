@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-inliner"
+#include "swift/AST/Module.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -177,7 +178,7 @@ public:
 // Returns true if it is possible to perform a generic
 // specialization for a given call.
 static bool canSpecializeGeneric(ApplySite AI, SILFunction *F,
-                                 SubstitutionList Subs) {
+                                 SubstitutionMap Subs) {
   return ReabstractionInfo::canBeSpecialized(AI, F, Subs);
 }
 
@@ -196,9 +197,9 @@ bool SILPerformanceInliner::profileBasedDecision(
   auto callerCount = bbIt->getSecond();
   if (callerCount < 1) {
     // Never called - do not inline
-    DEBUG(dumpCaller(AI.getFunction()); llvm::dbgs()
-                                        << "profiled decision: NO"
-                                        << ", reason= Never Called." << '\n';);
+    LLVM_DEBUG(dumpCaller(AI.getFunction());
+               llvm::dbgs() << "profiled decision: NO, "
+                               "reason= Never Called.\n");
     return false;
   }
   auto calleeCount = Callee->getEntryCount();
@@ -207,27 +208,25 @@ bool SILPerformanceInliner::profileBasedDecision(
     auto calleCountVal = calleeCount.getValue();
     auto percent = (long double)callerCount / (long double)calleCountVal;
     if (percent < 0.8) {
-      DEBUG(dumpCaller(AI.getFunction());
-            llvm::dbgs() << "profiled decision: NO"
-                         << ", reason=SI " << std::to_string(percent) << "%"
-                         << '\n';);
+      LLVM_DEBUG(dumpCaller(AI.getFunction());
+                 llvm::dbgs() << "profiled decision: NO, reason=SI "
+                              << std::to_string(percent) << "%\n");
       return false;
     }
-    DEBUG(dumpCaller(AI.getFunction()); llvm::dbgs() << "profiled decision: YES"
-                                                     << ", reason=SI "
-                                                     << std::to_string(percent)
-                                                     << "%" << '\n';);
+    LLVM_DEBUG(dumpCaller(AI.getFunction());
+               llvm::dbgs() << "profiled decision: YES, reason=SI "
+                            << std::to_string(percent) << "%\n");
   } else {
     // No callee count - use a "modified" aggressive IHF for now
     if (CalleeCost > Benefit && callerCount < 100) {
-      DEBUG(dumpCaller(AI.getFunction());
-            llvm::dbgs() << "profiled decision: NO"
-                         << ", reason=IHF " << callerCount << '\n';);
+      LLVM_DEBUG(dumpCaller(AI.getFunction());
+                 llvm::dbgs() << "profiled decision: NO, reason=IHF "
+                              << callerCount << '\n');
       return false;
     }
-    DEBUG(dumpCaller(AI.getFunction()); llvm::dbgs() << "profiled decision: YES"
-                                                     << ", reason=IHF "
-                                                     << callerCount << '\n';);
+    LLVM_DEBUG(dumpCaller(AI.getFunction());
+               llvm::dbgs() << "profiled decision: YES, reason=IHF "
+                            << callerCount << '\n');
   }
   // We're gonna inline!
   NumCallerBlocks += Callee->size();
@@ -239,7 +238,7 @@ bool SILPerformanceInliner::isProfitableToInline(
     int &NumCallerBlocks,
     const llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap) {
   SILFunction *Callee = AI.getReferencedFunction();
-  bool IsGeneric = !AI.getSubstitutions().empty();
+  bool IsGeneric = AI.hasSubstitutions();
 
   assert(EnableSILInliningOfGenerics || !IsGeneric);
 
@@ -268,17 +267,16 @@ bool SILPerformanceInliner::isProfitableToInline(
   // It is always OK to inline a simple call.
   // TODO: May be consider also the size of the callee?
   if (isPureCall(AI, SEA)) {
-    DEBUG(
-      dumpCaller(AI.getFunction());
-      llvm::dbgs() << "    pure-call decision " << Callee->getName() << '\n';
-    );
+    LLVM_DEBUG(dumpCaller(AI.getFunction());
+               llvm::dbgs() << "    pure-call decision " << Callee->getName()
+                            << '\n');
     return true;
   }
 
   // Bail out if this generic call can be optimized by means of
   // the generic specialization, because we prefer generic specialization
   // to inlining of generics.
-  if (IsGeneric && canSpecializeGeneric(AI, Callee, AI.getSubstitutions())) {
+  if (IsGeneric && canSpecializeGeneric(AI, Callee, AI.getSubstitutionMap())) {
     return false;
   }
 
@@ -295,12 +293,7 @@ bool SILPerformanceInliner::isProfitableToInline(
   int CalleeCost = 0;
   int Benefit = 0;
 
-  SubstitutionMap CalleeSubstMap;
-  if (IsGeneric) {
-    CalleeSubstMap = Callee->getLoweredFunctionType()
-      ->getGenericSignature()
-      ->getSubstitutionMap(AI.getSubstitutions());
-  }
+  SubstitutionMap CalleeSubstMap = AI.getSubstitutionMap();
 
   CallerWeight.updateBenefit(Benefit, BaseBenefit);
 
@@ -329,7 +322,7 @@ bool SILPerformanceInliner::isProfitableToInline(
         if (!def)
           continue;
 
-        auto Subs = FAI.getSubstitutions();
+        auto Subs = FAI.getSubstitutionMap();
 
         // Bail if it is not a generic call or inlining of generics is forbidden.
         if (!EnableSILInliningOfGenerics || Subs.empty())
@@ -345,21 +338,16 @@ bool SILPerformanceInliner::isProfitableToInline(
 
         // Create the list of substitutions as they will be after
         // inlining.
-        auto Sig = FAI.getOrigCalleeType()->getGenericSignature();
-        auto SubMap = Sig->getSubstitutionMap(Subs);
-        SubMap = SubMap.subst(CalleeSubstMap);
-
-        SmallVector<Substitution, 4> NewSubs;
-        Sig->getSubstitutions(SubMap, NewSubs);
+        auto SubMap = Subs.subst(CalleeSubstMap);
 
         // Check if the call can be devirtualized.
         if (isa<ClassMethodInst>(def) || isa<WitnessMethodInst>(def) ||
             isa<SuperMethodInst>(def)) {
           // TODO: Take AI.getSubstitutions() into account.
           if (canDevirtualizeApply(FAI, nullptr)) {
-            DEBUG(llvm::dbgs() << "Devirtualization will be possible after "
-                                  "inlining for the call:\n";
-                  FAI.getInstruction()->dumpInContext());
+            LLVM_DEBUG(llvm::dbgs() << "Devirtualization will be possible "
+                                       "after inlining for the call:\n";
+                       FAI.getInstruction()->dumpInContext());
             BlockW.updateBenefit(Benefit, DevirtualizedCallBenefit);
           }
         }
@@ -367,11 +355,11 @@ bool SILPerformanceInliner::isProfitableToInline(
         // Check if a generic specialization would be possible.
         if (isa<FunctionRefInst>(def)) {
           auto CalleeF = FAI.getCalleeFunction();
-          if (!canSpecializeGeneric(FAI, CalleeF, NewSubs))
+          if (!canSpecializeGeneric(FAI, CalleeF, SubMap))
             continue;
-          DEBUG(llvm::dbgs() << "Generic specialization will be possible after "
-                                "inlining for the call:\n";
-                FAI.getInstruction()->dumpInContext());
+          LLVM_DEBUG(llvm::dbgs() << "Generic specialization will be possible "
+                                     "after inlining for the call:\n";
+                     FAI.getInstruction()->dumpInContext());
           BlockW.updateBenefit(Benefit, GenericSpecializationBenefit);
         }
       } else if (auto *LI = dyn_cast<LoadInst>(&I)) {
@@ -417,11 +405,9 @@ bool SILPerformanceInliner::isProfitableToInline(
       return false;
     }
 
-    DEBUG(
-      dumpCaller(AI.getFunction());
-      llvm::dbgs() << "    decision {" << CalleeCost << " into thunk} " <<
-          Callee->getName() << '\n';
-    );
+    LLVM_DEBUG(dumpCaller(AI.getFunction());
+               llvm::dbgs() << "    decision {" << CalleeCost << " into thunk} "
+                            << Callee->getName() << '\n');
     return true;
   }
 
@@ -458,13 +444,14 @@ bool SILPerformanceInliner::isProfitableToInline(
 
   NumCallerBlocks += Callee->size();
 
-  DEBUG(
-    dumpCaller(AI.getFunction());
-    llvm::dbgs() << "    decision {c=" << CalleeCost << ", b=" << Benefit <<
-        ", l=" << SPA->getScopeLength(CalleeEntry, 0) <<
-        ", c-w=" << CallerWeight << ", bb=" << Callee->size() <<
-        ", c-bb=" << NumCallerBlocks << "} " << Callee->getName() << '\n';
-  );
+  LLVM_DEBUG(dumpCaller(AI.getFunction());
+             llvm::dbgs() << "    decision {c=" << CalleeCost
+                          << ", b=" << Benefit
+                          << ", l=" << SPA->getScopeLength(CalleeEntry, 0)
+                          << ", c-w=" << CallerWeight
+                          << ", bb=" << Callee->size()
+                          << ", c-bb=" << NumCallerBlocks
+                          << "} " << Callee->getName() << '\n');
   ORE.emit([&]() {
     using namespace OptRemark;
     return RemarkPassed("Inlined", *AI.getInstruction())
@@ -484,7 +471,7 @@ bool SILPerformanceInliner::isProfitableToInline(
 /// It returns None if the decision cannot be made without a more complex
 /// analysis.
 static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
-  assert(!AI.getSubstitutions().empty() &&
+  assert(AI.hasSubstitutions() &&
          "Expected a generic apply");
 
   SILFunction *Callee = AI.getReferencedFunction();
@@ -514,7 +501,7 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
   // If all substitutions are concrete, then there is no need to perform the
   // generic inlining. Let the generic specializer create a specialized
   // function and then decide if it is beneficial to inline it.
-  if (!hasArchetypes(AI.getSubstitutions()))
+  if (!AI.getSubstitutionMap().hasArchetypes())
     return false;
 
   // It is not clear yet if this function should be decided or not.
@@ -525,7 +512,7 @@ bool SILPerformanceInliner::decideInWarmBlock(
     FullApplySite AI, Weight CallerWeight, ConstantTracker &callerTracker,
     int &NumCallerBlocks,
     const llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap) {
-  if (!AI.getSubstitutions().empty()) {
+  if (AI.hasSubstitutions()) {
     // Only inline generics if definitively clear that it should be done.
     auto ShouldInlineGeneric = shouldInlineGeneric(AI);
     if (ShouldInlineGeneric.hasValue())
@@ -535,10 +522,9 @@ bool SILPerformanceInliner::decideInWarmBlock(
   SILFunction *Callee = AI.getReferencedFunction();
 
   if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent()) {
-    DEBUG(
-      dumpCaller(AI.getFunction());
-      llvm::dbgs() << "    always-inline decision " << Callee->getName() << '\n';
-    );
+    LLVM_DEBUG(dumpCaller(AI.getFunction());
+               llvm::dbgs() << "    always-inline decision "
+                            << Callee->getName() << '\n');
     return true;
   }
 
@@ -549,7 +535,7 @@ bool SILPerformanceInliner::decideInWarmBlock(
 /// Return true if inlining this call site into a cold block is profitable.
 bool SILPerformanceInliner::decideInColdBlock(FullApplySite AI,
                                               SILFunction *Callee) {
-  if (!AI.getSubstitutions().empty()) {
+  if (AI.hasSubstitutions()) {
     // Only inline generics if definitively clear that it should be done.
     auto ShouldInlineGeneric = shouldInlineGeneric(AI);
     if (ShouldInlineGeneric.hasValue())
@@ -559,10 +545,9 @@ bool SILPerformanceInliner::decideInColdBlock(FullApplySite AI,
   }
 
   if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent()) {
-    DEBUG(
-      dumpCaller(AI.getFunction());
-      llvm::dbgs() << "    always-inline decision " << Callee->getName() << '\n';
-      );
+    LLVM_DEBUG(dumpCaller(AI.getFunction());
+               llvm::dbgs() << "    always-inline decision "
+                            << Callee->getName() << '\n');
     return true;
   }
 
@@ -575,11 +560,9 @@ bool SILPerformanceInliner::decideInColdBlock(FullApplySite AI,
         return false;
     }
   }
-  DEBUG(
-    dumpCaller(AI.getFunction());
-    llvm::dbgs() << "    cold decision {" << CalleeCost << "} " <<
-              Callee->getName() << '\n';
-  );
+  LLVM_DEBUG(dumpCaller(AI.getFunction());
+             llvm::dbgs() << "    cold decision {" << CalleeCost << "} "
+                          << Callee->getName() << '\n');
   return true;
 }
 
@@ -832,11 +815,10 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     for (const auto &Arg : AI.getArguments())
       Args.push_back(Arg);
 
-    DEBUG(
-      dumpCaller(Caller);
-      llvm::dbgs() << "    inline [" << Callee->size() << "->" <<
-          Caller->size() << "] " << Callee->getName() << "\n";
-    );
+    LLVM_DEBUG(dumpCaller(Caller);
+               llvm::dbgs() << "    inline [" << Callee->size() << "->"
+                            << Caller->size()
+                            << "] " << Callee->getName() << "\n");
 
     SILOpenedArchetypesTracker OpenedArchetypesTracker(Caller);
     Caller->getModule().registerDeleteNotificationHandler(&OpenedArchetypesTracker);
@@ -846,7 +828,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
 
     SILInliner Inliner(*Caller, *Callee,
                        SILInliner::InlineKind::PerformanceInline,
-                       AI.getSubstitutions(),
+                       AI.getSubstitutionMap(),
                        OpenedArchetypesTracker);
 
     // We've already determined we should be able to inline this, so
@@ -933,7 +915,7 @@ public:
 } // end anonymous namespace
 
 /// Create an inliner pass that does not inline functions that are marked with
-/// the @_semantics, @effects or global_init attributes.
+/// the @_semantics, @_effects or global_init attributes.
 SILTransform *swift::createEarlyInliner() {
   return new SILPerformanceInlinerPass(
     InlineSelection::NoSemanticsAndGlobalInit, "Early");
@@ -946,7 +928,7 @@ SILTransform *swift::createPerfInliner() {
 }
 
 /// Create an inliner pass that inlines all functions that are marked with
-/// the @_semantics, @effects or global_init attributes.
+/// the @_semantics, @_effects or global_init attributes.
 SILTransform *swift::createLateInliner() {
   return new SILPerformanceInlinerPass(InlineSelection::Everything, "Late");
 }

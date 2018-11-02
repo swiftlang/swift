@@ -61,7 +61,7 @@ extension Sequence {
   ///     // Prints "Mateo"
   ///
   /// - Returns: A sequence of pairs enumerating the sequence.
-  @inlinable
+  @inlinable // protocol-only
   public func enumerated() -> EnumeratedSequence<Self> {
     return EnumeratedSequence(_base: self)
   }
@@ -102,7 +102,7 @@ extension Sequence {
   /// - Returns: The sequence's minimum element, according to
   ///   `areInIncreasingOrder`. If the sequence has no elements, returns
   ///   `nil`.
-  @inlinable
+  @inlinable // protocol-only
   @warn_unqualified_access
   public func min(
     by areInIncreasingOrder: (Element, Element) throws -> Bool
@@ -144,7 +144,7 @@ extension Sequence {
   ///   otherwise, `false`.
   /// - Returns: The sequence's maximum element if the sequence is not empty;
   ///   otherwise, `nil`.
-  @inlinable
+  @inlinable // protocol-only
   @warn_unqualified_access
   public func max(
     by areInIncreasingOrder: (Element, Element) throws -> Bool
@@ -488,6 +488,28 @@ extension Sequence {
     }
     return false
   }
+
+  /// Returns a Boolean value indicating whether every element of a sequence
+  /// satisfies a given predicate.
+  ///
+  /// The following code uses this method to test whether all the names in an
+  /// array have at least five characters:
+  ///
+  ///     let names = ["Sofia", "Camilla", "Martina", "Mateo", "Nicolás"]
+  ///     let allHaveAtLeastFive = names.allSatisfy({ $0.count >= 5 })
+  ///     // allHaveAtLeastFive == true
+  ///
+  /// - Parameter predicate: A closure that takes an element of the sequence
+  ///   as its argument and returns a Boolean value that indicates whether
+  ///   the passed element satisfies a condition.
+  /// - Returns: `true` if the sequence contains only elements that satisfy
+  ///   `predicate`; otherwise, `false`.
+  @inlinable
+  public func allSatisfy(
+    _ predicate: (Element) throws -> Bool
+  ) rethrows -> Bool {
+    return try !contains { try !predicate($0) }
+  }
 }
 
 extension Sequence where Element : Equatable {
@@ -727,41 +749,8 @@ extension Sequence {
   ///
   /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
   ///   and *n* is the length of the result.
-  @inlinable
+  @inlinable // protocol-only
   public func compactMap<ElementOfResult>(
-    _ transform: (Element) throws -> ElementOfResult?
-  ) rethrows -> [ElementOfResult] {
-    return try _compactMap(transform)
-  }
-
-  /// Returns an array containing the non-`nil` results of calling the given
-  /// transformation with each element of this sequence.
-  ///
-  /// Use this method to receive an array of nonoptional values when your
-  /// transformation produces an optional value.
-  ///
-  /// In this example, note the difference in the result of using `map` and
-  /// `flatMap` with a transformation that returns an optional `Int` value.
-  ///
-  ///     let possibleNumbers = ["1", "2", "three", "///4///", "5"]
-  ///
-  ///     let mapped: [Int?] = possibleNumbers.map { str in Int(str) }
-  ///     // [1, 2, nil, nil, 5]
-  ///
-  ///     let flatMapped: [Int] = possibleNumbers.flatMap { str in Int(str) }
-  ///     // [1, 2, 5]
-  ///
-  /// - Parameter transform: A closure that accepts an element of this
-  ///   sequence as its argument and returns an optional value.
-  /// - Returns: An array of the non-`nil` results of calling `transform`
-  ///   with each element of the sequence.
-  ///
-  /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
-  ///   and *n* is the length of the result.
-  @inline(__always)
-  @available(swift, deprecated: 4.1, renamed: "compactMap(_:)",
-    message: "Please use compactMap(_:) for the case where closure returns an optional value")
-  public func flatMap<ElementOfResult>(
     _ transform: (Element) throws -> ElementOfResult?
   ) rethrows -> [ElementOfResult] {
     return try _compactMap(transform)
@@ -770,7 +759,7 @@ extension Sequence {
   // The implementation of flatMap accepting a closure with an optional result.
   // Factored out into a separate functions in order to be used in multiple
   // overloads.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   @inline(__always)
   public func _compactMap<ElementOfResult>(
     _ transform: (Element) throws -> ElementOfResult?

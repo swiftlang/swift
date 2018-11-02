@@ -11,3 +11,14 @@ extension SR7251 {
   struct k {} // expected-error{{invalid redeclaration of 'k'}}
 }
 
+struct SR7249<T> {
+    var x: T { fatalError() } // expected-note {{previously declared}}
+    var y: Int // expected-note {{previously declared}}
+    var z: Int // expected-note {{previously declared}}
+}
+
+extension SR7249 {
+    var x: Int { fatalError() } // expected-error{{invalid redeclaration of 'x'}}
+    var y: T { fatalError() } // expected-error{{invalid redeclaration of 'y'}}
+    var z: Int { fatalError() } // expected-error{{invalid redeclaration of 'z'}}
+}

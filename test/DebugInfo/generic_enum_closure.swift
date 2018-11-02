@@ -15,9 +15,8 @@ struct CErrorOr<T>
     // CHECK-SAME: !DIExpression(DW_OP_deref))
     // CHECK-DAG: store i8* %[[DYN:.*]], i8** %[[SHADOW]]
     // CHECK-DAG: %[[DYN]] = alloca i8, i{{32|64}} %
-    // CHECK: ![[T1:.*]] = !DICompositeType({{.*}}, identifier: "$S20generic_enum_closure8CErrorOrVyACQq_GD")
-    // CHECK: ![[SELF]] = !DILocalVariable(name: "self", scope:
-    // CHECK-SAME:                         type: ![[T1]])
+    // CHECK-DAG: ![[SELF]] = !DILocalVariable(name: "self", scope:{{.*}}, type: ![[T1:.*]])
+    // CHECK-DAG: ![[T1]] = !DICompositeType({{.*}}, identifier: "$S20generic_enum_closure8CErrorOrVyxGD")
     value = .none
   }
 }

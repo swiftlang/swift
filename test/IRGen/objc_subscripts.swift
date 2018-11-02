@@ -36,7 +36,7 @@
 // CHECK:  }
 
 @objc class SomeObject {
-  subscript (i : Int) -> SomeObject {
+  @objc subscript (i : Int) -> SomeObject {
     // CHECK: define internal [[OPAQUE0:%.*]]* @"$S15objc_subscripts10SomeObjectCyACSicigTo"([[OPAQUE1]]*, i8*, i64) unnamed_addr
     get {
       // CHECK: call swiftcc %T15objc_subscripts10SomeObjectC* @"$S15objc_subscripts10SomeObjectCyACSicig"
@@ -49,7 +49,7 @@
     }
   }
 
-  subscript (s : SomeObject) -> Int {
+  @objc subscript (s : SomeObject) -> Int {
   // CHECK-LABEL: define internal i64 @"$S15objc_subscripts10SomeObjectCySiACcigTo"
     get {
       // CHECK: call swiftcc i64 @"$S15objc_subscripts10SomeObjectCySiACcig"
@@ -61,5 +61,7 @@
       // CHECK: call swiftcc void @"$S15objc_subscripts10SomeObjectCySiACcis"
     }
   }
+
+  @objc init() {}
 }
 

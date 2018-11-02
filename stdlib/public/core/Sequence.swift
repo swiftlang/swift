@@ -336,7 +336,7 @@ public protocol Sequence {
           SubSequence.SubSequence == SubSequence
 
   /// Returns an iterator over the elements of this sequence.
-  func makeIterator() -> Iterator
+  __consuming func makeIterator() -> Iterator
 
   /// A value less than or equal to the number of elements in the sequence,
   /// calculated nondestructively.
@@ -384,7 +384,7 @@ public protocol Sequence {
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be included in the returned array.
   /// - Returns: An array of the elements that `isIncluded` allowed.
-  func filter(
+  __consuming func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Element]
 
@@ -442,7 +442,7 @@ public protocol Sequence {
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements to drop from
   ///   the beginning of the sequence.
-  func dropFirst(_ n: Int) -> SubSequence
+  __consuming func dropFirst(_ n: Int) -> SubSequence
 
   /// Returns a subsequence containing all but the specified number of final
   /// elements.
@@ -462,7 +462,7 @@ public protocol Sequence {
   /// - Returns: A subsequence leaving off the specified number of elements.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  func dropLast(_ n: Int) -> SubSequence
+  __consuming func dropLast(_ n: Int) -> SubSequence
 
   /// Returns a subsequence by skipping elements while `predicate` returns
   /// `true` and returning the remaining elements.
@@ -472,7 +472,7 @@ public protocol Sequence {
   ///   whether the element is a match.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  func drop(
+  __consuming func drop(
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence
 
@@ -492,7 +492,7 @@ public protocol Sequence {
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A subsequence starting at the beginning of this sequence
   ///   with at most `maxLength` elements.
-  func prefix(_ maxLength: Int) -> SubSequence
+  __consuming func prefix(_ maxLength: Int) -> SubSequence
 
   /// Returns a subsequence containing the initial, consecutive elements that
   /// satisfy the given predicate.
@@ -516,7 +516,7 @@ public protocol Sequence {
   ///   satisfy `predicate`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  func prefix(
+  __consuming func prefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence
 
@@ -539,7 +539,7 @@ public protocol Sequence {
   ///   at most `maxLength` elements.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  func suffix(_ maxLength: Int) -> SubSequence
+  __consuming func suffix(_ maxLength: Int) -> SubSequence
 
   /// Returns the longest possible subsequences of the sequence, in order, that
   /// don't contain elements satisfying the given predicate.
@@ -590,7 +590,7 @@ public protocol Sequence {
   ///   - isSeparator: A closure that returns `true` if its argument should be
   ///     used to split the sequence; otherwise, `false`.
   /// - Returns: An array of subsequences, split from this sequence's elements.
-  func split(
+  __consuming func split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
     whereSeparator isSeparator: (Element) throws -> Bool
   ) rethrows -> [SubSequence]
@@ -607,11 +607,11 @@ public protocol Sequence {
 
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
-  func _copyToContiguousArray() -> ContiguousArray<Element>
+  __consuming func _copyToContiguousArray() -> ContiguousArray<Element>
 
   /// Copy `self` into an unsafe buffer, returning a partially-consumed
   /// iterator with any elements that didn't fit remaining.
-  func _copyContents(
+  __consuming func _copyContents(
     initializing ptr: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index)
 }
@@ -745,7 +745,8 @@ internal struct _PrefixSequence<Base : IteratorProtocol>
 internal struct _DropWhileSequence<Base : IteratorProtocol>
     : Sequence, IteratorProtocol {
 
-      typealias Element = Base.Element
+  @usableFromInline
+  typealias Element = Base.Element
 
   @usableFromInline
   internal var _iterator: Base
@@ -943,12 +944,6 @@ extension Sequence {
   }
 }
 
-@usableFromInline
-@_frozen
-internal enum _StopIteration : Error {
-  case stop
-}
-
 extension Sequence {
   /// Returns the first element of the sequence that satisfies the given
   /// predicate.
@@ -971,16 +966,12 @@ extension Sequence {
   public func first(
     where predicate: (Element) throws -> Bool
   ) rethrows -> Element? {
-    var foundElement: Element?
-    do {
-      try self.forEach {
-        if try predicate($0) {
-          foundElement = $0
-          throw _StopIteration.stop
-        }
+    for element in self  {
+      if try predicate(element) {
+        return element
       }
-    } catch is _StopIteration { }
-    return foundElement
+    }
+    return nil
   }
 }
 

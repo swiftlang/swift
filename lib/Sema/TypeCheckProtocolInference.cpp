@@ -223,8 +223,8 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
 
   for (auto witness : checker.lookupValueWitnesses(req,
                                                    /*ignoringNames=*/nullptr)) {
-    DEBUG(llvm::dbgs() << "Inferring associated types from decl:\n";
-          witness->dump(llvm::dbgs()));
+    LLVM_DEBUG(llvm::dbgs() << "Inferring associated types from decl:\n";
+               witness->dump(llvm::dbgs()));
 
     // If the potential witness came from an extension, and our `Self`
     // type can't use it regardless of what associated types we end up
@@ -246,20 +246,21 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
 }
       auto &result = witnessResult.Inferred[i];
 
-      DEBUG(llvm::dbgs() << "Considering whether " << result.first->getName()
-                         << " can infer to:\n";
-            result.second->dump(llvm::dbgs()));
+      LLVM_DEBUG(llvm::dbgs() << "Considering whether "
+                              << result.first->getName()
+                              << " can infer to:\n";
+                 result.second->dump(llvm::dbgs()));
 
       // Filter out errors.
       if (result.second->hasError()) {
-        DEBUG(llvm::dbgs() << "-- has error type\n");
+        LLVM_DEBUG(llvm::dbgs() << "-- has error type\n");
         REJECT;
       }
 
       // Filter out duplicates.
       if (!known.insert({result.first, result.second->getCanonicalType()})
                 .second) {
-        DEBUG(llvm::dbgs() << "-- duplicate\n");
+        LLVM_DEBUG(llvm::dbgs() << "-- duplicate\n");
         REJECT;
       }
 
@@ -318,8 +319,8 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
                       return t;
                     });
                     canInferFromOtherAssociatedType = true;
-                    DEBUG(llvm::dbgs() << "++ we can same-type to:\n";
-                          result.second->dump(llvm::dbgs()));
+                    LLVM_DEBUG(llvm::dbgs() << "++ we can same-type to:\n";
+                               result.second->dump(llvm::dbgs()));
                     return false;
                   }
                 }
@@ -332,7 +333,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
         });
 
       if (containsTautologicalType) {
-        DEBUG(llvm::dbgs() << "-- tautological\n");
+        LLVM_DEBUG(llvm::dbgs() << "-- tautological\n");
         REJECT;
       }
 
@@ -353,8 +354,8 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
         if (!newWitness->hasTypeParameter() &&
             !newWitness->hasDependentMember() &&
             !existingWitness->isEqual(newWitness)) {
-          DEBUG(llvm::dbgs() << "** contradicts explicit type witness, "
-                                "rejecting inference from this decl\n");
+          LLVM_DEBUG(llvm::dbgs() << "** contradicts explicit type witness, "
+                                     "rejecting inference from this decl\n");
           goto next_witness;
         }
       }
@@ -368,12 +369,12 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
                                            result.second)) {
           witnessResult.NonViable.push_back(
                           std::make_tuple(result.first,result.second,failed));
-          DEBUG(llvm::dbgs() << "-- doesn't fulfill requirements\n");
+          LLVM_DEBUG(llvm::dbgs() << "-- doesn't fulfill requirements\n");
           REJECT;
         }
       }
 
-      DEBUG(llvm::dbgs() << "++ seems legit\n");
+      LLVM_DEBUG(llvm::dbgs() << "++ seems legit\n");
       ++i;
     }
 #undef REJECT
@@ -503,7 +504,7 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
   // common, because most of the recursion involves the requirements
   // of the generic type.
   if (auto genericFn = type->getAs<GenericFunctionType>()) {
-    type = FunctionType::get(genericFn->getInput(),
+    type = FunctionType::get(genericFn->getParams(),
                              genericFn->getResult(),
                              genericFn->getExtInfo());
   }
@@ -877,7 +878,7 @@ Type AssociatedTypeInference::computeDerivedTypeWitness(
 
   // Can we derive conformances for this protocol and adoptee?
   NominalTypeDecl *derivingTypeDecl = adoptee->getAnyNominal();
-  if (!DerivedConformance::derivesProtocolConformance(tc, derivingTypeDecl,
+  if (!DerivedConformance::derivesProtocolConformance(tc, dc, derivingTypeDecl,
                                                       proto))
     return Type();
 
@@ -1002,11 +1003,14 @@ static void sanitizeProtocolRequirements(
       if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
         if (!depMemTy->getAssocType() ||
             depMemTy->getAssocType()->getProtocol() != proto) {
+
           for (auto member : proto->lookupDirect(depMemTy->getName())) {
             if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-              return Type(DependentMemberType::get(
-                                           sanitizeType(depMemTy->getBase()),
-                                           assocType));
+              Type sanitizedBase = sanitizeType(depMemTy->getBase());
+              if (!sanitizedBase)
+                return Type();
+              return Type(DependentMemberType::get(sanitizedBase,
+                                                   assocType));
             }
           }
 
@@ -1106,10 +1110,9 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
                              sanitizedRequirements,
                              QuerySubstitutionMap{substitutions},
                              TypeChecker::LookUpConformance(tc, dc),
-                             nullptr, None, nullptr, options);
+                             None, nullptr, options);
   switch (result) {
   case RequirementCheckResult::Failure:
-  case RequirementCheckResult::UnsatisfiedDependency:
     ++NumSolutionStatesFailedCheck;
     return true;
 
@@ -1155,15 +1158,13 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
                        ext->getGenericSignature()->getRequirements(),
                        QueryTypeSubstitutionMap{subs},
                        LookUpConformanceInModule(ext->getModuleContext()),
-                                   nullptr, ConformanceCheckFlags::InExpression,
-                                   nullptr,
-                                   options)) {
+                       ConformanceCheckFlags::InExpression,
+                       nullptr, options)) {
   case RequirementCheckResult::Success:
   case RequirementCheckResult::SubstitutionFailure:
     return false;
 
   case RequirementCheckResult::Failure:
-  case RequirementCheckResult::UnsatisfiedDependency:
     return true;
   }
 }
@@ -1898,8 +1899,8 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
   // Infer potential type witnesses from value witnesses.
   inferred = inferTypeWitnessesViaValueWitnesses(checker,
                                                  unresolvedAssocTypes);
-  DEBUG(llvm::dbgs() << "Candidates for inference:\n";
-        dumpInferredAssociatedTypes(inferred));
+  LLVM_DEBUG(llvm::dbgs() << "Candidates for inference:\n";
+             dumpInferredAssociatedTypes(inferred));
 
   // Compute the set of solutions.
   SmallVector<InferredTypeWitnessesSolution, 4> solutions;

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -parse-as-library
+// RUN: %target-typecheck-verify-swift -parse-as-library -enable-objc-interop
 
 class A {
   func ret_sametype() -> Int { return 0 }
@@ -161,23 +161,23 @@ class H : G {
 }
 
 @objc class IUOTestBaseClass {
-  func none() {}
+  @objc func none() {}
 
-  func oneA(_: AnyObject) {}
-  func oneB(x: AnyObject) {}
-  func oneC(_ x: AnyObject) {}
+  @objc func oneA(_: AnyObject) {}
+  @objc func oneB(x: AnyObject) {}
+  @objc func oneC(_ x: AnyObject) {}
 
-  func manyA(_: AnyObject, _: AnyObject) {}
-  func manyB(_ a: AnyObject, b: AnyObject) {}
-  func manyC(var a: AnyObject,  // expected-error {{'var' as a parameter attribute is not allowed}}
-             var b: AnyObject) {} // expected-error {{'var' as a parameter attribute is not allowed}}
+  @objc func manyA(_: AnyObject, _: AnyObject) {}
+  @objc func manyB(_ a: AnyObject, b: AnyObject) {}
+  @objc func manyC(var a: AnyObject,  // expected-error {{'var' as a parameter attribute is not allowed}}
+                   var b: AnyObject) {} // expected-error {{'var' as a parameter attribute is not allowed}}
 
-  func result() -> AnyObject? { return nil }
-  func both(_ x: AnyObject) -> AnyObject? { return x }
+  @objc func result() -> AnyObject? { return nil }
+  @objc func both(_ x: AnyObject) -> AnyObject? { return x }
 
-  init(_: AnyObject) {}
-  init(one: AnyObject) {}
-  init(a: AnyObject, b: AnyObject) {}
+  @objc init(_: AnyObject) {}
+  @objc init(one: AnyObject) {}
+  @objc init(a: AnyObject, b: AnyObject) {}
 }
 
 class IUOTestSubclass : IUOTestBaseClass {
@@ -349,4 +349,34 @@ class DerivedWithFilePrivateSetter: BaseWithFilePrivateSetter {
         get { return 0 }
         set { }
     }
+}
+
+// Issues with final overrides of open members
+open class OpenBase {
+  open func instanceMethod() {} // expected-note {{overridden declaration is here}}
+  open class func classMethod() {} // expected-note {{overridden declaration is here}}
+}
+
+public class PublicDerived : OpenBase {
+  override public func instanceMethod() {}
+  override public class func classMethod() {}
+}
+
+open class OpenDerived : OpenBase {
+  override open func instanceMethod() {}
+  override open class func classMethod() {}
+}
+
+open class OpenDerivedPublic : OpenBase {
+  override public func instanceMethod() {} // expected-error {{overriding instance method must be as accessible as the declaration it overrides}}
+  override public class func classMethod() {} // expected-error {{overriding class method must be as accessible as the declaration it overrides}}
+}
+
+open class OpenDerivedFinal : OpenBase {
+  override public final func instanceMethod() {}
+  override public class final func classMethod() {}
+}
+
+open class OpenDerivedStatic : OpenBase {
+  override public static func classMethod() {}
 }

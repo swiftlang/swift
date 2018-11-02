@@ -104,10 +104,21 @@ namespace swift {
     /// Given a function candidate with an uncurry level, return the parameter
     /// type at the specified uncurry level.  If there is an error getting to
     /// the specified input, this returns a null Type.
-    Type getArgumentType() const {
-      if (auto *funcTy = getUncurriedFunctionType())
-        return funcTy->getInput();
-      return Type();
+    Type getArgumentType(ASTContext &ctx) const {
+      if (!hasParameters())
+        return Type();
+
+      auto params = getParameters();
+      return FunctionType::composeInput(ctx, params, false);
+    }
+
+    bool hasParameters() const {
+      return getUncurriedFunctionType();
+    }
+
+    ArrayRef<AnyFunctionType::Param> getParameters() const {
+      assert(hasParameters());
+      return getUncurriedFunctionType()->getParams();
     }
     
     /// Given a function candidate with an uncurry level, return the parameter
@@ -176,6 +187,12 @@ namespace swift {
     CalleeCandidateInfo(Type baseType, ArrayRef<OverloadChoice> candidates,
                         bool hasTrailingClosure, ConstraintSystem &CS,
                         bool selfAlreadyApplied = true);
+
+    ~CalleeCandidateInfo() = default;
+    CalleeCandidateInfo(const CalleeCandidateInfo &CCI) = default;
+    CalleeCandidateInfo &operator=(const CalleeCandidateInfo &CCI);
+    CalleeCandidateInfo(CalleeCandidateInfo &&CCI) = delete;
+    CalleeCandidateInfo &operator=(CalleeCandidateInfo &&CCI) = delete;
 
     using ClosenessResultTy = std::pair<CandidateCloseness, FailedArgumentInfo>;
     using ClosenessPredicate =

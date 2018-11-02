@@ -70,22 +70,22 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     if (!ReferencedF)
       continue;
 
-    DEBUG(llvm::dbgs() << "Trying to use specialized function for:\n";
-          AI.getInstruction()->dumpInContext());
+    LLVM_DEBUG(llvm::dbgs() << "Trying to use specialized function for:\n";
+               AI.getInstruction()->dumpInContext());
 
     // Check if it is a call of a generic function.
     // If this is the case, check if there is a specialization
     // available for it already and use this specialization
     // instead of the generic version.
-
-    SubstitutionList Subs = AI.getSubstitutions();
-    if (Subs.empty())
+    if (!AI.hasSubstitutions())
       continue;
+
+    SubstitutionMap Subs = AI.getSubstitutionMap();
 
     // Bail if any generic type parameters are unbound.
     // TODO: Remove this limitation once public partial specializations
     // are supported and can be provided by other modules.
-    if (hasArchetypes(Subs))
+    if (Subs.hasArchetypes())
       continue;
 
     ReabstractionInfo ReInfo(AI, ReferencedF, Subs);
@@ -110,12 +110,13 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     // If we already have this specialization, reuse it.
     auto PrevF = M.lookUpFunction(ClonedName);
     if (PrevF) {
-      DEBUG(llvm::dbgs() << "Found a specialization: " << ClonedName << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "Found a specialization: " << ClonedName
+                              << "\n");
       if (PrevF->getLinkage() != SILLinkage::SharedExternal)
         NewF = PrevF;
       else {
-        DEBUG(llvm::dbgs() << "Wrong linkage: " << (int)PrevF->getLinkage()
-                           << "\n");
+        LLVM_DEBUG(llvm::dbgs() << "Wrong linkage: " << (int)PrevF->getLinkage()
+                                << "\n");
       }
     }
 
@@ -123,9 +124,9 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
       // Check for the existence of this function in another module without
       // loading the function body.
       PrevF = lookupPrespecializedSymbol(M, ClonedName);
-      DEBUG(llvm::dbgs()
-            << "Checked if there is a specialization in a different module: "
-            << PrevF << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "Checked if there is a specialization in a "
+                                 "different module: "
+                              << PrevF << "\n");
       if (!PrevF)
         continue;
       assert(PrevF->isExternalDeclaration() &&
@@ -137,8 +138,9 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
       continue;
 
     // An existing specialization was found.
-    DEBUG(llvm::dbgs() << "Found a specialization of " << ReferencedF->getName()
-                       << " : " << NewF->getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Found a specialization of "
+                            << ReferencedF->getName()
+                            << " : " << NewF->getName() << "\n");
 
     auto NewAI = replaceWithSpecializedFunction(AI, NewF, ReInfo);
     if (auto oldApply = dyn_cast<ApplyInst>(AI)) {

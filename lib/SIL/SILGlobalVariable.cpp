@@ -10,7 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILModule.h"
 
@@ -86,6 +88,17 @@ bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I,
           if (isa<LiteralInst>(bi->getArguments()[0]))
             return true;
           break;
+        case BuiltinValueKind::StringObjectOr:
+          // The first operand can be a string literal (i.e. a pointer), but the
+          // second operand must be a constant. This enables creating a
+          // a pointer+offset relocation.
+          // Note that StringObjectOr requires the or'd bits in the first
+          // operand to be 0, so the operation is equivalent to an addition.
+          if (isa<IntegerLiteralInst>(bi->getArguments()[1]))
+            return true;
+          break;
+        case BuiltinValueKind::ZExtOrBitCast:
+          return true;
         default:
           break;
       }
@@ -107,6 +120,7 @@ bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I,
     case SILInstructionKind::IntegerLiteralInst:
     case SILInstructionKind::FloatLiteralInst:
     case SILInstructionKind::ObjectInst:
+    case SILInstructionKind::ValueToBridgeObjectInst:
       return true;
     default:
       return false;
@@ -124,4 +138,133 @@ ClangNode SILGlobalVariable::getClangNode() const {
 }
 const clang::Decl *SILGlobalVariable::getClangDecl() const {
   return (VDecl ? VDecl->getClangDecl() : nullptr);
+}
+
+//===----------------------------------------------------------------------===//
+// Utilities for verification and optimization.
+//===----------------------------------------------------------------------===//
+
+static SILGlobalVariable *getStaticallyInitializedVariable(SILFunction *AddrF) {
+  if (AddrF->isExternalDeclaration())
+    return nullptr;
+
+  auto *RetInst = cast<ReturnInst>(AddrF->findReturnBB()->getTerminator());
+  auto *API = dyn_cast<AddressToPointerInst>(RetInst->getOperand());
+  if (!API)
+    return nullptr;
+  auto *GAI = dyn_cast<GlobalAddrInst>(API->getOperand());
+  if (!GAI)
+    return nullptr;
+
+  return GAI->getReferencedGlobal();
+}
+
+SILGlobalVariable *swift::getVariableOfGlobalInit(SILFunction *AddrF) {
+  if (!AddrF->isGlobalInit())
+    return nullptr;
+
+  if (auto *SILG = getStaticallyInitializedVariable(AddrF))
+    return SILG;
+
+  // If the addressor contains a single "once" call, it calls globalinit_func,
+  // and the globalinit_func is called by "once" from a single location,
+  // continue; otherwise bail.
+  BuiltinInst *CallToOnce;
+  auto *InitF = findInitializer(&AddrF->getModule(), AddrF, CallToOnce);
+
+  if (!InitF || !InitF->getName().startswith("globalinit_"))
+    return nullptr;
+
+  // If the globalinit_func is trivial, continue; otherwise bail.
+  SingleValueInstruction *dummyInitVal;
+  auto *SILG = getVariableOfStaticInitializer(InitF, dummyInitVal);
+
+  return SILG;
+}
+
+SILFunction *swift::getCalleeOfOnceCall(BuiltinInst *BI) {
+  assert(BI->getNumOperands() == 2 && "once call should have 2 operands.");
+
+  auto Callee = BI->getOperand(1);
+  assert(Callee->getType().castTo<SILFunctionType>()->getRepresentation()
+           == SILFunctionTypeRepresentation::CFunctionPointer &&
+         "Expected C function representation!");
+
+  if (auto *FR = dyn_cast<FunctionRefInst>(Callee))
+    return FR->getReferencedFunction();
+
+  return nullptr;
+}
+
+// Find the globalinit_func by analyzing the body of the addressor.
+SILFunction *swift::findInitializer(SILModule *Module, SILFunction *AddrF,
+                             BuiltinInst *&CallToOnce) {
+  // We only handle a single SILBasicBlock for now.
+  if (AddrF->size() != 1)
+    return nullptr;
+
+  CallToOnce = nullptr;
+  SILBasicBlock *BB = &AddrF->front();
+  for (auto &I : *BB) {
+    // Find the builtin "once" call.
+    if (auto *BI = dyn_cast<BuiltinInst>(&I)) {
+      const BuiltinInfo &Builtin =
+        BI->getModule().getBuiltinInfo(BI->getName());
+      if (Builtin.ID != BuiltinValueKind::Once)
+        continue;
+
+      // Bail if we have multiple "once" calls in the addressor.
+      if (CallToOnce)
+        return nullptr;
+
+      CallToOnce = BI;
+    }
+  }
+  if (!CallToOnce)
+    return nullptr;
+  return getCalleeOfOnceCall(CallToOnce);
+}
+
+SILGlobalVariable *
+swift::getVariableOfStaticInitializer(SILFunction *InitFunc,
+                                      SingleValueInstruction *&InitVal) {
+  InitVal = nullptr;
+  SILGlobalVariable *GVar = nullptr;
+  // We only handle a single SILBasicBlock for now.
+  if (InitFunc->size() != 1)
+    return nullptr;
+
+  SILBasicBlock *BB = &InitFunc->front();
+  GlobalAddrInst *SGA = nullptr;
+  bool HasStore = false;
+  for (auto &I : *BB) {
+    // Make sure we have a single GlobalAddrInst and a single StoreInst.
+    // And the StoreInst writes to the GlobalAddrInst.
+    if (isa<AllocGlobalInst>(&I) || isa<ReturnInst>(&I)
+        || isa<DebugValueInst>(&I)) {
+      continue;
+    } else if (auto *sga = dyn_cast<GlobalAddrInst>(&I)) {
+      if (SGA)
+        return nullptr;
+      SGA = sga;
+      GVar = SGA->getReferencedGlobal();
+    } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
+      if (HasStore || SI->getDest() != SGA)
+        return nullptr;
+      HasStore = true;
+      SILValue value = SI->getSrc();
+
+      // We only handle StructInst and TupleInst being stored to a
+      // global variable for now.
+      if (!isa<StructInst>(value) && !isa<TupleInst>(value))
+        return nullptr;
+      InitVal = cast<SingleValueInstruction>(value);
+    } else if (!SILGlobalVariable::isValidStaticInitializerInst(&I,
+                                                             I.getModule())) {
+      return nullptr;
+    }
+  }
+  if (!InitVal)
+    return nullptr;
+  return GVar;
 }

@@ -131,7 +131,8 @@ namespace {
     SILValue closure;
   public:
     CleanupClosureConstant(SILValue closure) : closure(closure) {}
-    void emit(SILGenFunction &SGF, CleanupLocation l) override {
+    void emit(SILGenFunction &SGF, CleanupLocation l,
+              ForUnwind_t forUnwind) override {
       SGF.B.emitDestroyValueOperation(l, closure);
     }
     void dump(SILGenFunction &) const override {
@@ -144,8 +145,8 @@ namespace {
   };
 } // end anonymous namespace
 
-SubstitutionList SILGenFunction::getForwardingSubstitutions() {
-  return F.getForwardingSubstitutions();
+SubstitutionMap SILGenFunction::getForwardingSubstitutionMap() {
+  return F.getForwardingSubstitutionMap();
 }
 
 void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
@@ -250,7 +251,8 @@ public:
   EndBorrowCleanup(SILValue original, SILValue borrowed)
       : original(original), borrowed(borrowed) {}
 
-  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
     SGF.B.createEndBorrow(l, borrowed, original);
   }
 
@@ -271,7 +273,8 @@ class ReleaseValueCleanup : public Cleanup {
 public:
   ReleaseValueCleanup(SILValue v) : v(v) {}
 
-  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
     if (v->getType().isAddress())
       SGF.B.createDestroyAddr(l, v);
     else
@@ -295,7 +298,8 @@ class DeallocStackCleanup : public Cleanup {
 public:
   DeallocStackCleanup(SILValue addr) : Addr(addr) {}
 
-  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
     SGF.B.createDeallocStack(l, Addr);
   }
 
@@ -316,7 +320,8 @@ class DestroyLocalVariable : public Cleanup {
 public:
   DestroyLocalVariable(VarDecl *var) : Var(var) {}
 
-  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
     SGF.destroyLocalVariable(l, Var);
   }
 
@@ -349,7 +354,8 @@ class DeallocateUninitializedLocalVariable : public Cleanup {
 public:
   DeallocateUninitializedLocalVariable(VarDecl *var) : Var(var) {}
 
-  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
     SGF.deallocateUninitializedLocalVariable(l, Var);
   }
 
@@ -394,7 +400,7 @@ public:
 
     auto boxType = SGF.SGM.Types
       .getContextBoxTypeForCapture(decl,
-                     SGF.getLoweredType(decl->getType()).getSwiftRValueType(),
+                     SGF.getLoweredType(decl->getType()).getASTType(),
                      SGF.F.getGenericEnvironment(),
                      /*mutable*/ true);
 
@@ -861,7 +867,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
         // Reabstract to the substituted type, if needed.
         CanType substEltTy =
             value.getType()
-                .getSwiftRValueType()
+                .getASTType()
                 ->getTypeOfMember(SGF.SGM.M.getSwiftModule(), eltDecl,
                                   eltDecl->getArgumentInterfaceType())
                 ->getCanonicalType();
@@ -1141,7 +1147,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
 
   // If an initial value expression was specified by the decl, emit it into
   // the initialization. Otherwise, mark it uninitialized for DI to resolve.
-  if (auto *Init = entry.getInit()) {
+  if (auto *Init = entry.getNonLazyInit()) {
     FullExpr Scope(Cleanups, CleanupLocation(Init));
     emitExprInto(Init, initialization.get(), SILLocation(PBD));
   } else {
@@ -1304,7 +1310,8 @@ namespace {
         concreteFormalType(concreteFormalType),
         repr(repr) {}
     
-    void emit(SILGenFunction &SGF, CleanupLocation l) override {
+    void emit(SILGenFunction &SGF, CleanupLocation l,
+              ForUnwind_t forUnwind) override {
       switch (repr) {
       case ExistentialRepresentation::None:
       case ExistentialRepresentation::Class:
@@ -1481,7 +1488,8 @@ struct FormalAccessReleaseValueCleanup : Cleanup {
     state = newState;
   }
 
-  void emit(SILGenFunction &SGF, CleanupLocation l) override {
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
     getEvaluation(SGF).finish(SGF);
   }
 

@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend -verify -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import -enable-sil-ownership %s | %FileCheck %s
-
-// REQUIRES: objc_interop
+// RUN: %target-swift-emit-silgen -verify -sdk %S/Inputs -I %S/Inputs -enable-source-import -enable-sil-ownership %s -enable-objc-interop | %FileCheck %s
 
 import Foundation
 

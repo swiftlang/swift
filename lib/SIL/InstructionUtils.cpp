@@ -256,6 +256,7 @@ SingleValueInstruction *swift::getSingleValueCopyOrCast(SILInstruction *I) {
     return nullptr;
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::CopyBlockInst:
+  case SILInstructionKind::CopyBlockWithoutEscapingInst:
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::BeginAccessInst:
     return cast<SingleValueInstruction>(I);
@@ -292,10 +293,25 @@ bool swift::onlyAffectsRefCount(SILInstruction *user) {
   case SILInstructionKind::UnmanagedAutoreleaseValueInst:
   case SILInstructionKind::UnmanagedReleaseValueInst:
   case SILInstructionKind::UnmanagedRetainValueInst:
-  case SILInstructionKind::UnownedReleaseInst:
-  case SILInstructionKind::UnownedRetainInst:
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Name##RetainInst: \
+  case SILInstructionKind::Name##ReleaseInst: \
+  case SILInstructionKind::StrongRetain##Name##Inst:
+#include "swift/AST/ReferenceStorage.def"
     return true;
   }
+}
+
+bool swift::isSanitizerInstrumentation(SILInstruction *Instruction) {
+  auto *BI = dyn_cast<BuiltinInst>(Instruction);
+  if (!BI)
+    return false;
+
+  Identifier Name = BI->getName();
+  if (Name == BI->getModule().getASTContext().getIdentifier("tsanInoutAccess"))
+    return true;
+
+  return false;
 }
 
 SILValue swift::stripConvertFunctions(SILValue V) {
@@ -342,14 +358,19 @@ SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
 static SILValue findClosureStoredIntoBlock(SILValue V) {
   auto FnType = V->getType().castTo<SILFunctionType>();
   assert(FnType->getRepresentation() == SILFunctionTypeRepresentation::Block);
+  (void)FnType;
 
   // Given a no escape block argument to a function,
   // pattern match to find the noescape closure that invoking the block
   // will call:
   //     %noescape_closure = ...
+  //     %wae_Thunk = function_ref @$withoutActuallyEscapingThunk
+  //     %sentinel =
+  //       partial_apply [callee_guaranteed] %wae_thunk(%noescape_closure)
+  //     %noescaped_wrapped = mark_dependence %sentinel on %noescape_closure
   //     %storage = alloc_stack
   //     %storage_address = project_block_storage %storage
-  //     store %noescape_closure to [init] %storage_address
+  //     store %noescaped_wrapped to [init] %storage_address
   //     %block = init_block_storage_header %storage invoke %thunk
   //     %arg = copy_block %block
 
@@ -359,6 +380,11 @@ static SILValue findClosureStoredIntoBlock(SILValue V) {
   while (true) {
     if (auto *CBI = dyn_cast<CopyBlockInst>(V)) {
       V = CBI->getOperand();
+      continue;
+    }
+
+    if (auto *CBI = dyn_cast<CopyBlockWithoutEscapingInst>(V)) {
+      V = CBI->getBlock();
       continue;
     }
 
@@ -376,7 +402,19 @@ static SILValue findClosureStoredIntoBlock(SILValue V) {
   auto *SI = PBSI->getSingleUserOfType<StoreInst>();
   assert(SI && "Couldn't find single store of function into block storage");
 
-  return SI->getSrc();
+  auto *CV = dyn_cast<CopyValueInst>(SI->getSrc());
+  if (!CV)
+    return nullptr;
+  auto *WrappedNoEscape = dyn_cast<MarkDependenceInst>(CV->getOperand());
+  if (!WrappedNoEscape)
+    return nullptr;
+  auto Sentinel = dyn_cast<PartialApplyInst>(WrappedNoEscape->getValue());
+  if (!Sentinel)
+    return nullptr;
+  auto NoEscapeClosure = isPartialApplyOfReabstractionThunk(Sentinel);
+  if (WrappedNoEscape->getBase() != NoEscapeClosure)
+    return nullptr;
+  return NoEscapeClosure;
 }
 
 /// Look through a value passed as a function argument to determine whether
@@ -438,8 +476,10 @@ struct OwnershipQualifiedKindVisitor : SILInstructionVisitor<OwnershipQualifiedK
   QUALIFIED_INST(EndBorrowInst)
   QUALIFIED_INST(LoadBorrowInst)
   QUALIFIED_INST(CopyValueInst)
-  QUALIFIED_INST(CopyUnownedValueInst)
   QUALIFIED_INST(DestroyValueInst)
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  QUALIFIED_INST(Copy##Name##ValueInst)
+#include "swift/AST/ReferenceStorage.def"
 #undef QUALIFIED_INST
 
   OwnershipQualifiedKind visitLoadInst(LoadInst *LI) {

@@ -182,7 +182,7 @@ bb2:
 }
 
 // specialized divideNum<A where ...> (A, den : A) throws -> A
-// CHECK-LABEL: sil shared @$S16eager_specialize9divideNum_3denxx_xtKs13SignedIntegerRzlFSi_Tg5 : $@convention(thin) (Int, Int) -> (Int, @error Error) {
+// CHECK-LABEL: sil shared @$S16eager_specialize9divideNum_3denxx_xtKSZRzlFSi_Tg5 : $@convention(thin) (Int, Int) -> (Int, @error Error) {
 // CHECK: bb0(%0 : $Int, %1 : $Int):
 // CHECK: return %{{.*}}
 // CHECK: throw %{{.*}}
@@ -224,7 +224,7 @@ bb2:
 // CHECK:   %{{.*}} = unchecked_addr_cast %2 : $*T to $*Int
 // CHECK:   %{{.*}} = load %{{.*}} : $*Int
 // CHECK:   // function_ref specialized divideNum<A>(_:den:)
-// CHECK:   %{{.*}} = function_ref @$S16eager_specialize9divideNum_3denxx_xtKs13SignedIntegerRzlFSi_Tg5 : $@convention(thin) (Int, Int) -> (Int, @error Error)
+// CHECK:   %{{.*}} = function_ref @$S16eager_specialize9divideNum_3denxx_xtKSZRzlFSi_Tg5 : $@convention(thin) (Int, Int) -> (Int, @error Error)
 // CHECK:   try_apply %{{.*}}(%{{.*}}, %{{.*}}) : $@convention(thin) (Int, Int) -> (Int, @error Error), normal bb8, error bb7
 
 // CHECK: bb7(%{{.*}} : $Error):
@@ -638,7 +638,7 @@ bb0(%0 : $*T, %1 : $*S):
 // CHECK:   %15 = unchecked_addr_cast %1 : $*S to $*S
 // function_ref specialized checkExplicitPartialSpecialization<A, B> (A, B) -> ()
 // CHECK:   %16 = function_ref @$S16eager_specialize34checkExplicitPartialSpecializationyyx_q_tr0_lFs5Int64Vq_ADRszr0_lIetyi_Tp5 : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 == Int64> (Int64, @in τ_0_1) -> ()
-// CHECK:   %17 = apply %16<S>(%14, %15) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 == Int64> (Int64, @in τ_0_1) -> ()
+// CHECK:   %17 = apply %16<Int64, S>(%14, %15) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 == Int64> (Int64, @in τ_0_1) -> ()
 // CHECK:   %18 = tuple ()
 // CHECK:   %19 = unchecked_trivial_bit_cast %18 : $() to $()
 // CHECK:   br bb2
@@ -704,7 +704,7 @@ bb0(%0 : $*Self, %1 : $*Self, %2 : $@thick Self.Type):
 // instead of value witness functions to load and store the value of a generic type.
 // CHECK-IRGEN-LABEL: define linkonce_odr hidden swiftcc void @"$S16eager_specialize18copyValueAndReturn_1sxx_xztlFxxxRlze31_lIetilr_Tp5"(i32* noalias nocapture sret, i32* noalias nocapture dereferenceable(4), i32* nocapture dereferenceable(4), %swift.type* %"\CF\84_0_0")
 // CHECK-IRGEN: entry:
-// CHECK-IRGEN-NEXT:  %3 = load i32, i32* %2
+// CHECK-IRGEN:       %3 = load i32, i32* %2
 // CHECK-IRGEN-NEXT:  store i32 %3, i32* %0
 // CHECK-IRGEN-NEXT:  ret void
 // CHECK-IRGEN-NEXT:}
@@ -713,7 +713,7 @@ bb0(%0 : $*Self, %1 : $*Self, %2 : $@thick Self.Type):
 // instead of value witness functions to load and store the value of a generic type.
 // CHECK-IRGEN-LABEL: define linkonce_odr hidden swiftcc void @"$S16eager_specialize18copyValueAndReturn_1sxx_xztlFxxxRlze63_lIetilr_Tp5"(i64* noalias nocapture sret, i64* noalias nocapture dereferenceable(8), i64* nocapture dereferenceable(8), %swift.type* %"\CF\84_0_0")
 // CHECK-IRGEN: entry:
-// CHECK-IRGEN-NEXT:   %3 = load i64, i64* %2
+// CHECK-IRGEN:        %3 = load i64, i64* %2
 // CHECK-IRGEN-NEXT:   store i64 %3, i64* %0
 // CHECK-IRGEN-NEXT:   ret void
 // CHECK-IRGEN-NEXT: }
@@ -722,7 +722,7 @@ bb0(%0 : $*Self, %1 : $*Self, %2 : $@thick Self.Type):
 // because it is known that the object is Trivial, i.e. contains no references.
 // CHECK-IRGEN-LABEL: define linkonce_odr hidden swiftcc void @"$S16eager_specialize19copyValueAndReturn2_1sxx_xztlFxxxRlzTlIetilr_Tp5"(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.opaque* nocapture, %swift.type* %"\CF\84_0_0")
 // CHECK-IRGEN-NEXT: entry:
-// CHECK-IRGEN-NEXT:   %3 = bitcast %swift.type* %"\CF\84_0_0" to i8***
+// CHECK-IRGEN:        %3 = bitcast %swift.type* %"\CF\84_0_0" to i8***
 // CHECK-IRGEN-NEXT:   %4 = getelementptr inbounds i8**, i8*** %3, i{{.*}} -1
 // CHECK-IRGEN-NEXT:   %"\CF\84_0_0.valueWitnesses" = load i8**, i8*** %4
 // CHECK-IRGEN-NEXT:   %5 = getelementptr inbounds i8*, i8** %"\CF\84_0_0.valueWitnesses"
@@ -853,7 +853,7 @@ bb0(%0 : $*T):
 sil_vtable ClassUsingThrowingP {
   #ClassUsingThrowingP.init!allocator.1: (ClassUsingThrowingP.Type) -> () -> ClassUsingThrowingP : @$S34eager_specialize_throwing_function19ClassUsingThrowingPCACycfC	// ClassUsingThrowingP.__allocating_init()
   #ClassUsingThrowingP.init!initializer.1: (ClassUsingThrowingP.Type) -> () -> ClassUsingThrowingP : @$S34eager_specialize_throwing_function19ClassUsingThrowingPCACycfc	// ClassUsingThrowingP.init()
-  #ClassUsingThrowingP.deinit!deallocator: @$S34eager_specialize_throwing_function19ClassUsingThrowingPCfD	// ClassUsingThrowingP.__deallocating_deinit
+  #ClassUsingThrowingP.deinit!deallocator.1: @$S34eager_specialize_throwing_function19ClassUsingThrowingPCfD	// ClassUsingThrowingP.__deallocating_deinit
 }
 
 sil_witness_table hidden Int64: ThrowingP module eager_specialize_throwing_function {

@@ -159,7 +159,7 @@ TEST(OwnedStringTest, copy_constructor_original_not_copy) {
   // Make sure updating the original pointer doesn't affect the copy.
   data[0] = 'a';
 
-  EXPECT_EQ("atring", str);
+  EXPECT_EQ("string", str);
 }
 
 TEST(OwnedStringTest, copy_constructor_original_copy) {

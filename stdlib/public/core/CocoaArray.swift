@@ -77,8 +77,7 @@ internal struct _CocoaArrayWrapper : RandomAccessCollection {
       : nil
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal init(_ buffer: _NSArrayCore) {
     self.buffer = buffer
   }

@@ -1,8 +1,8 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_blocks_bridging -verify -emit-silgen -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership %s | %FileCheck %s
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_blocks_bridging -verify -emit-silgen -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership  %s | %FileCheck %s --check-prefix=GUARANTEED
+// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_blocks_bridging -verify -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_blocks_bridging -verify -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership  %s | %FileCheck %s --check-prefix=GUARANTEED
 
 // REQUIRES: objc_interop
 
@@ -21,7 +21,7 @@ import Foundation
   // CHECK:         apply [[NATIVE]]([[CONVERT]], {{.*}}, [[BORROWED_SELF_COPY]])
   // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK: } // end sil function '$S20objc_blocks_bridging3FooC3foo_1xS3iXE_SitFTo'
-  dynamic func foo(_ f: (Int) -> Int, x: Int) -> Int {
+  @objc dynamic func foo(_ f: (Int) -> Int, x: Int) -> Int {
     return f(x)
   }
 
@@ -38,7 +38,7 @@ import Foundation
   // CHECK:         apply [[NATIVE]]([[CONVERT]], {{%.*}}, [[BORROWED_SELF_COPY]])
   // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK: } // end sil function '$S20objc_blocks_bridging3FooC3bar_1xS3SXE_SStFTo'
-  dynamic func bar(_ f: (String) -> String, x: String) -> String {
+  @objc dynamic func bar(_ f: (String) -> String, x: String) -> String {
     return f(x)
   }
 
@@ -61,7 +61,7 @@ import Foundation
   // CHECK:         [[NATIVE:%.*]] = function_ref @$S20objc_blocks_bridging3FooC3bas{{[_0-9a-zA-Z]*}}F : $@convention(method) (@noescape @callee_guaranteed (@guaranteed Optional<String>) -> @owned Optional<String>, @guaranteed Optional<String>, @guaranteed Foo) -> @owned Optional<String>
   // CHECK:         apply [[NATIVE]]([[CONVERT]], {{%.*}}, [[BORROWED_SELF_COPY]])
   // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
-  dynamic func bas(_ f: (String?) -> String?, x: String?) -> String? {
+  @objc dynamic func bas(_ f: (String?) -> String?, x: String?) -> String? {
     return f(x)
   }
 
@@ -73,7 +73,7 @@ import Foundation
   // CHECK:         apply [[NATIVE]]([[F]], [[X]], [[BORROWED_SELF_COPY]])
   // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK:         destroy_value [[SELF_COPY]]
-  dynamic func cFunctionPointer(_ fp: @convention(c) (Int) -> Int, x: Int) -> Int {
+  @objc dynamic func cFunctionPointer(_ fp: @convention(c) (Int) -> Int, x: Int) -> Int {
     _ = fp(x)
   }
 
@@ -89,7 +89,7 @@ import Foundation
   // CHECK:         enum $Optional<@callee_guaranteed (@guaranteed String) -> @owned String>, #Optional.some!enumelt.1, [[BRIDGED]]
   // CHECK:         [[NATIVE:%.*]] = function_ref @$S20objc_blocks_bridging3FooC7optFunc{{[_0-9a-zA-Z]*}}F : $@convention(method) (@guaranteed Optional<@callee_guaranteed (@guaranteed String) -> @owned String>, @guaranteed String, @guaranteed Foo) -> @owned Optional<String>
   // CHECK:         apply [[NATIVE]]
-  dynamic func optFunc(_ f: ((String) -> String)?, x: String) -> String? {
+  @objc dynamic func optFunc(_ f: ((String) -> String)?, x: String) -> String? {
     return f?(x)
   }
 
@@ -97,7 +97,7 @@ import Foundation
   // CHECK:         switch_enum %0
   //
   // CHECK: bb2([[FP_BUF:%.*]] : @trivial $@convention(c) (NSString) -> @autoreleased NSString):
-  dynamic func optCFunctionPointer(_ fp: (@convention(c) (String) -> String)?, x: String) -> String? {
+  @objc dynamic func optCFunctionPointer(_ fp: (@convention(c) (String) -> String)?, x: String) -> String? {
     return fp?(x)
   }
 }
@@ -113,24 +113,26 @@ func callBlocks(_ x: Foo,
   // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Foo, [[ARG1:%.*]] : @guaranteed $@callee_guaranteed (Int) -> Int, [[ARG2:%.*]] : @guaranteed $@callee_guaranteed (@guaranteed String) -> @owned String, [[ARG3:%.*]] : @guaranteed $@callee_guaranteed (@guaranteed Optional<String>) -> @owned Optional<String>):
   // CHECK: [[CLOSURE_COPY:%.*]] = copy_value [[ARG1]]
   // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_COPY]]
+  // CHECK: [[NOESCAPE_SENTINEL:%.*]] = mark_dependence {{.*}}on [[CONVERT]]
+  // CHECK: [[COPY:%.*]] = copy_value [[NOESCAPE_SENTINEL]]
   // CHECK: [[F_BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage
   // CHECK: [[F_BLOCK_CAPTURE:%.*]] = project_block_storage [[F_BLOCK_STORAGE]]
-  // CHECK: store [[CONVERT]] to [trivial] [[F_BLOCK_CAPTURE]]
-  // CHECK: [[F_BLOCK_INVOKE:%.*]] = function_ref @$SS2iIgyd_S2iIyByd_TR
+  // CHECK: store [[COPY]] to [init] [[F_BLOCK_CAPTURE]]
+  // CHECK: [[F_BLOCK_INVOKE:%.*]] = function_ref @$SS2iIegyd_S2iIyByd_TR
   // CHECK: [[F_STACK_BLOCK:%.*]] = init_block_storage_header [[F_BLOCK_STORAGE]] : {{.*}}, invoke [[F_BLOCK_INVOKE]]
-  // CHECK: [[F_BLOCK:%.*]] = copy_block [[F_STACK_BLOCK]]
+  // CHECK: [[F_BLOCK:%.*]] = copy_block_without_escaping [[F_STACK_BLOCK]]
   // CHECK: [[FOO:%.*]] =  objc_method [[ARG0]] : $Foo, #Foo.foo!1.foreign
   // CHECK: apply [[FOO]]([[F_BLOCK]]
 
-  // CHECK: [[G_BLOCK_INVOKE:%.*]] = function_ref @$SS2SIggo_So8NSStringCABIyBya_TR
+  // CHECK: [[G_BLOCK_INVOKE:%.*]] = function_ref @$SS2SIeggo_So8NSStringCABIyBya_TR
   // CHECK: [[G_STACK_BLOCK:%.*]] = init_block_storage_header {{.*}}, invoke [[G_BLOCK_INVOKE]]
-  // CHECK: [[G_BLOCK:%.*]] = copy_block [[G_STACK_BLOCK]]
+  // CHECK: [[G_BLOCK:%.*]] = copy_block_without_escaping [[G_STACK_BLOCK]]
   // CHECK: [[BAR:%.*]] = objc_method [[ARG0]] : $Foo, #Foo.bar!1.foreign
   // CHECK: apply [[BAR]]([[G_BLOCK]]
 
-  // CHECK: [[H_BLOCK_INVOKE:%.*]] = function_ref @$SSSSgAAIggo_So8NSStringCSgADIyBya_TR
+  // CHECK: [[H_BLOCK_INVOKE:%.*]] = function_ref @$SSSSgAAIeggo_So8NSStringCSgADIyBya_TR
   // CHECK: [[H_STACK_BLOCK:%.*]] = init_block_storage_header {{.*}}, invoke [[H_BLOCK_INVOKE]]
-  // CHECK: [[H_BLOCK:%.*]] = copy_block [[H_STACK_BLOCK]]
+  // CHECK: [[H_BLOCK:%.*]] = copy_block_without_escaping [[H_STACK_BLOCK]]
   // CHECK: [[BAS:%.*]] = objc_method [[ARG0]] : $Foo, #Foo.bas!1.foreign
   // CHECK: apply [[BAS]]([[H_BLOCK]]
 
@@ -141,7 +143,7 @@ func callBlocks(_ x: Foo,
 }
 
 class Test: NSObject {
-  func blockTakesBlock() -> ((Int) -> Int) -> Int {}
+  @objc func blockTakesBlock() -> ((Int) -> Int) -> Int {}
 }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SS2iIgyd_SiIegyd_S2iIyByd_SiIeyByd_TR
@@ -175,14 +177,19 @@ func bridgeNoescapeBlock(fn: () -> (), optFn: (() -> ())?) {
   // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$S20objc_blocks_bridging19bridgeNoescapeBlock2fn5optFnyyyXE_yycSgtFyyXEfU_
   // CHECK: [[CONV_FN:%.*]] = convert_function [[CLOSURE_FN]]
   // CHECK: [[THICK_FN:%.*]] = thin_to_thick_function [[CONV_FN]]
-  // CHECK: [[BLOCK_ALLOC:%.*]] = alloc_stack $@block_storage @noescape @callee_guaranteed () -> ()
+// without actually escaping sentinel
+  // CHECK: [[WAE_THUNK:%.*]] = function_ref @$SIg_Ieg_TR
+  // CHECK: [[WAE_PA:%.*]] = partial_apply [callee_guaranteed] [[WAE_THUNK]]([[THICK_FN]])
+  // CHECK: [[WAE_MD:%.*]] = mark_dependence [[WAE_PA]] : $@callee_guaranteed () -> () on [[THICK_FN]]
+  // CHECK: [[WAE:%.*]] = copy_value [[WAE_MD]] : $@callee_guaranteed () -> ()
+  // CHECK: [[BLOCK_ALLOC:%.*]] = alloc_stack $@block_storage @callee_guaranteed () -> ()
   // CHECK: [[BLOCK_ADDR:%.*]] = project_block_storage [[BLOCK_ALLOC]]
-  // CHECK: store [[THICK_FN]] to [trivial] [[BLOCK_ADDR]]
-  // CHECK: [[THUNK:%.*]] = function_ref @$SIg_IyB_TR : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: store [[WAE]] to [init] [[BLOCK_ADDR]]
+  // CHECK: [[THUNK:%.*]] = function_ref @$SIeg_IyB_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
   // CHECK: [[BLOCK_STACK:%.*]] = init_block_storage_header [[BLOCK_ALLOC]] : {{.*}}, invoke [[THUNK]] : {{.*}}
 
   // FIXME: We're passing the block as a no-escape -- so we don't have to copy it
-  // CHECK: [[BLOCK:%.*]] = copy_block [[BLOCK_STACK]]
+  // CHECK: [[BLOCK:%.*]] = copy_block_without_escaping [[BLOCK_STACK]]
 
   // CHECK: [[SOME_BLOCK:%.*]] = enum $Optional<@convention(block) @noescape () -> ()>, #Optional.some!enumelt.1, [[BLOCK]]
   // CHECK: dealloc_stack [[BLOCK_ALLOC]]
@@ -191,14 +198,18 @@ func bridgeNoescapeBlock(fn: () -> (), optFn: (() -> ())?) {
   noescapeBlock { }
   // CHECK: destroy_value [[SOME_BLOCK]]
 
-  // CHECK: [[BLOCK_ALLOC:%.*]] = alloc_stack $@block_storage @noescape @callee_guaranteed () -> ()
+  // CHECK: [[WAE_THUNK:%.*]] = function_ref @$SIg_Ieg_TR
+  // CHECK: [[WAE_PA:%.*]] = partial_apply [callee_guaranteed] [[WAE_THUNK]](%0)
+  // CHECK: [[WAE_MD:%.*]] = mark_dependence [[WAE_PA]] : $@callee_guaranteed () -> () on %0
+  // CHECK: [[WAE:%.*]] = copy_value [[WAE_MD]]
+  // CHECK: [[BLOCK_ALLOC:%.*]] = alloc_stack $@block_storage @callee_guaranteed () -> ()
   // CHECK: [[BLOCK_ADDR:%.*]] = project_block_storage [[BLOCK_ALLOC]]
-  // CHECK: store %0 to [trivial] [[BLOCK_ADDR]]
-  // CHECK: [[THUNK:%.*]] = function_ref @$SIg_IyB_TR : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: store [[WAE]] to [init] [[BLOCK_ADDR]]
+  // CHECK: [[THUNK:%.*]] = function_ref @$SIeg_IyB_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
   // CHECK: [[BLOCK_STACK:%.*]] = init_block_storage_header [[BLOCK_ALLOC]] : {{.*}}, invoke [[THUNK]] : {{.*}}
 
   // FIXME: We're passing the block as a no-escape -- so we don't have to copy it
-  // CHECK: [[BLOCK:%.*]] = copy_block [[BLOCK_STACK]]
+  // CHECK: [[BLOCK:%.*]] = copy_block_without_escaping [[BLOCK_STACK]]
 
   // CHECK: [[SOME_BLOCK:%.*]] = enum $Optional<@convention(block) @noescape () -> ()>, #Optional.some!enumelt.1, [[BLOCK]]
   // CHECK: dealloc_stack [[BLOCK_ALLOC]]
@@ -215,28 +226,36 @@ func bridgeNoescapeBlock(fn: () -> (), optFn: (() -> ())?) {
   // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$S20objc_blocks_bridging19bridgeNoescapeBlock2fn5optFnyyyXE_yycSgtF
   // CHECK: [[CONV_FN:%.*]] = convert_function [[CLOSURE_FN]]
   // CHECK: [[THICK_FN:%.*]] = thin_to_thick_function [[CONV_FN]]
-  // CHECK: [[BLOCK_ALLOC:%.*]] = alloc_stack $@block_storage @noescape @callee_guaranteed () -> ()
+  // CHECK: [[WAE_THUNK:%.*]] = function_ref @$SIg_Ieg_TR
+  // CHECK: [[WAE_PA:%.*]] = partial_apply [callee_guaranteed] [[WAE_THUNK]]([[THICK_FN]])
+  // CHECK: [[WAE_MD:%.*]] = mark_dependence [[WAE_PA]] : $@callee_guaranteed () -> () on [[THICK_FN]]
+  // CHECK: [[WAE:%.*]] = copy_value [[WAE_MD]]
+  // CHECK: [[BLOCK_ALLOC:%.*]] = alloc_stack $@block_storage @callee_guaranteed () -> ()
   // CHECK: [[BLOCK_ADDR:%.*]] = project_block_storage [[BLOCK_ALLOC]]
-  // CHECK: store [[THICK_FN]] to [trivial] [[BLOCK_ADDR]]
-  // CHECK: [[THUNK:%.*]] = function_ref @$SIg_IyB_TR : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: store [[WAE]] to [init] [[BLOCK_ADDR]]
+  // CHECK: [[THUNK:%.*]] = function_ref @$SIeg_IyB_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
   // CHECK: [[BLOCK_STACK:%.*]] = init_block_storage_header [[BLOCK_ALLOC]] : {{.*}}, invoke [[THUNK]] : {{.*}}
 
   // FIXME: We're passing the block as a no-escape -- so we don't have to copy it
-  // CHECK: [[BLOCK:%.*]] = copy_block [[BLOCK_STACK]]
+  // CHECK: [[BLOCK:%.*]] = copy_block_without_escaping [[BLOCK_STACK]]
 
   // CHECK: [[FN:%.*]] = function_ref @noescapeNonnullBlock : $@convention(c) (@convention(block) @noescape () -> ()) -> ()
   // CHECK: apply [[FN]]([[BLOCK]])
   noescapeNonnullBlock { }
   // CHECK: destroy_value [[BLOCK]]
 
-  // CHECK: [[BLOCK_ALLOC:%.*]] = alloc_stack $@block_storage @noescape @callee_guaranteed () -> ()
+  // CHECK: [[WAE_THUNK:%.*]] = function_ref @$SIg_Ieg_TR
+  // CHECK: [[WAE_PA:%.*]] = partial_apply [callee_guaranteed] [[WAE_THUNK]](%0)
+  // CHECK: [[WAE_MD:%.*]] = mark_dependence [[WAE_PA]] : $@callee_guaranteed () -> () on %0
+  // CHECK: [[WAE:%.*]] = copy_value [[WAE_MD]]
+  // CHECK: [[BLOCK_ALLOC:%.*]] = alloc_stack $@block_storage @callee_guaranteed () -> ()
   // CHECK: [[BLOCK_ADDR:%.*]] = project_block_storage [[BLOCK_ALLOC]]
-  // CHECK: store %0 to [trivial] [[BLOCK_ADDR]]
-  // CHECK: [[THUNK:%.*]] = function_ref @$SIg_IyB_TR : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> ()
+  // CHECK: store [[WAE]] to [init] [[BLOCK_ADDR]]
+  // CHECK: [[THUNK:%.*]] = function_ref @$SIeg_IyB_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
   // CHECK: [[BLOCK_STACK:%.*]] = init_block_storage_header [[BLOCK_ALLOC]] : {{.*}}, invoke [[THUNK]] : {{.*}}
 
   // FIXME: We're passing the block as a no-escape -- so we don't have to copy it
-  // CHECK: [[BLOCK:%.*]] = copy_block [[BLOCK_STACK]]
+  // CHECK: [[BLOCK:%.*]] = copy_block_without_escaping [[BLOCK_STACK]]
 
   // CHECK: [[FN:%.*]] = function_ref @noescapeNonnullBlock : $@convention(c) (@convention(block) @noescape () -> ()) -> ()
   // CHECK: apply [[FN]]([[BLOCK]])
@@ -267,7 +286,7 @@ public func bridgeNoescapeBlock() {
 class ObjCClass : NSObject {}
 
 extension ObjCClass {
-  func someDynamicMethod(closure: (() -> ()) -> ()) {}
+  @objc func someDynamicMethod(closure: (() -> ()) -> ()) {}
 }
 
 struct GenericStruct<T> {
@@ -277,7 +296,7 @@ struct GenericStruct<T> {
     o.someDynamicMethod(closure: closure)
   }
 }
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SIg_Igy_IyB_IyBy_TR : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed (@noescape @callee_guaranteed () -> ()) -> (), @convention(block) @noescape () -> ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SIg_Iegy_IyB_IyBy_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@noescape @callee_guaranteed () -> ()) -> (), @convention(block) @noescape () -> ()) -> () {
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SIyB_Ieg_TR : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
 
 // rdar://35402696

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi %s -emit-ir | %FileCheck -check-prefix=%target-cpu-%target-os %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi %s -emit-ir -enable-objc-interop | %FileCheck -check-prefix=%target-cpu-%target-os %s
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
 // XFAIL: linux
@@ -38,7 +38,7 @@ class Foo {
   // i386-watchos: define hidden void @"$S8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(%TSo6MyRectV* noalias nocapture sret, i8*, i8*) unnamed_addr {{.*}} {
   // armv7k-watchos: define hidden swiftcc { float, float, float, float } @"$S8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(%T8abitypes3FooC* swiftself) {{.*}} {
   // armv7k-watchos: define hidden [[ARMV7K_MYRECT]] @"$S8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(i8*, i8*) unnamed_addr {{.*}} {
-  dynamic func bar() -> MyRect {
+  @objc dynamic func bar() -> MyRect {
     return MyRect(x: 1, y: 2, width: 3, height: 4)
   }
 
@@ -51,7 +51,7 @@ class Foo {
   // armv7s-ios: define hidden double @"$S8abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}FTo"(i8*, i8*, [4 x i32]) unnamed_addr {{.*}} {
   // armv7k-watchos: define hidden swiftcc double @"$S8abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}F"(float, float, float, float, %T8abitypes3FooC* swiftself) {{.*}} {
   // armv7k-watchos: define hidden double @"$S8abitypes3FooC14getXFromNSRect{{[_0-9a-zA-Z]*}}FTo"(i8*, i8*, [4 x float]) unnamed_addr {{.*}} {
-  dynamic func getXFromNSRect(_ r: NSRect) -> Double {
+  @objc dynamic func getXFromNSRect(_ r: NSRect) -> Double {
     return Double(r.origin.x)
   }
 
@@ -63,7 +63,7 @@ class Foo {
   // armv7s-ios: define hidden float @"$S8abitypes3FooC12getXFromRect{{[_0-9a-zA-Z]*}}FTo"(i8*, i8*, [4 x i32]) unnamed_addr {{.*}} {
   // armv7k-watchos: define hidden swiftcc float @"$S8abitypes3FooC12getXFromRect{{[_0-9a-zA-Z]*}}F"(float, float, float, float, %T8abitypes3FooC* swiftself) {{.*}} {
   // armv7k-watchos: define hidden float @"$S8abitypes3FooC12getXFromRect{{[_0-9a-zA-Z]*}}FTo"(i8*, i8*, [4 x float]) unnamed_addr {{.*}} {
-  dynamic func getXFromRect(_ r: MyRect) -> Float {
+  @objc dynamic func getXFromRect(_ r: MyRect) -> Float {
     return r.x
   }
 
@@ -80,6 +80,7 @@ class Foo {
   // x86_64-macosx: [[SELFCAST:%.*]] = bitcast [[SELF]]* %2 to i8*
   // x86_64-macosx: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*,  <2 x float>, <2 x float>)*)(i8* [[SELFCAST]], i8* [[SEL]], <2 x float> [[FIRST_HALF]], <2 x float> [[SECOND_HALF]])
   // armv7-ios: define hidden swiftcc float @"$S8abitypes3FooC17getXFromRectSwift{{[_0-9a-zA-Z]*}}F"(float, float, float, float, [[SELF:%.*]]* swiftself) {{.*}} {
+  // armv7-ios: [[DEBUGVAR:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
   // armv7-ios: [[COERCED:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
   // armv7-ios: [[SEL:%.*]] = load i8*, i8** @"\01L_selector(getXFromRect:)", align 4
   // armv7-ios: [[CAST:%.*]] = bitcast [[MYRECT]]* [[COERCED]] to [4 x i32]*
@@ -88,6 +89,7 @@ class Foo {
   // armv7-ios: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*, [4 x i32])*)(i8* [[SELFCAST]], i8* [[SEL]], [4 x i32] [[LOADED]])
 
   // armv7s-ios: define hidden swiftcc float @"$S8abitypes3FooC17getXFromRectSwift{{[_0-9a-zA-Z]*}}F"(float, float, float, float, [[SELF:%.*]]* swiftself) {{.*}} {
+  // armv7s-ios: [[DEBUGVAR:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
   // armv7s-ios: [[COERCED:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
   // armv7s-ios: [[SEL:%.*]] = load i8*, i8** @"\01L_selector(getXFromRect:)", align 4
   // armv7s-ios: [[CAST:%.*]] = bitcast [[MYRECT]]* [[COERCED]] to [4 x i32]*
@@ -96,6 +98,7 @@ class Foo {
   // armv7s-ios: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*, [4 x i32])*)(i8* [[SELFCAST]], i8* [[SEL]], [4 x i32] [[LOADED]])
 
   // armv7k-watchos: define hidden swiftcc float @"$S8abitypes3FooC17getXFromRectSwift{{[_0-9a-zA-Z]*}}F"(float, float, float, float, [[SELF:%.*]]* swiftself) {{.*}} {
+  // armv7k-watchos: [[DEBUGVAR:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
   // armv7k-watchos: [[COERCED:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
   // armv7k-watchos: [[SEL:%.*]] = load i8*, i8** @"\01L_selector(getXFromRect:)", align 4
   // armv7k-watchos: [[CAST:%.*]] = bitcast [[MYRECT]]* [[COERCED]] to [4 x float]*
@@ -108,7 +111,7 @@ class Foo {
 
   // Ensure that MyRect is passed as an indirect-byval on x86_64 because we run out of registers for direct arguments
   // x86_64-macosx: define hidden float @"$S8abitypes3FooC25getXFromRectIndirectByVal{{[_0-9a-zA-Z]*}}FTo"(i8*, i8*, float, float, float, float, float, float, float, %TSo6MyRectV* byval align 8) unnamed_addr {{.*}} {
-  dynamic func getXFromRectIndirectByVal(_: Float, second _: Float, 
+  @objc dynamic func getXFromRectIndirectByVal(_: Float, second _: Float, 
                                        third _: Float, fourth _: Float,
                                        fifth _: Float, sixth _: Float,
                                        seventh _: Float, withRect r: MyRect)
@@ -120,6 +123,9 @@ class Foo {
   // x86_64-macosx: define hidden swiftcc float @"$S8abitypes3FooC25getXFromRectIndirectSwift{{[_0-9a-zA-Z]*}}F"(i64, i64, %T8abitypes3FooC* swiftself) {{.*}} {
   func getXFromRectIndirectSwift(_ r: MyRect) -> Float {
     let f : Float = 1.0
+    // x86_64-macosx: alloca
+    // x86_64-macosx: alloca
+    // x86_64-macosx: alloca
     // x86_64-macosx: [[TEMP:%.*]] = alloca [[TEMPTYPE:%.*]], align 8
     // x86_64-macosx: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*, float, float, float, float, float, float, float, [[TEMPTYPE]]*)*)(i8* %{{.*}}, i8* %{{.*}}, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, [[TEMPTYPE]]* byval align 8 [[TEMP]])
     // x86_64-macosx: ret float [[RESULT]]
@@ -169,7 +175,7 @@ class Foo {
 
   // x86_64-macosx: define hidden swiftcc { double, double, double } @"$S8abitypes3FooC3baz{{[_0-9a-zA-Z]*}}F"(%T8abitypes3FooC* swiftself) {{.*}} {
   // x86_64-macosx: define hidden void @"$S8abitypes3FooC3baz{{[_0-9a-zA-Z]*}}FTo"(%TSo4TrioV* noalias nocapture sret, i8*, i8*) unnamed_addr {{.*}} {
-  dynamic func baz() -> Trio {
+  @objc dynamic func baz() -> Trio {
     return Trio(i: 1.0, j: 2.0, k: 3.0)
   }
 
@@ -193,7 +199,7 @@ class Foo {
   }
 
   // x86_64-macosx:      define hidden i64 @"$S8abitypes3FooC8takepair{{[_0-9a-zA-Z]*}}FTo"(i8*, i8*, i64) unnamed_addr {{.*}} {
-  dynamic func takepair(_ p: IntPair) -> IntPair {
+  @objc dynamic func takepair(_ p: IntPair) -> IntPair {
     return p
   }
 
@@ -217,7 +223,7 @@ class Foo {
   // x86_64-macosx:      [[T0:%.*]] = call [[OBJC:%objc_class]]* @swift_getObjCClassFromMetadata([[TYPE]]* [[VALUE]])
   // x86_64-macosx:      [[RESULT:%[0-9]+]] = bitcast [[OBJC]]* [[T0]] to i8*
   // x86_64-macosx:      ret i8* [[RESULT]]
-  dynamic func copyClass(_ a: AnyClass) -> AnyClass {
+  @objc dynamic func copyClass(_ a: AnyClass) -> AnyClass {
     return a
   }
 
@@ -225,7 +231,7 @@ class Foo {
   // x86_64-macosx:      [[VALUE:%[0-9]+]] = call swiftcc [[TYPE:%.*]] @"$S8abitypes3FooC9copyProto{{[_0-9a-zA-Z]*}}F"
   // x86_64-macosx:      [[RESULT:%[0-9]+]] = bitcast [[TYPE]] [[VALUE]] to i8*
   // x86_64-macosx:      ret i8* [[RESULT]]
-  dynamic func copyProto(_ a: AnyObject) -> AnyObject {
+  @objc dynamic func copyProto(_ a: AnyObject) -> AnyObject {
     return a
   }
 
@@ -233,7 +239,7 @@ class Foo {
   // x86_64-macosx:      [[VALUE:%[0-9]+]] = call swiftcc [[TYPE:%.*]] @"$S8abitypes3FooC13copyProtoComp{{[_0-9a-zA-Z]*}}F"
   // x86_64-macosx:      [[RESULT:%[0-9]+]] = bitcast [[TYPE]] [[VALUE]] to i8*
   // x86_64-macosx:      ret i8* [[RESULT]]
-  dynamic func copyProtoComp(_ a: P1 & P2) -> P1 & P2 {
+  @objc dynamic func copyProtoComp(_ a: P1 & P2) -> P1 & P2 {
     return a
   }
 
@@ -296,7 +302,7 @@ class Foo {
   // i386-watchos:  [[R3:%[0-9]+]] = call swiftcc i1 @"$S10ObjectiveC22_convertBoolToObjCBoolyAA0eF0VSbF"(i1 [[R2]])
   // i386-watchos:  ret i1 [[R3]]
 
-  dynamic func negate(_ b: Bool) -> Bool {
+  @objc dynamic func negate(_ b: Bool) -> Bool {
     return !b
   }
 
@@ -412,7 +418,7 @@ class Foo {
   // armv7k-watchos: [[TOOBJCBOOL:%[0-9]+]] = call swiftcc i1 @"$S10ObjectiveC22_convertBoolToObjCBool{{[_0-9a-zA-Z]*}}F"(i1 [[NEG]])
   // armv7k-watchos: ret i1 [[TOOBJCBOOL]]
   //
-  dynamic func negate2(_ b: Bool) -> Bool {
+  @objc dynamic func negate2(_ b: Bool) -> Bool {
     var g = Gadget()
     return g.negate(b)
   }
@@ -435,7 +441,7 @@ class Foo {
   // i386-ios: ret i1 [[NEG]]
   // i386-ios: }
 
-  dynamic func negate3(_ b: Bool) -> Bool {
+  @objc dynamic func negate3(_ b: Bool) -> Bool {
     var g = Gadget()
     return g.invert(b)
   }
@@ -454,23 +460,23 @@ class Foo {
   // i386-ios: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(negateThrowing:error:)", align 4
   // i386-ios: call signext i8 bitcast (void ()* @objc_msgSend to i8 (%1*, i8*, i8, %2**)*)(%1* {{%[0-9]+}}, i8* [[SEL]], i8 signext {{%[0-9]+}}, %2** {{%[0-9]+}})
   // i386-ios: }
-  dynamic func throwsTest(_ b: Bool) throws {
+  @objc dynamic func throwsTest(_ b: Bool) throws {
     var g = Gadget()
     try g.negateThrowing(b)
   }
 
   // x86_64-macosx: define hidden i32* @"$S8abitypes3FooC24copyUnsafeMutablePointer{{[_0-9a-zA-Z]*}}FTo"(i8*, i8*, i32*) unnamed_addr {{.*}} {
-  dynamic func copyUnsafeMutablePointer(_ p: UnsafeMutablePointer<Int32>) -> UnsafeMutablePointer<Int32> {
+  @objc dynamic func copyUnsafeMutablePointer(_ p: UnsafeMutablePointer<Int32>) -> UnsafeMutablePointer<Int32> {
     return p
   }
 
   // x86_64-macosx: define hidden i64 @"$S8abitypes3FooC17returnNSEnumValue{{[_0-9a-zA-Z]*}}FTo"(i8*, i8*) unnamed_addr {{.*}} {
-  dynamic func returnNSEnumValue() -> ByteCountFormatter.CountStyle {
+  @objc dynamic func returnNSEnumValue() -> ByteCountFormatter.CountStyle {
     return .file
   }
 
   // x86_64-macosx: define hidden zeroext i16 @"$S8abitypes3FooC20returnOtherEnumValue{{[_0-9a-zA-Z]*}}FTo"(i8*, i8*, i16 zeroext) unnamed_addr {{.*}} {
-  dynamic func returnOtherEnumValue(_ choice: ChooseTo) -> ChooseTo {
+  @objc dynamic func returnOtherEnumValue(_ choice: ChooseTo) -> ChooseTo {
     switch choice {
       case .takeIt: return .leaveIt
       case .leaveIt: return .takeIt
@@ -479,7 +485,7 @@ class Foo {
 
   // x86_64-macosx: define hidden swiftcc i32 @"$S8abitypes3FooC10getRawEnum{{[_0-9a-zA-Z]*}}F"(%T8abitypes3FooC* swiftself) {{.*}} {
   // x86_64-macosx: define hidden i32 @"$S8abitypes3FooC10getRawEnum{{[_0-9a-zA-Z]*}}FTo"(i8*, i8*) unnamed_addr {{.*}} {
-  dynamic func getRawEnum() -> RawEnum {
+  @objc dynamic func getRawEnum() -> RawEnum {
     return Intergalactic
   }
 
@@ -489,13 +495,13 @@ class Foo {
   }
 
   // x86_64-macosx: define hidden void @"$S8abitypes3FooC13testArchetype{{[_0-9a-zA-Z]*}}FTo"(i8*, i8*, i8*) unnamed_addr {{.*}} {
-  dynamic func testArchetype(_ work: Work) {
+  @objc dynamic func testArchetype(_ work: Work) {
     work.doStuff(1)
     // x86_64-macosx: [[OBJCPTR:%.*]] = bitcast i8* %2 to %objc_object*
     // x86_64-macosx: call swiftcc void @"$S8abitypes3FooC13testArchetype{{[_0-9a-zA-Z]*}}F"(%objc_object* [[OBJCPTR]], %T8abitypes3FooC* swiftself %{{.*}})
   }
 
-  dynamic func foo(_ x: @convention(block) (Int) -> Int) -> Int {
+  @objc dynamic func foo(_ x: @convention(block) (Int) -> Int) -> Int {
     // FIXME: calling blocks is currently unimplemented
     // return x(5)
     return 1
@@ -513,7 +519,7 @@ class Foo {
   //
   // arm64-tvos: define hidden swiftcc { i64, i64, i64, i64 } @"$S8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}F"(%TSo13StructReturnsC*, i64, i64, i64, i64, %T8abitypes3FooC* swiftself) {{.*}} {
   // arm64-tvos: define hidden void @"$S8abitypes3FooC14callJustReturn{{[_0-9a-zA-Z]*}}FTo"(%TSo9BigStructV* noalias nocapture sret, i8*, i8*, [[OPAQUE:.*]]*, %TSo9BigStructV*) unnamed_addr {{.*}} {
-  dynamic func callJustReturn(_ r: StructReturns, with v: BigStruct) -> BigStruct {
+  @objc dynamic func callJustReturn(_ r: StructReturns, with v: BigStruct) -> BigStruct {
     return r.justReturn(v)
   }
 

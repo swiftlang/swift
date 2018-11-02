@@ -13,7 +13,6 @@
 #ifndef SWIFT_FRONTEND_FRONTENDOPTIONS_H
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
-#include "swift/AST/Module.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
@@ -39,7 +38,7 @@ public:
   InputFileKind InputKind = InputFileKind::IFK_Swift;
 
   void forAllOutputPaths(const InputFile &input,
-                         std::function<void(StringRef)> fn) const;
+                         llvm::function_ref<void(StringRef)> fn) const;
 
   bool isOutputFileDirectory() const;
 
@@ -71,6 +70,10 @@ public:
   /// The path to which we should store indexing data, if any.
   std::string IndexStorePath;
 
+  /// The path to which we should emit GraphViz output for the complete
+  /// request-evaluator graph.
+  std::string RequestEvaluatorGraphVizPath;
+
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 
@@ -90,6 +93,11 @@ public:
   /// the expression type checker run before we consider an expression
   /// too complex.
   unsigned SolverExpressionTimeThreshold = 0;
+  
+  /// If non-zero, overrides the default threshold for how many times
+  /// the Space::minus function is called before we consider switch statement
+  /// exhaustiveness checking to be too complex.
+  unsigned SwitchCheckingInvocationThreshold = 0;
 
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
@@ -97,6 +105,7 @@ public:
   enum class ActionType {
     NoneAction,        ///< No specific action
     Parse,             ///< Parse only
+    ResolveImports,    ///< Parse and resolve imports only
     Typecheck,         ///< Parse and type-check only
     DumpParse,         ///< Parse only and dump AST
     DumpInterfaceHash, ///< Parse and dump the interface token hash.
@@ -234,15 +243,20 @@ public:
   /// variables by name when we print it out. This eases diffing of SIL files.
   bool EmitSortedSIL = false;
 
+  /// Indicates whether the dependency tracker should track system
+  /// dependencies as well.
+  bool TrackSystemDeps = false;
+
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
+    Default,        ///< Do the default validation for the current platform.
     None,           ///< Do no validation.
     MissingFromTBD, ///< Only check for symbols that are in IR but not TBD.
     All, ///< Check for symbols that are in IR but not TBD and TBD but not IR.
   };
 
   /// Compare the symbols in the IR against the TBD file we would generate.
-  TBDValidationMode ValidateTBDAgainstIR = TBDValidationMode::None;
+  TBDValidationMode ValidateTBDAgainstIR = TBDValidationMode::Default;
 
   /// The install_name to use in the TBD file.
   std::string TBDInstallName;
@@ -287,6 +301,7 @@ public:
 
 private:
   static bool canActionEmitDependencies(ActionType);
+  static bool canActionEmitReferenceDependencies(ActionType);
   static bool canActionEmitObjCHeader(ActionType);
   static bool canActionEmitLoadedModuleTrace(ActionType);
   static bool canActionEmitModule(ActionType);

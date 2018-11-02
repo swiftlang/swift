@@ -45,7 +45,7 @@ entry(%p : $*(), %i: $Builtin.Word):
 // CHECK:        %3 = bitcast %swift.type* %T to i8***
 // CHECK-NEXT:   %4 = getelementptr inbounds i8**, i8*** %3, i64 -1
 // CHECK-NEXT:   %T.valueWitnesses = load i8**, i8*** %4, align 8
-// CHECK-NEXT:   %5 = getelementptr inbounds i8*, i8** %T.valueWitnesses, i32 11
+// CHECK-NEXT:   %5 = getelementptr inbounds i8*, i8** %T.valueWitnesses, i32 10
 // CHECK-NEXT:   %6 = load i8*, i8** %5, align 8
 // CHECK-NEXT:   %stride = ptrtoint i8* %6 to i64
 // CHECK-NEXT:   %7 = mul nsw i64 %1, %stride

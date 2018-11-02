@@ -61,7 +61,8 @@ void fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
 /// error diagnostic.
 ///
 /// \returns true if the issue was diagnosed
-bool diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
+bool diagnoseArgumentLabelError(ASTContext &ctx,
+                                const Expr *expr,
                                 ArrayRef<Identifier> newNames,
                                 bool isSubscript,
                                 InFlightDiagnostic *existingDiag = nullptr);
@@ -78,6 +79,7 @@ void diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
 /// emit a warning that the bound instance will be immediately deallocated.
 void diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
                                           const Pattern *pattern,
+                                          SourceLoc equalLoc,
                                           const Expr *initializer);
 
 /// Attempt to fix the type of \p decl so that it's a valid override for

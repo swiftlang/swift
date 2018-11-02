@@ -17,6 +17,8 @@
 
 #include "swift/Subsystems.h"
 #include "TypeChecker.h"
+#include "TypeCheckObjC.h"
+#include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
 #include "GenericTypeResolver.h"
 #include "swift/AST/ASTWalker.h"
@@ -390,9 +392,75 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   extendedNominal->addExtension(ED);
 }
 
+static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
+  // Utility function to try and resolve the extended type without diagnosing.
+  // If we succeed, we go ahead and bind the extension. Otherwise, return false.
+  auto tryBindExtension = [&](ExtensionDecl *ext) -> bool {
+    auto *extendedTy = ext->getExtendedTypeLoc().getTypeRepr();
+    if (auto *identTy = dyn_cast_or_null<IdentTypeRepr>(extendedTy)) {
+      auto *dc = ext->getDeclContext();
+
+      GenericTypeToArchetypeResolver resolver(dc);
+
+      TypeResolutionOptions options;
+      options |= TypeResolutionFlags::AllowUnboundGenerics;
+      options |= TypeResolutionFlags::ExtensionBinding;
+      options |= TypeResolutionFlags::SilenceErrors;
+
+      auto type = TC.resolveIdentifierType(dc, identTy, options, &resolver);
+      if (type->is<ErrorType>())
+        return false;
+    }
+
+    bindExtensionDecl(ext, TC);
+    return true;
+  };
+
+  // Phase 1 - try to bind each extension, adding those whose type cannot be
+  // resolved to a worklist.
+  SmallVector<ExtensionDecl *, 8> worklist;
+
+  // FIXME: The current source file needs to be handled specially, because of
+  // private extensions.
+  SF.forAllVisibleModules([&](ModuleDecl::ImportedModule import) {
+    // FIXME: Respect the access path?
+    for (auto file : import.second->getFiles()) {
+      auto SF = dyn_cast<SourceFile>(file);
+      if (!SF)
+        continue;
+
+      for (auto D : SF->Decls) {
+        if (auto ED = dyn_cast<ExtensionDecl>(D))
+          if (!tryBindExtension(ED))
+            worklist.push_back(ED);
+      }
+    }
+  });
+
+  // Phase 2 - repeatedly go through the worklist and attempt to bind each
+  // extension there, removing it from the worklist if we succeed.
+  bool changed;
+  do {
+    changed = false;
+
+    auto last = std::remove_if(worklist.begin(), worklist.end(),
+                               tryBindExtension);
+    if (last != worklist.end()) {
+      worklist.erase(last, worklist.end());
+      changed = true;
+    }
+  } while(changed);
+
+  // Phase 3 - anything that remains on the worklist cannot be resolved, which
+  // means its invalid. Diagnose.
+  for (auto *ext : worklist)
+    bindExtensionDecl(ext, TC);
+}
+
 void TypeChecker::bindExtension(ExtensionDecl *ext) {
   ::bindExtensionDecl(ext, *this);
 }
+
 void TypeChecker::resolveExtensionForConformanceConstruction(
     ExtensionDecl *ext,
     SmallVectorImpl<ConformanceConstructionInfo> &protocols) {
@@ -484,6 +552,17 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
       TC.validateDecl(decl);
     }
 
+    // Synthesize any necessary function bodies.
+    // FIXME: If we're not planning to run SILGen, this is wasted effort.
+    while (!TC.FunctionsToSynthesize.empty()) {
+      auto function = TC.FunctionsToSynthesize.back().second;
+      TC.FunctionsToSynthesize.pop_back();
+      if (function.getDecl()->isInvalid() || TC.Context.hadError())
+        continue;
+
+      TC.synthesizeFunctionBody(function);
+    }
+
     // Validate any referenced declarations for SIL's purposes.
     // Note: if we ever start putting extension members in vtables, we'll need
     // to validate those members too.
@@ -523,6 +602,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
            currentSynthesizedDecl < SF.SynthesizedDecls.size() ||
+           !TC.FunctionsToSynthesize.empty() ||
            !TC.DeclsToFinalize.empty() ||
            !TC.ConformanceContexts.empty() ||
            !TC.DelayedRequirementSignatures.empty() ||
@@ -576,7 +656,8 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                                 unsigned StartElem,
                                 unsigned WarnLongFunctionBodies,
                                 unsigned WarnLongExpressionTypeChecking,
-                                unsigned ExpressionTimeoutThreshold) {
+                                unsigned ExpressionTimeoutThreshold,
+                                unsigned SwitchCheckingInvocationThreshold) {
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
@@ -584,7 +665,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
   // Make sure we have a type checker.
   //
-  // FIXME: We should never have a type checker here, but currently do when
+  // FIXME: We should never have a type checker here, but currently we do when
   // we're using immediate together with -enable-source-import.
   //
   // This possibility should be eliminated, since it results in duplicated
@@ -595,7 +676,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
   // Make sure that name binding has been completed before doing any type
   // checking.
-    performNameBinding(SF, StartElem);
+  performNameBinding(SF, StartElem);
 
   {
     // NOTE: The type checker is scoped to be torn down before AST
@@ -607,6 +688,10 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
       MyTC->setWarnLongExpressionTypeChecking(WarnLongExpressionTypeChecking);
       if (ExpressionTimeoutThreshold != 0)
         MyTC->setExpressionTimeoutThreshold(ExpressionTimeoutThreshold);
+
+      if (SwitchCheckingInvocationThreshold != 0)
+        MyTC->setSwitchCheckingInvocationThreshold(
+            SwitchCheckingInvocationThreshold);
 
       if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
         MyTC->enableDebugTimeFunctionBodies();
@@ -634,23 +719,11 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // Resolve extensions. This has to occur first during type checking,
     // because the extensions need to be wired into the AST for name lookup
     // to work.
-    // FIXME: We can have interesting ordering dependencies among the various
-    // extensions, so we'll need to be smarter here.
-    // FIXME: The current source file needs to be handled specially, because of
-    // private extensions.
-    SF.forAllVisibleModules([&](ModuleDecl::ImportedModule import) {
-      // FIXME: Respect the access path?
-      for (auto file : import.second->getFiles()) {
-        auto SF = dyn_cast<SourceFile>(file);
-        if (!SF)
-          continue;
+    bindExtensions(SF, TC);
 
-        for (auto D : SF->Decls) {
-          if (auto ED = dyn_cast<ExtensionDecl>(D))
-            bindExtensionDecl(ED, TC);
-        }
-      }
-    });
+    // Look for bridging functions. This only matters when
+    // -enable-source-import is provided.
+    checkBridgedFunctions(TC.Context);
 
     // Type check the top-level elements of the source file.
     bool hasTopLevelCode = false;
@@ -784,7 +857,7 @@ swift::handleSILGenericParams(ASTContext &Ctx, GenericParamList *genericParams,
   return TypeChecker(Ctx).handleSILGenericParams(genericParams, DC);
 }
 
-bool swift::typeCheckCompletionDecl(Decl *D) {
+void swift::typeCheckCompletionDecl(Decl *D) {
   auto &Ctx = D->getASTContext();
 
   // Set up a diagnostics engine that swallows diagnostics.
@@ -794,8 +867,7 @@ bool swift::typeCheckCompletionDecl(Decl *D) {
   if (auto ext = dyn_cast<ExtensionDecl>(D))
     TC.validateExtension(ext);
   else
-    TC.typeCheckDecl(D);
-  return true;
+    TC.validateDecl(cast<ValueDecl>(D));
 }
 
 static Optional<Type> getTypeOfCompletionContextExpr(
@@ -878,13 +950,17 @@ bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   auto &ctx = DC->getASTContext();
   if (ctx.getLazyResolver()) {
     TypeChecker *TC = static_cast<TypeChecker *>(ctx.getLazyResolver());
-    auto resultTy = TC->typeCheckExpression(parsedExpr, DC);
+    auto resultTy = TC->typeCheckExpression(parsedExpr, DC, TypeLoc(),
+                                      ContextualTypePurpose::CTP_Unused,
+                                      TypeCheckExprFlags::SuppressDiagnostics);
     return !resultTy;
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
     DiagnosticEngine diags(ctx.SourceMgr);
     TypeChecker TC(ctx, diags);
-    auto resultTy = TC.typeCheckExpression(parsedExpr, DC);
+    auto resultTy = TC.typeCheckExpression(parsedExpr, DC, TypeLoc(),
+                                      ContextualTypePurpose::CTP_Unused,
+                                      TypeCheckExprFlags::SuppressDiagnostics);
     return !resultTy;
   }
 }
@@ -937,8 +1013,7 @@ void TypeChecker::diagnoseAmbiguousMemberType(Type baseTy,
       .highlight(baseRange);
   }
   for (const auto &member : lookup) {
-    diagnose(member.first, diag::found_candidate_type,
-             member.second);
+    diagnose(member.Member, diag::found_candidate_type, member.MemberType);
   }
 }
 

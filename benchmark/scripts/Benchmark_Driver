@@ -118,28 +118,32 @@ def instrument_test(driver_path, test, num_samples):
     return avg_test_output
 
 
-BENCHMARK_OUTPUT_RE = re.compile('([^,]+),')
-
-
 def get_tests(driver_path, args):
     """Return a list of available performance tests"""
     driver = ([driver_path, '--list'])
+    # Use tab delimiter for easier parsing to override the default comma.
+    # (The third 'column' is always comma-separated list of tags in square
+    # brackets -- currently unused here.)
+    driver.append('--delim=\t')
     if args.benchmarks or args.filters:
-        driver.append('--run-all')
-    tests = []
-    for l in subprocess.check_output(driver).split("\n")[1:]:
-        m = BENCHMARK_OUTPUT_RE.match(l)
-        if m is None:
-            continue
-        tests.append(m.group(1))
+        driver.append('--skip-tags=')  # list all tests, don't skip any tags
+    index_name_pairs = [
+        line.split('\t')[:2] for line in
+        subprocess.check_output(driver).split('\n')[1:-1]
+    ]
+    indices, names = zip(*index_name_pairs)  # unzip list of pairs into 2 lists
     if args.filters:
         regexes = [re.compile(pattern) for pattern in args.filters]
         return sorted(list(set([name for pattern in regexes
-                                for name in tests if pattern.match(name)])))
+                                for name in names if pattern.match(name)])))
     if not args.benchmarks:
-        return tests
-    tests.extend(map(str, range(1, len(tests) + 1)))  # ordinal numbers
-    return sorted(list(set(tests).intersection(set(args.benchmarks))))
+        return names
+    benchmarks = set(args.benchmarks)
+    index_to_name = dict(index_name_pairs)
+    indexed_names = [index_to_name[i]
+                     for i in benchmarks.intersection(set(indices))]
+    return sorted(list(
+        benchmarks.intersection(set(names)).union(indexed_names)))
 
 
 def get_current_git_branch(git_repo_path):

@@ -65,25 +65,6 @@ public:
   static ParameterList *createWithoutLoc(ParamDecl *decl) {
     return create(decl->getASTContext(), decl);
   }
-  
-  /// Create an implicit 'self' decl for a method in the specified decl context.
-  /// If 'static' is true, then this is self for a static method in the type.
-  ///
-  /// Note that this decl is created, but it is returned with an incorrect
-  /// DeclContext that needs to be set correctly.  This is automatically handled
-  /// when a function is created with this as part of its argument list.
-  ///
-  static ParameterList *createUnboundSelf(SourceLoc loc, DeclContext *DC);
-
-  /// Create an implicit 'self' decl for a method in the specified decl context.
-  /// If 'static' is true, then this is self for a static method in the type.
-  ///
-  /// Note that this decl is created, but it is returned with an incorrect
-  /// DeclContext that needs to be set correctly.  This is automatically handled
-  /// when a function is created with this as part of its argument list.
-  static ParameterList *createSelf(SourceLoc loc, DeclContext *DC,
-                                   bool isStatic = false,
-                                   bool isInOut = false);
 
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }

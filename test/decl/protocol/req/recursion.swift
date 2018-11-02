@@ -10,7 +10,7 @@ extension SomeProtocol where T == Optional<T> { } // expected-error{{same-type c
 
 class X<T> where T == X { // expected-error{{same-type constraint 'T' == 'X<T>' is recursive}}
 // expected-error@-1{{same-type requirement makes generic parameter 'T' non-generic}}
-    var type: T { return type(of: self) } // expected-error{{cannot convert return expression of type 'X<T>.Type' to return type 'T'}}
+    var type: T { return Swift.type(of: self) } // expected-error{{cannot convert return expression of type 'X<T>.Type' to return type 'T'}}
 }
 
 // FIXME: The "associated type 'Foo' is not a member type of 'Self'" diagnostic

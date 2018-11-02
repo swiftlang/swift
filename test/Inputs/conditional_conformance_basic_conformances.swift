@@ -49,8 +49,8 @@ public func single_generic<T: P2>(_: T.Type) {
 }
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S42conditional_conformance_basic_conformances14single_genericyyxmAA2P2RzlF"(%swift.type*, %swift.type* %T, i8** %T.P2)
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    %conditional.requirement.buffer = alloca [1 x i8**], align 8
-// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S42conditional_conformance_basic_conformances6SingleVMa"(i64 0, %swift.type* %T)
+// CHECK:         %conditional.requirement.buffer = alloca [1 x i8**], align 8
+// CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S42conditional_conformance_basic_conformances6SingleVMa"(i64 0, %swift.type* %T)
 // CHECK-NEXT:    [[Single_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[T_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
@@ -170,8 +170,8 @@ public func double_generic_generic<U: P2, V: P3>(_: U.Type, _: V.Type) {
 }
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S42conditional_conformance_basic_conformances015double_generic_F0yyxm_q_mtAA2P2RzAA2P3R_r0_lF"(%swift.type*, %swift.type*, %swift.type* %U, %swift.type* %V, i8** %U.P2, i8** %V.P3)
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    %conditional.requirement.buffer = alloca [2 x i8**], align 8
-// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S42conditional_conformance_basic_conformances6DoubleVMa"(i64 0, %swift.type* %U, %swift.type* %V)
+// CHECK:          %conditional.requirement.buffer = alloca [2 x i8**], align 8
+// CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S42conditional_conformance_basic_conformances6DoubleVMa"(i64 0, %swift.type* %U, %swift.type* %V)
 // CHECK-NEXT:    [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [2 x i8**], [2 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
@@ -199,8 +199,8 @@ public func double_generic_concrete<X: P2>(_: X.Type) {
 }
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S42conditional_conformance_basic_conformances23double_generic_concreteyyxmAA2P2RzlF"(%swift.type*, %swift.type* %X, i8** %X.P2)
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    %conditional.requirement.buffer = alloca [2 x i8**], align 8
-// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S42conditional_conformance_basic_conformances6DoubleVMa"(i64 0, %swift.type* %X, %swift.type* bitcast (i64* getelementptr inbounds (<{ i8**, i64, <{ {{.*}} }>* }>, <{ {{.*}} }>* @"$S42conditional_conformance_basic_conformances4IsP3VMf", i32 0, i32 1) to %swift.type*))
+// CHECK:         %conditional.requirement.buffer = alloca [2 x i8**], align 8
+// CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S42conditional_conformance_basic_conformances6DoubleVMa"(i64 0, %swift.type* %X, %swift.type* bitcast (i64* getelementptr inbounds (<{ i8**, i64, <{ {{.*}} }>* }>, <{ {{.*}} }>* @"$S42conditional_conformance_basic_conformances4IsP3VMf", i32 0, i32 1) to %swift.type*))
 // CHECK-NEXT:    [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [2 x i8**], [2 x i8**]* %conditional.requirement.buffer, i32 0, i32 0

@@ -61,7 +61,7 @@ static SILValue buildReturnValue(SILGenFunction &SGF, SILLocation loc,
 
   SmallVector<TupleTypeElt, 4> eltTypes;
   for (auto elt : directResults)
-    eltTypes.push_back(elt->getType().getSwiftRValueType());
+    eltTypes.push_back(elt->getType().getASTType());
   auto resultType = SILType::getPrimitiveObjectType(
     CanType(TupleType::get(eltTypes, SGF.getASTContext())));
   return SGF.B.createTuple(loc, resultType, directResults);

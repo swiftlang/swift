@@ -29,6 +29,8 @@ struct Root {
 namespace swift {
 namespace json {
 
+void *IncludeSpecialValueUserInfoKey = &IncludeSpecialValueUserInfoKey;
+
 template <> struct ObjectTraits<Leaf> {
   static void mapping(Output &out, Leaf &value) {
     switch (value.Val) {
@@ -71,6 +73,10 @@ template <> struct ObjectTraits<Root> {
     out.mapRequired("Children", value.Children);
     out.mapRequired("Empty", value.Empty);
     out.mapRequired("Side", value.Side);
+    if ((bool)out.getUserInfo()[IncludeSpecialValueUserInfoKey]) {
+      std::string Value = "42";
+      out.mapRequired("SpecialValue", Value);
+    }
   }
 };
 
@@ -84,7 +90,7 @@ TEST(JSONSerialization, basicCompact) {
   Root RootObj{"foo", {&LeafObj0, &LeafObj1, nullptr, &LeafObj2}, {}, nullptr};
   std::string Buffer;
   llvm::raw_string_ostream Stream(Buffer);
-  swift::json::Output Out(Stream, /*PrettyPrint=*/false);
+  swift::json::Output Out(Stream, /*UserInfo=*/{}, /*PrettyPrint=*/false);
 
   Out << RootObj;
   Stream.flush();
@@ -119,5 +125,26 @@ TEST(JSONSerialization, basicPretty) {
   ],
   "Empty": [],
   "Side": null
+})""");
+}
+
+TEST(JSONSerialization, basicUserInfo) {
+  Root RootObj{"foo", {}, {}, nullptr};
+  std::string Buffer;
+  llvm::raw_string_ostream Stream(Buffer);
+
+  swift::json::Output::UserInfoMap UserInfo;
+  UserInfo[swift::json::IncludeSpecialValueUserInfoKey] = (void *)true;
+  swift::json::Output Out(Stream, UserInfo);
+
+  Out << RootObj;
+  Stream.flush();
+
+  EXPECT_EQ(Buffer, R"""({
+  "Name": "foo",
+  "Children": [],
+  "Empty": [],
+  "Side": null,
+  "SpecialValue": "42"
 })""");
 }

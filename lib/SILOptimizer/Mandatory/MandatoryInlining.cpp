@@ -535,8 +535,8 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
 
       // Get our list of substitutions.
       auto Subs = (PAI
-                   ? PAI->getSubstitutions()
-                   : InnerAI.getSubstitutions());
+                   ? PAI->getSubstitutionMap()
+                   : InnerAI.getSubstitutionMap());
 
       SILOpenedArchetypesTracker OpenedArchetypesTracker(F);
       F->getModule().registerDeleteNotificationHandler(
@@ -565,9 +565,9 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       // process the inlined body after inlining, because the inlining may
       // have exposed new inlining opportunities beyond those present in
       // the inlined function when processed independently.
-      DEBUG(llvm::errs() << "Inlining @" << CalleeFunction->getName()
-                         << " into @" << InnerAI.getFunction()->getName()
-                         << "\n");
+      LLVM_DEBUG(llvm::errs() << "Inlining @" << CalleeFunction->getName()
+                              << " into @" << InnerAI.getFunction()->getName()
+                              << "\n");
 
       // If we intend to inline a thick function, then we need to balance the
       // reference counts for correctness.
@@ -673,7 +673,7 @@ class MandatoryInlining : public SILModuleTransform {
       if (F.getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
         continue;
 
-      notifyDeleteFunction(&F);
+      notifyWillDeleteFunction(&F);
 
       // Okay, just erase the function from the module.
       M->eraseFunction(&F);

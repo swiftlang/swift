@@ -1,0 +1,71 @@
+// RUN: %target-sil-opt %s -diagnostic-constant-propagation -o /dev/null -verify
+//
+// REQUIRES: CPU=i386 || CPU=x86_64
+//
+// Tests for checking floating-point diagnostics produced by constant
+// propagation phase on SIL inputs.
+// This file tests to make sure that diagnostics are correctly emitted when
+// AST information is not available.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+sil @testFPToUInt8ViaDouble : $@convention(thin) () -> UInt8 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE80, 0x4007FF00000000000000 // 510
+%1 = builtin "fptrunc_FPIEEE80_FPIEEE64"(%0 : $Builtin.FPIEEE80) : $Builtin.FPIEEE64
+%2 = struct $Double (%1 : $Builtin.FPIEEE64)
+%3 = struct_extract %2 : $Double, #Double._value
+%4 = builtin "fptoui_FPIEEE64_Int8"(%3 : $Builtin.FPIEEE64) : $Builtin.Int8 // expected-error {{invalid conversion: '510' overflows 'Builtin.Int8'}}
+%5 = struct $UInt8 (%4 : $Builtin.Int8)
+return %5 : $UInt8
+}
+
+sil @testFPToInt64 : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE80, 0x403DFFFFFFFFFFFFFFFE // 9223372036854775807
+%1 = builtin "fptosi_FPIEEE80_Int64"(%0 : $Builtin.FPIEEE80) : $Builtin.Int64
+%2 = float_literal $Builtin.FPIEEE80, 0xC03E8000000000000000 // -9223372036854775808
+%3 = builtin "fptosi_FPIEEE80_Int64"(%2 : $Builtin.FPIEEE80) : $Builtin.Int64
+%4 = float_literal $Builtin.FPIEEE80, 0x403E8000000000000000 // 9223372036854775808
+%5 = builtin "fptosi_FPIEEE80_Int64"(%4 : $Builtin.FPIEEE80) : $Builtin.Int64 // expected-error {{invalid conversion: '9223372036854775808' overflows 'Builtin.Int64'}}
+return %1 : $Builtin.Int64
+}
+
+sil @testFPToUInt64 : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE80, 0x403EFFFFFFFFFFFFFFFF // 18446744073709551615
+%1 = builtin "fptoui_FPIEEE80_Int64"(%0 : $Builtin.FPIEEE80) : $Builtin.Int64
+%2 = float_literal $Builtin.FPIEEE80, 0x403F8000000000000000 // 18446744073709551616
+%3 = builtin "fptoui_FPIEEE80_Int64"(%2 : $Builtin.FPIEEE80) : $Builtin.Int64 // expected-error {{invalid conversion: '18446744073709551616' overflows 'Builtin.Int64'}}
+%4 = float_literal $Builtin.FPIEEE80, 0xC03EFFFFFFFFFFFFFFFF // -18446744073709551615
+%5 = builtin "fptoui_FPIEEE80_Int64"(%4 : $Builtin.FPIEEE80) : $Builtin.Int64 // expected-error {{negative literal '-18446744073709551615' cannot be converted to unsigned 'Builtin.Int64'}}
+return %1 : $Builtin.Int64
+}
+
+sil @testFPToInt64ViaDouble : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+// A case where implicit conversion of the float literal to 'Double'
+// results in an overflow during conversion to 'Int64''
+%0 = float_literal $Builtin.FPIEEE80, 0x403DFFFFFFFFFFFFFFFE // 9223372036854775807
+%1 = builtin "fptrunc_FPIEEE80_FPIEEE64"(%0 : $Builtin.FPIEEE80) : $Builtin.FPIEEE64
+%2 = struct $Double (%1 : $Builtin.FPIEEE64)
+%3 = struct_extract %2 : $Double, #Double._value
+%4 = builtin "fptosi_FPIEEE64_Int64"(%3 : $Builtin.FPIEEE64) : $Builtin.Int64 // expected-error {{invalid conversion: '9.2233720368547758E+18' overflows 'Builtin.Int64'}}
+// A similar case for 'UInt64'.
+%5 = float_literal $Builtin.FPIEEE80, 0x403EFFFFFFFFFFFFFFFF // 18446744073709551615
+%6 = builtin "fptrunc_FPIEEE80_FPIEEE64"(%5 : $Builtin.FPIEEE80) : $Builtin.FPIEEE64
+%7 = struct $Double (%6 : $Builtin.FPIEEE64)
+%8 = struct_extract %7 : $Double, #Double._value
+%9 = builtin "fptoui_FPIEEE64_Int64"(%8 : $Builtin.FPIEEE64) : $Builtin.Int64 // expected-error {{invalid conversion: '1.8446744073709552E+19' overflows 'Builtin.Int64'}}
+// A case where implicit conversion of the float literal to 'Double'
+// elides an overflow that one would expect during conversion to 'Int64'.
+%10 = float_literal $Builtin.FPIEEE80,  0xC03E8000000000000001 // -9223372036854775809
+%11 = builtin "fptrunc_FPIEEE80_FPIEEE64"(%10 : $Builtin.FPIEEE80) : $Builtin.FPIEEE64
+%12 = struct $Double (%11 : $Builtin.FPIEEE64)
+%13 = struct_extract %12 : $Double, #Double._value
+%14 = builtin "fptosi_FPIEEE64_Int64"(%13 : $Builtin.FPIEEE64) : $Builtin.Int64
+return %14 : $Builtin.Int64
+}

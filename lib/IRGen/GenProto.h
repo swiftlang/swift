@@ -139,7 +139,7 @@ namespace irgen {
   /// generics clause.
   void emitPolymorphicArguments(IRGenFunction &IGF,
                                 CanSILFunctionType origType,
-                                const SubstitutionMap &subs,
+                                SubstitutionMap subs,
                                 WitnessMetadata *witnessMetadata,
                                 Explosion &args);
 
@@ -148,12 +148,6 @@ namespace irgen {
                                 CanSILFunctionType &OrigFnType,
                                 CanSILFunctionType &SubstFnType,
                                 Explosion &nativeParam, unsigned paramIndex);
-
-  /// Emit references to the witness tables for the substituted type
-  /// in the given substitution.
-  void emitWitnessTableRefs(IRGenFunction &IGF, const Substitution &sub,
-                            llvm::Value **metadataCache,
-                            SmallVectorImpl<llvm::Value *> &out);
 
   /// \brief Load a reference to the protocol descriptor for the given protocol.
   ///

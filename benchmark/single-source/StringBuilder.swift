@@ -22,6 +22,10 @@ public let StringBuilder = [
     runFunction: run_StringBuilder,
     tags: [.validation, .api, .String]),
   BenchmarkInfo(
+    name: "StringBuilderSmallReservingCapacity",
+    runFunction: run_StringBuilderSmallReservingCapacity,
+    tags: [.validation, .api, .String]),
+  BenchmarkInfo(
     name: "StringUTF16Builder",
     runFunction: run_StringUTF16Builder,
     tags: [.validation, .api, .String]),
@@ -48,8 +52,11 @@ public let StringBuilder = [
 ]
 
 @inline(never)
-func buildString(_ i: String) -> String {
+func buildString(_ i: String, reservingCapacity: Bool = false) -> String {
   var sb = getString(i)
+  if reservingCapacity {
+    sb.reserveCapacity(10)
+  }
   for str in ["b","c","d","pizza"] {
     sb += str
   }
@@ -60,6 +67,13 @@ func buildString(_ i: String) -> String {
 public func run_StringBuilder(_ N: Int) {
   for _ in 1...5000*N {
     blackHole(buildString("a"))
+  }
+}
+
+@inline(never)
+public func run_StringBuilderSmallReservingCapacity(_ N: Int) {
+  for _ in 1...5000*N {
+    blackHole(buildString("a", reservingCapacity: true))
   }
 }
 
@@ -179,3 +193,4 @@ public func run_StringWordBuilderReservingCapacity(_ N: Int) {
   blackHole(buildString(
     word: "bumfuzzle", count: 50_000 * N, reservingCapacity: true))
 }
+

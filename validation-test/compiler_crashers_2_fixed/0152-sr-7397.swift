@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift %s
+// RUN: %target-typecheck-verify-swift
 
 protocol _UnicodeParser_ {
     associatedtype Encoding: _UnicodeEncoding_

@@ -56,7 +56,6 @@ const char *irgen::getValueWitnessName(ValueWitness witness) {
   CASE(InitializeBufferWithCopyOfBuffer)
   CASE(InitializeWithCopy)
   CASE(InitializeWithTake)
-  CASE(InitializeBufferWithTakeOfBuffer)
   CASE(StoreExtraInhabitant)
   CASE(GetExtraInhabitantIndex)
   CASE(GetEnumTag)
@@ -331,47 +330,6 @@ static Address emitDefaultInitializeBufferWithCopyOfBuffer(
   }
 }
 
-/// Emit an 'initializeBufferWithTakeOfBuffer' operation.
-/// Returns the address of the destination object.
-static Address
-emitDefaultInitializeBufferWithTakeOfBuffer(IRGenFunction &IGF,
-                                            Address destBuffer,
-                                            Address srcBuffer,
-                                            SILType T,
-                                            const TypeInfo &type,
-                                            FixedPacking packing) {
-  switch (packing) {
-
-  case FixedPacking::Dynamic:
-    // Special-case dynamic packing in order to thread the jumps.
-    return emitForDynamicPacking(IGF,
-                                 &emitDefaultInitializeBufferWithTakeOfBuffer,
-                                 T, type, destBuffer, srcBuffer);
-
-  case FixedPacking::OffsetZero: {
-    // Both of these allocations/projections should be no-ops.
-    Address destObject =
-      emitDefaultAllocateBuffer(IGF, destBuffer, T, type, packing);
-    Address srcObject =
-      emitDefaultProjectBuffer(IGF, srcBuffer, T, type, packing);
-    type.initializeWithTake(IGF, destObject, srcObject, T, true);
-    return destObject;
-  }
-
-  case FixedPacking::Allocate: {
-    // Just copy the out-of-line storage pointers.
-    srcBuffer = IGF.Builder.CreateBitCast(
-        srcBuffer, IGF.IGM.RefCountedPtrTy->getPointerTo());
-    llvm::Value *addr = IGF.Builder.CreateLoad(srcBuffer);
-    destBuffer = IGF.Builder.CreateBitCast(
-        destBuffer, IGF.IGM.RefCountedPtrTy->getPointerTo());
-    IGF.Builder.CreateStore(addr, destBuffer);
-    return emitDefaultProjectBuffer(IGF, destBuffer, T, type, packing);
-  }
-  }
-  llvm_unreachable("bad fixed packing");
-}
-
 // Metaprogram some of the common boilerplate here:
 //   - the default implementation in TypeInfo
 //   - the value-witness emitter which tries to avoid some dynamic
@@ -392,8 +350,6 @@ static Address emit##TITLE(IRGenFunction &IGF, Address dest, Address src, \
 }
 DEFINE_BINARY_BUFFER_OP(initializeBufferWithCopyOfBuffer,
                         InitializeBufferWithCopyOfBuffer)
-DEFINE_BINARY_BUFFER_OP(initializeBufferWithTakeOfBuffer,
-                        InitializeBufferWithTakeOfBuffer)
 #undef DEFINE_BINARY_BUFFER_OP
 
 
@@ -526,19 +482,6 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
 
     Address result =
       emitInitializeBufferWithCopyOfBuffer(IGF, dest, src, concreteType,
-                                           type, packing);
-    result = IGF.Builder.CreateBitCast(result, IGF.IGM.OpaquePtrTy);
-    IGF.Builder.CreateRet(result.getAddress());
-    return;
-  }
-
-  case ValueWitness::InitializeBufferWithTakeOfBuffer: {
-    Address dest = getArgAsBuffer(IGF, argv, "dest");
-    Address src = getArgAsBuffer(IGF, argv, "src");
-    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
-
-    Address result =
-      emitInitializeBufferWithTakeOfBuffer(IGF, dest, src, concreteType,
                                            type, packing);
     result = IGF.Builder.CreateBitCast(result, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(result.getAddress());
@@ -805,38 +748,6 @@ static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
   });
 }
 
-/// Return a function which takes two buffer arguments, copies
-/// a pointer from the second to the first, and returns the pointer.
-static llvm::Constant *
-getCopyOutOfLineBoxPointerFunction(IRGenModule &IGM,
-                                   const FixedTypeInfo &fixedTI) {
-  llvm::Type *argTys[] = { IGM.Int8PtrPtrTy, IGM.Int8PtrPtrTy,
-                           IGM.TypeMetadataPtrTy };
-  llvm::SmallString<40> name;
-  {
-    llvm::raw_svector_ostream nameStream(name);
-    nameStream << "__swift_copy_outline_existential_box_pointer";
-    nameStream << fixedTI.getFixedAlignment().getValue();
-  }
-  return IGM.getOrCreateHelperFunction(
-      name, IGM.Int8PtrTy, argTys, [&](IRGenFunction &IGF) {
-        auto it = IGF.CurFn->arg_begin();
-        Address dest(&*it++, IGM.getPointerAlignment());
-        Address src(&*it++, IGM.getPointerAlignment());
-        auto *ptr = IGF.Builder.CreateLoad(src);
-        IGF.Builder.CreateStore(ptr, dest);
-        auto *alignmentMask = fixedTI.getStaticAlignmentMask(IGM);
-        auto *heapHeaderSize = llvm::ConstantInt::get(
-            IGM.SizeTy, IGM.RefCountedStructSize.getValue());
-        auto *startOffset = IGF.Builder.CreateAnd(
-            IGF.Builder.CreateAdd(heapHeaderSize, alignmentMask),
-            IGF.Builder.CreateNot(alignmentMask));
-        auto *objectAddr =
-            IGF.emitByteOffsetGEP(ptr, startOffset, IGM.Int8Ty);
-        IGF.Builder.CreateRet(objectAddr);
-      });
-}
-
 /// Find a witness to the fact that a type is a value type.
 /// Always adds an i8*.
 static void addValueWitness(IRGenModule &IGM,
@@ -867,17 +778,6 @@ static void addValueWitness(IRGenModule &IGM,
       } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
         return addFunction(getInitWithCopyStrongFunction(IGM));
       }
-    }
-    goto standard;
-
-  case ValueWitness::InitializeBufferWithTakeOfBuffer:
-    if (packing == FixedPacking::Allocate) {
-      return addFunction(getCopyOutOfLineBoxPointerFunction(
-          IGM, cast<FixedTypeInfo>(concreteTI)));
-    } else
-      if (packing == FixedPacking::OffsetZero &&
-               concreteTI.isBitwiseTakable(ResilienceExpansion::Maximal)) {
-      return addFunction(getMemCpyFunction(IGM, concreteTI));
     }
     goto standard;
 
@@ -927,13 +827,16 @@ static void addValueWitness(IRGenModule &IGM,
     if (auto *fixedTI = dyn_cast<FixedTypeInfo>(&concreteTI)) {
       assert(packing == FixedPacking::OffsetZero ||
              packing == FixedPacking::Allocate);
+      bool isInline = packing == FixedPacking::OffsetZero;
+      bool isBitwiseTakable =
+          fixedTI->isBitwiseTakable(ResilienceExpansion::Maximal);
+      assert(isBitwiseTakable || !isInline);
       flags = flags.withAlignment(fixedTI->getFixedAlignment().getValue())
-                   .withPOD(fixedTI->isPOD(ResilienceExpansion::Maximal))
-                   .withInlineStorage(packing == FixedPacking::OffsetZero)
-                   .withExtraInhabitants(
+                  .withPOD(fixedTI->isPOD(ResilienceExpansion::Maximal))
+                  .withInlineStorage(isInline)
+                  .withExtraInhabitants(
                       fixedTI->getFixedExtraInhabitantCount(IGM) > 0)
-                   .withBitwiseTakable(
-                      fixedTI->isBitwiseTakable(ResilienceExpansion::Maximal));
+                  .withBitwiseTakable(isBitwiseTakable);
     } else {
       flags = flags.withIncomplete(true);
     }
@@ -1288,6 +1191,10 @@ FixedPacking TypeInfo::getFixedPacking(IRGenModule &IGM) const {
   if (!fixedTI)
     return FixedPacking::Dynamic;
 
+  // By convention we only store bitwise takable values inline.
+  if (!fixedTI->isBitwiseTakable(ResilienceExpansion::Maximal))
+    return FixedPacking::Allocate;
+
   Size bufferSize = getFixedBufferSize(IGM);
   Size requiredSize = fixedTI->getFixedSize();
 
@@ -1491,6 +1398,7 @@ void TypeInfo::assignArrayWithTake(IRGenFunction &IGF, Address dest,
 
 void TypeInfo::collectMetadataForOutlining(OutliningMetadataCollector &c,
                                            SILType T) const {
-  auto canType = T.getSwiftRValueType();
+  auto canType = T.getASTType();
   assert(!canType->is<ArchetypeType>() && "Did not expect an ArchetypeType");
+  (void)canType;
 }

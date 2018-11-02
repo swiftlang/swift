@@ -2374,7 +2374,7 @@ extension _JSONDecoder {
                                                                         debugDescription: "Invalid URL string."))
             }
 
-            return url as! T
+            return (url as! T)
         } else if type == Decimal.self || type == NSDecimalNumber.self {
             return try self.unbox(value, as: Decimal.self) as? T
         } else {

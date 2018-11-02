@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name switch -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name switch %s | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -744,7 +744,7 @@ func test_union_4(u: MaybePair) {
   // CHECK:   case #MaybePair.Both!enumelt.1: [[IS_BOTH:bb[0-9]+]]
 
   // CHECK: [[IS_NEITHER]]:
-  case .Neither(_):
+  case .Neither:
   // CHECK:   function_ref @$S6switch1ayyF
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
@@ -783,7 +783,7 @@ func test_union_5(u: MaybePair) {
   // CHECK:   case #MaybePair.Both!enumelt.1: [[IS_BOTH:bb[0-9]+]]
 
   // CHECK: [[IS_NEITHER]]:
-  case .Neither():
+  case .Neither:
   // CHECK:   function_ref @$S6switch1ayyF
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()

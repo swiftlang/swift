@@ -41,6 +41,7 @@ KNOWN_STDLIB_TYPE_DECL(UInt8,  NominalTypeDecl, 0)
 
 KNOWN_STDLIB_TYPE_DECL(Float,  NominalTypeDecl, 0)
 KNOWN_STDLIB_TYPE_DECL(Double, NominalTypeDecl, 0)
+KNOWN_STDLIB_TYPE_DECL(Float80, NominalTypeDecl, 0)
 
 KNOWN_STDLIB_TYPE_DECL(String, NominalTypeDecl, 0)
 KNOWN_STDLIB_TYPE_DECL(Substring, NominalTypeDecl, 0)

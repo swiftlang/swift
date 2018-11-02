@@ -453,3 +453,6 @@ public func run_CharacterPropertiesPrecomputed(_ N: Int) {
 
 // TODO: run_CharacterPropertiesComputed
 
+// Local Variables:
+// eval: (read-only-mode 1)
+// End:

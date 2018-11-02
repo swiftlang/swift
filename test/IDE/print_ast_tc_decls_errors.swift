@@ -149,15 +149,15 @@ protocol ProtocolWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtoc
 // NO-TYREPR: {{^}}protocol ProtocolWithInheritance2 : <<error type>>, <<error type>> {{{$}}
 // TYREPR: {{^}}protocol ProtocolWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {{{$}}
 
-protocol ProtocolWithInheritance3 : FooClass {} // expected-error {{non-class type 'ProtocolWithInheritance3' cannot inherit from class 'FooClass'}}
-// NO-TYREPR: {{^}}protocol ProtocolWithInheritance3 : <<error type>> {{{$}}
+protocol ProtocolWithInheritance3 : FooClass {}
+// NO-TYREPR: {{^}}protocol ProtocolWithInheritance3 : FooClass {{{$}}
 // TYREPR: {{^}}protocol ProtocolWithInheritance3 : FooClass {{{$}}
 
-protocol ProtocolWithInheritance4 : FooClass, FooProtocol {} // expected-error {{non-class type 'ProtocolWithInheritance4' cannot inherit from class 'FooClass'}}
-// NO-TYREPR: {{^}}protocol ProtocolWithInheritance4 : <<error type>>, FooProtocol {{{$}}
+protocol ProtocolWithInheritance4 : FooClass, FooProtocol {}
+// NO-TYREPR: {{^}}protocol ProtocolWithInheritance4 : FooClass, FooProtocol {{{$}}
 // TYREPR: {{^}}protocol ProtocolWithInheritance4 : FooClass, FooProtocol {{{$}}
 
-protocol ProtocolWithInheritance5 : FooClass, BarClass {} // expected-error {{non-class type 'ProtocolWithInheritance5' cannot inherit from class 'FooClass'}} expected-error {{non-class type 'ProtocolWithInheritance5' cannot inherit from class 'BarClass'}} expected-error{{protocol 'ProtocolWithInheritance5' cannot be a subclass of both 'BarClass' and 'FooClass'}} // expected-note{{superclass constraint 'Self' : 'FooClass' written here}}
+protocol ProtocolWithInheritance5 : FooClass, BarClass {} // expected-error{{multiple inheritance from classes 'FooClass' and 'BarClass'}} expected-error{{protocol 'ProtocolWithInheritance5' cannot be a subclass of both 'BarClass' and 'FooClass'}} // expected-note{{superclass constraint 'Self' : 'FooClass' written here}}
 // NO-TYREPR: {{^}}protocol ProtocolWithInheritance5 : <<error type>>, <<error type>> {{{$}}
 // TYREPR: {{^}}protocol ProtocolWithInheritance5 : FooClass, BarClass {{{$}}
 
@@ -194,7 +194,7 @@ protocol AssociatedType1 {
 // TYREPR: {{^}}  associatedtype AssociatedTypeDecl4 : FooNonExistentProtocol, BarNonExistentProtocol{{$}}
 
   associatedtype AssociatedTypeDecl5 : FooClass
-// CHECK: {{^}}  associatedtype AssociatedTypeDecl5{{$}}
+// CHECK: {{^}}  associatedtype AssociatedTypeDecl5 : FooClass{{$}}
 }
 
 //===---

@@ -9,7 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-build-swift %s -swift-version 3 -g -Onone -o %t
+// RUN: %target-build-swift %s -g -Onone -o %t
 // RUN: %target-run %t
 // REQUIRES: executable_test
 

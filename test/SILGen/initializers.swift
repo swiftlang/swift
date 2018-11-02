@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -disable-objc-attr-requires-foundation-module %s -module-name failable_initializers | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -disable-objc-attr-requires-foundation-module -enable-objc-interop %s -module-name failable_initializers | %FileCheck %s
 
 // High-level tests that silgen properly emits code for failable and thorwing
 // initializers.
@@ -1120,4 +1120,10 @@ struct DynamicTypeStruct {
     use(type(of: self))
     self.init()
   }
+}
+
+class InOutInitializer {
+// CHECK-LABEL: sil hidden @$S21failable_initializers16InOutInitializerC1xACSiz_tcfC : $@convention(method) (@inout Int, @thick InOutInitializer.Type) -> @owned InOutInitializer {
+// CHECK: bb0(%0 : @trivial $*Int, %1 : @trivial $@thick InOutInitializer.Type):
+  init(x: inout Int) {}
 }

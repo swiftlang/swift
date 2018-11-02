@@ -110,6 +110,9 @@ def driver_filelist_threshold_EQ : Joined<["-"], "driver-filelist-threshold=">,
 def driver_batch_seed : Separate<["-"], "driver-batch-seed">,
   InternalDebugOpt,
   HelpText<"Use the given seed value to randomize batch-mode partitions">;
+def driver_batch_count : Separate<["-"], "driver-batch-count">,
+  InternalDebugOpt,
+  HelpText<"Use the given number of batch-mode partitions, rather than default parallelism level">;
 def driver_force_one_batch_repartition : Flag<["-"], "driver-force-one-batch-repartition">,
   InternalDebugOpt,
   HelpText<"Force one batch repartitioning for testing">;
@@ -229,6 +232,9 @@ def profile_stats_entities: Flag<["-"], "profile-stats-entities">,
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit basic Make-compatible dependencies files">;
+def track_system_dependencies : Flag<["-"], "track-system-dependencies">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Track system dependencies while emitting Make-style dependencies">;
 
 def emit_loaded_module_trace : Flag<["-"], "emit-loaded-module-trace">,
   Flags<[FrontendOption, NoInteractiveOption]>,
@@ -463,10 +469,18 @@ def gdwarf_types : Flag<["-"], "gdwarf-types">,
   Group<g_Group>, Flags<[FrontendOption]>,
   HelpText<"Emit full DWARF type info.">;
 
+def debug_info_format : Joined<["-"], "debug-info-format=">,
+  Flags<[FrontendOption]>,
+  HelpText<"Specify the debug info format type to either 'dwarf' or 'codeview'">;
+
 // Verify debug info
 def verify_debug_info : Flag<["-"], "verify-debug-info">,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Verify the binary representation of debug output.">;
+
+def debug_info_store_invocation : Flag<["-"], "debug-info-store-invocation">,
+  Flags<[FrontendOption]>,
+  HelpText<"Emit the compiler invocation in the debug info.">;
 
 // Assert configuration identifiers.
 def AssertConfig : Separate<["-"], "assert-config">,
@@ -538,6 +552,13 @@ def api_diff_data_file: Separate<["-"], "api-diff-data-file">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
          ArgumentIsPath]>,
   HelpText<"API migration data is from <path>">,
+  MetaVarName<"<path>">;
+
+def api_diff_data_dir: Separate<["-"], "api-diff-data-dir">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         ArgumentIsPath]>,
+  HelpText<"Load platform and version specific API migration data files from <path>. "
+      "Ignored if -api-diff-data-file is specified.">,
   MetaVarName<"<path>">;
 
 def dump_usr: Flag<["-"], "dump-usr">,
@@ -618,6 +639,9 @@ def fixit_all : Flag<["-"], "fixit-all">,
 // No Output Modes
 def parse: Flag<["-"], "parse">,
   HelpText<"Parse input file(s)">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def resolve_imports : Flag<["-"], "resolve-imports">,
+  HelpText<"Parse and resolve imports in input file(s)">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def typecheck : Flag<["-"], "typecheck">,
   HelpText<"Parse and type-check input file(s)">, ModeOpt,

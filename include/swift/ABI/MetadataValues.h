@@ -54,9 +54,20 @@ enum class MetadataKind : uint32_t {
 #define ABSTRACTMETADATAKIND(name, start, end)                                 \
   name##_Start = start, name##_End = end,
 #include "MetadataKind.def"
+  
+  /// The largest possible non-isa-pointer metadata kind value.
+  ///
+  /// This is included in the enumeration to prevent against attempts to
+  /// exhaustively match metadata kinds. Future Swift runtimes or compilers
+  /// may introduce new metadata kinds, so for forward compatibility, the
+  /// runtime must tolerate metadata with unknown kinds.
+  /// This specific value is not mapped to a valid metadata kind at this time,
+  /// however.
+  LastEnumerated = 2047,
 };
 
-const unsigned LastEnumeratedMetadataKind = 2047;
+const unsigned LastEnumeratedMetadataKind =
+  (unsigned)MetadataKind::LastEnumerated;
 
 /// Try to translate the 'isa' value of a type/heap metadata into a value
 /// of the MetadataKind enum.
@@ -127,6 +138,8 @@ public:
   }
 
   /// True if the type requires out-of-line allocation of its storage.
+  /// This can be the case because the value requires more storage or if it is
+  /// not bitwise takable.
   bool isInlineStorage() const { return !(Data & IsNonInline); }
   constexpr TargetValueWitnessFlags withInlineStorage(bool isInline) const {
     return TargetValueWitnessFlags((Data & ~IsNonInline) |
@@ -643,7 +656,10 @@ public:
 
 /// Flags in an existential type metadata record.
 class ExistentialTypeFlags {
-  typedef size_t int_type;
+public:
+  typedef uint32_t int_type;
+
+private:
   enum : int_type {
     NumWitnessTablesMask  = 0x00FFFFFFU,
     ClassConstraintMask   = 0x80000000U,
@@ -1176,6 +1192,12 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     ///
     /// Meaningful for all type-descriptor kinds.
     IsReflectable = 2,
+    
+    /// Set if the type is a Clang-importer-synthesized related entity. After
+    /// the null terminator for the type name is another null-terminated string
+    /// containing the tag that discriminates the entity from other synthesized
+    /// declarations associated with the same declaration.
+    IsSynthesizedRelatedEntity = 3,
 
     /// Set if the context descriptor is includes metadata for dynamically
     /// constructing a class's vtables at metadata instantiation time.
@@ -1207,6 +1229,10 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(IsCTag, isCTag, setIsCTag)
   FLAGSET_DEFINE_FLAG_ACCESSORS(IsCTypedef, isCTypedef, setIsCTypedef)
   FLAGSET_DEFINE_FLAG_ACCESSORS(IsReflectable, isReflectable, setIsReflectable)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsSynthesizedRelatedEntity,
+                                isSynthesizedRelatedEntity,
+                                setIsSynthesizedRelatedEntity)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasVTable,
                                 class_hasVTable,

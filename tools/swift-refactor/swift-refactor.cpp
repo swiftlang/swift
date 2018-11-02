@@ -41,7 +41,7 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
                       "expand-switch-cases", "Perform switch cases expand refactoring"),
            clEnumValN(RefactoringKind::LocalizeString,
                       "localize-string", "Perform string localization refactoring"),
-           clEnumValN(RefactoringKind::CollapseNestedIfExpr,
+           clEnumValN(RefactoringKind::CollapseNestedIfStmt,
                       "collapse-nested-if", "Perform collapse nested if statements"),
            clEnumValN(RefactoringKind::ConvertToDoCatch,
                       "convert-to-do-catch", "Perform force try to do try catch refactoring"),
@@ -279,7 +279,7 @@ int main(int argc, char *argv[]) {
 
   auto Start = getLocsByLabelOrPosition(options::LineColumnPair, Buffer);
   if (Start.empty()) {
-    llvm::errs() << "cannot parse position pair.";
+    llvm::errs() << "cannot parse position pair.\n";
     return 1;
   }
 

@@ -194,7 +194,7 @@ tests.test("clSetKernelArgsListAPPLE") {
           kernel!, 3,
           0, MemoryLayout<cl_mem>.size, inputPtr,
           1, MemoryLayout<cl_mem>.size, outputPtr,
-          2, MemoryLayout.size(ofValue: count), countPtr)
+          2, MemoryLayout.size(ofValue: countPtr.pointee), countPtr)
       }
     }
   }

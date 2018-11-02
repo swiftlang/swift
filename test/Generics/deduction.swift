@@ -23,7 +23,9 @@ func useIdentity(_ x: Int, y: Float, i32: Int32) {
   // Deduction where the result type and input type can get different results
   var xx : X, yy : Y
   xx = identity(yy) // expected-error{{cannot assign value of type 'Y' to type 'X'}}
-  xx = identity2(yy) // expected-error{{cannot convert value of type 'Y' to expected argument type 'X'}}
+
+  // FIXME: rdar://41416647
+  xx = identity2(yy) // expected-error{{type of expression is ambiguous without more context}}
 }
 
 // FIXME: Crummy diagnostic!
@@ -78,7 +80,7 @@ func passFunction(_ f: (Int) -> Float, x: Int, y: Float) {
    acceptFunction(f, y, y) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
 }
 
-func returnTuple<T, U>(_: T) -> (T, U) { } // expected-note {{in call to function 'returnTuple'}}
+func returnTuple<T, U>(_: T) -> (T, U) { } // expected-note 2{{in call to function 'returnTuple'}}
 
 func testReturnTuple(_ x: Int, y: Float) {
   returnTuple(x) // expected-error{{generic parameter 'U' could not be inferred}}
@@ -87,7 +89,7 @@ func testReturnTuple(_ x: Int, y: Float) {
   var _ : (Float, Float) = returnTuple(y)
 
   // <rdar://problem/22333090> QoI: Propagate contextual information in a call to operands
-  var _ : (Int, Float) = returnTuple(y) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
+  var _ : (Int, Float) = returnTuple(y) // expected-error{{generic parameter 'U' could not be inferred}}
 }
 
 
@@ -316,7 +318,9 @@ func foo() {
     let j = min(Int(3), Float(2.5)) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
     let k = min(A(), A()) // expected-error{{argument type 'A' does not conform to expected type 'Comparable'}}
     let oi : Int? = 5
-    let l = min(3, oi) // expected-error{{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'?}}
+    let l = min(3, oi) // expected-error{{value of optional type 'Int?' must be unwrapped}}
+  // expected-note@-1{{coalesce}}
+  // expected-note@-2{{force-unwrap}}
 }
 
 infix operator +&

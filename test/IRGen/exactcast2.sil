@@ -1,4 +1,4 @@
-// RUN: %target-build-swift %s -Xfrontend -assume-parsing-unqualified-ownership-sil -emit-ir -o -
+// RUN: %target-build-swift %s -Xfrontend -assume-parsing-unqualified-ownership-sil -Xfrontend -enable-objc-interop -emit-ir -o -
 // REQUIRES: executable_test
 
 // Make sure we are not crashing here.

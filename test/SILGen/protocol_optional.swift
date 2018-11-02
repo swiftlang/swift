@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name protocol_optional -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name protocol_optional -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop -enable-sil-ownership %s | %FileCheck %s
 
 @objc protocol P1 {
   @objc optional func method(_ x: Int)

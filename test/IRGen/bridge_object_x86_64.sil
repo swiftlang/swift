@@ -12,7 +12,7 @@ sil_vtable C {}
 @objc protocol ObjC {}
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @retain_release_bridge_object
-// CHECK:         call [[BRIDGE:%swift.bridge\*]] @swift_bridgeObjectRetain
+// CHECK:         call [[BRIDGE:%swift.bridge\*]] @swift_bridgeObjectRetain{{.*}}returned
 // CHECK:         call void @swift_bridgeObjectRelease
 sil @retain_release_bridge_object : $(Builtin.BridgeObject) -> () {
 entry(%b : $Builtin.BridgeObject):
@@ -48,7 +48,7 @@ entry(%c : $C, %w : $Builtin.Word):
 // CHECK:      tagged-cont:
 // CHECK:         phi [[C]] [ [[TAGGED_RESULT]], %tagged-pointer ], [ [[MASKED_RESULT]], %not-tagged-pointer ]
 
-sil @convert_from_bridge_object : $Builtin.BridgeObject -> (ObjC, Builtin.Word) {
+sil @convert_from_bridge_object : $(Builtin.BridgeObject) -> (ObjC, Builtin.Word) {
 entry(%b : $Builtin.BridgeObject):
   %c = bridge_object_to_ref %b : $Builtin.BridgeObject to $ObjC
   %w = bridge_object_to_word %b : $Builtin.BridgeObject to $Builtin.Word
@@ -61,7 +61,7 @@ entry(%b : $Builtin.BridgeObject):
 // CHECK:         [[MASKED_BITS:%.*]] = and i64 [[BOBITS]], 72057594037927928
 // CHECK:         [[RESULT:%.*]] = inttoptr i64 [[MASKED_BITS]] to [[C:%T13bridge_object1CC\*]]
 // CHECK:         ret %T13bridge_object1CC* [[RESULT]]
-sil @convert_from_native_bridge_object : $Builtin.BridgeObject -> C {
+sil @convert_from_native_bridge_object : $(Builtin.BridgeObject) -> C {
 entry(%b : $Builtin.BridgeObject):
   %c = bridge_object_to_ref %b : $Builtin.BridgeObject to $C
   return %c : $C

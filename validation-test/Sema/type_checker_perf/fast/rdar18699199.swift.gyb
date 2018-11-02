@@ -1,0 +1,17 @@
+// RUN: %scale-test --begin 1 --end 10 --step 1 --select incrementScopeCounter %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+public enum E
+{
+    case First,
+%for i in range(0, N):
+    C${i},
+%end
+    End
+
+    static let toRawValues = [
+%for i in range(0, N):
+    C${i}: String("hi"),
+%end
+    ]
+}

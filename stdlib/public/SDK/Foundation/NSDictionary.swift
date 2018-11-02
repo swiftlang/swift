@@ -192,7 +192,8 @@ extension NSDictionary : Sequence {
 
 extension NSMutableDictionary {
   // Bridging subscript.
-  override public subscript(key: Any) -> Any? {
+  @objc override public subscript(key: Any) -> Any? {
+    @objc(_swift_objectForKeyedSubscript:)
     get {
       return self.object(forKey: key)
     }

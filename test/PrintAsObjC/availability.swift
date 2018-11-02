@@ -153,7 +153,7 @@
     @available(macOS 10.10, *)
     @objc init(x _: Int) {}
 
-    var simpleProperty: Int {
+    @objc var simpleProperty: Int {
 	get {
 		return 100
 	    }
@@ -193,7 +193,7 @@ extension Availability {
 
 
   @available(macOS, deprecated: 10.10)
-  var propertyDeprecatedInsideExtension: Int {
+  @objc var propertyDeprecatedInsideExtension: Int {
 	  get {
 		  return 0
 	  }
@@ -208,7 +208,7 @@ extension Availability {
 
 
 @available(macOS 999, *)
-@objc class WholeClassAvailability {
+@objc @objcMembers class WholeClassAvailability {
   func wholeClassAvailability(_: WholeProtoAvailability) {}
 }
 

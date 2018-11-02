@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name collection_subtype_downcast -emit-silgen -enable-sil-ownership -sdk %S/Inputs %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name collection_subtype_downcast -enable-sil-ownership -sdk %S/Inputs %s | %FileCheck %s
 
 struct S { var x, y: Int }
 
@@ -28,12 +28,12 @@ func ==(lhs: S, rhs: S) -> Bool {
 }
 
 // FIXME: This entrypoint name should not be bridging-specific
-// CHECK-LABEL:      sil hidden @$S27collection_subtype_downcast05dict_C00D0s10DictionaryVyAA1SVSiGSgAEyAGypG_tF :
+// CHECK-LABEL:      sil hidden @$S27collection_subtype_downcast05dict_C00D0SDyAA1SVSiGSgSDyAEypG_tF :
 // CHECK:    bb0([[ARG:%.*]] : @guaranteed $Dictionary<S, Any>):
 // CHECK: debug_value [[ARG]]
 // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK: // function_ref
-// CHECK: [[FN:%.*]] = function_ref @$Ss30_dictionaryDownCastConditionalys10DictionaryVyq0_q1_GSgACyxq_Gs8HashableRzsAGR0_r2_lF
+// CHECK: [[FN:%.*]] = function_ref @$Ss30_dictionaryDownCastConditionalySDyq0_q1_GSgSDyxq_GSHRzSHR0_r2_lF
 // CHECK: [[BORROWED_ARG_COPY:%.*]] = begin_borrow [[ARG_COPY]]
 // CHECK: [[RESULT:%.*]] = apply [[FN]]<S, Any, S, Int>([[BORROWED_ARG_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
 // CHECK: end_borrow [[BORROWED_ARG_COPY]] from [[ARG_COPY]]

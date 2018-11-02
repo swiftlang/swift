@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -673,17 +673,8 @@ public:
   ///
   /// \param locator The locator that describes where the substitutions came
   /// from.
-  ///
-  /// \param substitutions Will be populated with the set of substitutions
-  /// to be applied to the generic function type.
-  void computeSubstitutions(GenericSignature *sig,
-                            ConstraintLocator *locator,
-                            SmallVectorImpl<Substitution> &substitutions) const;
-
-  /// Same as above but with a lazily-constructed locator.
-  void computeSubstitutions(GenericSignature *sig,
-                            ConstraintLocatorBuilder locator,
-                            SmallVectorImpl<Substitution> &substitutions) const;
+  SubstitutionMap computeSubstitutions(GenericSignature *sig,
+                                       ConstraintLocatorBuilder locator) const;
 
   /// Return the disjunction choice for the given constraint location.
   unsigned getDisjunctionChoice(ConstraintLocator *locator) const {
@@ -796,13 +787,19 @@ enum class ConstraintSystemFlags {
   /// Whether we allow the solver to attempt fixes to the system.
   AllowFixes = 0x01,
   
-  /// Set if the client prefers fixits to be in the form of force unwrapping
-  /// or optional chaining to return an optional.
-  PreferForceUnwrapToOptional = 0x02,
-
   /// If set, this is going to prevent constraint system from erasing all
   /// discovered solutions except the best one.
   ReturnAllDiscoveredSolutions = 0x04,
+
+  /// Set if the client wants diagnostics suppressed.
+  SuppressDiagnostics = 0x08,
+
+  /// If set, the client wants a best-effort solution to the constraint system,
+  /// but can tolerate a solution where all of the constraints are solved, but
+  /// not all type variables have been determined.  In this case, the constraint
+  /// system is not applied to the expression AST, but the ConstraintSystem is
+  /// left in-tact.
+  AllowUnresolvedTypeVariables = 0x10,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -915,6 +912,13 @@ public:
   /// The original CS if this CS was created as a simplification of another CS
   ConstraintSystem *baseCS = nullptr;
 
+  /// \brief The total number of disjunctions created.
+  unsigned CountDisjunctions = 0;
+
+  /// \brief Map from disjunction to the number indicating the order it
+  //         was created in.
+  llvm::DenseMap<Constraint *, unsigned> DisjunctionNumber;
+
 private:
 
   /// \brief Allocator used for all of the related constraint systems.
@@ -1000,6 +1004,9 @@ private:
 
   /// Types used in fixes.
   std::vector<Type> FixedTypes;
+
+  /// Declaration names used in fixes.
+  std::vector<DeclName> FixedDeclNames;
 
   /// \brief The set of remembered disjunction choices used to reach
   /// the current constraint system.
@@ -1133,6 +1140,15 @@ private:
     /// \brief Depth of the solution stack.
     unsigned depth = 0;
 
+    /// \brief Maximum depth reached so far in exploring solutions.
+    unsigned maxDepth = 0;
+
+    /// \brief Count of the number of leaf scopes we've created. These
+    /// either result in a failure to solve, or in a solution, unlike
+    /// all the intermediate scopes. They are interesting to track as
+    /// part of a metric of whether an expression is too complex.
+    unsigned leafScopes = 0;
+
     /// \brief Whether to record failures or not.
     bool recordFixes = false;
 
@@ -1153,19 +1169,6 @@ private:
     #define CS_STATISTIC(Name, Description) unsigned Name = 0;
     #include "ConstraintSolverStats.def"
 
-    /// \brief Register given scope to be tracked by the current solver state,
-    /// this helps to make sure that all of the retired/generated constraints
-    /// are dealt with correctly when the life time of the scope ends.
-    ///
-    /// \param scope The scope to associate with current solver state.
-    void registerScope(SolverScope *scope) {
-      CS.incrementScopeCounter();
-      auto scopeInfo =
-        std::make_tuple(scope, retiredConstraints.begin(),
-                        generatedConstraints.size());
-      scopes.push_back(scopeInfo);
-    }
-
     /// \brief Check whether there are any retired constraints present.
     bool hasRetiredConstraints() const {
       return !retiredConstraints.empty();
@@ -1183,7 +1186,7 @@ private:
     ///
     /// \param processor The processor function to be applied to each of
     /// the constraints retrieved.
-    void forEachRetired(std::function<void(Constraint &)> processor) {
+    void forEachRetired(llvm::function_ref<void(Constraint &)> processor) {
       for (auto &constraint : retiredConstraints)
         processor(constraint);
     }
@@ -1213,6 +1216,23 @@ private:
       }
     }
 
+    /// \brief Register given scope to be tracked by the current solver state,
+    /// this helps to make sure that all of the retired/generated constraints
+    /// are dealt with correctly when the life time of the scope ends.
+    ///
+    /// \param scope The scope to associate with current solver state.
+    void registerScope(SolverScope *scope) {
+      ++depth;
+      maxDepth = std::max(maxDepth, depth);
+      scope->scopeNumber = NumStatesExplored++;
+
+      CS.incrementScopeCounter();
+      auto scopeInfo =
+        std::make_tuple(scope, retiredConstraints.begin(),
+                        generatedConstraints.size());
+      scopes.push_back(scopeInfo);
+    }
+
     /// \brief Restore all of the retired/generated constraints to the state
     /// before given scope. This is required because retired constraints have
     /// to be re-introduced to the system in order of arrival (LIFO) and list
@@ -1221,6 +1241,12 @@ private:
     ///
     /// \param scope The solver scope to rollback.
     void rollback(SolverScope *scope) {
+      --depth;
+
+      unsigned countScopesExplored = NumStatesExplored - scope->scopeNumber;
+      if (countScopesExplored == 1)
+        ++leafScopes;
+
       SolverScope *savedScope;
       // The position of last retired constraint before given scope.
       ConstraintList::iterator lastRetiredPos;
@@ -1326,30 +1352,6 @@ private:
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
 
-  class TransferExprTypes : public ASTWalker {
-    ConstraintSystem &toCS;
-    ConstraintSystem &fromCS;
-
-  public:
-    TransferExprTypes(ConstraintSystem &toCS, ConstraintSystem &fromCS)
-        : toCS(toCS), fromCS(fromCS) {}
-
-    Expr *walkToExprPost(Expr *expr) override {
-      if (fromCS.hasType(expr))
-        toCS.setType(expr, fromCS.getType(expr));
-
-      return expr;
-    }
-
-    /// \brief Ignore statements.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return { false, stmt };
-    }
-
-    /// \brief Ignore declarations.
-    bool walkToDeclPre(Decl *decl) override { return false; }
-  };
-
 public:
 
   void setExprTypes(Expr *expr) {
@@ -1373,10 +1375,6 @@ public:
   void cacheSubExprTypes(Expr *expr) {
     bool excludeRoot = true;
     expr->walk(CacheExprTypes(expr, *this, excludeRoot));
-  }
-
-  void transferExprTypes(ConstraintSystem *oldCS, Expr *expr) {
-    expr->walk(TransferExprTypes(*this, *oldCS));
   }
 
   /// \brief The current solver state.
@@ -1449,6 +1447,12 @@ public:
     /// The previous score.
     Score PreviousScore;
 
+    /// The scope number of this scope. Set when the scope is registered.
+    unsigned scopeNumber = 0;
+
+    /// Time in fractional seconds at which we entered this scope.
+    double startTime;
+
     /// Constraint graph scope associated with this solver scope.
     ConstraintGraphScope CGScope;
 
@@ -1460,6 +1464,13 @@ public:
   public:
     explicit SolverScope(ConstraintSystem &cs);
     ~SolverScope();
+
+    Optional<double> getElapsedTimeInFractionalSeconds() {
+      if (!cs.Timer)
+        return None;
+
+      return cs.Timer->getElapsedProcessTimeInFractionalSeconds() - startTime;
+    }
   };
 
   ConstraintSystem(TypeChecker &tc, DeclContext *dc,
@@ -1547,6 +1558,10 @@ private:
 
   /// Add a new type variable that was already created.
   void addTypeVariable(TypeVariableType *typeVar);
+  
+  /// \brief Add a constraint from the subscript base to the root of the key
+  /// path literal to the constraint system.
+  void addKeyPathApplicationRootConstraint(Type root, ConstraintLocatorBuilder locator);
 
 public:
   /// \brief Lookup for a member with the given name in the given base type.
@@ -1711,6 +1726,10 @@ public:
     return !solverState || solverState->recordFixes;
   }
 
+  bool shouldSuppressDiagnostics() {
+    return Options.contains(ConstraintSystemFlags::SuppressDiagnostics);
+  }
+
   /// \brief Log and record the application of the fix. Return true iff any
   /// subsequent solution would be worse than the best known solution.
   bool recordFix(Fix fix, ConstraintLocatorBuilder locator);
@@ -1854,6 +1873,11 @@ public:
                                        bool allowFixes,
                                        ConstraintLocatorBuilder locator);
 
+  void noteNewDisjunction(Constraint *constraint) {
+    assert(constraint->getKind() == ConstraintKind::Disjunction);
+    DisjunctionNumber[constraint] = CountDisjunctions++;
+  }
+
   /// \brief Add a disjunction constraint.
   void addDisjunctionConstraint(ArrayRef<Constraint *> constraints,
                                 ConstraintLocatorBuilder locator,
@@ -1917,6 +1941,12 @@ public:
   /// The worklist of "active" constraints that should be revisited
   /// due to a change.
   ConstraintList &getActiveConstraints() { return ActiveConstraints; }
+
+  void findConstraints(SmallVectorImpl<Constraint *> &found,
+                       llvm::function_ref<bool(const Constraint &)> pred) {
+    filterConstraints(ActiveConstraints, pred, found);
+    filterConstraints(InactiveConstraints, pred, found);
+  }
 
   /// \brief Retrieve the representative of the equivalence class containing
   /// this type variable.
@@ -2037,12 +2067,6 @@ public:
   /// \brief Determine if the type in question is AnyHashable.
   bool isAnyHashableType(Type t);
 
-  /// Call Expr::propagateLValueAccessKind on the given expression,
-  /// using a custom accessor for the type on the expression that
-  /// reads the type from the ConstraintSystem expression type map.
-  void propagateLValueAccessKind(Expr *E, AccessKind accessKind, bool isShallow,
-                                 bool allowOverwrite = false);
-
   /// Call Expr::isTypeReference on the given expression, using a
   /// custom accessor for the type on the expression that reads the
   /// type from the ConstraintSystem expression type map.
@@ -2082,6 +2106,16 @@ private:
   /// Introduce the constraints associated with the given type variable
   /// into the worklist.
   void addTypeVariableConstraintsToWorkList(TypeVariableType *typeVar);
+
+  static void
+  filterConstraints(ConstraintList &constraints,
+                    llvm::function_ref<bool(const Constraint &)> pred,
+                    SmallVectorImpl<Constraint *> &found) {
+    for (auto &constraint : constraints) {
+      if (pred(constraint))
+        found.push_back(&constraint);
+    }
+  }
 
 public:
 
@@ -2153,6 +2187,15 @@ public:
                    ConstraintLocatorBuilder locator,
                    OpenedTypeMap &replacements);
 
+  /// Given generic signature open its generic requirements,
+  /// using substitution function, and record them in the
+  /// constraint system for further processing.
+  void openGenericRequirements(DeclContext *outerDC,
+                               GenericSignature *signature,
+                               bool skipProtocolSelfConstraint,
+                               ConstraintLocatorBuilder locator,
+                               llvm::function_ref<Type(Type)> subst);
+
   /// Record the set of opened types for the given locator.
   void recordOpenedTypes(
          ConstraintLocatorBuilder locator,
@@ -2172,6 +2215,7 @@ public:
                           ValueDecl *decl,
                           FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
+                          DeclContext *useDC,
                           const DeclRefExpr *base = nullptr);
 
   /// \brief Retrieve the type of a reference to the given value declaration,
@@ -2347,11 +2391,10 @@ public:
 
   /// \brief Subroutine of \c matchTypes(), used to bind a type to a
   /// type variable.
-  TypeMatchResult
-  matchTypesBindTypeVar(TypeVariableType *typeVar, Type type,
-                        ConstraintKind kind, TypeMatchOptions flags,
-                        ConstraintLocatorBuilder locator,
-                        std::function<TypeMatchResult()> formUnsolvedResult);
+  TypeMatchResult matchTypesBindTypeVar(
+      TypeVariableType *typeVar, Type type, ConstraintKind kind,
+      TypeMatchOptions flags, ConstraintLocatorBuilder locator,
+      llvm::function_ref<TypeMatchResult()> formUnsolvedResult);
 
 public: // FIXME: public due to statics in CSSimplify.cpp
   /// \brief Attempt to match up types \c type1 and \c type2, which in effect
@@ -2784,10 +2827,7 @@ private:
       if (formBindingScore(x) < formBindingScore(y))
         return true;
 
-      if (!x.hasNonDefaultableBindings())
-        return false;
-
-      if (x.FullyBound || x.SubtypeOfExistentialType)
+      if (formBindingScore(y) < formBindingScore(x))
         return false;
 
       // If the only difference is default types,
@@ -2903,11 +2943,16 @@ private:
   /// \brief Collect the current inactive disjunction constraints.
   void collectDisjunctions(SmallVectorImpl<Constraint *> &disjunctions);
 
+  /// \brief Attempt to solve for the choices in the given disjunction.
+  ///
+  /// \returns true if we found at least one solution.
+  bool
+  solveForDisjunctionChoices(Constraint *disjunction,
+                             SmallVectorImpl<Solution> &solutions,
+                             FreeTypeVariableBinding allowFreeTypeVariables);
+
   /// \brief Solve the system of constraints after it has already been
   /// simplified.
-  ///
-  /// \param disjunction The disjunction to try and solve using simplified
-  /// constraint system.
   ///
   /// \param solutions The set of solutions to this system of constraints.
   ///
@@ -2915,8 +2960,7 @@ private:
   /// the solution.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool solveSimplified(Constraint *disjunction,
-                       SmallVectorImpl<Solution> &solutions,
+  bool solveSimplified(SmallVectorImpl<Solution> &solutions,
                        FreeTypeVariableBinding allowFreeTypeVariables);
 
   /// \brief Find reduced domains of disjunction constraints for given
@@ -2928,15 +2972,10 @@ private:
   /// \param expr The expression to find reductions for.
   void shrink(Expr *expr);
 
-  /// \brief Pick a disjunction from the given list, which,
-  /// based on the associated constraints, is the most viable to
-  /// reduce depth of the search tree.
+  /// \brief Pick a disjunction from the InactiveConstraints list.
   ///
-  /// \param disjunctions A collection of disjunctions to examine.
-  ///
-  /// \returns The disjunction with most weight relative to others, based
-  /// on the number of constraints associated with it, or nullptr otherwise.
-  Constraint *selectDisjunction(SmallVectorImpl<Constraint *> &disjunctions);
+  /// \returns The selected disjunction.
+  Constraint *selectDisjunction();
 
   bool simplifyForConstraintPropagation();
   void collectNeighboringBindOverloadDisjunctions(
@@ -2948,7 +2987,6 @@ private:
                                      bool *foundConsistent);
   bool areBindPairConsistent(Constraint *first, Constraint *second);
 
-public:
   /// \brief Solve the system of constraints generated from provided expression.
   ///
   /// \param expr The expression to generate constraints from.
@@ -2960,12 +2998,34 @@ public:
   ///
   /// \returns Error is an error occurred, Solved is system is consistent
   /// and solutions were found, Unsolved otherwise.
-  SolutionKind solve(Expr *&expr,
-                     Type convertType,
-                     ExprTypeCheckListener *listener,
-                     SmallVectorImpl<Solution> &solutions,
-                     FreeTypeVariableBinding allowFreeTypeVariables
-                       = FreeTypeVariableBinding::Disallow);
+  SolutionKind solveImpl(Expr *&expr,
+                         Type convertType,
+                         ExprTypeCheckListener *listener,
+                         SmallVectorImpl<Solution> &solutions,
+                         FreeTypeVariableBinding allowFreeTypeVariables
+                          = FreeTypeVariableBinding::Disallow);
+
+public:
+  /// \brief Solve the system of constraints generated from provided expression.
+  ///
+  /// The expression should have already been pre-checked with
+  /// preCheckExpression().
+  ///
+  /// \param expr The expression to generate constraints from.
+  /// \param convertType The expected type of the expression.
+  /// \param listener The callback to check solving progress.
+  /// \param solutions The set of solutions to the system of constraints.
+  /// \param allowFreeTypeVariables How to bind free type variables in
+  /// the solution.
+  ///
+  /// \returns true is an error occurred, false is system is consistent
+  /// and solutions were found.
+  bool solve(Expr *&expr,
+             Type convertType,
+             ExprTypeCheckListener *listener,
+             SmallVectorImpl<Solution> &solutions,
+             FreeTypeVariableBinding allowFreeTypeVariables
+             = FreeTypeVariableBinding::Disallow);
 
   /// \brief Solve the system of constraints.
   ///
@@ -3053,7 +3113,6 @@ public:
   /// non-single expression closures.
   Expr *applySolution(Solution &solution, Expr *expr,
                       Type convertType, bool discardedExpr,
-                      bool suppressDiagnostics,
                       bool skipClosures);
 
   /// \brief Apply a given solution to the expression to the top-level
@@ -3069,6 +3128,15 @@ public:
   /// \brief Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
   bool getExpressionTooComplex(SmallVectorImpl<Solution> const &solutions) {
+    auto used = TC.Context.getSolverMemory();
+    for (auto const& s : solutions) {
+      used += s.getTotalMemory();
+    }
+    MaxMemory = std::max(used, MaxMemory);
+    auto threshold = TC.Context.LangOpts.SolverMemoryThreshold;
+    if (MaxMemory > threshold)
+      return true;
+
     auto timeoutThresholdInMillis = TC.getExpressionTimeoutThresholdInSeconds();
     if (Timer && Timer->isExpired(timeoutThresholdInMillis)) {
       // Disable warnings about expressions that go over the warning
@@ -3078,32 +3146,9 @@ public:
       return true;
     }
 
-    if (!getASTContext().isSwiftVersion3()) {
-      if (CountScopes < TypeCounter)
-        return false;
-
-      // If we haven't explored a relatively large number of possibilities
-      // yet, continue.
-      if (CountScopes <= 16 * 1024)
-        return false;
-
-      // Clearly exponential
-      if (TypeCounter < 32 && CountScopes > (1U << TypeCounter))
-        return true;
-
-      // Bail out once we've looked at a really large number of
-      // choices, even if we haven't used a huge amount of memory.
-      if (CountScopes > TC.Context.LangOpts.SolverBindingThreshold)
-        return true;
-    }
-
-    auto used = TC.Context.getSolverMemory();
-    for (auto const& s : solutions) {
-      used += s.getTotalMemory();
-    }
-    MaxMemory = std::max(used, MaxMemory);
-    auto threshold = TC.Context.LangOpts.SolverMemoryThreshold;
-    return MaxMemory > threshold;
+    // Bail out once we've looked at a really large number of
+    // choices.
+    return CountScopes > TC.Context.LangOpts.SolverBindingThreshold;
   }
   
   LLVM_ATTRIBUTE_DEPRECATED(
@@ -3175,7 +3220,26 @@ public:
   /// Indicate that there was no label given when one was expected by parameter.
   ///
   /// \param paramIndex The index of the parameter that is missing a label.
-  virtual void missingLabel(unsigned paramIndex);
+  ///
+  /// \returns true to indicate that this should cause a failure, false
+  /// otherwise.
+  virtual bool missingLabel(unsigned paramIndex);
+
+  /// Indicate that there was label given when none was expected by parameter.
+  ///
+  /// \param paramIndex The index of the parameter that wasn't expecting a label.
+  ///
+  /// \returns true to indicate that this should cause a failure, false
+  /// otherwise.
+  virtual bool extraneousLabel(unsigned paramIndex);
+
+  /// Indicate that there was a label given with a typo(s) in it.
+  ///
+  /// \param paramIndex The index of the parameter with misspelled label.
+  ///
+  /// \returns true to indicate that this should cause a failure, false
+  /// otherwise.
+  virtual bool incorrectLabel(unsigned paramIndex);
 
   /// Indicates that an argument is out-of-order with respect to a previously-
   /// seen argument.
@@ -3208,7 +3272,7 @@ public:
 /// \returns true if the call arguments could not be matched to the parameters.
 bool matchCallArguments(ArrayRef<AnyFunctionType::Param> argTuple,
                         ArrayRef<AnyFunctionType::Param> params,
-                        const SmallVectorImpl<bool> &defaultMap,
+                        const llvm::SmallBitVector &defaultMap,
                         bool hasTrailingClosure,
                         bool allowFixes,
                         MatchCallArgumentListener &listener,
@@ -3345,8 +3409,7 @@ public:
       llvm::SaveAndRestore<ConstraintSystem::SolverScope *>
           partialSolutionScope(cs.solverState->PartialSolutionScope, &scope);
 
-      failed = cs.solveSimplified(cs.selectDisjunction(Disjunctions), solutions,
-                                  allowFreeTypeVariables);
+      failed = cs.solveSimplified(solutions, allowFreeTypeVariables);
     }
 
     // Put the constraints back into their original bucket.
@@ -3398,9 +3461,6 @@ void eraseOpenedExistentials(constraints::ConstraintSystem &CS, Expr *&expr);
 /// their type variables, and we don't want pointers into the original AST to
 /// dereference these now-dangling types.
 class ExprCleaner {
-  llvm::SmallVector<Expr*,4> Exprs;
-  llvm::SmallVector<TypeLoc*, 4> TypeLocs;
-  llvm::SmallVector<Pattern*, 4> Patterns;
   llvm::SmallVector<VarDecl*, 4> Vars;
 public:
 
@@ -3408,21 +3468,6 @@ public:
     struct ExprCleanerImpl : public ASTWalker {
       ExprCleaner *TS;
       ExprCleanerImpl(ExprCleaner *TS) : TS(TS) {}
-
-      std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-        TS->Exprs.push_back(expr);
-        return { true, expr };
-      }
-
-      bool walkToTypeLocPre(TypeLoc &TL) override {
-        TS->TypeLocs.push_back(&TL);
-        return true;
-      }
-
-      std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-        TS->Patterns.push_back(P);
-        return { true, P };
-      }
 
       bool walkToDeclPre(Decl *D) override {
         if (auto VD = dyn_cast<VarDecl>(D))
@@ -3444,22 +3489,6 @@ public:
   ~ExprCleaner() {
     // Check each of the expression nodes to verify that there are no type
     // variables hanging out.  If so, just nuke the type.
-    for (auto E : Exprs) {
-      if (E->getType() && E->getType()->hasTypeVariable())
-        E->setType(Type());
-    }
-
-    for (auto TL : TypeLocs) {
-      if (TL->getTypeRepr() && TL->getType() &&
-          TL->getType()->hasTypeVariable())
-        TL->setType(Type(), false);
-    }
-
-    for (auto P : Patterns) {
-      if (P->hasType() && P->getType()->hasTypeVariable())
-        P->setType(Type());
-    }
-
     for (auto VD : Vars) {
       if (VD->hasType() && VD->getType()->hasTypeVariable()) {
         VD->setType(Type());
@@ -3491,6 +3520,77 @@ public:
     return { true, expr };
   }
 };
+
+/// \brief Matches array of function parameters to candidate inputs,
+/// which can be anything suitable (e.g., parameters, arguments).
+///
+/// It claims inputs sequentially and tries to pair between an input
+/// and the next appropriate parameter. The detailed matching behavior
+/// of each pair is specified by a custom function (i.e., pairMatcher).
+/// It considers variadic and defaulted arguments when forming proper
+/// input-parameter pairs; however, other information like label and
+/// type information is not directly used here. It can be implemented
+/// in the custom function when necessary.
+class InputMatcher {
+  size_t NumSkippedParameters;
+  const llvm::SmallBitVector DefaultValueMap;
+  const ArrayRef<AnyFunctionType::Param> Params;
+
+public:
+  enum Result {
+    /// The specified inputs are successfully matched.
+    IM_Succeeded,
+    /// There are input(s) left unclaimed while all parameters are matched.
+    IM_HasUnclaimedInput,
+    /// There are parateter(s) left unmatched while all inputs are claimed.
+    IM_HasUnmatchedParam,
+    /// Custom pair matcher function failure.
+    IM_CustomPairMatcherFailed,
+  };
+
+  InputMatcher(const ArrayRef<AnyFunctionType::Param> params,
+               const llvm::SmallBitVector &defaultValueMap);
+
+  /// Matching a given array of inputs.
+  ///
+  /// \param numInputs The number of inputs.
+  /// \param pairMatcher Custom matching behavior of an input-parameter pair.
+  /// \return the matching result.
+  Result
+  match(int numInputs,
+        std::function<bool(unsigned inputIdx, unsigned paramIdx)> pairMatcher);
+
+  size_t getNumSkippedParameters() const { return NumSkippedParameters; }
+};
+
+/// Diagnose an attempt to recover when we have a value of optional type
+/// that needs to be unwrapped.
+///
+/// \returns true if a diagnostic was produced.
+bool diagnoseUnwrap(TypeChecker &TC, DeclContext *DC, Expr *expr, Type type);
+
+/// Diagnose an attempt to recover from a member access into a value of
+/// optional type which needed to be unwrapped for the member to be found.
+///
+/// \returns true if a diagnostic was produced.
+bool diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
+                                       DeclName memberName,
+                                       SourceRange memberRange);
+
+// Return true if, when replacing "<expr>" with "<expr> ?? T", parentheses need
+// to be added around <expr> first in order to maintain the correct precedence.
+bool exprNeedsParensBeforeAddingNilCoalescing(TypeChecker &TC,
+                                              DeclContext *DC,
+                                              Expr *expr);
+
+// Return true if, when replacing "<expr>" with "<expr> as T", parentheses need
+// to be added around the new expression in order to maintain the correct
+// precedence.
+bool exprNeedsParensAfterAddingNilCoalescing(TypeChecker &TC,
+                                             DeclContext *DC,
+                                             Expr *expr,
+                                             Expr *rootExpr);
+
 } // end namespace swift
 
 #endif // LLVM_SWIFT_SEMA_CONSTRAINT_SYSTEM_H

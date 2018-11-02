@@ -433,7 +433,7 @@
       "name": "foo3",
       "printedName": "foo3(_:)",
       "declKind": "Func",
-      "usr": "s:4cake4foo3yys10DictionaryVySiSSGF",
+      "usr": "s:4cake4foo3yySDySiSSGF",
       "location": "",
       "moduleName": "cake",
       "children": [
@@ -446,7 +446,7 @@
           "kind": "TypeNominal",
           "name": "Dictionary",
           "printedName": "[Int : String]",
-          "usr": "s:s10DictionaryV",
+          "usr": "s:SD",
           "children": [
             {
               "kind": "TypeNominal",
@@ -583,8 +583,9 @@
             },
             {
               "kind": "TypeNominal",
-              "name": "InOut",
-              "printedName": "inout Hasher"
+              "name": "Hasher",
+              "printedName": "Hasher",
+              "usr": "s:s6HasherV"
             }
           ]
         },
@@ -650,6 +651,59 @@
                   "usr": "s:Si"
                 }
               ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "Int",
+      "printedName": "Int",
+      "declKind": "Struct",
+      "usr": "s:Si",
+      "location": "",
+      "moduleName": "Swift",
+      "conformingProtocols": [
+        "Comparable",
+        "SignedInteger",
+        "_ExpressibleByBuiltinIntegerLiteral",
+        "BinaryInteger",
+        "LosslessStringConvertible",
+        "SignedNumeric",
+        "Numeric",
+        "CustomStringConvertible",
+        "Strideable",
+        "ExpressibleByIntegerLiteral",
+        "FixedWidthInteger",
+        "Decodable",
+        "Encodable",
+        "Hashable",
+        "Equatable",
+        "_HasCustomAnyHashableRepresentation",
+        "CustomReflectable",
+        "_CustomPlaygroundQuickLookable",
+        "MirrorPath",
+        "CVarArg"
+      ],
+      "declAttributes": [
+        "fixedLayout"
+      ],
+      "children": [
+        {
+          "kind": "Function",
+          "name": "foo",
+          "printedName": "foo()",
+          "declKind": "Func",
+          "usr": "s:Si4cakeE3fooyyF",
+          "location": "",
+          "moduleName": "cake",
+          "parentExtensionReqs": [],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
             }
           ]
         }

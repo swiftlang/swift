@@ -74,8 +74,8 @@ STATISTIC(NumFuncLinked, "Number of SIL functions linked");
 void SILLinkerVisitor::addFunctionToWorklist(SILFunction *F) {
   assert(F->isExternalDeclaration());
 
-  DEBUG(llvm::dbgs() << "Imported function: "
-                     << F->getName() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Imported function: "
+                          << F->getName() << "\n");
   if (Mod.loadFunction(F)) {
     if (F->isExternalDeclaration())
       return;
@@ -156,21 +156,21 @@ void SILLinkerVisitor::linkInVTable(ClassDecl *D) {
 void SILLinkerVisitor::visitApplyInst(ApplyInst *AI) {
   if (auto sig = AI->getCallee()->getType().castTo<SILFunctionType>()
                    ->getGenericSignature()) {
-    visitApplySubstitutions(sig->getSubstitutionMap(AI->getSubstitutions()));
+    visitApplySubstitutions(AI->getSubstitutionMap());
   }
 }
 
 void SILLinkerVisitor::visitTryApplyInst(TryApplyInst *TAI) {
   if (auto sig = TAI->getCallee()->getType().castTo<SILFunctionType>()
                    ->getGenericSignature()) {
-    visitApplySubstitutions(sig->getSubstitutionMap(TAI->getSubstitutions()));
+    visitApplySubstitutions(TAI->getSubstitutionMap());
   }
 }
 
 void SILLinkerVisitor::visitPartialApplyInst(PartialApplyInst *PAI) {
   if (auto sig = PAI->getCallee()->getType().castTo<SILFunctionType>()
                     ->getGenericSignature()) {
-    visitApplySubstitutions(sig->getSubstitutionMap(PAI->getSubstitutions()));
+    visitApplySubstitutions(PAI->getSubstitutionMap());
   }
 }
 
@@ -283,7 +283,7 @@ void SILLinkerVisitor::visitProtocolConformance(
   }
 }
 
-void SILLinkerVisitor::visitApplySubstitutions(const SubstitutionMap &subs) {
+void SILLinkerVisitor::visitApplySubstitutions(SubstitutionMap subs) {
   for (auto &reqt : subs.getGenericSignature()->getRequirements()) {
     switch (reqt.getKind()) {
     case RequirementKind::Conformance: {
@@ -383,8 +383,8 @@ void SILLinkerVisitor::process() {
       Fn->setSerialized(IsSerialized_t::IsNotSerialized);
     }
 
-    DEBUG(llvm::dbgs() << "Process imports in function: "
-                       << Fn->getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Process imports in function: "
+                            << Fn->getName() << "\n");
 
     for (auto &BB : *Fn) {
       for (auto &I : BB) {

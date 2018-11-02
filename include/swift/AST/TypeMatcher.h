@@ -208,8 +208,7 @@ class TypeMatcher {
 
         auto sugaredFirstFunc = sugaredFirstType->castTo<AnyFunctionType>();
         if (firstFunc->getParams().size() != secondFunc->getParams().size())
-          return mismatch(firstFunc.getInput().getPointer(), secondFunc->getInput(),
-                          sugaredFirstFunc->getInput());
+          return mismatch(firstFunc.getPointer(), secondFunc, sugaredFirstFunc);
 
         for (unsigned i = 0, n = firstFunc->getParams().size(); i != n; ++i) {
           const auto &firstElt = firstFunc->getParams()[i];
@@ -218,9 +217,9 @@ class TypeMatcher {
           if (firstElt.getLabel() != secondElt.getLabel() ||
               firstElt.isVariadic() != secondElt.isVariadic() ||
               firstElt.isInOut() != secondElt.isInOut())
-            return mismatch(firstFunc.getInput().getPointer(),
-                            secondFunc->getInput(),
-                            sugaredFirstFunc->getInput());
+            return mismatch(firstElt.getType().getPointer(),
+                            secondElt.getType(),
+                            sugaredFirstFunc->getParams()[i].getType());
 
           // Recurse on parameter components.
           if (!this->visit(firstElt.getType()->getCanonicalType(),

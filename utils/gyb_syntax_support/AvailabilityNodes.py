@@ -63,11 +63,13 @@ AVAILABILITY_NODES = [
          certain platform to a version, e.g. `iOS 10` or `swift 3.4`.
          ''',
          children=[
-             Child('Platform', kind='IdentifierToken', description='''
-             The name of the OS on which the availability should be \
-             restricted or 'swift' if the availability should be restricted \
-             based on a Swift version.
-             '''),
+             Child('Platform', kind='IdentifierToken', 
+                   classification='Keyword',
+                   description='''
+                   The name of the OS on which the availability should be \
+                   restricted or 'swift' if the availability should be \
+                   restricted based on a Swift version.
+                   '''),
              Child('Version', kind='VersionTuple'),
          ]),
 

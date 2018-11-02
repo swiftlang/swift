@@ -354,6 +354,8 @@ class ConcreteContext3 {
 
   typealias NSCodingExistential = NSCoding.Type
 
+  @objc func inoutFunc(a: inout Int) {}
+  // expected-error@-1{{method cannot be marked @objc because inout parameters cannot be represented in Objective-C}}
   @objc func metatypeOfExistentialMetatypePram1(a: NSCodingExistential.Protocol) {}
   // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
 
@@ -1653,7 +1655,7 @@ class HasIBOutlet {
   init() {}
 
   @IBOutlet weak var goodOutlet: Class_ObjC1!
-  // CHECK-LABEL: {{^}} @IBOutlet @_implicitly_unwrapped_optional @objc weak var goodOutlet: @sil_weak Class_ObjC1!
+  // CHECK-LABEL: {{^}} @objc @IBOutlet @_implicitly_unwrapped_optional weak var goodOutlet: @sil_weak Class_ObjC1!
 
   @IBOutlet var badOutlet: PlainStruct
   // expected-error@-1 {{@IBOutlet property cannot have non-object type 'PlainStruct'}} {{3-13=}}
@@ -1670,11 +1672,10 @@ class HasIBOutlet {
 // CHECK-LABEL: {{^}}class HasIBAction {
 class HasIBAction {
   @IBAction func goodAction(_ sender: AnyObject?) { }
-  // CHECK: {{^}}  @IBAction @objc func goodAction(_ sender: AnyObject?) {
+  // CHECK: {{^}}  @objc @IBAction func goodAction(_ sender: AnyObject?) {
 
   @IBAction func badAction(_ sender: PlainStruct?) { }
   // expected-error@-1{{argument to @IBAction method cannot have non-object type 'PlainStruct?'}}
-  // expected-error@-2{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}
 }
 
 //===---
@@ -1684,7 +1685,7 @@ class HasIBAction {
 // CHECK-LABEL: {{^}}class HasIBInspectable {
 class HasIBInspectable {
   @IBInspectable var goodProperty: AnyObject?
-  // CHECK: {{^}}  @IBInspectable @objc var goodProperty: AnyObject?
+  // CHECK: {{^}}  @objc @IBInspectable var goodProperty: AnyObject?
 }
 
 //===---
@@ -1694,7 +1695,7 @@ class HasIBInspectable {
 // CHECK-LABEL: {{^}}class HasGKInspectable {
 class HasGKInspectable {
   @GKInspectable var goodProperty: AnyObject?
-  // CHECK: {{^}}  @GKInspectable @objc var goodProperty: AnyObject?
+  // CHECK: {{^}}  @objc @GKInspectable var goodProperty: AnyObject?
 }
 
 //===---
@@ -1708,12 +1709,13 @@ class HasNSManaged {
 
   @NSManaged
   var goodManaged: Class_ObjC1
-  // CHECK-LABEL: {{^}}  @NSManaged @objc dynamic var goodManaged: Class_ObjC1
+  // CHECK-LABEL: {{^}}  @objc @NSManaged dynamic var goodManaged: Class_ObjC1
 
   @NSManaged
   var badManaged: PlainStruct
   // expected-error@-1 {{property cannot be marked @NSManaged because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+  // expected-error@-3{{'dynamic' var 'badManaged' must also be '@objc'}}
   // CHECK-LABEL: {{^}}  @NSManaged var badManaged: PlainStruct
 }
 
@@ -1797,7 +1799,7 @@ enum BadEnum1: Int { case X }
 
 @objc
 enum BadEnum2: Int {
-  @objc(X:)   // expected-error{{'@objc' enum element must have a simple name}}{{10-11=}}
+  @objc(X:)   // expected-error{{'@objc' enum case must have a simple name}}{{10-11=}}
   case X
 }
 
@@ -2038,14 +2040,14 @@ class ClassThrows1 {
 }
 
 
-// CHECK-DUMP-LABEL: class_decl "ImplicitClassThrows1"
+// CHECK-DUMP-LABEL: class_decl{{.*}}"ImplicitClassThrows1"
 @objc class ImplicitClassThrows1 {
   // CHECK: @objc func methodReturnsVoid() throws
-  // CHECK-DUMP: func_decl "methodReturnsVoid()"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
+  // CHECK-DUMP: func_decl{{.*}}"methodReturnsVoid()"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
   func methodReturnsVoid() throws { }
 
   // CHECK: @objc func methodReturnsObjCClass() throws -> Class_ObjC1
-  // CHECK-DUMP: func_decl "methodReturnsObjCClass()" {{.*}}foreign_error=NilResult,unowned,param=0,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>
+  // CHECK-DUMP: func_decl{{.*}}"methodReturnsObjCClass()" {{.*}}foreign_error=NilResult,unowned,param=0,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>
   func methodReturnsObjCClass() throws -> Class_ObjC1 {
     return Class_ObjC1()
   }
@@ -2060,11 +2062,11 @@ class ClassThrows1 {
   func methodReturnsOptionalObjCClass() throws -> Class_ObjC1? { return nil }
 
   // CHECK: @objc func methodWithTrailingClosures(_ s: String, fn1: @escaping ((Int) -> Int), fn2: @escaping (Int) -> Int, fn3: @escaping (Int) -> Int)
-  // CHECK-DUMP: func_decl "methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=ZeroResult,unowned,param=1,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
+  // CHECK-DUMP: func_decl{{.*}}"methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=ZeroResult,unowned,param=1,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
   func methodWithTrailingClosures(_ s: String, fn1: (@escaping (Int) -> Int), fn2: @escaping (Int) -> Int, fn3: @escaping (Int) -> Int) throws { }
 
   // CHECK: @objc init(degrees: Double) throws
-  // CHECK-DUMP: constructor_decl "init(degrees:)"{{.*}}foreign_error=NilResult,unowned,param=1,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>
+  // CHECK-DUMP: constructor_decl{{.*}}"init(degrees:)"{{.*}}foreign_error=NilResult,unowned,param=1,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>
   init(degrees: Double) throws { }
 
   // CHECK: {{^}} func methodReturnsBridgedValueType() throws -> NSRange
@@ -2086,10 +2088,10 @@ class ClassThrows1 {
   }
 }
 
-// CHECK-DUMP-LABEL: class_decl "SubclassImplicitClassThrows1"
+// CHECK-DUMP-LABEL: class_decl{{.*}}"SubclassImplicitClassThrows1"
 @objc class SubclassImplicitClassThrows1 : ImplicitClassThrows1 {
   // CHECK: @objc override func methodWithTrailingClosures(_ s: String, fn1: @escaping ((Int) -> Int), fn2: @escaping ((Int) -> Int), fn3: @escaping ((Int) -> Int))
-  // CHECK-DUMP: func_decl "methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=ZeroResult,unowned,param=1,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
+  // CHECK-DUMP: func_decl{{.*}}"methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=ZeroResult,unowned,param=1,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
   override func methodWithTrailingClosures(_ s: String, fn1: (@escaping (Int) -> Int), fn2: (@escaping (Int) -> Int), fn3: (@escaping (Int) -> Int)) throws { }
 }
 
@@ -2122,20 +2124,20 @@ class ThrowsObjCName {
 
   @objc(method7) func method7(x: Int) throws { } // expected-error{{@objc' method name provides names for 0 arguments, but method has 2 parameters (including the error parameter)}}
 
-  // CHECK-DUMP: func_decl "method8(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=2,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
+  // CHECK-DUMP: func_decl{{.*}}"method8(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=2,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
   @objc(method8:fn1:error:fn2:)
   func method8(_ s: String, fn1: (@escaping (Int) -> Int), fn2: @escaping (Int) -> Int) throws { }
 
-  // CHECK-DUMP: func_decl "method9(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
+  // CHECK-DUMP: func_decl{{.*}}"method9(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
   @objc(method9AndReturnError:s:fn1:fn2:)
   func method9(_ s: String, fn1: (@escaping (Int) -> Int), fn2: @escaping (Int) -> Int) throws { }
 }
 
 class SubclassThrowsObjCName : ThrowsObjCName {
-  // CHECK-DUMP: func_decl "method8(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=2,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
+  // CHECK-DUMP: func_decl{{.*}}"method8(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=2,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
   override func method8(_ s: String, fn1: (@escaping (Int) -> Int), fn2: @escaping (Int) -> Int) throws { }
 
-  // CHECK-DUMP: func_decl "method9(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
+  // CHECK-DUMP: func_decl{{.*}}"method9(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
   override func method9(_ s: String, fn1: (@escaping (Int) -> Int), fn2: @escaping (Int) -> Int) throws { }
 }
 

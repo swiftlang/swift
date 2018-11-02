@@ -39,9 +39,6 @@ class Traversal : public TypeVisitor<Traversal, bool>
     if (auto parent = ty->getParent())
       if (doIt(parent)) return true;
 
-    if (doIt(ty->getSinglyDesugaredType()))
-      return true;
-
     for (auto arg : ty->getInnermostGenericArgs())
       if (doIt(arg))
         return true;
@@ -180,8 +177,8 @@ class Traversal : public TypeVisitor<Traversal, bool>
   }
 
   bool visitSILBoxType(SILBoxType *ty) {
-    for (auto &arg : ty->getGenericArgs()) {
-      if (doIt(arg.getReplacement()))
+    for (Type type : ty->getSubstitutions().getReplacementTypes()) {
+      if (type && doIt(type))
         return true;
     }
     return false;

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -enable-sil-ownership %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -38,7 +38,7 @@ struct Gen<T, U>: Fooable, _ObjectiveCBridgeable {
 }
 
 class Bar: NSObject {
-  dynamic func bar(_: Any) {}
+  @objc dynamic func bar(_: Any) {}
 }
 
 // CHECK-LABEL: sil hidden @$S42objc_bridged_using_protocol_extension_impl7callBar3bar3fooyAA0H0C_AA3FooVtF

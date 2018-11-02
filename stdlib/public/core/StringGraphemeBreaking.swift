@@ -18,29 +18,10 @@ internal var _CR: UInt8 { return 0x0d }
 @inlinable // FIXME(sil-serialize-all)
 internal var _LF: UInt8 { return 0x0a }
 
-extension String.Index {
-  @inlinable // FIXME(sil-serialize-all)
-  internal init(encodedOffset: Int, characterStride stride: Int) {
-    if _slowPath(stride == 0 || stride > UInt16.max) {
-      // Don't store a 0 stride for the endIndex
-      // or a truncated stride for an overlong grapheme cluster.
-      self.init(encodedOffset: encodedOffset)
-      return
-    }
-    self.init(
-      encodedOffset: encodedOffset,
-      .character(stride: UInt16(truncatingIfNeeded: stride)))
-  }
-}
-
 extension _StringVariant {
   @inlinable
   internal func _stride(at i: String.Index) -> Int {
-    if case .character(let stride) = i._cache {
-      // TODO: should _fastPath the case somehow
-      _sanityCheck(stride > 0)
-      return Int(stride)
-    }
+    if let stride = i.characterStride { return stride }
     return characterStride(atOffset: i.encodedOffset)
   }
 
@@ -274,7 +255,7 @@ extension _UnmanagedOpaqueString {
 
     // Nuclear option: copy out the rest of the string into a contiguous buffer.
     let longStart = UnsafeMutablePointer<UInt16>.allocate(capacity: count)
-    defer { longStart.deallocate(capacity: count) }
+    defer { longStart.deallocate() }
     self._copy(into: UnsafeMutableBufferPointer(start: longStart, count: count))
     return UTF16._measureFirstExtendedGraphemeCluster(
       in: UnsafeBufferPointer(start: longStart, count: count))
@@ -301,7 +282,7 @@ extension _UnmanagedOpaqueString {
 
     // Nuclear option: copy out the rest of the string into a contiguous buffer.
     let longStart = UnsafeMutablePointer<UInt16>.allocate(capacity: count)
-    defer { longStart.deallocate(capacity: count) }
+    defer { longStart.deallocate() }
     self._copy(into: UnsafeMutableBufferPointer(start: longStart, count: count))
     return UTF16._measureLastExtendedGraphemeCluster(
       in: UnsafeBufferPointer(start: longStart, count: count))

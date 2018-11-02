@@ -65,6 +65,7 @@ set(version_inc_files
   ${llvm_revision_inc} ${clang_revision_inc} ${swift_revision_inc})
 
 add_swift_library(swiftBasic STATIC
+  AnyValue.cpp
   Cache.cpp
   ClusteredBitVector.cpp
   DiverseStack.cpp

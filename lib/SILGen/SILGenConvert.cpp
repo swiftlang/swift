@@ -126,7 +126,7 @@ getOptionalSomeValue(SILLocation loc, ManagedValue value,
   assert((optTL.isLoadable() || !silConv.useLoweredAddresses()) &&
          "Address-only optionals cannot use this");
   SILType optType = optTL.getLoweredType();
-  CanType formalOptType = optType.getSwiftRValueType();
+  auto formalOptType = optType.getASTType();
   (void)formalOptType;
 
   assert(formalOptType.getOptionalObjectType());
@@ -182,7 +182,8 @@ auto SILGenFunction::emitSourceLocationArgs(SourceLoc sourceLoc,
 
 ManagedValue
 SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
-                                                 ManagedValue optional) {
+                                                 ManagedValue optional,
+                                                 bool isImplicitUnwrap) {
   // Generate code to the optional is present, and if not, abort with a message
   // (provided by the stdlib).
   SILBasicBlock *contBB = createBasicBlock();
@@ -217,12 +218,19 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
         getASTContext().getDiagnoseUnexpectedNilOptional(nullptr)) {
     auto args = emitSourceLocationArgs(loc.getSourceLoc(), loc);
     
+    auto i1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
+    auto isImplicitUnwrapLiteral =
+      B.createIntegerLiteral(loc, i1Ty, isImplicitUnwrap);
+    auto isImplicitUnwrapValue =
+      ManagedValue::forUnmanaged(isImplicitUnwrapLiteral);
+    
     emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, SubstitutionMap(),
                                 {
                                   args.filenameStartPointer,
                                   args.filenameLength,
                                   args.filenameIsAscii,
-                                  args.line
+                                  args.line,
+                                  isImplicitUnwrapValue
                                 },
                                 SGFContext());
   }
@@ -268,10 +276,11 @@ SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc,
 
 ManagedValue SILGenFunction::emitCheckedGetOptionalValueFrom(SILLocation loc,
                                                       ManagedValue src,
+                                                      bool isImplicitUnwrap,
                                                       const TypeLowering &optTL,
                                                       SGFContext C) {
   // TODO: Make this take optTL.
-  return emitPreconditionOptionalHasValue(loc, src);
+  return emitPreconditionOptionalHasValue(loc, src, isImplicitUnwrap);
 }
 
 ManagedValue SILGenFunction::emitUncheckedGetOptionalValueFrom(
@@ -435,7 +444,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
           return scope.exitAndBranch(loc, some);
         }
 
-        RValue R(*this, loc, noOptResultTy.getSwiftRValueType(), result);
+        RValue R(*this, loc, noOptResultTy.getASTType(), result);
         ArgumentSource resultValueRV(loc, std::move(R));
         emitInjectOptionalValueInto(loc, std::move(resultValueRV),
                                     finalResult.getValue(), resultTL);
@@ -572,7 +581,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       auto nsErrorVar = SGM.getNSErrorRequirement(loc);
       if (!nsErrorVar) return emitUndef(loc, existentialTL.getLoweredType());
 
-      SubstitutionList nsErrorVarSubstitutions;
+      SubstitutionMap nsErrorVarSubstitutions;
 
       // Devirtualize.  Maybe this should be done implicitly by
       // emitPropertyLValue?
@@ -592,7 +601,8 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       ManagedValue nsError =
           emitRValueForStorageLoad(
               loc, nativeError, concreteFormalType,
-              /*super*/ false, nsErrorVar, RValue(), nsErrorVarSubstitutions,
+              /*super*/ false, nsErrorVar, RValue(),
+              nsErrorVarSubstitutions,
               AccessSemantics::Ordinary, nsErrorType, SGFContext())
               .getAsSingleValue(*this, loc);
 
@@ -726,7 +736,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
                                    ExistentialRepresentation::Boxed, *this);
     ManagedValue mv = F(SGFContext(&init));
     if (!mv.isInContext()) {
-      mv.forwardInto(*this, loc, init.getAddress());
+      mv.ensurePlusOne(*this, loc).forwardInto(*this, loc, init.getAddress());
       init.finishInitialization(*this);
     }
     
@@ -1102,7 +1112,9 @@ ManagedValue Conversion::emit(SILGenFunction &SGF, SILLocation loc,
   case ForceAndBridgeToObjC: {
     auto &tl = SGF.getTypeLowering(value.getType());
     auto sourceValueType = getBridgingSourceType().getOptionalObjectType();
-    value = SGF.emitCheckedGetOptionalValueFrom(loc, value, tl, SGFContext());
+    value = SGF.emitCheckedGetOptionalValueFrom(loc, value,
+                                                /*isImplicitUnwrap*/ true,
+                                                tl, SGFContext());
     return SGF.emitNativeToBridgedValue(loc, value, sourceValueType,
                                         getBridgingResultType(),
                                         getBridgingLoweredResultType(), C);
@@ -1437,7 +1449,11 @@ Lowering::emitPeepholedConversions(SILGenFunction &SGF, SILLocation loc,
 
     auto value = produceOrigValue(SGF, loc, SGFContext());
     auto &optTL = SGF.getTypeLowering(value.getType());
-    return SGF.emitCheckedGetOptionalValueFrom(loc, value, optTL, C);
+    // isForceUnwrap is hardcoded true because hint.isForced() is only
+    // set by implicit force unwraps.
+    return SGF.emitCheckedGetOptionalValueFrom(loc, value,
+                                               /*isForceUnwrap*/ true,
+                                               optTL, C);
   };
 
   auto getBridgingSourceType = [&] {

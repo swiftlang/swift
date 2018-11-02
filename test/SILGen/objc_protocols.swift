@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name objc_protocols -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name objc_protocols -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -291,3 +291,39 @@ extension InitializableConformerByExtension: Initializable {
 func incrementTime(contents: SelectionItem) {
   contents.time += 1.0
 }
+
+@objc
+public protocol DangerousEscaper {
+  @objc
+  func malicious(_ mayActuallyEscape: () -> ())
+}
+
+// Make sure we emit an withoutActuallyEscaping sentinel.
+
+// CHECK-LABEL: sil @$S14objc_protocols19couldActuallyEscapeyyyyc_AA16DangerousEscaper_ptF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (), @guaranteed DangerousEscaper) -> () {
+// CHECK: bb0([[CLOSURE_ARG:%.*]] : @guaranteed $@callee_guaranteed () -> (), [[SELF:%.*]] : @guaranteed $DangerousEscaper):
+// CHECK:  [[OE:%.*]] = open_existential_ref [[SELF]]
+// CHECK:  [[CLOSURE_COPY1:%.*]]  = copy_value [[CLOSURE_ARG]]
+// CHECK:  [[NOESCAPE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_COPY1]]
+// CHECK:  [[WITHOUT_ACTUALLY_ESCAPING_THUNK:%.*]] = function_ref @$SIg_Ieg_TR : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+// CHECK:  [[WITHOUT_ACTUALLY_ESCAPING_SENTINEL:%.*]] = partial_apply [callee_guaranteed] [[WITHOUT_ACTUALLY_ESCAPING_THUNK]]([[NOESCAPE]])
+// CHECK:  [[WITHOUT_ESCAPING:%.*]] = mark_dependence [[WITHOUT_ACTUALLY_ESCAPING_SENTINEL]] : $@callee_guaranteed () -> () on [[NOESCAPE]]
+// CHECK:  [[WITHOUT_ESCAPING_COPY:%.*]] = copy_value [[WITHOUT_ESCAPING]] : $@callee_guaranteed () -> ()
+// CHECK:  [[BLOCK:%.*]] = alloc_stack $@block_storage @callee_guaranteed () -> ()
+// CHECK:  [[BLOCK_ADDR:%.*]] = project_block_storage [[BLOCK]] : $*@block_storage @callee_guaranteed () -> ()
+// CHECK:  store [[WITHOUT_ESCAPING_COPY]] to [init] [[BLOCK_ADDR]] : $*@callee_guaranteed () -> ()
+// CHECK:  [[BLOCK_INVOKE:%.*]] = function_ref @$SIeg_IyB_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+// CHECK:  [[BLOCK_CLOSURE:%.*]] = init_block_storage_header [[BLOCK]] : $*@block_storage @callee_guaranteed () -> (), invoke [[BLOCK_INVOKE]] : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> (), type $@convention(block) @noescape () -> ()
+// CHECK:  [[BLOCK_CLOSURE_COPY:%.*]] = copy_block_without_escaping [[BLOCK_CLOSURE]] : $@convention(block) @noescape () -> () withoutEscaping [[WITHOUT_ESCAPING]] : $@callee_guaranteed () -> ()
+// CHECK:  destroy_addr [[BLOCK_ADDR]] : $*@callee_guaranteed () -> ()
+// CHECK:  dealloc_stack [[BLOCK]] : $*@block_storage @callee_guaranteed () -> ()
+// CHECK:  destroy_value [[CLOSURE_COPY1]] : $@callee_guaranteed () -> ()
+// CHECK:  [[METH:%.*]] = objc_method [[OE]] : {{.*}} DangerousEscaper, #DangerousEscaper.malicious!1.foreign
+// CHECK:  apply [[METH]]<@opened("{{.*}}") DangerousEscaper>([[BLOCK_CLOSURE_COPY]], [[OE]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
+// CHECK:  destroy_value [[BLOCK_CLOSURE_COPY]] : $@convention(block) @noescape () -> ()
+// CHECK:  return {{.*}} : $()
+
+public func couldActuallyEscape(_ closure: @escaping () -> (), _ villian: DangerousEscaper) {
+  villian.malicious(closure)
+}
+

@@ -37,22 +37,22 @@ using namespace swift::index;
 static bool
 printArtificialName(const swift::AbstractStorageDecl *ASD, AccessorKind AK, llvm::raw_ostream &OS) {
   switch (AK) {
-  case AccessorKind::IsGetter:
+  case AccessorKind::Get:
     OS << "getter:" << ASD->getFullName();
     return false;
-  case AccessorKind::IsSetter:
+  case AccessorKind::Set:
     OS << "setter:" << ASD->getFullName();
     return false;
-  case AccessorKind::IsDidSet:
+  case AccessorKind::DidSet:
     OS << "didSet:" << ASD->getFullName();
     return false;
-  case AccessorKind::IsWillSet:
+  case AccessorKind::WillSet:
     OS << "willSet:" << ASD->getFullName() ;
     return false;
 
-  case AccessorKind::IsMaterializeForSet:
-  case AccessorKind::IsAddressor:
-  case AccessorKind::IsMutableAddressor:
+  case AccessorKind::MaterializeForSet:
+  case AccessorKind::Address:
+  case AccessorKind::MutableAddress:
     return true;
   }
 
@@ -245,7 +245,7 @@ public:
 
 private:
   bool visitImports(SourceFileOrModule Mod,
-                    llvm::SmallPtrSet<ModuleDecl *, 16> &Visited);
+                    llvm::SmallPtrSetImpl<ModuleDecl *> &Visited);
 
   bool handleSourceOrModuleFile(SourceFileOrModule SFOrMod, StringRef KnownHash,
                                 bool &HashIsKnown);
@@ -407,11 +407,11 @@ private:
   NominalTypeDecl *getTypeLocAsNominalTypeDecl(const TypeLoc &Ty);
 
   bool reportPseudoGetterDecl(VarDecl *D) {
-    return reportPseudoAccessor(D, AccessorKind::IsGetter, /*IsRef=*/false,
+    return reportPseudoAccessor(D, AccessorKind::Get, /*IsRef=*/false,
                                 D->getLoc());
   }
   bool reportPseudoSetterDecl(VarDecl *D) {
-    return reportPseudoAccessor(D, AccessorKind::IsSetter, /*IsRef=*/false,
+    return reportPseudoAccessor(D, AccessorKind::Set, /*IsRef=*/false,
                                 D->getLoc());
   }
   bool reportPseudoAccessor(AbstractStorageDecl *D, AccessorKind AccKind,
@@ -464,8 +464,9 @@ private:
                                     SourceFileOrModule SFOrMod);
   void getRecursiveModuleImports(ModuleDecl &Mod,
                                  SmallVectorImpl<ModuleDecl *> &Imports);
-  void collectRecursiveModuleImports(ModuleDecl &Mod,
-                                     llvm::SmallPtrSet<ModuleDecl *, 16> &Visited);
+  void
+  collectRecursiveModuleImports(ModuleDecl &Mod,
+                                llvm::SmallPtrSetImpl<ModuleDecl *> &Visited);
 
   template <typename F>
   void warn(F log) {
@@ -540,7 +541,7 @@ bool IndexSwiftASTWalker::handleSourceOrModuleFile(SourceFileOrModule SFOrMod,
 }
 
 bool IndexSwiftASTWalker::visitImports(
-    SourceFileOrModule TopMod, llvm::SmallPtrSet<ModuleDecl *, 16> &Visited) {
+    SourceFileOrModule TopMod, llvm::SmallPtrSetImpl<ModuleDecl *> &Visited) {
   // Dependencies of the stdlib module (like SwiftShims module) are
   // implementation details.
   if (TopMod.getModule().isStdlibModule())
@@ -572,7 +573,6 @@ bool IndexSwiftASTWalker::visitImports(
       switch (File->getKind()) {
       case FileUnitKind::Source:
       case FileUnitKind::Builtin:
-      case FileUnitKind::Derived:
         break;
       case FileUnitKind::SerializedAST:
         assert(!IsClangModuleOpt.hasValue() &&
@@ -870,8 +870,11 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
       auto isNullOrImplicit = [](const Decl *D) -> bool {
         return !D || D->isImplicit();
       };
+
+      bool usedPseudoAccessors = false;
       if (isa<VarDecl>(D) && isNullOrImplicit(StoreD->getGetter()) &&
           isNullOrImplicit(StoreD->getSetter())) {
+        usedPseudoAccessors = true;
         auto VarD = cast<VarDecl>(D);
         // No actual getter or setter, pass 'pseudo' accessors.
         // We create accessor entities so we can implement the functionality
@@ -884,33 +887,19 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
           return false;
         if (!reportPseudoSetterDecl(VarD))
           return false;
-      } else {
-        if (auto FD = StoreD->getGetter())
-          SourceEntityWalker::walk(cast<Decl>(FD));
+      } 
+
+      for (auto accessor : StoreD->getAllAccessors()) {
+        // Don't include the implicit getter and setter if we added pseudo
+        // accessors above.
+        if (usedPseudoAccessors &&
+            (accessor->getAccessorKind() == AccessorKind::Get ||
+             accessor->getAccessorKind() == AccessorKind::Set))
+          continue;
+
+        SourceEntityWalker::walk(cast<Decl>(accessor));
         if (Cancelled)
           return false;
-        if (auto FD = StoreD->getSetter())
-          SourceEntityWalker::walk(cast<Decl>(FD));
-        if (Cancelled)
-          return false;
-      }
-      if (StoreD->hasObservers()) {
-        if (auto FD = StoreD->getWillSetFunc())
-          SourceEntityWalker::walk(cast<Decl>(FD));
-        if (Cancelled)
-          return false;
-        if (auto FD = StoreD->getDidSetFunc())
-          SourceEntityWalker::walk(cast<Decl>(FD));
-        if (Cancelled)
-          return false;
-      }
-      if (StoreD->hasAddressors()) {
-        if (auto FD = StoreD->getAddressor())
-          SourceEntityWalker::walk(cast<Decl>(FD));
-        if (Cancelled)
-          return false;
-        if (auto FD = StoreD->getMutableAddressor())
-          SourceEntityWalker::walk(cast<Decl>(FD));
       }
     } else if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
       if (!reportInheritedTypeRefs(NTD->getInherited(), NTD))
@@ -961,11 +950,11 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
     bool UsesSetter = Info.roles & (SymbolRoleSet)SymbolRole::Write;
 
     if (UsesGetter)
-      if (!reportPseudoAccessor(ASD, AccessorKind::IsGetter, /*IsRef=*/true,
+      if (!reportPseudoAccessor(ASD, AccessorKind::Get, /*IsRef=*/true,
                                 Loc))
         return false;
     if (UsesSetter)
-      if (!reportPseudoAccessor(ASD, AccessorKind::IsSetter, /*IsRef=*/true,
+      if (!reportPseudoAccessor(ASD, AccessorKind::Set, /*IsRef=*/true,
                                 Loc))
         return false;
   }
@@ -1039,8 +1028,8 @@ bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
 
   if (D->getAttrs().hasAttribute<IBActionAttr>()) {
     // Relate with type of the first parameter using RelationIBTypeOf.
-    if (D->getParameterLists().size() >= 2) {
-      auto paramList = D->getParameterList(1);
+    if (D->hasImplicitSelfDecl()) {
+      auto paramList = D->getParameters();
       if (!paramList->getArray().empty()) {
         auto param = paramList->get(0);
         if (auto nominal = param->getType()->getAnyNominal()) {
@@ -1292,9 +1281,6 @@ void IndexSwiftASTWalker::getRecursiveModuleImports(
           case FileUnitKind::Builtin:
             Info += "builtin";
             break;
-          case FileUnitKind::Derived:
-            Info += "derived";
-            break;
           case FileUnitKind::Source:
             Info += "source, file=\"";
             Info += cast<SourceFile>(FU)->getFilename();
@@ -1329,7 +1315,7 @@ void IndexSwiftASTWalker::getRecursiveModuleImports(
 }
 
 void IndexSwiftASTWalker::collectRecursiveModuleImports(
-    ModuleDecl &TopMod, llvm::SmallPtrSet<ModuleDecl *, 16> &Visited) {
+    ModuleDecl &TopMod, llvm::SmallPtrSetImpl<ModuleDecl *> &Visited) {
 
   bool IsNew = Visited.insert(&TopMod).second;
   if (!IsNew)

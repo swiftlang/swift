@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name objc_thunks -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -emit-verbose-sil -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name objc_thunks -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-verbose-sil -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -58,6 +58,36 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @$S11objc_thunks6HoozitC7copyFooSo5GizmoCyF : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
+  // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[BORROWED_THIS_COPY]])
+  // CHECK-NEXT:   end_borrow [[BORROWED_THIS_COPY]] from [[THIS_COPY]]
+  // CHECK-NEXT:   destroy_value [[THIS_COPY]]
+  // CHECK-NEXT:   return [[RES]]
+  // CHECK-NEXT: }
+
+  // NS_RETURNS_RETAINED by family (-mutableCopy)
+  @objc func mutableCopyFoo() -> Gizmo { return self }
+  // CHECK-LABEL: sil hidden [thunk] @$S11objc_thunks6HoozitC14mutableCopyFooSo5GizmoCyFTo : $@convention(objc_method) (Hoozit) -> @owned Gizmo
+  // CHECK: bb0([[THIS:%.*]] : @unowned $Hoozit):
+  // CHECK-NEXT:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
+  // CHECK-NEXT:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
+  // CHECK-NEXT:   // function_ref
+  // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @$S11objc_thunks6HoozitC14mutableCopyFooSo5GizmoCyF : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
+  // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[BORROWED_THIS_COPY]])
+  // CHECK-NEXT:   end_borrow [[BORROWED_THIS_COPY]] from [[THIS_COPY]]
+  // CHECK-NEXT:   destroy_value [[THIS_COPY]]
+  // CHECK-NEXT:   return [[RES]]
+  // CHECK-NEXT: }
+
+  // NS_RETURNS_RETAINED by family (-copy). This is different from Swift's
+  // normal notion of CamelCase, but it's what Clang does, so we should match 
+  // it.
+  @objc func copy8() -> Gizmo { return self }
+  // CHECK-LABEL: sil hidden [thunk] @$S11objc_thunks6HoozitC5copy8So5GizmoCyFTo : $@convention(objc_method) (Hoozit) -> @owned Gizmo
+  // CHECK: bb0([[THIS:%.*]] : @unowned $Hoozit):
+  // CHECK-NEXT:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
+  // CHECK-NEXT:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
+  // CHECK-NEXT:   // function_ref
+  // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @$S11objc_thunks6HoozitC5copy8So5GizmoCyF : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[BORROWED_THIS_COPY]])
   // CHECK-NEXT:   end_borrow [[BORROWED_THIS_COPY]] from [[THIS_COPY]]
   // CHECK-NEXT:   destroy_value [[THIS_COPY]]
@@ -453,7 +483,7 @@ extension Hoozit {
     other()
   }
 
-  func foof() {}
+  @objc func foof() {}
   // CHECK-LABEL: sil hidden [thunk] @$S11objc_thunks6HoozitC4foofyyFTo : $@convention(objc_method) (Hoozit) -> () {
 
   var extensionProperty: Int { return 0 }
@@ -540,3 +570,25 @@ func registerAnsible() {
   // CHECK: function_ref @$S11objc_thunks15registerAnsibleyyFyyycSgcfU_
   Ansible.anseAsync({ completion in completion!() })
 }
+@_silgen_name("noescape")
+func noescape(f: @convention(block) () -> ())
+
+// CHECK: sil hidden @$S11objc_thunks21testObjCNoescapeThunkyyF : $@convention(thin) () -> () {
+// CHECK: [[REABSTRACT:%.*]] = function_ref @$SIeg_IyB_TR
+// CHECK: init_block_storage_header {{.*}} : $*@block_storage @callee_guaranteed () -> (), invoke [[REABSTRACT]]
+// CHECK: return
+func testObjCNoescapeThunk() {
+  noescape {
+  }
+}
+
+// Noescape verification relies on there not being a retain/release in order to
+// work in the presence of a objective c throwing implementation function.
+// CHECK: sil {{.*}} @$SIeg_IyB_TR
+// CHECK: bb0([[T0:%.*]] : @trivial $*@block_storage @callee_guaranteed () -> ()):
+// CHECK-NEXT:  [[T1:%.*]] = project_block_storage [[T0]]
+// CHECK-NEXT:  [[T2:%.*]] = load_borrow [[T1]]
+// CHECK-NEXT:  [[T3:%.*]] = apply [[T2]]()
+// CHECK-NEXT:  [[T4:%.*]] = tuple ()
+// CHECK-NEXT:  end_borrow [[T2]] from [[T1]]
+// CHECK-NEXT:  return [[T4]]

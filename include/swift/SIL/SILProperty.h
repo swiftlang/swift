@@ -42,11 +42,11 @@ private:
   AbstractStorageDecl *Decl;
   
   /// The key path component that represents its implementation.
-  KeyPathPatternComponent Component;
+  Optional<KeyPathPatternComponent> Component;
 
   SILProperty(bool Serialized,
               AbstractStorageDecl *Decl,
-              KeyPathPatternComponent Component)
+              Optional<KeyPathPatternComponent> Component)
     : Serialized(Serialized), Decl(Decl), Component(Component)
   {}
 
@@ -54,13 +54,19 @@ public:
   static SILProperty *create(SILModule &M,
                              bool Serialized,
                              AbstractStorageDecl *Decl,
-                             KeyPathPatternComponent Component);
+                             Optional<KeyPathPatternComponent> Component);
   
   bool isSerialized() const { return Serialized; }
   
   AbstractStorageDecl *getDecl() const { return Decl; }
   
-  const KeyPathPatternComponent &getComponent() const { return Component; }
+  bool isTrivial() const {
+    return !Component.hasValue();
+  }
+  
+  const Optional<KeyPathPatternComponent> &getComponent() const {
+    return Component;
+  }
   
   void print(SILPrintContext &Ctx) const;
   void dump() const;

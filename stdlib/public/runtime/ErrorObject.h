@@ -218,11 +218,22 @@ void swift_unexpectedError(SwiftError *object);
 #if SWIFT_OBJC_INTEROP
 
 /// Initialize an Error box to make it usable as an NSError instance.
+///
+/// errorObject is assumed to be passed at +1 and consumed in this function.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 id _swift_stdlib_bridgeErrorToNSError(SwiftError *errorObject);
 
+/// Attempt to dynamically cast an NSError object to a Swift ErrorType
+/// implementation using the _ObjectiveCBridgeableErrorType protocol or by
+/// putting it directly into an Error existential.
+bool tryDynamicCastNSErrorObjectToValue(HeapObject *object,
+                                        OpaqueValue *dest,
+                                        const Metadata *destType,
+                                        DynamicCastFlags flags);
+
 /// Attempt to dynamically cast an NSError instance to a Swift ErrorType
-/// implementation using the _ObjectiveCBridgeableErrorType protocol.
+/// implementation using the _ObjectiveCBridgeableErrorType protocol or by
+/// putting it directly into an Error existential.
 ///
 /// srcType must be some kind of class metadata.
 bool tryDynamicCastNSErrorToValue(OpaqueValue *dest,

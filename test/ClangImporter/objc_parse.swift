@@ -121,7 +121,7 @@ func properties(_ b: B) {
   // An informal property cannot be made formal in a subclass. The
   // formal property is simply ignored.
   b.informalMadeFormal()
-  b.informalMadeFormal = i // expected-error{{cannot assign to property: 'informalMadeFormal' is a method}}
+  b.informalMadeFormal = i // expected-error{{cannot assign to value: 'informalMadeFormal' is a method}}
   b.setInformalMadeFormal(5)
 
   b.overriddenProp = 17
@@ -130,7 +130,9 @@ func properties(_ b: B) {
   var obj : AnyObject = b
   var optStr = obj.nsstringProperty // optStr has type String??
   if optStr != nil {
-    var s : String = optStr! // expected-error{{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}}
+    var s : String = optStr! // expected-error{{value of optional type 'String?' must be unwrapped}}
+    // expected-note@-1{{coalesce}}
+    // expected-note@-2{{force-unwrap}}
     var t : String = optStr!!
   }
 
@@ -241,33 +243,24 @@ func overridingTest(_ srs: SuperRefsSub) {
 }
 
 func almostSubscriptableValueMismatch(_ as1: AlmostSubscriptable, a: A) {
-  as1[a] // expected-error{{type 'AlmostSubscriptable' has no subscript members}}
+  as1[a] // expected-error{{value of type 'AlmostSubscriptable' has no subscripts}}
 }
 
 func almostSubscriptableKeyMismatch(_ bc: BadCollection, key: NSString) {
   // FIXME: We end up importing this as read-only due to the mismatch between
   // getter/setter element types.
-  var _ : Any = bc[key] // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
-  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
-  // expected-note@-2 {{provide a default value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
+  var _ : Any = bc[key]
 }
 
 func almostSubscriptableKeyMismatchInherited(_ bc: BadCollectionChild,
                                              key: String) {
-  var value : Any = bc[key] // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
-  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
-  // expected-note@-2 {{provide a default value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
+  var value : Any = bc[key]
   bc[key] = value // expected-error{{cannot assign through subscript: subscript is get-only}}
 }
 
 func almostSubscriptableKeyMismatchInherited(_ roc: ReadOnlyCollectionChild,
                                              key: String) {
-  var value : Any = roc[key] // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
-  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
-  // expected-note@-2 {{provide a default value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
+  var value : Any = roc[key]
   roc[key] = value // expected-error{{cannot assign through subscript: subscript is get-only}}
 }
 
@@ -297,7 +290,9 @@ extension Wobbler2 : NSMaybeInitWobble { // expected-error{{type 'Wobbler2' does
 
 func optionalMemberAccess(_ w: NSWobbling) {
   w.wobble()
-  w.wibble() // expected-error{{value of optional type '(() -> Void)?' not unwrapped; did you mean to use '!' or '?'?}} {{11-11=!}}
+  w.wibble() // expected-error{{value of optional type '(() -> Void)?' must be unwrapped}}
+  // expected-note@-1{{coalesce}}
+  // expected-note@-2{{force-unwrap}}
   let x = w[5]!!
   _ = x
 }
@@ -407,22 +402,10 @@ func testPropertyAndMethodCollision(_ obj: PropertyAndMethodCollision,
   type(of: rev).classRef(rev, doSomething:#selector(getter: NSMenuItem.action))
 
   var value: Any
-  value = obj.protoProp() // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
-  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
-  // expected-note@-2 {{provide a default value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
-  value = obj.protoPropRO() // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
-  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
-  // expected-note@-2 {{provide a default value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
-  value = type(of: obj).protoClassProp() // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
-  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
-  // expected-note@-2 {{provide a default value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
-  value = type(of: obj).protoClassPropRO() // expected-warning {{expression implicitly coerced from 'Any?' to 'Any'}}
-  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
-  // expected-note@-2 {{provide a default value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
+  value = obj.protoProp()
+  value = obj.protoPropRO()
+  value = type(of: obj).protoClassProp()
+  value = type(of: obj).protoClassPropRO()
   _ = value
 }
 
@@ -559,11 +542,11 @@ func testProtocolQualified(_ obj: CopyableNSObject, cell: CopyableSomeCell,
 
   _ = cell as NSObject
   _ = cell as NSObjectProtocol
-  _ = cell as NSCopying // expected-error {{'CopyableSomeCell' (aka 'SomeCell') is not convertible to 'NSCopying'; did you mean to use 'as!' to force downcast?}} {{12-14=as!}}
+  _ = cell as NSCopying
   _ = cell as SomeCell
   
   _ = plainObj as CopyableNSObject // expected-error {{'NSObject' is not convertible to 'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol'); did you mean to use 'as!' to force downcast?}} {{16-18=as!}}
-  _ = plainCell as CopyableSomeCell // FIXME: This is not really typesafe.
+  _ = plainCell as CopyableSomeCell // expected-error {{'SomeCell' is not convertible to 'CopyableSomeCell' (aka 'SomeCell & NSCopying'); did you mean to use 'as!' to force downcast?}}
 }
 
 extension Printing {
@@ -654,6 +637,17 @@ class NewtypeUser {
   @objc func intNewtypeDictionary(a: [MyInt: NSObject]) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   @objc func cfNewtype(a: CFNewType) {}
   @objc func cfNewtypeArray(a: [CFNewType]) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+
+  typealias MyTuple = (Int, AnyObject?)
+  typealias MyNamedTuple = (a: Int, b: AnyObject?)
+  
+  @objc func blockWithTypealias(_ input: @escaping (MyTuple) -> MyInt) {}
+  // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2{{function types cannot be represented in Objective-C}}
+
+  @objc func blockWithTypealiasWithNames(_ input: (MyNamedTuple) -> MyInt) {}
+  // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2{{function types cannot be represented in Objective-C}}
 }
 
 func testTypeAndValue() {

@@ -26,6 +26,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   NSCoder.swift
   NSDate.swift
   NSDictionary.swift
+  NSError.mm
   NSError.swift
   NSExpression.swift
   NSFastEnumeration.swift

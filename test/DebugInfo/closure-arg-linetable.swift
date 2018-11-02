@@ -11,7 +11,7 @@ public class C {
   // CHECK: ![[DBG]] = !DILocation(line: 0, scope: ![[CURRY_THUNK]])
   func someHandler() { }
 
-  func doSomethingWithHandler(_ theHandler: ((Void) -> Void)!) -> Void {
+  func doSomethingWithHandler(_ theHandler: (() -> Void)!) -> Void {
 	  theHandler()
   }
 

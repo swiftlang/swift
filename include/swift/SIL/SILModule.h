@@ -19,7 +19,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
-#include "swift/AST/Module.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/LangOptions.h"
@@ -58,8 +57,10 @@ class Output;
 namespace swift {
   class AnyFunctionType;
   class ASTContext;
+  class FileUnit;
   class FuncDecl;
   class KeyPathPattern;
+  class ModuleDecl;
   class SILUndef;
   class SourceFile;
   class SerializedSILLoader;
@@ -345,15 +346,12 @@ public:
   /// later parse SIL bodies directly into, without converting from an AST.
   static std::unique_ptr<SILModule>
   createEmptyModule(ModuleDecl *M, SILOptions &Options,
-                    bool WholeModule = false) {
-    return std::unique_ptr<SILModule>(
-        new SILModule(M, Options, M, WholeModule));
-  }
+                    bool WholeModule = false);
 
   /// Get the Swift module associated with this SIL module.
   ModuleDecl *getSwiftModule() const { return TheSwiftModule; }
   /// Get the AST context used for type uniquing etc. by this SIL module.
-  ASTContext &getASTContext() const { return TheSwiftModule->getASTContext(); }
+  ASTContext &getASTContext() const;
   SourceManager &getSourceManager() const { return getASTContext().SourceMgr; }
 
   /// Get the Swift DeclContext associated with this SIL module.
@@ -475,6 +473,14 @@ public:
   llvm::yaml::Output *getOptRecordStream() { return OptRecordStream.get(); }
   void setOptRecordStream(std::unique_ptr<llvm::yaml::Output> &&Stream,
                           std::unique_ptr<llvm::raw_ostream> &&RawStream);
+
+  // This is currently limited to VarDecl because the visibility of global
+  // variables and class properties is straightforward, while the visibility of
+  // class methods (ValueDecls) depends on the subclass scope. "Visiblity" has
+  // a different meaning when vtable layout is at stake.
+  bool isVisibleExternally(const VarDecl *decl) {
+    return isPossiblyUsedExternally(getDeclSILLinkage(decl), isWholeModule());
+  }
 
   PropertyListType &getPropertyList() { return properties; }
   const PropertyListType &getPropertyList() const { return properties; }
@@ -633,6 +639,14 @@ public:
   void setPGOReader(std::unique_ptr<llvm::IndexedInstrProfReader> IPR) {
     PGOReader = std::move(IPR);
   }
+
+  /// Can value operations (copies and destroys) on the given lowered type
+  /// be performed in this module?
+  bool isTypeABIAccessible(SILType type);
+
+  /// Can type metadata for the given formal type be fetched in
+  /// the given module?
+  bool isTypeMetadataAccessible(CanType type);
 
   /// \brief Run the SIL verifier to make sure that all Functions follow
   /// invariants.

@@ -292,13 +292,13 @@ Runtime.test("forceBridgeFromObjectiveC") {
 
 
 Runtime.test("isBridgedToObjectiveC") {
-  expectTrue(_isBridgedToObjectiveC(BridgedValueType))
-  expectTrue(_isBridgedToObjectiveC(BridgedVerbatimRefType))
+  expectTrue(_isBridgedToObjectiveC(BridgedValueType.self))
+  expectTrue(_isBridgedToObjectiveC(BridgedVerbatimRefType.self))
 }
 
 Runtime.test("isBridgedVerbatimToObjectiveC") {
-  expectFalse(_isBridgedVerbatimToObjectiveC(BridgedValueType))
-  expectTrue(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefType))
+  expectFalse(_isBridgedVerbatimToObjectiveC(BridgedValueType.self))
+  expectTrue(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefType.self))
 }
 
 //===----------------------------------------------------------------------===//
@@ -700,7 +700,7 @@ Reflection.test("TupleMirror/NoLeak") {
   }
 }
 
-class TestArtificialSubclass: NSObject {
+@objc @objcMembers class TestArtificialSubclass: NSObject {
   dynamic var foo = "foo"
 }
 

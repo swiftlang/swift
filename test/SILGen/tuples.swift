@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name tuples -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name tuples -enable-sil-ownership %s | %FileCheck %s
 class C {}
 
 enum Foo {
@@ -120,20 +120,12 @@ func testTupleUnsplat() {
   // CHECK: [[TUPLE:%.+]] = tuple ([[X]] : $Int, [[Y]] : $Int)
   // CHECK: enum $GenericEnum<(Int, Int)>, #GenericEnum.one!enumelt.1, [[TUPLE]]
   _ = GenericEnum<(Int, Int)>.one((x, y))
-  // CHECK: [[TUPLE:%.+]] = tuple ([[X]] : $Int, [[Y]] : $Int)
-  // CHECK: enum $GenericEnum<(Int, Int)>, #GenericEnum.one!enumelt.1, [[TUPLE]]
-  _ = GenericEnum<(Int, Int)>.one(x, y)
 
   // CHECK: [[THUNK:%.+]] = function_ref @$SSi_SitIegn_S2iIegyy_TR
   // CHECK: [[REABSTRACTED:%.+]] = partial_apply [callee_guaranteed] [[THUNK]]({{%.+}})
   // CHECK: [[BORROW:%.*]] = begin_borrow [[REABSTRACTED]]
   // CHECK: apply [[BORROW]]([[X]], [[Y]])
   _ = GenericEnum<(Int, Int)>.callback((x, y))
-  // CHECK: [[THUNK:%.+]] = function_ref @$SSi_SitIegn_S2iIegyy_TR
-  // CHECK: [[REABSTRACTED:%.+]] = partial_apply [callee_guaranteed] [[THUNK]]({{%.+}})
-  // CHECK: [[BORROW:%.*]] = begin_borrow [[REABSTRACTED]]
-  // CHECK: apply [[BORROW]]([[X]], [[Y]])
-  _ = GenericEnum<(Int, Int)>.callback(x, y)
 } // CHECK: end sil function '$S6tuples16testTupleUnsplatyyF'
 
 // Make sure that we use a load_borrow instead of a load [take] when RValues are

@@ -286,11 +286,19 @@ bool swift_isUniquelyReferencedOrPinned_nonNull_native(
 /// one.
 /// This runtime call will print an error message with file name and location if
 /// the closure is escaping but it will not abort.
+///
+/// \p type: 0 - withoutActuallyEscaping verification
+///              Was the closure passed to a withoutActuallyEscaping block
+///              escaped in the block?
+///          1 - @objc closure sentinel verfication
+///              Was the closure passed to Objective-C escaped?
 SWIFT_RUNTIME_EXPORT
 bool swift_isEscapingClosureAtFileLocation(const struct HeapObject *object,
                                            const unsigned char *filename,
                                            int32_t filenameLength,
-                                           int32_t line);
+                                           int32_t line,
+                                           int32_t column,
+                                           unsigned type);
 
 /// Deallocate the given memory.
 ///

@@ -46,10 +46,10 @@ namespace {
     SILValue visitTupleInst(TupleInst *SI);
     SILValue visitBuiltinInst(BuiltinInst *AI);
     SILValue visitUpcastInst(UpcastInst *UI);
-    SILValue visitRefToUnownedInst(RefToUnownedInst *RUI);
-    SILValue visitUnownedToRefInst(UnownedToRefInst *URI);
-    SILValue visitRefToUnmanagedInst(RefToUnmanagedInst *RUI);
-    SILValue visitUnmanagedToRefInst(UnmanagedToRefInst *URI);
+#define LOADABLE_REF_STORAGE(Name, ...) \
+    SILValue visitRefTo##Name##Inst(RefTo##Name##Inst *I); \
+    SILValue visit##Name##ToRefInst(Name##ToRefInst *I);
+#include "swift/AST/ReferenceStorage.def"
     SILValue visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI);
     SILValue
     visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
@@ -368,41 +368,22 @@ SILValue InstSimplifier::visitUpcastInst(UpcastInst *UI) {
   return SILValue();
 }
 
-SILValue
-InstSimplifier::visitRefToUnownedInst(RefToUnownedInst *RUI) {
-  if (auto *URI = dyn_cast<UnownedToRefInst>(RUI->getOperand()))
-    if (URI->getOperand()->getType() == RUI->getType())
-      return URI->getOperand();
-
-  return SILValue();
+#define LOADABLE_REF_STORAGE(Name, ...) \
+SILValue \
+InstSimplifier::visitRefTo##Name##Inst(RefTo##Name##Inst *RUI) { \
+  if (auto *URI = dyn_cast<Name##ToRefInst>(RUI->getOperand())) \
+    if (URI->getOperand()->getType() == RUI->getType()) \
+      return URI->getOperand(); \
+  return SILValue(); \
+} \
+SILValue \
+InstSimplifier::visit##Name##ToRefInst(Name##ToRefInst *URI) { \
+  if (auto *RUI = dyn_cast<RefTo##Name##Inst>(URI->getOperand())) \
+    if (RUI->getOperand()->getType() == URI->getType()) \
+      return RUI->getOperand(); \
+  return SILValue(); \
 }
-
-SILValue
-InstSimplifier::visitUnownedToRefInst(UnownedToRefInst *URI) {
-  if (auto *RUI = dyn_cast<RefToUnownedInst>(URI->getOperand()))
-    if (RUI->getOperand()->getType() == URI->getType())
-      return RUI->getOperand();
-
-  return SILValue();
-}
-
-SILValue
-InstSimplifier::visitRefToUnmanagedInst(RefToUnmanagedInst *RUI) {
-  if (auto *URI = dyn_cast<UnmanagedToRefInst>(RUI->getOperand()))
-    if (URI->getOperand()->getType() == RUI->getType())
-      return URI->getOperand();
-
-  return SILValue();
-}
-
-SILValue
-InstSimplifier::visitUnmanagedToRefInst(UnmanagedToRefInst *URI) {
-  if (auto *RUI = dyn_cast<RefToUnmanagedInst>(URI->getOperand()))
-    if (RUI->getOperand()->getType() == URI->getType())
-      return RUI->getOperand();
-
-  return SILValue();
-}
+#include "swift/AST/ReferenceStorage.def"
 
 SILValue
 InstSimplifier::

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -I %S/Inputs/custom-modules -swift-version 4 -enable-nonfrozen-enum-exhaustivity-diagnostics %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -I %S/Inputs/custom-modules -enable-nonfrozen-enum-exhaustivity-diagnostics %s
 
 // REQUIRES: objc_interop
 

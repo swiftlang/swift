@@ -2438,7 +2438,7 @@
           {
             key.kind: source.lang.swift.ref.protocol,
             key.name: "SignedInteger",
-            key.usr: "s:s13SignedIntegerP"
+            key.usr: "s:SZ"
           },
           {
             key.kind: source.lang.swift.ref.protocol,

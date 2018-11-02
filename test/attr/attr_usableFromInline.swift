@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift
-// RUN: %target-typecheck-verify-swift -enable-testing
+// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift -enable-testing -swift-version 5
 
 @usableFromInline private func privateVersioned() {}
 // expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal declarations, but 'privateVersioned()' is private}}
@@ -16,7 +16,8 @@
 @usableFromInline public func publicVersioned() {}
 // expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal declarations, but 'publicVersioned()' is public}}
 
-internal class internalClass {
+internal class InternalClass {
+  // expected-note@-1 2{{type declared here}}
   @usableFromInline public func publicVersioned() {}
   // expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal declarations, but 'publicVersioned()' is public}}
 }
@@ -66,3 +67,77 @@ public func usesEqEnum() -> Bool {
   _ = RawEnum.foo.rawValue
   _ = RawEnum(rawValue: 0)
 }
+
+internal struct InternalStruct {}
+// expected-note@-1 9{{type declared here}}
+
+@usableFromInline var globalInferred = InternalStruct()
+// expected-error@-1 {{type referenced from a '@usableFromInline' variable with inferred type 'InternalStruct' must be '@usableFromInline' or public}}
+
+@usableFromInline var globalDeclared: InternalStruct = InternalStruct()
+// expected-error@-1 {{type referenced from a '@usableFromInline' variable must be '@usableFromInline' or public}}
+
+@usableFromInline typealias BadAlias = InternalStruct
+// expected-error@-1 {{type referenced from the underlying type of a '@usableFromInline' type alias must be '@usableFromInline' or public}}
+
+protocol InternalProtocol {
+  // expected-note@-1 4{{type declared here}}
+  associatedtype T
+}
+
+@usableFromInline
+struct BadStruct<T, U>
+// expected-error@-1 {{type referenced from a generic requirement of a '@usableFromInline' generic struct must be '@usableFromInline' or public}}
+where T : InternalProtocol,
+      T : Sequence,
+      T.Element == InternalStruct {
+  @usableFromInline init(x: InternalStruct) {}
+  // expected-error@-1 {{the parameter of a '@usableFromInline' initializer must be '@usableFromInline' or public}}
+
+  @usableFromInline func foo(x: InternalStruct) -> InternalClass {}
+  // expected-error@-1 {{the parameter of a '@usableFromInline' method must be '@usableFromInline' or public}}
+  // expected-error@-2 {{the result of a '@usableFromInline' method must be '@usableFromInline' or public}}
+
+  @usableFromInline var propertyInferred = InternalStruct()
+  // expected-error@-1 {{type referenced from a '@usableFromInline' property with inferred type 'InternalStruct' must be '@usableFromInline' or public}}
+
+  @usableFromInline var propertyDeclared: InternalStruct = InternalStruct()
+  // expected-error@-1 {{type referenced from a '@usableFromInline' property must be '@usableFromInline' or public}}
+
+  @usableFromInline subscript(x: InternalStruct) -> Int {
+    // expected-error@-1 {{index type of a '@usableFromInline' subscript must be '@usableFromInline' or public}}
+    get {}
+    set {}
+  }
+
+  @usableFromInline subscript(x: Int) -> InternalStruct {
+    // expected-error@-1 {{element type of a '@usableFromInline' subscript must be '@usableFromInline' or public}}
+    get {}
+    set {}
+  }
+}
+
+@usableFromInline
+protocol BadProtocol : InternalProtocol {
+  // expected-error@-1 {{protocol refined by '@usableFromInline' protocol must be '@usableForInline' or public}}
+  associatedtype X : InternalProtocol
+  // expected-error@-1 {{type referenced from a requirement of an associated type in a '@usableFromInline' protocol must be '@usableFromInline' or public}}
+  associatedtype Y = InternalStruct
+  // expected-error@-1 {{type referenced from a default definition of an associated type in a '@usableFromInline' protocol must be '@usableFromInline' or public}}
+}
+
+@usableFromInline
+protocol AnotherBadProtocol where Self.T : InternalProtocol {
+  // expected-error@-1 {{protocol used by '@usableFromInline' protocol must be '@usableForInline' or public}}
+  associatedtype T
+}
+
+@usableFromInline
+enum BadEnum {
+  case bad(InternalStruct)
+  // expected-error@-1 {{type of enum case in '@usableFromInline' enum must be '@usableFromInline' or public}}
+}
+
+@usableFromInline
+class BadClass : InternalClass {}
+// expected-error@-1 {{type referenced from the superclass of a '@usableFromInline' class must be '@usableFromInline' or public}}

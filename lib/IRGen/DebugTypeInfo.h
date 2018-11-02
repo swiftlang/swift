@@ -62,8 +62,7 @@ public:
   /// Create type for a local variable.
   static DebugTypeInfo getLocalVariable(DeclContext *DeclCtx,
                                         GenericEnvironment *GE, VarDecl *Decl,
-                                        swift::Type Ty, const TypeInfo &Info,
-                                        bool Unwrap);
+                                        swift::Type Ty, const TypeInfo &Info);
   /// Create type for an artificial metadata variable.
   static DebugTypeInfo getMetadata(swift::Type Ty, llvm::Type *StorageTy,
                                    Size size, Alignment align);
@@ -83,10 +82,6 @@ public:
   TypeDecl *getDecl() const;
   DeclContext *getDeclContext() const { return DeclCtx; }
   GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
-
-  void unwrapLValueOrInOutType() {
-    Type = Type->getWithoutSpecifierType().getPointer();
-  }
 
   // Determine whether this type is an Archetype itself.
   bool isArchetype() const {

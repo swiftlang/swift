@@ -410,8 +410,7 @@ struct BridgeObjectBox :
   static constexpr unsigned numExtraInhabitants = 1;
       
   static void *retain(void *obj) {
-    (void)swift_bridgeObjectRetain(obj);
-    return obj;
+    return swift_bridgeObjectRetain(obj);
   }
 
   static void release(void *obj) {
@@ -621,31 +620,28 @@ enum class FixedPacking {
   Allocate,
   OffsetZero
 };
-constexpr FixedPacking getFixedPacking(size_t size, size_t alignment) {
-  return (canBeInline(size, alignment) ? FixedPacking::OffsetZero
-                                       : FixedPacking::Allocate);
+constexpr FixedPacking getFixedPacking(bool isBitwiseTakable, size_t size,
+                                       size_t alignment) {
+  return (canBeInline(isBitwiseTakable, size, alignment)
+              ? FixedPacking::OffsetZero
+              : FixedPacking::Allocate);
 }
 
 /// A CRTP base class which provides default implementations of a
 /// number of value witnesses.
-template <class Impl, size_t Size, size_t Alignment,
-          FixedPacking Packing = getFixedPacking(Size, Alignment)>
+template <class Impl, bool isBitwiseTakable, size_t Size, size_t Alignment,
+          FixedPacking Packing =
+              getFixedPacking(isBitwiseTakable, Size, Alignment)>
 struct BufferValueWitnesses;
 
 /// An implementation of ValueBase suitable for classes that can be
 /// allocated inline.
-template <class Impl, size_t Size, size_t Alignment>
-struct BufferValueWitnesses<Impl, Size, Alignment, FixedPacking::OffsetZero>
+template <class Impl, bool isBitwiseTakable, size_t Size, size_t Alignment>
+struct BufferValueWitnesses<Impl, isBitwiseTakable, Size, Alignment,
+                            FixedPacking::OffsetZero>
     : BufferValueWitnessesBase<Impl> {
   static constexpr bool isInline = true;
 
-  static OpaqueValue *initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
-                                                       ValueBuffer *src,
-                                                       const Metadata *self) {
-    return Impl::initializeWithTake(reinterpret_cast<OpaqueValue*>(dest),
-                                    reinterpret_cast<OpaqueValue*>(src),
-                                    self);
-  }
   static OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                                                        ValueBuffer *src,
                                                        const Metadata *self) {
@@ -656,25 +652,11 @@ struct BufferValueWitnesses<Impl, Size, Alignment, FixedPacking::OffsetZero>
 
 /// An implementation of BufferValueWitnesses suitable for types that
 /// cannot be allocated inline.
-template <class Impl, size_t Size, size_t Alignment>
-struct BufferValueWitnesses<Impl, Size, Alignment, FixedPacking::Allocate>
+template <class Impl, bool isBitwiseTakable, size_t Size, size_t Alignment>
+struct BufferValueWitnesses<Impl, isBitwiseTakable, Size, Alignment,
+                            FixedPacking::Allocate>
     : BufferValueWitnessesBase<Impl> {
   static constexpr bool isInline = false;
-
-  static OpaqueValue *initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
-                                                       ValueBuffer *src,
-                                                       const Metadata *self) {
-    auto wtable = self->getValueWitnesses();
-    auto *srcReference = *reinterpret_cast<HeapObject **>(src);
-    *reinterpret_cast<HeapObject **>(dest) = srcReference;
-
-    // Project the address of the value in the buffer.
-    unsigned alignMask = wtable->getAlignmentMask();
-    // Compute the byte offset of the object in the box.
-    unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
-    auto *bytePtr = reinterpret_cast<char *>(srcReference);
-    return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
-  }
 
   static OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                                                        ValueBuffer *src,
@@ -696,26 +678,6 @@ struct BufferValueWitnesses<Impl, Size, Alignment, FixedPacking::Allocate>
 /// fixed in size.
 template <class Impl, bool IsKnownAllocated>
 struct NonFixedBufferValueWitnesses : BufferValueWitnessesBase<Impl> {
-  static OpaqueValue *initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
-                                                       ValueBuffer *src,
-                                                       const Metadata *self) {
-    auto vwtable = self->getValueWitnesses();
-    (void)vwtable;
-    if (!IsKnownAllocated && vwtable->isValueInline()) {
-      return Impl::initializeWithTake(reinterpret_cast<OpaqueValue *>(dest),
-                                      reinterpret_cast<OpaqueValue *>(src),
-                                      self);
-    } else {
-      auto reference = src->PrivateData[0];
-      dest->PrivateData[0] = reference;
-      // Project the address of the value in the buffer.
-      unsigned alignMask = vwtable->getAlignmentMask();
-      // Compute the byte offset of the object in the box.
-      unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
-      auto *bytePtr = reinterpret_cast<char *>(reference);
-      return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
-    }
-  }
 
   static OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                                                        ValueBuffer *src,
@@ -742,15 +704,16 @@ struct NonFixedBufferValueWitnesses : BufferValueWitnessesBase<Impl> {
 
 /// Provides implementations for
 /// getEnumTagSinglePayload/storeEnumTagSinglePayload.
-template<class Impl, size_t Size, size_t Alignment, bool hasExtraInhabitants>
+template <class Impl, bool isBitwiseTakable, size_t Size, size_t Alignment,
+          bool hasExtraInhabitants>
 struct FixedSizeBufferValueWitnesses;
 
 /// A fixed size buffer value witness that can rely on the presents of the extra
 /// inhabitant functions.
-template <class Impl, size_t Size, size_t Alignment>
-struct FixedSizeBufferValueWitnesses<Impl, Size, Alignment,
+template <class Impl, bool isBitwiseTakable, size_t Size, size_t Alignment>
+struct FixedSizeBufferValueWitnesses<Impl, isBitwiseTakable, Size, Alignment,
                                      true /*hasExtraInhabitants*/>
-    : BufferValueWitnesses<Impl, Size, Alignment> {
+    : BufferValueWitnesses<Impl, isBitwiseTakable, Size, Alignment> {
 
   static unsigned getEnumTagSinglePayload(const OpaqueValue *enumAddr,
                                           unsigned numEmptyCases,
@@ -772,10 +735,10 @@ struct FixedSizeBufferValueWitnesses<Impl, Size, Alignment,
 
 /// A fixed size buffer value witness that cannot rely on the presents of the
 /// extra inhabitant functions.
-template <class Impl, size_t Size, size_t Alignment>
-struct FixedSizeBufferValueWitnesses<Impl, Size, Alignment,
+template <class Impl, bool isBitwiseTakable, size_t Size, size_t Alignment>
+struct FixedSizeBufferValueWitnesses<Impl, isBitwiseTakable, Size, Alignment,
                                      false /*hasExtraInhabitants*/>
-    : BufferValueWitnesses<Impl, Size, Alignment> {
+    : BufferValueWitnesses<Impl, isBitwiseTakable, Size, Alignment> {
 
   static unsigned getEnumTagSinglePayload(const OpaqueValue *enumAddr,
                                           unsigned numEmptyCases,
@@ -802,11 +765,12 @@ static constexpr bool hasExtraInhabitants(unsigned numExtraInhabitants) {
 /// The box type has to provide a numExtraInhabitants member, but as
 /// long as it's zero, the rest is fine.
 template <class Box>
-struct ValueWitnesses : FixedSizeBufferValueWitnesses<
-                            ValueWitnesses<Box>, Box::size, Box::alignment,
-                            hasExtraInhabitants(Box::numExtraInhabitants)> {
+struct ValueWitnesses
+    : FixedSizeBufferValueWitnesses<
+          ValueWitnesses<Box>, Box::isBitwiseTakable, Box::size, Box::alignment,
+          hasExtraInhabitants(Box::numExtraInhabitants)> {
   using Base = FixedSizeBufferValueWitnesses<
-      ValueWitnesses<Box>, Box::size, Box::alignment,
+      ValueWitnesses<Box>, Box::isBitwiseTakable, Box::size, Box::alignment,
       hasExtraInhabitants(Box::numExtraInhabitants)>;
 
   static constexpr size_t size = Box::size;
@@ -818,7 +782,7 @@ struct ValueWitnesses : FixedSizeBufferValueWitnesses<
   static constexpr bool hasExtraInhabitants = (numExtraInhabitants != 0);
   static constexpr ValueWitnessFlags flags =
     ValueWitnessFlags().withAlignmentMask(alignment - 1)
-                       .withInlineStorage(Base::isInline)
+                       .withInlineStorage(Base::isInline && isBitwiseTakable)
                        .withPOD(isPOD)
                        .withBitwiseTakable(isBitwiseTakable)
                        .withExtraInhabitants(hasExtraInhabitants);
@@ -925,10 +889,8 @@ struct NonFixedValueWitnesses :
                                           const Metadata *self) {
     auto *payloadWitnesses = self->getValueWitnesses();
     auto size = payloadWitnesses->getSize();
-    auto getExtraInhabitantIndex =
-        (static_cast<const ExtraInhabitantsValueWitnessTable *>(
-             payloadWitnesses)
-             ->getExtraInhabitantIndex);
+    auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(payloadWitnesses);
+    auto getExtraInhabitantIndex = EIVWT ? EIVWT->getExtraInhabitantIndex : nullptr;
 
     return getEnumTagSinglePayloadImpl(enumAddr, numEmptyCases, self, size,
                                        numExtraInhabitants,
@@ -942,10 +904,8 @@ struct NonFixedValueWitnesses :
     auto *payloadWitnesses = self->getValueWitnesses();
     auto size = payloadWitnesses->getSize();
     auto numExtraInhabitants = payloadWitnesses->getNumExtraInhabitants();
-    auto storeExtraInhabitant =
-        (static_cast<const ExtraInhabitantsValueWitnessTable *>(
-             payloadWitnesses)
-             ->storeExtraInhabitant);
+    auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(payloadWitnesses);
+    auto storeExtraInhabitant = EIVWT ? EIVWT->storeExtraInhabitant : nullptr;
 
     storeEnumTagSinglePayloadImpl(enumAddr, whichCase, numEmptyCases, self,
                                   size, numExtraInhabitants,

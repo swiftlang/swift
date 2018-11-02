@@ -162,11 +162,6 @@ protected:
   // Ensure that TupleInst bitfield does not overflow.
   IBWTO_BITFIELD_EMPTY(TupleInst, SingleValueInstruction);
 
-  IBWTO_BITFIELD(BuiltinInst, SingleValueInstruction,
-                             32-NumSingleValueInstructionBits,
-    NumSubstitutions : 32-NumSingleValueInstructionBits
-  );
-
   IBWTO_BITFIELD(ObjectInst, SingleValueInstruction,
                              32-NumSingleValueInstructionBits,
     NumBaseElements : 32-NumSingleValueInstructionBits
@@ -263,24 +258,28 @@ protected:
 
   SWIFT_INLINE_BITFIELD(BeginAccessInst, SingleValueInstruction,
                         NumSILAccessKindBits+NumSILAccessEnforcementBits
-                        + 1,
+                        + 1 + 1,
     AccessKind : NumSILAccessKindBits,
     Enforcement : NumSILAccessEnforcementBits,
-    NoNestedConflict : 1
+    NoNestedConflict : 1,
+    FromBuiltin : 1
   );
   SWIFT_INLINE_BITFIELD(BeginUnpairedAccessInst, NonValueInstruction,
-                        NumSILAccessKindBits + NumSILAccessEnforcementBits + 1,
+                        NumSILAccessKindBits + NumSILAccessEnforcementBits
+                        + 1 + 1,
                         AccessKind : NumSILAccessKindBits,
                         Enforcement : NumSILAccessEnforcementBits,
-                        NoNestedConflict : 1);
+                        NoNestedConflict : 1,
+                        FromBuiltin : 1);
 
   SWIFT_INLINE_BITFIELD(EndAccessInst, NonValueInstruction, 1,
     Aborting : 1
   );
   SWIFT_INLINE_BITFIELD(EndUnpairedAccessInst, NonValueInstruction,
-                        NumSILAccessEnforcementBits + 1,
+                        NumSILAccessEnforcementBits + 1 + 1,
                         Enforcement : NumSILAccessEnforcementBits,
-                        Aborting : 1);
+                        Aborting : 1,
+                        FromBuiltin : 1);
 
   SWIFT_INLINE_BITFIELD(StoreInst, NonValueInstruction,
                         NumStoreOwnershipQualifierBits,

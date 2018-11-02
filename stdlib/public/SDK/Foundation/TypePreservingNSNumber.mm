@@ -317,7 +317,7 @@ DEFINE_INIT(CGFloat, CGFloat)
 
 SWIFT_CC(swift) extern "C" uint8_t
 _swift_Foundation_TypePreservingNSNumberGetKind(
-  NSNumber *SWIFT_NS_RELEASES_ARGUMENT _Nonnull self_) {
+  NSNumber *_Nonnull self_) {
   uint8_t result = NonSwift;
   if ([self_ isKindOfClass:
                    SWIFT_LAZY_CONSTANT([_SwiftTypePreservingNSNumber class])]) {
@@ -325,21 +325,19 @@ _swift_Foundation_TypePreservingNSNumberGetKind(
   } else if (CFGetTypeID(self_) == CFBooleanGetTypeID()) {
     result = SwiftBool;
   }
-  SWIFT_CC_PLUSONE_GUARD([self_ release]);
   return result;
 }
 
 #define DEFINE_GETTER(C_TYPE, FUNCTION_NAME) \
   SWIFT_CC(swift) extern "C" C_TYPE \
   _swift_Foundation_TypePreservingNSNumberGetAs ## FUNCTION_NAME( \
-      _SwiftTypePreservingNSNumber *SWIFT_NS_RELEASES_ARGUMENT _Nonnull self_) { \
+      _SwiftTypePreservingNSNumber *_Nonnull self_) { \
     if (self_->tag != Swift ## FUNCTION_NAME) { \
       swift::swift_reportError( \
         /* flags = */ 0, "Incorrect tag.\n"); \
     } \
     C_TYPE result; \
     memcpy(&result, self_->storage, sizeof(result)); \
-    SWIFT_CC_PLUSONE_GUARD([self_ release]); \
     return result; \
   }
 

@@ -76,6 +76,22 @@ DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
   llvm_unreachable("Unsupported Darwin platform");
 }
 
+DarwinPlatformKind swift::getNonSimulatorPlatform(DarwinPlatformKind platform) {
+  switch (platform) {
+  case DarwinPlatformKind::MacOS:
+    return DarwinPlatformKind::MacOS;
+  case DarwinPlatformKind::IPhoneOS:
+  case DarwinPlatformKind::IPhoneOSSimulator:
+    return DarwinPlatformKind::IPhoneOS;
+  case DarwinPlatformKind::TvOS:
+  case DarwinPlatformKind::TvOSSimulator:
+    return DarwinPlatformKind::TvOS;
+  case DarwinPlatformKind::WatchOS:
+  case DarwinPlatformKind::WatchOSSimulator:
+    return DarwinPlatformKind::WatchOS;
+  }
+}
+
 static StringRef getPlatformNameForDarwin(const DarwinPlatformKind platform) {
   switch (platform) {
   case DarwinPlatformKind::MacOS:

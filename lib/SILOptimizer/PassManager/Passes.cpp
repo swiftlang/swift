@@ -66,7 +66,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
   if (Module.getOptions().VerifyAll)
     Module.verify();
   else {
-    DEBUG(Module.verify());
+    LLVM_DEBUG(Module.verify());
   }
 
   // If errors were produced during SIL analysis, return true.
@@ -110,7 +110,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   if (Module.getOptions().VerifyAll)
     Module.verify();
   else {
-    DEBUG(Module.verify());
+    LLVM_DEBUG(Module.verify());
   }
 }
 
@@ -128,7 +128,7 @@ void swift::runSILPassesForOnone(SILModule &Module) {
   if (Module.getOptions().VerifyAll)
     Module.verify();
   else {
-    DEBUG(Module.verify());
+    LLVM_DEBUG(Module.verify());
   }
 }
 

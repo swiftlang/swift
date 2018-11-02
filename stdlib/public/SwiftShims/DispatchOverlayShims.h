@@ -95,6 +95,23 @@ SWIFT_DISPATCH_SOURCE_TYPE(PROC)
 SWIFT_DISPATCH_SOURCE_TYPE(VNODE)
 #endif
 
+extern void
+_swift_dispatch_source_create_abort(void);
+
+SWIFT_DISPATCH_RETURNS_RETAINED
+static inline dispatch_source_t
+_swift_dispatch_source_create(
+    dispatch_source_type_t type,
+	uintptr_t handle,
+	unsigned long mask,
+	dispatch_queue_t _Nullable queue)
+{
+  dispatch_source_t source = dispatch_source_create(type, handle, mask, queue);
+  if (!source) {
+    _swift_dispatch_source_create_abort();
+  }
+  return source;
+}
 
 static inline __swift_shims_dispatch_block_t
 _swift_dispatch_block_create_with_qos_class(

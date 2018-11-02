@@ -83,7 +83,7 @@ class OptBugReducerTestCase(unittest.TestCase):
                 '-resource-dir', os.path.join(self.build_dir, 'lib', 'swift'),
                 '-o', self._get_sib_file_path(input_file_path),
                 input_file_path]
-        subprocess.call(args)
+        subprocess.check_call(args)
 
     def test_basic(self):
         name = 'testbasic'
@@ -137,7 +137,7 @@ class OptBugReducerTestCase(unittest.TestCase):
         output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
         output_matches = [
             1 for o in output if output_file_re.match(o) is not None]
-        self.assertEquals(sum(output_matches), 0)
+        self.assertEquals(sum(output_matches), 1)
         # Make sure our final output command does not have -emit-sib in the
         # output. We want users to get sil output when they type in the
         # relevant command.
@@ -163,10 +163,10 @@ class OptBugReducerTestCase(unittest.TestCase):
         output = subprocess.check_output(args).split("\n")
         self.assertTrue('*** Found miscompiling passes!' in output)
         self.assertTrue(
-            '*** Final Functions: _TF18testreducefunction6foo413FT_T_')
+            '*** Final Functions: $S18testreducefunction6foo505yyF')
         self.assertTrue('*** Final Passes: --bug-reducer-tester' in output)
         re_end = 'testoptbugreducer_testreducefunction_initial_'
-        re_end += 'a490c440d7e84b77e5b134720b298d2c.sib'
+        re_end += 'd6f20dea982155f8f1c99c8c547b96f7.sib'
         output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
         output_matches = [
             1 for o in output if output_file_re.match(o) is not None]

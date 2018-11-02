@@ -13,21 +13,22 @@
 #define DEBUG_TYPE "sil-licm"
 
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
-#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
-#include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/InstructionUtils.h"
+#include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -37,19 +38,23 @@
 
 using namespace swift;
 
-/// Instructions which read from memory, e.g. loads, or function calls without
-/// side effects.
-using ReadSet = llvm::SmallPtrSet<SILInstruction *, 8>;
+/// Instructions which can be hoisted:
+/// loads, function calls without side effects and (some) exclusivity checks
+using InstSet = llvm::SmallPtrSet<SILInstruction *, 8>;
 
-/// Instructions which (potentially) write memory.
-using WriteSet = SmallVector<SILInstruction *, 8>;
+/// A subset of instruction which may have side effects.
+/// Doesn't contain ones that have special handling (e.g. fix_lifetime)
+using WriteSet = SmallPtrSet<SILInstruction *, 8>;
 
 /// Returns true if the \p MayWrites set contains any memory writes which may
 /// alias with the memory addressed by \a LI.
-static bool mayWriteTo(AliasAnalysis *AA, WriteSet &MayWrites, LoadInst *LI) {
+template <SILInstructionKind K, typename T>
+static bool mayWriteTo(AliasAnalysis *AA, WriteSet &MayWrites,
+                       UnaryInstructionBase<K, T> *Inst) {
   for (auto *W : MayWrites)
-    if (AA->mayWriteToMemory(W, LI->getOperand())) {
-      DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *W << " to " << *LI << "\n");
+    if (AA->mayWriteToMemory(W, Inst->getOperand())) {
+      LLVM_DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *W << " to "
+                              << *Inst << "\n");
       return true;
     }
   return false;
@@ -57,6 +62,7 @@ static bool mayWriteTo(AliasAnalysis *AA, WriteSet &MayWrites, LoadInst *LI) {
 
 /// Returns true if the \p MayWrites set contains any memory writes which may
 /// alias with any memory which is read by \p AI.
+/// Note: This function should only be called on a read-only apply!
 static bool mayWriteTo(AliasAnalysis *AA, SideEffectAnalysis *SEA,
                        WriteSet &MayWrites, ApplyInst *AI) {
   FunctionSideEffects E;
@@ -64,11 +70,8 @@ static bool mayWriteTo(AliasAnalysis *AA, SideEffectAnalysis *SEA,
   assert(E.getMemBehavior(RetainObserveKind::IgnoreRetains) <=
          SILInstruction::MemoryBehavior::MayRead &&
          "apply should only read from memory");
-  if (E.getGlobalEffects().mayRead() && !MayWrites.empty()) {
-    // We don't know which memory is read in the callee. Therefore we bail if
-    // there are any writes in the loop.
-    return true;
-  }
+  assert(!E.getGlobalEffects().mayRead() &&
+         "apply should not have global effects");
 
   for (unsigned Idx = 0, End = AI->getNumArguments(); Idx < End; ++Idx) {
     auto &ArgEffect = E.getParameterEffects()[Idx];
@@ -81,31 +84,13 @@ static bool mayWriteTo(AliasAnalysis *AA, SideEffectAnalysis *SEA,
     // Check if the memory addressed by the argument may alias any writes.
     for (auto *W : MayWrites) {
       if (AA->mayWriteToMemory(W, Arg)) {
-        DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *W << " to " << *AI << "\n");
+        LLVM_DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *W << " to "
+                                << *AI << "\n");
         return true;
       }
     }
   }
   return false;
-}
-
-static void removeWrittenTo(AliasAnalysis *AA, ReadSet &Reads,
-                            SILInstruction *ByInst) {
-
-  // We can ignore retains, cond_fails, and dealloc_stacks.
-  if (isa<StrongRetainInst>(ByInst) || isa<RetainValueInst>(ByInst) ||
-      isa<CondFailInst>(ByInst) || isa<DeallocStackInst>(ByInst))
-    return;
-
-  SmallVector<SILInstruction *, 8> RS(Reads.begin(), Reads.end());
-  for (auto R : RS) {
-    auto *LI = dyn_cast<LoadInst>(R);
-    if (LI && !AA->mayWriteToMemory(ByInst, LI->getOperand()))
-      continue;
-
-    DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *ByInst << " to " << *R << "\n");
-    Reads.erase(R);
-  }
 }
 
 static bool hasLoopInvariantOperands(SILInstruction *I, SILLoop *L) {
@@ -125,139 +110,12 @@ static bool hasLoopInvariantOperands(SILInstruction *I, SILLoop *L) {
   });
 }
 
-/// Check if an address does not depend on other values in a basic block.
-static SILInstruction *addressIndependent(SILValue Addr) {
-  Addr = stripCasts(Addr);
-  if (auto *SGAI = dyn_cast<GlobalAddrInst>(Addr))
-    return SGAI;
-  if (auto *SEAI = dyn_cast<StructElementAddrInst>(Addr))
-    return addressIndependent(SEAI->getOperand());
-  return nullptr;
-}
-
-/// Check if two addresses can potentially access the same memory.
-/// For now, return true when both can be traced to the same global variable.
-static bool addressCanPairUp(SILValue Addr1, SILValue Addr2) {
-  SILInstruction *Origin1 = addressIndependent(Addr1);
-  return Origin1 && Origin1 == addressIndependent(Addr2);
-}
-
-/// Move cond_fail down if it can potentially help register promotion later.
-static bool sinkCondFail(SILLoop *Loop) {
-  // Only handle innermost loops for now.
-  if (!Loop->getSubLoops().empty())
-    return false;
-
-  bool Changed = false;
-  for (auto *BB : Loop->getBlocks()) {
-    // A list of CondFails that can be moved down.
-    SmallVector<CondFailInst*, 4> CFs;
-    // A pair of load and store that are independent of the CondFails and
-    // can potentially access the same memory.
-    LoadInst *LIOfPair = nullptr;
-    bool foundPair = false;
-
-    for (auto &Inst : *BB) {
-      if (foundPair) {
-        // Move CFs to right before Inst.
-        for (unsigned I = 0, E = CFs.size(); I < E; I++) {
-          DEBUG(llvm::dbgs() << "sinking cond_fail down ");
-          DEBUG(CFs[I]->dump());
-          DEBUG(llvm::dbgs() << "  before ");
-          DEBUG(Inst.dump());
-          CFs[I]->moveBefore(&Inst);
-        }
-        Changed = true;
-
-        foundPair = false;
-        LIOfPair = nullptr;
-      }
-
-      if (auto CF = dyn_cast<CondFailInst>(&Inst)) {
-        CFs.push_back(CF);
-      } else if (auto LI = dyn_cast<LoadInst>(&Inst)) {
-        if (addressIndependent(LI->getOperand())) {
-          LIOfPair = LI;
-        } else {
-          CFs.clear();
-          LIOfPair = nullptr;
-        }
-      } else if (auto SI = dyn_cast<StoreInst>(&Inst)) {
-        if (addressIndependent(SI->getDest())) {
-          if (LIOfPair &&
-              addressCanPairUp(SI->getDest(), LIOfPair->getOperand()))
-            foundPair = true;
-        } else {
-          CFs.clear();
-          LIOfPair = nullptr;
-        }
-      } else if (Inst.mayHaveSideEffects()) {
-        CFs.clear();
-        LIOfPair = nullptr;
-      }
-    }
-  }
-  return Changed;
-}
-
-/// Checks if \p Inst has no side effects which prevent hoisting.
-/// The \a SafeReads set contain instructions which we already proved to have
-/// no such side effects.
-static bool hasNoSideEffect(SILInstruction *Inst, ReadSet &SafeReads) {
-  // We can (and must) hoist cond_fail instructions if the operand is
-  // invariant. We must hoist them so that we preserve memory safety. A
-  // cond_fail that would have protected (executed before) a memory access
-  // must - after hoisting - also be executed before said access.
-  if (isa<CondFailInst>(Inst))
-    return true;
-  
-  // Can't hoist if the instruction could read from memory and is not marked
-  // as safe.
-  if (SafeReads.count(Inst))
-    return true;
-
-  if (Inst->getMemoryBehavior() == SILInstruction::MemoryBehavior::None)
-    return true;
-  
-  return false;
-}
-
-static bool canHoistInstruction(SILInstruction *Inst, SILLoop *Loop,
-                                ReadSet &SafeReads) {
-  // Can't hoist terminators.
-  if (isa<TermInst>(Inst))
-    return false;
-  
-  // Can't hoist allocation and dealloc stacks.
-  if (isa<AllocationInst>(Inst) || isa<DeallocStackInst>(Inst))
-    return false;
-
-  // Can't hoist instructions which may have side effects.
-  if (!hasNoSideEffect(Inst, SafeReads))
-    return false;
-
-  // The operands need to be loop invariant.
-  if (!hasLoopInvariantOperands(Inst, Loop)) {
-    DEBUG(llvm::dbgs() << "   loop variant operands\n");
-    return false;
-  }
-  
-  return true;
-}
-
-static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT,
-                              ReadSet &SafeReads, bool RunsOnHighLevelSil) {
-  auto Preheader = Loop->getLoopPreheader();
-  if (!Preheader)
-    return false;
-
-  DEBUG(llvm::dbgs() << " Hoisting instructions.\n");
-
+// When Hoisting / Sinking,
+// Don't descend into control-dependent code.
+// Only traverse into basic blocks that dominate all exits.
+static void getDominatingBlocks(SmallVectorImpl<SILBasicBlock *> &domBlocks,
+                                SILLoop *Loop, DominanceInfo *DT) {
   auto HeaderBB = Loop->getHeader();
-  bool Changed = false;
-
-  // Traverse the dominator tree starting at the loop header. Hoisting
-  // instructions as we go.
   auto DTRoot = DT->getNode(HeaderBB);
   SmallVector<SILBasicBlock *, 8> ExitingBBs;
   Loop->getExitingBlocks(ExitingBBs);
@@ -272,100 +130,59 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT,
                      [=](SILBasicBlock *ExitBB) {
           return DT->dominates(CurBB, ExitBB);
         })) {
-      DEBUG(llvm::dbgs() << "  skipping conditional block " << *CurBB << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "  skipping conditional block "
+                              << *CurBB << "\n");
       It.skipChildren();
       continue;
     }
-
-    // We now that the block is guaranteed to be executed. Hoist if we can.
-    for (auto InstIt = CurBB->begin(), E = CurBB->end(); InstIt != E; ) {
-      SILInstruction *Inst = &*InstIt;
-      ++InstIt;
-      DEBUG(llvm::dbgs() << "  looking at " << *Inst);
-      if (canHoistInstruction(Inst, Loop, SafeReads)) {
-        DEBUG(llvm::dbgs() << "   hoisting to preheader.\n");
-        Changed = true;
-        Inst->moveBefore(Preheader->getTerminator());
-      } else if (RunsOnHighLevelSil) {
-        ArraySemanticsCall semCall(Inst);
-        switch (semCall.getKind()) {
-        case ArrayCallKind::kGetCount:
-        case ArrayCallKind::kGetCapacity:
-          if (hasLoopInvariantOperands(Inst, Loop) &&
-              semCall.canHoist(Preheader->getTerminator(), DT)) {
-            Changed = true;
-            semCall.hoist(Preheader->getTerminator(), DT);
-          }
-          break;
-        default:
-          break;
-        }
-      }
-    }
-
+    domBlocks.push_back(CurBB);
     // Next block in dominator tree.
     ++It;
   }
-  return Changed;
 }
 
-static bool sinkFixLifetime(SILLoop *Loop, DominanceInfo *DomTree,
-                            SILLoopInfo *LI) {
-  DEBUG(llvm::errs() << " Sink fix_lifetime attempt\n");
-  auto Preheader = Loop->getLoopPreheader();
-  if (!Preheader)
+static bool hoistInstruction(DominanceInfo *DT, SILInstruction *Inst,
+                             SILLoop *Loop, SILBasicBlock *&Preheader) {
+  if (!hasLoopInvariantOperands(Inst, Loop)) {
+    LLVM_DEBUG(llvm::dbgs() << "   loop variant operands\n");
     return false;
-
-  // Only handle innermost loops for now.
-  if (!Loop->getSubLoops().empty())
-    return false;
-
-  // Only handle single exit blocks for now.
-  auto *ExitBB = Loop->getExitBlock();
-  if (!ExitBB)
-    return false;
-  auto *ExitingBB = Loop->getExitingBlock();
-  if (!ExitingBB)
-    return false;
-
-  // We can sink fix_lifetime instructions if there are no reference counting
-  // instructions in the loop.
-  SmallVector<FixLifetimeInst *, 16> FixLifetimeInsts;
-  for (auto *BB : Loop->getBlocks()) {
-    for (auto &Inst : *BB) {
-      if (auto FLI = dyn_cast<FixLifetimeInst>(&Inst)) {
-        FixLifetimeInsts.push_back(FLI);
-      } else if (Inst.mayHaveSideEffects() && !isa<LoadInst>(&Inst) &&
-                 !isa<StoreInst>(&Inst)) {
-        DEBUG(llvm::errs() << "  mayhavesideeffects because of" << Inst);
-        DEBUG(Inst.getParent()->dump());
-        return false;
-      }
-    }
   }
 
-  // Sink the fix_lifetime instruction.
+  auto mvBefore = Preheader->getTerminator();
+  ArraySemanticsCall semCall(Inst);
+  if (semCall.canHoist(mvBefore, DT)) {
+    semCall.hoist(mvBefore, DT);
+  } else {
+    Inst->moveBefore(mvBefore);
+  }
+  return true;
+}
+
+static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT,
+                              InstSet &HoistUpSet) {
+  LLVM_DEBUG(llvm::dbgs() << " Hoisting instructions.\n");
+  auto Preheader = Loop->getLoopPreheader();
+  assert(Preheader && "Expected a preheader");
   bool Changed = false;
-  for (auto *FLI : FixLifetimeInsts)
-    if (DomTree->dominates(FLI->getOperand()->getParentBlock(),
-                           Preheader)) {
-      auto Succs = ExitingBB->getSuccessors();
-      for (unsigned EdgeIdx = 0; EdgeIdx <  Succs.size(); ++EdgeIdx) {
-        SILBasicBlock *BB = Succs[EdgeIdx];
-        if (BB == ExitBB) {
-          auto *SplitBB = splitCriticalEdge(ExitingBB->getTerminator(), EdgeIdx,
-                                            DomTree, LI);
-          auto *OutsideBB = SplitBB ? SplitBB : ExitBB;
-          // Update the ExitBB.
-          ExitBB = OutsideBB;
-          DEBUG(llvm::errs() << "  moving fix_lifetime to exit BB " << *FLI);
-          FLI->moveBefore(&*OutsideBB->begin());
-          Changed = true;
-        }
+  SmallVector<SILBasicBlock *, 8> domBlocks;
+  getDominatingBlocks(domBlocks, Loop, DT);
+
+  for (auto *CurBB : domBlocks) {
+    // We know that the block is guaranteed to be executed. Hoist if we can.
+    for (auto InstIt = CurBB->begin(), E = CurBB->end(); InstIt != E;) {
+      SILInstruction *Inst = &*InstIt;
+      ++InstIt;
+      LLVM_DEBUG(llvm::dbgs() << "  looking at " << *Inst);
+      if (!HoistUpSet.count(Inst)) {
+        continue;
       }
-    } else {
-      DEBUG(llvm::errs() << "  does not dominate " << *FLI);
+      if (!hoistInstruction(DT, Inst, Loop, Preheader)) {
+        continue;
+      }
+      LLVM_DEBUG(llvm::dbgs() << "Hoisted " << *Inst);
+      Changed = true;
     }
+  }
 
   return Changed;
 }
@@ -381,13 +198,158 @@ struct LoopNestSummary {
 
 
   void copySummary(LoopNestSummary &Other) {
-    MayWrites.append(Other.MayWrites.begin(), Other.MayWrites.end());
+    MayWrites.insert(Other.MayWrites.begin(), Other.MayWrites.end());
   }
 
   LoopNestSummary(const LoopNestSummary &) = delete;
   LoopNestSummary &operator=(const LoopNestSummary &) = delete;
   LoopNestSummary(LoopNestSummary &&) = delete;
 };
+
+static unsigned getEdgeIndex(SILBasicBlock *BB, SILBasicBlock *ExitingBB) {
+  auto Succs = ExitingBB->getSuccessors();
+  for (unsigned EdgeIdx = 0; EdgeIdx < Succs.size(); ++EdgeIdx) {
+    SILBasicBlock *CurrBB = Succs[EdgeIdx];
+    if (CurrBB == BB) {
+      return EdgeIdx;
+    }
+  }
+  llvm_unreachable("BB is not a Successor");
+}
+
+static bool sinkInstruction(DominanceInfo *DT,
+                            std::unique_ptr<LoopNestSummary> &LoopSummary,
+                            SILInstruction *Inst, SILLoopInfo *LI) {
+  auto *Loop = LoopSummary->Loop;
+  SmallVector<SILBasicBlock *, 8> ExitBBs;
+  Loop->getExitBlocks(ExitBBs);
+  SmallVector<SILBasicBlock *, 8> NewExitBBs;
+  SmallVector<SILBasicBlock *, 8> ExitingBBs;
+  Loop->getExitingBlocks(ExitingBBs);
+  auto *ExitBB = Loop->getExitBlock();
+
+  bool Changed = false;
+  for (auto *ExitingBB : ExitingBBs) {
+    SmallVector<SILBasicBlock *, 8> BBSuccessors;
+    auto Succs = ExitingBB->getSuccessors();
+    for (unsigned EdgeIdx = 0; EdgeIdx < Succs.size(); ++EdgeIdx) {
+      SILBasicBlock *BB = Succs[EdgeIdx];
+      BBSuccessors.push_back(BB);
+    }
+    while (!BBSuccessors.empty()) {
+      SILBasicBlock *BB = BBSuccessors.pop_back_val();
+      if (std::find(NewExitBBs.begin(), NewExitBBs.end(), BB) !=
+          NewExitBBs.end()) {
+        // Already got a copy there
+        continue;
+      }
+      auto EdgeIdx = getEdgeIndex(BB, ExitingBB);
+      SILBasicBlock *OutsideBB = nullptr;
+      if (std::find(ExitBBs.begin(), ExitBBs.end(), BB) != ExitBBs.end()) {
+        auto *SplitBB =
+            splitCriticalEdge(ExitingBB->getTerminator(), EdgeIdx, DT, LI);
+        OutsideBB = SplitBB ? SplitBB : BB;
+        NewExitBBs.push_back(OutsideBB);
+      }
+      if (!OutsideBB) {
+        continue;
+      }
+      // If OutsideBB already contains Inst -> skip
+      // This might happen if we have a conditional control flow
+      // And a pair
+      // We hoisted the first part, we can safely ignore sinking
+      auto matchPred = [&](SILInstruction &CurrIns) {
+        return Inst->isIdenticalTo(&CurrIns);
+      };
+      if (std::find_if(OutsideBB->begin(), OutsideBB->end(), matchPred) !=
+          OutsideBB->end()) {
+        LLVM_DEBUG(llvm::errs() << "  instruction already at exit BB "
+                                << *Inst);
+        ExitBB = nullptr;
+      } else if (ExitBB) {
+        // easy case
+        LLVM_DEBUG(llvm::errs() << "  moving instruction to exit BB " << *Inst);
+        Inst->moveBefore(&*OutsideBB->begin());
+      } else {
+        LLVM_DEBUG(llvm::errs() << "  cloning instruction to exit BB "
+                                << *Inst);
+        Inst->clone(&*OutsideBB->begin());
+      }
+      Changed = true;
+    }
+  }
+  if (Changed && !ExitBB) {
+    // Created clones of instruction
+    // Remove it from the may write set - dangling pointer
+    LoopSummary->MayWrites.erase(Inst);
+    Inst->getParent()->erase(Inst);
+  }
+  return Changed;
+}
+
+static bool sinkInstructions(std::unique_ptr<LoopNestSummary> &LoopSummary,
+                             DominanceInfo *DT, SILLoopInfo *LI,
+                             InstSet &SinkDownSet) {
+  auto *Loop = LoopSummary->Loop;
+  LLVM_DEBUG(llvm::errs() << " Sink instructions attempt\n");
+  SmallVector<SILBasicBlock *, 8> domBlocks;
+  getDominatingBlocks(domBlocks, Loop, DT);
+
+  bool Changed = false;
+  for (auto *Inst : SinkDownSet) {
+    // only sink if the block is guaranteed to be executed.
+    if (std::find(domBlocks.begin(), domBlocks.end(), Inst->getParent()) ==
+        domBlocks.end()) {
+      continue;
+    }
+    Changed |= sinkInstruction(DT, LoopSummary, Inst, LI);
+  }
+
+  return Changed;
+}
+
+static void getEndAccesses(BeginAccessInst *BI,
+                           SmallVectorImpl<EndAccessInst *> &EndAccesses) {
+  for (auto Use : BI->getUses()) {
+    auto *User = Use->getUser();
+    auto *EI = dyn_cast<EndAccessInst>(User);
+    if (!EI) {
+      continue;
+    }
+    EndAccesses.push_back(EI);
+  }
+}
+
+static bool
+hoistSpecialInstruction(std::unique_ptr<LoopNestSummary> &LoopSummary,
+                        DominanceInfo *DT, SILLoopInfo *LI, InstSet &Special) {
+  auto *Loop = LoopSummary->Loop;
+  LLVM_DEBUG(llvm::errs() << " Hoist and Sink pairs attempt\n");
+  auto Preheader = Loop->getLoopPreheader();
+  assert(Preheader && "Expected a preheader");
+
+  bool Changed = false;
+
+  for (auto *Inst : Special) {
+    auto *BI = dyn_cast<BeginAccessInst>(Inst);
+    assert(BI && "Only BeginAccessInst are supported");
+    SmallVector<EndAccessInst *, 2> Ends;
+    getEndAccesses(BI, Ends);
+    if (!hoistInstruction(DT, BI, Loop, Preheader)) {
+      continue;
+    }
+    LLVM_DEBUG(llvm::dbgs() << "Hoisted " << *BI);
+    for (auto *instSink : Ends) {
+      if (!sinkInstruction(DT, LoopSummary, instSink, LI)) {
+        llvm_unreachable("LICM: Could not perform must-sink instruction");
+      }
+    }
+    LLVM_DEBUG(llvm::errs() << " Successfully hosited and sank pair\n");
+    Changed = true;
+  }
+
+  return Changed;
+}
 
 /// \brief Optimize the loop tree bottom up propagating loop's summaries up the
 /// loop tree.
@@ -403,15 +365,24 @@ class LoopTreeOptimization {
 
   /// True if LICM is done on high-level SIL, i.e. semantic calls are not
   /// inlined yet. In this case some semantic calls can be hoisted.
-  bool RunsOnHighLevelSil;
+  bool RunsOnHighLevelSIL;
+
+  /// Instructions that we may be able to hoist up
+  InstSet HoistUp;
+
+  /// Instructions that we may be able to sink down
+  InstSet SinkDown;
+
+  /// Hoistable Instructions that need special treatment
+  /// e.g. begin_access
+  InstSet SpecialHoist;
 
 public:
   LoopTreeOptimization(SILLoop *TopLevelLoop, SILLoopInfo *LI,
                        AliasAnalysis *AA, SideEffectAnalysis *SEA,
-                       DominanceInfo *DT,
-                       bool RunsOnHighLevelSil)
+                       DominanceInfo *DT, bool RunsOnHighLevelSil)
       : LoopInfo(LI), AA(AA), SEA(SEA), DomTree(DT), Changed(false),
-        RunsOnHighLevelSil(RunsOnHighLevelSil) {
+        RunsOnHighLevelSIL(RunsOnHighLevelSil) {
     // Collect loops for a recursive bottom-up traversal in the loop tree.
     BotUpWorkList.push_back(TopLevelLoop);
     for (unsigned i = 0; i < BotUpWorkList.size(); ++i) {
@@ -428,12 +399,11 @@ protected:
   /// \brief Propagate the sub-loops' summaries up to the current loop.
   void propagateSummaries(std::unique_ptr<LoopNestSummary> &CurrSummary);
 
-  /// \brief Collect a set of reads that can be hoisted to the loop's preheader.
-  void analyzeCurrentLoop(std::unique_ptr<LoopNestSummary> &CurrSummary,
-                          ReadSet &SafeReads);
+  /// \brief Collect a set of instructions that can be hoisted
+  void analyzeCurrentLoop(std::unique_ptr<LoopNestSummary> &CurrSummary);
 
   /// \brief Optimize the current loop nest.
-  void optimizeLoop(SILLoop *CurrentLoop, ReadSet &SafeReads);
+  bool optimizeLoop(std::unique_ptr<LoopNestSummary> &CurrSummary);
 };
 } // end anonymous namespace
 
@@ -441,7 +411,7 @@ bool LoopTreeOptimization::optimize() {
   // Process loops bottom up in the loop tree.
   while (!BotUpWorkList.empty()) {
     SILLoop *CurrentLoop = BotUpWorkList.pop_back_val();
-    DEBUG(llvm::dbgs() << "Processing loop " << *CurrentLoop);
+    LLVM_DEBUG(llvm::dbgs() << "Processing loop " << *CurrentLoop);
 
     // Collect all summary of all sub loops of the current loop. Since we
     // process the loop tree bottom up they are guaranteed to be available in
@@ -449,11 +419,23 @@ bool LoopTreeOptimization::optimize() {
     auto CurrLoopSummary = llvm::make_unique<LoopNestSummary>(CurrentLoop);
     propagateSummaries(CurrLoopSummary);
 
-    // Analyze the current loop for reads that can be hoisted.
-    ReadSet SafeReads;
-    analyzeCurrentLoop(CurrLoopSummary, SafeReads);
+    // If the current loop changed, then we might reveal more instr to hoist
+    // For example, a fix_lifetime's operand, if hoisted outside,
+    // Might allow us to sink the instruction out of the loop
+    bool currChanged = false;
+    do {
+      currChanged = false;
 
-    optimizeLoop(CurrentLoop, SafeReads);
+      // Analyze the current loop for instructions that can be hoisted.
+      analyzeCurrentLoop(CurrLoopSummary);
+
+      currChanged = optimizeLoop(CurrLoopSummary);
+
+      // Reset the data structures for next loop in the list
+      HoistUp.clear();
+      SinkDown.clear();
+      SpecialHoist.clear();
+    } while (currChanged);
 
     // Store the summary for parent loops to use.
     LoopNestSummaryMap[CurrentLoop] = std::move(CurrLoopSummary);
@@ -470,57 +452,233 @@ void LoopTreeOptimization::propagateSummaries(
   }
 }
 
-void LoopTreeOptimization::analyzeCurrentLoop(
-    std::unique_ptr<LoopNestSummary> &CurrSummary, ReadSet &SafeReads) {
-  WriteSet &MayWrites = CurrSummary->MayWrites;
-  SILLoop *Loop = CurrSummary->Loop;
-  DEBUG(llvm::dbgs() << " Analyzing accesses.\n");
+static bool isSafeReadOnlyApply(SideEffectAnalysis *SEA, ApplyInst *AI) {
+  FunctionSideEffects E;
+  SEA->getCalleeEffects(E, AI);
 
-  // Contains function calls in the loop, which only read from memory.
-  SmallVector<ApplyInst *, 8> ReadOnlyApplies;
-
-  for (auto *BB : Loop->getBlocks()) {
-    for (auto &Inst : *BB) {
-      // Ignore fix_lifetime instructions.
-      if (isa<FixLifetimeInst>(&Inst))
-        continue;
-
-      // Collect loads.
-      auto LI = dyn_cast<LoadInst>(&Inst);
-      if (LI) {
-        if (!mayWriteTo(AA, MayWrites, LI))
-          SafeReads.insert(LI);
-        continue;
-      }
-      if (auto *AI = dyn_cast<ApplyInst>(&Inst)) {
-        // In contrast to load instructions, we first collect all read-only
-        // function calls and add them later to SafeReads.
-        FunctionSideEffects E;
-        SEA->getCalleeEffects(E, AI);
-
-        auto MB = E.getMemBehavior(RetainObserveKind::ObserveRetains);
-        if (MB <= SILInstruction::MemoryBehavior::MayRead)
-          ReadOnlyApplies.push_back(AI);
-      }
-      if (Inst.mayHaveSideEffects()) {
-        MayWrites.push_back(&Inst);
-        // Remove clobbered loads we have seen before.
-        removeWrittenTo(AA, SafeReads, &Inst);
-      }
-    }
+  if (E.getGlobalEffects().mayRead()) {
+    // If we have Global effects,
+    // we don't know which memory is read in the callee.
+    // Therefore we bail for safety
+    return false;
   }
-  for (auto *AI : ReadOnlyApplies) {
-    if (!mayWriteTo(AA, SEA, MayWrites, AI))
-      SafeReads.insert(AI);
+
+  auto MB = E.getMemBehavior(RetainObserveKind::ObserveRetains);
+  return (MB <= SILInstruction::MemoryBehavior::MayRead);
+}
+
+static void checkSideEffects(swift::SILInstruction &Inst, WriteSet &MayWrites) {
+  if (Inst.mayHaveSideEffects()) {
+    MayWrites.insert(&Inst);
   }
 }
 
-void LoopTreeOptimization::optimizeLoop(SILLoop *CurrentLoop,
-                                        ReadSet &SafeReads) {
-  Changed |= sinkCondFail(CurrentLoop);
-  Changed |= hoistInstructions(CurrentLoop, DomTree, SafeReads,
-                               RunsOnHighLevelSil);
-  Changed |= sinkFixLifetime(CurrentLoop, DomTree, LoopInfo);
+/// Returns true if the \p Inst follows the default hoisting heuristic
+static bool canHoistUpDefault(SILInstruction *inst, SILLoop *Loop,
+                              DominanceInfo *DT, bool RunsOnHighLevelSil) {
+  auto Preheader = Loop->getLoopPreheader();
+  if (!Preheader) {
+    return false;
+  }
+
+  if (isa<TermInst>(inst) || isa<AllocationInst>(inst) ||
+      isa<DeallocationInst>(inst)) {
+    return false;
+  }
+
+  if (inst->getMemoryBehavior() == SILInstruction::MemoryBehavior::None) {
+    return true;
+  }
+
+  if (!RunsOnHighLevelSil) {
+    return false;
+  }
+
+  // We can’t hoist everything that is hoist-able
+  // The canHoist method does not do all the required analysis
+  // Some of the work is done at COW Array Opt
+  // TODO: Refactor COW Array Opt + canHoist - radar 41601468
+  ArraySemanticsCall semCall(inst);
+  switch (semCall.getKind()) {
+  case ArrayCallKind::kGetCount:
+  case ArrayCallKind::kGetCapacity:
+    return semCall.canHoist(Preheader->getTerminator(), DT);
+  default:
+    return false;
+  }
+}
+
+// Check If all the end accesses of the given begin do not prevent hoisting
+// There are only two legal placements for the end access instructions:
+// 1) Inside the same loop (sink to loop exists)
+// Potential TODO: At loop exit block
+static bool handledEndAccesses(BeginAccessInst *BI, SILLoop *Loop) {
+  SmallVector<EndAccessInst *, 2> AllEnds;
+  getEndAccesses(BI, AllEnds);
+  if (AllEnds.empty()) {
+    return false;
+  }
+  for (auto *User : AllEnds) {
+    auto *BB = User->getParent();
+    if (Loop->getBlocksSet().count(BB) != 0) {
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
+static bool
+analyzeBeginAccess(BeginAccessInst *BI,
+                   SmallVector<BeginAccessInst *, 8> &BeginAccesses) {
+  if (BI->getEnforcement() != SILAccessEnforcement::Dynamic) {
+    return false;
+  }
+
+  const AccessedStorage &storage =
+      findAccessedStorageNonNested(BI->getSource());
+  if (!storage) {
+    return false;
+  }
+
+  auto BIAccessedStorageNonNested = findAccessedStorageNonNested(BI);
+  auto safeBeginPred = [&](BeginAccessInst *OtherBI) {
+    if (BI == OtherBI) {
+      return true;
+    }
+    return BIAccessedStorageNonNested.isDistinctFrom(
+        findAccessedStorageNonNested(OtherBI));
+  };
+
+  return (
+      std::all_of(BeginAccesses.begin(), BeginAccesses.end(), safeBeginPred));
+}
+
+// Analyzes current loop for hosting/sinking potential:
+// Computes set of instructions we may be able to move out of the loop
+// Important Note:
+// We can't bail out of this method! we have to run it on all loops.
+// We *need* to discover all MayWrites -
+// even if the loop is otherwise skipped!
+// This is because outer loops will depend on the inner loop's writes.
+void LoopTreeOptimization::analyzeCurrentLoop(
+    std::unique_ptr<LoopNestSummary> &CurrSummary) {
+  WriteSet &MayWrites = CurrSummary->MayWrites;
+  SILLoop *Loop = CurrSummary->Loop;
+  LLVM_DEBUG(llvm::dbgs() << " Analyzing accesses.\n");
+
+  // Contains function calls in the loop, which only read from memory.
+  SmallVector<ApplyInst *, 8> ReadOnlyApplies;
+  // Contains Loads inside the loop.
+  SmallVector<LoadInst *, 8> Loads;
+  // Contains fix_lifetime, we might be able to sink them.
+  SmallVector<FixLifetimeInst *, 8> FixLifetimes;
+  // Contains begin_access, we might be able to hoist them.
+  SmallVector<BeginAccessInst *, 8> BeginAccesses;
+
+  for (auto *BB : Loop->getBlocks()) {
+    for (auto &Inst : *BB) {
+      switch (Inst.getKind()) {
+      case SILInstructionKind::FixLifetimeInst: {
+        auto *FL = dyn_cast<FixLifetimeInst>(&Inst);
+        assert(FL && "Expected a FixLifetime instruction");
+        FixLifetimes.push_back(FL);
+        // We can ignore the side effects of FixLifetimes
+        break;
+      }
+      case SILInstructionKind::LoadInst: {
+        auto *LI = dyn_cast<LoadInst>(&Inst);
+        assert(LI && "Expected a Load instruction");
+        Loads.push_back(LI);
+        break;
+      }
+      case SILInstructionKind::BeginAccessInst: {
+        auto *BI = dyn_cast<BeginAccessInst>(&Inst);
+        assert(BI && "Expected a Begin Access");
+        BeginAccesses.push_back(BI);
+        checkSideEffects(Inst, MayWrites);
+        break;
+      }
+      case swift::SILInstructionKind::CondFailInst: {
+        // We can (and must) hoist cond_fail instructions if the operand is
+        // invariant. We must hoist them so that we preserve memory safety. A
+        // cond_fail that would have protected (executed before) a memory access
+        // must - after hoisting - also be executed before said access.
+        HoistUp.insert(&Inst);
+        checkSideEffects(Inst, MayWrites);
+        break;
+      }
+      case SILInstructionKind::ApplyInst: {
+        auto *AI = dyn_cast<ApplyInst>(&Inst);
+        assert(AI && "Expected an Apply Instruction");
+        if (isSafeReadOnlyApply(SEA, AI)) {
+          ReadOnlyApplies.push_back(AI);
+        }
+        // check for array semantics and side effects - same as default
+        LLVM_FALLTHROUGH;
+      }
+      default: {
+        checkSideEffects(Inst, MayWrites);
+        if (canHoistUpDefault(&Inst, Loop, DomTree, RunsOnHighLevelSIL)) {
+          HoistUp.insert(&Inst);
+        }
+        break;
+      }
+      }
+    }
+  }
+
+  auto *Preheader = Loop->getLoopPreheader();
+  if (!Preheader) {
+    // Can't hoist/sink instructions
+    return;
+  }
+  for (auto *AI : ReadOnlyApplies) {
+    if (!mayWriteTo(AA, SEA, MayWrites, AI)) {
+      HoistUp.insert(AI);
+    }
+  }
+  for (auto *LI : Loads) {
+    if (!mayWriteTo(AA, MayWrites, LI)) {
+      HoistUp.insert(LI);
+    }
+  }
+  bool mayWritesMayRelease =
+      std::any_of(MayWrites.begin(), MayWrites.end(),
+                  [&](SILInstruction *W) { return W->mayRelease(); });
+  for (auto *FL : FixLifetimes) {
+    if (!DomTree->dominates(FL->getOperand()->getParentBlock(), Preheader)) {
+      continue;
+    }
+    if (!mayWriteTo(AA, MayWrites, FL) || !mayWritesMayRelease) {
+      SinkDown.insert(FL);
+    }
+  }
+  for (auto *BI : BeginAccesses) {
+    if (!handledEndAccesses(BI, Loop)) {
+      LLVM_DEBUG(llvm::dbgs() << "Skipping: " << *BI);
+      LLVM_DEBUG(llvm::dbgs() << "Some end accesses can't be handled\n");
+      continue;
+    }
+    if (analyzeBeginAccess(BI, BeginAccesses)) {
+      SpecialHoist.insert(BI);
+    }
+  }
+}
+
+bool LoopTreeOptimization::optimizeLoop(
+    std::unique_ptr<LoopNestSummary> &CurrSummary) {
+  auto *CurrentLoop = CurrSummary->Loop;
+  // We only support Loops with a preheader
+  if (!CurrentLoop->getLoopPreheader())
+    return false;
+  bool currChanged = false;
+  currChanged |= hoistInstructions(CurrentLoop, DomTree, HoistUp);
+  currChanged |= sinkInstructions(CurrSummary, DomTree, LoopInfo, SinkDown);
+  currChanged |=
+      hoistSpecialInstruction(CurrSummary, DomTree, LoopInfo, SpecialHoist);
+  Changed |= currChanged;
+  return currChanged;
 }
 
 namespace {
@@ -546,7 +704,7 @@ public:
     SILLoopInfo *LoopInfo = LA->get(F);
 
     if (LoopInfo->empty()) {
-      DEBUG(llvm::dbgs() << "No loops in " << F->getName() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "No loops in " << F->getName() << "\n");
       return;
     }
 
@@ -555,7 +713,7 @@ public:
     SideEffectAnalysis *SEA = PM->getAnalysis<SideEffectAnalysis>();
     DominanceInfo *DomTree = nullptr;
 
-    DEBUG(llvm::dbgs() << "Processing loops in " << F->getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Processing loops in " << F->getName() << "\n");
     bool Changed = false;
 
     for (auto *TopLevelLoop : *LoopInfo) {

@@ -2,12 +2,26 @@
 
 # Swift Programming Language
 
-| | **Swift** | **Package** |
+
+| | **Architecture** | **Master** | **Package** |
+|---|:---:|:---:|:---:|
+| **macOS**        | x86_64 |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-osx/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-osx)|[![Build Status](https://ci.swift.org/job/oss-swift-package-osx/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-osx)|
+| **Ubuntu 14.04** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-14_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-14_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-14_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-14_04)|
+| **Ubuntu 16.04** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04)|
+| **Ubuntu 16.10** | x86_64 | [![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_10/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_10)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_10/lastCompletedBuild/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_10)|
+
+**Swift Community-Hosted CI Platforms**
+
+| **OS** | **Architecture** | **Build** |
 |---|:---:|:---:|
-|**macOS**        |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-osx/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-osx)|[![Build Status](https://ci.swift.org/job/oss-swift-package-osx/badge/icon)](https://ci.swift.org/job/oss-swift-package-osx)|
-|**Ubuntu 14.04** |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-14_04/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-14_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-14_04/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-14_04)|
-|**Ubuntu 16.04** |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_04)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_04)|
-|**Ubuntu 16.10** |[![Build Status](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_10/badge/icon)](https://ci.swift.org/job/oss-swift-incremental-RA-linux-ubuntu-16_10)|[![Build Status](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_10/badge/icon)](https://ci.swift.org/job/oss-swift-package-linux-ubuntu-16_10)|
+|**[Debian 9.1 (Raspberry Pi)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/armv7_debian_stretch.json)** | ARMv7 | [![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-debian-9_1/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-debian-9_1)|
+|**[Fedora 27](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_fedora_27.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-fedora-27/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-fedora-27)|
+|**[Ubuntu 16.04](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04)|
+|**[Ubuntu 16.04 (TensorFlow)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_tensorflow.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow)|
+|**[Ubuntu 16.04 ](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/ppc64le_ubuntu_16_04.json)** | PPC64LE |[![Build Status](https://ci-external.swift.org/job/oss-swift-4.1-RA-linux-ubuntu-16.04-ppc64le/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-4.1-RA-linux-ubuntu-16.04-ppc64le)|
+|**[Ubuntu 16.04 ](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/aarch64_ubuntu_16.04.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-aarch64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-aarch64)|
+|**[Ubuntu 16.04 (Android)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_LTS_android.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android)|
+
 
 **Welcome to Swift!**
 
@@ -42,9 +56,10 @@ well. For more, see the [Code of Conduct](https://swift.org/community/#code-of-c
 ## Getting Started
 
 These instructions give the most direct path to a working Swift development
-environment. To build from source you will need 2 GB of disk space for the
-source code and over 20 GB of disk space for the build artifacts. A clean
-build can take multiple hours, but incremental builds will finish much faster.
+environment. To build from source you will need about 2 GB of disk space for the
+source code and up to 70 GB of disk space for the build artifacts with full
+debugging. Depending on your machine, a clean build can take a few minutes to
+several hours. Naturally, incremental builds are much faster.
 
 
 ### System Requirements
@@ -54,7 +69,7 @@ supported host development operating systems.
 
 #### macOS
 
-To build for macOS, you need [Xcode 9.3](https://developer.apple.com/xcode/downloads/).
+To build for macOS, you need [Xcode 10 beta 3](https://developer.apple.com/xcode/downloads/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document or the host information on <https://ci.swift.org> for the
 current required version.
@@ -196,7 +211,7 @@ then run the build product in Terminal.
 Make sure you are using the [correct release](#macos) of Xcode.
 
 If you have changed Xcode versions but still encounter errors that appear to
-be related to the Xcode version, try passing `--rebuild` to `build-script`.
+be related to the Xcode version, try passing `--clean` to `build-script`.
 
 When a new version of Xcode is released, you can update your build without
 recompiling the entire project by passing the `--reconfigure` option.

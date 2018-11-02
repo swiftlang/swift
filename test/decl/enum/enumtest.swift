@@ -322,4 +322,7 @@ func useSynthesizedMember() {
 enum Lens<T> {
   case foo(inout T) // expected-error {{'inout' may only be used on parameters}}
   case bar(inout T, Int) // expected-error {{'inout' may only be used on parameters}}
+
+  case baz((inout T) -> ()) // ok
+  case quux((inout T, inout T) -> ()) // ok
 }

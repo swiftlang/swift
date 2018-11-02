@@ -132,11 +132,13 @@ func privateInOtherFile() {}
 
 #if !ACCESS_DISABLED
 struct ConformerByTypeAlias : TypeProto {
-  private typealias TheType = Int // expected-error {{type alias 'TheType' must be declared internal because it matches a requirement in internal protocol 'TypeProto'}} {{3-10=internal}}
+  private typealias TheType = Int // expected-error {{type alias 'TheType' must be declared internal because it matches a requirement in internal protocol 'TypeProto'}} {{none}}
+  // expected-note@-1 {{mark the type alias as 'internal' to satisfy the requirement}} {{3-10=internal}}
 }
 
 struct ConformerByLocalType : TypeProto {
-  private struct TheType {} // expected-error {{struct 'TheType' must be declared internal because it matches a requirement in internal protocol 'TypeProto'}} {{3-10=internal}}
+  private struct TheType {} // expected-error {{struct 'TheType' must be declared internal because it matches a requirement in internal protocol 'TypeProto'}} {{none}}
+  // expected-note@-1 {{mark the struct as 'internal' to satisfy the requirement}} {{3-10=internal}}
 }
 
 private struct PrivateConformerByLocalType : TypeProto {
@@ -144,7 +146,8 @@ private struct PrivateConformerByLocalType : TypeProto {
 }
 
 private struct PrivateConformerByLocalTypeBad : TypeProto {
-  private struct TheType {} // expected-error {{struct 'TheType' must be as accessible as its enclosing type because it matches a requirement in protocol 'TypeProto'}} {{3-10=fileprivate}}
+  private struct TheType {} // expected-error {{struct 'TheType' must be as accessible as its enclosing type because it matches a requirement in protocol 'TypeProto'}} {{none}}
+  // expected-note@-1 {{mark the struct as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
 }
 #endif
 
@@ -169,3 +172,7 @@ public class TestablePublicSub: InternalBase {} // expected-error {{undeclared t
 // <unknown>:0: error: unexpected note produced: 'method()' declared here
 // <unknown>:0: error: unexpected note produced: 'method' declared here
 // <unknown>:0: error: unexpected note produced: 'method' declared here
+
+class AccessMemberOfInternalProtocol : ImplementsInternalProtocol {
+  func testProperty() { let _ = i } // expected-error {{'i' is inaccessible due to 'internal' protection level}}
+}

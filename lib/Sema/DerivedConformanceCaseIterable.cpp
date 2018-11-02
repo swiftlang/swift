@@ -22,7 +22,6 @@
 #include "DerivedConformances.h"
 
 using namespace swift;
-using namespace DerivedConformance;
 
 /// Common preconditions for CaseIterable.
 static bool canDeriveConformance(NominalTypeDecl *type) {
@@ -43,7 +42,7 @@ static bool canDeriveConformance(NominalTypeDecl *type) {
 void deriveCaseIterable_enum_getter(AbstractFunctionDecl *funcDecl) {
   auto *parentDC = funcDecl->getDeclContext();
   auto *parentEnum = parentDC->getAsEnumOrEnumExtensionContext();
-  auto enumTy = parentEnum->getDeclaredTypeInContext();
+  auto enumTy = parentDC->getDeclaredTypeInContext();
   auto &C = parentDC->getASTContext();
 
   SmallVector<Expr *, 8> elExprs;
@@ -69,96 +68,64 @@ static ArraySliceType *computeAllCasesType(NominalTypeDecl *enumType) {
   return ArraySliceType::get(metaTy->getRValueInstanceType());
 }
 
-static Type deriveCaseIterable_AllCases(TypeChecker &tc, Decl *parentDecl,
-                                        EnumDecl *enumDecl) {
+static Type deriveCaseIterable_AllCases(DerivedConformance &derived) {
   // enum SomeEnum : CaseIterable {
   //   @derived
   //   typealias AllCases = [SomeEnum]
   // }
-  auto *rawInterfaceType = computeAllCasesType(enumDecl);
-  return cast<DeclContext>(parentDecl)->mapTypeIntoContext(rawInterfaceType);
+  auto *rawInterfaceType = computeAllCasesType(cast<EnumDecl>(derived.Nominal));
+  return derived.getConformanceContext()->mapTypeIntoContext(rawInterfaceType);
 }
 
-ValueDecl *DerivedConformance::deriveCaseIterable(TypeChecker &tc,
-                                                  Decl *parentDecl,
-                                                  NominalTypeDecl *targetDecl,
-                                                  ValueDecl *requirement) {
+ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
   // Conformance can't be synthesized in an extension.
-  auto caseIterableProto
-      = tc.Context.getProtocol(KnownProtocolKind::CaseIterable);
-  auto caseIterableType = caseIterableProto->getDeclaredType();
-  if (targetDecl != parentDecl) {
-    tc.diagnose(parentDecl->getLoc(), diag::cannot_synthesize_in_extension,
-                caseIterableType);
+  if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
-  }
 
   // Check that we can actually derive CaseIterable for this type.
-  if (!canDeriveConformance(targetDecl))
+  if (!canDeriveConformance(Nominal))
     return nullptr;
 
   // Build the necessary decl.
-  if (requirement->getBaseName() != tc.Context.Id_allCases) {
-    tc.diagnose(requirement->getLoc(),
-                diag::broken_case_iterable_requirement);
+  if (requirement->getBaseName() != TC.Context.Id_allCases) {
+    TC.diagnose(requirement->getLoc(), diag::broken_case_iterable_requirement);
     return nullptr;
   }
 
-  auto enumDecl = cast<EnumDecl>(targetDecl);
-  ASTContext &C = tc.Context;
-  
+  ASTContext &C = TC.Context;
 
   // Define the property.
-  auto *returnTy = computeAllCasesType(targetDecl);
+  auto *returnTy = computeAllCasesType(Nominal);
 
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
-  std::tie(propDecl, pbDecl)
-    = declareDerivedProperty(tc, parentDecl, enumDecl, C.Id_allCases,
-                             returnTy, returnTy,
+  std::tie(propDecl, pbDecl) =
+      declareDerivedProperty(C.Id_allCases, returnTy, returnTy,
                              /*isStatic=*/true, /*isFinal=*/true);
 
   // Define the getter.
-  auto *getterDecl = addGetterToReadOnlyDerivedProperty(tc, propDecl, returnTy);
+  auto *getterDecl = addGetterToReadOnlyDerivedProperty(TC, propDecl, returnTy);
 
   getterDecl->setBodySynthesizer(&deriveCaseIterable_enum_getter);
 
-  auto dc = cast<IterableDeclContext>(parentDecl);
-  dc->addMember(getterDecl);
-  dc->addMember(propDecl);
-  dc->addMember(pbDecl);
+  addMembersToConformanceContext({getterDecl, propDecl, pbDecl});
 
   return propDecl;
 }
 
-Type DerivedConformance::deriveCaseIterable(TypeChecker &tc, Decl *parentDecl,
-                                            NominalTypeDecl *targetDecl,
-                                            AssociatedTypeDecl *assocType) {
-  // Conformance can't be synthesized in an extension.
-  auto caseIterableProto
-      = tc.Context.getProtocol(KnownProtocolKind::CaseIterable);
-  auto caseIterableType = caseIterableProto->getDeclaredType();
-  if (targetDecl != parentDecl) {
-    tc.diagnose(parentDecl->getLoc(), diag::cannot_synthesize_in_extension,
-                caseIterableType);
-    return nullptr;
-  }
-
-  // We can only synthesize CaseIterable for enums.
-  auto enumDecl = dyn_cast<EnumDecl>(targetDecl);
-  if (!enumDecl)
+Type DerivedConformance::deriveCaseIterable(AssociatedTypeDecl *assocType) {
+  if (checkAndDiagnoseDisallowedContext(assocType))
     return nullptr;
 
   // Check that we can actually derive CaseIterable for this type.
-  if (!canDeriveConformance(targetDecl))
+  if (!canDeriveConformance(Nominal))
     return nullptr;
 
-  if (assocType->getName() == tc.Context.Id_AllCases) {
-    return deriveCaseIterable_AllCases(tc, parentDecl, enumDecl);
+  if (assocType->getName() == TC.Context.Id_AllCases) {
+    return deriveCaseIterable_AllCases(*this);
   }
 
-  tc.diagnose(assocType->getLoc(),
-              diag::broken_case_iterable_requirement);
+  TC.diagnose(assocType->getLoc(), diag::broken_case_iterable_requirement);
   return nullptr;
 }
 

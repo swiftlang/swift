@@ -24,16 +24,16 @@
 // CHECK-LABEL: @interface A_Public{{$}}
 // CHECK-INTERNAL-NEXT: init
 // CHECK-NEXT: @end
-@objc public class A_Public {}
+@objc @objcMembers public class A_Public {}
 
 // CHECK-PUBLIC-NOT: B_Internal
 // CHECK-INTERNAL-LABEL: @interface B_Internal{{$}}
 // CHECK-INTERNAL-NEXT: init
 // CHECK-INTERNAL-NEXT: @end
-@objc internal class B_Internal {}
+@objc @objcMembers internal class B_Internal {}
 
 // CHECK-NOT: C_Private
-@objc private class C_Private {}
+@objc @objcMembers private class C_Private {}
 
 
 #if MAIN

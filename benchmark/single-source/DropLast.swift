@@ -236,3 +236,7 @@ public func run_DropLastArrayLazy(_ N: Int) {
     CheckResults(result == sumCount)
   }
 }
+
+// Local Variables:
+// eval: (read-only-mode 1)
+// End:

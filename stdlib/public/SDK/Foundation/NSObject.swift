@@ -130,12 +130,12 @@ func _bridgeStringToKeyPath(_ keyPath:String) -> AnyKeyPath? {
 
 public class NSKeyValueObservation : NSObject {
     
-    weak var object : NSObject?
-    let callback : (NSObject, NSKeyValueObservedChange<Any>) -> Void
-    let path : String
+    @nonobjc weak var object : NSObject?
+    @nonobjc let callback : (NSObject, NSKeyValueObservedChange<Any>) -> Void
+    @nonobjc let path : String
     
     //workaround for <rdar://problem/31640524> Erroneous (?) error when using bridging in the Foundation overlay
-    static var swizzler : NSKeyValueObservation? = {
+    @nonobjc static var swizzler : NSKeyValueObservation? = {
         let bridgeClass: AnyClass = NSKeyValueObservation.self
         let observeSel = #selector(NSObject.observeValue(forKeyPath:of:change:context:))
         let swapSel = #selector(NSKeyValueObservation._swizzle_me_observeValue(forKeyPath:of:change:context:))
@@ -157,7 +157,7 @@ public class NSKeyValueObservation : NSObject {
     }
     
     ///invalidate() will be called automatically when an NSKeyValueObservation is deinited
-    public func invalidate() {
+    @objc public func invalidate() {
         object?.removeObserver(self, forKeyPath: path, context: nil)
         object = nil
     }

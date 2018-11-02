@@ -29,7 +29,7 @@ class SimpleChildClass : SimpleClass {
     let _ = SimpleChildClass.CodingKeys.self // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}
 
     // The enum should have a case for each of the vars.
-    // NOTE: This expectedxerror will need to be removed in the future.
+    // NOTE: This expected error will need to be removed in the future.
     let _ = SimpleChildClass.CodingKeys.w // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}
 
     // Inherited vars should not be part of the CodingKeys enum.

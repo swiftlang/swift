@@ -102,9 +102,6 @@ def update_single_repository(args):
                     checkout_target = find_rev_by_timestamp(timestamp,
                                                             repo_name,
                                                             checkout_target)
-            elif timestamp:
-                checkout_target = find_rev_by_timestamp(timestamp, repo_name,
-                                                        "HEAD")
 
             # The clean option restores a repository to pristine condition.
             if should_clean:
@@ -271,14 +268,21 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
                     remote = config['https-clone-pattern'] % remote_repo_id
 
             repo_branch = None
+            repo_not_in_scheme = False
             if scheme_name:
                 for v in config['branch-schemes'].values():
                     if scheme_name not in v['aliases']:
+                        continue
+                    # If repo is not specified in the scheme, skip cloning it.
+                    if repo_name not in v['repos']:
+                        repo_not_in_scheme = True
                         continue
                     repo_branch = v['repos'][repo_name]
                     break
                 else:
                     repo_branch = scheme_name
+            if repo_not_in_scheme:
+                continue
 
             pool_args.append([args, repo_name, repo_info, repo_branch, remote,
                               with_ssh, scheme_name, skip_history,
@@ -435,10 +439,17 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         dest="n_processes")
     args = parser.parse_args()
 
-    if args.reset_to_remote and not args.scheme:
-        print("update-checkout usage error: --reset-to-remote must specify "
-              "--scheme=foo")
-        sys.exit(1)
+    if not args.scheme:
+        if args.reset_to_remote:
+            print("update-checkout usage error: --reset-to-remote must "
+                  "specify --scheme=foo")
+            sys.exit(1)
+        if args.match_timestamp:
+            # without a scheme, we won't be able match timestamps forward in
+            # time, which is an annoying footgun for bisection etc.
+            print("update-checkout usage error: --match-timestamp must "
+                  "specify --scheme=foo")
+            sys.exit(1)
 
     clone = args.clone
     clone_with_ssh = args.clone_with_ssh

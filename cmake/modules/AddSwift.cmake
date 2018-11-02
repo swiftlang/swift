@@ -1,6 +1,7 @@
 include(SwiftList)
 include(SwiftXcodeSupport)
 include(SwiftWindowsSupport)
+include(SwiftAndroidSupport)
 
 # SWIFTLIB_DIR is the directory in the build tree where Swift resource files
 # should be placed.  Note that $CMAKE_CFG_INTDIR expands to "." for
@@ -132,9 +133,9 @@ function(_add_variant_c_compile_link_flags)
 
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
     list(APPEND result
-      "--sysroot=${SWIFT_ANDROID_SDK_PATH}"
+      "--sysroot=${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_PATH}"
       # Use the linker included in the Android NDK.
-      "-B" "${SWIFT_ANDROID_PREBUILT_PATH}/arm-linux-androideabi/bin/")
+      "-B" "${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_NDK_PREBUILT_PATH}/${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_NDK_TRIPLE}/bin/")
   endif()
 
   if(IS_DARWIN)
@@ -287,12 +288,11 @@ function(_add_variant_c_compile_flags)
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
-    # FIXME: Instead of hardcoding paths in the Android NDK, these paths should
-    #        be passed in via ENV, as with the Windows build.
-    list(APPEND result
-        "-I${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/include"
-        "-I${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++abi/include"
-        "-I${SWIFT_ANDROID_NDK_PATH}/sources/android/support/include")
+    swift_android_include_for_arch("${CFLAGS_ARCH}" "${CFLAGS_ARCH}_INCLUDE")
+    foreach(path IN LISTS ${CFLAGS_ARCH}_INCLUDE)
+      list(APPEND result "\"${CMAKE_INCLUDE_FLAG_C}${path}\"")
+    endforeach()
+    list(APPEND result "-D__ANDROID_API__=${SWIFT_ANDROID_API_LEVEL}")
   endif()
 
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
@@ -303,7 +303,9 @@ function(_add_variant_swift_compile_flags
   set(result ${${result_var_name}})
 
   # On Windows, we don't set SWIFT_SDK_WINDOWS_PATH_ARCH_{ARCH}_PATH, so don't include it.
-  if (NOT "${sdk}" STREQUAL "WINDOWS")
+  # On Android the sdk is split to two different paths for includes and libs, so these
+  # need to be set manually.
+  if (NOT "${sdk}" STREQUAL "WINDOWS" AND NOT "${sdk}" STREQUAL "ANDROID")
     list(APPEND result "-sdk" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}")
   endif()
 
@@ -314,6 +316,13 @@ function(_add_variant_swift_compile_flags
   else()
     list(APPEND result
         "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}")
+  endif()
+
+  if("${sdk}" STREQUAL "ANDROID")
+    swift_android_include_for_arch(${arch} ${arch}_swift_include)
+    foreach(path IN LISTS ${arch}_swift_include)
+      list(APPEND result "\"${CMAKE_INCLUDE_FLAG_C}${path}\"")
+    endforeach()
   endif()
 
   if(NOT BUILD_STANDALONE)
@@ -402,9 +411,10 @@ function(_add_variant_link_flags)
     list(APPEND result
         "-ldl" "-llog" "-latomic" "-licudataswift" "-licui18nswift" "-licuucswift"
         "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so")
-    list(APPEND library_search_directories
-        "${SWIFT_ANDROID_PREBUILT_PATH}/arm-linux-androideabi/lib/armv7-a"
-        "${SWIFT_ANDROID_PREBUILT_PATH}/lib/gcc/arm-linux-androideabi/${SWIFT_ANDROID_NDK_GCC_VERSION}.x")
+    swift_android_lib_for_arch(${LFLAGS_ARCH} ${LFLAGS_ARCH}_LIB)
+    foreach(path IN LISTS ${LFLAGS_ARCH}_LIB)
+      list(APPEND library_search_directories ${path}) 
+    endforeach()
   else()
     # If lto is enabled, we need to add the object path flag so that the LTO code
     # generator leaves the intermediate object file in a place where it will not
@@ -430,8 +440,8 @@ function(_add_variant_link_flags)
   endif()
 
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+    # FIXME: On Apple platforms, find_program needs to look for "ld64.lld"
     find_program(LDLLD_PATH "ld.lld")
-    # Strangely, macOS finds lld and then can't find it when using -fuse-ld=
     if((SWIFT_ENABLE_LLD_LINKER AND LDLLD_PATH AND NOT APPLE) OR
        ("${LFLAGS_SDK}" STREQUAL "WINDOWS" AND
         NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WINDOWS"))
@@ -710,7 +720,11 @@ function(_add_swift_library_single target name)
   if(SWIFT_EMBED_BITCODE_SECTION AND NOT SWIFTLIB_SINGLE_DONT_EMBED_BITCODE)
     if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS")
       list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS "-fembed-bitcode")
-      list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-bitcode_bundle" "-Xlinker" "-bitcode_hide_symbols" "-Xlinker" "-lto_library" "-Xlinker" "${LLVM_LIBRARY_DIR}/libLTO.dylib")
+      list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-bitcode_bundle" "-Xlinker" "-lto_library" "-Xlinker" "${LLVM_LIBRARY_DIR}/libLTO.dylib")
+      # If we are asked to hide symbols, pass the obfuscation flag to libLTO.
+      if (SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS)
+        list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-bitcode_hide_symbols")
+      endif()
       set(embed_bitcode_arg EMBED_BITCODE)
     endif()
   endif()
@@ -770,9 +784,9 @@ function(_add_swift_library_single target name)
           ${SWIFTLIB_SINGLE_SDK} STREQUAL "OSX")
         # HACK: don't build WatchKit API notes for OS X.
       else()
-        if (NOT IS_DIRECTORY "${SWIFT_SOURCE_DIR}/stdlib/public/SDK/${framework_name}")
-          list(APPEND SWIFTLIB_SINGLE_API_NOTES "${framework_name}")
-        endif()
+        # Always build the "non-overlay" apinotes to keep them in sync
+        # rdar://40496966
+        list(APPEND SWIFTLIB_SINGLE_API_NOTES "${framework_name}")
       endif()
     endforeach()
   endif()
@@ -782,9 +796,6 @@ function(_add_swift_library_single target name)
     set(module_name "Swift")
   else()
     string(REPLACE swift "" module_name "${name}")
-  endif()
-  if("${module_name}" IN_LIST SWIFT_API_NOTES_INPUTS)
-    set(SWIFTLIB_SINGLE_API_NOTES "${module_name}")
   endif()
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
@@ -1859,6 +1870,13 @@ function(add_swift_library name)
               FILES "${UNIVERSAL_LIBRARY_NAME}"
               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
               PERMISSIONS ${file_permissions})
+          swift_is_installing_component("${SWIFTLIB_INSTALL_IN_COMPONENT}" is_installing)
+
+          if(NOT is_installing)
+            set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${VARIANT_NAME})
+          else()
+            set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${VARIANT_NAME})
+          endif()
         endif()
 
         # If we built static variants of the library, create a lipo target for
@@ -2304,6 +2322,19 @@ function(add_swift_host_tool executable)
       set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${executable})
     endif()
   endif()
+endfunction()
+
+# This declares a swift host tool that links with libfuzzer.
+function(add_swift_fuzzer_host_tool executable)
+  # First create our target. We do not actually parse the argument since we do
+  # not care about the arguments, we just pass them all through to
+  # add_swift_host_tool.
+  add_swift_host_tool(${executable} ${ARGN})
+
+  # Then make sure that we pass the -fsanitize=fuzzer flag both on the cflags
+  # and cxx flags line.
+  target_compile_options(${executable} PRIVATE "-fsanitize=fuzzer")
+  target_link_libraries(${executable} PRIVATE "-fsanitize=fuzzer")
 endfunction()
 
 macro(add_swift_tool_symlink name dest component)

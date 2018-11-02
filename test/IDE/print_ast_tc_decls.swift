@@ -529,7 +529,7 @@ class d0170_TestAvailability {
 // PASS_COMMON-LABEL: {{^}}@objc class d0180_TestIBAttrs {{{$}}
 
   @IBAction func anAction(_: AnyObject) {}
-// PASS_COMMON-NEXT: {{^}}  @IBAction @objc func anAction(_: AnyObject){{$}}
+// PASS_COMMON-NEXT: {{^}}  @objc @IBAction func anAction(_: AnyObject){{$}}
 
   @IBDesignable
   class ADesignableClass {}
@@ -541,13 +541,13 @@ class d0170_TestAvailability {
 // PASS_EXPLODE_PATTERN-LABEL: {{^}}@objc class d0181_TestIBAttrs {{{$}}
 
   @IBOutlet weak var anOutlet: d0181_TestIBAttrs!
-// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @IBOutlet @_implicitly_unwrapped_optional @objc weak var anOutlet: @sil_weak d0181_TestIBAttrs!{{$}}
+// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @objc @IBOutlet @_implicitly_unwrapped_optional weak var anOutlet: @sil_weak d0181_TestIBAttrs!{{$}}
 
   @IBInspectable var inspectableProp: Int = 0
-// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @IBInspectable @objc var inspectableProp: Int{{$}}
+// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @objc @IBInspectable var inspectableProp: Int{{$}}
 
   @GKInspectable var inspectableProp2: Int = 0
-// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @GKInspectable @objc var inspectableProp2: Int{{$}}
+// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @objc @GKInspectable var inspectableProp2: Int{{$}}
 }
 
 struct d0190_LetVarDecls {
@@ -1352,11 +1352,11 @@ extension ProtocolToExtend where Self.Assoc == Int {}
 
 // Protocol with where clauses
 
-protocol ProtocolWithWhereClause : QuxProtocol where Qux == Int, Self : FooProtocol {}
-// PREFER_TYPE_REPR_PRINTING: protocol ProtocolWithWhereClause : FooProtocol, QuxProtocol where Self.Qux == Int {
+protocol ProtocolWithWhereClause : QuxProtocol where Qux == Int {}
+// PREFER_TYPE_REPR_PRINTING: protocol ProtocolWithWhereClause : QuxProtocol where Self.Qux == Int {
 
-protocol ProtocolWithWhereClauseAndAssoc : QuxProtocol where Qux == Int, Self : FooProtocol {
-// PREFER_TYPE_REPR_PRINTING-DAG: protocol ProtocolWithWhereClauseAndAssoc : FooProtocol, QuxProtocol where Self.Qux == Int {
+protocol ProtocolWithWhereClauseAndAssoc : QuxProtocol where Qux == Int {
+// PREFER_TYPE_REPR_PRINTING-DAG: protocol ProtocolWithWhereClauseAndAssoc : QuxProtocol where Self.Qux == Int {
   associatedtype A1 : QuxProtocol where A1 : FooProtocol, A1.Qux : QuxProtocol, Int == A1.Qux.Qux
 // PREFER_TYPE_REPR_PRINTING-DAG: {{^}}  associatedtype A1 : FooProtocol, QuxProtocol where Self.A1.Qux : QuxProtocol, Self.A1.Qux.Qux == Int{{$}}
 

@@ -2,29 +2,13 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-
-/// A type that provides subscript access to its elements, with forward
-/// index traversal.
-///
-/// In most cases, it's best to ignore this protocol and use the `Collection`
-/// protocol instead, because it has a more complete interface.
-@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'Collection' instead")
-public typealias IndexableBase = Collection
-
-/// A type that provides subscript access to its elements, with forward index
-/// traversal.
-///
-/// In most cases, it's best to ignore this protocol and use the `Collection`
-/// protocol instead, because it has a more complete interface.
-@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'Collection' instead")
-public typealias Indexable = Collection
 
 /// A type that iterates over a collection using its indices.
 ///
@@ -349,6 +333,11 @@ extension IndexingIterator: IteratorProtocol, Sequence {
 /// the number of contained elements, accessing its `count` property is an
 /// O(*n*) operation.
 public protocol Collection: Sequence where SubSequence: Collection {
+  // FIXME: ideally this would be in MigrationSupport.swift, but it needs
+  // to be on the protocol instead of as an extension
+  @available(*, deprecated/*, obsoleted: 5.0*/, message: "all index distances are now of type Int")
+  typealias IndexDistance = Int  
+
   // FIXME(ABI): Associated type inference requires this.
   associatedtype Element
 
@@ -522,7 +511,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// - Returns: A subsequence up to, but not including, the `end` position.
   ///
   /// - Complexity: O(1)
-  func prefix(upTo end: Index) -> SubSequence
+  __consuming func prefix(upTo end: Index) -> SubSequence
 
   /// Returns a subsequence from the specified position to the end of the
   /// collection.
@@ -557,7 +546,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// - Returns: A subsequence starting at the `start` position.
   ///
   /// - Complexity: O(1)
-  func suffix(from start: Index) -> SubSequence
+  __consuming func suffix(from start: Index) -> SubSequence
 
   /// Returns a subsequence from the start of the collection through the
   /// specified position.
@@ -588,7 +577,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// - Returns: A subsequence up to, and including, the `end` position.
   ///
   /// - Complexity: O(1)
-  func prefix(through position: Index) -> SubSequence
+  __consuming func prefix(through position: Index) -> SubSequence
 
   /// A Boolean value indicating whether the collection is empty.
   ///
@@ -642,6 +631,11 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///
   /// - Complexity: Hopefully less than O(`count`).
   func _customLastIndexOfEquatableElement(_ element: Element) -> Index??
+
+  // FIXME(move-only types): `first` might not be implementable by collections
+  // with move-only elements, since they would need to be able to somehow form
+  // a temporary `Optional<Element>` value from a non-optional Element without
+  // modifying the collection.
 
   /// The first element of the collection.
   ///
@@ -802,9 +796,6 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   func formIndex(after i: inout Index)
-
-  @available(*, deprecated, message: "all index distances are now of type Int")
-  typealias IndexDistance = Int
 }
 
 /// Default implementation for forward collections.
@@ -813,7 +804,7 @@ extension Collection {
   ///
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   @inline(__always)
   public func formIndex(after i: inout Index) {
     i = index(after: i)
@@ -1016,6 +1007,54 @@ extension Collection {
     return count
   }
 
+  /// Returns a random element of the collection, using the given generator as
+  /// a source for randomness.
+  ///
+  /// Call `randomElement(using:)` to select a random element from an array or
+  /// another collection when you are using a custom random number generator.
+  /// This example picks a name at random from an array:
+  ///
+  ///     let names = ["Zoey", "Chloe", "Amani", "Amaia"]
+  ///     let randomName = names.randomElement(using: &myGenerator)!
+  ///     // randomName == "Amani"
+  ///
+  /// - Parameter generator: The random number generator to use when choosing
+  ///   a random element.
+  /// - Returns: A random element from the collection. If the collection is
+  ///   empty, the method returns `nil`.
+  @inlinable
+  public func randomElement<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) -> Element? {
+    guard !isEmpty else { return nil }
+    let random = generator.next(upperBound: UInt(count))
+    let index = self.index(
+      startIndex,
+      offsetBy: numericCast(random)
+    )
+    return self[index]
+  }
+
+  /// Returns a random element of the collection.
+  ///
+  /// Call `randomElement()` to select a random element from an array or
+  /// another collection. This example picks a name at random from an array:
+  ///
+  ///     let names = ["Zoey", "Chloe", "Amani", "Amaia"]
+  ///     let randomName = names.randomElement()!
+  ///     // randomName == "Amani"
+  ///
+  /// This method is equivalent to calling the version that takes a generator, 
+  /// passing in the system's default random generator.
+  ///
+  /// - Returns: A random element from the collection. If the collection is
+  ///   empty, the method returns `nil`.
+  @inlinable
+  public func randomElement() -> Element? {
+    var g = SystemRandomNumberGenerator()
+    return randomElement(using: &g)
+  }
+
   /// Do not use this method directly; call advanced(by: n) instead.
   @inlinable
   @inline(__always)
@@ -1055,7 +1094,7 @@ extension Collection {
 /// `IndexingIterator<Self>`.
 extension Collection where Iterator == IndexingIterator<Self> {
   /// Returns an iterator over the elements of the collection.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // trivial-implementation
   @inline(__always)
   public func makeIterator() -> IndexingIterator<Self> {
     return IndexingIterator(_elements: self)
@@ -1205,7 +1244,7 @@ extension Collection {
   /// - Complexity: Hopefully less than O(`count`).
   @inlinable
   public // dispatching
-  func _customIndexOfEquatableElement(_: Iterator.Element) -> Index?? {
+  func _customIndexOfEquatableElement(_: Element) -> Index?? {
     return nil
   }
 
@@ -1729,37 +1768,5 @@ extension Collection {
     _ preprocess: () throws -> R
   ) rethrows -> R? {
     return try preprocess()
-  }
-}
-
-extension Collection {
-  // FIXME: <rdar://problem/34142121>
-  // This typealias should be removed as it predates the source compatibility
-  // guarantees of Swift 3, but it cannot due to a bug.
-  @available(*, unavailable, renamed: "Iterator")
-  public typealias Generator = Iterator
-
-  @available(swift, deprecated: 3.2, renamed: "Element")
-  public typealias _Element = Element
-
-  @available(*, deprecated, message: "all index distances are now of type Int")
-  public func index<T: BinaryInteger>(_ i: Index, offsetBy n: T) -> Index {
-    return index(i, offsetBy: Int(n))
-  }
-  @available(*, deprecated, message: "all index distances are now of type Int")
-  public func formIndex<T: BinaryInteger>(_ i: inout Index, offsetBy n: T) {
-    return formIndex(&i, offsetBy: Int(n))
-  }
-  @available(*, deprecated, message: "all index distances are now of type Int")
-  public func index<T: BinaryInteger>(_ i: Index, offsetBy n: T, limitedBy limit: Index) -> Index? {
-    return index(i, offsetBy: Int(n), limitedBy: limit)
-  }
-  @available(*, deprecated, message: "all index distances are now of type Int")
-  public func formIndex<T: BinaryInteger>(_ i: inout Index, offsetBy n: T, limitedBy limit: Index) -> Bool {
-    return formIndex(&i, offsetBy: Int(n), limitedBy: limit)
-  }
-  @available(*, deprecated, message: "all index distances are now of type Int")
-  public func distance<T: BinaryInteger>(from start: Index, to end: Index) -> T {
-    return numericCast(distance(from: start, to: end) as Int)
   }
 }

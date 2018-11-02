@@ -71,7 +71,6 @@ extension String {
 
 // Fix the lifetime of the given instruction so that the ARC optimizer does not
 // shorten the lifetime of x to be before this point.
-@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public func _fixLifetime<T>(_ x: T) {
   Builtin.fixLifetime(x)
@@ -111,8 +110,7 @@ public func withUnsafeMutablePointer<T, Result>(
 /// Invokes the given closure with a pointer to the given argument.
 ///
 /// The `withUnsafePointer(to:_:)` function is useful for calling Objective-C
-/// APIs that take in/out parameters (and default-constructible out
-/// parameters) by pointer.
+/// APIs that take in parameters by const pointer.
 ///
 /// The pointer argument to `body` is valid only during the execution of
 /// `withUnsafePointer(to:_:)`. Do not store or return the pointer for later

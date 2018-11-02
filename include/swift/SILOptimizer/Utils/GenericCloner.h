@@ -41,7 +41,7 @@ public:
   GenericCloner(SILFunction *F,
                 IsSerialized_t Serialized,
                 const ReabstractionInfo &ReInfo,
-                SubstitutionList ParamSubs,
+                SubstitutionMap ParamSubs,
                 StringRef NewName,
                 CloneCollector::CallbackType Callback)
   : TypeSubstCloner(*initCloned(F, Serialized, ReInfo, NewName), *F,
@@ -55,7 +55,7 @@ public:
   cloneFunction(SILFunction *F,
                 IsSerialized_t Serialized,
                 const ReabstractionInfo &ReInfo,
-                SubstitutionList ParamSubs,
+                SubstitutionMap ParamSubs,
                 StringRef NewName,
                 CloneCollector::CallbackType Callback =nullptr) {
     // Clone and specialize the function.

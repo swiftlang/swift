@@ -268,9 +268,9 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   CE->setBody(Body, false);
   TC.typeCheckClosureBody(CE);
 
-  Expr *TheCall = CallExpr::createImplicit(Context, CE, { E }, { });
-  if (TC.typeCheckExpressionShallow(TheCall, Arg->getDeclContext()))
-    return ;
+  auto *TheCall = CallExpr::createImplicit(Context, CE, { E }, { });
+  TheCall->getArg()->setType(ParenType::get(Context, E->getType()));
+  TheCall->setType(Context.TheEmptyTupleType);
 
   // Inject the call into the top level stream by wrapping it with a TLCD.
   auto *BS = BraceStmt::create(Context, Loc, ASTNode(TheCall),
@@ -318,9 +318,10 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
   Pattern *metavarPat = new (Context) NamedPattern(vd);
   metavarPat->setType(E->getType());
 
-  PatternBindingDecl *metavarBinding
-    = PatternBindingDecl::create(Context, SourceLoc(), StaticSpellingKind::None,
-                                 E->getStartLoc(), metavarPat, E, TLCD);
+  PatternBindingDecl *metavarBinding = PatternBindingDecl::create(
+      Context, /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None,
+      /*VarLoc*/ E->getStartLoc(), metavarPat, /*EqualLoc*/ SourceLoc(), E,
+      TLCD);
 
   // Overwrite the body of the existing TopLevelCodeDecl.
   TLCD->setBody(BraceStmt::create(Context,
@@ -392,12 +393,11 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
     // Create a PatternBindingDecl to bind the expression into the decl.
     Pattern *metavarPat = new (Context) NamedPattern(vd);
     metavarPat->setType(vd->getType());
-    PatternBindingDecl *metavarBinding
-      = PatternBindingDecl::create(Context, SourceLoc(),
-                                   StaticSpellingKind::None,
-                                   PBD->getStartLoc(), metavarPat,
-                                   patternEntry.getInit(), &SF);
-    
+    PatternBindingDecl *metavarBinding = PatternBindingDecl::create(
+        Context, /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None,
+        /*VarLoc*/ PBD->getStartLoc(), metavarPat, /*EqualLoc*/ SourceLoc(),
+        patternEntry.getInit(), &SF);
+
     auto MVBrace = BraceStmt::create(Context, metavarBinding->getStartLoc(),
                                      ASTNode(metavarBinding),
                                      metavarBinding->getEndLoc());

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -sdk %S/Inputs %s -I %S/Inputs -enable-source-import | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -44,7 +44,7 @@ class DynamicSubObject: DynamicObject, AnotherNativeReadWrite {
 // CHECK-NOT: hidden_external {{.*}}main{{.*}}DynamicSubObject{{.*}}name
 
 class DynamicObject: NativeReadWrite {
-  dynamic var name: String = ""
+  @objc dynamic var name: String = ""
 }
 
 // CHECK-NOT: hidden_external {{.*}}main{{.*}}DynamicObject{{.*}}name

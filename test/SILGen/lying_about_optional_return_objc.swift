@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/block_property_in_objc_class.h -emit-silgen -enable-sil-ownership %s | %FileCheck %s
-// REQUIRES: objc_interop
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -enable-objc-interop -import-objc-header %S/Inputs/block_property_in_objc_class.h -enable-sil-ownership %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @$S32lying_about_optional_return_objc0C37ChainingForeignFunctionTypeProperties{{[_0-9a-zA-Z]*}}F
 func optionalChainingForeignFunctionTypeProperties(b: BlockProperty?) {

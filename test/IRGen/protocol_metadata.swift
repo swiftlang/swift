@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s -DINT=i%target-ptrsize
 
 // REQUIRES: CPU=x86_64
 
@@ -118,21 +118,22 @@ func reify_metadata<T>(_ x: T) {}
 func protocol_types(_ a: A,
                     abc: A & B & C,
                     abco: A & B & C & O) {
-  // CHECK: store %swift.protocol* @"$S17protocol_metadata1AMp"
-  // CHECK: call %swift.type* @swift_getExistentialTypeMetadata(i1 true, %swift.type* null, i64 1, %swift.protocol** {{%.*}})
+  // CHECK: store [[INT]] ptrtoint (%swift.protocol* @"$S17protocol_metadata1AMp" to [[INT]])
+  // CHECK: call %swift.type* @swift_getExistentialTypeMetadata(i1 true, %swift.type* null, i64 1, [[INT]]* {{%.*}})
   reify_metadata(a)
-  // CHECK: store %swift.protocol* @"$S17protocol_metadata1AMp"
-  // CHECK: store %swift.protocol* @"$S17protocol_metadata1BMp"
-  // CHECK: store %swift.protocol* @"$S17protocol_metadata1CMp"
-  // CHECK: call %swift.type* @swift_getExistentialTypeMetadata(i1 false, %swift.type* null, i64 3, %swift.protocol** {{%.*}})
+  // CHECK: store [[INT]] ptrtoint (%swift.protocol* @"$S17protocol_metadata1AMp"
+  // CHECK: store [[INT]] ptrtoint (%swift.protocol* @"$S17protocol_metadata1BMp"
+  // CHECK: store [[INT]] ptrtoint (%swift.protocol* @"$S17protocol_metadata1CMp"
+  // CHECK: call %swift.type* @swift_getExistentialTypeMetadata(i1 false, %swift.type* null, i64 3, [[INT]]* {{%.*}})
   reify_metadata(abc)
-  // CHECK: store %swift.protocol* @"$S17protocol_metadata1AMp"
-  // CHECK: store %swift.protocol* @"$S17protocol_metadata1BMp"
-  // CHECK: store %swift.protocol* @"$S17protocol_metadata1CMp"
+  // CHECK: store [[INT]] ptrtoint (%swift.protocol* @"$S17protocol_metadata1AMp"
+  // CHECK: store [[INT]] ptrtoint (%swift.protocol* @"$S17protocol_metadata1BMp"
+  // CHECK: store [[INT]] ptrtoint (%swift.protocol* @"$S17protocol_metadata1CMp"
   // CHECK: [[O_REF:%.*]] = load i8*, i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP17protocol_metadata1O_"
-  // CHECK: [[O_REF_BITCAST:%.*]] = bitcast i8* [[O_REF]] to %swift.protocol*
-  // CHECK: store %swift.protocol* [[O_REF_BITCAST]]
-  // CHECK: call %swift.type* @swift_getExistentialTypeMetadata(i1 false, %swift.type* null, i64 4, %swift.protocol** {{%.*}})
+  // CHECK: [[O_REF_INT:%.*]] = ptrtoint i8* [[O_REF]] to [[INT]]
+  // CHECK: [[O_REF_DESCRIPTOR:%.*]] = or [[INT]] [[O_REF_INT]], 1
+  // CHECK: store [[INT]] [[O_REF_DESCRIPTOR]]
+  // CHECK: call %swift.type* @swift_getExistentialTypeMetadata(i1 false, %swift.type* null, i64 4, [[INT]]* {{%.*}})
   reify_metadata(abco)
 }
 

@@ -120,8 +120,6 @@ BOOL __NSDataWriteToURL(NSData * _Nonnull data NS_RELEASES_ARGUMENT, NSURL * _No
 
     if (![path getFileSystemRepresentation:cpath maxLength:1024]) {
         if (errorPtr) *errorPtr = _NSErrorWithFilePath(NSFileWriteInvalidFileNameError, path);
-        SWIFT_CC_PLUSONE_GUARD([data release]);
-        SWIFT_CC_PLUSONE_GUARD([url release]);
         return NO;
     }
 
@@ -137,8 +135,6 @@ BOOL __NSDataWriteToURL(NSData * _Nonnull data NS_RELEASES_ARGUMENT, NSURL * _No
     int32_t fd = _NSOpenFileDescriptor(cpath, flags, protectionClass, 0666);
     if (fd < 0) {
         if (errorPtr) *errorPtr = _NSErrorWithFilePathAndErrno(errno, path, NO);
-        SWIFT_CC_PLUSONE_GUARD([url release]);
-        SWIFT_CC_PLUSONE_GUARD([data release]);
         return NO;
     }
 
@@ -172,12 +168,8 @@ BOOL __NSDataWriteToURL(NSData * _Nonnull data NS_RELEASES_ARGUMENT, NSURL * _No
         if (errorPtr) {
             *errorPtr = _NSErrorWithFilePathAndErrno(errno, path, NO);
         }
-        SWIFT_CC_PLUSONE_GUARD([url release]);
-        SWIFT_CC_PLUSONE_GUARD([data release]);
         return NO;
     }
     close(fd);
-    SWIFT_CC_PLUSONE_GUARD([url release]);
-    SWIFT_CC_PLUSONE_GUARD([data release]);
     return YES;
 }

@@ -263,12 +263,6 @@ extension Unsafe${Mutable}RawBufferPointer: RandomAccessCollection { }
 
 extension Unsafe${Mutable}RawBufferPointer {
 %  if mutable:
-  @available(swift, deprecated: 4.1, obsoleted: 5.0.0, renamed: "allocate(byteCount:alignment:)")
-  public static func allocate(count: Int) -> UnsafeMutableRawBufferPointer { 
-    return UnsafeMutableRawBufferPointer.allocate(
-      byteCount: count, alignment: MemoryLayout<UInt>.alignment)
-  }
-
   /// Returns a newly allocated buffer with the given size, in bytes.
   ///
   /// The memory referenced by the new buffer is allocated, but not
@@ -374,10 +368,6 @@ extension Unsafe${Mutable}RawBufferPointer {
     baseAddress!.storeBytes(of: value, toByteOffset: offset, as: T.self)
   }
 
-  @available(swift, deprecated: 4.1, obsoleted: 5.0.0, renamed: "copyMemory(from:)")
-  public func copyBytes(from source: UnsafeRawBufferPointer) {
-    copyMemory(from: source)
-  }
   /// Copies the bytes from the given buffer to this buffer's memory.
   ///
   /// If the `source.count` bytes of memory referenced by this buffer are bound
@@ -671,7 +661,6 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Returns: A typed buffer of the newly bound memory. The memory in this
   ///   region is bound to `T`, but has not been modified in any other way.
   ///   The typed buffer references `self.count / MemoryLayout<T>.stride` instances of `T`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @discardableResult
   public func bindMemory<T>(
@@ -690,7 +679,6 @@ extension Unsafe${Mutable}RawBufferPointer {
 
 extension Unsafe${Mutable}RawBufferPointer : CustomDebugStringConvertible {
   /// A textual representation of the buffer, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return "${Self}"
       + "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"
@@ -815,8 +803,6 @@ public func withUnsafeBytes<T, Result>(
   return try body(buffer)
 }
 
-// @available(*, deprecated, renamed: "UnsafeRawBufferPointer.Iterator")
-public typealias UnsafeRawBufferPointerIterator<T> = UnsafeBufferPointer<T>.Iterator
-
-// @available(*, deprecated, renamed: "UnsafeRawBufferPointer.Iterator")
-public typealias UnsafeMutableRawBufferPointerIterator<T> = UnsafeBufferPointer<T>.Iterator
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

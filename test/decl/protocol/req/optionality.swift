@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 
 @objc class C1 { }
 @objc class C2 { }
@@ -46,7 +46,7 @@
 // Parameters of non-optional type.
 // ------------------------------------------------------------------------
 @objc protocol ParameterNonOpt1 {
-  @objc optional func f0(_ x: C1) // expected-note 2{{declared here}}
+  @objc optional func f0(_ x: C1) // expected-note 3 {{declared here}}
 }
 
 @objc class ParameterNonOpt1a : ParameterNonOpt1 {
@@ -60,6 +60,11 @@
 @objc class ParameterNonOpt1c : ParameterNonOpt1 {
   func f0(_ x: C1?) { } // expected-warning{{parameter of 'f0' has different optionality than expected by protocol 'ParameterNonOpt1'}}{{18-19=}}
 }
+
+@objc class ParameterNonOpt1d {
+  func f0(_ x: C1?) { } // expected-note {{'f0' declared here}} {{none}}
+}
+extension ParameterNonOpt1d : ParameterNonOpt1 {} // expected-warning{{parameter of 'f0' has different optionality than expected by protocol 'ParameterNonOpt1'}} {{none}}
 
 // ------------------------------------------------------------------------
 // Result of IUO type.

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@usableFromInline // FIXME(sil-serialize-all)
 internal
 typealias _SmallUTF16StringBuffer = _FixedArray16<UInt16>
 
@@ -32,6 +33,7 @@ func unsupportedOn32bit() -> Never { _conditionallyUnreachable() }
 @_fixed_layout
 public // @testable
 struct _SmallUTF8String {
+  @usableFromInline
   typealias _RawBitPattern = (low: UInt, high: UInt)
 
   //
@@ -127,26 +129,30 @@ extension _SmallUTF8String {
 #endif
   }
 
+  @inline(__always)
   @inlinable
+  @_effects(readonly)
   public // @testable
-  init?<C: RandomAccessCollection>(_ codeUnits: C) where C.Element == UInt8 {
+  init?(_ codeUnits: UnsafeBufferPointer<UInt8>) {
 #if arch(i386) || arch(arm)
     return nil // Never form small strings on 32-bit
 #else
     let count = codeUnits.count
     guard count <= _SmallUTF8String.capacity else { return nil }
-    self.init()
-    self._withAllUnsafeMutableBytes { rawBufPtr in
-      let bufPtr = UnsafeMutableBufferPointer(
-        start: rawBufPtr.baseAddress.unsafelyUnwrapped.assumingMemoryBound(
-          to: UInt8.self),
-        count: rawBufPtr.count)
-      var (itr, written) = codeUnits._copyContents(initializing: bufPtr)
-      _sanityCheck(itr.next() == nil)
-      _sanityCheck(count == written)
+
+    let addr = codeUnits.baseAddress._unsafelyUnwrappedUnchecked
+    var high: UInt
+    let lowCount: Int
+    if count > 8 {
+      lowCount = 8
+      high = _bytesToUInt(addr + 8, count &- 8)
+    } else {
+      lowCount = count
+      high = 0
     }
-    _sanityCheck(self.count == 0, "overwrote count early?")
-    self.count = count
+    high |= (UInt(count) &<< (8*15))
+    let low = _bytesToUInt(addr, lowCount)
+    _storage = (low, high)
 
     // FIXME: support transcoding
     if !self.isASCII { return nil }
@@ -154,6 +160,32 @@ extension _SmallUTF8String {
     _invariantCheck()
 #endif
   }
+
+  @inlinable
+  public // @testable
+  init?(_ scalar: Unicode.Scalar) {
+#if arch(i386) || arch(arm)
+    return nil // Never form small strings on 32-bit
+#else
+    // FIXME: support transcoding
+    guard scalar.value <= 0x7F else { return nil }
+    self.init()
+    self.count = 1
+    self[0] = UInt8(truncatingIfNeeded: scalar.value)
+#endif
+  }
+}
+
+@inline(__always)
+@inlinable
+func _bytesToUInt(_ input: UnsafePointer<UInt8>, _ c: Int) -> UInt {
+  var r: UInt = 0
+  var shift: Int = 0
+  for idx in 0..<c {
+    r = r | (UInt(input[idx]) &<< shift)
+    shift = shift &+ 8
+  }
+  return r
 }
 
 //
@@ -451,10 +483,7 @@ extension _SmallUTF8String {
 
   // NOTE: This exists to facilitate _fromCodeUnits, which is awful for this use
   // case. Please don't call this from anywhere else.
-  @usableFromInline
-  @inline(never) // @outlined
-  // @_specialize(where Encoding == UTF16)
-  // @_specialize(where Encoding == UTF8)
+  @inlinable
   init?<S: Sequence, Encoding: Unicode.Encoding>(
     _fromCodeUnits codeUnits: S,
     utf16Length: Int,
@@ -704,7 +733,8 @@ extension _SmallUTF8String {
 }
 
 extension _SmallUTF8String {//}: _StringVariant {
-  typealias TranscodedBuffer = _SmallUTF16StringBuffer
+  @usableFromInline
+  internal typealias TranscodedBuffer = _SmallUTF16StringBuffer
 
   @inlinable
   @discardableResult

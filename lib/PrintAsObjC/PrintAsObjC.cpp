@@ -590,13 +590,10 @@ private:
 
     os << ")";
 
-    auto paramLists = AFD->getParameterLists();
-    assert(paramLists.size() == 2 && "not an ObjC-compatible method");
-
     auto selector = AFD->getObjCSelector();
     ArrayRef<Identifier> selectorPieces = selector.getSelectorPieces();
     
-    const auto &params = paramLists[1]->getArray();
+    const auto &params = AFD->getParameters()->getArray();
     unsigned paramIndex = 0;
     for (unsigned i = 0, n = selectorPieces.size(); i != n; ++i) {
       if (i > 0) os << ' ';
@@ -744,8 +741,7 @@ private:
     
     os << ' ' << FD->getAttrs().getAttribute<CDeclAttr>()->Name << '(';
     
-    assert(FD->getParameterLists().size() == 1 && "not a C-compatible func");
-    auto params = FD->getParameterLists().back();
+    auto params = FD->getParameters();
     if (params->size()) {
       interleave(*params,
                  [&](const ParamDecl *param) {
@@ -1733,14 +1729,14 @@ private:
       return;
     }
 
-    if (layout.superclass) {
-      auto *CD = layout.superclass->getClassOrBoundGenericClass();
+    if (auto superclass = layout.explicitSuperclass) {
+      auto *CD = superclass->getClassOrBoundGenericClass();
       assert(CD->isObjC());
       if (isMetatype) {
         os << "SWIFT_METATYPE(" << getNameForObjC(CD) << ")";
       } else {
         os << getNameForObjC(CD);
-        if (auto *BGT = layout.superclass->getAs<BoundGenericClassType>())
+        if (auto *BGT = superclass->getAs<BoundGenericClassType>())
           printGenericArgs(BGT);
       }
     } else {
@@ -1752,7 +1748,7 @@ private:
       protos.push_back(proto->getDecl());
     printProtocols(protos);
 
-    if (layout.superclass && !isMetatype)
+    if (layout.explicitSuperclass && !isMetatype)
       os << " *";
 
     printNullability(optionalKind);
@@ -2007,8 +2003,8 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
 
   void visitProtocolCompositionType(ProtocolCompositionType *composition) {
     auto layout = composition->getExistentialLayout();
-    if (layout.superclass)
-      visit(layout.superclass);
+    if (auto superclass = layout.explicitSuperclass)
+      visit(superclass);
     for (auto proto : layout.getProtocols())
       visit(proto);
   }
@@ -2158,7 +2154,7 @@ public:
   }
 
   void forwardDeclare(const NominalTypeDecl *NTD,
-                      std::function<void (void)> Printer) {
+                      llvm::function_ref<void(void)> Printer) {
     if (NTD->getModuleContext()->isStdlibModule())
       return;
     auto &state = seenTypes[NTD];
@@ -2438,7 +2434,7 @@ public:
            "#endif\n"
            "\n"
            "#pragma clang diagnostic ignored \"-Wauto-import\"\n"
-           "#include <objc/NSObject.h>\n"
+           "#include <Foundation/Foundation.h>\n"
            "#include <stdint.h>\n"
            "#include <stddef.h>\n"
            "#include <stdbool.h>\n"

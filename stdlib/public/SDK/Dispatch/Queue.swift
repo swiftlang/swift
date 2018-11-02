@@ -170,6 +170,28 @@ public extension DispatchQueue {
 		return String(validatingUTF8: __dispatch_queue_get_label(self))!
 	}
 
+	///
+	/// Submits a block for synchronous execution on this queue.
+	///
+	/// Submits a work item to a dispatch queue like `async(execute:)`, however
+	/// `sync(execute:)` will not return until the work item has finished.
+	///
+	/// Work items submitted to a queue with `sync(execute:)` do not observe certain
+	/// queue attributes of that queue when invoked (such as autorelease frequency
+	/// and QoS class).
+	///
+	/// Calls to `sync(execute:)` targeting the current queue will result
+	/// in deadlock. Use of `sync(execute:)` is also subject to the same
+	/// multi-party deadlock problems that may result from the use of a mutex.
+	/// Use of `async(execute:)` is preferred.
+	///
+	/// As an optimization, `sync(execute:)` invokes the work item on the thread which
+	/// submitted it, except when the queue is the main queue or
+	/// a queue targetting it.
+	///
+	/// - parameter execute: The work item to be invoked on the queue.
+	/// - SeeAlso: `async(execute:)`
+	///
 	@available(macOS 10.10, iOS 8.0, *)
 	public func sync(execute workItem: DispatchWorkItem) {
 		// _swift_dispatch_sync preserves the @convention(block) for
@@ -177,6 +199,23 @@ public extension DispatchQueue {
 		_swift_dispatch_sync(self, workItem._block)
 	}
 
+	///
+	/// Submits a work item for asynchronous execution on a dispatch queue.
+	///
+	/// `async(execute:)` is the fundamental mechanism for submitting
+	/// work items to a dispatch queue.
+	///
+	/// Calls to `async(execute:)` always return immediately after the work item has
+	/// been submitted, and never wait for the work item to be invoked.
+	///
+	/// The target queue determines whether the work item will be invoked serially or
+	/// concurrently with respect to other work items submitted to that same queue.
+	/// Serial queues are processed concurrently with respect to each other.
+	///
+	/// - parameter execute: The work item to be invoked on the queue.
+	/// - SeeAlso: `sync(execute:)`
+	///
+	///
 	@available(macOS 10.10, iOS 8.0, *)
 	public func async(execute workItem: DispatchWorkItem) {
 		// _swift_dispatch_async preserves the @convention(block)
@@ -184,6 +223,15 @@ public extension DispatchQueue {
 		_swift_dispatch_async(self, workItem._block)
 	}
 
+	///
+	/// Submits a work item to a dispatch queue and associates it with the given
+	/// dispatch group. The dispatch group may be used to wait for the completion
+	/// of the work items it references.
+	///
+	/// - parameter group: the dispatch group to associate with the submitted block.
+	/// - parameter execute: The work item to be invoked on the queue.
+	/// - SeeAlso: `sync(execute:)`
+	///
 	@available(macOS 10.10, iOS 8.0, *)
 	public func async(group: DispatchGroup, execute workItem: DispatchWorkItem) {
 		// _swift_dispatch_group_async preserves the @convention(block)
@@ -191,6 +239,23 @@ public extension DispatchQueue {
 		_swift_dispatch_group_async(group, self, workItem._block)
 	}
 
+	///
+	/// Submits a work item to a dispatch queue and optionally associates it with a
+	/// dispatch group. The dispatch group may be used to wait for the completion
+	/// of the work items it references.
+	///
+	/// - parameter group: the dispatch group to associate with the submitted
+	/// work item. If this is `nil`, the work item is not associated with a group.
+	/// - parameter flags: flags that control the execution environment of the
+	/// - parameter qos: the QoS at which the work item should be executed.
+	///	Defaults to `DispatchQoS.unspecified`.
+	/// - parameter flags: flags that control the execution environment of the
+	/// work item.
+	/// - parameter execute: The work item to be invoked on the queue.
+	/// - SeeAlso: `sync(execute:)`
+	/// - SeeAlso: `DispatchQoS`
+	/// - SeeAlso: `DispatchWorkItemFlags`
+	///
 	public func async(
 		group: DispatchGroup? = nil,
 		qos: DispatchQoS = .unspecified,
@@ -272,10 +337,32 @@ public extension DispatchQueue {
 		}
 	}
 
+	///
+	/// Submits a block for synchronous execution on this queue.
+	///
+	/// Submits a work item to a dispatch queue like `sync(execute:)`, and returns
+	/// the value, of type `T`, returned by that work item.
+	///
+	/// - parameter execute: The work item to be invoked on the queue.
+	/// - returns the value returned by the work item.
+	/// - SeeAlso: `sync(execute:)`
+	///
 	public func sync<T>(execute work: () throws -> T) rethrows -> T {
 		return try self._syncHelper(fn: sync, execute: work, rescue: { throw $0 })
 	}
 
+	///
+	/// Submits a block for synchronous execution on this queue.
+	///
+	/// Submits a work item to a dispatch queue like `sync(execute:)`, and returns
+	/// the value, of type `T`, returned by that work item.
+	///
+	/// - parameter flags: flags that control the execution environment of the
+	/// - parameter execute: The work item to be invoked on the queue.
+	/// - returns the value returned by the work item.
+	/// - SeeAlso: `sync(execute:)`
+	/// - SeeAlso: `DispatchWorkItemFlags`
+	///
 	public func sync<T>(flags: DispatchWorkItemFlags, execute work: () throws -> T) rethrows -> T {
 		if flags == .barrier {
 			return try self._syncHelper(fn: _syncBarrier, execute: work, rescue: { throw $0 })
@@ -286,6 +373,23 @@ public extension DispatchQueue {
 		}
 	}
 
+	///
+	/// Submits a work item to a dispatch queue for asynchronous execution after
+	/// a specified time.
+	///
+	/// - parameter: deadline the time after which the work item should be executed,
+	/// given as a `DispatchTime`.
+	/// - parameter qos: the QoS at which the work item should be executed.
+	///	Defaults to `DispatchQoS.unspecified`.
+	/// - parameter flags: flags that control the execution environment of the
+	/// work item.
+	/// - parameter execute: The work item to be invoked on the queue.
+	/// - SeeAlso: `async(execute:)`
+	/// - SeeAlso: `asyncAfter(deadline:execute:)`
+	/// - SeeAlso: `DispatchQoS`
+	/// - SeeAlso: `DispatchWorkItemFlags`
+	/// - SeeAlso: `DispatchTime`
+	///
 	public func asyncAfter(
 		deadline: DispatchTime,
 		qos: DispatchQoS = .unspecified,
@@ -300,6 +404,23 @@ public extension DispatchQueue {
 		}
 	}
 
+	///
+	/// Submits a work item to a dispatch queue for asynchronous execution after
+	/// a specified time.
+	///
+	/// - parameter: deadline the time after which the work item should be executed,
+	/// given as a `DispatchWallTime`.
+	/// - parameter qos: the QoS at which the work item should be executed.
+	///	Defaults to `DispatchQoS.unspecified`.
+	/// - parameter flags: flags that control the execution environment of the
+	/// work item.
+	/// - parameter execute: The work item to be invoked on the queue.
+	/// - SeeAlso: `async(execute:)`
+	/// - SeeAlso: `asyncAfter(wallDeadline:execute:)`
+	/// - SeeAlso: `DispatchQoS`
+	/// - SeeAlso: `DispatchWorkItemFlags`
+	/// - SeeAlso: `DispatchWallTime`
+	///
 	public func asyncAfter(
 		wallDeadline: DispatchWallTime,
 		qos: DispatchQoS = .unspecified,
@@ -314,11 +435,31 @@ public extension DispatchQueue {
 		}
 	}
 
+	///
+	/// Submits a work item to a dispatch queue for asynchronous execution after
+	/// a specified time.
+	///
+	/// - parameter: deadline the time after which the work item should be executed,
+	/// given as a `DispatchTime`.
+	/// - parameter execute: The work item to be invoked on the queue.
+	/// - SeeAlso: `asyncAfter(deadline:qos:flags:execute:)`
+	/// - SeeAlso: `DispatchTime`
+	///
 	@available(macOS 10.10, iOS 8.0, *)
 	public func asyncAfter(deadline: DispatchTime, execute: DispatchWorkItem) {
 		_swift_dispatch_after(deadline.rawValue, self, execute._block)
 	}
 
+	///
+	/// Submits a work item to a dispatch queue for asynchronous execution after
+	/// a specified time.
+	///
+	/// - parameter: deadline the time after which the work item should be executed,
+	/// given as a `DispatchWallTime`.
+	/// - parameter execute: The work item to be invoked on the queue.
+	/// - SeeAlso: `asyncAfter(wallDeadline:qos:flags:execute:)`
+	/// - SeeAlso: `DispatchTime`
+	///
 	@available(macOS 10.10, iOS 8.0, *)
 	public func asyncAfter(wallDeadline: DispatchWallTime, execute: DispatchWorkItem) {
 		_swift_dispatch_after(wallDeadline.rawValue, self, execute._block)

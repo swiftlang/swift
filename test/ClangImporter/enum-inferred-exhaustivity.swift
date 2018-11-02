@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -import-objc-header %S/Inputs/enum-inferred-exhaustivity.h -verify -enable-nonfrozen-enum-exhaustivity-diagnostics -warnings-as-errors
+// RUN: %target-swift-frontend -typecheck %s -enable-objc-interop -import-objc-header %S/Inputs/enum-inferred-exhaustivity.h -verify -enable-nonfrozen-enum-exhaustivity-diagnostics -warnings-as-errors
 
 // This is testing what happens with a CF_ENUM definition that doesn't include
 // any enum_extensibility attributes. As such, the test deliberately avoids

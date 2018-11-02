@@ -21,24 +21,6 @@ import _SwiftUIKitOverlayShims
 // UIGeometry
 //===----------------------------------------------------------------------===//
 
-public extension UIEdgeInsets {
-  static var zero: UIEdgeInsets {
-    @_transparent // @fragile
-    get { return UIEdgeInsets(top: 0.0, left: 0.0, bottom: 0.0, right: 0.0) }
-  }
-}
-
-public extension UIOffset {
-  static var zero: UIOffset {
-    @_transparent // @fragile
-    get { return UIOffset(horizontal: 0.0, vertical: 0.0) }
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// Equatable types.
-//===----------------------------------------------------------------------===//
-
 extension UIEdgeInsets : Equatable {
   @_transparent // @fragile
   public static func == (lhs: UIEdgeInsets, rhs: UIEdgeInsets) -> Bool {
@@ -49,6 +31,17 @@ extension UIEdgeInsets : Equatable {
   }
 }
 
+@available(iOS 11.0, tvOS 11.0, watchOS 4.0, *)
+extension NSDirectionalEdgeInsets : Equatable {
+  @_transparent // @fragile
+  public static func == (lhs: NSDirectionalEdgeInsets, rhs: NSDirectionalEdgeInsets) -> Bool {
+    return lhs.top == rhs.top &&
+           lhs.leading == rhs.leading &&
+           lhs.bottom == rhs.bottom &&
+           lhs.trailing == rhs.trailing
+  }
+}
+
 extension UIOffset : Equatable {
   @_transparent // @fragile
   public static func == (lhs: UIOffset, rhs: UIOffset) -> Bool {
@@ -56,6 +49,33 @@ extension UIOffset : Equatable {
            lhs.vertical == rhs.vertical
   }
 }
+
+#if os(iOS) || os(tvOS)
+extension UIFloatRange : Equatable {
+  @_transparent // @fragile
+  public static func == (lhs: UIFloatRange, rhs: UIFloatRange) -> Bool {
+    return lhs.minimum == rhs.minimum &&
+           lhs.maximum == rhs.maximum
+  }
+}
+#endif
+
+@available(swift, deprecated: 4.2, message:"Use == operator instead.")
+public func UIEdgeInsetsEqualToEdgeInsets(_ insets1: UIEdgeInsets, _ insets2: UIEdgeInsets) -> Bool {
+  return insets1 == insets2
+}
+
+@available(swift, deprecated: 4.2, message:"Use == operator instead.")
+public func UIOffsetEqualToOffset(_ offset1: UIOffset, _ offset2: UIOffset) -> Bool {
+  return offset1 == offset2
+}
+
+#if os(iOS) || os(tvOS)
+@available(swift, deprecated: 4.2, message:"Use == operator instead.")
+public func UIFloatRangeIsEqualToRange(_ range: UIFloatRange, _ otherRange: UIFloatRange) -> Bool {
+  return range == otherRange
+}
+#endif
 
 //===----------------------------------------------------------------------===//
 // Numeric backed types
@@ -108,44 +128,27 @@ extension UILayoutPriority : _UIKitNumericRawRepresentable {}
 //===----------------------------------------------------------------------===//
 
 #if !os(watchOS) && !os(tvOS)
-public extension UIDeviceOrientation {
-  var isLandscape: Bool {
-    return self == .landscapeLeft || self == .landscapeRight
-  }
-
-  var isPortrait: Bool {
-    return self == .portrait || self == .portraitUpsideDown
-  }
-
-  var isFlat: Bool {
-    return self == .faceUp || self == .faceDown
-  }
-
-  var isValidInterfaceOrientation: Bool {
-    switch self {
-    case .portrait, .portraitUpsideDown, .landscapeLeft, .landscapeRight:
-      return true
-    default:
-      return false
-    }
-  }
-}
-
+@available(swift, obsoleted: 4.2,
+  renamed: "getter:UIDeviceOrientation.isLandscape(self:)")
 public func UIDeviceOrientationIsLandscape(
   _ orientation: UIDeviceOrientation
 ) -> Bool {
   return orientation.isLandscape
 }
 
+@available(swift, obsoleted: 4.2,
+  renamed: "getter:UIDeviceOrientation.isPortrait(self:)")
 public func UIDeviceOrientationIsPortrait(
   _ orientation: UIDeviceOrientation
 ) -> Bool {
   return orientation.isPortrait
 }
 
+@available(swift, obsoleted: 4.2,
+  renamed: "getter:UIDeviceOrientation.isValidInterfaceOrientation(self:)")
 public func UIDeviceOrientationIsValidInterfaceOrientation(
-  _ orientation: UIDeviceOrientation) -> Bool
-{
+  _ orientation: UIDeviceOrientation
+) -> Bool {
   return orientation.isValidInterfaceOrientation
 }
 #endif
@@ -155,21 +158,16 @@ public func UIDeviceOrientationIsValidInterfaceOrientation(
 //===----------------------------------------------------------------------===//
 
 #if !os(watchOS) && !os(tvOS)
-public extension UIInterfaceOrientation {
-  var isLandscape: Bool {
-    return self == .landscapeLeft || self == .landscapeRight
-  }
-
-  var isPortrait: Bool {
-    return self == .portrait || self == .portraitUpsideDown
-  }
-}
-
+@available(swift, obsoleted: 4.2,
+  renamed: "getter:UIInterfaceOrientation.isPortrait(self:)")
 public func UIInterfaceOrientationIsPortrait(
-  _ orientation: UIInterfaceOrientation) -> Bool {
+  _ orientation: UIInterfaceOrientation
+) -> Bool {
   return orientation.isPortrait
 }
 
+@available(swift, obsoleted: 4.2,
+  renamed: "getter:UIInterfaceOrientation.isLandscape(self:)")
 public func UIInterfaceOrientationIsLandscape(
   _ orientation: UIInterfaceOrientation
 ) -> Bool {
@@ -419,5 +417,25 @@ extension UIPasteboard {
       expirationDate: expirationDate)
   }
 }
+
+#endif
+
+//===----------------------------------------------------------------------===//
+// UIPrintError compatibility
+//===----------------------------------------------------------------------===//
+
+#if os(iOS)
+
+@available(swift, obsoleted: 4.2, renamed:"UIPrintError.Code.notAvailable.rawValue")
+public let UIPrintingNotAvailableError = 1
+
+@available(swift, obsoleted: 4.2, renamed:"UIPrintError.Code.noContent.rawValue")
+public let UIPrintNoContentError = 2
+
+@available(swift, obsoleted: 4.2, renamed:"UIPrintError.Code.unknownImageFormat.rawValue")
+public let UIPrintUnknownImageFormatError = 3
+
+@available(swift, obsoleted: 4.2, renamed:"UIPrintError.Code.jobFailed.rawValue")
+public let UIPrintJobFailedError = 4
 
 #endif

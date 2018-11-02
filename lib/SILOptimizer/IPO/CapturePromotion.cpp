@@ -244,8 +244,8 @@ void ReachabilityInfo::compute() {
   Matrix = ReachingBlockSet::allocateMatrix(N);
   ReachingBlockSet NewSet = ReachingBlockSet::allocateSet(N);
 
-  DEBUG(llvm::dbgs() << "Computing Reachability for " << F->getName()
-        << " with " << N << " blocks.\n");
+  LLVM_DEBUG(llvm::dbgs() << "Computing Reachability for " << F->getName()
+             << " with " << N << " blocks.\n");
 
   // Iterate to a fix point, two times for a topological DAG.
   bool Changed;
@@ -279,12 +279,12 @@ void ReachabilityInfo::compute() {
           CurSet.set(PredID);
         }
       }
-      DEBUG(llvm::dbgs() << "  Block " << BlockMap[&BB] << " reached by ";
-            for (unsigned i = 0; i < N; ++i) {
-              if (CurSet.test(i))
-                llvm::dbgs() << i << " ";
-            }
-            llvm::dbgs() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "  Block " << BlockMap[&BB] << " reached by ";
+                 for (unsigned i = 0; i < N; ++i) {
+                   if (CurSet.test(i))
+                     llvm::dbgs() << i << " ";
+                 }
+                 llvm::dbgs() << "\n");
     }
   } while (Changed);
 
@@ -328,7 +328,7 @@ computeNewArgInterfaceTypes(SILFunction *F,
   auto fnConv = F->getConventions();
   auto Parameters = fnConv.funcTy->getParameters();
 
-  DEBUG(llvm::dbgs() << "Preparing New Args!\n");
+  LLVM_DEBUG(llvm::dbgs() << "Preparing New Args!\n");
 
   auto fnTy = F->getLoweredFunctionType();
 
@@ -344,9 +344,9 @@ computeNewArgInterfaceTypes(SILFunction *F,
     // the arg index when working with PromotableIndices.
     unsigned ArgIndex = Index + fnConv.getSILArgIndexOfFirstParam();
 
-    DEBUG(llvm::dbgs() << "Index: " << Index << "; PromotableIndices: "
-          << (PromotableIndices.count(ArgIndex)?"yes":"no")
-          << " Param: "; param.dump());
+    LLVM_DEBUG(llvm::dbgs() << "Index: " << Index << "; PromotableIndices: "
+               << (PromotableIndices.count(ArgIndex)?"yes":"no")
+               << " Param: "; param.dump());
 
     if (!PromotableIndices.count(ArgIndex)) {
       OutTys.push_back(param);
@@ -371,7 +371,7 @@ computeNewArgInterfaceTypes(SILFunction *F,
       convention = param.isGuaranteed() ? ParameterConvention::Direct_Guaranteed
                                         : ParameterConvention::Direct_Owned;
     }
-    OutTys.push_back(SILParameterInfo(paramBoxedTy.getSwiftRValueType(),
+    OutTys.push_back(SILParameterInfo(paramBoxedTy.getASTType(),
                                       convention));
   }
 }
@@ -817,7 +817,7 @@ public:
   ///
   /// These are considered to be escapes.
   bool visitSILInstruction(SILInstruction *I) {
-    DEBUG(llvm::dbgs() << "    FAIL! Have unknown escaping user: " << *I);
+    LLVM_DEBUG(llvm::dbgs() << "    FAIL! Have unknown escaping user: " << *I);
     return false;
   }
 
@@ -844,7 +844,8 @@ public:
     SILFunctionConventions substConv(AI->getSubstCalleeType(), AI->getModule());
     auto convention = substConv.getSILArgumentConvention(argIndex);
     if (!convention.isIndirectConvention()) {
-      DEBUG(llvm::dbgs() << "    FAIL! Found non indirect apply user: " << *AI);
+      LLVM_DEBUG(llvm::dbgs() << "    FAIL! Found non indirect apply user: "
+                              << *AI);
       return false;
     }
     Mutations.push_back(AI);
@@ -903,7 +904,7 @@ public:
 
   bool visitStoreInst(StoreInst *SI) {
     if (CurrentOp.get()->getOperandNumber() != 1) {
-      DEBUG(llvm::dbgs() << "    FAIL! Found store of pointer: " << *SI);
+      LLVM_DEBUG(llvm::dbgs() << "    FAIL! Found store of pointer: " << *SI);
       return false;
     }
     Mutations.push_back(SI);
@@ -912,7 +913,7 @@ public:
 
   bool visitAssignInst(AssignInst *AI) {
     if (CurrentOp.get()->getOperandNumber() != 1) {
-      DEBUG(llvm::dbgs() << "    FAIL! Found store of pointer: " << *AI);
+      LLVM_DEBUG(llvm::dbgs() << "    FAIL! Found store of pointer: " << *AI);
       return false;
     }
     Mutations.push_back(AI);
@@ -949,7 +950,7 @@ static bool isNonEscapingUse(Operand *InitialOp,
 
 bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
                                    EscapeMutationScanningState &State) {
-  DEBUG(llvm::dbgs() << "    Found partial: " << *PAI);
+  LLVM_DEBUG(llvm::dbgs() << "    Found partial: " << *PAI);
 
   unsigned OpNo = CurrentOp->getOperandNumber();
   assert(OpNo != 0 && "Alloc box used as callee of partial apply?");
@@ -958,7 +959,7 @@ bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
   // box is being captured twice by the same closure, which is odd and
   // unexpected: bail instead of trying to handle this case.
   if (State.IM.count(PAI)) {
-    DEBUG(llvm::dbgs() << "        FAIL! Already seen.\n");
+    LLVM_DEBUG(llvm::dbgs() << "        FAIL! Already seen.\n");
     return false;
   }
 
@@ -973,7 +974,7 @@ bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
 
   auto *Fn = PAI->getReferencedFunction();
   if (!Fn || !Fn->isDefinition()) {
-    DEBUG(llvm::dbgs() << "        FAIL! Not a direct function definition "
+    LLVM_DEBUG(llvm::dbgs() << "        FAIL! Not a direct function definition "
                           "reference.\n");
     return false;
   }
@@ -987,7 +988,8 @@ bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
   assert(BoxTy->getLayout()->getFields().size() == 1 &&
          "promoting compound box not implemented yet");
   if (BoxTy->getFieldType(M, 0).isAddressOnly(M)) {
-    DEBUG(llvm::dbgs() << "        FAIL! Box is an address only argument!\n");
+    LLVM_DEBUG(llvm::dbgs() << "        FAIL! Box is an address only "
+                               "argument!\n");
     return false;
   }
 
@@ -995,26 +997,26 @@ bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
   // it does, then conservatively refuse to promote any captures of this
   // value.
   if (!isNonMutatingCapture(BoxArg)) {
-    DEBUG(llvm::dbgs() << "        FAIL: Have a mutating capture!\n");
+    LLVM_DEBUG(llvm::dbgs() << "        FAIL: Have a mutating capture!\n");
     return false;
   }
 
   // Record the index and continue.
-  DEBUG(llvm::dbgs()
-        << "        Partial apply does not escape, may be optimizable!\n");
-  DEBUG(llvm::dbgs() << "        Index: " << Index << "\n");
+  LLVM_DEBUG(llvm::dbgs()
+             << "        Partial apply does not escape, may be optimizable!\n");
+  LLVM_DEBUG(llvm::dbgs() << "        Index: " << Index << "\n");
   State.IM.insert(std::make_pair(PAI, Index));
   return true;
 }
 
 static bool isProjectBoxNonEscapingUse(ProjectBoxInst *PBI,
                                        EscapeMutationScanningState &State) {
-  DEBUG(llvm::dbgs() << "    Found project box: " << *PBI);
+  LLVM_DEBUG(llvm::dbgs() << "    Found project box: " << *PBI);
 
   for (Operand *AddrOp : PBI->getUses()) {
     if (!isNonEscapingUse(AddrOp, State)) {
-      DEBUG(llvm::dbgs() << "    FAIL! Has escaping user of addr:"
-                         << *AddrOp->getUser());
+      LLVM_DEBUG(llvm::dbgs() << "    FAIL! Has escaping user of addr:"
+                              << *AddrOp->getUser());
       return false;
     }
   }
@@ -1066,19 +1068,19 @@ static bool scanUsesForEscapesAndMutations(Operand *Op,
 static bool
 examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
                     llvm::DenseMap<PartialApplyInst *, unsigned> &IM) {
-  DEBUG(llvm::dbgs() << "Visiting alloc box: " << *ABI);
+  LLVM_DEBUG(llvm::dbgs() << "Visiting alloc box: " << *ABI);
   EscapeMutationScanningState State{{}, false, IM};
 
   // Scan the box for interesting uses.
   if (any_of(ABI->getUses(), [&State](Operand *Op) {
         return !scanUsesForEscapesAndMutations(Op, State);
       })) {
-    DEBUG(llvm::dbgs()
-          << "Found an escaping use! Can not optimize this alloc box?!\n");
+    LLVM_DEBUG(llvm::dbgs()
+               << "Found an escaping use! Can not optimize this alloc box?!\n");
     return false;
   }
 
-  DEBUG(llvm::dbgs() << "We can optimize this alloc box!\n");
+  LLVM_DEBUG(llvm::dbgs() << "We can optimize this alloc box!\n");
 
   // Helper lambda function to determine if instruction b is strictly after
   // instruction a, assuming both are in the same basic block.
@@ -1094,8 +1096,8 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
     return false;
   };
 
-  DEBUG(llvm::dbgs()
-        << "Checking for any mutations that invalidate captures...\n");
+  LLVM_DEBUG(llvm::dbgs()
+             << "Checking for any mutations that invalidate captures...\n");
   // Loop over all mutations to possibly invalidate captures.
   for (auto *I : State.Mutations) {
     auto Iter = IM.begin();
@@ -1106,8 +1108,8 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       // block is after the partial_apply.
       if (RI.isReachable(PAI->getParent(), I->getParent()) ||
           (PAI->getParent() == I->getParent() && isAfter(PAI, I))) {
-        DEBUG(llvm::dbgs() << "    Invalidating: " << *PAI);
-        DEBUG(llvm::dbgs() << "    Because of user: " << *I);
+        LLVM_DEBUG(llvm::dbgs() << "    Invalidating: " << *PAI);
+        LLVM_DEBUG(llvm::dbgs() << "    Because of user: " << *I);
         auto Prev = Iter++;
         IM.erase(Prev);
         continue;
@@ -1116,12 +1118,12 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
     }
     // If there are no valid captures left, then stop.
     if (IM.empty()) {
-      DEBUG(llvm::dbgs() << "    Ran out of valid captures... bailing!\n");
+      LLVM_DEBUG(llvm::dbgs() << "    Ran out of valid captures... bailing!\n");
       return false;
     }
   }
 
-  DEBUG(llvm::dbgs() << "    We can optimize this box!\n");
+  LLVM_DEBUG(llvm::dbgs() << "    We can optimize this box!\n");
   return true;
 }
 
@@ -1221,7 +1223,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   auto SubstCalleeFunctionTy = CalleeFunctionTy;
   if (PAI->hasSubstitutions())
     SubstCalleeFunctionTy =
-        CalleeFunctionTy->substGenericArgs(M, PAI->getSubstitutions());
+        CalleeFunctionTy->substGenericArgs(M, PAI->getSubstitutionMap());
   SILFunctionConventions calleeConv(SubstCalleeFunctionTy, M);
   auto CalleePInfo = SubstCalleeFunctionTy->getParameters();
   SILFunctionConventions paConv(PAI->getType().castTo<SILFunctionType>(), M);
@@ -1261,7 +1263,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
 
   // Create a new partial apply with the new arguments.
   auto *NewPAI = B.createPartialApply(
-      PAI->getLoc(), FnVal, PAI->getSubstitutions(), Args,
+      PAI->getLoc(), FnVal, PAI->getSubstitutionMap(), Args,
       PAI->getType().getAs<SILFunctionType>()->getCalleeConvention());
   PAI->replaceAllUsesWith(NewPAI);
   PAI->eraseFromParent();
@@ -1293,7 +1295,7 @@ constructMapFromPartialApplyToPromotableIndices(SILFunction *F,
           for (auto &IndexPair : IndexMap)
             Map[IndexPair.first].insert(IndexPair.second);
         }
-        DEBUG(llvm::dbgs() << "\n");
+        LLVM_DEBUG(llvm::dbgs() << "\n");
       }
     }
   }
@@ -1325,8 +1327,8 @@ class CapturePromotionPass : public SILModuleTransform {
 
 void CapturePromotionPass::processFunction(SILFunction *F,
                                       SmallVectorImpl<SILFunction*> &Worklist) {
-  DEBUG(llvm::dbgs() << "******** Performing Capture Promotion on: "
-                     << F->getName() << "********\n");
+  LLVM_DEBUG(llvm::dbgs() << "******** Performing Capture Promotion on: "
+                          << F->getName() << "********\n");
   // This is a map from each partial apply to a set of indices of promotable
   // box variables.
   PartialApplyIndicesMap IndicesMap;

@@ -295,6 +295,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
           !isTerminatorForBraceItemListKind(Kind, Entries))) {
 
     SyntaxParsingContext NodeContext(SyntaxContext, SyntaxKind::CodeBlockItem);
+    if (loadCurrentSyntaxNodeFromCache()) {
+      continue;
+    }
 
     if (Tok.is(tok::r_brace)) {
       SyntaxParsingContext ErrContext(SyntaxContext, SyntaxContextKind::Stmt);
@@ -445,11 +448,8 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     }
 
     if (NeedParseErrorRecovery) {
-      SyntaxContext->createNodeInPlace(SyntaxKind::CodeBlockItem);
-      SyntaxContext->setTransparent();
-
-      SyntaxParsingContext ItemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);
-      SyntaxParsingContext StmtCtxt(SyntaxContext, SyntaxContextKind::Stmt);
+      SyntaxParsingContext TokenListCtxt(SyntaxContext,
+                                         SyntaxKind::NonEmptyTokenList);
       // If we had a parse error, skip to the start of the next stmt, decl or
       // '{'.
       //
@@ -827,6 +827,7 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
                        /*NameLoc=*/ SourceLoc(),
                        /*Throws=*/ false, /*ThrowsLoc=*/ SourceLoc(),
                        /*generic params*/ nullptr,
+                       /*selfDecl*/ nullptr,
                        params,
                        TypeLoc(),
                        CurDeclContext);
@@ -975,6 +976,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     // represents tuples and var patterns as tupleexprs and
     // unresolved_pattern_expr nodes, instead of as proper pattern nodes.
     patternResult.get()->forEachVariable([&](VarDecl *VD) {
+      P.setLocalDiscriminator(VD);
       if (VD->hasName()) P.addToScope(VD);
       boundDecls.push_back(VD);
     });
@@ -996,6 +998,8 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
       for (auto previous : boundDecls) {
         if (previous->hasName() && previous->getName() == VD->getName()) {
           found = true;
+          // Use the same local discriminator.
+          VD->setLocalDiscriminator(previous->getLocalDiscriminator());
           break;
         }
       }
@@ -1397,6 +1401,7 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
   // Add variable bindings from the pattern to our current scope and mark
   // them as being having a non-pattern-binding initializer.
   ThePattern.get()->forEachVariable([&](VarDecl *VD) {
+    setLocalDiscriminator(VD);
     if (VD->hasName())
       addToScope(VD);
     VD->setHasNonPatternBindingInit();
@@ -1541,10 +1546,20 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo) {
     if (Tok.is(tok::kw_if)) {
       SyntaxParsingContext ElseIfCtxt(SyntaxContext, SyntaxKind::IfStmt);
       ElseBody = parseStmtIf(LabeledStmtInfo());
+    } else if (Tok.is(tok::code_complete)) {
+      if (CodeCompletion)
+        CodeCompletion->completeAfterIfStmt(/*hasElse*/true);
+      Status.setHasCodeCompletion();
+      consumeToken(tok::code_complete);
     } else {
       ElseBody = parseBraceItemList(diag::expected_lbrace_after_else);
     }
     Status |= ElseBody;
+  } else if (Tok.is(tok::code_complete)) {
+    if (CodeCompletion)
+      CodeCompletion->completeAfterIfStmt(/*hasElse*/false);
+    Status.setHasCodeCompletion();
+    consumeToken(tok::code_complete);
   }
 
   return makeParserResult(
@@ -1612,7 +1627,7 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
   for (auto &elt : Condition)
     if (auto pattern = elt.getPatternOrNull())
       pattern->collectVariables(Vars);
-
+  Vars.append(DisabledVars.begin(), DisabledVars.end());
   llvm::SaveAndRestore<decltype(DisabledVars)>
   RestoreCurVars(DisabledVars, Vars);
 

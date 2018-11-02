@@ -233,8 +233,8 @@ enum class FixKind : uint8_t {
   /// Introduce a '!' to force an optional unwrap.
   ForceOptional,
 
-  /// Introduce a '?.' to begin optional chaining.
-  OptionalChaining,
+  /// Unwrap an optional base when we have a member access.
+  UnwrapOptionalBase,
 
   /// Append 'as! T' to force a downcast to the specified type.
   ForceDowncast,
@@ -265,16 +265,25 @@ class Fix {
 public:
   Fix(FixKind kind) : Kind(kind), Data(0) {
     assert(kind != FixKind::ForceDowncast && "Use getForceDowncast()");
+    assert(kind != FixKind::UnwrapOptionalBase &&
+           "Use getUnwrapOptionalBase()");
   }
 
   /// Produce a new fix that performs a forced downcast to the given type.
   static Fix getForcedDowncast(ConstraintSystem &cs, Type toType);
+
+  /// Produce a new fix that unwraps an optional base for an access to a member
+  /// with the given name.
+  static Fix getUnwrapOptionalBase(ConstraintSystem &cs, DeclName memberName);
 
   /// Retrieve the kind of fix.
   FixKind getKind() const { return Kind; }
 
   /// If this fix has a type argument, retrieve it.
   Type getTypeArgument(ConstraintSystem &cs) const;
+
+  /// If this fix has a name argument, retrieve it.
+  DeclName getDeclNameArgument(ConstraintSystem &cs) const;
 
   /// Return a string representation of a fix.
   static llvm::StringRef getName(FixKind kind);

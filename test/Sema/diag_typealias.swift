@@ -2,5 +2,5 @@
 
 struct S {}
 
-typealias S = S // expected-error {{redundant type alias declaration}}{{1-17=}}
-
+typealias S = S // expected-error {{type alias 'S' references itself}}
+// expected-note@-1{{type declared here}}

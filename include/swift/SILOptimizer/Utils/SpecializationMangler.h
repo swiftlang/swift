@@ -65,17 +65,17 @@ protected:
 // The mangler for specialized generic functions.
 class GenericSpecializationMangler : public SpecializationMangler {
 
-  SubstitutionList Subs;
+  SubstitutionMap SubMap;
   bool isReAbstracted;
 
 public:
 
   GenericSpecializationMangler(SILFunction *F,
-                               SubstitutionList Subs,
+                               SubstitutionMap SubMap,
                                IsSerialized_t Serialized,
                                bool isReAbstracted)
     : SpecializationMangler(SpecializationPass::GenericSpecializer, Serialized, F),
-      Subs(Subs), isReAbstracted(isReAbstracted) {}
+      SubMap(SubMap), isReAbstracted(isReAbstracted) {}
 
   std::string mangle();
 };
@@ -127,6 +127,8 @@ class FunctionSignatureSpecializationMangler : public SpecializationMangler {
     Dead=32,
     OwnedToGuaranteed=64,
     SROA=128,
+    GuaranteedToOwned=256,
+    ExistentialToGeneric=512,
     First_OptionSetEntry=32, LastOptionSetEntry=32768,
   };
 
@@ -149,12 +151,14 @@ public:
                               ThinToThickFunctionInst *TTTFI);
   void setArgumentDead(unsigned OrigArgIdx);
   void setArgumentOwnedToGuaranteed(unsigned OrigArgIdx);
+  void setArgumentGuaranteedToOwned(unsigned OrigArgIdx);
+  void setArgumentExistentialToGeneric(unsigned OrigArgIdx);
   void setArgumentSROA(unsigned OrigArgIdx);
   void setArgumentBoxToValue(unsigned OrigArgIdx);
   void setArgumentBoxToStack(unsigned OrigArgIdx);
   void setReturnValueOwnedToUnowned();
 
-  std::string mangle(int UniqueID = 0);
+  std::string mangle();
   
 private:
   void mangleConstantProp(LiteralInst *LI);

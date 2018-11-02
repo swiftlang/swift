@@ -1,0 +1,4 @@
+// RUN: not test -d '%swift_src_root'/.git || not git -C '%swift_src_root' grep '\bDEBUG[(]' || (printf '\n*** The DE'B'UG(...) macro is being renamed to LLVM_DEBUG(...);\n*** please use that instead.\n' && false)
+
+If you see a failure in this test, that means you introduced a use of the DEBUG
+macro from LLVM, which is being renamed to LLVM_DEBUG.

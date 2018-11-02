@@ -34,6 +34,7 @@ class SemaAnnotator : public ASTWalker {
   SmallVector<ConstructorRefCallExpr *, 2> CtorRefs;
   SmallVector<ExtensionDecl *, 2> ExtDecls;
   bool Cancelled = false;
+  Optional<AccessKind> OpAccess;
 
 public:
   explicit SemaAnnotator(SourceEntityWalker &SEWalker)
@@ -62,6 +63,8 @@ private:
   bool passModulePathElements(ArrayRef<ImportDecl::AccessPathElement> Path,
                               const clang::Module *ClangMod);
 
+  bool passReference(ValueDecl *D, Type Ty, SourceLoc Loc, SourceRange Range,
+                     ReferenceMetaData Data);
   bool passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data);
   bool passReference(ModuleEntity Mod, std::pair<Identifier, SourceLoc> IdLoc);
 
@@ -115,9 +118,8 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
     };
 
     if (auto AF = dyn_cast<AbstractFunctionDecl>(VD)) {
-      for (auto *PL : AF->getParameterLists())
-        if (ReportParamList(PL))
-          return false;
+      if (ReportParamList(AF->getParameters()))
+        return false;
     }
     if (auto SD = dyn_cast<SubscriptDecl>(VD)) {
       if (ReportParamList(SD->getIndices()))
@@ -211,11 +213,18 @@ std::pair<bool, Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
   bool TraverseChildren = SEWalker.walkToStmtPre(S);
   if (TraverseChildren) {
     if (auto *DeferS = dyn_cast<DeferStmt>(S)) {
+      // Since 'DeferStmt::getTempDecl()' is marked as implicit, we manually
+      // walk into the body.
       if (auto *FD = DeferS->getTempDecl()) {
         auto *RetS = FD->getBody()->walk(*this);
-        // Already walked children.
-        return { false, RetS };
+        assert(RetS == FD->getBody());
+        (void)RetS;
       }
+      bool Continue = SEWalker.walkToStmtPost(DeferS);
+      if (!Continue)
+        Cancelled = true;
+      // Already walked children.
+      return { false, Continue ? DeferS : nullptr };
     }
   }
   return { TraverseChildren, S };
@@ -236,13 +245,9 @@ static SemaReferenceKind getReferenceKind(Expr *Parent, Expr *E) {
   return SemaReferenceKind::DeclRef;
 }
 
-static Optional<AccessKind> getAccessKind(Expr *E) {
-  if (E->hasLValueAccessKind())
-    return E->getLValueAccessKind();
-  return None;
-}
-
 std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
+  assert(E);
+
   if (isDone())
     return { false, nullptr };
 
@@ -252,10 +257,10 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   if (auto *CtorRefE = dyn_cast<ConstructorRefCallExpr>(E))
     CtorRefs.push_back(CtorRefE);
 
-  if (E->isImplicit())
+  if (!isa<InOutExpr>(E) &&
+      !isa<LoadExpr>(E) &&
+      E->isImplicit())
     return { true, E };
-
-  Optional<AccessKind> OpAccess = getAccessKind(E);
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     if (auto *module = dyn_cast<ModuleDecl>(DRE->getDecl())) {
@@ -269,9 +274,25 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       return { false, nullptr };
     }
   } else if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
-    // Visit in source order.
-    if (!MRE->getBase()->walk(*this))
-      return { false, nullptr };
+    {
+      // This could be made more accurate if the member is nonmutating,
+      // or whatever.
+      Optional<AccessKind> NewOpAccess;
+      if (OpAccess) {
+        if (*OpAccess == AccessKind::Write)
+          NewOpAccess = AccessKind::ReadWrite;
+        else
+          NewOpAccess = OpAccess;
+      }
+
+      llvm::SaveAndRestore<Optional<AccessKind>>
+        C(this->OpAccess, NewOpAccess);
+
+      // Visit in source order.
+      if (!MRE->getBase()->walk(*this))
+        return { false, nullptr };
+    }
+
     if (!passReference(MRE->getMember().getDecl(), MRE->getType(),
                        MRE->getNameLoc(),
                        ReferenceMetaData(SemaReferenceKind::DeclMemberRef,
@@ -317,6 +338,32 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       return { false, nullptr };
     return { false, E };
 
+  } else if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
+    for (auto &component : KPE->getComponents()) {
+      switch (component.getKind()) {
+      case KeyPathExpr::Component::Kind::Property:
+      case KeyPathExpr::Component::Kind::Subscript: {
+        auto *decl = component.getDeclRef().getDecl();
+        auto loc = component.getLoc();
+        SourceRange range(loc, loc);
+        passReference(decl, component.getComponentType(), loc, range,
+                      ReferenceMetaData(
+                        (isa<SubscriptDecl>(decl)
+                          ? SemaReferenceKind::SubscriptRef
+                          : SemaReferenceKind::DeclMemberRef),
+                        OpAccess));
+        break;
+      }
+
+      case KeyPathExpr::Component::Kind::Invalid:
+      case KeyPathExpr::Component::Kind::UnresolvedProperty:
+      case KeyPathExpr::Component::Kind::UnresolvedSubscript:
+      case KeyPathExpr::Component::Kind::OptionalChain:
+      case KeyPathExpr::Component::Kind::OptionalWrap:
+      case KeyPathExpr::Component::Kind::OptionalForce:
+        break;
+      }
+    }
   } else if (auto *BinE = dyn_cast<BinaryExpr>(E)) {
     // Visit in source order.
     if (!BinE->getArg()->getElement(0)->walk(*this))
@@ -336,6 +383,44 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       if (!passCallArgNames(CallE->getFn(), TupleE))
         return { false, nullptr };
     }
+  } else if (auto IOE = dyn_cast<InOutExpr>(E)) {
+    llvm::SaveAndRestore<Optional<AccessKind>>
+      C(this->OpAccess, AccessKind::ReadWrite);
+
+    if (!IOE->getSubExpr()->walk(*this))
+      return { false, nullptr };
+
+    // We already visited the children.
+    if (!walkToExprPost(E))
+      return { false, nullptr };
+    return { false, E };
+  } else if (auto LE = dyn_cast<LoadExpr>(E)) {
+    llvm::SaveAndRestore<Optional<AccessKind>>
+      C(this->OpAccess, AccessKind::Read);
+
+    if (!LE->getSubExpr()->walk(*this))
+      return { false, nullptr };
+
+    // We already visited the children.
+    if (!walkToExprPost(E))
+      return { false, nullptr };
+    return { false, E };
+  } else if (auto AE = dyn_cast<AssignExpr>(E)) {
+    {
+      llvm::SaveAndRestore<Optional<AccessKind>>
+        C(this->OpAccess, AccessKind::Write);
+
+      if (AE->getDest() && !AE->getDest()->walk(*this))
+        return { false, nullptr };
+    }
+
+    if (AE->getSrc() && !AE->getSrc()->walk(*this))
+      return { false, nullptr };
+
+    // We already visited the children.
+    if (!walkToExprPost(E))
+      return { false, nullptr };
+    return { false, E };
   }
 
   return { true, E };
@@ -452,31 +537,37 @@ bool SemaAnnotator::passSubscriptReference(ValueDecl *D, SourceLoc Loc,
 
 bool SemaAnnotator::
 passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data) {
+  return passReference(D, Ty, Loc.getBaseNameLoc(), Loc.getSourceRange(), Data);
+}
+
+bool SemaAnnotator::
+passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
+              ReferenceMetaData Data) {
   TypeDecl *CtorTyRef = nullptr;
   ExtensionDecl *ExtDecl = nullptr;
 
   if (auto *TD = dyn_cast<TypeDecl>(D)) {
-    if (!CtorRefs.empty() && Loc.isValid()) {
+    if (!CtorRefs.empty() && BaseNameLoc.isValid()) {
       Expr *Fn = CtorRefs.back()->getFn();
-      if (Fn->getLoc() == Loc.getBaseNameLoc()) {
+      if (Fn->getLoc() == BaseNameLoc) {
         D = extractDecl(Fn);
         CtorTyRef = TD;
       }
     }
 
-    if (!ExtDecls.empty() && Loc.isValid()) {
+    if (!ExtDecls.empty() && BaseNameLoc.isValid()) {
       auto ExtTyLoc = ExtDecls.back()->getExtendedTypeLoc().getLoc();
-      if (ExtTyLoc.isValid() && ExtTyLoc == Loc.getBaseNameLoc()) {
+      if (ExtTyLoc.isValid() && ExtTyLoc == BaseNameLoc) {
         ExtDecl = ExtDecls.back();
       }
     }
   }
 
-  CharSourceRange Range =
+  CharSourceRange CharRange =
     Lexer::getCharSourceRangeFromSourceRange(D->getASTContext().SourceMgr,
-                                             Loc.getSourceRange());
-  bool Continue = SEWalker.visitDeclReference(D, Range, CtorTyRef, ExtDecl, Ty,
-                                              Data);
+                                             Range);
+  bool Continue = SEWalker.visitDeclReference(D, CharRange, CtorTyRef, ExtDecl,
+                                              Ty, Data);
   if (!Continue)
     Cancelled = true;
   return Continue;

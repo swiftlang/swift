@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 // rdar://problem/20714534 -- we need to canonicalize an associated type's
 // protocols when emitting witness method table for a conformance.

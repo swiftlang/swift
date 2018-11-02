@@ -238,6 +238,7 @@ func testFunctionCollectionTypes() {
 
   _ = [1 -> Int]() // expected-error {{expected type before '->'}}
   _ = [Int -> 1]() // expected-error {{expected type after '->'}}
+    // expected-error@-1 {{single argument function types require parentheses}}
 
   // Should parse () as void type when before or after arrow
   _ = [() -> Int]()

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -swift-version 4 -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -swift-version 4 -enable-sil-ownership %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

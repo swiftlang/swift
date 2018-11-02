@@ -73,7 +73,6 @@ AbstractionPattern TypeConverter::getAbstractionPattern(VarDecl *var) {
     genericSig = sig->getCanonicalSignature();
 
   CanType swiftType = var->getInterfaceType()
-                         ->getInOutObjectType()
                          ->getCanonicalType();
 
   if (auto clangDecl = var->getClangDecl()) {

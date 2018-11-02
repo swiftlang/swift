@@ -27,6 +27,7 @@
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <map>
 #include <vector>
 
 namespace swift {
@@ -341,6 +342,10 @@ struct unvalidatedObjectTraits : public std::integral_constant<bool,
 && !has_ObjectValidateTraits<T>::value> {};
 
 class Output {
+public:
+  using UserInfoMap = std::map<void *, void *>;
+
+private:
   enum State {
     ArrayFirstValue,
     ArrayOtherValue,
@@ -353,12 +358,18 @@ class Output {
   bool PrettyPrint;
   bool NeedBitValueComma;
   bool EnumerationMatchFound;
+  UserInfoMap UserInfo;
 
 public:
-  Output(llvm::raw_ostream &os, bool PrettyPrint = true) : Stream(os),
-      PrettyPrint(PrettyPrint), NeedBitValueComma(false),
-      EnumerationMatchFound(false) {}
+  Output(llvm::raw_ostream &os, UserInfoMap UserInfo = {},
+         bool PrettyPrint = true)
+      : Stream(os), PrettyPrint(PrettyPrint), NeedBitValueComma(false),
+        EnumerationMatchFound(false), UserInfo(UserInfo) {}
   virtual ~Output() = default;
+
+  UserInfoMap &getUserInfo() {
+    return UserInfo;
+  }
 
   unsigned beginArray();
   bool preflightElement(unsigned, void *&);

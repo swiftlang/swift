@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -enable-sil-ownership %s | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -101,6 +101,17 @@ func fooUsesUninitializedValue() {
 fooUsesUninitializedValue()
 NotInitializedInteger = 10
 fooUsesUninitializedValue()
+
+// Test initialization of variables captured by top-level defer.
+
+// CHECK: alloc_global @$S8toplevel9uninitVarSiv
+// CHECK-NEXT: [[UNINIADDR:%[0-9]+]] = global_addr @$S8toplevel9uninitVarSiv
+// CHECK-NEXT: [[UNINIMUI:%[0-9]+]] = mark_uninitialized [var] [[UNINIADDR]] : $*Int
+// CHECK-NEXT: mark_function_escape [[UNINIMUI]] : $*Int
+var uninitVar: Int
+defer {
+  print(uninitVar)
+}
 
 
 

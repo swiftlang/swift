@@ -27,7 +27,7 @@ enum E {
 
 // CHECK-NORMAL-LABEL:define hidden swiftcc i{{.*}} @"$S12enum_derived1EO9hashValueSivg"(i8)
 // CHECK-TESTABLE-LABEL:define{{( dllexport)?}}{{( protected)?}} swiftcc i{{.*}} @"$S12enum_derived1EO9hashValueSivg"(i8)
-// CHECK: call swiftcc void @"$Ss6HasherVABycfC"(%Ts6HasherV* {{.*}})
+// CHECK: call swiftcc void @"$Ss6HasherV5_seedABs6UInt64V_AEt_tcfC"(%Ts6HasherV* {{.*}})
 // CHECK: call swiftcc i{{[0-9]+}} @"$Ss6HasherV9_finalizeSiyF"(%Ts6HasherV* {{.*}})
 // CHECK: ret i{{[0-9]+}} %{{[0-9]+}}
 

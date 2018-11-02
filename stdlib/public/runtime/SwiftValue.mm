@@ -219,16 +219,12 @@ swift::findSwiftValueConformances(const ExistentialTypeMetadata *existentialType
   if (existentialType->getSuperclassConstraint() != nullptr)
     return false;
 
-  auto &protocols = existentialType->Protocols;
-
   Class cls = nullptr;
 
   // Note that currently we never modify tablesBuffer because
   // _SwiftValue doesn't conform to any protocols that need witness tables.
 
-  for (size_t i = 0, e = protocols.NumProtocols; i != e; ++i) {
-    auto protocol = protocols[i];
-
+  for (auto protocol : existentialType->getProtocols()) {
     // _SwiftValue only conforms to ObjC protocols.  We specifically
     // don't want to say that _SwiftValue conforms to the Swift protocols
     // that NSObject conforms to because that would create a situation
@@ -236,13 +232,13 @@ swift::findSwiftValueConformances(const ExistentialTypeMetadata *existentialType
     // by way of coercion through _SwiftValue.  Eventually we want to
     // change _SwiftValue to not be an NSObject subclass at all.
 
-    if (protocol->Flags.getDispatchStrategy() != ProtocolDispatchStrategy::ObjC)
+    if (!protocol.isObjC())
       return false;
 
     if (!cls) cls = _getSwiftValueClass();
 
     // Check whether the class conforms to the protocol.
-    if (![cls conformsToProtocol: protocol_const_cast(protocol)])
+    if (![cls conformsToProtocol: protocol.getObjCProtocol()])
       return false;
   }
 

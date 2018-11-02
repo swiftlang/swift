@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enforce-exclusivity=none -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil -enforce-exclusivity=none -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
 // FIXME: Update for select_enum change.
 
 // Declare this SIL to be canonical because some tests break raw SIL

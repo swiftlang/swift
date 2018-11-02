@@ -234,8 +234,8 @@ public func checkRandomAccessIndex<Instances, Distances, BaseCollection>(
     (Instances.Index, Instances.Index) -> Distances.Element,
   advanceOracle:
     (Instances.Index, Distances.Index) -> Instances.Element,
-  startIndex: Instances.Iterator.Element,
-  endIndex: Instances.Iterator.Element,
+  startIndex: Instances.Element,
+  endIndex: Instances.Element,
 
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),

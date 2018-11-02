@@ -23,16 +23,14 @@ import SwiftShims
 
 /// Returns `true` iff the given `index` is valid as a position, i.e. `0
 /// ≤ index ≤ count`.
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
+@usableFromInline @_transparent
 internal func _isValidArrayIndex(_ index: Int, count: Int) -> Bool {
   return (index >= 0) && (index <= count)
 }
 
 /// Returns `true` iff the given `index` is valid for subscripting, i.e.
 /// `0 ≤ index < count`.
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
+@usableFromInline @_transparent
 internal func _isValidArraySubscript(_ index: Int, count: Int) -> Bool {
   return (index >= 0) && (index < count)
 }
@@ -161,6 +159,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
       to: Optional<AnyObject>.self)
   }
 
+  @usableFromInline
   internal typealias HeapBufferStorage = _HeapBufferStorage<Int, AnyObject>
 
   @inlinable

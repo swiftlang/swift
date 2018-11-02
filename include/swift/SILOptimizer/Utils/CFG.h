@@ -171,6 +171,9 @@ void completeJointPostDominanceSet(
     ArrayRef<SILBasicBlock *> UserBlocks, ArrayRef<SILBasicBlock *> DefBlocks,
     llvm::SmallVectorImpl<SILBasicBlock *> &Completion);
 
+/// \brief Remove all unreachable blocks in a function.
+bool removeUnreachableBlocks(SILFunction &Fn);
+
 } // end namespace swift
 
 #endif

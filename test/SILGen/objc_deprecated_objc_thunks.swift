@@ -1,8 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen -enable-swift3-objc-inference -swift-version 4 -enable-sil-ownership | %FileCheck -check-prefix CHECK-SWIFT4 %s
-
-// RUN: %target-swift-frontend -sdk %S/Inputs %s -enable-sil-ownership -I %S/Inputs -enable-source-import -emit-silgen -swift-version 3 | %FileCheck -check-prefix CHECK-SWIFT3 %s
-
-// REQUIRES: objc_interop
+// RUN: %target-swift-emit-silgen -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -enable-swift3-objc-inference -swift-version 4 -enable-sil-ownership -enable-objc-interop | %FileCheck -check-prefix CHECK-SWIFT4 %s
 
 import Foundation
 

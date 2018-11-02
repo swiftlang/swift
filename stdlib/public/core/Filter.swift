@@ -408,11 +408,3 @@ extension LazyFilterCollection {
     }
   }
 }
-
-// @available(*, deprecated, renamed: "LazyFilterSequence.Iterator")
-public typealias LazyFilterIterator<T: Sequence> = LazyFilterSequence<T>.Iterator
-// @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use Base.Index")
-public typealias LazyFilterIndex<Base: Collection> = Base.Index
-@available(*, deprecated, renamed: "LazyFilterCollection")
-public typealias LazyFilterBidirectionalCollection<T> = LazyFilterCollection<T> where T : BidirectionalCollection
-

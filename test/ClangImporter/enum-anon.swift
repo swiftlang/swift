@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -typecheck %s -import-objc-header %S/Inputs/enum-anon.h -DDIAGS -verify
-// RUN: %target-swift-frontend -emit-ir %s -import-objc-header %S/Inputs/enum-anon.h | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-%target-runtime %s
+// RUN: %target-swift-frontend -typecheck %s -enable-objc-interop -import-objc-header %S/Inputs/enum-anon.h -DDIAGS -verify
+// RUN: %target-swift-frontend -emit-ir %s -enable-objc-interop -import-objc-header %S/Inputs/enum-anon.h | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-%target-runtime %s
 
 #if DIAGS
 func testDiags() {

@@ -48,29 +48,6 @@ extension LazySequenceProtocol {
   > {
     return self.map(transform).filter { $0 != nil }.map { $0! }
   }
-
-  /// Returns the non-`nil` results of mapping the given transformation over
-  /// this sequence.
-  ///
-  /// Use this method to receive a sequence of nonoptional values when your
-  /// transformation produces an optional value.
-  ///
-  /// - Parameter transform: A closure that accepts an element of this sequence
-  ///   as its argument and returns an optional value.
-  ///
-  /// - Complexity: O(1)
-  @inline(__always)
-  @available(swift, deprecated: 4.1, renamed: "compactMap(_:)",
-    message: "Please use compactMap(_:) for the case where closure returns an optional value")
-  public func flatMap<ElementOfResult>(
-    _ transform: @escaping (Elements.Element) -> ElementOfResult?
-  ) -> LazyMapSequence<
-    LazyFilterSequence<
-      LazyMapSequence<Elements, ElementOfResult?>>,
-    ElementOfResult
-  > {
-    return self.compactMap(transform)
-  }
 }
 
 extension LazyCollectionProtocol {
@@ -105,29 +82,6 @@ extension LazyCollectionProtocol {
   /// - Complexity: O(1)
   @inlinable // FIXME(sil-serialize-all)
   public func compactMap<ElementOfResult>(
-    _ transform: @escaping (Elements.Element) -> ElementOfResult?
-  ) -> LazyMapCollection<
-    LazyFilterCollection<
-      LazyMapCollection<Elements, ElementOfResult?>>,
-    ElementOfResult
-  > {
-    return self.map(transform).filter { $0 != nil }.map { $0! }
-  }
-
-  /// Returns the non-`nil` results of mapping the given transformation over
-  /// this collection.
-  ///
-  /// Use this method to receive a collection of nonoptional values when your
-  /// transformation produces an optional value.
-  ///
-  /// - Parameter transform: A closure that accepts an element of this
-  ///   collection as its argument and returns an optional value.
-  ///
-  /// - Complexity: O(1)
-  @available(swift, deprecated: 4.1, renamed: "compactMap(_:)",
-    message: "Please use compactMap(_:) for the case where closure returns an optional value")
-  @inlinable // FIXME(sil-serialize-all)
-  public func flatMap<ElementOfResult>(
     _ transform: @escaping (Elements.Element) -> ElementOfResult?
   ) -> LazyMapCollection<
     LazyFilterCollection<

@@ -16,10 +16,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "TypeCheckObjC.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
@@ -162,7 +165,9 @@ public:
         }
       });
 
-      gft->getInput().walk(walker);
+      for (const auto &param : gft->getParams())
+        param.getType().walk(walker);
+
       gft->getResult().walk(walker);
     }
   }
@@ -224,6 +229,13 @@ public:
     }
   }
 
+  bool shouldWalkIntoLazyInitializers() override {
+    // We don't want to walk into lazy initializers because they're not
+    // really present at this level.  We'll catch them when processing
+    // the getter.
+    return false;
+  }
+
   std::pair<bool, Expr *> walkToDeclRefExpr(DeclRefExpr *DRE) {
     auto *D = DRE->getDecl();
 
@@ -232,8 +244,13 @@ public:
     // parameter references transitively.
     if (!D->getDeclContext()->isLocalContext()) {
       if (!AFR.isObjC() || !D->isObjC() || isa<ConstructorDecl>(D)) {
-        for (auto sub : DRE->getDeclRef().getSubstitutions()) {
-          checkType(sub.getReplacement(), DRE->getLoc());
+        if (auto subMap = DRE->getDeclRef().getSubstitutions()) {
+          auto genericSig = subMap.getGenericSignature();
+          for (auto gp : genericSig->getGenericParams()) {
+            if (auto type = Type(gp).subst(subMap)) {
+              checkType(type, DRE->getLoc());
+            }
+          }
         }
       }
     }
@@ -254,6 +271,22 @@ public:
         if (TmpDC == DC)
           break;
 
+        // The initializer of a lazy property will eventually get
+        // recontextualized into it, so treat it as if it's already there.
+        if (auto init = dyn_cast<PatternBindingInitializer>(TmpDC)) {
+          if (auto lazyVar = init->getInitializedLazyVar()) {
+            // Referring to the 'self' parameter is fine.
+            if (D == init->getImplicitSelfDecl())
+              return { false, DRE };
+
+            // Otherwise, act as if we're in the getter.
+            auto getter = lazyVar->getGetter();
+            assert(getter && "lazy variable without getter");
+            TmpDC = getter;
+            continue;
+          }
+        }
+
         // We have an intervening nominal type context that is not the
         // declaration context, and the declaration context is not global.
         // This is not supported since nominal types cannot capture values.
@@ -263,7 +296,8 @@ public:
                         NTD->getDescriptiveKind(),
                         D->getBaseName().getIdentifier());
 
-            TC.diagnose(NTD->getLoc(), diag::type_declared_here);
+            TC.diagnose(NTD->getLoc(), diag::kind_declared_here,
+                        DescriptiveDeclKind::Type);
 
             TC.diagnose(D, diag::decl_declared_here, D->getFullName());
             return { false, DRE };
@@ -373,8 +407,14 @@ public:
 
     // If this is a direct reference to underlying storage, then this is a
     // capture of the storage address - not a capture of the getter/setter.
-    if (DRE->getAccessSemantics() == AccessSemantics::DirectToStorage)
-      Flags |= CapturedValue::IsDirect;
+    if (auto var = dyn_cast<VarDecl>(D)) {
+      if (var->getAccessStrategy(DRE->getAccessSemantics(),
+                                 var->supportsMutation()
+                                   ? AccessKind::ReadWrite : AccessKind::Read,
+                                 AFR.getAsDeclContext())
+          .getKind() == AccessStrategy::Storage)
+        Flags |= CapturedValue::IsDirect;
+    }
 
     // If the closure is noescape, then we can capture the decl as noescape.
     if (AFR.isKnownNoEscape())
@@ -429,11 +469,10 @@ public:
 
       // Can default parameter initializers capture state?  That seems like
       // a really bad idea.
-      for (auto *paramList : AFD->getParameterLists())
-        for (auto param : *paramList) {
-          if (auto E = param->getDefaultValue())
-            E->walk(*this);
-        }
+      for (auto *param : *AFD->getParameters())
+        if (auto E = param->getDefaultValue())
+          E->walk(*this);
+
       return false;
     }
 
@@ -610,6 +649,12 @@ public:
     if (auto *DRE = dyn_cast<DeclRefExpr>(E))
       return walkToDeclRefExpr(DRE);
 
+    // Look into lazy initializers.
+    if (auto *LIE = dyn_cast<LazyInitializerExpr>(E)) {
+      LIE->getSubExpr()->walk(*this);
+      return { true, E };
+    }
+
     // When we see a reference to the 'super' expression, capture 'self' decl.
     if (auto *superE = dyn_cast<SuperRefExpr>(E)) {
       auto CurDC = AFR.getAsDeclContext();
@@ -712,9 +757,13 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
         if (!PBD) continue;
         // Walk the initializers for all properties declared in the type with
         // an initializer.
-        for (auto &elt : PBD->getPatternList())
+        for (auto &elt : PBD->getPatternList()) {
+          if (elt.isInitializerLazy())
+            continue;
+
           if (auto *init = elt.getInit())
             init->walk(finder);
+        }
       }
     }
   }

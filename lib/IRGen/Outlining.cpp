@@ -35,8 +35,13 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType type) {
     return;
   }
 
-  CanType formalType = type.getSwiftRValueType();
-  if (isa<FixedTypeInfo>(IGF.IGM.getTypeInfoForLowered(formalType))) {
+  auto formalType = type.getASTType();
+  auto &ti = IGF.IGM.getTypeInfoForLowered(formalType);
+
+  // We don't need the metadata for fixed size types or types that are not ABI
+  // accessible. Outlining will call the value witness of the enclosing type of
+  // non ABI accessible field/element types.
+  if (isa<FixedTypeInfo>(ti) || !ti.isABIAccessible()) {
     return;
   }
 
@@ -47,7 +52,7 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType type) {
     return collectFormalTypeMetadata(formalType);
   }
 
-  auto key = LocalTypeDataKey(type.getSwiftRValueType(),
+  auto key = LocalTypeDataKey(type.getASTType(),
                             LocalTypeDataKind::forRepresentationTypeMetadata());
   if (Values.count(key)) return;
 
@@ -100,7 +105,7 @@ void OutliningMetadataCollector::bindMetadataParameters(IRGenFunction &IGF,
 
 std::pair<CanType, CanGenericSignature>
 irgen::getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
-  auto loweredType = type.getSwiftRValueType();
+  auto loweredType = type.getASTType();
   if (loweredType->hasArchetype()) {
     GenericEnvironment *env = nullptr;
     loweredType.findIf([&env](Type t) -> bool {

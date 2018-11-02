@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name casts -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name casts -enable-sil-ownership %s | %FileCheck %s
 
 class B { }
 class D : B { }

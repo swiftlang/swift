@@ -112,8 +112,17 @@ public:
 
   /// Whether this version is greater than or equal to the given major version
   /// number.
-  bool isVersionAtLeast(unsigned major) const {
-    return !empty() && Components[0] >= major;
+  bool isVersionAtLeast(unsigned major, unsigned minor = 0) const {
+    switch (size()) {
+    case 0:
+      return false;
+    case 1:
+      return ((Components[0] == major && 0 == minor) ||
+              (Components[0] > major));
+    default:
+      return ((Components[0] == major && Components[1] >= minor) ||
+              (Components[0] > major));
+    }
   }
 
   /// Return this Version struct with minor and sub-minor components stripped

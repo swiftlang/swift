@@ -138,7 +138,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
                        IsNotTransparent, IsNotSerialized);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
-  SILGenFunction(*this, *thunk)
+  SILGenFunction(*this, *thunk, theClass)
     .emitVTableThunk(derived, implFn, basePattern,
                      overrideInfo.LoweredType,
                      derivedInfo.LoweredType);
@@ -341,7 +341,7 @@ public:
 
     auto witnessStorage = cast<AbstractStorageDecl>(witness.getDecl());
     auto witnessAccessor =
-      witnessStorage->getAccessorFunction(reqAccessor->getAccessorKind());
+      witnessStorage->getAccessor(reqAccessor->getAccessorKind());
     if (!witnessAccessor)
       return asDerived().addMissingMethod(requirementRef);
 
@@ -604,25 +604,40 @@ SILFunction *SILGenModule::emitProtocolWitness(
 
   // Mapping from the requirement's generic signature to the witness
   // thunk's generic signature.
-  auto reqtSubs = witness.getRequirementToSyntheticSubs();
-  auto reqtSubMap = reqtOrigTy->getGenericSignature()->getSubstitutionMap(reqtSubs);
+  auto reqtSubMap = witness.getRequirementToSyntheticSubs();
 
   // The generic environment for the witness thunk.
   auto *genericEnv = witness.getSyntheticEnvironment();
 
   // The type of the witness thunk.
-  auto input = reqtOrigTy->getInput().subst(reqtSubMap)->getCanonicalType();
-  auto result = reqtOrigTy->getResult().subst(reqtSubMap)->getCanonicalType();
+  auto substReqtTy =
+        cast<AnyFunctionType>(reqtOrigTy.subst(reqtSubMap)->getCanonicalType());
+
+  // If there's something to map to for the witness thunk, the conformance
+  // should be phrased in the same terms. This particularly applies to classes
+  // where a thunk for a method in a conformance like `extension Class: P where
+  // T: Q` will go from its native signature of `<τ_0_0 where τ_0_0: Q>` (with T
+  // canonicalised to τ_0_0), to `<τ_0_0, τ_1_0 where τ_0_0: Class<τ_1_0>,
+  // τ_1_0: Q>` (with T now represented by τ_1_0). Find the right conformance by
+  // looking for the conformance of 'Self'.
+  if (reqtSubMap) {
+    auto requirement = conformance.getRequirement();
+    auto self = requirement->getProtocolSelfType()->getCanonicalType();
+
+    conformance = *reqtSubMap.lookupConformance(self, requirement);
+  }
 
   CanAnyFunctionType reqtSubstTy;
   if (genericEnv) {
     auto *genericSig = genericEnv->getGenericSignature();
     reqtSubstTy = CanGenericFunctionType::get(
         genericSig->getCanonicalSignature(),
-        input, result, reqtOrigTy->getExtInfo());
+        substReqtTy->getParams(), substReqtTy.getResult(),
+        reqtOrigTy->getExtInfo());
   } else {
-    reqtSubstTy = CanFunctionType::get(
-        input, result, reqtOrigTy->getExtInfo());
+    reqtSubstTy = CanFunctionType::get(substReqtTy->getParams(),
+                                       substReqtTy.getResult(),
+                                       reqtOrigTy->getExtInfo());
   }
 
   // FIXME: this needs to pull out the conformances/witness-tables for any
@@ -661,7 +676,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   PrettyStackTraceSILFunction trace("generating protocol witness thunk", f);
 
   // Create the witness.
-  SILGenFunction SGF(*this, *f);
+  SILGenFunction SGF(*this, *f, SwiftModule);
 
   // Substitutions mapping the generic parameters of the witness to
   // archetypes of the witness thunk generic environment.
@@ -849,7 +864,7 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers.
     for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i) {
-      if (pd->getInit(i)) {
+      if (pd->getNonLazyInit(i)) {
         if (pd->isStatic())
           SGM.emitGlobalInitialization(pd, i);
         else
@@ -940,7 +955,7 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *pd) {
     // Emit initializers for static variables.
     for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i) {
-      if (pd->getInit(i)) {
+      if (pd->getNonLazyInit(i)) {
         assert(pd->isStatic() && "stored property in extension?!");
         SGM.emitGlobalInitialization(pd, i);
       }

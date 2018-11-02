@@ -37,4 +37,13 @@ ParseFile.test("ParseSingleFile") {
   })
 }
 
+ParseFile.test("ParseBuffer") {
+  expectDoesNotThrow({
+    let content = "func foo() {}"
+    let parsed = try SourceFileSyntax.decodeSourceFileSyntax(try
+      SwiftLang.parse(content))
+    expectEqual("\(parsed)", content)
+  })
+}
+
 runAllTests()

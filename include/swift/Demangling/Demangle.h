@@ -94,6 +94,8 @@ enum class FunctionSigSpecializationParamKind : unsigned {
   Dead = 1 << 6,
   OwnedToGuaranteed = 1 << 7,
   SROA = 1 << 8,
+  GuaranteedToOwned = 1 << 9,
+  ExistentialToGeneric = 1 << 10,
 };
 
 /// The pass that caused the specialization to occur. We use this to make sure

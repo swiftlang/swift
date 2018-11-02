@@ -84,6 +84,7 @@ public struct Character {
     return UInt64(Builtin.zext_Int63_Int64(value))
   }
 
+  @usableFromInline // FIXME(sil-serialize-all)
   typealias UTF16View = String.UTF16View
   @inlinable // FIXME(sil-serialize-all)
   internal var utf16: UTF16View {
@@ -130,7 +131,7 @@ extension Character
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @effects(readonly)
+  @_effects(readonly)
   public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
     self.init(Unicode.Scalar(_builtinUnicodeScalarLiteral: value))
   }
@@ -139,7 +140,7 @@ extension Character
   // integer constant in case of small character literals.
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
-  @effects(readonly)
+  @_effects(readonly)
   public init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     utf8CodeUnitCount: Builtin.Word,
@@ -194,7 +195,7 @@ extension Character
   // integer constant in case of small character literals.
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
-  @effects(readonly)
+  @_effects(readonly)
   public init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     utf16CodeUnitCount: Builtin.Word
@@ -366,13 +367,13 @@ extension Character : LosslessStringConvertible { }
 
 extension Character : CustomDebugStringConvertible {
   /// A textual representation of the character, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return String(self).debugDescription
   }
 }
 
 extension Character {
+  @usableFromInline
   internal typealias _SmallUTF16 = _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>
 
   @inlinable // FIXME(sil-serialize-all)
@@ -477,14 +478,16 @@ extension Character : Comparable {
 }
 
 extension Character: Hashable {
-  /// The character's hash value.
+  // not @inlinable (performance)
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
   ///
-  /// Hash values are not guaranteed to be equal across different executions of
-  /// your program. Do not save hash values to use during a future execution.
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @_effects(releasenone)
+  public func hash(into hasher: inout Hasher) {
     // FIXME(performance): constructing a temporary string is extremely
     // wasteful and inefficient.
-    return String(self).hashValue
+    hasher.combine(String(self))
   }
 }

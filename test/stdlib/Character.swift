@@ -202,6 +202,9 @@ CharacterTests.test("Unicode 9 grapheme breaking") {
   // Only run it on ObjC platforms. Supported Linux versions do not have a
   // recent enough ICU for Unicode 9 support.
 #if _runtime(_ObjC)
+  // Check for Unicode 9 or later
+  guard #available(iOS 10.0, macOS 10.12, *) else { return }
+
   let flags = "🇺🇸🇨🇦🇩🇰🏳️‍🌈"
   expectEqual(4, flags.count)
   expectEqual(flags.reversed().count, flags.count)

@@ -14,9 +14,11 @@
 // CHECK-NOT: @_PROPERTIES__TtC19objc_class_property7Smashed
 
 @objc class Smashed {
-  class var sharedSmashed: Smashed {
+  @objc class var sharedSmashed: Smashed {
     return Smashed()
   }
+
+  @objc init() {}
 }
 
 let s = Smashed.sharedSmashed

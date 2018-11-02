@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name switch_var -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name switch_var %s | %FileCheck %s
 
 // TODO: Implement tuple equality in the library.
 // BLOCKED: <rdar://problem/13822406>

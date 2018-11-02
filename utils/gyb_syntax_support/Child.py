@@ -9,13 +9,23 @@ class Child(object):
     restricted subset of acceptable kinds or texts.
     """
     def __init__(self, name, kind, description=None, is_optional=False,
-                 token_choices=None, text_choices=None, node_choices=None):
+                 token_choices=None, text_choices=None, node_choices=None,
+                 classification=None, force_classification=False):
+        """
+        If a classification is passed, it specifies the color identifiers in 
+        that subtree should inherit for syntax coloring. Must be a member of 
+        SyntaxClassification in SyntaxClassifier.h.gyb
+        If force_classification is also set to true, all child nodes (not only
+        identifiers) inherit the syntax classification.
+        """
         self.name = name
         self.swift_name = lowercase_first_word(name)
         self.syntax_kind = kind
         self.description = description
         self.swift_syntax_kind = lowercase_first_word(self.syntax_kind)
         self.type_name = kind_to_type(self.syntax_kind)
+        self.classification = classification
+        self.force_classification = force_classification
 
         # If the child has "token" anywhere in the kind, it's considered
         # a token node. Grab the existing reference to that token from the

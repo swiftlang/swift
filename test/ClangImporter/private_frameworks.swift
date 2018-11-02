@@ -9,19 +9,19 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -F %S/Inputs/privateframeworks/withprivate -o %t %S/Inputs/privateframeworks/overlay/SomeKit.swift
 
 // Use the overlay with private frameworks.
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-sil -o /dev/null -F %S/Inputs/privateframeworks/withprivate %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-sil -o /dev/null -F %S/Inputs/privateframeworks/withprivate -swift-version 4 %s -import-objc-header %S/Inputs/privateframeworks/bridging-somekitcore.h -verify
 
 // Use the overlay without private frameworks.
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-sil -o /dev/null -F %S/Inputs/privateframeworks/withoutprivate -I %t %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-sil -o /dev/null -F %S/Inputs/privateframeworks/withoutprivate -I %t -swift-version 4 -import-objc-header %S/Inputs/privateframeworks/bridging-somekit.h %s
 
 // Build the overlay with public frameworks.
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -F %S/Inputs/privateframeworks/withoutprivate -o %t %S/Inputs/privateframeworks/overlay/SomeKit.swift
 
 // Use the overlay with private frameworks.
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-sil -o /dev/null -F %S/Inputs/privateframeworks/withprivate %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-sil -o /dev/null -F %S/Inputs/privateframeworks/withprivate -swift-version 4 %s -import-objc-header %S/Inputs/privateframeworks/bridging-somekitcore.h -verify
 
 // Use the overlay without private frameworks.
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-sil -o /dev/null -F %S/Inputs/privateframeworks/withoutprivate -I %t %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-sil -o /dev/null -F %S/Inputs/privateframeworks/withoutprivate -I %t -swift-version 4 %s -import-objc-header %S/Inputs/privateframeworks/bridging-somekit.h 
 
 // REQUIRES: objc_interop
 
@@ -36,6 +36,8 @@ func testWidget(widget: SKWidget) {
 
   widget.doSomethingElse(widget)
   inlineWidgetOperations(widget)
+
+  let _ = widget.name
 }
 
 func testError(widget: SKWidget) {
@@ -43,3 +45,8 @@ func testError(widget: SKWidget) {
   if c.isBoom { }
 }
 
+func testGlobals() {
+  someKitGlobalFunc()
+  SomeKit.someKitOtherGlobalFunc()
+  someKitOtherGlobalFunc()
+}

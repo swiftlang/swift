@@ -443,27 +443,6 @@ func conformsTo<T1 : P2, T2 : Base<Int> & P2>(
   conformsToBaseIntAndP2WithWhereClause(baseAndP2Archetype)
 }
 
-//
-// Protocols with superclass-constrained Self -- not supported yet.
-//
-
-protocol ProtoConstraintsSelfToClass where Self : Base<Int> {}
-
-protocol ProtoRefinesClass : Base<Int> {} // FIXME expected-error {{}}
-protocol ProtoRefinesClassAndProtocolAlias : BaseIntAndP2 {}
-protocol ProtoRefinesClassAndProtocolDirect : Base<Int> & P2 {}
-protocol ProtoRefinesClassAndProtocolExpanded : Base<Int>, P2 {} // FIXME expected-error {{}}
-
-class ClassConformsToClassProtocolBad1 : ProtoConstraintsSelfToClass {}
-// expected-error@-1 {{'ProtoConstraintsSelfToClass' requires that 'ClassConformsToClassProtocolBad1' inherit from 'Base<Int>'}}
-// expected-note@-2 {{requirement specified as 'Self' : 'Base<Int>' [with Self = ClassConformsToClassProtocolBad1]}}
-class ClassConformsToClassProtocolGood1 : Derived, ProtoConstraintsSelfToClass {}
-
-class ClassConformsToClassProtocolBad2 : ProtoRefinesClass {}
-// expected-error@-1 {{'ProtoRefinesClass' requires that 'ClassConformsToClassProtocolBad2' inherit from 'Base<Int>'}}
-// expected-note@-2 {{requirement specified as 'Self' : 'Base<Int>' [with Self = ClassConformsToClassProtocolBad2]}}
-class ClassConformsToClassProtocolGood2 : Derived, ProtoRefinesClass {}
-
 // Subclass existentials inside inheritance clauses
 class CompositionInClassInheritanceClauseAlias : BaseIntAndP2 {
   required init(classInit: ()) {

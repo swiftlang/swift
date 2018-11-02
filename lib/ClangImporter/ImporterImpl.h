@@ -108,8 +108,8 @@ enum class ImportTypeKind {
   /// \brief Import the type of a literal value.
   Value,
 
-  /// \brief Import the type of a literal value that can be bridged.
-  BridgedValue,
+  /// \brief Import the type of an Objective-C generic argument.
+  ObjCCollectionElement,
 
   /// \brief Import the declared type of a variable.
   Variable,
@@ -196,8 +196,14 @@ enum class Bridgeability {
 ///
 /// In either case we end up losing sugar at some uses sites, so this is more
 /// about what the right default is.
-static inline Bridgeability getTypedefBridgeability(clang::QualType type) {
-  return type->isBlockPointerType() ? Bridgeability::Full : Bridgeability::None;
+static inline Bridgeability getTypedefBridgeability(
+                                          const clang::TypedefNameDecl *decl,
+                                          clang::QualType type) {
+    return decl->hasAttr<clang::SwiftBridgedTypedefAttr>()
+      ? Bridgeability::Full
+        : type->isBlockPointerType()
+        ? Bridgeability::Full
+          : Bridgeability::None;
 }
 
 /// \brief Describes the kind of the C type that can be mapped to a stdlib
@@ -619,11 +625,9 @@ public:
     } else if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
       assert(CD->getInterfaceType());
       ty = CD->getResultInterfaceType();
-    } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
-      ty = SD->getElementInterfaceType();
     } else {
-      auto *VD = cast<VarDecl>(decl);
-      ty = VD->getInterfaceType()->getReferenceStorageReferent();
+      ty = cast<AbstractStorageDecl>(decl)->getValueInterfaceType()
+                                          ->getReferenceStorageReferent();
     }
 #endif
 
@@ -1285,7 +1289,7 @@ public:
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
       ASD->setSetterAccess(access);
     // All imported decls are constructed fully validated.
-    D->setValidationStarted();
+    D->setValidationToChecked();
     if (auto AFD = dyn_cast<AbstractFunctionDecl>(static_cast<Decl *>(D)))
       AFD->setNeedsNewVTableEntry(false);
     return D;
@@ -1346,7 +1350,9 @@ public:
   void forEachDistinctName(
       const clang::NamedDecl *decl,
       llvm::function_ref<bool(importer::ImportedName,
-                              importer::ImportNameVersion)> action);
+                              importer::ImportNameVersion)> action) {
+    getNameImporter().forEachDistinctImportName(decl, CurrentVersion, action);
+  }
 
   /// Dump the Swift-specific name lookup tables we generate.
   void dumpSwiftLookupTables();
@@ -1374,6 +1380,10 @@ namespace importer {
 
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);
+
+/// Identifies certain UIKit constants that used to have overlay equivalents,
+/// but are now renamed using the swift_name attribute.
+bool isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl);
 
 /// Finds a particular kind of nominal by looking through typealiases.
 template <typename T>

@@ -20,6 +20,7 @@
 #include "Scope.h"
 #include "swift/AST/Initializer.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/SILUndef.h"
 
 using namespace swift;
@@ -29,10 +30,12 @@ using namespace Lowering;
 // SILGenFunction Class implementation
 //===----------------------------------------------------------------------===//
 
-SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F)
-    : SGM(SGM), F(F), silConv(SGM.M), StartOfPostmatter(F.end()),
-      B(*this), OpenedArchetypesTracker(&F),
+SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
+                               DeclContext *DC)
+    : SGM(SGM), F(F), silConv(SGM.M), FunctionDC(DC),
+      StartOfPostmatter(F.end()), B(*this), OpenedArchetypesTracker(&F),
       CurrentSILLoc(F.getLocation()), Cleanups(*this) {
+  assert(DC && "creating SGF without a DeclContext?");
   B.setInsertionPoint(createBasicBlock());
   B.setCurrentDebugScope(F.getDebugScope());
   B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
@@ -129,7 +132,7 @@ std::tuple<ManagedValue, SILType>
 SILGenFunction::emitSiblingMethodRef(SILLocation loc,
                                      SILValue selfValue,
                                      SILDeclRef methodConstant,
-                                     const SubstitutionMap &subMap) {
+                                     SubstitutionMap subMap) {
   SILValue methodValue;
 
   // If the method is dynamic, access it through runtime-hookable virtual
@@ -272,7 +275,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         // in-place.
         // TODO: Use immutable box for immutable captures.
         auto boxTy = SGM.Types.getContextBoxTypeForCapture(vd,
-                                       vl.value->getType().getSwiftRValueType(),
+                                       vl.value->getType().getASTType(),
                                        F.getGenericEnvironment(),
                                        /*mutable*/ true);
         
@@ -302,7 +305,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 ManagedValue
 SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                                  CanType expectedType,
-                                 SubstitutionList subs) {
+                                 SubstitutionMap subs) {
   auto closure = *constant.getAnyFunctionRef();
   auto captureInfo = closure.getCaptureInfo();
   auto loweredCaptureInfo = SGM.Types.getLoweredLocalCaptures(closure);
@@ -325,7 +328,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     // If we have a closure expression in generic context, Sema won't give
     // us substitutions, so we just use the forwarding substitutions from
     // context.
-    subs = getForwardingSubstitutions();
+    subs = getForwardingSubstitutionMap();
   }
 
   bool wasSpecialized = false;
@@ -387,8 +390,8 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 void SILGenFunction::emitFunction(FuncDecl *fd) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(fd);
 
-  emitProlog(fd, fd->getParameterLists(), fd->getResultInterfaceType(),
-             fd->hasThrows());
+  emitProlog(fd, fd->getParameters(), fd->getImplicitSelfDecl(),
+             fd->getResultInterfaceType(), fd->hasThrows());
   Type resultTy = fd->mapTypeIntoContext(fd->getResultInterfaceType());
   prepareEpilog(resultTy, fd->hasThrows(), CleanupLocation(fd));
 
@@ -402,8 +405,8 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ace);
 
   auto resultIfaceTy = ace->getResultType()->mapTypeOutOfContext();
-  emitProlog(ace, ace->getParameters(), resultIfaceTy,
-             ace->isBodyThrowing());
+  emitProlog(ace, ace->getParameters(), /*selfParam=*/nullptr,
+             resultIfaceTy, ace->isBodyThrowing());
   prepareEpilog(ace->getResultType(), ace->isBodyThrowing(),
                 CleanupLocation(ace));
   emitProfilerIncrement(ace);
@@ -438,17 +441,27 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     // we're getting away with it because the types are guaranteed to already
     // be imported.
     ASTContext &ctx = getASTContext();
-    ModuleDecl *UIKit = ctx.getLoadedModule(ctx.getIdentifier("UIKit"));
+    
+    std::pair<Identifier, SourceLoc> UIKitName =
+      {ctx.getIdentifier("UIKit"), SourceLoc()};
+    
+    ModuleDecl *UIKit = ctx
+      .getClangModuleLoader()
+      ->loadModule(SourceLoc(), UIKitName);
+    assert(UIKit && "couldn't find UIKit objc module?!");
     SmallVector<ValueDecl *, 1> results;
     UIKit->lookupQualified(UIKit->getInterfaceType(),
                            ctx.getIdentifier("UIApplicationMain"),
                            NL_QualifiedDefault,
                            /*resolver*/nullptr,
                            results);
-    assert(!results.empty() && "couldn't find UIApplicationMain in UIKit");
-    assert(results.size() == 1 && "more than one UIApplicationMain?");
+    assert(results.size() == 1
+           && "couldn't find a unique UIApplicationMain in the UIKit ObjC "
+              "module?!");
 
-    auto mainRef = SILDeclRef(results.front()).asForeign();
+    ValueDecl *UIApplicationMainDecl = results.front();
+
+    auto mainRef = SILDeclRef(UIApplicationMainDecl).asForeign();
     auto UIApplicationMainFn = SGM.M.getOrCreateFunction(mainClass, mainRef,
                                                          NotForDefinition);
     auto fnTy = UIApplicationMainFn->getLoweredFunctionType();
@@ -495,6 +508,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     // Fix up the string parameters to have the right type.
     SILType nameArgTy = fnConv.getSILArgumentType(3);
     assert(nameArgTy == fnConv.getSILArgumentType(2));
+    (void)nameArgTy;
     auto managedName = ManagedValue::forUnmanaged(optName);
     SILValue nilValue;
     assert(optName->getType() == nameArgTy);
@@ -505,7 +519,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     auto argvTy = fnConv.getSILArgumentType(1);
 
     SILType unwrappedTy = argvTy;
-    if (Type innerTy = argvTy.getSwiftRValueType()->getOptionalObjectType()) {
+    if (Type innerTy = argvTy.getASTType()->getOptionalObjectType()) {
       auto canInnerTy = innerTy->getCanonicalType();
       unwrappedTy = SILType::getPrimitiveObjectType(canInnerTy);
     }
@@ -515,8 +529,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     if (unwrappedTy != argv->getType()) {
       auto converted =
           emitPointerToPointer(mainClass, managedArgv,
-                               argv->getType().getSwiftRValueType(),
-                               unwrappedTy.getSwiftRValueType());
+                               argv->getType().getASTType(),
+                               unwrappedTy.getASTType());
       managedArgv = std::move(converted).getAsSingleValue(*this, mainClass);
     }
 
@@ -549,9 +563,9 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     // return NSApplicationMain(C_ARGC, C_ARGV);
 
     SILParameterInfo argTypes[] = {
-      SILParameterInfo(argc->getType().getSwiftRValueType(),
+      SILParameterInfo(argc->getType().getASTType(),
                        ParameterConvention::Direct_Unowned),
-      SILParameterInfo(argv->getType().getSwiftRValueType(),
+      SILParameterInfo(argv->getType().getASTType(),
                        ParameterConvention::Direct_Unowned),
     };
     auto NSApplicationMainType = SILFunctionType::get(nullptr,
@@ -563,7 +577,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                   ParameterConvention::Direct_Unowned,
                   argTypes,
                   /*yields*/ {},
-                  SILResultInfo(argc->getType().getSwiftRValueType(),
+                  SILResultInfo(argc->getType().getASTType(),
                                 ResultConvention::Unowned),
                   /*error result*/ None,
                   getASTContext());
@@ -612,7 +626,8 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {
 
   auto *dc = function.getDecl()->getInnermostDeclContext();
   auto interfaceType = value->getType()->mapTypeOutOfContext();
-  emitProlog({}, interfaceType, dc, false);
+  emitProlog(/*paramList=*/nullptr, /*selfParam=*/nullptr, interfaceType,
+             dc, false);
   prepareEpilog(value->getType(), false, CleanupLocation::get(Loc));
   emitReturnExpr(Loc, value);
   emitEpilog(Loc);
@@ -657,7 +672,6 @@ void SILGenFunction::emitProfilerIncrement(ASTNode N) {
       B.createIntegerLiteral(Loc, Int32Ty, CounterIt->second)};
   B.createBuiltin(Loc, C.getIdentifier("int_instrprof_increment"),
                   SGM.Types.getEmptyTupleType(), {}, Args);
-  SP->recordCounterUpdate();
 }
 
 ProfileCounter SILGenFunction::loadProfilerCount(ASTNode Node) const {

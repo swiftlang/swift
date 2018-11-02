@@ -157,21 +157,14 @@ public:
     return llvm::hash_combine(X->getKind(), X->getOperand());
   }
 
-  hash_code visitUnownedToRefInst(UnownedToRefInst *X) {
-    return llvm::hash_combine(X->getKind(), X->getOperand());
+#define LOADABLE_REF_STORAGE(Name, ...) \
+  hash_code visit##Name##ToRefInst(Name##ToRefInst *X) { \
+    return llvm::hash_combine(X->getKind(), X->getOperand()); \
+  } \
+  hash_code visitRefTo##Name##Inst(RefTo##Name##Inst *X) { \
+    return llvm::hash_combine(X->getKind(), X->getOperand()); \
   }
-
-  hash_code visitRefToUnownedInst(RefToUnownedInst *X) {
-    return llvm::hash_combine(X->getKind(), X->getOperand());
-  }
-
-  hash_code visitUnmanagedToRefInst(UnmanagedToRefInst *X) {
-    return llvm::hash_combine(X->getKind(), X->getOperand());
-  }
-
-  hash_code visitRefToUnmanagedInst(RefToUnmanagedInst *X) {
-    return llvm::hash_combine(X->getKind(), X->getOperand());
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   hash_code visitUpcastInst(UpcastInst *X) {
     return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand());
@@ -741,7 +734,7 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst, ValueBase *V,
 
       // Check if the result type depends on this specific opened existential.
       auto ResultDependsOnOldOpenedArchetype =
-          CandidateResult->getType().getSwiftRValueType().findIf(
+          CandidateResult->getType().getASTType().findIf(
               [&OldOpenedArchetype](Type t) -> bool {
                 return (CanType(t) == OldOpenedArchetype);
               });
@@ -789,11 +782,11 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     SILInstruction *Inst = &*nextI;
     ++nextI;
 
-    DEBUG(llvm::dbgs() << "SILCSE VISITING: " << *Inst << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "SILCSE VISITING: " << *Inst << "\n");
 
     // Dead instructions should just be removed.
     if (isInstructionTriviallyDead(Inst)) {
-      DEBUG(llvm::dbgs() << "SILCSE DCE: " << *Inst << '\n');
+      LLVM_DEBUG(llvm::dbgs() << "SILCSE DCE: " << *Inst << '\n');
       eraseFromParentWithDebugInsts(Inst, nextI);
       Changed = true;
       ++NumSimplify;
@@ -803,8 +796,8 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     // If the instruction can be simplified (e.g. X+0 = X) then replace it with
     // its simpler value.
     if (SILValue V = simplifyInstruction(Inst)) {
-      DEBUG(llvm::dbgs() << "SILCSE SIMPLIFY: " << *Inst << "  to: " << *V
-            << '\n');
+      LLVM_DEBUG(llvm::dbgs() << "SILCSE SIMPLIFY: " << *Inst << "  to: " << *V
+                              << '\n');
       replaceAllSimplifiedUsesAndErase(Inst, V,
                                        [&nextI](SILInstruction *deleteI) {
                                          if (nextI == deleteI->getIterator())
@@ -828,8 +821,8 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     // Now that we know we have an instruction we understand see if the
     // instruction has an available value.  If so, use it.
     if (SILInstruction *AvailInst = AvailableValues->lookup(Inst)) {
-      DEBUG(llvm::dbgs() << "SILCSE CSE: " << *Inst << "  to: " << *AvailInst
-                         << '\n');
+      LLVM_DEBUG(llvm::dbgs() << "SILCSE CSE: " << *Inst << "  to: "
+                              << *AvailInst << '\n');
       // Instructions producing a new opened archetype need a special handling,
       // because replacing these instructions may require a replacement
       // of the opened archetype type operands in some of the uses.
@@ -847,8 +840,8 @@ bool CSE::processNode(DominanceInfoNode *Node) {
 
     // Otherwise, just remember that this value is available.
     AvailableValues->insert(Inst, Inst);
-    DEBUG(llvm::dbgs() << "SILCSE Adding to value table: " << *Inst << " -> "
-                       << *Inst << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "SILCSE Adding to value table: " << *Inst
+                            << " -> " << *Inst << "\n");
   }
 
   return Changed;
@@ -927,10 +920,6 @@ bool CSE::canHandle(SILInstruction *Inst) {
   case SILInstructionKind::UncheckedBitwiseCastInst:
   case SILInstructionKind::RefToRawPointerInst:
   case SILInstructionKind::RawPointerToRefInst:
-  case SILInstructionKind::RefToUnownedInst:
-  case SILInstructionKind::UnownedToRefInst:
-  case SILInstructionKind::RefToUnmanagedInst:
-  case SILInstructionKind::UnmanagedToRefInst:
   case SILInstructionKind::UpcastInst:
   case SILInstructionKind::ThickToObjCMetatypeInst:
   case SILInstructionKind::ObjCToThickMetatypeInst:
@@ -950,6 +939,10 @@ bool CSE::canHandle(SILInstruction *Inst) {
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::OpenExistentialRefInst:
   case SILInstructionKind::WitnessMethodInst:
+#define LOADABLE_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::RefTo##Name##Inst: \
+  case SILInstructionKind::Name##ToRefInst:
+#include "swift/AST/ReferenceStorage.def"
     return true;
   default:
     return false;
@@ -1043,7 +1036,8 @@ static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
          "Invalid number of arguments");
 
   // Don't handle any apply instructions that involve substitutions.
-  if (ToAI->getSubstitutions().size() != 1) return false;
+  if (ToAI->getSubstitutionMap().getReplacementTypes().size() != 1)
+    return false;
 
   // Prepare the Apply args.
   SmallVector<SILValue, 8> Args;
@@ -1052,7 +1046,7 @@ static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
   }
 
   ApplyInst *NAI = Builder.createApply(ToAI->getLoc(), ToWMI,
-                                       ToAI->getSubstitutions(), Args,
+                                       ToAI->getSubstitutionMap(), Args,
                                        ToAI->isNonThrowing());
   FromAI->replaceAllUsesWith(NAI);
   FromAI->eraseFromParent();
@@ -1169,8 +1163,8 @@ class SILCSE : public SILFunctionTransform {
   bool RunsOnHighLevelSil;
   
   void run() override {
-    DEBUG(llvm::dbgs() << "***** CSE on function: " << getFunction()->getName()
-          << " *****\n");
+    LLVM_DEBUG(llvm::dbgs() << "***** CSE on function: "
+                            << getFunction()->getName() << " *****\n");
 
     DominanceAnalysis* DA = getAnalysis<DominanceAnalysis>();
 

@@ -37,7 +37,6 @@
 ///
 /// To customize the mirror representation of a custom type, add conformance to
 /// the `CustomReflectable` protocol.
-@_fixed_layout // FIXME(sil-serialize-all)
 public struct Mirror {
   /// Representation of descendant classes that don't override
   /// `customMirror`.
@@ -45,8 +44,6 @@ public struct Mirror {
   /// Note that the effect of this setting goes no deeper than the
   /// nearest descendant class that overrides `customMirror`, which
   /// in turn can determine representation of *its* descendants.
-  @_frozen // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal enum _DefaultDescendantRepresentation {
     /// Generate a default mirror for descendant classes that don't
     /// override `customMirror`.
@@ -115,7 +112,6 @@ public struct Mirror {
   /// though, the observability of mutations is unspecified.
   ///
   /// - Parameter subject: The instance for which to create a mirror.
-  @inlinable // FIXME(sil-serialize-all)
   public init(reflecting subject: Any) {
     if case let customized as CustomReflectable = subject {
       self = customized.customMirror
@@ -156,12 +152,10 @@ public struct Mirror {
     case dictionary, `set`
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   internal static func _noSuperclassMirror() -> Mirror? { return nil }
 
   @_semantics("optimize.sil.specialize.generic.never")
   @inline(never)
-  @inlinable // FIXME(sil-serialize-all)
   internal static func _superclassIterator<Subject>(
     _ subject: Subject, _ ancestorRepresentation: AncestorRepresentation
   ) -> () -> Mirror? {
@@ -218,7 +212,6 @@ public struct Mirror {
   ///   - ancestorRepresentation: The means of generating the subject's
   ///     ancestor representation. `ancestorRepresentation` is ignored if
   ///     `subject` is not a class instance. The default is `.generated`.
-  @inlinable // FIXME(sil-serialize-all)
   public init<Subject, C : Collection>(
     _ subject: Subject,
     children: C,
@@ -264,7 +257,6 @@ public struct Mirror {
   ///   - ancestorRepresentation: The means of generating the subject's
   ///     ancestor representation. `ancestorRepresentation` is ignored if
   ///     `subject` is not a class instance. The default is `.generated`.
-  @inlinable // FIXME(sil-serialize-all)
   public init<Subject, C : Collection>(
     _ subject: Subject,
     unlabeledChildren: C,
@@ -315,7 +307,6 @@ public struct Mirror {
   ///   - ancestorRepresentation: The means of generating the subject's
   ///     ancestor representation. `ancestorRepresentation` is ignored if
   ///     `subject` is not a class instance. The default is `.generated`.
-  @inlinable // FIXME(sil-serialize-all)
   public init<Subject>(
     _ subject: Subject,
     children: DictionaryLiteral<String, Any>,
@@ -348,14 +339,11 @@ public struct Mirror {
   public let displayStyle: DisplayStyle?
 
   /// A mirror of the subject's superclass, if one exists.
-  @inlinable // FIXME(sil-serialize-all)
   public var superclassMirror: Mirror? {
     return _makeSuperclassMirror()
   }
 
-  @usableFromInline // FIXME(sil-serialize-all)
   internal let _makeSuperclassMirror: () -> Mirror?
-  @usableFromInline // FIXME(sil-serialize-all)
   internal let _defaultDescendantRepresentation: _DefaultDescendantRepresentation
 }
 
@@ -393,16 +381,11 @@ extension Int : MirrorPath {}
 extension String : MirrorPath {}
 
 extension Mirror {
-  @_fixed_layout // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal struct _Dummy : CustomReflectable {
-    @inlinable // FIXME(sil-serialize-all)
-    internal init(mirror: Mirror) {
+      internal init(mirror: Mirror) {
       self.mirror = mirror
     }
-    @usableFromInline // FIXME(sil-serialize-all)
     internal var mirror: Mirror
-    @inlinable // FIXME(sil-serialize-all)
     internal var customMirror: Mirror { return mirror }
   }
 
@@ -450,7 +433,6 @@ extension Mirror {
   ///   - rest: Any remaining mirror path components.
   /// - Returns: The descendant of this mirror specified by the given mirror
   ///   path components if such a descendant exists; otherwise, `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   public func descendant(
     _ first: MirrorPath, _ rest: MirrorPath...
   ) -> Any? {
@@ -475,169 +457,6 @@ extension Mirror {
     }
     return result
   }
-}
-
-//===--- QuickLooks -------------------------------------------------------===//
-
-/// The sum of types that can be used as a Quick Look representation.
-///
-/// The `PlaygroundQuickLook` protocol is deprecated, and will be removed from
-/// the standard library in a future Swift release. To customize the logging of
-/// your type in a playground, conform to the
-/// `CustomPlaygroundDisplayConvertible` protocol, which does not use the
-/// `PlaygroundQuickLook` enum.
-///
-/// If you need to provide a customized playground representation in Swift 4.0
-/// or Swift 3.2 or earlier, use a conditional compilation block:
-///
-///     #if swift(>=4.1) || (swift(>=3.3) && !swift(>=4.0))
-///         // With Swift 4.1 and later (including Swift 3.3 and later), use
-///         // the CustomPlaygroundDisplayConvertible protocol.
-///     #else
-///         // With Swift 4.0 and Swift 3.2 and earlier, use PlaygroundQuickLook
-///         // and the CustomPlaygroundQuickLookable protocol.
-///     #endif
-@_frozen // rdar://problem/38719739 - needed by LLDB
-@available(*, deprecated, message: "PlaygroundQuickLook will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
-public enum PlaygroundQuickLook {
-  /// Plain text.
-  case text(String)
-
-  /// An integer numeric value.
-  case int(Int64)
-
-  /// An unsigned integer numeric value.
-  case uInt(UInt64)
-
-  /// A single precision floating-point numeric value.
-  case float(Float32)
-
-  /// A double precision floating-point numeric value.
-  case double(Float64)
-
-  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
-  /// An image.
-  case image(Any)
-
-  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
-  /// A sound.
-  case sound(Any)
-
-  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
-  /// A color.
-  case color(Any)
-
-  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
-  /// A bezier path.
-  case bezierPath(Any)
-
-  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
-  /// An attributed string.
-  case attributedString(Any)
-
-  // FIXME: Uses explicit coordinates to avoid coupling a particular Cocoa type.
-  /// A rectangle.
-  case rectangle(Float64, Float64, Float64, Float64)
-
-  // FIXME: Uses explicit coordinates to avoid coupling a particular Cocoa type.
-  /// A point.
-  case point(Float64, Float64)
-
-  // FIXME: Uses explicit coordinates to avoid coupling a particular Cocoa type.
-  /// A size.
-  case size(Float64, Float64)
-
-  /// A boolean value.
-  case bool(Bool)
-
-  // FIXME: Uses explicit values to avoid coupling a particular Cocoa type.
-  /// A range.
-  case range(Int64, Int64)
-
-  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
-  /// A GUI view.
-  case view(Any)
-
-  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
-  /// A graphical sprite.
-  case sprite(Any)
-
-  /// A Uniform Resource Locator.
-  case url(String)
-
-  /// Raw data that has already been encoded in a format the IDE understands.
-  case _raw([UInt8], String)
-}
-
-extension PlaygroundQuickLook {
-  /// Creates a new Quick Look for the given instance.
-  ///
-  /// If the dynamic type of `subject` conforms to
-  /// `CustomPlaygroundQuickLookable`, the result is found by calling its
-  /// `customPlaygroundQuickLook` property. Otherwise, the result is
-  /// synthesized by the language. In some cases, the synthesized result may
-  /// be `.text(String(reflecting: subject))`.
-  ///
-  /// - Note: If the dynamic type of `subject` has value semantics, subsequent
-  ///   mutations of `subject` will not observable in the Quick Look. In
-  ///   general, though, the observability of such mutations is unspecified.
-  ///
-  /// - Parameter subject: The instance to represent with the resulting Quick
-  ///   Look.
-  @inlinable // FIXME(sil-serialize-all)
-  @available(*, deprecated, message: "PlaygroundQuickLook will be removed in a future Swift version.")
-  public init(reflecting subject: Any) {
-    if let customized = subject as? CustomPlaygroundQuickLookable {
-      self = customized.customPlaygroundQuickLook
-    }
-    else if let customized = subject as? _DefaultCustomPlaygroundQuickLookable {
-      self = customized._defaultCustomPlaygroundQuickLook
-    }
-    else {
-      if let q = Mirror.quickLookObject(subject) {
-        self = q
-      }
-      else {
-        self = .text(String(reflecting: subject))
-      }
-    }
-  }
-}
-
-/// A type that explicitly supplies its own playground Quick Look.
-///
-/// The `CustomPlaygroundQuickLookable` protocol is deprecated, and will be
-/// removed from the standard library in a future Swift release. To customize
-/// the logging of your type in a playground, conform to the
-/// `CustomPlaygroundDisplayConvertible` protocol.
-///
-/// If you need to provide a customized playground representation in Swift 4.0
-/// or Swift 3.2 or earlier, use a conditional compilation block:
-///
-///     #if swift(>=4.1) || (swift(>=3.3) && !swift(>=4.0))
-///         // With Swift 4.1 and later (including Swift 3.3 and later),
-///         // conform to CustomPlaygroundDisplayConvertible.
-///         extension MyType: CustomPlaygroundDisplayConvertible { /*...*/ }
-///     #else
-///         // Otherwise, on Swift 4.0 and Swift 3.2 and earlier,
-///         // conform to CustomPlaygroundQuickLookable.
-///         extension MyType: CustomPlaygroundQuickLookable { /*...*/ }
-///     #endif
-@available(*, deprecated, message: "CustomPlaygroundQuickLookable will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
-public protocol CustomPlaygroundQuickLookable {
-  /// A custom playground Quick Look for this instance.
-  ///
-  /// If this type has value semantics, the `PlaygroundQuickLook` instance
-  /// should be unaffected by subsequent mutations.
-  var customPlaygroundQuickLook: PlaygroundQuickLook { get }
-}
-
-
-// A workaround for <rdar://problem/26182650>
-// FIXME(ABI)#50 (Dynamic Dispatch for Class Extensions) though not if it moves out of stdlib.
-@available(*, deprecated, message: "_DefaultCustomPlaygroundQuickLookable will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
-public protocol _DefaultCustomPlaygroundQuickLookable {
-  var _defaultCustomPlaygroundQuickLook: PlaygroundQuickLook { get }
 }
 
 //===--- General Utilities ------------------------------------------------===//
@@ -712,7 +531,6 @@ public struct DictionaryLiteral<Key, Value> : ExpressibleByDictionaryLiteral {
   ///
   /// The order of the key-value pairs is kept intact in the resulting
   /// `DictionaryLiteral` instance.
-  @inlinable // FIXME(sil-serialize-all)
   public init(dictionaryLiteral elements: (Key, Value)...) {
     self._elements = elements
   }
@@ -856,14 +674,12 @@ extension String {
 
 /// Reflection for `Mirror` itself.
 extension Mirror : CustomStringConvertible {
-  @inlinable // FIXME(sil-serialize-all)
   public var description: String {
     return "Mirror for \(self.subjectType)"
   }
 }
 
 extension Mirror : CustomReflectable {
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(self, children: [:])
   }

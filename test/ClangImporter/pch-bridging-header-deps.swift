@@ -1,4 +1,3 @@
-// REQUIRES: objc_interop
 // RUN: rm -f %t.*
 //
 // Generate a bridging PCH, use it in a swift file, and check that the swift file's .swiftdeps

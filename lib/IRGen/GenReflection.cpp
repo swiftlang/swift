@@ -247,7 +247,7 @@ protected:
 
     // Others, such as capture descriptors, do not have a name.
     } else {
-      var = B.finishAndCreateGlobal("\x01l__swift4_reflection_descriptor",
+      var = B.finishAndCreateGlobal("\x01l__swift5_reflection_descriptor",
                                     Alignment(4), /*isConstant*/ true,
                                     llvm::GlobalValue::PrivateLinkage);
     }
@@ -558,14 +558,14 @@ class CaptureDescriptorBuilder : public ReflectionMetadataBuilder {
   swift::reflection::MetadataSourceBuilder SourceBuilder;
   CanSILFunctionType OrigCalleeType;
   CanSILFunctionType SubstCalleeType;
-  SubstitutionList Subs;
+  SubstitutionMap Subs;
   const HeapLayout &Layout;
 
 public:
   CaptureDescriptorBuilder(IRGenModule &IGM,
                            CanSILFunctionType OrigCalleeType,
                            CanSILFunctionType SubstCalleeType,
-                           SubstitutionList Subs,
+                           SubstitutionMap Subs,
                            const HeapLayout &Layout)
     : ReflectionMetadataBuilder(IGM),
       OrigCalleeType(OrigCalleeType),
@@ -610,7 +610,7 @@ public:
     auto ElementTypes = Layout.getElementTypes().slice(
         Layout.hasBindings() ? 1 : 0);
     for (auto ElementType : ElementTypes) {
-      auto SwiftType = ElementType.getSwiftRValueType();
+      auto SwiftType = ElementType.getASTType();
       if (SwiftType->hasOpenedExistential())
         return true;
     }
@@ -656,9 +656,6 @@ public:
     // Check if any requirements were fulfilled by metadata stored inside a
     // captured value.
 
-    auto SubstMap =
-      OrigCalleeType->getGenericSignature()->getSubstitutionMap(Subs);
-
     enumerateGenericParamFulfillments(IGM, OrigCalleeType,
         [&](CanType GenericParam,
             const irgen::MetadataSource &Source,
@@ -690,7 +687,7 @@ public:
       // parameters.
       auto Src = Path.getMetadataSource(SourceBuilder, Root);
 
-      auto SubstType = GenericParam.subst(SubstMap);
+      auto SubstType = GenericParam.subst(Subs);
       auto InterfaceType = SubstType->mapTypeOutOfContext();
       SourceMap.push_back({InterfaceType->getCanonicalType(), Src});
     });
@@ -704,7 +701,7 @@ public:
     std::vector<CanType> CaptureTypes;
 
     for (auto ElementType : getElementTypes()) {
-      auto SwiftType = ElementType.getSwiftRValueType();
+      auto SwiftType = ElementType.getASTType();
 
       // Erase pseudogeneric captures down to AnyObject.
       if (OrigCalleeType->isPseudogeneric()) {
@@ -769,12 +766,12 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
     OS << ".sw5" << FourCC << "$B";
     break;
   case llvm::Triple::ELF:
-    OS << "swift4_" << LongName;
+    OS << "swift5_" << LongName;
     break;
   case llvm::Triple::MachO:
     assert(LongName.size() <= 7 &&
            "Mach-O section name length must be <= 16 characters");
-    OS << "__TEXT,__swift4_" << LongName << ", regular, no_dead_strip";
+    OS << "__TEXT,__swift5_" << LongName << ", regular, no_dead_strip";
     break;
   case llvm::Triple::Wasm:
     llvm_unreachable("web assembly object format is not supported.");
@@ -845,7 +842,7 @@ llvm::Constant *
 IRGenModule::getAddrOfCaptureDescriptor(SILFunction &Caller,
                                         CanSILFunctionType OrigCalleeType,
                                         CanSILFunctionType SubstCalleeType,
-                                        SubstitutionList Subs,
+                                        SubstitutionMap Subs,
                                         const HeapLayout &Layout) {
   if (!IRGen.Opts.EnableReflectionMetadata)
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);

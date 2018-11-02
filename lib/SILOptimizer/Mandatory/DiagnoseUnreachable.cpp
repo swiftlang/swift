@@ -20,6 +20,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
@@ -423,6 +424,20 @@ static SILInstruction *getAsCallToNoReturn(SILInstruction *I) {
     if (BI->getModule().isNoReturnBuiltinOrIntrinsic(BI->getName()))
       return BI;
   }
+
+  // These appear in accessors for stored properties with uninhabited
+  // type. Since a type containing an uninhabited stored property is
+  // itself uninhabited, we treat these identically to fatalError(), etc.
+  if (auto *SEI = dyn_cast<StructExtractInst>(I)) {
+    if (SEI->getType().getASTType()->isUninhabited())
+      return SEI;
+  }
+
+  if (auto *SEAI = dyn_cast<StructElementAddrInst>(I)) {
+    if (SEAI->getType().getASTType()->isUninhabited())
+      return SEAI;
+  }
+
   return nullptr;
 }
 
@@ -734,20 +749,23 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
 /// control flow edges.
 static void performNoReturnFunctionProcessing(SILFunction &Fn,
                                               SILFunctionTransform *T) {
-  DEBUG(llvm::errs() << "*** No return function processing: " << Fn.getName()
-                     << "\n");
-
+  LLVM_DEBUG(llvm::errs() << "*** No return function processing: "
+                          << Fn.getName() << "\n");
+  bool Changed = false;
   for (auto &BB : Fn) {
     // Remove instructions from the basic block after a call to a noreturn
     // function.
-    simplifyBlocksWithCallsToNoReturn(BB, nullptr);
+    Changed |= simplifyBlocksWithCallsToNoReturn(BB, nullptr);
   }
-  T->invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+  if (Changed) {
+    removeUnreachableBlocks(Fn);
+    T->invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+  }
 }
 
 static void diagnoseUnreachable(SILFunction &Fn) {
-  DEBUG(llvm::errs() << "*** Diagnose Unreachable processing: " << Fn.getName()
-                     << "\n");
+  LLVM_DEBUG(llvm::errs() << "*** Diagnose Unreachable processing: "
+                          << Fn.getName() << "\n");
 
   UnreachableUserCodeReportingState State;
 

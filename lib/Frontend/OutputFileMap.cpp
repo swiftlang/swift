@@ -110,11 +110,19 @@ static void writeQuotedEscaped(llvm::raw_ostream &os,
 void OutputFileMap::write(llvm::raw_ostream &os,
                           ArrayRef<StringRef> inputs) const {
   for (const auto input : inputs) {
-    const TypeToPathMap *outputMap = getOutputMapForInput(input);
-    if (!outputMap)
-      continue;
     writeQuotedEscaped(os, input);
-    os << ":\n";
+    os << ":";
+
+    const TypeToPathMap *outputMap = getOutputMapForInput(input);
+    if (!outputMap) {
+      // The map doesn't have an entry for this input. (Perhaps there were no
+      // outputs and thus the entry was never created.) Put an empty sub-map
+      // into the output and move on.
+      os << " {}\n";
+      continue;
+    }
+
+    os << "\n";
     for (auto &typeAndOutputPath : *outputMap) {
       file_types::ID type = typeAndOutputPath.getFirst();
       StringRef output = typeAndOutputPath.getSecond();

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift --stdlib-unittest-in-process | tee %t.txt
+// RUN: %target-run-simple-swift-swift3 --stdlib-unittest-in-process | tee %t.txt
 // RUN: %FileCheck %s < %t.txt
 // note: remove the --stdlib-unittest-in-process once all the FileCheck tests
 // have been converted to StdlibUnittest

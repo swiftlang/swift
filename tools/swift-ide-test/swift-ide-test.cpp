@@ -39,6 +39,7 @@
 #include "swift/IDE/Utils.h"
 #include "swift/Index/Index.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Syntax/SyntaxClassifier.h"
 #include "swift/Markup/Markup.h"
 #include "swift/Config.h"
 #include "clang/APINotes/APINotesReader.h"
@@ -425,6 +426,12 @@ Playground("playground",
            llvm::cl::desc("Whether coloring in playground"),
            llvm::cl::cat(Category),
            llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+SyntaxTreeColoring("force-libsyntax-based-processing",
+                   llvm::cl::desc("Perform syntax coloring using libSyntax"),
+                   llvm::cl::cat(Category),
+                   llvm::cl::init(false));
 
 // AST printing options.
 
@@ -950,6 +957,125 @@ public:
   }
 };
 
+class ColoredSyntaxTreePrinter : public SyntaxVisitor {
+  llvm::raw_ostream &OS;
+
+  std::map<SyntaxNodeId, SyntaxClassification> TokenClassifications;
+
+  /// The name of the tag that is currently open
+  StringRef CurrentTag;
+
+  // Don't print the next newline in trivia if this flag is set.
+  // Used to skip the newline after a CHECK line
+  bool SkipNextNewline = false;
+
+public:
+  ColoredSyntaxTreePrinter(
+      llvm::raw_ostream &OS,
+      std::map<SyntaxNodeId, SyntaxClassification> TokenClassifications)
+      : OS(OS), TokenClassifications(TokenClassifications) {}
+
+private:
+  void print(Trivia Trivia) {
+    for (auto TriviaPiece : Trivia) {
+      print(TriviaPiece);
+    }
+  }
+
+  /// Closes the current tag if it is different from the previous one and opens
+  /// a tag with the specified ID.
+  void recordCurrentTag(StringRef Id) {
+    if (CurrentTag != Id) {
+      if (!CurrentTag.empty()) {
+        OS << "</" << CurrentTag << ">";
+      }
+      if (!Id.empty()) {
+        OS << "<" << Id << ">";
+      }
+    }
+    CurrentTag = Id;
+  }
+
+  void print(TriviaPiece TriviaPiece) {
+    StringRef Id;
+    switch (TriviaPiece.getKind()) {
+    case TriviaKind::Space:
+    case TriviaKind::Tab:
+    case TriviaKind::VerticalTab:
+    case TriviaKind::Formfeed:
+      Id = "";
+      break;
+    case TriviaKind::Newline:
+    case TriviaKind::CarriageReturn:
+    case TriviaKind::CarriageReturnLineFeed:
+      if (SkipNextNewline) {
+        SkipNextNewline = false;
+        return;
+      }
+      Id = "";
+      break;
+    case swift::syntax::TriviaKind::Backtick:
+      Id = "";
+      break;
+    case swift::syntax::TriviaKind::LineComment:
+      // Don't print CHECK lines
+      if (TriviaPiece.getText().contains("// CHECK")) {
+        SkipNextNewline = true;
+        return;
+      }
+      Id = "comment-line";
+      break;
+    case TriviaKind::BlockComment: Id = "comment-block"; break;
+    case TriviaKind::DocLineComment: Id = "doc-comment-line"; break;
+    case TriviaKind::DocBlockComment: Id = "doc-comment-block"; break;
+    case TriviaKind::GarbageText: Id = ""; break;
+    }
+    recordCurrentTag(Id);
+    TriviaPiece.print(OS);
+  }
+
+  StringRef
+  getTagForSyntaxClassification(SyntaxClassification Classification) const {
+    switch (Classification) {
+    case SyntaxClassification::None: return "";
+    case SyntaxClassification::Keyword: return "kw";
+    case SyntaxClassification::Identifier: return "";
+    case SyntaxClassification::DollarIdentifier: return "dollar";
+    case SyntaxClassification::IntegerLiteral: return "int";
+    case SyntaxClassification::FloatingLiteral: return "float";
+    case SyntaxClassification::StringLiteral: return "str";
+    case SyntaxClassification::StringInterpolationAnchor: return "anchor";
+    case SyntaxClassification::TypeIdentifier: return "type";
+    case SyntaxClassification::BuildConfigKeyword: return "#kw";
+    case SyntaxClassification::BuildConfigId: return "#id";
+    case SyntaxClassification::PoundDirectiveKeyword: return "#kw";
+    case SyntaxClassification::Attribute: return "attr-builtin";
+    case SyntaxClassification::EditorPlaceholder: return "placeholder";
+    case SyntaxClassification::ObjectLiteral: return "object-literal";
+    }
+  }
+
+public:
+  virtual void visit(TokenSyntax Token) override {
+    if (Token.isMissing())
+      return;
+
+    print(Token.getLeadingTrivia());
+
+    SyntaxClassification Classification = TokenClassifications[Token.getId()];
+    recordCurrentTag(getTagForSyntaxClassification(Classification));
+    OS << Token.getText();
+
+    print(Token.getTrailingTrivia());
+  }
+
+  void print(Syntax Node) {
+    Node.accept(*this);
+    // Emit the last closing tag
+    recordCurrentTag("");
+  }
+};
+
 } // end anonymous namespace
 
 static int doSyntaxColoring(const CompilerInvocation &InitInvok,
@@ -984,11 +1110,18 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
       break;
   }
   assert(SF && "no source file?");
-  ide::SyntaxModelContext ColorContext(*SF);
-  PrintSyntaxColorWalker ColorWalker(CI.getSourceMgr(), BufID, llvm::outs(),
-                                     TerminalOutput);
-  ColorContext.walk(ColorWalker);
-  ColorWalker.finished();
+  if (options::SyntaxTreeColoring) {
+    SyntaxClassifier Classifier;
+    auto Classification = Classifier.classify(SF->getSyntaxRoot());
+    ColoredSyntaxTreePrinter Printer(llvm::outs(), Classification);
+    Printer.print(SF->getSyntaxRoot());
+  } else {
+    ide::SyntaxModelContext ColorContext(*SF);
+    PrintSyntaxColorWalker ColorWalker(CI.getSourceMgr(), BufID, llvm::outs(),
+                                       TerminalOutput);
+    ColorContext.walk(ColorWalker);
+    ColorWalker.finished();
+  }
 
   return 0;
 }
@@ -1854,6 +1987,8 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
     // Get the (sub)module to print.
     auto *M = getModuleByFullName(Context, ModuleToPrint);
     if (!M) {
+      llvm::errs() << "error: could not find module '" << ModuleToPrint
+                   << "'\n";
       ExitCode = 1;
       continue;
     }
@@ -1873,6 +2008,8 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
     if (ModuleName.size() > 1) {
       M = getModuleByFullName(Context, ModuleName[0]);
       if (!M) {
+        llvm::errs() << "error: could not find module '" << ModuleName[0]
+                     << "'\n";
         ExitCode = 1;
         continue;
       }
@@ -2169,25 +2306,25 @@ public:
     if (auto accessor = dyn_cast<AccessorDecl>(VD)) {
       auto *storage = accessor->getStorage();
       switch (accessor->getAccessorKind()) {
-      case AccessorKind::IsGetter:
+      case AccessorKind::Get:
         OS << "<getter for ";
         break;
-      case AccessorKind::IsSetter:
+      case AccessorKind::Set:
         OS << "<setter for ";
         break;
-      case AccessorKind::IsWillSet:
+      case AccessorKind::WillSet:
         OS << "<willSet for ";
         break;
-      case AccessorKind::IsDidSet:
+      case AccessorKind::DidSet:
         OS << "<didSet for ";
         break;
-      case AccessorKind::IsAddressor:
+      case AccessorKind::Address:
         OS << "<addressor for ";
         break;
-      case AccessorKind::IsMutableAddressor:
+      case AccessorKind::MutableAddress:
         OS << "<mutableAddressor for ";
         break;
-      case AccessorKind::IsMaterializeForSet:
+      case AccessorKind::MaterializeForSet:
         OS << "<materializeForSet for ";
         break;
       }
@@ -2629,10 +2766,11 @@ private:
   void tryDemangleType(Type T, const DeclContext *DC, CharSourceRange range) {
     Mangle::ASTMangler Mangler;
     std::string mangledName(Mangler.mangleTypeForDebugger(
-        T, DC, DC->getGenericEnvironmentOfContext()));
+                              T->mapTypeOutOfContext(), DC,
+        DC->getGenericEnvironmentOfContext()));
     std::string Error;
-    Type ReconstructedType =
-        getTypeFromMangledSymbolname(Ctx, mangledName, Error);
+    Type ReconstructedType = DC->mapTypeIntoContext(
+        getTypeFromMangledSymbolname(Ctx, mangledName, Error));
     Stream << "type: ";
     if (ReconstructedType) {
       ReconstructedType->print(Stream);

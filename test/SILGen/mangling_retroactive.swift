@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-sil-ownership -o %t %S/Inputs/RetroactiveA.swift
 // RUN: %target-swift-frontend -emit-module -enable-sil-ownership -o %t %S/Inputs/RetroactiveB.swift
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -I %t %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -I %t %s | %FileCheck %s
 
 
 import RetroactiveA

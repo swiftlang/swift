@@ -50,6 +50,7 @@ class ModuleFile
   friend class SerializedASTFile;
   friend class SILDeserializer;
   using Status = serialization::Status;
+  using TypeID = serialization::TypeID;
 
   /// A reference back to the AST representation of the file.
   FileUnit *FileContext = nullptr;
@@ -155,8 +156,6 @@ public:
     bool isExported() const { return IsExported; }
     bool isHeader() const { return IsHeader; }
     bool isScoped() const { return IsScoped; }
-
-    void forceExported() { IsExported = true; }
 
     std::string getPrettyPrintedPath() const;
   };
@@ -310,6 +309,9 @@ private:
   /// Generic environments referenced by this module.
   std::vector<Serialized<GenericEnvironment *>> GenericEnvironments;
 
+  /// Substitution maps referenced by this module.
+  std::vector<Serialized<SubstitutionMap>> SubstitutionMaps;
+
   /// Represents an identifier that may or may not have been deserialized yet.
   ///
   /// If \c Offset is non-zero, the identifier has not been loaded yet.
@@ -398,12 +400,6 @@ private:
 
     /// Whether this module file comes from a framework.
     unsigned IsFramework : 1;
-
-    /// THIS SETTING IS OBSOLETE BUT IS STILL USED BY OLDER MODULES.
-    ///
-    /// Whether this module has a shadowed module that's part of its public
-    /// interface.
-    unsigned HasUnderlyingModule : 1;
 
     /// Whether or not ImportDecls is valid.
     unsigned ComputedImportDecls : 1;
@@ -573,16 +569,16 @@ private:
   /// Populates TopLevelIDs for name lookup.
   void buildTopLevelDeclMap();
 
+  struct AccessorRecord {
+    SmallVector<serialization::DeclID, 8> IDs;
+  };
+
   /// Sets the accessors for \p storage based on \p rawStorageKind.
   void configureStorage(AbstractStorageDecl *storage,
-                        unsigned rawStorageKind,
-                        serialization::DeclID getter,
-                        serialization::DeclID setter,
-                        serialization::DeclID materializeForSet,
-                        serialization::DeclID addressor,
-                        serialization::DeclID mutableAddressor,
-                        serialization::DeclID willSet,
-                        serialization::DeclID didSet);
+                        uint8_t rawReadImpl,
+                        uint8_t rawWriteImpl,
+                        uint8_t rawReadWriteImpl,
+                        AccessorRecord &accessors);
 
 public:
   /// Loads a module from the given memory buffer.
@@ -624,6 +620,13 @@ public:
   Status getStatus() const {
     return static_cast<Status>(Bits.Status);
   }
+
+  /// Transfers ownership of a buffer that might contain source code where
+  /// other parts of the compiler could have emitted diagnostics, to keep them
+  /// alive even if the ModuleFile is destroyed.
+  ///
+  /// Should only be called when getStatus() indicates a failure.
+  std::unique_ptr<llvm::MemoryBuffer> takeBufferForDiagnostics();
 
   /// Returns the list of modules this module depends on.
   ArrayRef<Dependency> getDependencies() const {
@@ -844,12 +847,9 @@ public:
   GenericEnvironment *getGenericEnvironment(
                                         serialization::GenericEnvironmentID ID);
 
-  /// Reads a substitution record from \c DeclTypeCursor.
-  ///
-  /// If the record at the cursor is not a substitution, returns None.
-  Optional<Substitution> maybeReadSubstitution(llvm::BitstreamCursor &Cursor,
-                                               GenericEnvironment *genericEnv =
-                                                nullptr);
+  /// Returns the substitution map for the given ID, deserializing it if
+  /// needed.
+  SubstitutionMap getSubstitutionMap(serialization::SubstitutionMapID id);
 
   /// Recursively reads a protocol conformance from the given cursor.
   ProtocolConformanceRef readConformance(llvm::BitstreamCursor &Cursor,

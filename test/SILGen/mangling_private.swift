@@ -1,14 +1,14 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enable-sil-ownership -emit-module -o %t %S/Inputs/mangling_private_helper.swift
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %S/Inputs/mangling_private_helper.swift | %FileCheck %s -check-prefix=CHECK-BASE
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %S/Inputs/mangling_private_helper.swift | %FileCheck %s -check-prefix=CHECK-BASE
 
-// RUN: %target-swift-frontend %s -I %t -emit-silgen -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -I %t -enable-sil-ownership | %FileCheck %s
 
 // RUN: cp %s %t
-// RUN: %target-swift-frontend %t/mangling_private.swift -I %t -emit-silgen -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen %t/mangling_private.swift -I %t -enable-sil-ownership | %FileCheck %s
 
 // RUN: cp %s %t/other_name.swift
-// RUN: %target-swift-frontend %t/other_name.swift -I %t -emit-silgen -enable-sil-ownership -module-name mangling_private | %FileCheck %s -check-prefix=OTHER-NAME
+// RUN: %target-swift-emit-silgen %t/other_name.swift -I %t -enable-sil-ownership -module-name mangling_private | %FileCheck %s -check-prefix=OTHER-NAME
 
 import mangling_private_helper
 

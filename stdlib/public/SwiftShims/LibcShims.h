@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -130,7 +130,7 @@ int _stdlib_ioctlPtr(int fd, unsigned long int request, void* ptr);
 // Environment
 #if defined(__APPLE__) || defined(__FreeBSD__)
 SWIFT_RUNTIME_STDLIB_INTERNAL
-char * _Nullable *_stdlib_getEnviron();
+char * _Nullable * _Null_unspecified _stdlib_getEnviron();
 #endif
 
 // System error numbers <errno.h>
@@ -148,6 +148,10 @@ SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint32_t _stdlib_cxx11_mt19937(void);
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint32_t _stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound);
+
+// Random number for stdlib
+SWIFT_RUNTIME_STDLIB_INTERNAL
+void _stdlib_random(void *buf, __swift_size_t nbytes);
 
 // Math library functions
 static inline SWIFT_ALWAYS_INLINE

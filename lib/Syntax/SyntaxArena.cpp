@@ -29,9 +29,6 @@ struct SyntaxArena::Implementation {
   /// List of pointers to the allocated RawSyntax
   std::vector<RawSyntax *> AllocatedRawSyntaxList;
 
-  /// Cached Tokens.
-  llvm::FoldingSet<RawSyntaxCacheNode> CachedTokens;
-
   Implementation() = default;
   void *Allocate(size_t size, size_t alignment) {
     return Allocator.Allocate(size, alignment);
@@ -125,38 +122,6 @@ RC<RawSyntax> RawSyntax::getToken(SyntaxArena &Arena, tok TokKind,
                                   llvm::ArrayRef<TriviaPiece> LeadingTrivia,
                                   llvm::ArrayRef<TriviaPiece> TrailingTrivia) {
 
-  // Determine whether this token is worth to cache.
-  if (
-      // Is string_literal with >16 length.
-      (TokKind == tok::string_literal && Text.size() > 16) ||
-      // Has leading comment trivia et al.
-      any_of(LeadingTrivia,
-             [](const syntax::TriviaPiece &T) { return T.getText().size(); }) ||
-      // Has trailing comment trivia et al.
-      any_of(TrailingTrivia,
-             [](const syntax::TriviaPiece &T) { return T.getText().size(); })) {
-
-    // Do not use cache.
-    return RawSyntax::make(TokKind, Text, LeadingTrivia, TrailingTrivia,
-                           SourcePresence::Present, &Arena);
-  }
-
-  // This node is cacheable. Get or create.
-  auto &CachedTokens = Arena.Impl.CachedTokens;
-
-  llvm::FoldingSetNodeID ID;
-  RawSyntax::Profile(ID, TokKind, Text, LeadingTrivia, TrailingTrivia);
-
-  void *insertPos = nullptr;
-  if (auto existing = CachedTokens.FindNodeOrInsertPos(ID, insertPos))
-    // Found in the cache. Just return it.
-    return existing->get();
-
-  // Could not found in the cache. Create it.
-  auto Raw = RawSyntax::make(TokKind, Text, LeadingTrivia, TrailingTrivia,
-                             SourcePresence::Present, &Arena);
-  auto IDRef = ID.Intern(Arena.getAllocator());
-  auto CacheNode = new (Arena) RawSyntaxCacheNode(Raw.get(), IDRef);
-  CachedTokens.InsertNode(CacheNode, insertPos);
-  return Raw;
+  return RawSyntax::make(TokKind, Text, LeadingTrivia, TrailingTrivia,
+                         SourcePresence::Present, &Arena);
 }

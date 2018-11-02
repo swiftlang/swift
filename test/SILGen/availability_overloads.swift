@@ -1,11 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/availability_overloads_other.swiftmodule -emit-module -primary-file %S/Inputs/availability_overloads_other.swift
 
-// RUN: %target-swift-frontend -swift-version 3 -I %t -emit-silgen -primary-file %s
-// RUN: %target-swift-frontend -swift-version 3 -I %t -emit-silgen -emit-ir %s
+// RUN: %target-swift-emit-silgen -swift-version 3 -I %t -primary-file %s
+// RUN: %target-swift-emit-ir -swift-version 3 -I %t %s
 
-// RUN: %target-swift-frontend -swift-version 4 -I %t -emit-silgen -primary-file %s
-// RUN: %target-swift-frontend -swift-version 4 -I %t -emit-silgen -emit-ir %s
+// RUN: %target-swift-emit-silgen -swift-version 4 -I %t -primary-file %s
+// RUN: %target-swift-emit-ir -swift-version 4 -I %t %s
 
 // RUN: %target-swift-frontend -swift-version 3 -I %t -emit-module -emit-module-path /dev/null -primary-file %s
 // RUN: %target-swift-frontend -swift-version 4 -I %t -emit-module -emit-module-path /dev/null -primary-file %s

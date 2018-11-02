@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-sil-ownership -o %t %S/Inputs/def_structA.swift
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -module-name ext_structA -I %t %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -module-name ext_structA -I %t %s | %FileCheck %s
 
 // Ensure that members of extensions of types from another module are mangled
 // correctly.

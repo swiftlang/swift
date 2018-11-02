@@ -9,7 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-stdlib-swift
+// RUN: %target-run-stdlib-swift-swift3
 // REQUIRES: executable_test
 
 // FIXME: This test runs very slowly on watchOS.

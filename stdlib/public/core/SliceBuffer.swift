@@ -18,6 +18,7 @@ internal struct _SliceBuffer<Element>
     RandomAccessCollection
 {
   internal typealias NativeStorage = _ContiguousArrayStorage<Element>
+  @usableFromInline
   internal typealias NativeBuffer = _ContiguousArrayBuffer<Element>
 
   @inlinable

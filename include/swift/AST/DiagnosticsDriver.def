@@ -37,6 +37,10 @@
   DIAG(NOTE,ID,Options,Text,Signature)
 #endif
 
+#ifndef REMARK
+#  define REMARK(ID,Options,Text,Signature) \
+DIAG(REMARK,ID,Options,Text,Signature)
+#endif
 
 WARNING(warning_parallel_execution_not_supported,none,
         "parallel execution not supported; falling back to serial execution",
@@ -150,6 +154,9 @@ WARNING(warn_ignoring_batch_mode,none,
 WARNING(warn_use_filelists_deprecated, none,
         "the option '-driver-use-filelists' is deprecated; use "
         "'-driver-filelist-threshold=0' instead", ())
+
+ERROR(cannot_find_migration_script, none,
+      "missing migration script from path '%0'", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

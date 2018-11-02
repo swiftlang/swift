@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -61,8 +61,175 @@ static void errnoAndExit(const char *message) {
   abort();
 }
 
+static const size_t ReadEnd = 0;
+static const size_t WriteEnd = 1;
+
+static
+int PipeMemoryReader_getParentReadFD(const PipeMemoryReader *Reader) {
+  return Reader->from_child[ReadEnd];
+}
+
+static
+int PipeMemoryReader_getChildWriteFD(const PipeMemoryReader *Reader) {
+  return Reader->from_child[WriteEnd];
+}
+
+static
+int PipeMemoryReader_getParentWriteFD(const PipeMemoryReader *Reader) {
+    return Reader->to_child[WriteEnd];
+}
+
+static
+int PipeMemoryReader_getChildReadFD(const PipeMemoryReader *Reader) {
+    return Reader->to_child[ReadEnd];
+}
+
+static
+uint8_t PipeMemoryReader_getPointerSize(void *Context) {
+  return sizeof(uintptr_t);
+}
+
+static
+void PipeMemoryReader_collectBytesFromPipe(const PipeMemoryReader *Reader,
+                                           void *Dest, size_t Size) {
+  int ReadFD = PipeMemoryReader_getParentReadFD(Reader);
+  while (Size) {
+    int bytesRead = read(ReadFD, Dest, Size);
+    if (bytesRead < 0)
+      if (errno == EINTR)
+        continue;
+      else
+        errnoAndExit("collectBytesFromPipe");
+    else if (bytesRead == 0)
+      errorAndExit("collectBytesFromPipe: Unexpected end of file");
+    Size -= bytesRead;
+    // Arithmetic on a void pointer is a GNU extension.
+    Dest = (char*)(Dest) + bytesRead;
+  }
+}
+
+static int PipeMemoryReader_queryDataLayout(void *Context,
+                                             DataLayoutQueryType type,
+                                             void *inBuffer, void *outBuffer) {
+  switch (type) {
+    case DLQ_GetPointerSize: {
+      uint8_t *result = (uint8_t *)outBuffer;
+      *result = sizeof(void *);
+      return 1;
+    }
+    case DLQ_GetSizeSize: {
+      uint8_t *result = (uint8_t *)outBuffer;
+      *result = sizeof(size_t);
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+static void PipeMemoryReader_freeBytes(void *reader_context, const void *bytes,
+                                       void *context) {
+  free((void *)bytes);
+}
+
+static
+const void *PipeMemoryReader_readBytes(void *Context, swift_addr_t Address,
+                                       uint64_t Size, void **outFreeContext) {
+  const PipeMemoryReader *Reader = (const PipeMemoryReader *)Context;
+  uintptr_t TargetAddress = Address;
+  size_t TargetSize = (size_t)Size;
+  int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
+  write(WriteFD, REQUEST_READ_BYTES, 2);
+  write(WriteFD, &TargetAddress, sizeof(TargetAddress));
+  write(WriteFD, &TargetSize, sizeof(size_t));
+  
+  void *Buf = malloc(Size);
+  PipeMemoryReader_collectBytesFromPipe(Reader, Buf, Size);
+  
+  *outFreeContext = NULL;
+  
+  return Buf;
+}
+
+static
+swift_addr_t PipeMemoryReader_getSymbolAddress(void *Context,
+                                               const char *SymbolName,
+                                               uint64_t Length) {
+  const PipeMemoryReader *Reader = (const PipeMemoryReader *)Context;
+  uintptr_t Address = 0;
+  int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
+  write(WriteFD, REQUEST_SYMBOL_ADDRESS, 2);
+  write(WriteFD, SymbolName, Length);
+  write(WriteFD, "\n", 1);
+  PipeMemoryReader_collectBytesFromPipe(Reader, (uint8_t*)&Address,
+                                        sizeof(Address));
+  return (uintptr_t)Address;
+}
+
+static InstanceKind
+PipeMemoryReader_receiveInstanceKind(const PipeMemoryReader *Reader) {
+  int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
+  write(WriteFD, REQUEST_INSTANCE_KIND, 2);
+  uint8_t KindValue = 0;
+  PipeMemoryReader_collectBytesFromPipe(Reader, &KindValue, sizeof(KindValue));
+  return KindValue;
+}
+
+static uintptr_t
+PipeMemoryReader_receiveInstanceAddress(const PipeMemoryReader *Reader) {
+  int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
+  write(WriteFD, REQUEST_INSTANCE_ADDRESS, 2);
+  uintptr_t InstanceAddress = 0;
+  PipeMemoryReader_collectBytesFromPipe(Reader, (uint8_t *)&InstanceAddress,
+                                        sizeof(InstanceAddress));
+  return InstanceAddress;
+}
+
+static
+void PipeMemoryReader_sendDoneMessage(const PipeMemoryReader *Reader) {
+  int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
+  write(WriteFD, REQUEST_DONE, 2);
+}
+
+static
+PipeMemoryReader createPipeMemoryReader() {
+  PipeMemoryReader Reader;
+  if (pipe(Reader.to_child))
+    errnoAndExit("Couldn't create pipes to child process");
+  if (pipe(Reader.from_child))
+    errnoAndExit("Couldn't create pipes from child process");
+  return Reader;
+}
+
+#if defined(__APPLE__) && defined(__MACH__)
+static void
+PipeMemoryReader_receiveImages(SwiftReflectionContextRef RC,
+                                       const PipeMemoryReader *Reader) {
+  int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
+  write(WriteFD, REQUEST_IMAGES, 2);
+  size_t NumReflectionInfos;
+  PipeMemoryReader_collectBytesFromPipe(Reader, &NumReflectionInfos,
+                                        sizeof(NumReflectionInfos));
+
+  if (NumReflectionInfos == 0)
+    return;
+  
+  struct { uintptr_t Start, Size; } *Images;
+  Images = calloc(NumReflectionInfos, sizeof(*Images));
+  PipeMemoryReader_collectBytesFromPipe(Reader, Images,
+                                        NumReflectionInfos * sizeof(*Images));
+  
+  for (size_t i = 0; i < NumReflectionInfos; ++i) {
+    swift_reflection_addImage(RC, Images[i].Start);
+  }
+  
+  free(Images);
+}
+
+#else
+
 static swift_reflection_section_t
-makeLocalSection(void *Buffer, RemoteSection Section,
+makeLocalSection(const void *Buffer, RemoteSection Section,
                  RemoteReflectionInfo Info) {
   if (Section.Size == 0) {
     swift_reflection_section_t LS = {NULL, NULL};
@@ -132,146 +299,6 @@ RemoteReflectionInfo makeRemoteReflectionInfo(RemoteSection fieldmd,
   return Info;
 }
 
-static const size_t ReadEnd = 0;
-static const size_t WriteEnd = 1;
-
-static
-int PipeMemoryReader_getParentReadFD(const PipeMemoryReader *Reader) {
-  return Reader->from_child[ReadEnd];
-}
-
-static
-int PipeMemoryReader_getChildWriteFD(const PipeMemoryReader *Reader) {
-  return Reader->from_child[WriteEnd];
-}
-
-static
-int PipeMemoryReader_getParentWriteFD(const PipeMemoryReader *Reader) {
-    return Reader->to_child[WriteEnd];
-}
-
-static
-int PipeMemoryReader_getChildReadFD(const PipeMemoryReader *Reader) {
-    return Reader->to_child[ReadEnd];
-}
-
-static
-uint8_t PipeMemoryReader_getPointerSize(void *Context) {
-  return sizeof(uintptr_t);
-}
-
-static
-void PipeMemoryReader_collectBytesFromPipe(const PipeMemoryReader *Reader,
-                                           void *Dest, size_t Size) {
-  int ReadFD = PipeMemoryReader_getParentReadFD(Reader);
-  while (Size) {
-    int bytesRead = read(ReadFD, Dest, Size);
-    if (bytesRead < 0)
-      if (errno == EINTR)
-        continue;
-      else
-        errnoAndExit("collectBytesFromPipe");
-    else if (bytesRead == 0)
-      errorAndExit("collectBytesFromPipe: Unexpected end of file");
-    Size -= bytesRead;
-    Dest += bytesRead;
-  }
-}
-
-static int PipeMemoryReader_queryDataLayout(void *Context,
-                                             DataLayoutQueryType type,
-                                             void *inBuffer, void *outBuffer) {
-  switch (type) {
-    case DLQ_GetPointerSize: {
-      uint8_t *result = (uint8_t *)outBuffer;
-      *result = sizeof(void *);
-      return 1;
-    }
-    case DLQ_GetSizeSize: {
-      uint8_t *result = (uint8_t *)outBuffer;
-      *result = sizeof(size_t);
-      return 1;
-    }
-  }
-
-  return 0;
-}
-
-static void PipeMemoryReader_freeBytes(void *reader_context, const void *bytes,
-                                       void *context) {
-  free((void *)bytes);
-}
-
-static
-const void *PipeMemoryReader_readBytes(void *Context, swift_addr_t Address,
-                                       uint64_t Size,
-                                       void **outFreeContext) {
-  const PipeMemoryReader *Reader = (const PipeMemoryReader *)Context;
-  uintptr_t TargetAddress = Address;
-  size_t TargetSize = (size_t)Size;
-  int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
-  write(WriteFD, REQUEST_READ_BYTES, 2);
-  write(WriteFD, &TargetAddress, sizeof(TargetAddress));
-  write(WriteFD, &TargetSize, sizeof(size_t));
-  
-  void *Buf = malloc(Size);
-  PipeMemoryReader_collectBytesFromPipe(Reader, Buf, Size);
-  
-  *outFreeContext = NULL;
-  
-  return Buf;
-}
-
-static
-swift_addr_t PipeMemoryReader_getSymbolAddress(void *Context,
-                                               const char *SymbolName,
-                                               uint64_t Length) {
-  const PipeMemoryReader *Reader = (const PipeMemoryReader *)Context;
-  uintptr_t Address = 0;
-  int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
-  write(WriteFD, REQUEST_SYMBOL_ADDRESS, 2);
-  write(WriteFD, SymbolName, Length);
-  write(WriteFD, "\n", 1);
-  PipeMemoryReader_collectBytesFromPipe(Reader, (uint8_t*)&Address,
-                                        sizeof(Address));
-  return (uintptr_t)Address;
-}
-
-static InstanceKind
-PipeMemoryReader_receiveInstanceKind(const PipeMemoryReader *Reader) {
-  int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
-  write(WriteFD, REQUEST_INSTANCE_KIND, 2);
-  uint8_t KindValue = 0;
-  PipeMemoryReader_collectBytesFromPipe(Reader, &KindValue, sizeof(KindValue));
-  return KindValue;
-}
-
-static uintptr_t
-PipeMemoryReader_receiveInstanceAddress(const PipeMemoryReader *Reader) {
-  int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
-  write(WriteFD, REQUEST_INSTANCE_ADDRESS, 2);
-  uintptr_t InstanceAddress = 0;
-  PipeMemoryReader_collectBytesFromPipe(Reader, (uint8_t *)&InstanceAddress,
-                                        sizeof(InstanceAddress));
-  return InstanceAddress;
-}
-
-static
-void PipeMemoryReader_sendDoneMessage(const PipeMemoryReader *Reader) {
-  int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
-  write(WriteFD, REQUEST_DONE, 2);
-}
-
-static
-PipeMemoryReader createPipeMemoryReader() {
-  PipeMemoryReader Reader;
-  if (pipe(Reader.to_child))
-    errnoAndExit("Couldn't create pipes to child process");
-  if (pipe(Reader.from_child))
-    errnoAndExit("Couldn't create pipes from child process");
-  return Reader;
-}
-
 static
 RemoteSection makeRemoteSection(const PipeMemoryReader *Reader) {
   uintptr_t Start;
@@ -283,32 +310,6 @@ RemoteSection makeRemoteSection(const PipeMemoryReader *Reader) {
   RemoteSection RS = {Start, Size, Start + Size};
   return RS;
 }
-
-#if defined(__APPLE__) && defined(__MACH__)
-static void
-PipeMemoryReader_receiveImages(SwiftReflectionContextRef RC,
-                                       const PipeMemoryReader *Reader) {
-  int WriteFD = PipeMemoryReader_getParentWriteFD(Reader);
-  write(WriteFD, REQUEST_IMAGES, 2);
-  size_t NumReflectionInfos;
-  PipeMemoryReader_collectBytesFromPipe(Reader, &NumReflectionInfos,
-                                        sizeof(NumReflectionInfos));
-
-  if (NumReflectionInfos == 0)
-    return;
-  
-  struct { uintptr_t Start, Size; } *Images;
-  Images = calloc(NumReflectionInfos, sizeof(*Images));
-  PipeMemoryReader_collectBytesFromPipe(Reader, Images,
-                                        NumReflectionInfos * sizeof(*Images));
-  
-  for (size_t i = 0; i < NumReflectionInfos; ++i) {
-    swift_reflection_addImage(RC, Images[i].Start);
-  }
-  
-  free(Images);
-}
-#endif
 
 static void
 PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,
@@ -342,13 +343,12 @@ PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,
   for (size_t i = 0; i < NumReflectionInfos; ++i) {
     RemoteReflectionInfo RemoteInfo = RemoteInfos[i];
 
-    void *Buffer = malloc(RemoteInfo.TotalSize);
-
-    int Success = PipeMemoryReader_readBytes((void *)Reader,
-                                             RemoteInfo.StartAddress,
-                                             Buffer,
-                                             RemoteInfo.TotalSize);
-    if (!Success)
+    void *outFreeContext = NULL;
+    const void *Buffer = PipeMemoryReader_readBytes((void *)Reader,
+                                                    RemoteInfo.StartAddress,
+                                                    RemoteInfo.TotalSize,
+                                                    &outFreeContext);
+    if (!Buffer)
       errorAndExit("Couldn't read reflection information");
 
     swift_reflection_info_t Info = {
@@ -366,6 +366,7 @@ PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,
 
   free(RemoteInfos);
 }
+#endif
 
 uint64_t PipeMemoryReader_getStringLength(void *Context, swift_addr_t Address) {
   const PipeMemoryReader *Reader = (const PipeMemoryReader *)Context;

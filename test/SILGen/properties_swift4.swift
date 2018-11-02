@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -swift-version 4 -module-name properties -Xllvm -sil-full-demangle -parse-as-library -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -swift-version 4 -module-name properties -Xllvm -sil-full-demangle -parse-as-library %s | %FileCheck %s
 
 var zero: Int = 0
 

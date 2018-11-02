@@ -45,6 +45,10 @@ public protocol Decodable {
 }
 
 /// A type that can convert itself into and out of an external representation.
+///
+/// `Codable` is a type alias for the `Encodable` and `Decodable` protocols.
+/// When you use `Codable` as a type or a generic constraint, it matches
+/// any type that conforms to both protocols.
 public typealias Codable = Encodable & Decodable
 
 //===----------------------------------------------------------------------===//
@@ -88,7 +92,6 @@ extension CodingKey {
   }
 
   /// A textual representation of this key, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return description
   }
@@ -848,7 +851,7 @@ public protocol UnkeyedEncodingContainer {
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
   mutating func encode<T : Sequence>(
-    contentsOf sequence: T) throws where T.Iterator.Element == ${type}
+    contentsOf sequence: T) throws where T.Element == ${type}
 % end
 
   /// Encodes the elements of the given sequence.
@@ -856,7 +859,7 @@ public protocol UnkeyedEncodingContainer {
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
   mutating func encode<T : Sequence>(
-    contentsOf sequence: T) throws where T.Iterator.Element : Encodable
+    contentsOf sequence: T) throws where T.Element : Encodable
 
   /// Encodes a nested container keyed by the given type and returns it.
   ///
@@ -1090,9 +1093,19 @@ public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
   }
 
   /// The key's hash value.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var hashValue: Int {
     return self.rawValue.hashValue
+  }
+
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(self.rawValue)
   }
 }
 
@@ -1166,7 +1179,7 @@ public enum EncodingError : Error {
   public var _userInfo: AnyObject? {
     // The error dictionary must be returned as an AnyObject. We can do this
     // only on platforms with bridging, unfortunately.
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    #if _runtime(_ObjC)
       let context: Context
       switch self {
       case .invalidValue(_, let c): context = c
@@ -1276,7 +1289,7 @@ public enum DecodingError : Error {
   public var _userInfo: AnyObject? {
     // The error dictionary must be returned as an AnyObject. We can do this
     // only on platforms with bridging, unfortunately.
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    #if _runtime(_ObjC)
       let context: Context
       switch self {
       case .keyNotFound(_,   let c): context = c
@@ -1476,6 +1489,7 @@ internal class _KeyedEncodingContainerBase<Key : CodingKey> {
 internal final class _KeyedEncodingContainerBox<
   Concrete : KeyedEncodingContainerProtocol
 > : _KeyedEncodingContainerBase<Concrete.Key> {
+  @usableFromInline
   typealias Key = Concrete.Key
 
   @usableFromInline
@@ -1649,6 +1663,7 @@ internal class _KeyedDecodingContainerBase<Key : CodingKey> {
 internal final class _KeyedDecodingContainerBox<
   Concrete : KeyedDecodingContainerProtocol
 > : _KeyedDecodingContainerBase<Concrete.Key> {
+  @usableFromInline
   typealias Key = Concrete.Key
 
   @usableFromInline
@@ -2123,7 +2138,7 @@ public extension UnkeyedEncodingContainer {
 % for type in codable_types:
   @inlinable // FIXME(sil-serialize-all)
   public mutating func encode<T : Sequence>(
-    contentsOf sequence: T) throws where T.Iterator.Element == ${type}
+    contentsOf sequence: T) throws where T.Element == ${type}
   {
     for element in sequence {
       try self.encode(element)
@@ -2133,7 +2148,7 @@ public extension UnkeyedEncodingContainer {
 
   @inlinable // FIXME(sil-serialize-all)
   public mutating func encode<T : Sequence>(
-    contentsOf sequence: T) throws where T.Iterator.Element : Encodable
+    contentsOf sequence: T) throws where T.Element : Encodable
   {
     for element in sequence {
       try self.encode(element)
@@ -2162,3 +2177,7 @@ public extension UnkeyedDecodingContainer {
     return try self.decode(T.self)
   }
 }
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -253,33 +253,32 @@ extension MutableCollection {
   ///   collection match `belongsInSecondPartition`, the returned index is
   ///   equal to the collection's `endIndex`.
   ///
-  /// - Complexity: O(*n*)
+  /// - Complexity: O(*n*) where n is the length of the collection.
   @inlinable
   public mutating func partition(
     by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index {
-
-    var pivot = startIndex
-    while true {
-      if pivot == endIndex {
-        return pivot
-      }
-      if try belongsInSecondPartition(self[pivot]) {
-        break
-      }
-      formIndex(after: &pivot)
-    }
-
-    var i = index(after: pivot)
-    while i < endIndex {
-      if try !belongsInSecondPartition(self[i]) {
-        swapAt(i, pivot)
-        formIndex(after: &pivot)
-      }
-      formIndex(after: &i)
-    }
-    return pivot
+    return try _halfStablePartition(isSuffixElement: belongsInSecondPartition)
   }
+
+  /// Moves all elements satisfying `isSuffixElement` into a suffix of the
+  /// collection, returning the start position of the resulting suffix.
+  ///
+  /// - Complexity: O(*n*) where n is the length of the collection.
+  @inlinable
+  internal mutating func _halfStablePartition(
+    isSuffixElement: (Element) throws -> Bool
+  ) rethrows -> Index {
+    guard var i = try firstIndex(where: isSuffixElement)
+    else { return endIndex }
+    
+    var j = index(after: i)
+    while j != endIndex {
+      if try !isSuffixElement(self[j]) { swapAt(i, j); formIndex(after: &i) }
+      formIndex(after: &j)
+    }
+    return i
+  }  
 }
 
 extension MutableCollection where Self : BidirectionalCollection {
@@ -368,258 +367,109 @@ extension MutableCollection where Self : BidirectionalCollection {
 }
 
 //===----------------------------------------------------------------------===//
-// sorted()/sort()
+// shuffled()/shuffle()
 //===----------------------------------------------------------------------===//
 
-extension Sequence where Element : Comparable {
-  /// Returns the elements of the sequence, sorted.
-  ///
-  /// You can sort any sequence of elements that conform to the `Comparable`
-  /// protocol by calling this method. Elements are sorted in ascending order.
-  ///
-  /// The sorting algorithm is not stable. A nonstable sort may change the
-  /// relative order of elements that compare equal.
-  ///
-  /// Here's an example of sorting a list of students' names. Strings in Swift
-  /// conform to the `Comparable` protocol, so the names are sorted in
-  /// ascending order according to the less-than operator (`<`).
-  ///
-  ///     let students: Set = ["Kofi", "Abena", "Peter", "Kweku", "Akosua"]
-  ///     let sortedStudents = students.sorted()
-  ///     print(sortedStudents)
-  ///     // Prints "["Abena", "Akosua", "Kofi", "Kweku", "Peter"]"
-  ///
-  /// To sort the elements of your sequence in descending order, pass the
-  /// greater-than operator (`>`) to the `sorted(by:)` method.
-  ///
-  ///     let descendingStudents = students.sorted(by: >)
-  ///     print(descendingStudents)
-  ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
-  ///
-  /// - Returns: A sorted array of the sequence's elements.
-  @inlinable
-  public func sorted() -> [Element] {
-    var result = ContiguousArray(self)
-    result.sort()
-    return Array(result)
-  }
-}
-
 extension Sequence {
-  /// Returns the elements of the sequence, sorted using the given predicate as
-  /// the comparison between elements.
+  /// Returns the elements of the sequence, shuffled using the given generator
+  /// as a source for randomness.
   ///
-  /// When you want to sort a sequence of elements that don't conform to the
-  /// `Comparable` protocol, pass a predicate to this method that returns
-  /// `true` when the first element passed should be ordered before the
-  /// second. The elements of the resulting array are ordered according to the
-  /// given predicate.
+  /// You use this method to randomize the elements of a sequence when you
+  /// are using a custom random number generator. For example, you can shuffle
+  /// the numbers between `0` and `9` by calling the `shuffled(using:)` method
+  /// on that range:
   ///
-  /// The predicate must be a *strict weak ordering* over the elements. That
-  /// is, for any elements `a`, `b`, and `c`, the following conditions must
-  /// hold:
+  ///     let numbers = 0...9
+  ///     let shuffledNumbers = numbers.shuffled(using: &myGenerator)
+  ///     // shuffledNumbers == [8, 9, 4, 3, 2, 6, 7, 0, 5, 1]
   ///
-  /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
-  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
-  ///   both `true`, then `areInIncreasingOrder(a, c)` is also `true`.
-  ///   (Transitive comparability)
-  /// - Two elements are *incomparable* if neither is ordered before the other
-  ///   according to the predicate. If `a` and `b` are incomparable, and `b`
-  ///   and `c` are incomparable, then `a` and `c` are also incomparable.
-  ///   (Transitive incomparability)
+  /// - Parameter generator: The random number generator to use when shuffling
+  ///   the sequence.
+  /// - Returns: An array of this sequence's elements in a shuffled order.
   ///
-  /// The sorting algorithm is not stable. A nonstable sort may change the
-  /// relative order of elements for which `areInIncreasingOrder` does not
-  /// establish an order.
-  ///
-  /// In the following example, the predicate provides an ordering for an array
-  /// of a custom `HTTPResponse` type. The predicate orders errors before
-  /// successes and sorts the error responses by their error code.
-  ///
-  ///     enum HTTPResponse {
-  ///         case ok
-  ///         case error(Int)
-  ///     }
-  ///
-  ///     let responses: [HTTPResponse] = [.error(500), .ok, .ok, .error(404), .error(403)]
-  ///     let sortedResponses = responses.sorted {
-  ///         switch ($0, $1) {
-  ///         // Order errors by code
-  ///         case let (.error(aCode), .error(bCode)):
-  ///             return aCode < bCode
-  ///
-  ///         // All successes are equivalent, so none is before any other
-  ///         case (.ok, .ok): return false
-  ///
-  ///         // Order errors before successes
-  ///         case (.error, .ok): return true
-  ///         case (.ok, .error): return false
-  ///         }
-  ///     }
-  ///     print(sortedResponses)
-  ///     // Prints "[.error(403), .error(404), .error(500), .ok, .ok]"
-  ///
-  /// You also use this method to sort elements that conform to the
-  /// `Comparable` protocol in descending order. To sort your sequence in
-  /// descending order, pass the greater-than operator (`>`) as the
-  /// `areInIncreasingOrder` parameter.
-  ///
-  ///     let students: Set = ["Kofi", "Abena", "Peter", "Kweku", "Akosua"]
-  ///     let descendingStudents = students.sorted(by: >)
-  ///     print(descendingStudents)
-  ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
-  ///
-  /// Calling the related `sorted()` method is equivalent to calling this
-  /// method and passing the less-than operator (`<`) as the predicate.
-  ///
-  ///     print(students.sorted())
-  ///     // Prints "["Abena", "Akosua", "Kofi", "Kweku", "Peter"]"
-  ///     print(students.sorted(by: <))
-  ///     // Prints "["Abena", "Akosua", "Kofi", "Kweku", "Peter"]"
-  ///
-  /// - Parameter areInIncreasingOrder: A predicate that returns `true` if its
-  ///   first argument should be ordered before its second argument;
-  ///   otherwise, `false`.
-  /// - Returns: A sorted array of the sequence's elements.
+  /// - Complexity: O(*n*)
   @inlinable
-  public func sorted(
-    by areInIncreasingOrder:
-      (Element, Element) throws -> Bool
-  ) rethrows -> [Element] {
+  public func shuffled<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) -> [Element] {
     var result = ContiguousArray(self)
-    try result.sort(by: areInIncreasingOrder)
+    result.shuffle(using: &generator)
     return Array(result)
   }
-}
-
-extension MutableCollection
-  where
-  Self : RandomAccessCollection, Element : Comparable {
-
-  /// Sorts the collection in place.
+  
+  /// Returns the elements of the sequence, shuffled.
   ///
-  /// You can sort any mutable collection of elements that conform to the
-  /// `Comparable` protocol by calling this method. Elements are sorted in
-  /// ascending order.
+  /// For example, you can shuffle the numbers between `0` and `9` by calling
+  /// the `shuffled()` method on that range:
   ///
-  /// The sorting algorithm is not stable. A nonstable sort may change the
-  /// relative order of elements that compare equal.
+  ///     let numbers = 0...9
+  ///     let shuffledNumbers = numbers.shuffled()
+  ///     // shuffledNumbers == [1, 7, 6, 2, 8, 9, 4, 3, 5, 0]
   ///
-  /// Here's an example of sorting a list of students' names. Strings in Swift
-  /// conform to the `Comparable` protocol, so the names are sorted in
-  /// ascending order according to the less-than operator (`<`).
+  /// This method is equivalent to calling the version that takes a generator, 
+  /// passing in the system's default random generator.
   ///
-  ///     var students = ["Kofi", "Abena", "Peter", "Kweku", "Akosua"]
-  ///     students.sort()
-  ///     print(students)
-  ///     // Prints "["Abena", "Akosua", "Kofi", "Kweku", "Peter"]"
+  /// - Returns: A shuffled array of this sequence's elements.
   ///
-  /// To sort the elements of your collection in descending order, pass the
-  /// greater-than operator (`>`) to the `sort(by:)` method.
-  ///
-  ///     students.sort(by: >)
-  ///     print(students)
-  ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
+  /// - Complexity: O(*n*)
   @inlinable
-  public mutating func sort() {
-    let didSortUnsafeBuffer: Void? =
-      _withUnsafeMutableBufferPointerIfSupported {
-      (bufferPointer) -> Void in
-      bufferPointer.sort()
-      return ()
-    }
-    if didSortUnsafeBuffer == nil {
-      _introSort(&self, subRange: startIndex..<endIndex)
-    }
+  public func shuffled() -> [Element] {
+    var g = SystemRandomNumberGenerator()
+    return shuffled(using: &g)
   }
 }
 
 extension MutableCollection where Self : RandomAccessCollection {
-  /// Sorts the collection in place, using the given predicate as the
-  /// comparison between elements.
+  /// Shuffles the collection in place, using the given generator as a source
+  /// for randomness.
   ///
-  /// When you want to sort a collection of elements that doesn't conform to
-  /// the `Comparable` protocol, pass a closure to this method that returns
-  /// `true` when the first element passed should be ordered before the
-  /// second.
+  /// You use this method to randomize the elements of a collection when you
+  /// are using a custom random number generator. For example, you can use the
+  /// `shuffle(using:)` method to randomly reorder the elements of an array.
   ///
-  /// The predicate must be a *strict weak ordering* over the elements. That
-  /// is, for any elements `a`, `b`, and `c`, the following conditions must
-  /// hold:
+  ///     var names = ["Alejandro", "Camila", "Diego", "Luciana", "Luis", "Sofía"]
+  ///     names.shuffle(using: &myGenerator)
+  ///     // names == ["Sofía", "Alejandro", "Camila", "Luis", "Diego", "Luciana"]
   ///
-  /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
-  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
-  ///   both `true`, then `areInIncreasingOrder(a, c)` is also `true`.
-  ///   (Transitive comparability)
-  /// - Two elements are *incomparable* if neither is ordered before the other
-  ///   according to the predicate. If `a` and `b` are incomparable, and `b`
-  ///   and `c` are incomparable, then `a` and `c` are also incomparable.
-  ///   (Transitive incomparability)
+  /// - Parameter generator: The random number generator to use when shuffling
+  ///   the collection.
   ///
-  /// The sorting algorithm is not stable. A nonstable sort may change the
-  /// relative order of elements for which `areInIncreasingOrder` does not
-  /// establish an order.
-  ///
-  /// In the following example, the closure provides an ordering for an array
-  /// of a custom enumeration that describes an HTTP response. The predicate
-  /// orders errors before successes and sorts the error responses by their
-  /// error code.
-  ///
-  ///     enum HTTPResponse {
-  ///         case ok
-  ///         case error(Int)
-  ///     }
-  ///
-  ///     var responses: [HTTPResponse] = [.error(500), .ok, .ok, .error(404), .error(403)]
-  ///     responses.sort {
-  ///         switch ($0, $1) {
-  ///         // Order errors by code
-  ///         case let (.error(aCode), .error(bCode)):
-  ///             return aCode < bCode
-  ///
-  ///         // All successes are equivalent, so none is before any other
-  ///         case (.ok, .ok): return false
-  ///
-  ///         // Order errors before successes
-  ///         case (.error, .ok): return true
-  ///         case (.ok, .error): return false
-  ///         }
-  ///     }
-  ///     print(responses)
-  ///     // Prints "[.error(403), .error(404), .error(500), .ok, .ok]"
-  ///
-  /// Alternatively, use this method to sort a collection of elements that do
-  /// conform to `Comparable` when you want the sort to be descending instead
-  /// of ascending. Pass the greater-than operator (`>`) operator as the
-  /// predicate.
-  ///
-  ///     var students = ["Kofi", "Abena", "Peter", "Kweku", "Akosua"]
-  ///     students.sort(by: >)
-  ///     print(students)
-  ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
-  ///
-  /// - Parameter areInIncreasingOrder: A predicate that returns `true` if its
-  ///   first argument should be ordered before its second argument;
-  ///   otherwise, `false`. If `areInIncreasingOrder` throws an error during
-  ///   the sort, the elements may be in a different order, but none will be
-  ///   lost.
+  /// - Complexity: O(*n*)
   @inlinable
-  public mutating func sort(
-    by areInIncreasingOrder:
-      (Element, Element) throws -> Bool
-  ) rethrows {
-
-    let didSortUnsafeBuffer: Void? =
-      try _withUnsafeMutableBufferPointerIfSupported {
-      (bufferPointer) -> Void in
-      try bufferPointer.sort(by: areInIncreasingOrder)
-      return ()
+  public mutating func shuffle<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) {
+    let count = self.count
+    guard count > 1 else { return }
+    var amount = count
+    var currentIndex = startIndex
+    while amount > 1 {
+      let random = generator.next(upperBound: UInt(amount))
+      amount -= 1
+      swapAt(
+        currentIndex,
+        index(currentIndex, offsetBy: numericCast(random))
+      )
+      formIndex(after: &currentIndex)
     }
-    if didSortUnsafeBuffer == nil {
-      try _introSort(
-        &self,
-        subRange: startIndex..<endIndex,
-        by: areInIncreasingOrder)
-    }
+  }
+  
+  /// Shuffles the collection in place.
+  ///
+  /// Use the `shuffle()` method to randomly reorder the elements of an
+  /// array.
+  ///
+  ///     var names = ["Alejandro", "Camila", "Diego", "Luciana", "Luis", "Sofía"]
+  ///     names.shuffle(using: myGenerator)
+  ///     // names == ["Luis", "Camila", "Luciana", "Sofía", "Alejandro", "Diego"]
+  ///
+  /// This method is equivalent to calling the version that takes a generator, 
+  /// passing in the system's default random generator.
+  ///
+  /// - Complexity: O(*n*)
+  @inlinable
+  public mutating func shuffle() {
+    var g = SystemRandomNumberGenerator()
+    shuffle(using: &g)
   }
 }

@@ -24,16 +24,21 @@ CHANGELOG
 Swift 5.0
 ---------
 
-- [SR-419][]
+* Notable bug fix: unowned and unowned(unsafe) variables now support optional
+  types.
 
-  In Swift 5 mode, when setting a property from within its own `didSet` or `willSet` observer, the observer will now only avoid being recursively called if the property is set on `self` (either implicitly or explicitly).
+* [SR-419][]
+
+  In Swift 5 mode, when setting a property from within its own `didSet` or
+  `willSet` observer, the observer will now only avoid being recursively called
+  if the property is set on `self` (either implicitly or explicitly).
 
   For example:
   ```swift
   class Node {
     var children = [Node]()
 
-    var depth: Int {
+    var depth: Int = 0 {
       didSet {
         if depth < 0 {
           // Will not recursively call didSet, as setting depth on self (same
@@ -49,10 +54,6 @@ Swift 5.0
         }
       }
     }
-
-    init(depth: Int) {
-      self.depth = depth
-    }
   }
   ```
 
@@ -61,6 +62,144 @@ Swift 5.0
 Swift 4.2
 ---------
 
+* [SE-0194][]
+
+  The new CaseIterable protocol describes types which have a static
+  “allCases” property that is used to describe all of the cases of the
+  type. Swift will synthesize this “allCases” property for enums that
+  have no associated values. For example:
+
+  ```swift
+  enum Suit: CaseIterable {
+    case heart
+    case club
+    case diamond
+    case spade
+  }
+
+  print(Suit.allCases) // prints [Suit.heart, Suit.club, Suit.diamond, Suit.spade]
+  ```
+
+* [SE-0185][]
+
+  Protocol conformances are now able to be synthesized in extensions in the same
+  file as the type definition, allowing automatic synthesis of conditional
+  conformances to `Hashable`, `Equatable` and `Codable` (both `Encodable` and
+  `Decodable`). For instance, if there is a generic wrapper type that can only
+  be `Equatable` when its wrapped type is also `Equatable`, the `==` method can
+  be automatically constructed by the compiler:
+
+  ```swift
+  struct Generic<Param> {
+    var property: Param
+  }
+
+  extension Generic: Equatable where Param: Equatable {}
+  // Automatically synthesized inside the extension:
+  // static func ==(lhs: Generic, rhs: Generic) -> Bool {
+  //   return lhs.property == rhs.property
+  // }
+  ```
+
+  Code that wants to be as precise as possible should generally not
+  conditionally conform to `Codable` directly, but rather its two constituent
+  protocols `Encodable` and `Decodable`, or else one can only (for instance)
+  decode a `Generic<Param>` if `Param` is `Encodable` in addition to
+  `Decodable`, even though `Encodable` is likely not required:
+
+  ```swift
+  // Unnecessarily restrictive:
+  extension Generic: Codable where Param: Codable {}
+
+  // More precise:
+  extension Generic: Encodable where Param: Encodable {}
+  extension Generic: Decodable where Param: Decodable {}
+  ```
+
+  Finally, due to `Decodable` having an `init` requirement, it is not possible
+  to conform to `Decodable` in an extension of a non-final class: such a class
+  needs to have any `init`s from protocols be `required`, which means they need
+  to be in the class definition.
+
+
+* [SE-0054][]
+
+  `ImplicitlyUnwrappedOptional<T>` is now an unavailable typealias of `Optional<T>`.
+  Declarations annotated with `!` have the type `Optional<T>`. If an
+  expression involving one of these values will not compile successfully with the
+  type `Optional<T>`, it is implicitly unwrapped, producing a value of type `T`.
+
+  In some cases this change will cause code that previously compiled to
+  need to be adjusted. Please see [this blog post](https://swift.org/blog/iuo/)
+  for more information.
+
+* [SE-0206][]
+
+    The standard library now uses a high-quality, randomly seeded, universal
+    hash function, represented by the new public `Hasher` struct.
+  
+    “Random seeding” varies the result of `hashValue` on each execution of a
+    Swift program, improving the reliability of the standard library's hashed
+    collections such as `Set` and `Dictionary`. In particular, random seeding
+    enables better protection against (accidental or deliberate) hash-flooding
+    attacks.
+    
+    This change fulfills a long-standing prophecy in Hashable's documentation:
+
+    > Hash values are not guaranteed to be equal across different executions of
+    > your program. Do not save hash values to use during a future execution.
+    
+    As a consequence of random seeding, the elements in `Set` and `Dictionary`
+    values may have a different order on each execution. This may expose some
+    bugs in existing code that accidentally relies on repeatable ordering.
+
+    Additionally, the `Hashable` protocol now includes an extra function
+    requirement, `hash(into:)`. The new requirement is designed to be much
+    easier to implement than the old `hashValue` property, and it generally
+    provides better hashing. To implement `hash(into:)`, simply feed the exact
+    same components of your type that you compare in `Equatable`'s `==`
+    implementation to the supplied `Hasher`:
+    
+    ```swift
+    struct Foo: Hashable {
+      var a: String?
+      var b: [Int]
+      var c: [String: Int]
+      
+      static func ==(lhs: Foo, rhs: Foo) -> Bool {
+        return lhs.a == rhs.a && lhs.b == rhs.b && lhs.c == rhs.c
+      }
+      
+      func hash(into hasher: inout Hasher) {
+        hasher.combine(a)
+        hasher.combine(b)
+        hasher.combine(c)
+      }
+    }
+    ```
+    
+    Automatic synthesis for `Hashable` ([SE-0185]) has been updated to generate
+    `hash(into:)` implementations. For example, the `==` and `hash(into:)`
+    implementations above are equivalent to the ones synthesized by the
+    compiler, and can be removed without changing the meaning of the code.
+    
+    Synthesis has also been extended to support deriving `hashValue` from
+    `hash(into:)`, and vice versa. Therefore, code that only implements
+    `hashValue` continues to work in Swift 4.2. This new compiler functionality
+    works for all types that can implement `Hashable`, including classes.
+    
+    Note that these changes don't affect Foundation's hashing interface. Classes
+    that subclass `NSObject` should override the `hash` property, like before.
+
+    In certain controlled environments, such as while running particular tests,
+    it may be helpful to selectively disable hash seed randomization, so that
+    hash values and the order of elements in `Set`/`Dictionary` values remain
+    consistent across executions. You can disable hash seed randomization by
+    defining the environment variable `SWIFT_DETERMINISTIC_HASHING` with the
+    value of `1`. The Swift runtime looks at this variable during process
+    startup and, if it is defined, replaces the random seed with a constant
+    value.
+  
 * [SR-106][]
 
   The behavior of `.description` and `.debugDescription` for floating-point
@@ -91,11 +230,10 @@ Swift 4.2
 * [SE-0143][]
 
   The standard library types `Optional`, `Array`, `ArraySlice`,
-  `ContiguousArray`, `Dictionary`, `DictionaryLiteral`, `Range`, and
-  `ClosedRange` now conform to the `Hashable` protocol when their element or
-  bound types (as the case may be) conform to `Hashable`.  This makes
-  synthesized `Hashable` implementations available for types that include stored
-  properties of these types.
+  `ContiguousArray`, `Dictionary`, `Range`, and `ClosedRange` now conform to the
+  `Hashable` protocol when their element or bound types (as the case may be)
+  conform to `Hashable`.  This makes synthesized `Hashable` implementations
+  available for types that include stored properties of these types.
 
 * [SE-0196][]
   
@@ -133,6 +271,8 @@ Swift 4.2
 
 Swift 4.1
 ---------
+
+### 2018-03-29 (Xcode 9.3)
 
 * [SE-0075][]
 
@@ -6989,6 +7129,19 @@ Swift 1.0
 [SE-0197]: <https://github.com/apple/swift-evolution/blob/master/proposals/0197-remove-where.md>
 [SE-0198]: <https://github.com/apple/swift-evolution/blob/master/proposals/0198-playground-quicklook-api-revamp.md>
 [SE-0199]: <https://github.com/apple/swift-evolution/blob/master/proposals/0199-bool-toggle.md>
+[SE-0200]: <https://github.com/apple/swift-evolution/blob/master/proposals/0200-raw-string-escaping.md>
+[SE-0201]: <https://github.com/apple/swift-evolution/blob/master/proposals/0201-package-manager-local-dependencies.md>
+[SE-0202]: <https://github.com/apple/swift-evolution/blob/master/proposals/0202-random-unification.md>
+[SE-0203]: <https://github.com/apple/swift-evolution/blob/master/proposals/0203-rename-sequence-elements-equal.md>
+[SE-0204]: <https://github.com/apple/swift-evolution/blob/master/proposals/0204-add-last-methods.md>
+[SE-0205]: <https://github.com/apple/swift-evolution/blob/master/proposals/0205-withUnsafePointer-for-lets.md>
+[SE-0206]: <https://github.com/apple/swift-evolution/blob/master/proposals/0206-hashable-enhancements.md>
+[SE-0207]: <https://github.com/apple/swift-evolution/blob/master/proposals/0207-containsOnly.md>
+[SE-0208]: <https://github.com/apple/swift-evolution/blob/master/proposals/0208-package-manager-system-library-targets.md>
+[SE-0209]: <https://github.com/apple/swift-evolution/blob/master/proposals/0209-package-manager-swift-lang-version-update.md>
+[SE-0210]: <https://github.com/apple/swift-evolution/blob/master/proposals/0210-key-path-offset.md>
+[SE-0211]: <https://github.com/apple/swift-evolution/blob/master/proposals/0211-unicode-scalar-properties.md>
+[SE-0212]: <https://github.com/apple/swift-evolution/blob/master/proposals/0212-compiler-version-directive.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>

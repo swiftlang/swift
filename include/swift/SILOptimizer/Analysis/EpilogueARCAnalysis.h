@@ -271,8 +271,9 @@ class EpilogueARCAnalysis : public FunctionAnalysisBase<EpilogueARCFunctionInfo>
 
 public:
   EpilogueARCAnalysis(SILModule *)
-    : FunctionAnalysisBase<EpilogueARCFunctionInfo>(AnalysisKind::EpilogueARC),
-      PO(nullptr), AA(nullptr), RC(nullptr) {}
+      : FunctionAnalysisBase<EpilogueARCFunctionInfo>(
+            SILAnalysisKind::EpilogueARC),
+        PO(nullptr), AA(nullptr), RC(nullptr) {}
 
   EpilogueARCAnalysis(const EpilogueARCAnalysis &) = delete;
   EpilogueARCAnalysis &operator=(const EpilogueARCAnalysis &) = delete;
@@ -294,7 +295,7 @@ public:
   virtual bool needsNotifications() override { return true; }
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::EpilogueARC;
+    return S->getKind() == SILAnalysisKind::EpilogueARC;
   }
 
   virtual void initialize(SILPassManager *PM) override;

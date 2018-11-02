@@ -48,6 +48,12 @@ HashingTestSuite.test("Hasher/DefaultKey") {
 
   let defaultHash = _hashValue(for: value)
 
+  let rawHash = value._rawHashValue(seed: Hasher._seed)
+  expectEqual(rawHash, defaultHash)
+
+  let oneShotHash = Hasher._hash(seed: Hasher._seed, value)
+  expectEqual(oneShotHash, defaultHash)
+
   var defaultHasher = Hasher()
   defaultHasher._combine(value)
   expectEqual(defaultHasher.finalize(), defaultHash)
@@ -55,6 +61,131 @@ HashingTestSuite.test("Hasher/DefaultKey") {
   var customHasher = Hasher(_seed: Hasher._seed)
   customHasher._combine(value)
   expectEqual(customHasher.finalize(), defaultHash)
+}
+
+HashingTestSuite.test("Hashing/TopLevelHashing/UInt64") {
+  func checkTopLevelHash(
+    for value: UInt64,
+    seed: (UInt64, UInt64),
+    file: String = #file,
+    line: UInt = #line) {
+    var hasher = Hasher(_seed: seed)
+    hasher._combine(value)
+    let expected = hasher.finalize()
+    let actual = Hasher._hash(seed: seed, value)
+    expectEqual(actual, expected, file: file, line: line)
+  }
+  checkTopLevelHash(for: 0, seed: (0, 0))
+  checkTopLevelHash(for: 1, seed: (0, 0))
+  checkTopLevelHash(for: 1, seed: (1, 0))
+  checkTopLevelHash(for: 1, seed: (1, 1))
+  checkTopLevelHash(for: 0x0102030405060708, seed: (1, 1))
+  checkTopLevelHash(
+    for: 0x0102030405060708,
+    seed: (0x0807060504030201, 0x090a0b0c0d0e0f))
+  checkTopLevelHash(for: UInt64.max, seed: (1, 1))
+  checkTopLevelHash(for: UInt64.max, seed: (UInt64.max, UInt64.max))
+}
+
+HashingTestSuite.test("Hashing/TopLevelHashing/UInt") {
+  func checkTopLevelHash(
+    for value: UInt,
+    seed: (UInt64, UInt64),
+    file: String = #file,
+    line: UInt = #line) {
+    var hasher = Hasher(_seed: seed)
+    hasher._combine(value)
+    let expected = hasher.finalize()
+    let actual = Hasher._hash(seed: seed, value)
+    expectEqual(actual, expected, file: file, line: line)
+  }
+  checkTopLevelHash(for: 0, seed: (0, 0))
+  checkTopLevelHash(for: 1, seed: (0, 0))
+  checkTopLevelHash(for: 1, seed: (1, 0))
+  checkTopLevelHash(for: 1, seed: (1, 1))
+  checkTopLevelHash(
+    for: UInt(truncatingIfNeeded: 0x0102030405060708 as UInt64),
+    seed: (1, 1))
+  checkTopLevelHash(
+    for: UInt(truncatingIfNeeded: 0x0102030405060708 as UInt64),
+    seed: (0x8877665544332211, 0x1122334455667788))
+  checkTopLevelHash(for: UInt.max, seed: (1, 1))
+  checkTopLevelHash(for: UInt.max, seed: (UInt64.max, UInt64.max))
+}
+
+HashingTestSuite.test("Hashing/TopLevelHashing/PartialUInt64") {
+  func checkTopLevelHash(
+    for value: UInt64,
+    count: Int,
+    seed: (UInt64, UInt64),
+    file: String = #file,
+    line: UInt = #line) {
+    var hasher = Hasher(_seed: seed)
+    hasher._combine(bytes: value, count: count)
+    let expected = hasher.finalize()
+    let actual = Hasher._hash(seed: seed, bytes: value, count: count)
+    expectEqual(
+      actual,
+      expected,
+      "seed: \(seed), value: \(value), count: \(count)",
+      file: file,
+      line: line)
+  }
+  for seed: (UInt64, UInt64) in [
+    (0, 0),
+    (1, 0),
+    (1, 1),
+    (0x1827364554637281, 0xf9e8d7c6b5a49382)
+  ] {
+    for count in 1 ..< 8 {
+      checkTopLevelHash(for: 0, count: count, seed: seed)
+    }
+    checkTopLevelHash(for: 0x01, count: 1, seed: seed)
+    checkTopLevelHash(for: 0x0102, count: 2, seed: seed)
+    checkTopLevelHash(for: 0x010203, count: 3, seed: seed)
+    checkTopLevelHash(for: 0x01020304, count: 4, seed: seed)
+    checkTopLevelHash(for: 0x0102030405, count: 5, seed: seed)
+    checkTopLevelHash(for: 0x010203040506, count: 6, seed: seed)
+    checkTopLevelHash(for: 0x01020304050607, count: 7, seed: seed)
+  }
+}
+
+HashingTestSuite.test("Hashing/TopLevelHashing/UnsafeRawBufferPointer") {
+  func checkTopLevelHash(
+    for buffer: [UInt8],
+    seed: (UInt64, UInt64),
+    file: String = #file,
+    line: UInt = #line) {
+    var hasher = Hasher(_seed: seed)
+    buffer.withUnsafeBytes { buffer in
+      hasher.combine(bytes: buffer)
+    }
+    let expected = hasher.finalize()
+    let actual = buffer.withUnsafeBytes { buffer in
+      Hasher._hash(seed: seed, bytes: buffer)
+    }
+    expectEqual(
+      actual,
+      expected,
+      "seed: \(seed), buffer: \(buffer)",
+      file: file,
+      line: line)
+  }
+  for seed: (UInt64, UInt64) in [
+    (0, 0),
+    (1, 0),
+    (1, 1),
+    (0x1827364554637281, 0xf9e8d7c6b5a49382)
+  ] {
+    var zeros: [UInt8] = []
+    var integers: [UInt8] = []
+    for i: UInt8 in 0 ..< 20 {
+      zeros.append(0)
+      checkTopLevelHash(for: zeros, seed: seed)
+      integers.append(i)
+      checkTopLevelHash(for: integers, seed: seed)
+    }
+  }
 }
 
 runAllTests()

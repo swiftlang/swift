@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
-
-// REQUIRES: objc_interop
+// RUN: %target-swift-emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-sil-ownership -enable-objc-interop | %FileCheck %s
 
 import gizmo
 

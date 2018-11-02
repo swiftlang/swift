@@ -112,6 +112,16 @@ struct Generic<T> {
   }
 }
 
+protocol P { // expected-note {{'P' previously declared here}}
+  typealias a = Generic
+}
+
+protocol P {} // expected-error {{invalid redeclaration of 'P'}}
+
+func hasTypo() {
+  _ = P.a.a // expected-error {{value of type 'Generic' has no member 'a'}}
+}
+
 // Typo correction with AnyObject.
 func takesAnyObject(_ t: AnyObject) {
   _ = t.rawPointer

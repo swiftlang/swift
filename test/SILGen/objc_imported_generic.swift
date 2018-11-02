@@ -1,7 +1,7 @@
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name objc_imported_generic -emit-silgen %s -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -module-name objc_imported_generic %s -enable-sil-ownership | %FileCheck %s
 // For integration testing, ensure we get through IRGen too.
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name objc_imported_generic -emit-ir -verify -DIRGEN_INTEGRATION_TEST %s
+// RUN: %target-swift-emit-ir(mock-sdk: %clang-importer-sdk) -module-name objc_imported_generic -verify -DIRGEN_INTEGRATION_TEST %s
 
 // REQUIRES: objc_interop
 
@@ -19,7 +19,7 @@ public func genericMethodOnAnyObject(o: AnyObject, b: Bool) -> AnyObject {
 }
 
 // CHECK-LABEL: sil @$S21objc_imported_generic0C17MethodOnAnyObject{{[_0-9a-zA-Z]*}}F
-// CHECK:         objc_method {{%.*}} : $@opened([[TAG:.*]]) AnyObject, #GenericClass.thing!1.foreign : <T where T : AnyObject> (GenericClass<T>) -> () -> T?, $@convention(objc_method) @pseudogeneric (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>
+// CHECK:         objc_method {{%.*}} : $@opened([[TAG:.*]]) AnyObject, #GenericClass.thing!1.foreign : <T where T : AnyObject> (GenericClass<T>) -> () -> T?, $@convention(objc_method) (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>
 
 public func genericMethodOnAnyObjectChained(o: AnyObject, b: Bool) -> AnyObject? {
   return o.thing?()
@@ -30,7 +30,7 @@ public func genericMethodOnAnyObjectChained(o: AnyObject, b: Bool) -> AnyObject?
 // CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened([[TAG:.*]]) AnyObject, #GenericClass.thing!1.foreign, bb1
-// CHECK:   bb1({{%.*}} : @trivial $@convention(objc_method) @pseudogeneric (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>):
+// CHECK:   bb1({{%.*}} : @trivial $@convention(objc_method) (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>):
 // CHECK: } // end sil function '$S21objc_imported_generic0C24MethodOnAnyObjectChained1o1byXlSgyXl_SbtF'
 
 public func genericSubscriptOnAnyObject(o: AnyObject, b: Bool) -> AnyObject? {
@@ -42,7 +42,7 @@ public func genericSubscriptOnAnyObject(o: AnyObject, b: Bool) -> AnyObject? {
 // CHCEK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened([[TAG:.*]]) AnyObject, #GenericClass.subscript!getter.1.foreign, bb1
-// CHECK:   bb1({{%.*}} : @trivial $@convention(objc_method) @pseudogeneric (UInt16, @opened([[TAG]]) AnyObject) -> @autoreleased AnyObject):
+// CHECK:   bb1({{%.*}} : @trivial $@convention(objc_method) (UInt16, @opened([[TAG]]) AnyObject) -> @autoreleased AnyObject):
 // CHECK: } // end sil function '$S21objc_imported_generic0C20SubscriptOnAnyObject1o1byXlSgyXl_SbtF'
 
 public func genericPropertyOnAnyObject(o: AnyObject, b: Bool) -> AnyObject?? {
@@ -54,7 +54,7 @@ public func genericPropertyOnAnyObject(o: AnyObject, b: Bool) -> AnyObject?? {
 // CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened([[TAG:.*]]) AnyObject, #GenericClass.propertyThing!getter.1.foreign, bb1
-// CHECK:   bb1({{%.*}} : @trivial $@convention(objc_method) @pseudogeneric (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>):
+// CHECK:   bb1({{%.*}} : @trivial $@convention(objc_method) (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>):
 // CHECK: } // end sil function '$S21objc_imported_generic0C19PropertyOnAnyObject1o1byXlSgSgyXl_SbtF'
 
 public protocol ThingHolder {
@@ -123,13 +123,13 @@ func configureWithoutOptions() {
 // foreign to native thunk for init(options:), uses GenericOption : Hashable
 // conformance
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$SSo12GenericClassC7optionsAByxGSgs10DictionaryVySo0A6OptionaypGSg_tcfcTO : $@convention(method) <T where T : AnyObject> (@owned Optional<Dictionary<GenericOption, Any>>, @owned GenericClass<T>) -> @owned Optional<GenericClass<T>>
-// CHECK: [[FN:%.*]] = function_ref @$Ss10DictionaryV10FoundationE19_bridgeToObjectiveCSo12NSDictionaryCyF : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
+// CHECK-LABEL: sil shared [serializable] [thunk] @$SSo12GenericClassC7optionsAByxGSgSDySo0A6OptionaypGSg_tcfcTO : $@convention(method) <T where T : AnyObject> (@owned Optional<Dictionary<GenericOption, Any>>, @owned GenericClass<T>) -> @owned Optional<GenericClass<T>>
+// CHECK: [[FN:%.*]] = function_ref @$SSD10FoundationE19_bridgeToObjectiveCSo12NSDictionaryCyF : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
 // CHECK: apply [[FN]]<GenericOption, Any>({{.*}}) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
 // CHECK: return
 
 // Make sure we emitted the witness table for the above conformance
 
 // CHECK-LABEL: sil_witness_table shared [serialized] GenericOption: Hashable module objc_generics {
-// CHECK: method #Hashable.hashValue!getter.1: {{.*}}: @$SSo13GenericOptionas8HashableSCsACP9hashValueSivgTW
+// CHECK: method #Hashable.hashValue!getter.1: {{.*}}: @$SSo13GenericOptionaSHSCSH9hashValueSivgTW
 // CHECK: }

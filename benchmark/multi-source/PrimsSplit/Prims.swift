@@ -176,10 +176,9 @@ func ==(lhs: Edge, rhs: Edge) -> Bool {
 }
 
 extension Edge : Hashable {
-  var hashValue: Int {
-    get {
-      return start.hashValue ^ end.hashValue
-    }
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(start)
+    hasher.combine(end)
   }
 }
 

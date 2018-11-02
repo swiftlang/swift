@@ -58,18 +58,6 @@ namespace irgen {
                                                         Address destBuffer,
                                                         Address srcBuffer);
 
-  /// Emit a call to do an 'initializeBufferWithTakeOfBuffer' operation.
-  llvm::Value *emitInitializeBufferWithTakeOfBufferCall(IRGenFunction &IGF,
-                                                        llvm::Value *metadata,
-                                                        Address destBuffer,
-                                                        Address srcBuffer);
-
-  /// Emit a call to do an 'initializeBufferWithTakeOfBuffer' operation.
-  llvm::Value *emitInitializeBufferWithTakeOfBufferCall(IRGenFunction &IGF,
-                                                        SILType T,
-                                                        Address destBuffer,
-                                                        Address srcBuffer);
-
   /// Emit a call to do an 'initializeWithCopy' operation.
   void emitInitializeWithCopyCall(IRGenFunction &IGF,
                                   SILType T,

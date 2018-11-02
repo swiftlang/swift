@@ -31,6 +31,7 @@ set(swift_runtime_objc_sources
     SwiftObject.mm
     SwiftValue.mm
     ReflectionMirror.mm
+    ObjCRuntimeGetImageNameFromClass.cpp
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldRemangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/TypeDecoder.cpp"
@@ -103,16 +104,39 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   string(TOLOWER "${sdk}" lowercase_sdk)
 
   # These two libraries are only used with the static swiftcore
-  add_swift_library(swiftImageInspectionShared STATIC
+  add_swift_library(swiftImageInspectionShared TARGET_LIBRARY STATIC
     ImageInspectionELF.cpp
     C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
-    LINK_FLAGS ${swift_runtime_linker_flags})
-  set_target_properties(swiftImageInspectionShared PROPERTIES
-    ARCHIVE_OUTPUT_DIRECTORY "${SWIFTSTATICLIB_DIR}/${lowercase_sdk}")
+    LINK_FLAGS ${swift_runtime_linker_flags}
+    INSTALL_IN_COMPONENT stdlib)
 
-  swift_install_in_component(stdlib
-    TARGETS swiftImageInspectionShared
-    DESTINATION "lib/swift_static/${lowercase_sdk}")
+  foreach(arch IN LISTS SWIFT_SDK_${sdk}_ARCHITECTURES)
+    set(FragileSupportLibrary swiftImageInspectionShared-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch})
+    set(LibraryLocation ${SWIFTSTATICLIB_DIR}/${lowercase_sdk}/${arch})
+    add_custom_command_target(swift_image_inspection_${arch}_static
+      COMMAND
+        "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:${FragileSupportLibrary}> ${LibraryLocation}
+      OUTPUT
+        "${LibraryLocation}/${CMAKE_STATIC_LIBRARY_PREFIX}swiftImageInspectionShared${CMAKE_STATIC_LIBRARY_SUFFIX}"
+      DEPENDS
+         ${FragileSupportLibrary})
+    swift_install_in_component(stdlib
+      FILES $<TARGET_FILE:${FragileSupportLibrary}>
+      DESTINATION "lib/swift_static/${lowercase_sdk}/${arch}")
+  endforeach()
+
+  set(FragileSupportLibraryPrimary swiftImageInspectionShared-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${SWIFT_PRIMARY_VARIANT_ARCH})
+  set(LibraryLocationPrimary ${SWIFTSTATICLIB_DIR}/${lowercase_sdk})
+  add_custom_command_target(swift_image_inspection_static_primary_arch
+      COMMAND
+         "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:${FragileSupportLibraryPrimary}> ${LibraryLocationPrimary}
+      OUTPUT
+      "${LibraryLocationPrimary}/${CMAKE_STATIC_LIBRARY_PREFIX}swiftImageInspectionShared${CMAKE_STATIC_LIBRARY_SUFFIX}"
+      DEPENDS
+         ${FragileSupportLibraryPrimary})
+    swift_install_in_component(stdlib
+      FILES $<TARGET_FILE:${FragileSupportLibraryPrimary}>
+      DESTINATION "lib/swift_static/${lowercase_sdk}")
 
   # Generate the static-executable-args.lnk file used for ELF systems (eg linux)
   set(linkfile "${lowercase_sdk}/static-executable-args.lnk")
@@ -131,8 +155,12 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
     FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
     DESTINATION "lib/swift_static/${lowercase_sdk}")
   add_custom_target(static_binary_magic ALL DEPENDS ${static_binary_lnk_file_list})
+  foreach(arch IN LISTS SWIFT_SDK_LINUX_ARCHITECTURES)
+    add_dependencies(static_binary_magic ${swift_image_inspection_${arch}_static})
+  endforeach()
+  add_dependencies(static_binary_magic ${swift_image_inspection_static_primary_arch})
 
-  add_swift_library(swiftImageInspectionShared OBJECT_LIBRARY TARGET_LIBRARY
+  add_swift_library(swiftImageInspectionSharedObject OBJECT_LIBRARY TARGET_LIBRARY
     ImageInspectionELF.cpp
     C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
     LINK_FLAGS ${swift_runtime_linker_flags}

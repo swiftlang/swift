@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name vtables_objc -enable-sil-ownership -sdk %S/Inputs -emit-silgen -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name vtables_objc -enable-sil-ownership -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -59,17 +59,13 @@ func callWotsit(_ w: Wotsit) {
 // CHECK: sil_vtable Hoozit {
 // CHECK-NEXT:   #Hoozit.anse!1: {{.*}} : @$S12vtables_objc6HoozitC4anse{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT:   #Hoozit.incorrige!1: {{.*}} : @$S12vtables_objc6HoozitC9incorrige{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> () -> Hoozit? : @$S12vtables_objc6HoozitCACSgycfc
-// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> (Int) -> Hoozit? : @$S12vtables_objc6HoozitC7bellsOnACSgSi_tcfc
-// CHECK-NEXT:   #Hoozit.deinit!deallocator: @$S12vtables_objc6HoozitCfD
+// CHECK-NEXT:   #Hoozit.deinit!deallocator.1: @$S12vtables_objc6HoozitCfD
 // CHECK-NEXT: }
 
 // CHECK: sil_vtable Wotsit {
 // CHECK-NEXT:   #Hoozit.anse!1: {{.*}} : @$S12vtables_objc6HoozitC4anse{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT:   #Hoozit.incorrige!1: {{.*}} : @$S12vtables_objc6WotsitC9incorrige{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> () -> Hoozit? : @$S12vtables_objc6WotsitCACSgycfc
-// CHECK-NEXT:   #Hoozit.init!initializer.1: (Hoozit.Type) -> (Int) -> Hoozit? : @$S12vtables_objc6WotsitC7bellsOnACSgSi_tcfc
-// CHECK-NEXT:   #Wotsit.deinit!deallocator: @$S12vtables_objc6WotsitCfD
+// CHECK-NEXT:   #Wotsit.deinit!deallocator.1: @$S12vtables_objc6WotsitCfD
 // CHECK-NEXT: }
 
 // <rdar://problem/15282548>
@@ -83,7 +79,7 @@ func callWotsit(_ w: Wotsit) {
 
 extension Base {
   // note: does not have a vtable slot, because it is from an extension
-  func identify() -> Int {
+  @objc func identify() -> Int {
     return 0
   }
 }

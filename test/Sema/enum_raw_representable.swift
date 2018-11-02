@@ -120,7 +120,7 @@ rdar32431165_1(.baz)
 // expected-error@-1 {{reference to member 'baz' cannot be resolved without a contextual type}}
 
 rdar32431165_1("")
-// expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'E_32431165'}} {{15-15=E_32431165(rawValue: }} {{19-19=)}}
+// expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'E_32431165'}} {{16-16=E_32431165(rawValue: }} {{18-18=)}}
 rdar32431165_1(42, "")
 // expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'E_32431165'}} {{20-20=E_32431165(rawValue: }} {{22-22=)}}
 
@@ -129,7 +129,7 @@ func rdar32431165_2(_: Int) {}
 func rdar32431165_2(_: Int, _: String) {}
 
 rdar32431165_2(E_32431165.bar)
-// expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{15-15=}} {{31-31=.rawValue}}
+// expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{16-16=}} {{30-30=.rawValue}}
 rdar32431165_2(42, E_32431165.bar)
 // expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{20-20=}} {{34-34=.rawValue}}
 
@@ -145,6 +145,42 @@ func rdar32432253(_ condition: Bool = false) {
   // expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{11-11=}} {{17-17=.rawValue}}
 }
 
+func sr8150_helper1(_: Int) {}
+func sr8150_helper1(_: Double) {}
+
+func sr8150_helper2(_: Double) {}
+func sr8150_helper2(_: Int) {}
+
+func sr8150_helper3(_: Foo) {}
+func sr8150_helper3(_: Bar) {}
+
+func sr8150_helper4(_: Bar) {}
+func sr8150_helper4(_: Foo) {}
+
+func sr8150(bar: Bar) {
+  sr8150_helper1(bar)
+  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{18-18=}} {{21-21=.rawValue}}
+  sr8150_helper2(bar)
+  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{18-18=}} {{21-21=.rawValue}}
+  sr8150_helper3(0.0)
+  // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Bar'}} {{18-18=Bar(rawValue: }} {{21-21=)}}
+  sr8150_helper4(0.0)
+  // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Bar'}} {{18-18=Bar(rawValue: }} {{21-21=)}}
+}
+
+class SR8150Box {
+  var bar: Bar
+  init(bar: Bar) { self.bar = bar }
+}
+// Bonus problem with mutable values being passed.
+func sr8150_mutable(obj: SR8150Box) {
+  sr8150_helper1(obj.bar)
+  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{18-18=}} {{25-25=.rawValue}}
+
+  var bar = obj.bar
+  sr8150_helper1(bar)
+  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{18-18=}} {{21-21=.rawValue}}
+}
 
 struct NotEquatable { }
 

@@ -90,6 +90,9 @@ static void configureX86_64(IRGenModule &IGM, const llvm::Triple &triple,
 /// Configures target-specific information for 32-bit x86 platforms.
 static void configureX86(IRGenModule &IGM, const llvm::Triple &triple,
                          SwiftTargetInfo &target) {
+  setToMask(target.PointerSpareBits, 32,
+            SWIFT_ABI_I386_SWIFT_SPARE_BITS_MASK);
+
   // x86 uses objc_msgSend_fpret but not objc_msgSend_fp2ret.
   target.ObjCUseFPRet = true;
   setToMask(target.IsObjCPointerBit, 32, SWIFT_ABI_I386_IS_OBJC_BIT);

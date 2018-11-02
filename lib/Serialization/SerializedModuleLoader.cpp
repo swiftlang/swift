@@ -15,6 +15,7 @@
 #include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
@@ -26,6 +27,7 @@
 #include <system_error>
 
 using namespace swift;
+using swift::version::Version;
 
 namespace {
 using AccessPathElem = std::pair<Identifier, SourceLoc>;
@@ -80,12 +82,48 @@ openModuleFiles(StringRef DirName, StringRef ModuleFilename,
   return std::error_code();
 }
 
+static void addDiagnosticInfoForArchitectureMismatch(ASTContext &ctx,
+                                                     SourceLoc sourceLocation,
+                                                     StringRef moduleName,
+                                                     StringRef archName,
+                                                     StringRef directoryPath) {
+
+  std::error_code errorCode;
+  llvm::sys::fs::directory_iterator directoryIterator(directoryPath, errorCode,
+                                                      true);
+  llvm::sys::fs::directory_iterator endIterator;
+
+  if (errorCode) {
+    return;
+  }
+
+  std::string foundArchs;
+  for (; directoryIterator != endIterator;
+       directoryIterator.increment(errorCode)) {
+    if (errorCode) {
+      return;
+    }
+    auto entry = *directoryIterator;
+    StringRef filePath(entry.path());
+    StringRef extension = llvm::sys::path::extension(filePath);
+    if (extension.startswith(".") &&
+        extension.drop_front() == SERIALIZED_MODULE_EXTENSION) {
+      foundArchs = foundArchs + (foundArchs.length() > 0 ? ", " : "") +
+                   llvm::sys::path::stem(filePath).str();
+    }
+  }
+
+  ctx.Diags.diagnose(sourceLocation, diag::sema_no_import_arch, moduleName,
+                     archName, foundArchs);
+}
+
 static bool
 findModule(ASTContext &ctx, AccessPathElem moduleID,
            std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
            std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
            bool &isFramework) {
-  llvm::SmallString<64> moduleFilename(moduleID.first.str());
+  llvm::SmallString<64> moduleName(moduleID.first.str());
+  llvm::SmallString<64> moduleFilename(moduleName);
   moduleFilename += '.';
   moduleFilename += SERIALIZED_MODULE_EXTENSION;
 
@@ -95,9 +133,10 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
 
   // FIXME: Which name should we be using here? Do we care about CPU subtypes?
   // FIXME: At the very least, don't hardcode "arch".
-  llvm::SmallString<16> archFile{
+  llvm::SmallString<16> archName{
       ctx.LangOpts.getPlatformConditionValue(PlatformConditionKind::Arch)};
-  llvm::SmallString<16> archDocFile{archFile};
+  llvm::SmallString<16> archFile{archName};
+  llvm::SmallString<16> archDocFile{archName};
   if (!archFile.empty()) {
     archFile += '.';
     archFile += SERIALIZED_MODULE_EXTENSION;
@@ -121,6 +160,12 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
                             archFile.str(), archDocFile.str(),
                             moduleBuffer, moduleDocBuffer,
                             scratch);
+
+      if (err == std::errc::no_such_file_or_directory) {
+        addDiagnosticInfoForArchitectureMismatch(
+            ctx, moduleID.second, moduleName, archName, currPath);
+        return false;
+      }
     }
     if (!err)
       return true;
@@ -133,12 +178,22 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
 
     auto tryFrameworkImport = [&](StringRef frameworkPath) -> bool {
       currPath = frameworkPath;
-      llvm::sys::path::append(currPath, moduleFramework.str(),
-                              "Modules", moduleFilename.str());
-      auto err = openModuleFiles(currPath,
-                                 archFile.str(), archDocFile.str(),
-                                 moduleBuffer, moduleDocBuffer,
-                                 scratch);
+      llvm::sys::path::append(currPath, moduleFramework.str());
+      // Check if the framework directory exists
+      if (!llvm::sys::fs::is_directory(currPath)) {
+        return false;
+      }
+
+      llvm::sys::path::append(currPath, "Modules", moduleFilename.str());
+      auto err = openModuleFiles(currPath, archFile.str(), archDocFile.str(),
+                                 moduleBuffer, moduleDocBuffer, scratch);
+
+      if (err == std::errc::no_such_file_or_directory) {
+        addDiagnosticInfoForArchitectureMismatch(
+            ctx, moduleID.second, moduleName, archName, currPath);
+        return false;
+      }
+
       return !err;
     };
 
@@ -222,7 +277,14 @@ FileUnit *SerializedModuleLoader::loadAST(
     M.removeFile(*fileUnit);
   }
 
-  // This is the failure path. If we have a location, diagnose the issue.
+  // From here on is the failure path.
+
+  // Even though the module failed to load, it's possible its contents include
+  // a source buffer that need to survive because it's already been used for
+  // diagnostics.
+  if (auto orphanedBuffer = loadedModuleFile->takeBufferForDiagnostics())
+    OrphanedMemoryBuffers.push_back(std::move(orphanedBuffer));
+
   if (!diagLoc)
     return nullptr;
 
@@ -232,7 +294,7 @@ FileUnit *SerializedModuleLoader::loadAST(
 
     SmallString<32> versionBuf;
     llvm::raw_svector_ostream versionString(versionBuf);
-    versionString << Ctx.LangOpts.EffectiveLanguageVersion;
+    versionString << Version::getCurrentLanguageVersion();
     if (versionString.str() == shortVersion)
       return false;
 
@@ -313,6 +375,25 @@ FileUnit *SerializedModuleLoader::loadAST(
       Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
       Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);
     }
+    break;
+  }
+
+  case serialization::Status::CircularDependency: {
+    auto circularDependencyIter =
+        llvm::find_if(loadedModuleFile->getDependencies(),
+                      [](const ModuleFile::Dependency &next) {
+      return !next.Import.second->hasResolvedImports();
+    });
+    assert(circularDependencyIter != loadedModuleFile->getDependencies().end()
+           && "circular dependency reported, but no module with unresolved "
+              "imports found");
+
+    // FIXME: We should include the path of the circularity as well, but that's
+    // hard because we're discovering this /while/ resolving imports, which
+    // means the problematic modules haven't been recorded yet.
+    Ctx.Diags.diagnose(*diagLoc, diag::serialization_circular_dependency,
+                       circularDependencyIter->getPrettyPrintedPath(),
+                       M.getName());
     break;
   }
 
@@ -434,6 +515,7 @@ ModuleDecl *SerializedModuleLoader::loadModule(SourceLoc importLoc,
 
   auto M = ModuleDecl::create(moduleID.first, Ctx);
   Ctx.LoadedModules[moduleID.first] = M;
+  SWIFT_DEFER { M->setHasResolvedImports(); };
 
   if (!loadAST(*M, moduleID.second, std::move(moduleInputBuffer),
                std::move(moduleDocInputBuffer), isFramework)) {

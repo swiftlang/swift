@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -g -Xllvm -sil-print-debuginfo -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -g -Xllvm -sil-print-debuginfo %s | %FileCheck %s
 
 func nop1() {}
 func nop2() {}

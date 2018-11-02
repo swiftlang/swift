@@ -331,8 +331,8 @@ bool ObjectOutliner::optimizeObjectAllocation(
       return false;
   }
 
-  DEBUG(llvm::dbgs() << "Outline global variable in " <<
-        ARI->getFunction()->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "Outline global variable in "
+                          << ARI->getFunction()->getName() << '\n');
 
   SILModule *Module = &ARI->getFunction()->getModule();
   assert(!Cl->isResilient(Module->getSwiftModule(),
@@ -473,7 +473,7 @@ void ObjectOutliner::replaceFindStringCall(ApplyInst *FindStringCall) {
   FunctionRefInst *FRI = B.createFunctionRef(FindStringCall->getLoc(),
                                              replacementFunc);
   ApplyInst *NewCall = B.createApply(FindStringCall->getLoc(), FRI,
-                                     FindStringCall->getSubstitutions(),
+                                     FindStringCall->getSubstitutionMap(),
                                      { FindStringCall->getArgument(0),
                                        FindStringCall->getArgument(1),
                                        CacheAddr },

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 public protocol P {}
 extension Int: P {}

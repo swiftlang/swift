@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name objc_extensions -enable-sil-ownership -emit-silgen -sdk %S/Inputs/ -I %S/Inputs -enable-source-import %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name objc_extensions -enable-sil-ownership -sdk %S/Inputs/ -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -9,7 +9,7 @@ import objc_extensions_helper
 class Sub : Base {}
 
 extension Sub {
-  override var prop: String! {
+  @objc override var prop: String! {
     didSet {
       // Ignore it.
     }
@@ -100,10 +100,10 @@ extension Sub {
 
   }
 
-  func foo() {
+  @objc func foo() {
   }
 
-  override func objCBaseMethod() {}
+  @objc override func objCBaseMethod() {}
 }
 
 // CHECK-LABEL: sil hidden @$S15objc_extensions20testOverridePropertyyyAA3SubCF
@@ -128,7 +128,7 @@ func testCurry(_ x: Sub) {
 }
 
 extension Sub {
-  var otherProp: String {
+  @objc var otherProp: String {
     get { return "hello" }
     set { }
   }
@@ -166,7 +166,7 @@ extension SubSub {
   // CHECK:   = objc_super_method [[DOWNCAST_BORROWED_UPCAST_SELF_COPY_2]] : $SubSub, #Sub.otherProp!setter.1.foreign
   // CHECK:   end_borrow [[BORROWED_UPCAST_SELF_COPY_2]] from [[UPCAST_SELF_COPY_2]]
   // CHECK: } // end sil function '$S15objc_extensions03SubC0C9otherPropSSvs'
-  override var otherProp: String {
+  @objc override var otherProp: String {
     didSet {
       // Ignore it.
     }

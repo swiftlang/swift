@@ -144,7 +144,7 @@ void Mangler::finalize(llvm::raw_ostream &stream) {
   stream.write(result.data(), result.size());
 }
 
-
+LLVM_ATTRIBUTE_UNUSED
 static bool treeContains(Demangle::NodePointer Nd, Demangle::Node::Kind Kind) {
   if (Nd->getKind() == Kind)
     return true;

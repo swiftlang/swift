@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sanitize=thread -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -sanitize=thread %s | %FileCheck %s
 // REQUIRES: tsan_runtime
 
 func takesInout(_ p: inout Int) { }
@@ -57,9 +57,10 @@ func inoutGlobalStructStoredProperty() {
 // CHECK:  [[BUFFER_ADDRESS:%.*]] = pointer_to_address [[TEMPORARY_BUFFER]] : $Builtin.RawPointer to [strict] $*Int
 // CHECK:  [[BUFFER_ADDRESS_DEPENDENCE:%.*]] = mark_dependence [[BUFFER_ADDRESS]] : $*Int on [[LOADED_CLASS]] : $MyClass
 // CHECK:  end_borrow [[BORROWED_CLASS]] from [[LOADED_CLASS]] : $MyClass, $MyClass
-// CHECK:  {{%.*}} builtin "tsanInoutAccess"([[BUFFER_ADDRESS_DEPENDENCE]] : $*Int) : $()
+// CHECK:  [[BUFFER_ADDRESS_ACCESS:%.*]] = begin_access [modify] [unsafe] [[BUFFER_ADDRESS_DEPENDENCE]]
+// CHECK:  {{%.*}} builtin "tsanInoutAccess"([[BUFFER_ADDRESS_ACCESS]] : $*Int) : $()
 // CHECK:  [[TAKES_INOUT_FUNC:%.*]] = function_ref @$S20tsan_instrumentation10takesInoutyySizF : $@convention(thin) (@inout Int) -> ()
-// CHECK:  {{%.*}} apply [[TAKES_INOUT_FUNC]]([[BUFFER_ADDRESS_DEPENDENCE]]) : $@convention(thin) (@inout Int) -> ()
+// CHECK:  {{%.*}} apply [[TAKES_INOUT_FUNC]]([[BUFFER_ADDRESS_ACCESS]]) : $@convention(thin) (@inout Int) -> ()
 func inoutGlobalClassStoredProperty() {
   // This generates two TSan inout instrumentations. One for the value
   // buffer that is passed inout to materializeForSet and one for the

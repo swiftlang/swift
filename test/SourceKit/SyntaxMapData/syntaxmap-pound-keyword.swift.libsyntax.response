@@ -1,0 +1,187 @@
+{
+  key.offset: 0,
+  key.length: 517,
+  key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+  key.syntaxmap: [
+    {
+      key.kind: source.lang.swift.syntaxtype.comment,
+      key.offset: 0,
+      key.length: 70
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.comment,
+      key.offset: 71,
+      key.length: 39
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.comment,
+      key.offset: 111,
+      key.length: 114
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.comment,
+      key.offset: 226,
+      key.length: 59
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.offset: 287,
+      key.length: 3
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.identifier,
+      key.offset: 291,
+      key.length: 2
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.offset: 296,
+      key.length: 9
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.offset: 306,
+      key.length: 3
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.identifier,
+      key.offset: 310,
+      key.length: 1
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.offset: 314,
+      key.length: 5
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.offset: 320,
+      key.length: 3
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.identifier,
+      key.offset: 324,
+      key.length: 1
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.offset: 328,
+      key.length: 5
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.offset: 334,
+      key.length: 3
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.identifier,
+      key.offset: 338,
+      key.length: 1
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.offset: 342,
+      key.length: 7
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.offset: 351,
+      key.length: 2
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.offset: 354,
+      key.length: 10
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.offset: 365,
+      key.length: 3
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.number,
+      key.offset: 369,
+      key.length: 3
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.buildconfig.keyword,
+      key.offset: 381,
+      key.length: 3
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.offset: 385,
+      key.length: 5
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.pounddirective.keyword,
+      key.offset: 391,
+      key.length: 6
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.string,
+      key.offset: 398,
+      key.length: 7
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.buildconfig.keyword,
+      key.offset: 407,
+      key.length: 7
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.offset: 415,
+      key.length: 4
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.pounddirective.keyword,
+      key.offset: 420,
+      key.length: 8
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.string,
+      key.offset: 429,
+      key.length: 9
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.buildconfig.keyword,
+      key.offset: 440,
+      key.length: 5
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.pounddirective.keyword,
+      key.offset: 446,
+      key.length: 15
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.identifier,
+      key.offset: 462,
+      key.length: 4
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.string,
+      key.offset: 468,
+      key.length: 12
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.identifier,
+      key.offset: 482,
+      key.length: 4
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.number,
+      key.offset: 487,
+      key.length: 3
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.pounddirective.keyword,
+      key.offset: 492,
+      key.length: 15
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.buildconfig.keyword,
+      key.offset: 510,
+      key.length: 6
+    }
+  ]
+}

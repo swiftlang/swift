@@ -90,9 +90,9 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
                                                  SILType fromType,
                                                  SILType toType) {
   // Check metatype objects directly. Don't try to find their meta-metatype.
-  bool isMetatype = isa<MetatypeType>(fromType.getSwiftRValueType());
-  if (isMetatype) {
-    auto metaType = cast<MetatypeType>(toType.getSwiftRValueType());
+  auto isMetatype = false;
+  if (auto metaType = toType.getAs<MetatypeType>()) {
+    isMetatype = true;
     assert(metaType->getRepresentation() != MetatypeRepresentation::ObjC &&
            "not implemented");
     toType = IGF.IGM.getLoweredType(metaType.getInstanceType());
@@ -106,12 +106,12 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
   // TODO: use ObjC class references
   llvm::Value *targetMetadata;
   if ((targetMetadata =
-           tryEmitConstantHeapMetadataRef(IGF.IGM, toType.getSwiftRValueType(),
+           tryEmitConstantHeapMetadataRef(IGF.IGM, toType.getASTType(),
                                           /*allowUninitialized*/ false))) {
     // ok
   } else {
     targetMetadata
-      = emitClassHeapMetadataRef(IGF, toType.getSwiftRValueType(),
+      = emitClassHeapMetadataRef(IGF, toType.getASTType(),
                                  MetadataValueType::ObjCClass,
                                  MetadataState::Complete,
                                  /*allowUninitialized*/ false);
@@ -158,7 +158,7 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
   // If the destination type is known to have a Swift-compatible
   // implementation, use the most specific entrypoint.
   if (destClass && destClass->hasKnownSwiftImplementation()) {
-    metadataRef = IGF.emitTypeMetadataRef(toType.getSwiftRValueType());
+    metadataRef = IGF.emitTypeMetadataRef(toType.getASTType());
 
     switch (mode) {
     case CheckedCastMode::Unconditional:
@@ -173,7 +173,7 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
   // class-bounded archetype, use the most general cast entrypoint.
   } else if (toType.is<ArchetypeType>() ||
              destClass->getForeignClassKind()==ClassDecl::ForeignKind::CFType) {
-    metadataRef = IGF.emitTypeMetadataRef(toType.getSwiftRValueType());
+    metadataRef = IGF.emitTypeMetadataRef(toType.getASTType());
 
     switch (mode) {
     case CheckedCastMode::Unconditional:
@@ -504,8 +504,8 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
                                   CheckedCastMode mode,
                                   Optional<MetatypeRepresentation> metatypeKind,
                                   Explosion &ex) {
-  auto srcInstanceType = srcType.getSwiftRValueType();
-  auto destInstanceType = destType.getSwiftRValueType();
+  auto srcInstanceType = srcType.getASTType();
+  auto destInstanceType = destType.getASTType();
   while (auto metatypeType = dyn_cast<ExistentialMetatypeType>(
            destInstanceType)) {
     destInstanceType = metatypeType.getInstanceType();
@@ -522,7 +522,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   bool hasClassConstraint = layout.requiresClass();
   bool hasClassConstraintByProtocol = false;
 
-  bool hasSuperclassConstraint = bool(layout.superclass);
+  bool hasSuperclassConstraint = bool(layout.explicitSuperclass);
 
   for (auto protoTy : layout.getProtocols()) {
     auto *protoDecl = protoTy->getDecl();
@@ -535,7 +535,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     }
 
     if (Lowering::TypeConverter::protocolRequiresWitnessTable(protoDecl)) {
-      auto descriptor = emitProtocolDescriptorRef(IGF, protoDecl);
+      auto descriptor = IGF.IGM.getAddrOfProtocolDescriptor(protoDecl);
       witnessTableProtos.push_back(descriptor);
     }
 
@@ -563,7 +563,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   // The source of a scalar cast is statically known to be a class or a
   // metatype, so we only have to check the class constraint in two cases:
   //
-  // 1) The destination type has an explicit superclass constraint that is
+  // 1) The destination type has a superclass constraint that is
   //    more derived than what the source type is known to be.
   //
   // 2) We are casting between metatypes, in which case the source might
@@ -581,9 +581,17 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   // Note that destInstanceType is always an existential type, so calling
   // getSuperclass() returns the superclass constraint of the existential,
   // not the superclass of some concrete class.
-  bool checkSuperclassConstraint =
-    hasSuperclassConstraint &&
-    !destInstanceType->getSuperclass()->isExactSuperclassOf(srcInstanceType);
+  bool checkSuperclassConstraint = false;
+  if (hasSuperclassConstraint) {
+    Type srcSuperclassType = srcInstanceType;
+    if (srcSuperclassType->isExistentialType())
+      srcSuperclassType = srcSuperclassType->getSuperclass();
+    if (srcSuperclassType) {
+      checkSuperclassConstraint =
+        !destInstanceType->getSuperclass()->isExactSuperclassOf(
+          srcSuperclassType);
+    }
+  }
 
   if (checkSuperclassConstraint)
     checkClassConstraint = true;
@@ -739,7 +747,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   args.push_back(metadataValue);
 
   if (checkSuperclassConstraint)
-    args.push_back(IGF.emitTypeMetadataRef(CanType(layout.superclass)));
+    args.push_back(IGF.emitTypeMetadataRef(CanType(layout.explicitSuperclass)));
 
   for (auto proto : witnessTableProtos)
     args.push_back(proto);

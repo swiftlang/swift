@@ -202,12 +202,12 @@ extension LazyPrefixWhileCollection.Index: Comparable {
 }
 
 extension LazyPrefixWhileCollection.Index: Hashable where Base.Index: Hashable {
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     switch _value {
     case .index(let value):
@@ -311,10 +311,3 @@ extension LazyCollectionProtocol {
       _base: self.elements, predicate: predicate)
   }
 }
-
-@available(*, deprecated, renamed: "LazyDropWhileSequence.Iterator")
-public typealias LazyPrefixWhileIterator<T> = LazyPrefixWhileSequence<T>.Iterator where T: Sequence
-@available(*, deprecated, renamed: "LazyDropWhileCollection.Index")
-public typealias LazyPrefixWhileIndex<T> = LazyPrefixWhileCollection<T>.Index where T: Collection
-@available(*, deprecated, renamed: "LazyPrefixWhileCollection")
-public typealias LazyPrefixWhileBidirectionalCollection<T> = LazyPrefixWhileCollection<T> where T: BidirectionalCollection

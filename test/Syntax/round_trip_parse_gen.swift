@@ -108,6 +108,11 @@ class C {
 
   internal subscript(x: Int) -> Int { get {} set {} }
   subscript() -> Int { return 1 }
+
+  var x: Int {
+    address { fatalError() }
+    unsafeMutableAddress { fatalError() }
+  }
 }
 
 protocol PP {
@@ -441,6 +446,7 @@ func keypath() {
   _ = \a.b.c
   _ = \a.b[1]
   _ = \.a.b
+  _ = \Array<Int>.[]
   _ = #keyPath(a.b.c)
 }
 func objcSelector() {
@@ -533,3 +539,11 @@ struct S : Q, Equatable {
 }
 
 @_alignment(16) public struct float3 { public var x, y, z: Float }
+
+#sourceLocation(file: "otherFile.swift", line: 5)
+
+func foo() {}
+
+#sourceLocation()
+
+"abc \( } ) def"

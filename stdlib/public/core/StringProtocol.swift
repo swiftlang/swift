@@ -126,18 +126,6 @@ extension StringProtocol {
   }
 }
 
-extension StringProtocol {
-  //@available(swift, deprecated: 3.2, obsoleted: 4.0, message: "Please use the StringProtocol itself")
-  //public var characters: Self { return self }
-
-  @available(swift, deprecated: 3.2, obsoleted: 4.0, renamed: "UTF8View.Index")
-  public typealias UTF8Index = UTF8View.Index
-  @available(swift, deprecated: 3.2, obsoleted: 4.0, renamed: "UTF16View.Index")
-  public typealias UTF16Index = UTF16View.Index
-  @available(swift, deprecated: 3.2, obsoleted: 4.0, renamed: "UnicodeScalarView.Index")
-  public typealias UnicodeScalarIndex = UnicodeScalarView.Index
-}
-
 /// A protocol that provides fast access to a known representation of String.
 ///
 /// Can be used to specialize generic functions that would otherwise end up

@@ -27,7 +27,7 @@
                     },
                     {
                       "kind": "LineComment",
-                      "value": "\/\/ RUN: diff %t %S\/Inputs\/serialize_struct_decl.json"
+                      "value": "\/\/ RUN: diff %t %S\/Inputs\/serialize_struct_decl.json -u"
                     },
                     {
                       "kind": "Newline",
@@ -40,7 +40,8 @@
                       "value": 1
                     }
                   ],
-                  "presence": "Present"
+                  "presence": "Present",
+                  "id": 1
                 },
                 {
                   "tokenKind": {
@@ -54,7 +55,8 @@
                       "value": 1
                     }
                   ],
-                  "presence": "Present"
+                  "presence": "Present",
+                  "id": 2
                 },
                 null,
                 null,
@@ -68,7 +70,8 @@
                       },
                       "leadingTrivia": [],
                       "trailingTrivia": [],
-                      "presence": "Present"
+                      "presence": "Present",
+                      "id": 3
                     },
                     {
                       "kind": "MemberDeclList",
@@ -101,7 +104,8 @@
                                       "value": 3
                                     }
                                   ],
-                                  "presence": "Present"
+                                  "presence": "Present",
+                                  "id": 4
                                 },
                                 {
                                   "kind": "PatternBindingList",
@@ -124,10 +128,12 @@
                                                   "value": 1
                                                 }
                                               ],
-                                              "presence": "Present"
+                                              "presence": "Present",
+                                              "id": 5
                                             }
                                           ],
-                                          "presence": "Present"
+                                          "presence": "Present",
+                                          "id": 6
                                         },
                                         {
                                           "kind": "TypeAnnotation",
@@ -143,7 +149,8 @@
                                                   "value": 1
                                                 }
                                               ],
-                                              "presence": "Present"
+                                              "presence": "Present",
+                                              "id": 7
                                             },
                                             {
                                               "kind": "SimpleTypeIdentifier",
@@ -155,30 +162,37 @@
                                                   },
                                                   "leadingTrivia": [],
                                                   "trailingTrivia": [],
-                                                  "presence": "Present"
+                                                  "presence": "Present",
+                                                  "id": 8
                                                 },
                                                 null
                                               ],
-                                              "presence": "Present"
+                                              "presence": "Present",
+                                              "id": 9
                                             }
                                           ],
-                                          "presence": "Present"
+                                          "presence": "Present",
+                                          "id": 10
                                         },
                                         null,
                                         null,
                                         null
                                       ],
-                                      "presence": "Present"
+                                      "presence": "Present",
+                                      "id": 11
                                     }
                                   ],
-                                  "presence": "Present"
+                                  "presence": "Present",
+                                  "id": 12
                                 }
                               ],
-                              "presence": "Present"
+                              "presence": "Present",
+                              "id": 13
                             },
                             null
                           ],
-                          "presence": "Present"
+                          "presence": "Present",
+                          "id": 14
                         },
                         {
                           "kind": "MemberDeclListItem",
@@ -208,7 +222,8 @@
                                       "value": 1
                                     }
                                   ],
-                                  "presence": "Present"
+                                  "presence": "Present",
+                                  "id": 15
                                 },
                                 {
                                   "kind": "PatternBindingList",
@@ -231,10 +246,12 @@
                                                   "value": 1
                                                 }
                                               ],
-                                              "presence": "Present"
+                                              "presence": "Present",
+                                              "id": 16
                                             }
                                           ],
-                                          "presence": "Present"
+                                          "presence": "Present",
+                                          "id": 17
                                         },
                                         {
                                           "kind": "TypeAnnotation",
@@ -250,7 +267,8 @@
                                                   "value": 1
                                                 }
                                               ],
-                                              "presence": "Present"
+                                              "presence": "Present",
+                                              "id": 18
                                             },
                                             {
                                               "kind": "SimpleTypeIdentifier",
@@ -267,7 +285,8 @@
                                                       "value": 1
                                                     }
                                                   ],
-                                                  "presence": "Present"
+                                                  "presence": "Present",
+                                                  "id": 19
                                                 },
                                                 {
                                                   "kind": "GenericArgumentClause",
@@ -283,7 +302,8 @@
                                                           "value": 1
                                                         }
                                                       ],
-                                                      "presence": "Present"
+                                                      "presence": "Present",
+                                                      "id": 20
                                                     },
                                                     {
                                                       "kind": "GenericArgumentList",
@@ -306,18 +326,22 @@
                                                                       "value": 1
                                                                     }
                                                                   ],
-                                                                  "presence": "Present"
+                                                                  "presence": "Present",
+                                                                  "id": 21
                                                                 },
                                                                 null
                                                               ],
-                                                              "presence": "Present"
+                                                              "presence": "Present",
+                                                              "id": 22
                                                             },
                                                             null
                                                           ],
-                                                          "presence": "Present"
+                                                          "presence": "Present",
+                                                          "id": 23
                                                         }
                                                       ],
-                                                      "presence": "Present"
+                                                      "presence": "Present",
+                                                      "id": 24
                                                     },
                                                     {
                                                       "tokenKind": {
@@ -325,35 +349,44 @@
                                                       },
                                                       "leadingTrivia": [],
                                                       "trailingTrivia": [],
-                                                      "presence": "Present"
+                                                      "presence": "Present",
+                                                      "id": 25
                                                     }
                                                   ],
-                                                  "presence": "Present"
+                                                  "presence": "Present",
+                                                  "id": 26
                                                 }
                                               ],
-                                              "presence": "Present"
+                                              "presence": "Present",
+                                              "id": 27
                                             }
                                           ],
-                                          "presence": "Present"
+                                          "presence": "Present",
+                                          "id": 28
                                         },
                                         null,
                                         null,
                                         null
                                       ],
-                                      "presence": "Present"
+                                      "presence": "Present",
+                                      "id": 29
                                     }
                                   ],
-                                  "presence": "Present"
+                                  "presence": "Present",
+                                  "id": 30
                                 }
                               ],
-                              "presence": "Present"
+                              "presence": "Present",
+                              "id": 31
                             },
                             null
                           ],
-                          "presence": "Present"
+                          "presence": "Present",
+                          "id": 32
                         }
                       ],
-                      "presence": "Present"
+                      "presence": "Present",
+                      "id": 33
                     },
                     {
                       "tokenKind": {
@@ -370,20 +403,26 @@
                         }
                       ],
                       "trailingTrivia": [],
-                      "presence": "Present"
+                      "presence": "Present",
+                      "id": 34
                     }
                   ],
-                  "presence": "Present"
+                  "presence": "Present",
+                  "id": 35
                 }
               ],
-              "presence": "Present"
+              "presence": "Present",
+              "id": 36
             },
+            null,
             null
           ],
-          "presence": "Present"
+          "presence": "Present",
+          "id": 37
         }
       ],
-      "presence": "Present"
+      "presence": "Present",
+      "id": 40
     },
     {
       "tokenKind": {
@@ -397,8 +436,10 @@
         }
       ],
       "trailingTrivia": [],
-      "presence": "Present"
+      "presence": "Present",
+      "id": 39
     }
   ],
-  "presence": "Present"
+  "presence": "Present",
+  "id": 41
 }

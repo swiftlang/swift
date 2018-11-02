@@ -985,6 +985,19 @@ func useUnavailableExtension() {
       // expected-note@-1 {{add 'if #available' version check}}
 }
 
+// Availability of synthesized designated initializers.
+
+@available(OSX, introduced: 10.51)
+class WidelyAvailableBase {
+  init() {}
+
+  @available(OSX, introduced: 10.52)
+  init(thing: ()) {}
+}
+
+@available(OSX, introduced: 10.53)
+class EsotericSmallBatchHipsterThing : WidelyAvailableBase {}
+
 // Useless #available(...) checks
 
 func functionWithDefaultAvailabilityAndUselessCheck(_ p: Bool) {
@@ -1345,7 +1358,7 @@ func testForFixitWithNestedMemberRefExpr() {
 // Protocol Conformances
 
 protocol ProtocolWithRequirementMentioningUnavailable {
-      // expected-note@-1 4{{add @available attribute to enclosing protocol}}
+      // expected-note@-1 2{{add @available attribute to enclosing protocol}}
   func hasUnavailableParameter(_ p: ClassAvailableOn10_51) // expected-error * {{'ClassAvailableOn10_51' is only available on OS X 10.51 or newer}}
       // expected-note@-1 * {{add @available attribute to enclosing instance method}}
       
@@ -1362,7 +1375,7 @@ protocol HasMethodF {
   func f(_ p: T) // expected-note 5{{protocol requirement here}}
 }
 
-class TriesToConformWithFunctionIntroducedOn10_51 : HasMethodF { // expected-note {{conformance introduced here}}
+class TriesToConformWithFunctionIntroducedOn10_51 : HasMethodF {
   @available(OSX, introduced: 10.51)
   func f(_ p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available on OS X 10.50.0 and newer}}
 }
@@ -1377,10 +1390,10 @@ class ConformsWithFunctionIntroducedOnMinimumDeploymentTarget : HasMethodF {
 
 class SuperHasMethodF {
   @available(OSX, introduced: 10.51)
-    func f(_ p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available on OS X 10.50.0 and newer}}
+    func f(_ p: Int) { } // expected-note {{'f' declared here}}
 }
 
-class TriesToConformWithUnavailableFunctionInSuperClass : SuperHasMethodF, HasMethodF { // expected-note {{conformance introduced here}}
+class TriesToConformWithUnavailableFunctionInSuperClass : SuperHasMethodF, HasMethodF { // expected-error {{protocol 'HasMethodF' requires 'f' to be available on OS X 10.50.0 and newer}}
   // The conformance here is generating an error on f in the super class.
 }
 
@@ -1402,14 +1415,14 @@ class ConformsByOverridingFunctionInSuperClass : SuperHasMethodF, HasMethodF {
 // Attempt to conform in protocol extension with unavailable witness
 // in extension
 class HasNoMethodF1 { }
-extension HasNoMethodF1 : HasMethodF { // expected-note {{conformance introduced here}}
+extension HasNoMethodF1 : HasMethodF {
   @available(OSX, introduced: 10.51)
   func f(_ p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available on OS X 10.50.0 and newer}}
 }
 
 class HasNoMethodF2 { }
 @available(OSX, introduced: 10.51)
-extension HasNoMethodF2 : HasMethodF { // expected-note {{conformance introduced here}}
+extension HasNoMethodF2 : HasMethodF {
   func f(_ p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available on OS X 10.50.0 and newer}}
 }
 
@@ -1435,7 +1448,7 @@ class ConformsToUnavailableProtocolWithUnavailableWitness : HasMethodFOn10_51 {
 @available(OSX, introduced: 10.51)
 class HasNoMethodF4 { }
 @available(OSX, introduced: 10.52)
-extension HasNoMethodF4 : HasMethodFOn10_51 { // expected-note {{conformance introduced here}}
+extension HasNoMethodF4 : HasMethodFOn10_51 {
   func f(_ p: Int) { } // expected-error {{protocol 'HasMethodFOn10_51' requires 'f' to be available on OS X 10.51 and newer}}
 }
 
@@ -1444,7 +1457,7 @@ protocol HasTakesClassAvailableOn10_51 {
   func takesClassAvailableOn10_51(_ o: ClassAvailableOn10_51) // expected-note 2{{protocol requirement here}}
 }
 
-class AttemptsToConformToHasTakesClassAvailableOn10_51 : HasTakesClassAvailableOn10_51 { // expected-note {{conformance introduced here}}
+class AttemptsToConformToHasTakesClassAvailableOn10_51 : HasTakesClassAvailableOn10_51 {
   @available(OSX, introduced: 10.52)
   func takesClassAvailableOn10_51(_ o: ClassAvailableOn10_51) { // expected-error {{protocol 'HasTakesClassAvailableOn10_51' requires 'takesClassAvailableOn10_51' to be available on OS X 10.51 and newer}}
   }
@@ -1457,7 +1470,7 @@ class ConformsToHasTakesClassAvailableOn10_51 : HasTakesClassAvailableOn10_51 {
 }
 
 class TakesClassAvailableOn10_51_A { }
-extension TakesClassAvailableOn10_51_A : HasTakesClassAvailableOn10_51 { // expected-note {{conformance introduced here}}
+extension TakesClassAvailableOn10_51_A : HasTakesClassAvailableOn10_51 {
   @available(OSX, introduced: 10.52)
   func takesClassAvailableOn10_51(_ o: ClassAvailableOn10_51) { // expected-error {{protocol 'HasTakesClassAvailableOn10_51' requires 'takesClassAvailableOn10_51' to be available on OS X 10.51 and newer}}
   }
@@ -1475,7 +1488,7 @@ extension TakesClassAvailableOn10_51_B : HasTakesClassAvailableOn10_51 {
 // protocol requirement. Rather, the witness should be chosen, regardless of its
 // potential unavailability, and then it should be diagnosed if it is less available
 // than the protocol requires.
-class TestAvailabilityDoesNotAffectWitnessCandidacy : HasMethodF { // expected-note {{conformance introduced here}}
+class TestAvailabilityDoesNotAffectWitnessCandidacy : HasMethodF {
   // Test that we choose the more specialized witness even though it is
   // less available than the protocol requires and there is a less specialized
   // witness that has suitable availability.

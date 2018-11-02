@@ -114,11 +114,12 @@ bb0(%0 : @owned $Builtin.NativeObject):
   return %9999 : $()
 }
 
+// We no longer lower copy_unowned_value. So make sure that we actually don't.
+//
 // CHECK-LABEL: sil @copy_unowned_value_test : $@convention(thin) (@owned @sil_unowned Builtin.NativeObject) -> () {
 // CHECK: bb0([[ARG:%.*]] : $@sil_unowned Builtin.NativeObject):
-// CHECK-NEXT: strong_retain_unowned [[ARG]] : $@sil_unowned Builtin.NativeObject
-// CHECK-NEXT: [[OWNED_ARG:%.*]] = unowned_to_ref [[ARG]] : $@sil_unowned Builtin.NativeObject to $Builtin.NativeObject
-// CHECK-NEXT: strong_release [[OWNED_ARG]] : $Builtin.NativeObject
+// CHECK-NEXT: [[STRONG:%.*]] = copy_unowned_value [[ARG]] : $@sil_unowned Builtin.NativeObject
+// CHECK-NEXT: strong_release [[STRONG]] : $Builtin.NativeObject
 // CHECK-NEXT: unowned_release [[ARG]] : $@sil_unowned Builtin.NativeObject
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return

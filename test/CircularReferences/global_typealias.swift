@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -iterative-type-checker
+// RUN: %target-typecheck-verify-swift
 
-typealias A = B // expected-error{{circular reference}}
-typealias C = D // expected-note{{through reference here}}
-typealias D = (A, Int) // expected-note{{through reference here}}
-typealias B = C // expected-note{{through reference here}}
+typealias A = B // expected-note{{type declared here}}
+typealias C = D
+typealias D = (A, Int) // expected-error{{type alias 'A' references itself}}
+typealias B = C

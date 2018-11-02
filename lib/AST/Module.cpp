@@ -354,13 +354,13 @@ void SourceLookupCache::invalidate() {
 ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   : DeclContext(DeclContextKind::Module, nullptr),
     TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), { }),
-    Flags({0, 0, 0}) {
+    Flags() {
   ctx.addDestructorCleanup(*this);
   setImplicit();
   setInterfaceType(ModuleType::get(this));
 
   // validateDecl() should return immediately given a ModuleDecl.
-  setValidationStarted();
+  setValidationToChecked();
 
   setAccess(AccessLevel::Public);
 }
@@ -611,15 +611,29 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
 
     // If the existential is class-constrained, the class might conform
     // concretely.
-    if (layout.superclass) {
-      if (auto result = lookupConformance(layout.superclass, protocol))
+    if (auto superclass = layout.explicitSuperclass) {
+      if (auto result = lookupConformance(superclass, protocol))
         return result;
     }
 
     // Otherwise, the existential might conform abstractly.
     for (auto proto : layout.getProtocols()) {
       auto *protoDecl = proto->getDecl();
-      if (protoDecl == protocol || protoDecl->inheritsFrom(protocol))
+
+      // If we found the protocol we're looking for, return an abstract
+      // conformance to it.
+      if (protoDecl == protocol)
+        return ProtocolConformanceRef(protocol);
+
+      // If the protocol has a superclass constraint, we might conform
+      // concretely.
+      if (auto superclass = protoDecl->getSuperclass()) {
+        if (auto result = lookupConformance(superclass, protocol))
+          return result;
+      }
+
+      // Now check refined protocols.
+      if (protoDecl->inheritsFrom(protocol))
         return ProtocolConformanceRef(protocol);
     }
 
@@ -835,8 +849,7 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
 {
   switch (File.getKind()) {
   case FileUnitKind::Builtin:
-  case FileUnitKind::Derived:
-    // The Builtin module declares no operators, nor do derived units.
+    // The Builtin module declares no operators.
     return nullptr;
   case FileUnitKind::Source:
     break;
@@ -1127,24 +1140,19 @@ bool ModuleDecl::isSystemModule() const {
   return false;
 }
 
-template<bool respectVisibility, typename Callback>
-static bool forAllImportedModules(ModuleDecl *topLevel,
-                                  ModuleDecl::AccessPathTy thisPath,
-                                  bool includePrivateTopLevelImports,
-                                  const Callback &fn) {
+template<bool respectVisibility>
+static bool
+forAllImportedModules(ModuleDecl *topLevel, ModuleDecl::AccessPathTy thisPath,
+                      llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn) {
   using ImportedModule = ModuleDecl::ImportedModule;
   using AccessPathTy = ModuleDecl::AccessPathTy;
   
   llvm::SmallSet<ImportedModule, 32, ModuleDecl::OrderImportedModules> visited;
   SmallVector<ImportedModule, 32> stack;
 
-  // Even if we're processing the top-level module like any other, we may
-  // still want to include non-exported modules.
-  ModuleDecl::ImportFilter filter = respectVisibility ? ModuleDecl::ImportFilter::Public
-                                                      : ModuleDecl::ImportFilter::All;
-  ModuleDecl::ImportFilter topLevelFilter =
-    includePrivateTopLevelImports ? ModuleDecl::ImportFilter::All : filter;
-  topLevel->getImportedModules(stack, topLevelFilter);
+  auto filter = respectVisibility ? ModuleDecl::ImportFilter::Public
+                                  : ModuleDecl::ImportFilter::All;
+  topLevel->getImportedModules(stack, filter);
 
   // Make sure the top-level module is first; we want pre-order-ish traversal.
   AccessPathTy overridingPath;
@@ -1182,11 +1190,10 @@ static bool forAllImportedModules(ModuleDecl *topLevel,
   return true;
 }
 
-bool ModuleDecl::forAllVisibleModules(AccessPathTy thisPath,
-                                      bool includePrivateTopLevelImports,
-                                  llvm::function_ref<bool(ImportedModule)> fn) {
-  return forAllImportedModules<true>(this, thisPath,
-                                     includePrivateTopLevelImports, fn);
+bool
+ModuleDecl::forAllVisibleModules(AccessPathTy thisPath,
+                                 llvm::function_ref<bool(ImportedModule)> fn) {
+  return forAllImportedModules<true>(this, thisPath, fn);
 }
 
 bool FileUnit::forAllVisibleModules(
@@ -1214,13 +1221,14 @@ void ModuleDecl::collectLinkLibraries(LinkLibraryCallback callback) {
 
 void
 SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {
-
-  const_cast<SourceFile *>(this)->forAllVisibleModules([&](swift::ModuleDecl::ImportedModule import) {
+  forAllImportedModules<false>(getParentModule(), /*thisPath*/{},
+                               [=](ModuleDecl::ImportedModule import) -> bool {
     swift::ModuleDecl *next = import.second;
     if (next->getName() == getParentModule()->getName())
-      return;
+      return true;
 
     next->collectLinkLibraries(callback);
+    return true;
   });
 }
 

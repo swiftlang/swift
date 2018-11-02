@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name unowned -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name unowned -enable-sil-ownership %s | %FileCheck %s
 
 func takeClosure(_ fn: () -> Int) {}
 
@@ -159,3 +159,12 @@ struct Unowned<T: AnyObject> {
 }
 func takesUnownedStruct(_ z: Unowned<C>) {}
 // CHECK-LABEL: sil hidden @$S7unowned18takesUnownedStructyyAA0C0VyAA1CCGF : $@convention(thin) (@guaranteed Unowned<C>) -> ()
+
+// Make sure we don't crash here
+struct UnownedGenericCapture<T : AnyObject> {
+  var object: T
+
+  func f() -> () -> () {
+    return { [unowned object] in _ = object }
+  }
+}

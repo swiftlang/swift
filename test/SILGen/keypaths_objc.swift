@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -import-objc-header %S/Inputs/keypaths_objc.h %s | %FileCheck %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir -import-objc-header %S/Inputs/keypaths_objc.h %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/keypaths_objc.h %s | %FileCheck %s
+// RUN: %target-swift-emit-ir(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/keypaths_objc.h %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -18,7 +18,7 @@ class Foo: NSObject {
   @objc subscript(x: Int) -> Foo { return self }
   @objc subscript(x: Bar) -> Foo { return self }
 
-  dynamic var dyn: String { fatalError() }
+  @objc dynamic var dyn: String { fatalError() }
 }
 
 class Bar: NSObject {

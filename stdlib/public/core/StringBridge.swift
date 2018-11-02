@@ -30,7 +30,7 @@ func _stdlib_binary_CFStringCreateCopy(
 }
 
 @inlinable // FIXME(sil-serialize-all)
-@effects(readonly)
+@_effects(readonly)
 public // @testable
 func _stdlib_binary_CFStringGetLength(
   _ source: _CocoaString
@@ -203,22 +203,6 @@ func _makeCocoaStringGuts(_ cocoaString: _CocoaString) -> _StringGuts {
 
   let length = _StringGuts.getCocoaLength(
     _unsafeBitPattern: Builtin.reinterpretCast(immutableCopy))
-
-  // TODO(SSO): And also for UTF-16 strings and non-contiguous strings
-  if let ptr = start, !isUTF16 && length <= _SmallUTF8String.capacity {
-    if let small = _SmallUTF8String(
-      UnsafeBufferPointer(
-        start: ptr.assumingMemoryBound(to: UInt8.self), count: length)
-    ) {
-      return _StringGuts(small)
-    } else {
-#if arch(i386) || arch(arm)
-#else
-      _sanityCheckFailure("Couldn't fit 15-char ASCII small string?")
-#endif
-    }
-  }
-
   return _StringGuts(
     _largeNonTaggedCocoaObject: immutableCopy,
     count: length,

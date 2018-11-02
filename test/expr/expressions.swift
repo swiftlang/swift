@@ -256,7 +256,7 @@ func test_lambda() {
 
 func test_lambda2() {
   { () -> protocol<Int> in
-    // expected-warning @-1 {{'protocol<...>' composition syntax is deprecated and not needed here}} {{11-24=Int}}
+    // expected-error @-1 {{'protocol<...>' composition syntax has been removed and is not needed here}} {{11-24=Int}}
     // expected-error @-2 {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
     // expected-warning @-3 {{result of call to closure returning 'Any' is unused}}
     return 1
@@ -743,10 +743,10 @@ func invalidDictionaryLiteral() {
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
 //===----------------------------------------------------------------------===//
-_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'Any.Type' to nil always returns false}}
-_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'Any.Type' to nil always returns false}}
-_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'Any.Type' to nil always returns true}}
-_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'Any.Type' to nil always returns true}}
+_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'Any.Type' to 'nil' always returns false}}
+_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'Any.Type' to 'nil' always returns false}}
+_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'Any.Type' to 'nil' always returns true}}
+_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'Any.Type' to 'nil' always returns true}}
 
 // <rdar://problem/19032294> Disallow postfix ? when not chaining
 func testOptionalChaining(_ a : Int?, b : Int!, c : Int??) {
@@ -814,8 +814,8 @@ public struct TestPropMethodOverloadGroup {
 // <rdar://problem/18496742> Passing ternary operator expression as inout crashes Swift compiler
 func inoutTests(_ arr: inout Int) {
   var x = 1, y = 2
-  (true ? &x : &y) // expected-error 2 {{use of extraneous '&'}}
-  let a = (true ? &x : &y) // expected-error 2 {{use of extraneous '&'}}
+  (true ? &x : &y) // expected-error {{use of extraneous '&'}}
+  let a = (true ? &x : &y) // expected-error {{use of extraneous '&'}}
 
   inoutTests(true ? &x : &y) // expected-error {{use of extraneous '&'}}
 
@@ -827,7 +827,7 @@ func inoutTests(_ arr: inout Int) {
   inoutTests(&x)
   
   // <rdar://problem/17489894> inout not rejected as operand to assignment operator
-  &x += y  // expected-error {{'&' can only appear immediately in a call argument list}}}
+  &x += y  // expected-error {{'&' can only appear immediately in a call argument list}}
 
   // <rdar://problem/23249098>
   func takeAny(_ x: Any) {}
@@ -885,7 +885,7 @@ var y = 1
 let _ = (x, x + 1).0
 let _ = (x, 3).1
 (x,y) = (2,3)
-(x,4) = (1,2) // expected-error {{cannot assign to value: literals are not mutable}}
+(x,4) = (1,2) // expected-error {{expression is not assignable: literals are not mutable}}
 (x,y).1 = 7 // expected-error {{cannot assign to immutable expression of type 'Int'}}
 x = (x,(3,y)).1.1
 
@@ -910,3 +910,10 @@ Sr3439: do {
   let obj = C();
   _ = obj[#column] // Ok.
 }
+
+// rdar://problem/23672697 - No way to express literal integers larger than Int without using type ascription
+let _: Int64 = 0xFFF_FFFF_FFFF_FFFF
+let _: Int64 = Int64(0xFFF_FFFF_FFFF_FFFF)
+let _: Int64 = 0xFFF_FFFF_FFFF_FFFF as Int64
+let _ = Int64(0xFFF_FFFF_FFFF_FFFF)
+let _ = 0xFFF_FFFF_FFFF_FFFF as Int64

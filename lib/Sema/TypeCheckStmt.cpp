@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -642,11 +642,9 @@ public:
       // Create a pattern binding to initialize the generator.
       auto genPat = new (TC.Context) NamedPattern(generator);
       genPat->setImplicit();
-      auto genBinding =
-          PatternBindingDecl::create(TC.Context, SourceLoc(),
-                                     StaticSpellingKind::None,
-                                     S->getForLoc(), genPat, getIterator, DC);
-      genBinding->setImplicit();
+      auto *genBinding = PatternBindingDecl::createImplicit(
+          TC.Context, StaticSpellingKind::None, genPat, getIterator, DC,
+          /*VarLoc*/ S->getForLoc());
       S->setIterator(genBinding);
     }
 
@@ -948,7 +946,7 @@ public:
 
       // If the previous case fellthrough, similarly check that that case's bindings
       // includes our first label item's pattern bindings and types.
-      if (PreviousFallthrough) {
+      if (PreviousFallthrough && previousBlock) {
         auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
         SmallVector<VarDecl *, 4> Vars;
         firstPattern->collectVariables(Vars);
@@ -1395,38 +1393,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 }
 
 /// Check the default arguments that occur within this pattern.
-static void checkDefaultArguments(TypeChecker &tc,
-                                  ParameterList *params,
-                                  unsigned &nextArgIndex) {
-  for (auto &param : *params) {
-    ++nextArgIndex;
-    if (!param->getDefaultValue() || !param->hasType() ||
-        param->getType()->hasError())
-      continue;
-
-    Expr *e = param->getDefaultValue();
-    auto initContext = param->getDefaultArgumentInitContext();
-
-    // Type-check the initializer, then flag that we did so.
-    auto resultTy = tc.typeCheckExpression(
-        e, initContext, TypeLoc::withoutLoc(param->getType()),
-        CTP_DefaultParameter);
-    if (resultTy) {
-      param->setDefaultValue(e);
-    } else {
-      param->setDefaultValue(nullptr);
-    }
-
-    tc.checkInitializerErrorHandling(initContext, e);
-
-    // Walk the checked initializer and contextualize any closures
-    // we saw there.
-    (void)tc.contextualizeInitializer(initContext, e);
-  }
-}
-
-/// Check the default arguments that occur within this pattern.
-void TypeChecker::checkDefaultArguments(ArrayRef<ParameterList *> paramLists,
+void TypeChecker::checkDefaultArguments(ParameterList *params,
                                         ValueDecl *VD) {
   auto access =
     VD->getFormalAccessScope(/*useDC=*/nullptr,
@@ -1449,9 +1416,31 @@ void TypeChecker::checkDefaultArguments(ArrayRef<ParameterList *> paramLists,
     EED->setDefaultArgumentResilienceExpansion(expansion);
   }
 
-  unsigned nextArgIndex = 0;
-  for (auto *paramList : paramLists)
-    ::checkDefaultArguments(*this, paramList, nextArgIndex);
+  for (auto *param : *params) {
+    if (!param->getDefaultValue() ||
+        !param->hasInterfaceType() ||
+        param->getInterfaceType()->hasError())
+      continue;
+
+    Expr *e = param->getDefaultValue();
+    auto initContext = param->getDefaultArgumentInitContext();
+
+    // Type-check the initializer, then flag that we did so.
+    auto resultTy = typeCheckExpression(
+        e, initContext, TypeLoc::withoutLoc(param->getType()),
+        CTP_DefaultParameter);
+    if (resultTy) {
+      param->setDefaultValue(e);
+    } else {
+      param->setDefaultValue(nullptr);
+    }
+
+    checkInitializerErrorHandling(initContext, e);
+
+    // Walk the checked initializer and contextualize any closures
+    // we saw there.
+    (void)contextualizeInitializer(initContext, e);
+  }
 }
 
 bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
@@ -1491,8 +1480,7 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   if (DebugTimeFunctionBodies || WarnLongFunctionBodies)
     timer.emplace(AFD, DebugTimeFunctionBodies, WarnLongFunctionBodies);
 
-  for (auto paramList : AFD->getParameterLists())
-    requestRequiredNominalTypeLayoutForParameters(paramList);
+  requestRequiredNominalTypeLayoutForParameters(AFD->getParameters());
 
   bool error = typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
   AFD->setBodyTypeCheckedIfPresent();
@@ -1509,7 +1497,7 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
 bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
                                              SourceLoc EndTypeCheckLoc) {
   // Check the default argument definitions.
-  checkDefaultArguments(FD->getParameterLists(), FD);
+  checkDefaultArguments(FD->getParameters(), FD);
 
   // Clang imported inline functions do not have a Swift body to
   // typecheck.
@@ -1614,7 +1602,7 @@ static bool isKnownEndOfConstructor(ASTNode N) {
 bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
                                                 SourceLoc EndTypeCheckLoc) {
   // Check the default argument definitions.
-  checkDefaultArguments(ctor->getParameterLists(), ctor);
+  checkDefaultArguments(ctor->getParameters(), ctor);
 
   BraceStmt *body = ctor->getBody();
   if (!body)

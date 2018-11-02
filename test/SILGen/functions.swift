@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name functions -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name functions -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -enable-sil-ownership %s | %FileCheck %s
 
 import Swift // just for Optional
 

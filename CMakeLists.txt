@@ -180,6 +180,9 @@ option(SWIFT_FORCE_OPTIMIZED_TYPECHECKER "Override the optimization setting of
 # User-configurable Android specific options.
 #
 
+set(SWIFT_ANDROID_API_LEVEL "" CACHE STRING
+  "Version number for the Android API")
+
 set(SWIFT_ANDROID_NDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android NDK tools that are executable on the build machine")
 set(SWIFT_ANDROID_NDK_GCC_VERSION "" CACHE STRING
@@ -209,10 +212,13 @@ endforeach()
 #
 # User-configurable Darwin-specific options.
 #
-
 option(SWIFT_EMBED_BITCODE_SECTION
     "If non-empty, embeds LLVM bitcode binary sections in the standard library and overlay binaries for supported platforms"
     FALSE)
+
+option(SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS
+  "If non-empty, when embedding the LLVM bitcode binary sections into the relevant binaries, pass in -bitcode_hide_symbols. Does nothing if SWIFT_EMBED_BITCODE_SECTION is set to false."
+  FALSE)
 
 option(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT
     "Whether to enable CrashReporter integration"
@@ -567,7 +573,7 @@ endif()
 
 # If SWIFT_HOST_VARIANT_ARCH not given, try to detect from the CMAKE_SYSTEM_PROCESSOR.
 if(SWIFT_HOST_VARIANT_ARCH)
-  set(SWIFT_HOST_VARIANT_ARCH_default, "${SWIFT_HOST_VARIANT_ARCH}")
+  set(SWIFT_HOST_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
 else()
   if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
     set(SWIFT_HOST_VARIANT_ARCH_default "x86_64")
@@ -754,20 +760,6 @@ endif()
 # Should we cross-compile the standard library for Android?
 is_sdk_requested(ANDROID swift_build_android)
 if(swift_build_android AND NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
-  # Get the prebuilt suffix to create the correct toolchain path when using the NDK
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-    set(_swift_android_prebuilt_suffix "darwin-x86_64")
-  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-    set(_swift_android_prebuilt_suffix "linux-x86_64")
-  endif()
-
-  set(SWIFT_ANDROID_PREBUILT_PATH
-      "${SWIFT_ANDROID_NDK_PATH}/toolchains/arm-linux-androideabi-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/${_swift_android_prebuilt_suffix}")
-  
-  # Resolve the correct linker based on the file name of CMAKE_LINKER (being 'ld' or 'ld.gold' the options)
-  get_filename_component(SWIFT_ANDROID_LINKER_NAME "${CMAKE_LINKER}" NAME)
-  set(SWIFT_SDK_ANDROID_ARCH_armv7_LINKER 
-      "${SWIFT_ANDROID_NDK_PATH}/toolchains/arm-linux-androideabi-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/${_swift_android_prebuilt_suffix}/bin/arm-linux-androideabi-${SWIFT_ANDROID_LINKER_NAME}")
 
   configure_sdk_unix(ANDROID "Android" "android" "android" "armv7" "armv7-none-linux-androideabi" "${SWIFT_ANDROID_SDK_PATH}")
 
@@ -852,17 +844,32 @@ endif()
 # Find required dependencies.
 #
 
+function(swift_icu_variables_set sdk arch result)
+  string(TOUPPER "${sdk}" sdk)
+
+  set(icu_var_ICU_UC_INCLUDE ${SWIFT_${sdk}_${arch}_ICU_UC_INCLUDE})
+  set(icu_var_ICU_UC ${SWIFT_${sdk}_${arch}_ICU_UC})
+  set(icu_var_ICU_I18N_INCLUDE ${SWIFT_${sdk}_${arch}_ICU_I18N_INCLUDE})
+  set(icu_var_ICU_I18N ${SWIFT_${sdk}_${arch}_ICU_I18N})
+
+  if(icu_var_ICU_UC_INCLUDE AND icu_var_ICU_UC AND
+     icu_var_ICU_I18N_INCLUDE AND icu_var_ICU_I18N)
+    set(${result} TRUE PARENT_SCOPE)
+  else()
+    set(${result} FALSE PARENT_SCOPE)
+  endif()
+endfunction()
+
 # ICU is provided through CoreFoundation on Darwin.  On other hosts, assume that
 # we are compiling for the build as the host.  In such a case, if the ICU
 # unicode and i18n include and library paths are not defined, perform a standard
 # package lookup.  Otherwise, rely on the paths specified by the user.  These
 # need to be defined when cross-compiling.
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  if("${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "" AND
-     ("${SWIFT_${SWIFT_HOST_VARIANT_SDK_default}_ICU_UC_INCLUDE}" STREQUAL "" OR
-      "${SWIFT_${SWIFT_HOST_VARIANT_SDK_default}_ICU_UC}" STREQUAL "" OR
-      "${SWIFT_${SWIFT_HOST_VARIANT_SDK_default}_ICU_I18N_INCLUDE}" STREQUAL "" OR
-      "${SWIFT_${SWIFT_HOST_VARIANT_SDK_default}_ICU_I18N}" STREQUAL ""))
+  swift_icu_variables_set("${SWIFT_HOST_VARIANT_SDK_default}"
+                          "${SWIFT_HOST_VARIANT_ARCH_default}"
+                          ICU_CONFIGURED)
+  if("${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "" AND NOT ${ICU_CONFIGURED})
     find_package(ICU REQUIRED COMPONENTS uc i18n)
   endif()
 endif()
@@ -888,6 +895,8 @@ if(HAVE_EL_WGETS)
   set(HAVE_UNICODE_LIBEDIT 1)
 endif()
 cmake_pop_check_state()
+
+check_symbol_exists(wait4 "sys/wait.h" HAVE_WAIT4)
 
 if (LLVM_ENABLE_DOXYGEN)
   message(STATUS "Doxygen: enabled")

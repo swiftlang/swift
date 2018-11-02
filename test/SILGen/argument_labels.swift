@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name argument_labels -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name argument_labels -enable-sil-ownership %s | %FileCheck %s
 
 public struct X { }
 public struct Y { }

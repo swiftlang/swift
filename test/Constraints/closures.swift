@@ -1,4 +1,3 @@
-// RUN: %target-typecheck-verify-swift -swift-version 3
 // RUN: %target-typecheck-verify-swift -swift-version 4
 
 func myMap<T1, T2>(_ array: [T1], _ fn: (T1) -> T2) -> [T2] {}
@@ -282,7 +281,9 @@ struct S<T> {
 
   func subscribe<Object: AnyObject>(object: Object?, method: (Object, T) -> ()) where Object: Hashable {
     let wrappedMethod = { (object: AnyObject, value: T) in }
-    // expected-error @+1 {{value of optional type 'Object?' not unwrapped; did you mean to use '!' or '?'?}}
+    // expected-error @+3 {{value of optional type 'Object?' must be unwrapped to a value of type 'Object'}}
+    // expected-note @+2{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+    // expected-note @+1{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
     cs.forEach { $0.w.append(value: wrappedMethod, forKey: object) }
   }
 }
@@ -299,7 +300,7 @@ struct Thing {
   init?() {}
 }
 // This throws a compiler error
-let things = Thing().map { thing in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{34-34=-> (Thing) }}
+let things = Thing().map { thing in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{34-34=-> Thing }}
   // Commenting out this makes it compile
   _ = thing
   return thing
@@ -552,7 +553,7 @@ extension A_SR_5030 {
   func foo() -> B_SR_5030<Int> {
     let tt : B_SR_5030<Int> = sr5030_exFalso()
     return tt.map { x in (idx: x) }
-    // expected-error@-1 {{cannot convert value of type '(idx: (Int))' to closure result type 'Int'}}
+    // expected-error@-1 {{cannot convert value of type '(idx: Int)' to closure result type 'Int'}}
   }
 }
 

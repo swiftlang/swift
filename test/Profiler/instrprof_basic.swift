@@ -47,13 +47,12 @@ func throwing_nop() throws {}
 // CHECK: sil hidden @[[F_EXCEPTIONS:.*exceptions.*]] :
 // CHECK: %[[NAME:.*]] = string_literal utf8 "{{.*}}instrprof_basic.swift:[[F_EXCEPTIONS]]"
 // CHECK: %[[HASH:.*]] = integer_literal $Builtin.Int64,
-// CHECK: %[[NCOUNTS:.*]] = integer_literal $Builtin.Int32, 3
+// CHECK: %[[NCOUNTS:.*]] = integer_literal $Builtin.Int32, 2
 // CHECK: %[[INDEX:.*]] = integer_literal $Builtin.Int32, 0
 // CHECK: builtin "int_instrprof_increment"(%[[NAME]] : {{.*}}, %[[HASH]] : {{.*}}, %[[NCOUNTS]] : {{.*}}, %[[INDEX]] : {{.*}})
 func exceptions() {
   do {
     try throwing_nop()
-    // CHECK: builtin "int_instrprof_increment"
   } catch {
     // CHECK: builtin "int_instrprof_increment"
     return

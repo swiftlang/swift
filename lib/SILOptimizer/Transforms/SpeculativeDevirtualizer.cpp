@@ -62,17 +62,17 @@ static FullApplySite CloneApply(FullApplySite AI, SILBuilder &Builder) {
   switch (AI.getInstruction()->getKind()) {
   case SILInstructionKind::ApplyInst:
     NAI = Builder.createApply(AI.getLoc(), AI.getCallee(),
-                                   AI.getSubstitutions(),
-                                   Ret,
-                                   cast<ApplyInst>(AI)->isNonThrowing());
+                              AI.getSubstitutionMap(),
+                              Ret,
+                              cast<ApplyInst>(AI)->isNonThrowing());
     break;
   case SILInstructionKind::TryApplyInst: {
     auto *TryApplyI = cast<TryApplyInst>(AI.getInstruction());
     NAI = Builder.createTryApply(AI.getLoc(), AI.getCallee(),
-                                      AI.getSubstitutions(),
-                                      Ret,
-                                      TryApplyI->getNormalBB(),
-                                      TryApplyI->getErrorBB());
+                                 AI.getSubstitutionMap(),
+                                 Ret,
+                                 TryApplyI->getNormalBB(),
+                                 TryApplyI->getErrorBB());
     }
     break;
   default:
@@ -93,7 +93,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   if (!canDevirtualizeClassMethod(AI, SubType))
     return FullApplySite();
 
-  if (SubType.getSwiftRValueType()->hasDynamicSelfType())
+  if (SubType.getASTType()->hasDynamicSelfType())
     return FullApplySite();
 
   // Create a diamond shaped control flow and a checked_cast_branch
@@ -209,7 +209,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
       Args.push_back(Arg);
     }
     FullApplySite NewVirtAI = Builder.createTryApply(VirtAI.getLoc(), VirtAI.getCallee(),
-        VirtAI.getSubstitutions(),
+        VirtAI.getSubstitutionMap(),
         Args, NormalBB, ErrorBB);
     VirtAI.getInstruction()->eraseFromParent();
     VirtAI = NewVirtAI;
@@ -372,8 +372,8 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
       return NewInstPair.second.getInstruction() != nullptr;
     }
 
-    DEBUG(llvm::dbgs() << "Inserting monomorphic speculative call for class " <<
-          CD->getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Inserting monomorphic speculative call for "
+               "class " << CD->getName() << "\n");
     return !!speculateMonomorphicTarget(AI, SubType, LastCCBI);
   }
 
@@ -386,17 +386,17 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
   // Number of subclasses which cannot be handled by checked_cast_br checks.
   int NotHandledSubsNum = 0;
   if (Subs.size() > MaxNumSpeculativeTargets) {
-    DEBUG(llvm::dbgs() << "Class " << CD->getName() << " has too many ("
-                       << Subs.size() << ") subclasses. Performing speculative "
-                         "devirtualization only for the first "
-                       << MaxNumSpeculativeTargets << " of them.\n");
+    LLVM_DEBUG(llvm::dbgs() << "Class " << CD->getName() << " has too many ("
+                            << Subs.size() << ") subclasses. Performing "
+                              "speculative devirtualization only for the first "
+                            << MaxNumSpeculativeTargets << " of them.\n");
 
     NotHandledSubsNum += (Subs.size() - MaxNumSpeculativeTargets);
     Subs.erase(&Subs[MaxNumSpeculativeTargets], Subs.end());
   }
 
-  DEBUG(llvm::dbgs() << "Class " << CD->getName() << " is a superclass. "
-        "Inserting polymorphic speculative call.\n");
+  LLVM_DEBUG(llvm::dbgs() << "Class " << CD->getName() << " is a superclass. "
+             "Inserting polymorphic speculative call.\n");
 
   // Try to devirtualize the static class of instance
   // if it is possible.
@@ -453,8 +453,8 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
   // the most probable alternatives could be checked first.
 
   for (auto S : Subs) {
-    DEBUG(llvm::dbgs() << "Inserting a speculative call for class "
-          << CD->getName() << " and subclass " << S->getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Inserting a speculative call for class "
+               << CD->getName() << " and subclass " << S->getName() << "\n");
 
     // FIXME: Add support for generic subclasses.
     if (S->isGenericContext()) {
@@ -467,7 +467,7 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
 
     auto ClassOrMetatypeType = ClassType;
     if (auto EMT = SubType.getAs<AnyMetatypeType>()) {
-      auto InstTy = ClassType.getSwiftRValueType();
+      auto InstTy = ClassType.getASTType();
       auto *MetaTy = MetatypeType::get(InstTy, EMT->getRepresentation());
       auto CanMetaTy = CanMetatypeType(MetaTy);
       ClassOrMetatypeType = SILType::getPrimitiveObjectType(CanMetaTy);

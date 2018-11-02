@@ -13,16 +13,17 @@
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_ARCANALYSIS_H
 #define SWIFT_SILOPTIMIZER_ANALYSIS_ARCANALYSIS_H
 
+#include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "llvm/ADT/BitVector.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
@@ -39,14 +40,12 @@ class SILFunction;
 } // end namespace swift
 
 namespace swift {
+
 /// Return true if this is a retain instruction.
 bool isRetainInstruction(SILInstruction *II);
 
 /// Return true if this is a release instruction.
 bool isReleaseInstruction(SILInstruction *II);
-
-using RetainList = llvm::SmallVector<SILInstruction *, 1>;
-using ReleaseList = llvm::SmallVector<SILInstruction *, 1>;
 
 /// \returns True if the user \p User decrements the ref count of \p Ptr.
 bool mayDecrementRefCount(SILInstruction *User, SILValue Ptr,
@@ -141,16 +140,11 @@ private:
   SILFunction *F;
   RCIdentityFunctionInfo *RCFI;
   AliasAnalysis *AA;
+
   // We use a list of instructions for now so that we can keep the same interface
   // and handle exploded retain_value later.
-  RetainList EpilogueRetainInsts;
+  TinyPtrVector<SILInstruction *> EpilogueRetainInsts;
 
-  /// Return true if all the successors of the EpilogueRetainInsts do not have
-  /// a retain. 
-  bool isTransitiveSuccessorsRetainFree(llvm::DenseSet<SILBasicBlock *> BBs);
-
-  /// Finds matching releases in the provided block \p BB.
-  RetainKindValue findMatchingRetainsInBasicBlock(SILBasicBlock *BB, SILValue V);
 public:
   /// Finds matching releases in the return block of the function \p F.
   ConsumedResultToEpilogueRetainMatcher(RCIdentityFunctionInfo *RCFI,
@@ -160,7 +154,9 @@ public:
   /// Finds matching releases in the provided block \p BB.
   void findMatchingRetains(SILBasicBlock *BB);
 
-  RetainList getEpilogueRetains() { return EpilogueRetainInsts; }
+  ArrayRef<SILInstruction *> getEpilogueRetains() const {
+    return EpilogueRetainInsts;
+  }
 
   /// Recompute the mapping from argument to consumed arg.
   void recompute();
@@ -182,6 +178,16 @@ public:
   unsigned size() const { return EpilogueRetainInsts.size(); }
 
   iterator_range<iterator> getRange() { return swift::make_range(begin(), end()); }
+
+private:
+  /// Return true if all the successors of the EpilogueRetainInsts do not have
+  /// a retain.
+  bool
+  isTransitiveSuccessorsRetainFree(const llvm::DenseSet<SILBasicBlock *> &BBs);
+
+  /// Finds matching releases in the provided block \p BB.
+  RetainKindValue findMatchingRetainsInBasicBlock(SILBasicBlock *BB,
+                                                  SILValue V);
 };
 
 /// A class that attempts to match owned arguments and corresponding epilogue
@@ -197,39 +203,51 @@ private:
   RCIdentityFunctionInfo *RCFI;
   ExitKind Kind;
   ArrayRef<SILArgumentConvention> ArgumentConventions;
-  llvm::SmallMapVector<SILArgument *, ReleaseList, 8> ArgInstMap;
 
-  /// Set to true if we found some releases but not all for the argument.
-  llvm::DenseSet<SILArgument *> FoundSomeReleases;
+  class ArgumentState {
+    /// The list of releases associated with this argument.
+    TinyPtrVector<SILInstruction *> releases;
+
+    /// If this is set to true, then we know that we were able to find
+    /// a set of releases.
+    bool jointPostDominatingReleaseSet;
+
+  public:
+    ArgumentState(ArrayRef<SILInstruction *> releases)
+        : releases(releases), jointPostDominatingReleaseSet(false) {}
+
+    void addRelease(SILInstruction *release) { releases.push_back(release); }
+    void setHasJointPostDominatingReleaseSet() {
+      jointPostDominatingReleaseSet = true;
+    }
+
+    bool foundSomeButNotAllReleases() const {
+      return releases.size() && !jointPostDominatingReleaseSet;
+    }
+
+    /// If we were able to find a set of releases for this argument that joint
+    /// post-dominate the argument, return our release set.
+    Optional<ArrayRef<SILInstruction *>> getFullyPostDomReleases() const {
+      if (releases.empty() || foundSomeButNotAllReleases())
+        return None;
+      return {releases};
+    }
+
+    /// If we were able to find a set of releases for this argument, but those
+    /// releases do not joint post-dominate the argument, return our release
+    /// set.
+    ///
+    /// *NOTE* This returns none if we did not find any releases.
+    Optional<ArrayRef<SILInstruction *>> getPartiallyPostDomReleases() const {
+      if (releases.empty() || !foundSomeButNotAllReleases())
+        return None;
+      return ArrayRef<SILInstruction *>(releases);
+    }
+  };
+  llvm::SmallMapVector<SILArgument *, ArgumentState, 8> ArgInstMap;
 
   /// Eventually this will be used in place of HasBlock.
   SILBasicBlock *ProcessedBlock;
-
-  /// Return true if we have seen releases to part or all of \p Derived in
-  /// \p Insts.
-  /// 
-  /// NOTE: This function relies on projections to analyze the relation
-  /// between the releases values in \p Insts and \p Derived, it also bails
-  /// out and return true if projection path can not be formed between Base
-  /// and any one the released values.
-  bool isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived);
-
-  /// Return true if we have a release instruction for all the reference
-  /// semantics part of \p Argument.
-  bool releaseArgument(ReleaseList Insts, SILValue Argument);
-
-  /// Walk the basic block and find all the releases that match to function
-  /// arguments. 
-  void collectMatchingReleases(SILBasicBlock *BB);
-
-  /// Walk the function and find all the destroy_addr instructions that match
-  /// to function arguments. 
-  void collectMatchingDestroyAddresses(SILBasicBlock *BB);
-
-  /// For every argument in the function, check to see whether all epilogue
-  /// releases are found. Clear all releases for the argument if not all 
-  /// epilogue releases are found.
-  void processMatchingReleases();
 
 public:
   /// Finds matching releases in the return block of the function \p F.
@@ -245,95 +263,124 @@ public:
 
   bool hasBlock() const { return ProcessedBlock != nullptr; }
 
-  bool isEpilogueRelease(SILInstruction *I) const {
+  bool isEpilogueRelease(SILInstruction *i) const {
     // This is not a release instruction in the epilogue block.
-    if (I->getParent() != ProcessedBlock)
+    if (i->getParent() != ProcessedBlock)
       return false;
-    for (auto &X : ArgInstMap) {
-      // Either did not find epilogue release or found exploded epilogue
-      // releases.
-      if (X.second.size() != 1)
-        continue;
-      if (*X.second.begin() == I) 
-        return true;
-    }
-    return false;
+
+    using PairTy = const std::pair<SILArgument *, ArgumentState>;
+    return llvm::any_of(ArgInstMap, [&i](PairTy &p) {
+      auto completeList = p.second.getFullyPostDomReleases();
+      // If we did not have a complete post dominating release set, then we do
+      // not want to treat any releases from p as epilogue releases.
+      if (!completeList)
+        return false;
+
+      // Then make sure that we either found an epilogue release or found
+      // exploded epilogue releases. We rely on our callers to split up exploded
+      // parameters.
+      return completeList->size() == 1 && *completeList->begin() == i;
+    });
   }
 
   /// Return true if we've found some epilogue releases for the argument
   /// but not all.
-  bool hasSomeReleasesForArgument(SILArgument *Arg) {
-    return FoundSomeReleases.find(Arg) != FoundSomeReleases.end();
+  bool hasSomeReleasesForArgument(SILArgument *arg) const {
+    auto iter = ArgInstMap.find(arg);
+    if (iter == ArgInstMap.end())
+      return false;
+    return iter->second.foundSomeButNotAllReleases();
   }
 
-  bool isSingleRelease(SILArgument *Arg) const {
-    auto Iter = ArgInstMap.find(Arg);
-    assert(Iter != ArgInstMap.end() && "Failed to get release list for argument");
-    return Iter->second.size() == 1;
+  bool isSingleRelease(SILArgument *arg) const {
+    auto iter = ArgInstMap.find(arg);
+    assert(iter != ArgInstMap.end() &&
+           "Failed to get release list for argument");
+
+    // If we do not have a fully post dominating release set bail.
+    auto completeList = iter->second.getFullyPostDomReleases();
+    if (!completeList)
+      return false;
+
+    return completeList->size() == 1;
   }
 
-  SILInstruction *getSingleReleaseForArgument(SILArgument *Arg) {
-    auto I = ArgInstMap.find(Arg);
-    if (I == ArgInstMap.end())
+  SILInstruction *getSingleReleaseForArgument(SILArgument *arg) const {
+    auto iter = ArgInstMap.find(arg);
+    if (iter == ArgInstMap.end())
       return nullptr;
-    if (!isSingleRelease(Arg))
+    if (!isSingleRelease(arg))
       return nullptr;
-    return *I->second.begin();
-  }
-
-  SILInstruction *getSingleReleaseForArgument(SILValue V) {
-    auto *Arg = dyn_cast<SILArgument>(V);
-    if (!Arg)
+    auto completeList = iter->second.getFullyPostDomReleases();
+    if (!completeList)
       return nullptr;
-    return getSingleReleaseForArgument(Arg);
+    return *completeList->begin();
   }
 
-  ReleaseList getReleasesForArgument(SILArgument *Arg) {
-    ReleaseList Releases;
-    auto I = ArgInstMap.find(Arg);
-    if (I == ArgInstMap.end())
-      return Releases;
-    return I->second; 
+  SILInstruction *getSingleReleaseForArgument(SILValue value) const {
+    auto *arg = dyn_cast<SILArgument>(value);
+    if (!arg)
+      return nullptr;
+    return getSingleReleaseForArgument(arg);
   }
 
-  ReleaseList getReleasesForArgument(SILValue V) {
-    ReleaseList Releases;
-    auto *Arg = dyn_cast<SILArgument>(V);
-    if (!Arg)
-      return Releases;
-    return getReleasesForArgument(Arg);
+  ArrayRef<SILInstruction *> getReleasesForArgument(SILArgument *arg) const {
+    auto iter = ArgInstMap.find(arg);
+    if (iter == ArgInstMap.end())
+      return {};
+    auto completeList = iter->second.getFullyPostDomReleases();
+    if (!completeList)
+      return {};
+    return completeList.getValue();
+  }
+
+  ArrayRef<SILInstruction *> getReleasesForArgument(SILValue value) const {
+    auto *arg = dyn_cast<SILArgument>(value);
+    if (!arg)
+      return {};
+    return getReleasesForArgument(arg);
   }
 
   /// Recompute the mapping from argument to consumed arg.
   void recompute();
 
-  bool isSingleReleaseMatchedToArgument(SILInstruction *Inst) {
-    auto Pred = [&Inst](const std::pair<SILArgument *,
-                                        ReleaseList> &P) -> bool {
-      if (P.second.size() > 1)
+  bool isSingleReleaseMatchedToArgument(SILInstruction *inst) {
+    using PairTy = const std::pair<SILArgument *, ArgumentState>;
+    return count_if(ArgInstMap, [&inst](PairTy &p) {
+      auto completeList = p.second.getFullyPostDomReleases();
+      if (!completeList || completeList->size() > 1)
         return false;
-      return *P.second.begin() == Inst;
-    };
-    return count_if(ArgInstMap, Pred);
+      return *completeList->begin() == inst;
+    });
   }
 
-  using iterator = decltype(ArgInstMap)::iterator;
-  using const_iterator = decltype(ArgInstMap)::const_iterator;
-  iterator begin() { return ArgInstMap.begin(); }
-  iterator end() { return ArgInstMap.end(); }
-  const_iterator begin() const { return ArgInstMap.begin(); }
-  const_iterator end() const { return ArgInstMap.end(); }
+private:
+  /// Return true if we have seen releases to part or all of \p Derived in
+  /// \p Insts.
+  ///
+  /// NOTE: This function relies on projections to analyze the relation
+  /// between the releases values in \p Insts and \p Derived, it also bails
+  /// out and return true if projection path can not be formed between Base
+  /// and any one the released values.
+  bool isRedundantRelease(ArrayRef<SILInstruction *> Insts, SILValue Base,
+                          SILValue Derived);
 
-  using reverse_iterator = decltype(ArgInstMap)::reverse_iterator;
-  using const_reverse_iterator = decltype(ArgInstMap)::const_reverse_iterator;
-  reverse_iterator rbegin() { return ArgInstMap.rbegin(); }
-  reverse_iterator rend() { return ArgInstMap.rend(); }
-  const_reverse_iterator rbegin() const { return ArgInstMap.rbegin(); }
-  const_reverse_iterator rend() const { return ArgInstMap.rend(); }
+  /// Return true if we have a release instruction for all the reference
+  /// semantics part of \p Argument.
+  bool releaseArgument(ArrayRef<SILInstruction *> Insts, SILValue Argument);
 
-  unsigned size() const { return ArgInstMap.size(); }
+  /// Walk the basic block and find all the releases that match to function
+  /// arguments.
+  void collectMatchingReleases(SILBasicBlock *BB);
 
-  iterator_range<iterator> getRange() { return swift::make_range(begin(), end()); }
+  /// Walk the function and find all the destroy_addr instructions that match
+  /// to function arguments.
+  void collectMatchingDestroyAddresses(SILBasicBlock *BB);
+
+  /// For every argument in the function, check to see whether all epilogue
+  /// releases are found. Clear all releases for the argument if not all
+  /// epilogue releases are found.
+  void processMatchingReleases();
 };
 
 class ReleaseTracker {

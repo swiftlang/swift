@@ -53,6 +53,7 @@ public func returnOptionalEscape() -> (() ->())?
 
 // NOPEEPHOLE-LABEL: sil @$S1A19bridgeNoescapeBlockyyF : $@convention(thin) () -> () {
 // NOPEEPHOLE: bb0:
+// NOPEEPHOLE:  alloc_stack $Optional<@callee_guaranteed () -> ()>
 // NOPEEPHOLE:  [[SLOT:%.*]] = alloc_stack $Optional<@callee_guaranteed () -> ()>
 // NOPEEPHOLE:  [[NONE:%.*]] = enum $Optional
 // NOPEEPHOLE:  store [[NONE]] to [[SLOT]]

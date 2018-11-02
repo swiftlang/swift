@@ -31,7 +31,7 @@ bool Ran;
     if (!EnableOverride)                                            \
       return originalImpl namedArgs;                                \
     Ran = true;                                                     \
-    return nullptr;                                                 \
+    return (ret)0;                                                  \
   }
 #include "../../stdlib/public/runtime/CompatibilityOverride.def"
 

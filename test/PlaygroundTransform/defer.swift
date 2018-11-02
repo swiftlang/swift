@@ -12,9 +12,9 @@ func foo() {
 	1
 }
 foo()
-// CHECK: {{.*}} $builtin_log_scope_entry
-// CHECK-NEXT: {{.*}} $builtin_log[='1']
-// CHECK-NEXT: {{.*}} $builtin_log_scope_exit
-// CHECK-NEXT: {{.*}} $builtin_log_scope_entry
-// CHECK-NEXT: {{.*}} $builtin_log[='2']
-// CHECK-NEXT: {{.*}} $builtin_log_scope_exit
+// CHECK: {{.*}} __builtin_log_scope_entry
+// CHECK-NEXT: {{.*}} __builtin_log[='1']
+// CHECK-NEXT: {{.*}} __builtin_log_scope_exit
+// CHECK-NEXT: {{.*}} __builtin_log_scope_entry
+// CHECK-NEXT: {{.*}} __builtin_log[='2']
+// CHECK-NEXT: {{.*}} __builtin_log_scope_exit

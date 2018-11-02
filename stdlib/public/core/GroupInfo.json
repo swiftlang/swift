@@ -14,7 +14,6 @@
     "StaticString.swift",
     "String.swift",
     "StringBridge.swift",
-    "StringCharacterView.swift",
     "StringComparable.swift",
     "StringComparison.swift",
     "StringObject.swift",
@@ -40,6 +39,7 @@
     "UnicodeEncoding.swift",
     "UnicodeParser.swift",
     "UnicodeScalar.swift",
+    "UnicodeScalarProperties.swift",
     "UnavailableStringAPIs.swift",
     "UnmanagedOpaqueString.swift",
     "UnmanagedString.swift",
@@ -63,7 +63,6 @@
     "Repeat.swift",
     "Sort.swift",
     "Range.swift",
-    "SentinelCollection.swift",
     "ClosedRange.swift",
     "CollectionOfOne.swift",
     "HeapBuffer.swift",
@@ -94,13 +93,16 @@
         "LazyCollection.swift",
         "LazySequence.swift"],
       "Array": [
+        "Array.swift",
         "ArrayBody.swift",
         "ArrayBuffer.swift",
         "ArrayBufferProtocol.swift",
         "ArrayCast.swift",
         "ArrayType.swift",
-        "Arrays.swift",
+        "ArrayShared.swift",
+        "ArraySlice.swift",
         "CocoaArray.swift",
+        "ContiguousArray.swift",
         "ContiguousArrayBuffer.swift",
         "FixedArray.swift",
         "SliceBuffer.swift",
@@ -143,7 +145,6 @@
       "FloatingPointTypes.swift"]}
   ],
   "Optional": [
-    "ImplicitlyUnwrappedOptional.swift",
     "Optional.swift"
   ],
   "Pointer": [
@@ -176,6 +177,7 @@
     "Policy.swift",
     "Print.swift",
     "REPL.swift",
+    "Random.swift",
     "Runtime.swift",
     "RuntimeFunctionCounters.swift",
     "Shims.swift",
@@ -190,6 +192,7 @@
     "Equatable.swift",
     "Comparable.swift",
     "Hashable.swift",
-    "Codable.swift"
+    "Codable.swift",
+    "MigrationSupport.swift"
   ]
 }

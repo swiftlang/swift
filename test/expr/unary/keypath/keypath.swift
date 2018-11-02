@@ -44,6 +44,29 @@ struct C<T> {
   subscript<X>(noHashableConstraint sub: X) -> X { get { return sub } set { } }
 }
 
+struct Unavailable {
+  @available(*, unavailable)
+  var unavailableProperty: Int
+  // expected-note@-1 {{'unavailableProperty' has been explicitly marked unavailable here}}
+
+  @available(*, unavailable)
+  subscript(x: Sub) -> Int { get { } set { } }
+  // expected-note@-1 {{'subscript' has been explicitly marked unavailable here}}
+}
+
+struct Deprecated {
+  @available(*, deprecated)
+  var deprecatedProperty: Int
+
+  @available(*, deprecated)
+  subscript(x: Sub) -> Int { get { } set { } }
+}
+
+@available(*, deprecated)
+func getDeprecatedSub() -> Sub {
+  return Sub()
+}
+
 extension Array where Element == A {
   var property: Prop { fatalError() }
 }
@@ -178,6 +201,14 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   let _ = \C<Int>.[sub]
   let _ = \C<Int>.[noHashableConstraint: sub]
   let _ = \C<Int>.[noHashableConstraint: nonHashableSub] // expected-error{{subscript index of type 'NonHashableSub' in a key path must be Hashable}}
+
+  let _ = \Unavailable.unavailableProperty // expected-error {{'unavailableProperty' is unavailable}}
+  let _ = \Unavailable.[sub] // expected-error {{'subscript' is unavailable}}
+
+  let _ = \Deprecated.deprecatedProperty // expected-warning {{'deprecatedProperty' is deprecated}}
+  let _ = \Deprecated.[sub] // expected-warning {{'subscript' is deprecated}}
+
+  let _ = \A.[getDeprecatedSub()] // expected-warning {{'getDeprecatedSub()' is deprecated}}
 }
 
 func testKeyPathInGenericContext<H: Hashable, X>(hashable: H, anything: X) {
@@ -471,6 +502,33 @@ func testImplicitConversionInSubscriptIndex() {
   _ = \BassSubscript.["hello"] // expected-error{{must be Hashable}}
 }
 
+// Crash in diagnostics
+struct AmbiguousSubscript {
+  subscript(sub: Sub) -> Int { get { } set { } }
+  // expected-note@-1 {{'subscript' declared here}}
+
+  subscript(y y: Sub) -> Int { get { } set { } }
+  // expected-note@-1 {{'subscript(y:)' declared here}}
+}
+
+func useAmbiguousSubscript(_ sub: Sub) {
+  let _: PartialKeyPath<AmbiguousSubscript> = \.[sub]
+  // expected-error@-1 {{ambiguous reference to member 'subscript'}}
+}
+
+struct BothUnavailableSubscript {
+  @available(*, unavailable)
+  subscript(sub: Sub) -> Int { get { } set { } }
+
+  @available(*, unavailable)
+  subscript(y y: Sub) -> Int { get { } set { } }
+}
+
+func useBothUnavailableSubscript(_ sub: Sub) {
+  let _: PartialKeyPath<BothUnavailableSubscript> = \.[sub]
+  // expected-error@-1 {{type of expression is ambiguous without more context}}
+}
+
 // SR-6106
 func sr6106() {
   class B {}
@@ -499,6 +557,41 @@ func sr6744() {
     _ = get(for: \.value)
 }
 
+func sr7380() {
+  _ = ""[keyPath: \.count]
+  _ = ""[keyPath: \String.count]
+
+  let arr1 = [1]
+  _ = arr1[keyPath: \.[0]]
+  _ = arr1[keyPath: \[Int].[0]]
+
+  let dic1 = [1:"s"]
+  _ = dic1[keyPath: \.[1]]
+  _ = dic1[keyPath: \[Int: String].[1]]
+
+  var arr2 = [1]
+  arr2[keyPath: \.[0]] = 2
+  arr2[keyPath: \[Int].[0]] = 2
+
+  var dic2 = [1:"s"]
+  dic2[keyPath: \.[1]] = ""
+  dic2[keyPath: \[Int: String].[1]] = ""
+
+  _ = [""][keyPath: \.[0]]
+  _ = [""][keyPath: \[String].[0]]
+
+  _ = ["": ""][keyPath: \.["foo"]]
+  _ = ["": ""][keyPath: \[String: String].["foo"]]
+
+  class A {
+    var a: String = ""
+  }
+  _ = A()[keyPath: \.a]
+  _ = A()[keyPath: \A.a]
+  A()[keyPath: \.a] = ""
+  A()[keyPath: \A.a] = ""
+}
+
 struct VisibilityTesting {
   private(set) var x: Int
   fileprivate(set) var y: Int
@@ -514,8 +607,9 @@ struct VisibilityTesting {
       toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
     expect(&yRef,
       toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
+    // Allow WritableKeyPath for Swift 3/4 only.
     expect(&zRef,
-      toHaveType: Exactly<KeyPath<VisibilityTesting, Int>>.self)
+      toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
   }
 
   func inPrivateContext() {
@@ -536,8 +630,9 @@ struct VisibilityTesting2 {
     var xRef = \VisibilityTesting.x
     var yRef = \VisibilityTesting.y
     var zRef = \VisibilityTesting.z
+    // Allow WritableKeyPath for Swift 3/4 only.
     expect(&xRef,
-      toHaveType: Exactly<KeyPath<VisibilityTesting, Int>>.self)
+      toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
     expect(&yRef,
       toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
     expect(&zRef,

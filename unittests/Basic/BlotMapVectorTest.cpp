@@ -95,7 +95,7 @@ public:
 
   CtorTester() : Value(new int(-1)) {
     dump("Constructing ()");
-    DEBUG(llvm::errs() << "\n");
+    LLVM_DEBUG(llvm::errs() << "\n");
     // EXPECT_TRUE(ConstructedTesters->insert(this));
     assert(!isLive());
     fflush(stdout);
@@ -103,7 +103,7 @@ public:
 
   explicit CtorTester(EmptyTester) : Value(new int(-2)) {
     dump("Constructing Empty");
-    DEBUG(llvm::errs() << "\n");
+    LLVM_DEBUG(llvm::errs() << "\n");
     // EXPECT_TRUE(ConstructedTesters->insert(this));
     assert(!isLive());
     fflush(stdout);
@@ -111,7 +111,7 @@ public:
 
   explicit CtorTester(TombstoneTester) : Value(new int(-3)) {
     dump("Constructing Tombstone");
-    DEBUG(llvm::errs() << "\n");
+    LLVM_DEBUG(llvm::errs() << "\n");
     // EXPECT_TRUE(ConstructedTesters->insert(this));
     assert(!isLive());
     fflush(stdout);
@@ -119,7 +119,7 @@ public:
 
   explicit CtorTester(int V) : Value(new int(V)) {
     dump("Constructing Normal");
-    DEBUG(llvm::errs() << "\n");
+    LLVM_DEBUG(llvm::errs() << "\n");
     EXPECT_TRUE(ConstructedTesters->insert(this));
     assert(!isIgnorableTester());
     assert(isLive());
@@ -128,7 +128,7 @@ public:
 
   explicit CtorTester(uint32_t V) : Value(new int(V)) {
     dump("Constructing Normal");
-    DEBUG(llvm::errs() << "\n");
+    LLVM_DEBUG(llvm::errs() << "\n");
     EXPECT_TRUE(ConstructedTesters->insert(this));
     assert(!isIgnorableTester());
     assert(isLive());
@@ -138,7 +138,7 @@ public:
   CtorTester(const CtorTester &Arg) : Value(new int(*Arg.Value.get())) {
     dump("CopyConstructing");
     Arg.dump("   From");
-    DEBUG(llvm::errs() << "\n");
+    LLVM_DEBUG(llvm::errs() << "\n");
     if (!Arg.isIgnorableTester()) {
       EXPECT_TRUE(ConstructedTesters->insert(this));
       fflush(stdout);
@@ -148,7 +148,7 @@ public:
   CtorTester(CtorTester &&Arg) : Value(new int(-1)) {
     dump("Operator Move Constructor");
     Arg.dump("    From");
-    DEBUG(llvm::errs() << "\n");
+    LLVM_DEBUG(llvm::errs() << "\n");
     assert(Value);
     assert(Arg.Value);
     // If Arg is not ignorable, it will be now and we will not be.
@@ -157,13 +157,13 @@ public:
       EXPECT_EQ(1u, ConstructedTesters->erase(&Arg));
     }
     std::swap(Value, Arg.Value);
-    DEBUG(fflush(stdout));
+    LLVM_DEBUG(fflush(stdout));
   }
 
   CtorTester &operator=(const CtorTester &Arg) {
     dump("Operator Copy Assignment");
     Arg.dump("    From");
-    DEBUG(llvm::errs() << "\n");
+    LLVM_DEBUG(llvm::errs() << "\n");
     assert(Value);
     assert(Arg.Value);
 
@@ -180,7 +180,7 @@ public:
   CtorTester &operator=(CtorTester &&Arg) {
     dump("Operator Move Assignment");
     Arg.dump("    From");
-    DEBUG(llvm::errs() << "\n");
+    LLVM_DEBUG(llvm::errs() << "\n");
     assert(Value);
     assert(Arg.Value);
     if (!Arg.isIgnorableTester() && isIgnorableTester()) {
@@ -192,14 +192,14 @@ public:
     }
 
     std::swap(Value, Arg.Value);
-    DEBUG(fflush(stdout));
+    LLVM_DEBUG(fflush(stdout));
     return *this;
   }
 
   ~CtorTester() {
     bool IsIgnorable = isIgnorableTester();
     dump("Destroying");
-    DEBUG(llvm::errs() << "\n");
+    LLVM_DEBUG(llvm::errs() << "\n");
     delete Value.get();
     Value = nullptr;
     fflush(stdout);
@@ -226,9 +226,9 @@ private:
     Addr += llvm::utohexstr(uintptr_t(this));
     std::string ValueAddr = "0x";
     ValueAddr += llvm::utohexstr(uintptr_t(Value.get()));
-    DEBUG(llvm::errs() << Name << " <Tester Addr:" << Addr
-          << " ValueAddr:" << ValueAddr << " Value:" << *Value.get()
-          << ">");
+    LLVM_DEBUG(llvm::errs() << Name << " <Tester Addr:" << Addr
+               << " ValueAddr:" << ValueAddr << " Value:" << *Value.get()
+               << ">");
   }
 };
 
@@ -333,7 +333,7 @@ public:
 
   ~BlotMapVectorTest() override {
     ConstructedTesters->verifyTesters();
-    DEBUG(llvm::errs() << "Destroying Fixture\n");
+    LLVM_DEBUG(llvm::errs() << "Destroying Fixture\n");
     ConstructedTesters->finalize();
   }
 
@@ -515,7 +515,14 @@ TYPED_TEST(BlotMapVectorTest, AssignmentTest) {
   EXPECT_EQ(this->getValue(), copyMap[this->getKey()]);
 
   // test self-assignment.
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wself-assign-overloaded"
   copyMap = copyMap;
+#pragma clang diagnostic pop
+#else
+  copyMap = copyMap;
+#endif
   EXPECT_EQ(1u, copyMap.size());
   EXPECT_EQ(this->getValue(), copyMap[this->getKey()]);
   this->NumExpectedLiveTesters = 2;

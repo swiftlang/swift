@@ -23,7 +23,6 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ProfileData/InstrProfReader.h"
 #include <deque>
 
 namespace swift {
@@ -249,7 +248,7 @@ public:
 
   /// Emits the default argument generator with the given expression.
   void emitDefaultArgGenerator(SILDeclRef constant, Expr *arg,
-                               DefaultArgumentKind kind);
+                               DefaultArgumentKind kind, DeclContext *DC);
 
   /// Emits the stored property initializer for the given pattern.
   void emitStoredPropertyInitialization(PatternBindingDecl *pd, unsigned i);
@@ -335,8 +334,8 @@ public:
   
   SILDeclRef getGetterDeclRef(AbstractStorageDecl *decl);
   SILDeclRef getSetterDeclRef(AbstractStorageDecl *decl);
-  SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
-                                 AccessKind accessKind);
+  SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl);
+  SILDeclRef getMutableAddressorDeclRef(AbstractStorageDecl *decl);
   SILDeclRef getMaterializeForSetDeclRef(AbstractStorageDecl *decl);
 
   KeyPathPatternComponent
@@ -344,7 +343,7 @@ public:
                               GenericEnvironment *genericEnv,
                               unsigned &baseOperand,
                               bool &needsGenericContext,
-                              SubstitutionList subs,
+                              SubstitutionMap subs,
                               AbstractStorageDecl *storage,
                               ArrayRef<ProtocolConformanceRef> indexHashables,
                               CanType baseTy,
@@ -426,7 +425,7 @@ public:
   void useConformance(ProtocolConformanceRef conformance);
 
   /// Mark protocol conformances from the given set of substitutions as used.
-  void useConformancesFromSubstitutions(SubstitutionList subs);
+  void useConformancesFromSubstitutions(SubstitutionMap subs);
 
   /// Emit a `mark_function_escape` instruction for top-level code when a
   /// function or closure at top level refers to script globals.
@@ -435,7 +434,7 @@ public:
 
   /// Get the substitutions necessary to invoke a non-member (global or local)
   /// property.
-  SubstitutionList
+  SubstitutionMap
   getNonMemberVarDeclSubstitutions(VarDecl *var);
 
   /// Emit a property descriptor for the given storage decl if it needs one.

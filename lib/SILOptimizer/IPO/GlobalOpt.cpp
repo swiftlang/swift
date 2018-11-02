@@ -14,6 +14,7 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
@@ -112,8 +113,6 @@ protected:
 
   /// This is the main entrypoint for collecting global accesses.
   void collectGlobalAccess(GlobalAddrInst *GAI);
-
-  SILGlobalVariable *getVariableOfGlobalInit(SILFunction *AddrF);
 
   /// Returns true if we think that \p CurBB is inside a loop.
   bool isInLoop(SILBasicBlock *CurBB);
@@ -261,7 +260,7 @@ static SILFunction *getGlobalGetterFunction(SILModule &M,
   auto refType = M.Types.getLoweredType(varDecl->getInterfaceType());
 
   // Function takes no arguments and returns refType
-  SILResultInfo Results[] = { SILResultInfo(refType.getSwiftRValueType(),
+  SILResultInfo Results[] = { SILResultInfo(refType.getASTType(),
                                             ResultConvention::Owned) };
   SILFunctionType::ExtInfo EInfo;
   EInfo = EInfo.withRepresentation(SILFunctionType::Representation::Thin);
@@ -349,21 +348,6 @@ void SILGlobalOpt::collectGlobalStore(StoreInst *SI, SILGlobalVariable *SILG) {
   GlobalVarStore[SILG] = SI;
 }
 
-/// Return the callee of a once call.
-static SILFunction *getCalleeOfOnceCall(BuiltinInst *BI) {
-  assert(BI->getNumOperands() == 2 && "once call should have 2 operands.");
-
-  auto Callee = BI->getOperand(1);
-  assert(Callee->getType().castTo<SILFunctionType>()->getRepresentation()
-           == SILFunctionTypeRepresentation::CFunctionPointer &&
-         "Expected C function representation!");
-
-  if (auto *FR = dyn_cast<FunctionRefInst>(Callee))
-    return FR->getReferencedFunction();
-
-  return nullptr;
-}
-
 // Update UnhandledOnceCallee and InitializerCount by going through all "once"
 // calls.
 void SILGlobalOpt::collectOnceCall(BuiltinInst *BI) {
@@ -376,7 +360,7 @@ void SILGlobalOpt::collectOnceCall(BuiltinInst *BI) {
 
   SILFunction *Callee = getCalleeOfOnceCall(BI);
   if (!Callee) {
-    DEBUG(llvm::dbgs() << "GlobalOpt: unhandled once callee\n");
+    LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: unhandled once callee\n");
     UnhandledOnceCallee = true;
     return;
   }
@@ -497,9 +481,9 @@ ApplyInst *SILGlobalOpt::getHoistedApplyForInitializer(
 /// a single dominating call in the outer loop preheader.
 void SILGlobalOpt::placeInitializers(SILFunction *InitF,
                                      ArrayRef<ApplyInst *> Calls) {
-  DEBUG(llvm::dbgs() << "GlobalOpt: calls to "
-        << Demangle::demangleSymbolAsString(InitF->getName())
-        << " : " << Calls.size() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: calls to "
+             << Demangle::demangleSymbolAsString(InitF->getName())
+             << " : " << Calls.size() << "\n");
   // Map each initializer-containing function to its final initializer call.
   llvm::DenseMap<SILFunction *, ApplyInst *> ParentFuncs;
   for (auto *AI : Calls) {
@@ -523,8 +507,9 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
     while (Node) {
       SILBasicBlock *DomParentBB = Node->getBlock();
       if (isAvailabilityCheck(DomParentBB)) {
-        DEBUG(llvm::dbgs() << "  don't hoist above availability check at bb"
-                           << DomParentBB->getDebugID() << "\n");
+        LLVM_DEBUG(llvm::dbgs() << "  don't hoist above availability check "
+                                   "at bb"
+                                << DomParentBB->getDebugID() << "\n");
         break;
       }
       BB = DomParentBB;
@@ -535,13 +520,13 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
 
     if (BB == HoistAI->getParent()) {
       // BB is either unreachable or not in a loop.
-      DEBUG(llvm::dbgs() << "  skipping (not in a loop): " << *HoistAI
-                         << "  in " << HoistAI->getFunction()->getName()
-                         << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "  skipping (not in a loop): " << *HoistAI
+                              << "  in " << HoistAI->getFunction()->getName()
+                              << "\n");
       continue;
     }
 
-    DEBUG(llvm::dbgs() << "  hoisting: " << *HoistAI << "  in "
+    LLVM_DEBUG(llvm::dbgs() << "  hoisting: " << *HoistAI << "  in "
                        << HoistAI->getFunction()->getName() << "\n");
     HoistAI->moveBefore(&*BB->begin());
     placeFuncRef(HoistAI, DT);
@@ -596,34 +581,6 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
   return GetterF;
 }
 
-/// Find the globalinit_func by analyzing the body of the addressor.
-static SILFunction *findInitializer(SILModule *Module, SILFunction *AddrF,
-                                    BuiltinInst *&CallToOnce) {
-  // We only handle a single SILBasicBlock for now.
-  if (AddrF->size() != 1)
-    return nullptr;
-
-  CallToOnce = nullptr;
-  SILBasicBlock *BB = &AddrF->front();
-  for (auto &I : *BB) {
-    // Find the builtin "once" call.
-    if (auto *BI = dyn_cast<BuiltinInst>(&I)) {
-      const BuiltinInfo &Builtin = Module->getBuiltinInfo(BI->getName());
-      if (Builtin.ID != BuiltinValueKind::Once)
-        continue;
-
-      // Bail if we have multiple "once" calls in the addressor.
-      if (CallToOnce)
-        return nullptr;
-
-      CallToOnce = BI;
-    }
-  }
-  if (!CallToOnce)
-    return nullptr;
-  return getCalleeOfOnceCall(CallToOnce);
-}
-
 /// Checks if a given global variable is assigned only once.
 static bool isAssignedOnlyOnceInInitializer(SILGlobalVariable *SILG) {
   if (SILG->isLet())
@@ -667,49 +624,6 @@ static SILValue convertLoadSequence(SILValue oldSequence,
 
   llvm_unreachable("Unknown instruction sequence for reading from a global");
   return nullptr;
-}
-
-static SILGlobalVariable *getVariableOfStaticInitializer(SILFunction *InitFunc,
-                                             SingleValueInstruction *&InitVal) {
-  InitVal = nullptr;
-  SILGlobalVariable *GVar = nullptr;
-  // We only handle a single SILBasicBlock for now.
-  if (InitFunc->size() != 1)
-    return nullptr;
-
-  SILBasicBlock *BB = &InitFunc->front();
-  GlobalAddrInst *SGA = nullptr;
-  bool HasStore = false;
-  for (auto &I : *BB) {
-    // Make sure we have a single GlobalAddrInst and a single StoreInst.
-    // And the StoreInst writes to the GlobalAddrInst.
-    if (isa<AllocGlobalInst>(&I) || isa<ReturnInst>(&I)
-        || isa<DebugValueInst>(&I)) {
-      continue;
-    } else if (auto *sga = dyn_cast<GlobalAddrInst>(&I)) {
-      if (SGA)
-        return nullptr;
-      SGA = sga;
-      GVar = SGA->getReferencedGlobal();
-    } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
-      if (HasStore || SI->getDest() != SGA)
-        return nullptr;
-      HasStore = true;
-      SILValue value = SI->getSrc();
-
-      // We only handle StructInst and TupleInst being stored to a
-      // global variable for now.
-      if (!isa<StructInst>(value) && !isa<TupleInst>(value))
-        return nullptr;
-      InitVal = cast<SingleValueInstruction>(value);
-    } else if (!SILGlobalVariable::isValidStaticInitializerInst(&I,
-                                                             I.getModule())) {
-      return nullptr;
-    }
-  }
-  if (!InitVal)
-    return nullptr;
-  return GVar;
 }
 
 /// Replace loads from a global variable by the known value.
@@ -765,6 +679,10 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
     auto *GetterRef = B.createFunctionRef(Call->getLoc(), GetterF);
     auto *NewAI = B.createApply(Call->getLoc(), GetterRef, Args, false);
 
+    // FIXME: This is asserting that a specific SIL sequence follows an
+    // addressor! SIL passes should never do this without first specifying a
+    // structural SIL property independent of the SILOptimizer and enforced by
+    // the SILVerifier.
     for (auto Use : Call->getUses()) {
       auto *PTAI = dyn_cast<PointerToAddressInst>(Use->getUser());
       assert(PTAI && "All uses should be pointer_to_address");
@@ -806,8 +724,8 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
   if (!SILG)
     return;
 
-  DEBUG(llvm::dbgs() << "GlobalOpt: use static initializer for " <<
-        SILG->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: use static initializer for "
+                          << SILG->getName() << '\n');
 
   // Remove "once" call from the addressor.
   if (!isAssignedOnlyOnceInInitializer(SILG) || !SILG->getDecl()) {
@@ -820,29 +738,6 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
 
   replaceLoadsByKnownValue(CallToOnce, AddrF, InitF, SILG, InitVal, Calls);
   HasChanged = true;
-}
-
-SILGlobalVariable *SILGlobalOpt::getVariableOfGlobalInit(SILFunction *AddrF) {
-  if (!AddrF->isGlobalInit())
-    return nullptr;
-
-  // If the addressor contains a single "once" call, it calls globalinit_func,
-  // and the globalinit_func is called by "once" from a single location,
-  // continue; otherwise bail.
-  BuiltinInst *CallToOnce;
-  auto *InitF = findInitializer(Module, AddrF, CallToOnce);
-
-  if (!InitF || !InitF->getName().startswith("globalinit_")
-      || InitializerCount[InitF] > 1)
-    return nullptr;
-
-  // If the globalinit_func is trivial, continue; otherwise bail.
-  SingleValueInstruction *dummyInitVal;
-  auto *SILG = getVariableOfStaticInitializer(InitF, dummyInitVal);
-  if (!SILG || !SILG->isDefinition())
-    return nullptr;
-
-  return SILG;
 }
 
 static bool canBeChangedExternally(SILGlobalVariable *SILG) {
@@ -952,8 +847,8 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
 // that returns the value of this variable.
 void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
                                         StoreInst *SI) {
-  DEBUG(llvm::dbgs() << "GlobalOpt: use static initializer for " <<
-        SILG->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: use static initializer for "
+                          << SILG->getName() << '\n');
 
   if (GlobalVarSkipProcessing.count(SILG))
     return;

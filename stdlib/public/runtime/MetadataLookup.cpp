@@ -23,7 +23,6 @@
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
-#include "swift/Runtime/Mutex.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
@@ -106,11 +105,9 @@ namespace {
 
 struct TypeMetadataPrivateState {
   ConcurrentMap<NominalTypeDescriptorCacheEntry> NominalCache;
-  std::vector<TypeMetadataSection> SectionsToScan;
-  Mutex SectionsToScanLock;
+  ConcurrentReadableArray<TypeMetadataSection> SectionsToScan;
 
   TypeMetadataPrivateState() {
-    SectionsToScan.reserve(16);
     initializeTypeMetadataRecordLookup();
   }
 
@@ -122,7 +119,6 @@ static void
 _registerTypeMetadataRecords(TypeMetadataPrivateState &T,
                              const TypeMetadataRecord *begin,
                              const TypeMetadataRecord *end) {
-  ScopedLock guard(T.SectionsToScanLock);
   T.SectionsToScan.push_back(TypeMetadataSection{begin, end});
 }
 
@@ -153,13 +149,17 @@ swift::swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
   _registerTypeMetadataRecords(T, begin, end);
 }
 
+static const TypeContextDescriptor *
+_findNominalTypeDescriptor(Demangle::NodePointer node,
+                           Demangle::Demangler &Dem);
+
 bool
 swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
                                          Demangle::NodePointer node) {
-  if (node->getKind() == Demangle::Node::Kind::Type)
-    node = node->getChild(0);
-
   while (context) {
+    if (node->getKind() == Demangle::Node::Kind::Type)
+      node = node->getChild(0);
+    
     // We can directly match symbolic references to the current context.
     if (node && node->getKind() == Demangle::Node::Kind::SymbolicReference) {
       if (equalContexts(context, reinterpret_cast<const ContextDescriptor *>(
@@ -182,8 +182,56 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
     }
     
     case ContextDescriptorKind::Extension: {
-      // TODO: Check whether the extension context constraints match.
-      return false;
+      auto extension = cast<ExtensionContextDescriptor>(context);
+      
+      // Check whether the extension context matches the mangled context.
+      if (node->getKind() != Demangle::Node::Kind::Extension)
+        return false;
+      if (node->getNumChildren() < 2)
+        return false;
+      
+      // Check that the context being extended matches as well.
+      auto extendedContextNode = node->getChild(1);
+      auto extendedContextMangledName = extension->getMangledExtendedContext();
+      auto demangler = getDemanglerForRuntimeTypeResolution();
+      auto extendedContextDemangled =
+         demangler.demangleType(extendedContextMangledName);
+      if (!extendedContextDemangled)
+        return false;
+      if (extendedContextDemangled->getKind() == Node::Kind::Type) {
+        if (extendedContextDemangled->getNumChildren() < 1)
+          return false;
+        extendedContextDemangled = extendedContextDemangled->getChild(0);
+      }
+      extendedContextDemangled =
+        stripGenericArgsFromContextNode(extendedContextDemangled, demangler);
+      
+      auto extendedDescriptorFromNode =
+        _findNominalTypeDescriptor(extendedContextNode, demangler);
+      auto extendedDescriptorFromDemangled =
+        _findNominalTypeDescriptor(extendedContextDemangled, demangler);
+      
+      if (!extendedDescriptorFromNode || !extendedDescriptorFromDemangled ||
+          !equalContexts(extendedDescriptorFromNode,
+                         extendedDescriptorFromDemangled))
+        return false;
+      
+      // Check whether the generic signature of the extension matches the
+      // mangled constraints, if any.
+
+      if (node->getNumChildren() >= 3) {
+        // NB: If we ever support extensions with independent generic arguments
+        // like `extension <T> Array where Element == Optional<T>`, we'd need
+        // to look at the mangled context name to match up generic arguments.
+        // That would probably need a new extension mangling form, though.
+        
+        // TODO
+      }
+      
+      // The parent context of the extension should match in the mangling and
+      // context descriptor.
+      node = node->getChild(0);
+      break;
     }
     
     default:
@@ -216,14 +264,31 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
         }
 
         auto nameNode = node->getChild(1);
-        if (nameNode->getKind() == Demangle::Node::Kind::PrivateDeclName)
-          return false;
-
-        if (nameNode->getText() != type->Name.get())
-          return false;
         
-        node = node->getChild(0);
-        break;
+        // Declarations synthesized by the Clang importer get a small tag
+        // string in addition to their name.
+        if (nameNode->getKind() == Demangle::Node::Kind::RelatedEntityDeclName){
+          if (nameNode->getText() != type->getSynthesizedDeclRelatedEntityTag())
+            return false;
+          
+          nameNode = nameNode->getChild(0);
+        } else if (type->isSynthesizedRelatedEntity()) {
+          return false;
+        }
+        
+        // We should only match public or internal declarations with stable
+        // names. The runtime metadata for private declarations would be
+        // anonymized.
+        if (nameNode->getKind() == Demangle::Node::Kind::Identifier) {
+          if (nameNode->getText() != type->Name.get())
+            return false;
+          
+          node = node->getChild(0);
+          break;
+        }
+        
+        return false;
+
       }
       
       // We don't know about this kind of context, or it doesn't have a stable
@@ -244,12 +309,9 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
 
 // returns the nominal type descriptor for the type named by typeName
 static const TypeContextDescriptor *
-_searchTypeMetadataRecords(const TypeMetadataPrivateState &T,
+_searchTypeMetadataRecords(TypeMetadataPrivateState &T,
                            Demangle::NodePointer node) {
-  unsigned sectionIdx = 0;
-  unsigned endSectionIdx = T.SectionsToScan.size();
-  for (; sectionIdx < endSectionIdx; ++sectionIdx) {
-    auto &section = T.SectionsToScan[sectionIdx];
+  for (auto &section : T.SectionsToScan.snapshot()) {
     for (const auto &record : section) {
       if (auto ntd = record.getTypeContextDescriptor()) {
         if (_contextDescriptorMatchesMangling(ntd, node)) {
@@ -290,9 +352,7 @@ _findNominalTypeDescriptor(Demangle::NodePointer node,
     return Value->getDescription();
 
   // Check type metadata records
-  T.SectionsToScanLock.withLock([&] {
-    foundNominal = _searchTypeMetadataRecords(T, node);
-  });
+  foundNominal = _searchTypeMetadataRecords(T, node);
 
   // Check protocol conformances table. Note that this has no support for
   // resolving generic types yet.
@@ -343,11 +403,9 @@ namespace {
 
   struct ProtocolMetadataPrivateState {
     ConcurrentMap<ProtocolDescriptorCacheEntry> ProtocolCache;
-    std::vector<ProtocolSection> SectionsToScan;
-    Mutex SectionsToScanLock;
+    ConcurrentReadableArray<ProtocolSection> SectionsToScan;
 
     ProtocolMetadataPrivateState() {
-      SectionsToScan.reserve(16);
       initializeProtocolLookup();
     }
   };
@@ -359,7 +417,6 @@ static void
 _registerProtocols(ProtocolMetadataPrivateState &C,
                    const ProtocolRecord *begin,
                    const ProtocolRecord *end) {
-  ScopedLock guard(C.SectionsToScanLock);
   C.SectionsToScan.push_back(ProtocolSection{begin, end});
 }
 
@@ -387,12 +444,9 @@ void swift::swift_registerProtocols(const ProtocolRecord *begin,
 }
 
 static const ProtocolDescriptor *
-_searchProtocolRecords(const ProtocolMetadataPrivateState &C,
+_searchProtocolRecords(ProtocolMetadataPrivateState &C,
                        const llvm::StringRef protocolName){
-  unsigned sectionIdx = 0;
-  unsigned endSectionIdx = C.SectionsToScan.size();
-  for (; sectionIdx < endSectionIdx; ++sectionIdx) {
-    auto &section = C.SectionsToScan[sectionIdx];
+  for (auto &section : C.SectionsToScan.snapshot()) {
     for (const auto &record : section) {
       if (auto protocol = record.Protocol.getPointer()) {
         // Drop the "S$" prefix from the protocol record. It's not used in
@@ -420,9 +474,7 @@ _findProtocolDescriptor(llvm::StringRef mangledName) {
     return Value->getDescription();
 
   // Check type metadata records
-  T.SectionsToScanLock.withLock([&] {
-    foundProtocol = _searchProtocolRecords(T, mangledName);
-  });
+  foundProtocol = _searchProtocolRecords(T, mangledName);
 
   if (foundProtocol) {
     T.ProtocolCache.getOrInsert(mangledName, foundProtocol);
@@ -482,7 +534,7 @@ public:
   DynamicFieldSection(const FieldDescriptor **fields, size_t size)
       : Begin(fields), End(fields + size) {}
 
-  const FieldDescriptor **begin() { return Begin; }
+  const FieldDescriptor **begin() const { return Begin; }
 
   const FieldDescriptor **end() const { return End; }
 };
@@ -490,13 +542,10 @@ public:
 struct FieldCacheState {
   ConcurrentMap<FieldDescriptorCacheEntry> FieldCache;
 
-  Mutex SectionsLock;
-  std::vector<StaticFieldSection> StaticSections;
-  std::vector<DynamicFieldSection> DynamicSections;
+  ConcurrentReadableArray<StaticFieldSection> StaticSections;
+  ConcurrentReadableArray<DynamicFieldSection> DynamicSections;
 
   FieldCacheState() {
-    StaticSections.reserve(16);
-    DynamicSections.reserve(8);
     initializeTypeFieldLookup();
   }
 };
@@ -507,7 +556,6 @@ static Lazy<FieldCacheState> FieldCache;
 void swift::swift_registerFieldDescriptors(const FieldDescriptor **records,
                                            size_t size) {
   auto &cache = FieldCache.get();
-  ScopedLock guard(cache.SectionsLock);
   cache.DynamicSections.push_back({records, size});
 }
 
@@ -518,7 +566,6 @@ void swift::addImageTypeFieldDescriptorBlockCallback(const void *recordsBegin,
 
   // Field cache should always be sufficiently initialized by this point.
   auto &cache = FieldCache.unsafeGetAlreadyInitialized();
-  ScopedLock guard(cache.SectionsLock);
   cache.StaticSections.push_back({recordsBegin, recordsEnd});
 }
 
@@ -687,7 +734,7 @@ public:
     explicit operator bool() const { return !isNull(); }
   };
 
-  using BuiltProtocolDecl = const ProtocolDescriptor *;
+  using BuiltProtocolDecl = ProtocolDescriptorRef;
 
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
 
@@ -709,11 +756,11 @@ public:
   BuiltProtocolDecl createProtocolDecl(
                                     const Demangle::NodePointer &node) const {
 #if SWIFT_OBJC_INTEROP
-    // If we have an Objective-C class name, call into the Objective-C
+    // If we have an Objective-C protocol name, call into the Objective-C
     // runtime to find them.
     if (auto objcProtocolName = getObjCClassOrProtocolName(node)) {
-      return (ProtocolDescriptor *)objc_getProtocol(
-                                              objcProtocolName->str().c_str());
+      return ProtocolDescriptorRef::forObjC(objc_getProtocol(
+                                              objcProtocolName->str().c_str()));
     }
 #endif
 
@@ -721,7 +768,7 @@ public:
 
     // Look for a Swift protocol with this mangled name.
     if (auto protocol = _findProtocolDescriptor(mangledName))
-      return protocol;
+      return ProtocolDescriptorRef::forSwift(protocol);
 
 #if SWIFT_OBJC_INTEROP
     // Look for a Swift-defined @objc protocol with the Swift 3 mangling that
@@ -729,10 +776,10 @@ public:
     std::string objcMangledName =
       "_TtP" + mangledName.substr(0, mangledName.size()-1) + "_";
     if (auto protocol = objc_getProtocol(objcMangledName.c_str()))
-      return (ProtocolDescriptor *)protocol;
+      return ProtocolDescriptorRef::forObjC(protocol);
 #endif
 
-    return nullptr;
+    return ProtocolDescriptorRef();
   }
 
   BuiltType createNominalType(BuiltNominalTypeDecl metadataOrTypeDecl,
@@ -895,8 +942,7 @@ public:
       classConstraint = ProtocolClassConstraint::Class;
     } else {
       for (auto protocol : protocols) {
-        if (protocol->Flags.getClassConstraint()
-              == ProtocolClassConstraint::Class) {
+        if (protocol.getClassConstraint() == ProtocolClassConstraint::Class) {
           classConstraint = ProtocolClassConstraint::Class;
           break;
         }
@@ -954,26 +1000,23 @@ public:
 
   BuiltType createDependentMemberType(StringRef name, BuiltType base,
                                       BuiltProtocolDecl protocol) const {
+#if SWIFT_OBJC_INTEROP
+    if (protocol.isObjC())
+      return BuiltType();
+#endif
+
     if (lookupDependentMember)
-      return lookupDependentMember(base, name, protocol);
+      return lookupDependentMember(base, name, protocol.getSwiftProtocol());
 
     return BuiltType();
   }
 
-  BuiltType createUnownedStorageType(BuiltType base) {
-    ReferenceOwnership.setUnowned();
-    return base;
+#define REF_STORAGE(Name, ...) \
+  BuiltType create##Name##StorageType(BuiltType base) { \
+    ReferenceOwnership.set##Name(); \
+    return base; \
   }
-
-  BuiltType createUnmanagedStorageType(BuiltType base) {
-    ReferenceOwnership.setUnmanaged();
-    return base;
-  }
-
-  BuiltType createWeakStorageType(BuiltType base) {
-    ReferenceOwnership.setWeak();
-    return base;
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   BuiltType createSILBoxType(BuiltType base) const {
     // FIXME: Implement.
@@ -1069,6 +1112,12 @@ swift_getTypeByMangledNameImpl(const char *typeNameStart, size_t typeNameLength,
 }
 
 void swift::swift_getFieldAt(
+  const Metadata *base, unsigned index, 
+  void (*callback)(const char *name, const Metadata *type, void *ctx), void *callbackCtx) {
+    swift::_swift_getFieldAt(base, index, [&] (llvm::StringRef name, FieldType fieldInfo) { callback(name.data(), fieldInfo.getType(), callbackCtx); });
+}
+
+void swift::_swift_getFieldAt(
     const Metadata *base, unsigned index,
     std::function<void(llvm::StringRef name, FieldType fieldInfo)>
         callback) {
@@ -1098,8 +1147,10 @@ void swift::swift_getFieldAt(
       }
     }
 
+    auto typeName = field.getMangledTypeName(0);
+
     auto typeInfo = _getTypeByMangledName(
-        field.getMangledTypeName(0),
+        typeName,
         [&](unsigned depth, unsigned index) -> const Metadata * {
           if (depth >= descriptorPath.size())
             return nullptr;
@@ -1122,6 +1173,16 @@ void swift::swift_getFieldAt(
 
           return base->getGenericArgs()[flatIndex];
         });
+
+    // If demangling the type failed, pretend it's an empty type instead with
+    // a log message.
+    if (typeInfo == nullptr) {
+      typeInfo = TypeInfo(&METADATA_SYM(EMPTY_TUPLE_MANGLING), {});
+      warning(0, "SWIFT RUNTIME BUG: unable to demangle type of field '%*s'. "
+                 "mangled type name is '%*s'\n",
+                 (int)name.size(), name.data(),
+                 (int)typeName.size(), typeName.data());
+    }
 
     callback(name, FieldType()
                        .withType(typeInfo)
@@ -1152,21 +1213,31 @@ void swift::swift_getFieldAt(
     return;
   }
 
-  ScopedLock guard(cache.SectionsLock);
   // Otherwise let's try to find it in one of the sections.
-  for (auto &section : cache.DynamicSections) {
+  for (auto &section : cache.DynamicSections.snapshot()) {
     for (const auto *descriptor : section) {
       if (isRequestedDescriptor(*descriptor))
         return;
     }
   }
 
-  for (const auto &section : cache.StaticSections) {
+  for (const auto &section : cache.StaticSections.snapshot()) {
     for (auto &descriptor : section) {
       if (isRequestedDescriptor(descriptor))
         return;
     }
   }
+
+  // If we failed to find the field descriptor metadata for the type, fall
+  // back to returning an empty tuple as a standin.
+  auto typeName = swift_getTypeName(base, /*qualified*/ true);
+  warning(0, "SWIFT RUNTIME BUG: unable to find field metadata for type '%*s'\n",
+             (int)typeName.length, typeName.data);
+  callback("unknown",
+           FieldType()
+             .withType(TypeInfo(&METADATA_SYM(EMPTY_TUPLE_MANGLING), {}))
+             .withIndirect(false)
+             .withWeak(false));
 }
 
 #define OVERRIDE_METADATALOOKUP COMPATIBILITY_OVERRIDE

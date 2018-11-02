@@ -362,7 +362,7 @@ bb0(%0 : @trivial $*ContainsNativeObject):
 
 // CHECK-LABEL: sil @non_box_assign_trivial
 // CHECK-NOT: load
-// CHECK: store
+// CHECK: assign
 // CHECK: return
 sil @non_box_assign_trivial : $@convention(thin) (@inout Bool, Bool) -> () {
 bb0(%0 : @trivial $*Bool, %1 : @trivial $Bool):
@@ -372,8 +372,8 @@ bb0(%0 : @trivial $*Bool, %1 : @trivial $Bool):
 }
 
 // CHECK-LABEL: sil @non_box_assign
-// CHECK: load
-// CHECK: store
+// CHECK-NOT: load
+// CHECK: assign
 // CHECK: return
 sil @non_box_assign : $@convention(thin) (@inout SomeClass, @owned SomeClass) -> () {
 bb0(%0 : @trivial $*SomeClass, %1 : @owned $SomeClass):
@@ -390,7 +390,6 @@ sil_global @int_global : $Int
 sil @test_tlc : $() -> () {
   %0 = global_addr @int_global : $*Int
   %1 = mark_uninitialized [var] %0 : $*Int
-
   %9 = tuple ()
   return %9 : $()
 }
@@ -542,4 +541,77 @@ bb2:
   dealloc_stack %5 : $*SomeClass // id: %20
   %23 = tuple ()                                  // user: %24
   return %23 : $()                                // id: %24
+}
+// CHECK: } // end sil function 'conditionalInitOrAssign'
+
+// Make sure that we use a dealloc_box on the path where we do not assign.
+//
+// CHECK-LABEL: sil @conditionalInitOrAssignAllocBox : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK: [[BOX:%.*]] = alloc_box
+//
+// CHECK: bb1:
+// CHECK:   destroy_value [[BOX]]
+// CHECK:   br bb3
+//
+// CHECK: bb2:
+// CHECK:   dealloc_box [[BOX]]
+// CHECK:   br bb3
+//
+// CHECK: bb3:
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'conditionalInitOrAssignAllocBox'
+sil @conditionalInitOrAssignAllocBox : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box $<τ_0_0> { var τ_0_0 } <SomeClass>
+  %5 = project_box %box : $<τ_0_0> { var τ_0_0 } <SomeClass>, 0
+  %7 = mark_uninitialized [var] %5 : $*SomeClass
+  %2 = function_ref @getSomeClass : $@convention(thin) () -> @owned SomeClass
+  cond_br undef, bb1, bb2
+
+// Value is stored into box and then destroyed.
+bb1:
+  %12 = apply %2() : $@convention(thin) () -> @owned SomeClass
+  assign %12 to %7 : $*SomeClass
+  destroy_value %box : $<τ_0_0> { var τ_0_0 } <SomeClass>
+  br bb3
+
+bb2:
+  destroy_value %box : $<τ_0_0> { var τ_0_0 } <SomeClass>
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// LLDB uses mark_uninitialized [var] in an unsupported way via an address to
+// pointer. LLDB shouldn't do this, but until it is removed and validated we
+// need a test for this.
+// CHECK-LABEL: sil @lldb_unsupported_markuninitialized_testcase : $@convention(thin) (UnsafeMutablePointer<Any>) -> () {
+// CHECK-NOT: mark_uninitialized [var]
+// CHECK: } // end sil function 'lldb_unsupported_markuninitialized_testcase'
+sil @lldb_unsupported_markuninitialized_testcase : $@convention(thin) (UnsafeMutablePointer<Any>) -> () {
+bb0(%0 : @trivial $UnsafeMutablePointer<Any>):
+  %2 = struct_extract %0 : $UnsafeMutablePointer<Any>, #UnsafeMutablePointer._rawValue
+  %3 = integer_literal $Builtin.Int64, 8
+  %4 = index_raw_pointer %2 : $Builtin.RawPointer, %3 : $Builtin.Int64
+  %5 = pointer_to_address %4 : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+  %6 = load [trivial] %5 : $*Builtin.RawPointer
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*Error
+  %8 = mark_uninitialized [var] %7 : $*Error
+  %9 = struct_extract %0 : $UnsafeMutablePointer<Any>, #UnsafeMutablePointer._rawValue
+  %10 = integer_literal $Builtin.Int64, 0
+  %11 = index_raw_pointer %9 : $Builtin.RawPointer, %10 : $Builtin.Int64
+  %12 = pointer_to_address %11 : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+  %13 = load [trivial] %12 : $*Builtin.RawPointer
+  %14 = pointer_to_address %13 : $Builtin.RawPointer to [strict] $*@thick SomeClass.Type
+  %15 = mark_uninitialized [var] %14 : $*@thick SomeClass.Type
+  %16 = metatype $@thick SomeClass.Type
+  %17 = begin_access [modify] [unsafe] %15 : $*@thick SomeClass.Type
+  assign %16 to %17 : $*@thick SomeClass.Type
+  end_access %17 : $*@thick SomeClass.Type
+  %9999 = tuple()
+  return %9999 : $()
 }

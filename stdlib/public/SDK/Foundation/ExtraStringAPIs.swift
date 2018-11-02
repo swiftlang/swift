@@ -16,7 +16,7 @@ extension String.UTF16View.Index {
   @available(swift, obsoleted: 4.0)
   public init(_ offset: Int) {
     _precondition(offset >= 0, "Negative UTF16 index offset not allowed")
-    self.init(_offset: offset)
+    self.init(encodedOffset: offset)
   }
 
   @available(swift, deprecated: 3.2)

@@ -19,7 +19,6 @@
 #define SWIFT_SIL_PROFILER_H
 
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/Stmt.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -93,9 +92,6 @@ public:
   const llvm::DenseMap<ASTNode, unsigned> &getRegionCounterMap() const {
     return RegionCounterMap;
   }
-
-  /// Increment the number of counter updates associated with this profiler.
-  void recordCounterUpdate();
 
 private:
   /// Map counters to ASTNodes and set them up for profiling the function.

@@ -135,6 +135,7 @@ IDENTIFIER(AssignmentPrecedence)
 IDENTIFIER(CastingPrecedence)
 IDENTIFIER(DefaultPrecedence)
 IDENTIFIER(FunctionArrowPrecedence)
+IDENTIFIER(NilCoalescingPrecedence)
 IDENTIFIER(TernaryPrecedence)
 
 // Builtins and literals

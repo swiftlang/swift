@@ -24,6 +24,8 @@ namespace llvm {
 
 namespace swift {
   class SILDeserializer {
+    using TypeID = serialization::TypeID;
+    
     ModuleFile *MF;
     SILModule &SILMod;
     SerializedSILLoader::Callback *Callback;
@@ -79,6 +81,12 @@ namespace swift {
     SILFunction *readSILFunction(serialization::DeclID, SILFunction *InFunc,
                                  StringRef Name, bool declarationOnly,
                                  bool errorIfEmptyBody = true);
+    /// Read a SIL function.
+    llvm::Expected<SILFunction *>
+    readSILFunctionChecked(serialization::DeclID, SILFunction *InFunc,
+                           StringRef Name, bool declarationOnly,
+                           bool errorIfEmptyBody = true);
+
     /// Read a SIL basic block within a given SIL function.
     SILBasicBlock *readSILBasicBlock(SILFunction *Fn,
                                      SILBasicBlock *Prev,
@@ -112,7 +120,7 @@ namespace swift {
     readDefaultWitnessTable(serialization::DeclID,
                             SILDefaultWitnessTable *existingWt);
 
-    KeyPathPatternComponent
+    Optional<KeyPathPatternComponent>
     readKeyPathComponent(ArrayRef<uint64_t> ListOfValues, unsigned &nextValue);
     
 public:

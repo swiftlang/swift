@@ -24,8 +24,8 @@ from gyb_stdlib_support import (
 
 import SwiftShims
 
-@inlinable // FIXME(sil-serialize-all)
 @inline(never)
+@usableFromInline
 internal func _abstract(
   file: StaticString = #file,
   line: UInt = #line
@@ -409,10 +409,12 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
 @_fixed_layout
 @usableFromInline
-internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Element>
+internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Element>
 {
+  @usableFromInline
   internal typealias Element = S.Element
 
+  @inline(__always)
   @inlinable
   internal override func _makeIterator() -> AnyIterator<Element> {
     return AnyIterator(_base.makeIterator())
@@ -710,6 +712,7 @@ extension Any${Kind} {
 %   else:
   /// Returns an iterator over the elements of this collection.
 %   end
+  @inline(__always)
   @inlinable
   public func makeIterator() -> Iterator {
     return _box._makeIterator()
@@ -1155,3 +1158,7 @@ extension ${Self}: _AnyCollectionProtocol {
   }
 }
 % end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

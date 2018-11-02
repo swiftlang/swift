@@ -614,6 +614,20 @@ SequenceTypeTests.test("contains/Predicate") {
   }
 }
 
+SequenceTypeTests.test("allSatisfy/Predicate") {
+  for test in findTests {
+    let s = MinimalSequence<OpaqueValue<Int>>(
+      elements: test.sequence.map { OpaqueValue($0.value) })
+    expectEqual(
+      test.expected == nil,
+      s.allSatisfy { $0.value != test.element.value },
+      stackTrace: SourceLocStack().with(test.loc))
+    expectEqual(
+      test.expectedLeftoverSequence.map { $0.value }, s.map { $0.value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // reduce()
 //===----------------------------------------------------------------------===//
@@ -680,7 +694,7 @@ SequenceTypeTests.test("reverse/WhereIndexIsRandomAccess,RandomAccessReverseView
       elements: test.sequence.map(OpaqueValue.init))
     var result = s.reversed()
     expectType(
-      ReversedRandomAccessCollection<MinimalRandomAccessCollection<OpaqueValue<Int>>>.self,
+      ReversedCollection<MinimalRandomAccessCollection<OpaqueValue<Int>>>.self,
       &result)
     expectEqual(
       test.expected, result.map { $0.value },
@@ -910,7 +924,7 @@ SequenceTypeTests.test("flatMap/Sequence/TransformProducesOptional") {
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
-      var result = s.flatMap {
+      var result = s.compactMap {
         (element: OpaqueValue<Int>) -> OpaqueValue<Int32>? in
         _blackHole(closureLifetimeTracker)
         timesClosureWasCalled += 1
@@ -947,7 +961,7 @@ SequenceTypeTests.test("forEach/dispatch") {
 //===----------------------------------------------------------------------===//
 
 SequenceTypeTests.test("dropFirst/dispatch") {
-  var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
   _ = tester.dropFirst(1)
   expectCustomizable(tester, tester.log.dropFirst)
 }
@@ -957,7 +971,7 @@ SequenceTypeTests.test("dropFirst/dispatch") {
 //===----------------------------------------------------------------------===//
 
 SequenceTypeTests.test("dropLast/dispatch") {
-  var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
   _ = tester.dropLast(1)
   expectCustomizable(tester, tester.log.dropLast)
 }
@@ -967,8 +981,8 @@ SequenceTypeTests.test("dropLast/dispatch") {
 //===----------------------------------------------------------------------===//
 
 SequenceTypeTests.test("drop(while:)/dispatch") {
-  var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  tester.drop { _ in return false }
+  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  _ = tester.drop { _ in return false }
   expectCustomizable(tester, tester.log.dropWhile)
 }
 
@@ -977,7 +991,7 @@ SequenceTypeTests.test("drop(while:)/dispatch") {
 //===----------------------------------------------------------------------===//
 
 SequenceTypeTests.test("prefix/dispatch") {
-  var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
   _ = tester.prefix(1)
   expectCustomizable(tester, tester.log.prefixMaxLength)
 }
@@ -992,8 +1006,8 @@ SequenceTypeTests.test("prefix/drop/dispatch") {
 //===----------------------------------------------------------------------===//
 
 SequenceTypeTests.test("prefix(while:)/dispatch") {
-  var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  tester.prefix { _ in return false }
+  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  _ = tester.prefix { _ in return false }
   expectCustomizable(tester, tester.log.prefixWhile)
 }
 
@@ -1002,7 +1016,7 @@ SequenceTypeTests.test("prefix(while:)/dispatch") {
 //===----------------------------------------------------------------------===//
 
 SequenceTypeTests.test("suffix/dispatch") {
-  var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
   _ = tester.suffix(1)
   expectCustomizable(tester, tester.log.suffixMaxLength)
 }
@@ -1012,7 +1026,7 @@ SequenceTypeTests.test("suffix/dispatch") {
 //===----------------------------------------------------------------------===//
 
 SequenceTypeTests.test("Sequence/split/dispatch") {
-  var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
   _ = tester.split { $0.value == 1 }
   expectCustomizable(tester, tester.log.split)
 }

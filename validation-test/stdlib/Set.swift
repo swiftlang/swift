@@ -3,9 +3,9 @@
 // RUN: %gyb %s -o %t/main.swift
 // RUN: if [ %target-runtime == "objc" ]; then \
 // RUN:   %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o; \
-// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Set -Xfrontend -disable-access-control; \
+// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Set -Xfrontend -disable-access-control -swift-version 3; \
 // RUN: else \
-// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -o %t/Set -Xfrontend -disable-access-control; \
+// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -o %t/Set -Xfrontend -disable-access-control -swift-version 3; \
 // RUN: fi
 //
 // RUN: %line-directive %t/main.swift -- %target-run %t/Set
@@ -3470,6 +3470,27 @@ SetTestSuite.test("Hashable") {
   let ss11 = Set([Set([2020] as [Int]), Set([3030] as [Int]), Set([2020] as [Int])])
   let ss2 = Set([Set([9090] as [Int])])
   checkHashable([ss1, ss11, ss2], equalityOracle: { $0 == $1 })
+
+  // Set should hash itself in a way that ensures instances get correctly
+  // delineated even when they are nested in other commutative collections.
+  // These are different Sets, so they should produce different hashes:
+  let remix: [Set<Set<Int>>] = [
+    [[1, 2], [3, 4]],
+    [[1, 3], [2, 4]],
+    [[1, 4], [2, 3]],
+  ]
+  checkHashable(remix, equalityOracle: { $0 == $1 })
+
+  // Set ordering is not guaranteed to be consistent across equal instances. In
+  // particular, ordering is highly sensitive to the size of the allocated
+  // storage buffer.
+  var variants: [Set<Int>] = []
+  for i in 4 ..< 12 {
+    var set: Set<Int> = [1, 2, 3, 4, 5, 6]
+    set.reserveCapacity(1 << i)
+    variants.append(set)
+  }
+  checkHashable(variants, equalityOracle: { _, _ in true })
 }
 
 //===---

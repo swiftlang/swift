@@ -26,14 +26,14 @@ protocol MyArrayBufferProtocol : MutableCollection, RandomAccessCollection {
   mutating func myReplace<C>(
     _ subRange: Range<Int>,
     with newValues: C
-  ) where C : Collection, C.Iterator.Element == Element
+  ) where C : Collection, C.Element == Element
 }
 
 extension Array : MyArrayBufferProtocol {
   mutating func myReplace<C>(
     _ subRange: Range<Int>,
     with newValues: C
-  ) where C : Collection, C.Iterator.Element == Element {
+  ) where C : Collection, C.Element == Element {
     replaceSubrange(subRange, with: newValues)
   }
 }
@@ -42,7 +42,7 @@ func myArrayReplace<
   B: MyArrayBufferProtocol,
   C: Collection
 >(_ target: inout B, _ subRange: Range<Int>, _ newValues: C)
-  where C.Iterator.Element == B.Element, B.Index == Int {
+  where C.Element == B.Element, B.Index == Int {
   target.myReplace(subRange, with: newValues)
 }
 

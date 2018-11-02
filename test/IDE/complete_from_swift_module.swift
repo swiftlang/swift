@@ -54,6 +54,7 @@ func testCompleteModuleQualified2() {
   foo_swift_module.FooSwiftStruct.#^MODULE_QUALIFIED_2^#
 }
 // MODULE_QUALIFIED_2: Begin completions
+// MODULE_QUALIFIED_2-NEXT: Keyword[self]/CurrNominal: self[#FooSwiftStruct.Type#]; name=self
 // MODULE_QUALIFIED_2-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc({#self: FooSwiftStruct#})[#() -> Void#]{{; name=.+$}}
 // MODULE_QUALIFIED_2-NEXT: Decl[Constructor]/CurrNominal: init()[#FooSwiftStruct#]{{; name=.+$}}
 // MODULE_QUALIFIED_2-NEXT: End completions
@@ -72,6 +73,7 @@ func testCompleteModuleQualified4() {
 // MODULE_QUALIFIED_4: Begin completions
 // MODULE_QUALIFIED_4-NEXT: Decl[Constructor]/CurrNominal: ({#t: _#}, {#u: _#})[#BarGenericSwiftStruct2<_, _>#]; name=(t: _, u: _)
 // MODULE_QUALIFIED_4-NEXT: Decl[InstanceMethod]/CurrNominal: .bar2InstanceFunc({#self: BarGenericSwiftStruct2<_, _>#})[#() -> Void#]; name=bar2InstanceFunc(BarGenericSwiftStruct2<_, _>)
+// MODULE_QUALIFIED_4-NEXT: Keyword[self]/CurrNominal: .self[#BarGenericSwiftStruct2<_, _>.Type#]; name=self
 // MODULE_QUALIFIED_4-NEXT: End completions
 
 func testCompleteModuleQualified5() {

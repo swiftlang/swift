@@ -25,6 +25,8 @@ Windows.
 - Using the latest Visual Studio version is recommended (tested with Visual
   Studio 2017 - Version 15.5.5). Swift may fail to build with older C++ 
   compilers.
+- Note that the release version of Swift on Windows may crash when you try to compile a 
+  Swift program. See bug report [SR-7867](https://bugs.swift.org/browse/SR-7867).
 
 ### 1. Install dependencies
 1. Latest version (2.7.12 tested) of [Python
@@ -44,6 +46,7 @@ Windows.
 1. Clone `apple/swift-cmark` into a folder named `cmark`
 1. Clone `apple/swift-clang` into a folder named `clang`
 1. Clone `apple/swift-llvm` into a folder named `llvm`
+1. Clone `apple/swift-compiler-rt` into a folder named `compiler-rt`
 1. Clone `apple/swift` into a folder named `swift`
 - Currently, other repositories in the Swift project have not been tested and
   may not be supported.
@@ -51,7 +54,7 @@ Windows.
 ### 3. Build ICU
 1. Download and extract the [ICU source
 code](http://site.icu-project.org/download) to a folder named `icu` in the same
-directory as the other Swift project repositories.
+directory as the other Swift project repositories (tested with ICU versions 55.1 and 59.1).
 1. Open `src/win32/allinone.sln` in Visual Studio.
 1. Make sure to select the correct architecture from the drop-down in Visual
 Studio.
@@ -81,32 +84,37 @@ VsDevCmd -arch=x86
 set swift_source_dir=path-to-directory-containing-all-cloned-repositories
 ```
 
+- Decide whether you want to build a release or debug version of Swift on Windows and 
+  replace the `CMAKE_BUILD_TYPE` parameter in the build steps below with the correct value 
+  (`Debug`, `RelWithDebInfoAssert` or `Release`) to avoid conflicts between the debug and 
+  non-debug version of the MSCRT library.
+
 ### 5. Build CMark
 - This must be done from within a developer command prompt. CMark is a fairly
   small project and should only take a few minutes to build.
 ```cmd
-mkdir "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/cmark-windows-amd64"
-pushd "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/cmark-windows-amd64"
-cmake -G "Ninja" "%swift_source_dir%/cmark"
+mkdir "%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64"
+pushd "%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64"
+cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Debug "%swift_source_dir%/cmark"
 popd
-cmake --build "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/cmark-windows-amd64/"
+cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64/"
 ```
 
 ### 6. Build LLVM/Clang/Compiler-RT
 - This must be done from within a developer command prompt. LLVM and Clang are
   large projects, so building might take a few hours. Make sure that the build
-  type (e.g. Debug, Release, RelWithDebInfoAssert) for LLVM/Clang matches the
+  type (e.g. `Debug`, `Release`, `RelWithDebInfoAssert`) for LLVM/Clang matches the
   build type for Swift.
 - Optionally, you can omit building compiler-rt by removing all lines referring
   to `compiler-rt` below, which should give faster build times.
 ```cmd
 mklink /J "%swift_source_dir%/llvm/tools/clang" "%swift_source_dir%/clang"
 mklink /J "%swift_source_dir%/llvm/tools/compiler-rt" "%swift_source_dir%/compiler-rt"
-mkdir "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64"
-pushd "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64"
+mkdir "%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"
+pushd "%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"
 cmake -G "Ninja"^
  -DLLVM_ENABLE_ASSERTIONS=TRUE^
- -DCMAKE_BUILD_TYPE=RelWithDebInfo^
+ -DCMAKE_BUILD_TYPE=Debug^
  -DLLVM_TOOL_SWIFT_BUILD=NO^
  -DLLVM_INCLUDE_DOCS=TRUE^
  -DLLVM_TOOL_COMPILER_RT_BUILD=TRUE^
@@ -115,19 +123,19 @@ cmake -G "Ninja"^
  -DLLVM_TARGETS_TO_BUILD=X86^
  "%swift_source_dir%/llvm"
 popd
-cmake --build "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64"
+cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"
 ```
 - Store the LLVM `bin` directory in an environment variable so it can be used
   to build Swift. Assuming you followed the instructions exactly, the path
   below is correct, but it may be different based on your build variant and
   platform, so double check.
 ```cmd
-set llvm_bin_dir="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64/bin"
+set llvm_bin_dir="%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64/bin"
 ```
 
 ### 7. Build Swift
-- This must be done from within a developer command prompt and could take up to
-  two hours depending on your system.
+- This must be done from within a developer command prompt and could take hours 
+  depending on your system.
 - You may need to adjust the `SWIFT_WINDOWS_LIB_DIRECTORY` parameter depending on
   your target platform or Windows SDK version.
 ```cmd
@@ -136,12 +144,12 @@ pushd "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64"
 cmake -G "Ninja" "%swift_source_dir%/swift"^
  -DCMAKE_BUILD_TYPE=Debug^
  -DSWIFT_PATH_TO_CMARK_SOURCE="%swift_source_dir%/cmark"^
- -DSWIFT_PATH_TO_CMARK_BUILD="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/cmark-windows-amd64"^
- -DSWIFT_CMARK_LIBRARY_DIR="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/cmark-windows-amd64/src"^
+ -DSWIFT_PATH_TO_CMARK_BUILD="%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64"^
+ -DSWIFT_CMARK_LIBRARY_DIR="%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64/src"^
  -DSWIFT_PATH_TO_LLVM_SOURCE="%swift_source_dir%/llvm"^
- -DSWIFT_PATH_TO_LLVM_BUILD="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64"^
+ -DSWIFT_PATH_TO_LLVM_BUILD="%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"^
  -DSWIFT_PATH_TO_CLANG_SOURCE="%swift_source_dir%/llvm/tools/clang"^
- -DSWIFT_PATH_TO_CLANG_BUILD="%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/llvm-windows-amd64"^
+ -DSWIFT_PATH_TO_CLANG_BUILD="%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"^
  -DICU_UC_INCLUDE_DIR="%swift_source_dir%/icu/include"^
  -DICU_UC_LIBRARY_DIRS="%swift_source_dir%/icu/lib64"^
  -DICU_I18N_INCLUDE_DIR="%swift_source_dir%/icu/include"^
@@ -153,7 +161,12 @@ cmake -G "Ninja" "%swift_source_dir%/swift"^
  -DCMAKE_C_COMPILER="%llvm_bin_dir%/clang-cl.exe"^
  -DCMAKE_CXX_COMPILER="%llvm_bin_dir%/clang-cl.exe"^
  -DCMAKE_C_FLAGS="-fms-compatibility-version=19.00 /Z7"^
- -DCMAKE_CXX_FLAGS="-fms-compatibility-version=19.00 -Z7" ^
+ -DCMAKE_CXX_FLAGS="-fms-compatibility-version=19.00 -Z7"^
+ -DCMAKE_EXE_LINKER_FLAGS:STRING="/INCREMENTAL:NO"^
+ -DCMAKE_MODULE_LINKER_FLAGS="/INCREMENTAL:NO"^
+ -DCMAKE_SHARED_LINKER_FLAGS="/INCREMENTAL:NO"^
+ -DCMAKE_STATIC_LINKER_FLAGS="/INCREMENTAL:NO"^
+ -DCMAKE_INSTALL_PREFIX="C:/Program Files (x86)/Swift"^
  -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER=FALSE
 popd
 cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64"
@@ -171,6 +184,44 @@ cmake -G "Visual Studio 15" "%swift_source_dir%/swift"^
  -DCMAKE_GENERATOR_PLATFORM="x64"^
  ...
 ```
+
+### 8. Build lldb
+- This must be done from within a developer command prompt and could take hours
+  depending on your system.
+```cmd
+mkdir "%swift_source_dir%/build/Ninja-DebugAssert/lldb-windows-amd64"
+pushd "%swift_source_dir%/build/Ninja-DebugAssert/lldb-windows-amd64"
+cmake -G "Ninja" "%swift_source_dir%/lldb"^
+  -DCMAKE_BUILD_TYPE=Debug^
+  -DLLDB_PATH_TO_CMARK_SOURCE="%swift_source_dir%/cmark"^
+  -DLLDB_PATH_TO_CMARK_BUILD="%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64"^
+  -DLLDB_PATH_TO_LLVM_SOURCE="%swift_source_dir%/llvm"^
+  -DLLDB_PATH_TO_LLVM_BUILD="%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"^
+  -DLLDB_PATH_TO_CLANG_SOURCE="%swift_source_dir%/clang"^
+  -DLLDB_PATH_TO_CLANG_BUILD="%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"^
+  -DLLDB_PATH_TO_SWIFT_SOURCE="%swift_source_dir%/swift"^
+  -DLLDB_PATH_TO_SWIFT_BUILD="%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64"^
+  -DCMAKE_C_COMPILER="%llvm_bin_dir%/clang-cl.exe"^
+  -DCMAKE_CXX_COMPILER="%llvm_bin_dir%/clang-cl.exe"^
+  -DCMAKE_C_FLAGS="-fms-compatibility-version=19.00 /Z7"^
+  -DCMAKE_CXX_FLAGS="-fms-compatibility-version=19.00 -Z7 -Wno-c++98-compat"^
+  -DLLVM_ENABLE_ASSERTIONS=YES
+popd
+cmake --build "%swift_source_dir%/build/Ninja-RelWithDebInfoAssert/lldb-windows-amd64"
+```
+
+### 9. Install Swift on Windows
+
+- Run ninja install:
+```cmd 
+pushd "%swift_source_dir%/build/Ninja-DebugAssert/swift-windows-amd64"
+ninja install
+popd
+```
+- Add the Swift on Windows binaries path (`C:\Program Files (x86)\Swift\bin`)  to the 
+  `Path` environment variable.
+- Add the Swift on Windows library path (`C:\Program Files (x86)\Swift\lib\swift\windows`) 
+  to the `Path` environment variable.
 
 ## MSVC
 

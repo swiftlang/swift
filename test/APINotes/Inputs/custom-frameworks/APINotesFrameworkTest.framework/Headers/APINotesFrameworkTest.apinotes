@@ -41,10 +41,10 @@ Classes:
       - Name: accessorsOnlyWeak
         PropertyKind:    Instance
         SwiftImportAsAccessors: true
-      - Name: accessorsOnlyExceptInVersion3
+      - Name: accessorsOnlyExceptInVersion4
         PropertyKind:    Instance
         SwiftImportAsAccessors: true
-      - Name: accessorsOnlyForClassExceptInVersion3
+      - Name: accessorsOnlyForClassExceptInVersion4
         PropertyKind:    Class
         SwiftImportAsAccessors: true
       - Name: accessorsOnlyWithNewType
@@ -63,7 +63,7 @@ Functions:
   - Name: jumpToLocation
     SwiftName: 'jumpTo(x:y:z:)'
 Tags:
-  - Name: InnerInSwift4
+  - Name: InnerInSwift5
     SwiftName: Outer.Inner
 Globals:
   - Name: multiVersionedGlobal34Notes
@@ -84,146 +84,6 @@ Globals:
     SwiftName: multiVersionedGlobal45Both_NEW
 SwiftVersions:
   - Version: 3.0
-    Classes:
-      - Name: PrintingInterference
-        Methods:
-          - Selector: 'print:'
-            MethodKind: Instance
-            SwiftName: 'print(_:)'
-      - Name: PrintingRenamed
-        Methods:
-          - Selector: 'print'
-            MethodKind: Instance
-            SwiftName: 'print()'
-          - Selector: 'print:'
-            MethodKind: Instance
-            SwiftName: 'print(_:)'
-          - Selector: 'print:options:'
-            MethodKind: Instance
-            SwiftName: 'print(_:options:)'
-          - Selector: 'print'
-            MethodKind: Class
-            SwiftName: 'print()'
-          - Selector: 'print:'
-            MethodKind: Class
-            SwiftName: 'print(_:)'
-          - Selector: 'print:options:'
-            MethodKind: Class
-            SwiftName: 'print(_:options:)'
-      - Name: TestProperties
-        Methods:
-          - Selector: accessorsOnlyRenamedRetyped
-            MethodKind: Instance
-            SwiftName: 'renamedAndRetyped()'
-            ResultType: 'id _Nonnull'
-          - Selector: 'setAccessorsOnlyRenamedRetyped:'
-            MethodKind: Instance
-            SwiftName: 'setRenamedAndRetyped(_:)'
-            Parameters:
-              - Position: 0
-                Type: 'id _Nullable'
-          - Selector: accessorsOnlyRenamedRetypedClass
-            MethodKind: Class
-            SwiftName: 'renamedAndRetypedClass()'
-            ResultType: 'id _Nonnull'
-          - Selector: 'setAccessorsOnlyRenamedRetypedClass:'
-            MethodKind: Class
-            SwiftName: 'setRenamedAndRetypedClass(_:)'
-            Parameters:
-              - Position: 0
-                Type: 'id _Nullable'
-        Properties:
-          - Name: accessorsOnlyInVersion3
-            PropertyKind:    Instance
-            SwiftImportAsAccessors: true
-          - Name: accessorsOnlyForClassInVersion3
-            PropertyKind:    Class
-            SwiftImportAsAccessors: true
-          - Name: accessorsOnlyExceptInVersion3
-            PropertyKind:    Instance
-            SwiftImportAsAccessors: false
-          - Name: accessorsOnlyForClassExceptInVersion3
-            PropertyKind:    Class
-            SwiftImportAsAccessors: false
-          - Name: accessorsOnlyRenamedRetyped
-            PropertyKind:    Instance
-            SwiftImportAsAccessors: true
-          - Name: accessorsOnlyRenamedRetypedClass
-            PropertyKind:    Class
-            SwiftImportAsAccessors: true
-      - Name: NewlyGenericSub
-        SwiftImportAsNonGeneric: true
-      - Name: RenamedGeneric
-        SwiftName: OldRenamedGeneric
-      - Name: ClassWithManyRenames
-        Methods:
-          - Selector: "classWithManyRenamesForInt:"
-            MethodKind: Class
-            SwiftName: "init(swift3Factory:)"
-          - Selector: "initWithBoolean:"
-            MethodKind: Instance
-            SwiftName: "init(swift3Boolean:)"
-          - Selector: "doImportantThings"
-            MethodKind: Instance
-            SwiftName: "swift3DoImportantThings()"
-        Properties:
-          - Name: "importantClassProperty"
-            PropertyKind: Class
-            SwiftName: "swift3ClassProperty"
-          - Name: "importantInstanceProperty"
-            PropertyKind: Instance
-            SwiftName: "swift3InstanceProperty"
-    Protocols:
-      - Name: ProtoWithVersionedUnavailableMember
-        Methods:
-          - Selector: requirement
-            MethodKind: Instance
-            ResultType: 'ForwardClass * _Nullable'
-      - Name: ProtoWithManyRenames
-        Methods:
-          - Selector: "initWithBoolean:"
-            MethodKind: Instance
-            SwiftName: "init(swift3Boolean:)"
-          - Selector: "doImportantThings"
-            MethodKind: Instance
-            SwiftName: "swift3DoImportantThings()"
-        Properties:
-          - Name: "importantClassProperty"
-            PropertyKind: Class
-            SwiftName: "swift3ClassProperty"
-    Functions:
-      - Name: acceptDoublePointer
-        SwiftName: 'acceptPointer(_:)'
-        Nullability: [ O ]
-      - Name: normallyUnchanged
-        SwiftName: normallyUnchangedButChangedInSwift3()
-      - Name: normallyChangedOriginal
-        SwiftName: normallyChangedButSpecialInSwift3()
-    Tags:
-      - Name: SomeCStruct
-        SwiftName: ImportantCStruct
-      - Name: InnerInSwift4
-        SwiftName: InnerInSwift4
-      - Name: NormallyUnchangedWrapper
-        SwiftName: NormallyUnchangedButChangedInSwift3Wrapper
-      - Name: NormallyChangedOriginalWrapper
-        SwiftName: NormallyChangedButSpecialInSwift3Wrapper
-    Typedefs:
-      - Name: SomeCAlias
-        SwiftName: ImportantCAlias
-      - Name: EnclosingStructIdentifier
-        SwiftName: EnclosingStructIdentifier
-    Enumerators:
-      - Name: AnonymousEnumRenamed
-        SwiftName: AnonymousEnumRenamedSwift3
-      - Name: UnknownEnumRenamed
-        SwiftName: UnknownEnumRenamedSwift3
-      - Name: TrueEnumRenamed
-        SwiftName: renamedSwift3
-      - Name: TrueEnumAliasRenamed
-        SwiftName: aliasRenamedSwift3
-      - Name: OptionyEnumRenamed
-        SwiftName: renamedSwift3
     Globals:
       - Name: multiVersionedGlobal34
         SwiftName: multiVersionedGlobal34_3
@@ -259,7 +119,145 @@ SwiftVersions:
         SwiftName: multiVersionedGlobal45Notes_5
       - Name: multiVersionedGlobal45Both
         SwiftName: multiVersionedGlobal45Both_5
-  - Version: 4 # Versions are deliberately ordered as "3, 5, 4.2, 4" to catch bugs.
+  - Version: 4 # Versions are deliberately ordered as "3, 5, 4, 4.2" to catch bugs.
+    Classes:
+      - Name: ClassWithManyRenames
+        Methods:
+          - Selector: "classWithManyRenamesForInt:"
+            MethodKind: Class
+            SwiftName: "init(swift4Factory:)"
+          - Selector: "initWithBoolean:"
+            MethodKind: Instance
+            SwiftName: "init(swift4Boolean:)"
+          - Selector: "doImportantThings"
+            MethodKind: Instance
+            SwiftName: "swift4DoImportantThings()"
+        Properties:
+          - Name: "importantClassProperty"
+            PropertyKind: Class
+            SwiftName: "swift4ClassProperty"
+          - Name: "importantInstanceProperty"
+            PropertyKind: Instance
+            SwiftName: "swift4InstanceProperty"
+      - Name: NewlyGenericSub
+        SwiftImportAsNonGeneric: true
+      - Name: PrintingInterference
+        Methods:
+          - Selector: 'print:'
+            MethodKind: Instance
+            SwiftName: 'print(_:)'
+      - Name: PrintingRenamed
+        Methods:
+          - Selector: 'print'
+            MethodKind: Instance
+            SwiftName: 'print()'
+          - Selector: 'print:'
+            MethodKind: Instance
+            SwiftName: 'print(_:)'
+          - Selector: 'print:options:'
+            MethodKind: Instance
+            SwiftName: 'print(_:options:)'
+          - Selector: 'print'
+            MethodKind: Class
+            SwiftName: 'print()'
+          - Selector: 'print:'
+            MethodKind: Class
+            SwiftName: 'print(_:)'
+          - Selector: 'print:options:'
+            MethodKind: Class
+            SwiftName: 'print(_:options:)'
+      - Name: RenamedGeneric
+        SwiftName: OldRenamedGeneric
+      - Name: TestProperties
+        Methods:
+          - Selector: accessorsOnlyRenamedRetyped
+            MethodKind: Instance
+            SwiftName: 'renamedAndRetyped()'
+            ResultType: 'id _Nonnull'
+          - Selector: 'setAccessorsOnlyRenamedRetyped:'
+            MethodKind: Instance
+            SwiftName: 'setRenamedAndRetyped(_:)'
+            Parameters:
+              - Position: 0
+                Type: 'id _Nullable'
+          - Selector: accessorsOnlyRenamedRetypedClass
+            MethodKind: Class
+            SwiftName: 'renamedAndRetypedClass()'
+            ResultType: 'id _Nonnull'
+          - Selector: 'setAccessorsOnlyRenamedRetypedClass:'
+            MethodKind: Class
+            SwiftName: 'setRenamedAndRetypedClass(_:)'
+            Parameters:
+              - Position: 0
+                Type: 'id _Nullable'
+        Properties:
+          - Name: accessorsOnlyInVersion4
+            PropertyKind:    Instance
+            SwiftImportAsAccessors: true
+          - Name: accessorsOnlyForClassInVersion4
+            PropertyKind:    Class
+            SwiftImportAsAccessors: true
+          - Name: accessorsOnlyExceptInVersion4
+            PropertyKind:    Instance
+            SwiftImportAsAccessors: false
+          - Name: accessorsOnlyForClassExceptInVersion4
+            PropertyKind:    Class
+            SwiftImportAsAccessors: false
+          - Name: accessorsOnlyRenamedRetyped
+            PropertyKind:    Instance
+            SwiftImportAsAccessors: true
+          - Name: accessorsOnlyRenamedRetypedClass
+            PropertyKind:    Class
+            SwiftImportAsAccessors: true
+    Protocols:
+      - Name: ProtoWithManyRenames
+        Methods:
+          - Selector: "initWithBoolean:"
+            MethodKind: Instance
+            SwiftName: "init(swift4Boolean:)"
+          - Selector: "doImportantThings"
+            MethodKind: Instance
+            SwiftName: "swift4DoImportantThings()"
+        Properties:
+          - Name: "importantClassProperty"
+            PropertyKind: Class
+            SwiftName: "swift4ClassProperty"
+      - Name: ProtoWithVersionedUnavailableMember
+        Methods:
+          - Selector: requirement
+            MethodKind: Instance
+            ResultType: 'ForwardClass * _Nullable'
+    Tags:
+      - Name: InnerInSwift5
+        SwiftName: InnerInSwift5
+      - Name: NormallyChangedOriginalWrapper
+        SwiftName: NormallyChangedButSpecialInSwift4Wrapper
+      - Name: NormallyUnchangedWrapper
+        SwiftName: NormallyUnchangedButChangedInSwift4Wrapper
+      - Name: SomeCStruct
+        SwiftName: ImportantCStruct
+    Enumerators:
+      - Name: AnonymousEnumRenamed
+        SwiftName: AnonymousEnumRenamedSwift4
+      - Name: UnknownEnumRenamed
+        SwiftName: UnknownEnumRenamedSwift4
+      - Name: TrueEnumRenamed
+        SwiftName: renamedSwift4
+      - Name: TrueEnumAliasRenamed
+        SwiftName: aliasRenamedSwift4
+      - Name: OptionyEnumRenamed
+        SwiftName: renamedSwift4
+    Typedefs:
+      - Name: SomeCAlias
+        SwiftName: ImportantCAlias
+    Functions:
+      - Name: acceptDoublePointer
+        SwiftName: 'acceptPointer(_:)'
+        Nullability: [ O ]
+      - Name: normallyUnchanged
+        SwiftName: normallyUnchangedButChangedInSwift4()
+      - Name: normallyChangedOriginal
+        SwiftName: normallyChangedButSpecialInSwift4()
     Globals:
       - Name: multiVersionedGlobal34
         SwiftName: multiVersionedGlobal34_4

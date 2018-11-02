@@ -88,23 +88,6 @@ extension UnicodeScalar {
     return 0 != __swift_stdlib_unorm2_hasBoundaryBefore(
       _Normalization._nfcNormalizer, value)
   }
-
-  // Whether the supported version of Unicode has assigned a code point to this
-  // value.
-  internal var _isDefined: Bool {
-    return __swift_stdlib_u_isdefined(Int32(self.value)) != 0
-  }
-
-  // A property tracked in ICU regarding the scalar's potential non-normality;
-  // this is equivalent to whether quickCheck=NO. A subset of such scalars may
-  // expand under NFC normalization, and a subset of those may expand into
-  // multiple segments.
-  internal var _hasFullCompExclusion: Bool {
-    _sanityCheck(Int32(exactly: self.value) != nil, "top bit shouldn't be set")
-    let value = Int32(bitPattern: self.value)
-    let prop = __swift_stdlib_UCHAR_FULL_COMPOSITION_EXCLUSION
-    return __swift_stdlib_u_hasBinaryProperty(value, prop) != 0
-  }
 }
 
 extension _Normalization {

@@ -42,9 +42,10 @@ namespace irgen {
 template <class Impl>
 class ResilientTypeInfo : public WitnessSizedTypeInfo<Impl> {
 protected:
-  ResilientTypeInfo(llvm::Type *type)
+  ResilientTypeInfo(llvm::Type *type, IsABIAccessible_t abiAccessible)
     : WitnessSizedTypeInfo<Impl>(type, Alignment(1),
-                                 IsNotPOD, IsNotBitwiseTakable) {}
+                                 IsNotPOD, IsNotBitwiseTakable,
+                                 abiAccessible) {}
 
 public:
   void assignWithCopy(IRGenFunction &IGF, Address dest, Address src, SILType T,
@@ -84,13 +85,6 @@ public:
                                    Address dest, Address src,
                                    SILType T) const override {
     auto addr = emitInitializeBufferWithCopyOfBufferCall(IGF, T, dest, src);
-    return this->getAddressForPointer(addr);
-  }
-
-  Address initializeBufferWithTakeOfBuffer(IRGenFunction &IGF,
-                                   Address dest, Address src,
-                                   SILType T) const override {
-    auto addr = emitInitializeBufferWithTakeOfBufferCall(IGF, T, dest, src);
     return this->getAddressForPointer(addr);
   }
 

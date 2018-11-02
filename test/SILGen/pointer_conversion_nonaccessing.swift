@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 4 -enable-sil-ownership -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -swift-version 4 -enable-sil-ownership %s | %FileCheck %s
 
 // rdar://33265254
 

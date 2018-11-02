@@ -222,6 +222,11 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 
 typealias GenericAlias<T, U> = MyAlias<T, U> where T: P1
 
+enum E7: String {
+    case a = "\u{001B}"
+    case b = "\u{66}"
+}
+
 // REQUIRES: objc_interop
 // RUN: %empty-directory(%t.tmp)
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -752,3 +757,11 @@ typealias GenericAlias<T, U> = MyAlias<T, U> where T: P1
 // RUN: %sourcekitd-test -req=cursor -pos=223:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK91 %s
 // CHECK91: <Declaration>typealias GenericAlias&lt;T, U&gt; = <Type usr="s:11cursor_info7MyAliasa">MyAlias</Type>&lt;<Type usr="s:11cursor_info12GenericAliasa1Txmfp">T</Type>, <Type usr="s:11cursor_info12GenericAliasa1Uq_mfp">U</Type>&gt; where T : <Type usr="s:11cursor_info2P1P">P1</Type></Declaration>
 // CHECK91-NEXT: <decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>GenericAlias</decl.name>&lt;<decl.generic_type_param usr="s:11cursor_info12GenericAliasa1Txmfp"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="s:11cursor_info12GenericAliasa1Uq_mfp"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt; = <ref.typealias usr="s:11cursor_info7MyAliasa">MyAlias</ref.typealias>&lt;<ref.generic_type_param usr="s:11cursor_info12GenericAliasa1Txmfp">T</ref.generic_type_param>, <ref.generic_type_param usr="s:11cursor_info12GenericAliasa1Uq_mfp">U</ref.generic_type_param>&gt; <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>T : <ref.protocol usr="s:11cursor_info2P1P">P1</ref.protocol></decl.generic_type_requirement></decl.typealias>
+
+// RUN: %sourcekitd-test -req=cursor -pos=226:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK92 %s
+// CHECK92: <Declaration>case a = &quot;\u{1B}&quot;</Declaration>
+// CHECK92-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>a</decl.name> = <syntaxtype.string>&quot;\u{1B}&quot;</syntaxtype.string></decl.enumelement>
+
+// RUN: %sourcekitd-test -req=cursor -pos=227:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK93 %s
+// CHECK93: <Declaration>case b = &quot;f&quot;</Declaration>
+// CHECK93-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>b</decl.name> = <syntaxtype.string>&quot;f&quot;</syntaxtype.string></decl.enumelement>

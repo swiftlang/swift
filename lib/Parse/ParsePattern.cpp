@@ -57,7 +57,7 @@ static DefaultArgumentKind getDefaultArgKind(Expr *init) {
 }
 
 void Parser::DefaultArgumentInfo::setFunctionContext(
-    DeclContext *DC, MutableArrayRef<ParameterList *> paramList){
+    DeclContext *DC, ParameterList *paramList){
   for (auto context : ParsedContexts) {
     context->changeFunction(DC, paramList);
   }
@@ -240,23 +240,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
     if (startsParameterName(*this, isClosure)) {
       // identifier-or-none for the first name
-      if (Tok.is(tok::kw__)) {
-        param.FirstNameLoc = consumeToken();
-      } else {
-        assert(Tok.canBeArgumentLabel() && "startsParameterName() lied");
-        Tok.setKind(tok::identifier);
-        param.FirstName = Context.getIdentifier(Tok.getText());
-        param.FirstNameLoc = consumeToken();
-      }
+      param.FirstNameLoc = consumeArgumentLabel(param.FirstName);
 
       // identifier-or-none? for the second name
-      if (Tok.canBeArgumentLabel()) {
-        if (!Tok.is(tok::kw__)) {
-          param.SecondName = Context.getIdentifier(Tok.getText());
-          Tok.setKind(tok::identifier);
-        }
-        param.SecondNameLoc = consumeToken();
-      }
+      if (Tok.canBeArgumentLabel())
+        param.SecondNameLoc = consumeArgumentLabel(param.SecondName);
 
       // Operators, closures, and enum elements cannot have API names.
       if ((paramContext == ParameterContextKind::Operator ||
@@ -437,12 +425,12 @@ mapParsedParameters(Parser &parser,
                          Identifier argName, SourceLoc argNameLoc,
                          Identifier paramName, SourceLoc paramNameLoc)
   -> ParamDecl * {
-    auto param = new (ctx) ParamDecl(paramInfo.SpecifierKind,
+    auto param = new (ctx) ParamDecl(VarDecl::Specifier::Default,
                                      paramInfo.SpecifierLoc,
                                      argNameLoc, argName,
                                      paramNameLoc, paramName, Type(),
                                      parser.CurDeclContext);
-
+    param->getAttrs() = paramInfo.Attrs;
     bool parsingEnumElt
       = (paramContext == Parser::ParameterContextKind::EnumElement);
     // If we're not parsing an enum case, lack of a SourceLoc for both
@@ -667,41 +655,42 @@ Parser::parseSingleParameterClause(ParameterContextKind paramContext,
 ///
 ParserStatus
 Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
-                               SmallVectorImpl<ParameterList*> &BodyParams,
+                               ParameterList *&BodyParams,
                                ParameterContextKind paramContext,
                                DefaultArgumentInfo &DefaultArgs) {
   // Parse parameter-clauses.
   ParserStatus status;
-  unsigned FirstBodyPatternIndex = BodyParams.size();
 
   auto FirstParameterClause
     = parseSingleParameterClause(paramContext, &NamePieces, &DefaultArgs);
   status |= FirstParameterClause;
-  BodyParams.push_back(FirstParameterClause.get());
+  BodyParams = FirstParameterClause.get();
 
+  SmallVector<ParameterList *, 2> AllParams;
+  AllParams.push_back(BodyParams);
   while (Tok.is(tok::l_paren)) {
     auto CurriedParameterClause
       = parseSingleParameterClause(ParameterContextKind::Curried);
     status |= CurriedParameterClause;
-    BodyParams.push_back(CurriedParameterClause.get());
+    AllParams.push_back(CurriedParameterClause.get());
   }
 
   // If the decl uses currying syntax, complain that that syntax has gone away.
-  if (BodyParams.size() - FirstBodyPatternIndex > 1) {
+  if (AllParams.size() > 1) {
     SourceRange allPatternsRange(
-      BodyParams[FirstBodyPatternIndex]->getStartLoc(),
-      BodyParams.back()->getEndLoc());
+      BodyParams->getStartLoc(),
+      AllParams.back()->getEndLoc());
     auto diag = diagnose(allPatternsRange.Start,
                          diag::parameter_curry_syntax_removed);
     diag.highlight(allPatternsRange);
     bool seenArg = false;
-    for (unsigned i = FirstBodyPatternIndex; i < BodyParams.size() - 1; i++) {
+    for (unsigned i = 0; i < AllParams.size() - 1; i++) {
       // Replace ")(" with ", ", so "(x: Int)(y: Int)" becomes
       // "(x: Int, y: Int)". But just delete them if they're not actually
       // separating any arguments, e.g. in "()(y: Int)".
       StringRef replacement(", ");
-      auto *leftParamList = BodyParams[i];
-      auto *rightParamList = BodyParams[i + 1];
+      auto *leftParamList = AllParams[i];
+      auto *rightParamList = AllParams[i + 1];
       if (leftParamList->size() != 0)
         seenArg = true;
       if (!seenArg || rightParamList->size() == 0)
@@ -726,7 +715,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 ParserStatus
 Parser::parseFunctionSignature(Identifier SimpleName,
                                DeclName &FullName,
-                               SmallVectorImpl<ParameterList*> &bodyParams,
+                               ParameterList *&bodyParams,
                                DefaultArgumentInfo &defaultArgs,
                                SourceLoc &throwsLoc,
                                bool &rethrows,

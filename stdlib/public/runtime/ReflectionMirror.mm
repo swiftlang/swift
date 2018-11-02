@@ -257,11 +257,21 @@ struct TupleImpl : ReflectionMirrorImpl {
 
 // Implementation for structs.
 struct StructImpl : ReflectionMirrorImpl {
+  bool isReflectable() {
+    const auto *Struct = static_cast<const StructMetadata *>(type);
+    const auto &Description = Struct->getDescription();
+    return Description->getTypeContextDescriptorFlags().isReflectable();
+  }
+
   char displayStyle() {
     return 's';
   }
   
   intptr_t count() {
+    if (!isReflectable()) {
+      return 0;
+    }
+
     auto *Struct = static_cast<const StructMetadata *>(type);
     return Struct->getDescription()->NumFields;
   }
@@ -278,7 +288,7 @@ struct StructImpl : ReflectionMirrorImpl {
 
     Any result;
     
-    swift_getFieldAt(type, i, [&](llvm::StringRef name, FieldType fieldInfo) {
+    _swift_getFieldAt(type, i, [&](llvm::StringRef name, FieldType fieldInfo) {
       assert(!fieldInfo.isIndirect() && "indirect struct fields not implemented");
       
       *outName = name.data();
@@ -319,7 +329,7 @@ struct EnumImpl : ReflectionMirrorImpl {
     bool indirect = false;
     
     const char *caseName = nullptr;
-    swift_getFieldAt(type, tag, [&](llvm::StringRef name, FieldType info) {
+    _swift_getFieldAt(type, tag, [&](llvm::StringRef name, FieldType info) {
       caseName = name.data();
       payloadType = info.getType();
       indirect = info.isIndirect();
@@ -399,11 +409,20 @@ struct EnumImpl : ReflectionMirrorImpl {
 
 // Implementation for classes.
 struct ClassImpl : ReflectionMirrorImpl {
+  bool isReflectable() {
+    const auto *Class = static_cast<const ClassMetadata *>(type);
+    const auto &Description = Class->getDescription();
+    return Description->getTypeContextDescriptorFlags().isReflectable();
+  }
+
   char displayStyle() {
     return 'c';
   }
   
   intptr_t count() {
+    if (!isReflectable())
+      return 0;
+
     auto *Clas = static_cast<const ClassMetadata*>(type);
     auto count = Clas->getDescription()->NumFields;
 
@@ -435,7 +454,7 @@ struct ClassImpl : ReflectionMirrorImpl {
 
     Any result;
     
-    swift_getFieldAt(type, i, [&](llvm::StringRef name, FieldType fieldInfo) {
+    _swift_getFieldAt(type, i, [&](llvm::StringRef name, FieldType fieldInfo) {
       assert(!fieldInfo.isIndirect() && "class indirect properties not implemented");
       
       auto *bytes = *reinterpret_cast<char * const *>(value);
@@ -539,7 +558,6 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
     impl->type = type;
     impl->value = value;
     auto result = f(impl);
-    SWIFT_CC_PLUSONE_GUARD(T->vw_destroy(passedValue));
     return result;
   };
   
@@ -622,8 +640,7 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
     }
 
     /// TODO: Implement specialized mirror witnesses for all kinds.
-    case MetadataKind::Function:
-    case MetadataKind::Existential:
+    default:
       break;
 
     // Types can't have these kinds.
@@ -725,9 +742,9 @@ const char *swift_OpaqueSummary(const Metadata *T) {
       return "(Heap Generic Local Variable)";
     case MetadataKind::ErrorObject:
       return "(ErrorType Object)";
+    default:
+      return "(Unknown)";
   }
-
-  return "(Unknown)";
 }
 
 #if SWIFT_OBJC_INTEROP

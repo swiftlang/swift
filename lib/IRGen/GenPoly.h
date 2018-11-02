@@ -25,7 +25,6 @@ namespace llvm {
 
 namespace swift {
   class CanType;
-  class Substitution;
 
 namespace irgen {
   class Explosion;

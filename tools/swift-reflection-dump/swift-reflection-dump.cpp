@@ -13,10 +13,6 @@
 // binaries.
 //===----------------------------------------------------------------------===//
 
-// FIXME davidino: this needs to be included first to avoid textual
-// replacement. It's silly and needs to be fixed.
-#include "llvm/Object/MachO.h"
-
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Basic/LLVMInitialize.h"
@@ -81,73 +77,6 @@ static T unwrap(llvm::Expected<T> value) {
     return std::move(value.get());
   std::cerr << "swift-reflection-test error: " << toString(value.takeError()) << "\n";
   exit(EXIT_FAILURE);
-}
-
-static SectionRef getSectionRef(const ObjectFile *objectFile,
-                                ArrayRef<StringRef> anySectionNames) {
-  for (auto section : objectFile->sections()) {
-    StringRef sectionName;
-    section.getName(sectionName);
-    for (auto desiredName : anySectionNames) {
-      if (sectionName.equals(desiredName)) {
-        return section;
-      }
-    }
-  }
-  return SectionRef();
-}
-
-template <typename Section>
-static std::pair<Section, uintptr_t>
-findReflectionSection(const ObjectFile *objectFile,
-                      ArrayRef<StringRef> anySectionNames) {
-  auto sectionRef = getSectionRef(objectFile, anySectionNames);
-
-  if (sectionRef.getObject() == nullptr)
-    return {{nullptr, nullptr}, 0};
-
-  StringRef sectionContents;
-  sectionRef.getContents(sectionContents);
-
-  uintptr_t Offset = 0;
-  if (isa<ELFObjectFileBase>(sectionRef.getObject())) {
-    ELFSectionRef S{sectionRef};
-    Offset = sectionRef.getAddress() - S.getOffset();
-  }
-
-  return {{reinterpret_cast<const void *>(sectionContents.begin()),
-           reinterpret_cast<const void *>(sectionContents.end())},
-          Offset};
-}
-
-static ReflectionInfo findReflectionInfo(const ObjectFile *objectFile) {
-  auto fieldSection = findReflectionSection<FieldSection>(
-      objectFile, {"__swift4_fieldmd", ".swift4_fieldmd", "swift4_fieldmd"});
-  auto associatedTypeSection = findReflectionSection<AssociatedTypeSection>(
-      objectFile, {"__swift4_assocty", ".swift4_assocty", "swift4_assocty"});
-  auto builtinTypeSection = findReflectionSection<BuiltinTypeSection>(
-      objectFile, {"__swift4_builtin", ".swift4_builtin", "swift4_builtin"});
-  auto captureSection = findReflectionSection<CaptureSection>(
-      objectFile, {"__swift4_capture", ".swift4_capture", "swift4_capture"});
-  auto typeRefSection = findReflectionSection<GenericSection>(
-      objectFile, {"__swift4_typeref", ".swift4_typeref", "swift4_typeref"});
-  auto reflectionStringsSection = findReflectionSection<GenericSection>(
-      objectFile, {"__swift4_reflstr", ".swift4_reflstr", "swift4_reflstr"});
-
-  // The entire object file is mapped into this process's memory, so the
-  // local/remote mapping is identity.
-  auto startAddress = (uintptr_t)objectFile->getData().begin();
-
-  return {
-      {fieldSection.first, fieldSection.second},
-      {associatedTypeSection.first, associatedTypeSection.second},
-      {builtinTypeSection.first, builtinTypeSection.second},
-      {captureSection.first, captureSection.second},
-      {typeRefSection.first, typeRefSection.second},
-      {reflectionStringsSection.first, reflectionStringsSection.second},
-      /*LocalStartAddress*/ startAddress,
-      /*RemoteStartAddress*/ startAddress,
-  };
 }
 
 using NativeReflectionContext
@@ -263,7 +192,8 @@ static int doDumpReflectionSections(ArrayRef<std::string> binaryFilenames,
     objectOwners.push_back(std::move(objectOwner));
     objectFiles.push_back(objectFile);
 
-    context.addReflectionInfo(findReflectionInfo(objectFile));
+    auto startAddress = (uintptr_t)objectFile->getData().begin();
+    context.addImage(RemoteAddress(startAddress));
   }
 
   switch (action) {

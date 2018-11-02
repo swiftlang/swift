@@ -191,6 +191,3 @@ extension Sequence where Element : Sequence {
     return JoinedSequence(base: self, separator: separator)
   }
 }
-
-// @available(*, deprecated, renamed: "JoinedSequence.Iterator")
-public typealias JoinedIterator<T: Sequence> = JoinedSequence<T>.Iterator where T.Element: Sequence

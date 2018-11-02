@@ -103,4 +103,16 @@ if #available(iOS 11.0, *) {
 }
 #endif
 
+#if os(iOS) || os(watchOS)
+if #available(iOS 12.0, watchOS 5.0, *) {
+    
+  IntentsTestSuite.test("INPlayMediaIntent Initializer/\(swiftVersion)") {
+    let intent = INPlayMediaIntent(mediaItems: nil, mediaContainer: nil, playShuffled: false, playbackRepeatMode: .unknown, resumePlayback: true)
+    expectFalse(intent.playShuffled ?? true)
+    expectTrue(intent.resumePlayback ?? false)
+  }
+    
+}
+#endif
+
 runAllTests()

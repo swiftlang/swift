@@ -175,3 +175,16 @@ public class A {
     }
   }
 }
+
+// This used to crash during mandatory inlining because noreturn folding would
+// create sil instructions with undef in unreachable code.
+func dontCrash() {
+  fatalError() // expected-note {{a call to a never-returning function}}
+  let k = "foo" // expected-warning {{will never be executed}}
+  switch k {
+  case "bar":
+    return
+  default:
+    fatalError("baz \(k)")
+  }
+}

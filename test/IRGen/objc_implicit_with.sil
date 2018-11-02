@@ -16,9 +16,9 @@ import Swift
 import gizmo
 
 class SwiftGizmo : Gizmo {
-  init(red: Float, green: Float, blue: Float) { }
-  func color(red: Float, green: Float, blue: Float)
-  func otherColorFor(red: Float, green: Float, blue: Float)
+  @objc init(red: Float, green: Float, blue: Float) { }
+  @objc func color(red: Float, green: Float, blue: Float)
+  @objc func otherColorFor(red: Float, green: Float, blue: Float)
 }
 sil_vtable SwiftGizmo {}
 

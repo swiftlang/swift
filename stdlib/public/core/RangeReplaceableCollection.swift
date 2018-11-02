@@ -14,15 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type that supports replacement of an arbitrary subrange of elements with
-/// the elements of another collection.
-///
-/// In most cases, it's best to ignore this protocol and use the
-/// `RangeReplaceableCollection` protocol instead, because it has a more
-/// complete interface.
-@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'RandomAccessCollection' instead")
-public typealias RangeReplaceableIndexable = RangeReplaceableCollection
-
 /// A collection that supports replacement of an arbitrary subrange of elements
 /// with the elements of another collection.
 ///
@@ -175,7 +166,7 @@ public protocol RangeReplaceableCollection : Collection
   ///
   /// - Complexity: O(1) on average, over many additions to the same
   ///   collection.
-  mutating func append(_ newElement: Element)
+  mutating func append(_ newElement: __owned Element)
 
   /// Adds the elements of a sequence or collection to the end of this
   /// collection.
@@ -197,7 +188,7 @@ public protocol RangeReplaceableCollection : Collection
   ///   collection.
   // FIXME(ABI)#166 (Evolution): Consider replacing .append(contentsOf) with +=
   // suggestion in SE-91
-  mutating func append<S : Sequence>(contentsOf newElements: S)
+  mutating func append<S : Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element
 
   /// Inserts a new element into the collection at the specified position.
@@ -222,7 +213,7 @@ public protocol RangeReplaceableCollection : Collection
   ///   `index` must be a valid index into the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  mutating func insert(_ newElement: Element, at i: Index)
+  mutating func insert(_ newElement: __owned Element, at i: Index)
 
   /// Inserts the elements of a sequence into the collection at the specified
   /// position.
@@ -250,7 +241,7 @@ public protocol RangeReplaceableCollection : Collection
   ///   and `newElements`. If `i` is equal to the collection's `endIndex`
   ///   property, the complexity is O(*n*), where *n* is the length of
   ///   `newElements`.
-  mutating func insert<S : Collection>(contentsOf newElements: S, at i: Index)
+  mutating func insert<S : Collection>(contentsOf newElements: __owned S, at i: Index)
     where S.Element == Element
 
   /// Removes and returns the element at the specified position.
@@ -355,12 +346,13 @@ public protocol RangeReplaceableCollection : Collection
 
   /// Removes from the collection all elements that satisfy the given predicate.
   ///
-  /// - Parameter predicate: A closure that takes an element of the
+  /// - Parameter shouldBeRemoved: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be removed from the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  mutating func removeAll(where predicate: (Element) throws -> Bool) rethrows
+  mutating func removeAll(
+    where shouldBeRemoved: (Element) throws -> Bool) rethrows
 
   // FIXME(ABI): Associated type inference requires this.
   subscript(bounds: Index) -> Element { get }
@@ -1086,45 +1078,53 @@ extension RangeReplaceableCollection {
 }
 
 extension RangeReplaceableCollection where Self: MutableCollection {
-  /// Removes from the collection all elements that satisfy the given predicate.
+  /// Removes all the elements that satisfy the given predicate.
   ///
-  /// - Parameter predicate: A closure that takes an element of the
+  /// Use this method to remove every element in a collection that meets
+  /// particular criteria. This example removes all the odd values from an
+  /// array of numbers:
+  ///
+  ///     var numbers = [5, 6, 7, 8, 9, 10, 11]
+  ///     numbers.removeAll(where: { $0 % 2 == 1 })
+  ///     // numbers == [6, 8, 10]
+  ///
+  /// - Parameter shouldBeRemoved: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be removed from the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public mutating func removeAll(
-    where predicate: (Element) throws -> Bool
+    where shouldBeRemoved: (Element) throws -> Bool
   ) rethrows {
-    if var i = try firstIndex(where: predicate) {
-      var j = index(after: i)
-      while j != endIndex {
-        if try !predicate(self[j]) {
-          swapAt(i, j)
-          formIndex(after: &i)
-        }
-        formIndex(after: &j)
-      }
-      removeSubrange(i...)
-    }
+    let suffixStart = try _halfStablePartition(isSuffixElement: shouldBeRemoved)
+    removeSubrange(suffixStart...)
   }
 }
 
 extension RangeReplaceableCollection {
-  /// Removes from the collection all elements that satisfy the given predicate.
+  /// Removes all the elements that satisfy the given predicate.
   ///
-  /// - Parameter predicate: A closure that takes an element of the
+  /// Use this method to remove every element in a collection that meets
+  /// particular criteria. This example removes all the vowels from a string:
+  ///
+  ///     var phrase = "The rain in Spain stays mainly in the plain."
+  ///
+  ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
+  ///     phrase.removeAll(where: { vowels.contains($0) })
+  ///     // phrase == "Th rn n Spn stys mnly n th pln."
+  ///
+  /// - Parameter shouldBeRemoved: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be removed from the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public mutating func removeAll(
-    where predicate: (Element) throws -> Bool
+    where shouldBeRemoved: (Element) throws -> Bool
   ) rethrows {
     // FIXME: Switch to using RRC.filter once stdlib is compiled for 4.0
     // self = try filter { try !predicate($0) }
-    self = try Self(self.lazy.filter { try !predicate($0) })
+    self = try Self(self.lazy.filter { try !shouldBeRemoved($0) })
   }
 }

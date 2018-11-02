@@ -4,6 +4,5 @@
 // These are specific to Swift 4.
 
 func testArithmeticOverflowSwift4() {
-  var _ = Int8(126) + (1 + 1)  //  FIXME: Should expect an integer overflow
-    // error but none happens now (see <rdar://problem/39120081>)
+  var _ = Int8(126) + (1 + 1) // expected-error {{arithmetic operation '126 + 2' (on type 'Int8') results in an overflow}}
 }

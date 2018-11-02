@@ -66,6 +66,27 @@ static SILBasicBlock *getOptionalDiamondSuccessor(SwitchEnumInst *SEI) {
    return nullptr;
 }
 
+/// Find a safe insertion point for closure destruction. We might create a
+/// closure that captures self in deinit of self. In this situation it is not
+/// safe to destroy the closure after we called super deinit. We have to place
+/// the closure destruction before that call.
+///
+///  %deinit = objc_super_method %0 : $C, #A.deinit!deallocator.foreign
+///  %super = upcast %0 : $C to $A
+///  apply %deinit(%super) : $@convention(objc_method) (A) -> ()
+///  end_lifetime %super : $A
+static SILInstruction *getDeinitSafeClosureDestructionPoint(TermInst *Term) {
+  for (auto It = Term->getParent()->rbegin(), E = Term->getParent()->rend();
+       It != E; ++It) {
+    if (auto *EndLifetime = dyn_cast<EndLifetimeInst>(&*It)) {
+      auto *SuperInstance = EndLifetime->getOperand()->getDefiningInstruction();
+      assert(SuperInstance && "Expected an instruction");
+      return SuperInstance;
+    }
+  }
+  return Term;
+}
+
 /// Extend the lifetime of the convert_escape_to_noescape's operand to the end
 /// of the function.
 static void extendLifetimeToEndOfFunction(SILFunction &Fn,
@@ -111,10 +132,11 @@ static void extendLifetimeToEndOfFunction(SILFunction &Fn,
   Fn.findExitingBlocks(ExitingBlocks);
   for (auto *Exit : ExitingBlocks) {
     auto *Term = Exit->getTerminator();
-    SILBuilderWithScope B(Term);
-    B.setInsertionPoint(Term);
+    auto *SafeClosureDestructionPt = getDeinitSafeClosureDestructionPoint(Term);
+    SILBuilderWithScope B(SafeClosureDestructionPt);
     B.createDestroyAddr(loc, Slot);
-    B.createDeallocStack(loc, Slot);
+    SILBuilderWithScope B2(Term);
+    B2.createDeallocStack(loc, Slot);
   }
 }
 
@@ -296,7 +318,6 @@ static bool trySwitchEnumPeephole(ConvertEscapeToNoEscapeInst *Cvt) {
         Cvt->getLoc(), Cvt->getOperand(), Cvt->getType(), false, true);
     Cvt->replaceAllUsesWith(NewCvt);
     Cvt->eraseFromParent();
-    Cvt = NewCvt;
   }
 
   // Extend the lifetime.
@@ -309,7 +330,160 @@ static bool trySwitchEnumPeephole(ConvertEscapeToNoEscapeInst *Cvt) {
   return true;
 }
 
-static bool fixupConvertEscapeToNoEscapeLifetime(SILFunction &Fn) {
+/// Look for a single destroy user and possibly unowned apply uses.
+static SILInstruction *getOnlyDestroy(CopyBlockWithoutEscapingInst *CB) {
+  SILInstruction *onlyDestroy = nullptr;
+
+  for (auto *Use : getNonDebugUses(CB)) {
+    SILInstruction *Inst = Use->getUser();
+
+    // If this an apply use, only handle unowned parameters.
+    if (auto Apply = FullApplySite::isa(Inst)) {
+      SILArgumentConvention Conv =
+          Apply.getArgumentConvention(Apply.getCalleeArgIndex(*Use));
+      if (Conv != SILArgumentConvention::Direct_Unowned)
+        return nullptr;
+      continue;
+    }
+
+    // We have already seen one destroy.
+    if (onlyDestroy)
+      return nullptr;
+
+    if (isa<DestroyValueInst>(Inst) || isa<ReleaseValueInst>(Inst) ||
+        isa<StrongReleaseInst>(Inst)) {
+      onlyDestroy = Inst;
+      continue;
+    }
+
+    // Some other instruction.
+    return nullptr;
+  }
+
+  if (!onlyDestroy)
+    return nullptr;
+
+  // Now look at whether the dealloc_stack or the destroy postdominates and
+  // return the post dominator.
+  auto *BlockInit = dyn_cast<InitBlockStorageHeaderInst>(CB->getBlock());
+  if (!BlockInit)
+    return nullptr;
+
+  auto *AS = dyn_cast<AllocStackInst>(BlockInit->getBlockStorage());
+  if (!AS)
+    return nullptr;
+  auto *Dealloc = AS->getSingleDeallocStack();
+  if (!Dealloc || Dealloc->getParent() != onlyDestroy->getParent())
+    return nullptr;
+
+  // Return the later instruction.
+  for (auto It = SILBasicBlock::iterator(onlyDestroy),
+            E = Dealloc->getParent()->end();
+       It != E; ++It) {
+    if (&*It == Dealloc)
+      return Dealloc;
+  }
+  return onlyDestroy;
+}
+
+/// Lower a copy_block_without_escaping instruction.
+///
+///    This involves replacing:
+///
+///      %copy = copy_block_without_escaping %block withoutEscaping %closure
+///
+///      ...
+///      destroy_value %copy
+///
+///    by (roughly) the instruction sequence:
+///
+///      %copy = copy_block %block
+///
+///      ...
+///      destroy_value %copy
+///      %e = is_escaping %closure
+///      cond_fail %e
+///      destroy_value %closure
+static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *CB) {
+  SmallVector<SILInstruction *, 4> LifetimeEndPoints;
+
+  // Find the end of the lifetime of the copy_block_without_escaping
+  // instruction.
+  auto &Fn  = *CB->getFunction();
+  auto *SingleDestroy = getOnlyDestroy(CB);
+  SmallVector<SILBasicBlock *, 4> ExitingBlocks;
+  Fn.findExitingBlocks(ExitingBlocks);
+  if (SingleDestroy) {
+    LifetimeEndPoints.push_back(
+        &*std::next(SILBasicBlock::iterator(SingleDestroy)));
+  } else {
+    // Otherwise, conservatively insert verification at the end of the function.
+    for (auto *Exit : ExitingBlocks)
+      LifetimeEndPoints.push_back(Exit->getTerminator());
+  }
+
+  auto SentinelClosure = CB->getClosure();
+  auto Loc = CB->getLoc();
+
+  SILBuilderWithScope B(CB);
+  auto *NewCB = B.createCopyBlock(Loc, CB->getBlock());
+  CB->replaceAllUsesWith(NewCB);
+  CB->eraseFromParent();
+
+  // Create an stack slot for the closure sentinel and store the sentinel (or
+  // none on other paths.
+  auto generatedLoc = RegularLocation::getAutoGeneratedLocation();
+  AllocStackInst *Slot;
+  auto &Context = NewCB->getModule().getASTContext();
+  auto OptionalEscapingClosureTy =
+      SILType::getOptionalType(SentinelClosure->getType());
+  auto *NoneDecl = Context.getOptionalNoneDecl();
+  {
+    SILBuilderWithScope B(Fn.getEntryBlock()->begin());
+    Slot = B.createAllocStack(generatedLoc, OptionalEscapingClosureTy);
+    // Store None to it.
+    B.createStore(generatedLoc,
+                  B.createEnum(generatedLoc, SILValue(), NoneDecl,
+                               OptionalEscapingClosureTy),
+                  Slot, StoreOwnershipQualifier::Init);
+  }
+  {
+    SILBuilderWithScope B(NewCB);
+    // Store the closure sentinel (the copy_block_without_escaping closure
+    // operand consumed at +1, so we don't need a copy) to it.
+    B.createDestroyAddr(generatedLoc, Slot); // We could be in a loop.
+    auto *SomeDecl = Context.getOptionalSomeDecl();
+    B.createStore(generatedLoc,
+                  B.createEnum(generatedLoc, SentinelClosure, SomeDecl,
+                               OptionalEscapingClosureTy),
+                  Slot, StoreOwnershipQualifier::Init);
+  }
+
+  for (auto LifetimeEndPoint : LifetimeEndPoints) {
+    SILBuilderWithScope B(LifetimeEndPoint);
+    auto IsEscaping =
+        B.createIsEscapingClosure(Loc, B.createLoadBorrow(generatedLoc, Slot),
+                                  IsEscapingClosureInst::ObjCEscaping);
+    B.createCondFail(Loc, IsEscaping);
+    B.createDestroyAddr(generatedLoc, Slot);
+    // Store None to it.
+    B.createStore(generatedLoc,
+                  B.createEnum(generatedLoc, SILValue(), NoneDecl,
+                               OptionalEscapingClosureTy),
+                  Slot, StoreOwnershipQualifier::Init);
+  }
+
+  // Insert the dealloc_stack in all exiting blocks.
+  for (auto *ExitBlock: ExitingBlocks) {
+    auto *Terminator = ExitBlock->getTerminator();
+    SILBuilderWithScope B(Terminator);
+    B.createDeallocStack(generatedLoc, Slot);
+  }
+
+  return true;
+}
+
+static bool fixupClosureLifetimes(SILFunction &Fn) {
   bool Changed = false;
 
   // tryExtendLifetimeToLastUse uses a cache of recursive instruction use
@@ -321,6 +495,15 @@ static bool fixupConvertEscapeToNoEscapeLifetime(SILFunction &Fn) {
     while (I != BB.end()) {
       SILInstruction *Inst = &*I;
       ++I;
+
+      // Handle, copy_block_without_escaping instructions.
+      if (auto *CB = dyn_cast<CopyBlockWithoutEscapingInst>(Inst)) {
+        Changed |= fixupCopyBlockWithoutEscaping(CB);
+        continue;
+      }
+
+      // Otherwise, look at convert_escape_to_noescape [not_guaranteed]
+      // instructions.
       auto *Cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(Inst);
       if (!Cvt || Cvt->isLifetimeGuaranteed())
         continue;
@@ -362,10 +545,11 @@ class ClosureLifetimeFixup : public SILFunctionTransform {
     if (getFunction()->wasDeserializedCanonical())
       return;
 
-    // Fixup lifetimes of optional convertEscapeToNoEscape.
-    if (fixupConvertEscapeToNoEscapeLifetime(*getFunction()))
+    // Fixup convert_escape_to_noescape [not_guaranteed] and
+    // copy_block_without_escaping instructions.
+    if (fixupClosureLifetimes(*getFunction()))
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
-    DEBUG(getFunction()->verify());
+    LLVM_DEBUG(getFunction()->verify());
 
   }
 

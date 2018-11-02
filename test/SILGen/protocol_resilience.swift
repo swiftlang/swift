@@ -1,14 +1,14 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -module-name protocol_resilience -emit-module -enable-sil-ownership -enable-resilience -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift
-// RUN: %target-swift-frontend -module-name protocol_resilience -I %t -emit-silgen -enable-sil-ownership -enable-resilience %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name protocol_resilience -I %t -enable-sil-ownership -enable-resilience %s | %FileCheck %s
 
 import resilient_protocol
 
-prefix operator ~~~ {}
-infix operator <*> {}
-infix operator <**> {}
-infix operator <===> {}
+prefix operator ~~~
+infix operator <*>
+infix operator <**>
+infix operator <===>
 
 public protocol P {}
 

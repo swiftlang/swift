@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-ownership %s -emit-silgen -emit-verbose-sil -sdk %S/Inputs -I %S/Inputs -enable-source-import | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s -emit-verbose-sil -sdk %S/Inputs -I %S/Inputs -enable-source-import | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -137,21 +137,21 @@ class TestComputedOutlet : NSObject {
 class Singleton : NSObject {
   // CHECK-DAG: sil hidden @$S15objc_properties9SingletonC14sharedInstanceACvgZ : $@convention(method) (@thick Singleton.Type) -> @owned Singleton
   // CHECK-DAG: sil hidden [thunk] @$S15objc_properties9SingletonC14sharedInstanceACvgZTo : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased Singleton {
-  static let sharedInstance = Singleton()
+  @objc static let sharedInstance = Singleton()
 
   // CHECK-DAG: sil hidden @$S15objc_properties9SingletonC1iSivgZ : $@convention(method) (@thick Singleton.Type) -> Int
   // CHECK-DAG: sil hidden [thunk] @$S15objc_properties9SingletonC1iSivgZTo : $@convention(objc_method) (@objc_metatype Singleton.Type) -> Int
-  static let i = 2
+  @objc static let i = 2
 
   // CHECK-DAG: sil hidden @$S15objc_properties9SingletonC1jSSvgZ : $@convention(method) (@thick Singleton.Type) -> @owned String
   // CHECK-DAG: sil hidden [thunk] @$S15objc_properties9SingletonC1jSSvgZTo : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased NSString
   // CHECK-DAG: sil hidden @$S15objc_properties9SingletonC1jSSvsZ : $@convention(method) (@owned String, @thick Singleton.Type) -> ()
   // CHECK-DAG: sil hidden [thunk] @$S15objc_properties9SingletonC1jSSvsZTo : $@convention(objc_method) (NSString, @objc_metatype Singleton.Type) -> ()
-  static var j = "Hello"
+  @objc static var j = "Hello"
 
   // CHECK-DAG: sil hidden [thunk] @$S15objc_properties9SingletonC1kSdvgZTo : $@convention(objc_method) (@objc_metatype Singleton.Type) -> Double
   // CHECK-DAG: sil hidden @$S15objc_properties9SingletonC1kSdvgZ : $@convention(method) (@thick Singleton.Type) -> Double
-  static var k: Double {
+  @objc static var k: Double {
     return 7.7
   }
 }
@@ -201,9 +201,10 @@ class NonObjCClassWithObjCProperty {
   // CHECK: [[RAW_POINTER:%.*]] = tuple_extract [[TUPLE]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 0
   // CHECK: [[OBJECT:%.*]] = pointer_to_address [[RAW_POINTER]] : $Builtin.RawPointer to [strict] $*NSObject
   // CHECK: [[OBJECT_DEP:%.*]] = mark_dependence [[OBJECT]] : $*NSObject on [[ARG]]
-  // CHECK: [[LOADED_OBJECT:%.*]] = load_borrow [[OBJECT_DEP]]
+  // CHECK: [[OBJECT_ACCESS:%.*]] = begin_access [modify] [unsafe] [[OBJECT_DEP]] : $*NSObject
+  // CHECK: [[LOADED_OBJECT:%.*]] = load_borrow [[OBJECT_ACCESS]]
   // CHECK: [[UNMANAGED_OBJECT:%.*]] = ref_to_unmanaged [[LOADED_OBJECT]] : $NSObject to $@sil_unmanaged NSObject
-  // CHECK: end_borrow [[LOADED_OBJECT]] from [[OBJECT_DEP]]
+  // CHECK: end_borrow [[LOADED_OBJECT]] from [[OBJECT_ACCESS]]
   func useProperty() {
     useAutoreleasingUnsafeMutablePointer(&property)
   }

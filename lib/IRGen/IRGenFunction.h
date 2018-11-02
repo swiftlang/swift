@@ -314,53 +314,90 @@ public:
                          Atomicity atomicity);
   llvm::Value *emitLoadRefcountedPtr(Address addr, ReferenceCounting style);
 
-  //   - unowned references
-  void emitUnownedRetain(llvm::Value *value, ReferenceCounting style,
-                         Atomicity atomicity);
-  void emitUnownedRelease(llvm::Value *value, ReferenceCounting style,
-                          Atomicity atomicity);
-  void emitStrongRetainUnowned(llvm::Value *value, ReferenceCounting style,
-                               Atomicity atomicity);
-  void emitStrongRetainAndUnownedRelease(llvm::Value *value,
-                                         ReferenceCounting style,
-                                         Atomicity atomicity);
-  void emitUnownedInit(llvm::Value *val, Address dest, ReferenceCounting style);
-  void emitUnownedAssign(llvm::Value *value, Address dest,
-                         ReferenceCounting style);
-  void emitUnownedCopyInit(Address destAddr, Address srcAddr,
-                           ReferenceCounting style);
-  void emitUnownedTakeInit(Address destAddr, Address srcAddr,
-                           ReferenceCounting style);
-  void emitUnownedCopyAssign(Address destAddr, Address srcAddr,
-                             ReferenceCounting style);
-  void emitUnownedTakeAssign(Address destAddr, Address srcAddr,
-                             ReferenceCounting style);
-  llvm::Value *emitUnownedLoadStrong(Address src, llvm::Type *resultType,
-                                     ReferenceCounting style);
-  llvm::Value *emitUnownedTakeStrong(Address src, llvm::Type *resultType,
-                                     ReferenceCounting style);
-  void emitUnownedDestroy(Address addr, ReferenceCounting style);
-  llvm::Value *getUnownedExtraInhabitantIndex(Address src,
-                                              ReferenceCounting style);
-  void storeUnownedExtraInhabitant(llvm::Value *index, Address dest,
-                                   ReferenceCounting style);
+  llvm::Value *getReferenceStorageExtraInhabitantIndex(Address src,
+                                                   ReferenceOwnership ownership,
+                                                   ReferenceCounting style);
+  void storeReferenceStorageExtraInhabitant(llvm::Value *index,
+                                            Address dest,
+                                            ReferenceOwnership ownership,
+                                            ReferenceCounting style);
 
-  //   - weak references
-  void emitWeakInit(llvm::Value *ref, Address dest, ReferenceCounting style);
-  void emitWeakAssign(llvm::Value *ref, Address dest, ReferenceCounting style);
-  void emitWeakCopyInit(Address destAddr, Address srcAddr,
-                        ReferenceCounting style);
-  void emitWeakTakeInit(Address destAddr, Address srcAddr,
-                        ReferenceCounting style);
-  void emitWeakCopyAssign(Address destAddr, Address srcAddr,
-                          ReferenceCounting style);
-  void emitWeakTakeAssign(Address destAddr, Address srcAddr,
-                          ReferenceCounting style);
-  llvm::Value *emitWeakLoadStrong(Address src, llvm::Type *resultType,
-                                  ReferenceCounting style);
-  llvm::Value *emitWeakTakeStrong(Address src, llvm::Type *resultType,
-                                  ReferenceCounting style);
-  void emitWeakDestroy(Address addr, ReferenceCounting style);
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Kind) \
+  void emit##Kind##Name##Init(llvm::Value *val, Address dest); \
+  void emit##Kind##Name##Assign(llvm::Value *value, Address dest); \
+  void emit##Kind##Name##CopyInit(Address destAddr, Address srcAddr); \
+  void emit##Kind##Name##TakeInit(Address destAddr, Address srcAddr); \
+  void emit##Kind##Name##CopyAssign(Address destAddr, Address srcAddr); \
+  void emit##Kind##Name##TakeAssign(Address destAddr, Address srcAddr); \
+  llvm::Value *emit##Kind##Name##LoadStrong(Address src, \
+                                            llvm::Type *resultType); \
+  llvm::Value *emit##Kind##Name##TakeStrong(Address src, \
+                                            llvm::Type *resultType); \
+  void emit##Kind##Name##Destroy(Address addr);
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Kind) \
+  void emit##Kind##Name##Retain(llvm::Value *value, Atomicity atomicity); \
+  void emit##Kind##Name##Release(llvm::Value *value, Atomicity atomicity); \
+  void emit##Kind##StrongRetain##Name(llvm::Value *value, Atomicity atomicity);\
+  void emit##Kind##StrongRetainAnd##Name##Release(llvm::Value *value, \
+                                                  Atomicity atomicity);
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Native) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Unknown) \
+  void emit##Name##Init(llvm::Value *val, Address dest, ReferenceCounting style); \
+  void emit##Name##Assign(llvm::Value *value, Address dest, \
+                          ReferenceCounting style); \
+  void emit##Name##CopyInit(Address destAddr, Address srcAddr, \
+                            ReferenceCounting style); \
+  void emit##Name##TakeInit(Address destAddr, Address srcAddr, \
+                            ReferenceCounting style); \
+  void emit##Name##CopyAssign(Address destAddr, Address srcAddr, \
+                              ReferenceCounting style); \
+  void emit##Name##TakeAssign(Address destAddr, Address srcAddr, \
+                              ReferenceCounting style); \
+  llvm::Value *emit##Name##LoadStrong(Address src, llvm::Type *resultType, \
+                                      ReferenceCounting style); \
+  llvm::Value *emit##Name##TakeStrong(Address src, llvm::Type *resultType, \
+                                      ReferenceCounting style); \
+  void emit##Name##Destroy(Address addr, ReferenceCounting style);
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
+  ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Native) \
+  ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Unknown) \
+  void emit##Name##Retain(llvm::Value *value, ReferenceCounting style, \
+                         Atomicity atomicity); \
+  void emit##Name##Release(llvm::Value *value, ReferenceCounting style, \
+                          Atomicity atomicity); \
+  void emitStrongRetain##Name(llvm::Value *value, ReferenceCounting style, \
+                              Atomicity atomicity); \
+  void emitStrongRetainAnd##Name##Release(llvm::Value *value, \
+                                          ReferenceCounting style, \
+                                          Atomicity atomicity);
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Native) \
+  void emit##Name##Retain(llvm::Value *value, ReferenceCounting style, \
+                         Atomicity atomicity) { \
+    assert(style == ReferenceCounting::Native); \
+    emitNative##Name##Retain(value, atomicity); \
+  } \
+  void emit##Name##Release(llvm::Value *value, ReferenceCounting style, \
+                          Atomicity atomicity) { \
+    assert(style == ReferenceCounting::Native); \
+    emitNative##Name##Release(value, atomicity); \
+  } \
+  void emitStrongRetain##Name(llvm::Value *value, ReferenceCounting style, \
+                              Atomicity atomicity) { \
+    assert(style == ReferenceCounting::Native); \
+    emitNativeStrongRetain##Name(value, atomicity); \
+  } \
+  void emitStrongRetainAnd##Name##Release(llvm::Value *value, \
+                                          ReferenceCounting style, \
+                                          Atomicity atomicity) { \
+    assert(style == ReferenceCounting::Native); \
+    emitNativeStrongRetainAnd##Name##Release(value, atomicity); \
+  }
+#include "swift/AST/ReferenceStorage.def"
+#undef NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER
+#undef ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER
 
   // Routines for the Swift native reference-counting style.
   //   - strong references
@@ -369,32 +406,7 @@ public:
   void emitNativeStrongRetain(llvm::Value *value, Atomicity atomicity);
   void emitNativeStrongRelease(llvm::Value *value, Atomicity atomicity);
   void emitNativeSetDeallocating(llvm::Value *value);
-  //   - unowned references
-  void emitNativeUnownedRetain(llvm::Value *value, Atomicity atomicity);
-  void emitNativeUnownedRelease(llvm::Value *value, Atomicity atomicity);
-  void emitNativeStrongRetainUnowned(llvm::Value *value, Atomicity atomicity);
-  void emitNativeStrongRetainAndUnownedRelease(llvm::Value *value,
-                                               Atomicity atomicity);
-  void emitNativeUnownedInit(llvm::Value *val, Address dest);
-  void emitNativeUnownedAssign(llvm::Value *value, Address dest);
-  void emitNativeUnownedCopyInit(Address destAddr, Address srcAddr);
-  void emitNativeUnownedTakeInit(Address destAddr, Address srcAddr);
-  void emitNativeUnownedCopyAssign(Address destAddr, Address srcAddr);
-  void emitNativeUnownedTakeAssign(Address destAddr, Address srcAddr);
-  llvm::Value *emitNativeUnownedLoadStrong(Address src, llvm::Type *resultType);
-  llvm::Value *emitNativeUnownedTakeStrong(Address src, llvm::Type *resultType);
-  void emitNativeUnownedDestroy(Address addr);
 
-  //   - weak references
-  void emitNativeWeakInit(llvm::Value *value, Address dest);
-  void emitNativeWeakAssign(llvm::Value *value, Address dest);
-  llvm::Value *emitNativeWeakLoadStrong(Address src, llvm::Type *type);
-  llvm::Value *emitNativeWeakTakeStrong(Address src, llvm::Type *type);
-  void emitNativeWeakDestroy(Address addr);
-  void emitNativeWeakCopyInit(Address destAddr, Address srcAddr);
-  void emitNativeWeakTakeInit(Address destAddr, Address srcAddr);
-  void emitNativeWeakCopyAssign(Address destAddr, Address srcAddr);
-  void emitNativeWeakTakeAssign(Address destAddr, Address srcAddr);
   //   - other operations
   llvm::Value *emitNativeTryPin(llvm::Value *object, Atomicity atomicity);
   void emitNativeUnpin(llvm::Value *handle, Atomicity atomicity);
@@ -413,26 +425,6 @@ public:
   //   - strong references
   void emitUnknownStrongRetain(llvm::Value *value, Atomicity atomicity);
   void emitUnknownStrongRelease(llvm::Value *value, Atomicity atomicity);
-  //   - unowned references
-  void emitUnknownUnownedInit(llvm::Value *val, Address dest);
-  void emitUnknownUnownedAssign(llvm::Value *value, Address dest);
-  void emitUnknownUnownedCopyInit(Address destAddr, Address srcAddr);
-  void emitUnknownUnownedTakeInit(Address destAddr, Address srcAddr);
-  void emitUnknownUnownedCopyAssign(Address destAddr, Address srcAddr);
-  void emitUnknownUnownedTakeAssign(Address destAddr, Address srcAddr);
-  llvm::Value *emitUnknownUnownedLoadStrong(Address src, llvm::Type *resultTy);
-  llvm::Value *emitUnknownUnownedTakeStrong(Address src, llvm::Type *resultTy);
-  void emitUnknownUnownedDestroy(Address addr);
-  //   - weak references
-  void emitUnknownWeakDestroy(Address addr);
-  void emitUnknownWeakCopyInit(Address destAddr, Address srcAddr);
-  void emitUnknownWeakTakeInit(Address destAddr, Address srcAddr);
-  void emitUnknownWeakCopyAssign(Address destAddr, Address srcAddr);
-  void emitUnknownWeakTakeAssign(Address destAddr, Address srcAddr);
-  void emitUnknownWeakInit(llvm::Value *value, Address dest);
-  void emitUnknownWeakAssign(llvm::Value *value, Address dest);
-  llvm::Value *emitUnknownWeakLoadStrong(Address src, llvm::Type *type);
-  llvm::Value *emitUnknownWeakTakeStrong(Address src, llvm::Type *type);
 
   // Routines for the Builtin.NativeObject reference-counting style.
   void emitBridgeStrongRetain(llvm::Value *value, Atomicity atomicity);
@@ -445,9 +437,11 @@ public:
   llvm::Value *emitIsUniqueCall(llvm::Value *value, SourceLoc loc,
                                 bool isNonNull, bool checkPinned);
 
-  llvm::Value *emitIsEscapingClosureCall(llvm::Value *value, SourceLoc loc);
+  llvm::Value *emitIsEscapingClosureCall(llvm::Value *value, SourceLoc loc,
+                                         unsigned verificationType);
 
-//--- Expression emission ------------------------------------------------------
+  //--- Expression emission
+  //------------------------------------------------------
 public:
   void emitFakeExplosion(const TypeInfo &type, Explosion &explosion);
 

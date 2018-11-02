@@ -88,6 +88,9 @@ private:
 
 } // end anonymous namespace
 
+// FIXME: This method is pretty long since it is actually several smaller
+// optimizations that have been copied/pasted over time. This should be split
+// into those smaller (currently inline) functions.
 void SwiftARCContractImpl::
 performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
   // Go through all of our pointers and merge all of the retains with the
@@ -215,7 +218,12 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
 
       // Remove all old retain instructions.
       for (auto *Inst : BridgeRetainList) {
-        Inst->replaceAllUsesWith(I);
+        // We may need to perform a pointer cast here to ensure that the output
+        // type of the retainN matches the output type. This can come up in
+        // cases where types have been obfuscated in some way. In such a case,
+        // we need the inert point to be at the retain location.
+        B.setInsertPoint(Inst);
+        Inst->replaceAllUsesWith(B.maybeCast(I, Inst->getType()));
         Inst->eraseFromParent();
         NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN++;
       }

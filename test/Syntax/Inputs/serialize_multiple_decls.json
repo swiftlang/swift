@@ -27,7 +27,7 @@
                     },
                     {
                       "kind": "LineComment",
-                      "value": "\/\/ RUN: diff %t %S\/Inputs\/serialize_multiple_decls.json"
+                      "value": "\/\/ RUN: diff %t %S\/Inputs\/serialize_multiple_decls.json -u"
                     },
                     {
                       "kind": "Newline",
@@ -40,7 +40,8 @@
                       "value": 1
                     }
                   ],
-                  "presence": "Present"
+                  "presence": "Present",
+                  "id": 1
                 },
                 {
                   "tokenKind": {
@@ -54,7 +55,8 @@
                       "value": 1
                     }
                   ],
-                  "presence": "Present"
+                  "presence": "Present",
+                  "id": 2
                 },
                 null,
                 null,
@@ -68,12 +70,14 @@
                       },
                       "leadingTrivia": [],
                       "trailingTrivia": [],
-                      "presence": "Present"
+                      "presence": "Present",
+                      "id": 3
                     },
                     {
                       "kind": "MemberDeclList",
                       "layout": [],
-                      "presence": "Present"
+                      "presence": "Present",
+                      "id": 4
                     },
                     {
                       "tokenKind": {
@@ -86,17 +90,22 @@
                         }
                       ],
                       "trailingTrivia": [],
-                      "presence": "Present"
+                      "presence": "Present",
+                      "id": 5
                     }
                   ],
-                  "presence": "Present"
+                  "presence": "Present",
+                  "id": 6
                 }
               ],
-              "presence": "Present"
+              "presence": "Present",
+              "id": 7
             },
+            null,
             null
           ],
-          "presence": "Present"
+          "presence": "Present",
+          "id": 8
         },
         {
           "kind": "CodeBlockItem",
@@ -122,7 +131,8 @@
                       "value": 1
                     }
                   ],
-                  "presence": "Present"
+                  "presence": "Present",
+                  "id": 9
                 },
                 {
                   "tokenKind": {
@@ -136,7 +146,8 @@
                       "value": 1
                     }
                   ],
-                  "presence": "Present"
+                  "presence": "Present",
+                  "id": 10
                 },
                 null,
                 null,
@@ -150,12 +161,14 @@
                       },
                       "leadingTrivia": [],
                       "trailingTrivia": [],
-                      "presence": "Present"
+                      "presence": "Present",
+                      "id": 11
                     },
                     {
                       "kind": "MemberDeclList",
                       "layout": [],
-                      "presence": "Present"
+                      "presence": "Present",
+                      "id": 12
                     },
                     {
                       "tokenKind": {
@@ -168,20 +181,26 @@
                         }
                       ],
                       "trailingTrivia": [],
-                      "presence": "Present"
+                      "presence": "Present",
+                      "id": 13
                     }
                   ],
-                  "presence": "Present"
+                  "presence": "Present",
+                  "id": 14
                 }
               ],
-              "presence": "Present"
+              "presence": "Present",
+              "id": 15
             },
+            null,
             null
           ],
-          "presence": "Present"
+          "presence": "Present",
+          "id": 16
         }
       ],
-      "presence": "Present"
+      "presence": "Present",
+      "id": 19
     },
     {
       "tokenKind": {
@@ -195,8 +214,10 @@
         }
       ],
       "trailingTrivia": [],
-      "presence": "Present"
+      "presence": "Present",
+      "id": 18
     }
   ],
-  "presence": "Present"
+  "presence": "Present",
+  "id": 20
 }

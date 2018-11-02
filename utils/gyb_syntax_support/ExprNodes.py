@@ -473,7 +473,9 @@ EXPR_NODES = [
          traits=['Parenthesized'],
          children=[
              Child('Backslash', kind='BackslashToken'),
-             Child('LeftParen', kind='LeftParenToken'),
+             Child('LeftParen', kind='LeftParenToken', 
+                   classification='StringInterpolationAnchor',
+                   force_classification=True),
              Child('Expression', kind='Expr'),
              Child('RightParen', kind='StringInterpolationAnchorToken'),
          ]),
@@ -498,7 +500,11 @@ EXPR_NODES = [
     Node('KeyPathExpr', kind='Expr',
          children=[
              Child('Backslash', kind='BackslashToken'),
-             Child('RootExpr', kind='IdentifierExpr', is_optional=True), 
+             Child('RootExpr', kind='Expr', is_optional=True, 
+                   node_choices=[
+                       Child('IdentifierExpr', kind='IdentifierExpr'),
+                       Child('SpecializeExpr', kind='SpecializeExpr')
+                   ]), 
              Child('Expression', kind='Expr'),
          ]),
 

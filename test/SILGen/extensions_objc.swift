@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name extensions_objc -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name extensions_objc -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -enable-sil-ownership | %FileCheck %s
 //
 // REQUIRES: objc_interop
 
@@ -8,8 +8,8 @@ import Foundation
 class Foo {}
 
 extension Foo {
-  dynamic func kay() {}
-  dynamic var cox: Int { return 0 }
+  @objc dynamic func kay() {}
+  @objc dynamic var cox: Int { return 0 }
 }
 
 // CHECK-LABEL: sil hidden @$S15extensions_objc19extensionReferencesyyAA3FooCF

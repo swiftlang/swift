@@ -183,7 +183,7 @@ NSString *swift_stdlib_getDescription(OpaqueValue *value,
 
 NSString *swift::getDescription(OpaqueValue *value, const Metadata *type) {
   auto result = swift_stdlib_getDescription(value, type);
-  SWIFT_CC_PLUSZERO_GUARD(type->vw_destroy(value));
+  type->vw_destroy(value);
   return [result autorelease];
 }
 
@@ -603,12 +603,13 @@ void *swift::swift_bridgeObjectRetain(void *object) {
 #if SWIFT_OBJC_INTEROP
   if (!isNonNative_unTagged_bridgeObject(object)) {
     swift_retain(static_cast<HeapObject *>(objectRef));
-    return static_cast<HeapObject *>(objectRef);
+    return object;
   }
-  return objc_retain(static_cast<id>(objectRef));
+  objc_retain(static_cast<id>(objectRef));
+  return object;
 #else
   swift_retain(static_cast<HeapObject *>(objectRef));
-  return static_cast<HeapObject *>(objectRef);
+  return object;
 #endif
 }
 
@@ -624,12 +625,13 @@ void *swift::swift_nonatomic_bridgeObjectRetain(void *object) {
 #if SWIFT_OBJC_INTEROP
   if (!isNonNative_unTagged_bridgeObject(object)) {
     swift_nonatomic_retain(static_cast<HeapObject *>(objectRef));
-    return static_cast<HeapObject *>(objectRef);
+    return object;
   }
-  return objc_retain(static_cast<id>(objectRef));
+  objc_retain(static_cast<id>(objectRef));
+  return object;
 #else
   swift_nonatomic_retain(static_cast<HeapObject *>(objectRef));
-  return static_cast<HeapObject *>(objectRef);
+  return object;
 #endif
 }
 
@@ -680,14 +682,14 @@ void *swift::swift_bridgeObjectRetain_n(void *object, int n) {
   void *objc_ret = nullptr;
   if (!isNonNative_unTagged_bridgeObject(object)) {
     swift_retain_n(static_cast<HeapObject *>(objectRef), n);
-    return static_cast<HeapObject *>(objectRef);
+    return object;
   }
   for (int i = 0;i < n; ++i)
     objc_ret = objc_retain(static_cast<id>(objectRef));
-  return objc_ret;
+  return object;
 #else
   swift_retain_n(static_cast<HeapObject *>(objectRef), n);
-  return static_cast<HeapObject *>(objectRef);
+  return object;
 #endif
 }
 
@@ -721,14 +723,14 @@ void *swift::swift_nonatomic_bridgeObjectRetain_n(void *object, int n) {
   void *objc_ret = nullptr;
   if (!isNonNative_unTagged_bridgeObject(object)) {
     swift_nonatomic_retain_n(static_cast<HeapObject *>(objectRef), n);
-    return static_cast<HeapObject *>(objectRef);
+    return object;
   }
   for (int i = 0;i < n; ++i)
     objc_ret = objc_retain(static_cast<id>(objectRef));
-  return objc_ret;
+  return object;
 #else
   swift_nonatomic_retain_n(static_cast<HeapObject *>(objectRef), n);
-  return static_cast<HeapObject *>(objectRef);
+  return object;
 #endif
 }
 
@@ -1112,16 +1114,16 @@ swift_dynamicCastForeignClassUnconditionalImpl(
 }
 
 bool swift::objectConformsToObjCProtocol(const void *theObject,
-                                         const ProtocolDescriptor *protocol) {
+                                         ProtocolDescriptorRef protocol) {
   return [id_const_cast(theObject)
-          conformsToProtocol: protocol_const_cast(protocol)];
+          conformsToProtocol: protocol.getObjCProtocol()];
 }
 
 
 bool swift::classConformsToObjCProtocol(const void *theClass,
-                                        const ProtocolDescriptor *protocol) {
+                                        ProtocolDescriptorRef protocol) {
   return [class_const_cast(theClass)
-          conformsToProtocol: protocol_const_cast(protocol)];
+          conformsToProtocol: protocol.getObjCProtocol()];
 }
 
 SWIFT_RUNTIME_EXPORT
@@ -1140,16 +1142,7 @@ const Metadata *swift_dynamicCastTypeToObjCProtocolUnconditional(
     break;
 
   // Other kinds of type can never conform to ObjC protocols.
-  case MetadataKind::Struct:
-  case MetadataKind::Enum:
-  case MetadataKind::Optional:
-  case MetadataKind::Opaque:
-  case MetadataKind::Tuple:
-  case MetadataKind::Function:
-  case MetadataKind::Existential:
-  case MetadataKind::Metatype:
-  case MetadataKind::ExistentialMetatype:
-  case MetadataKind::ForeignClass:
+  default:
     swift_dynamicCastFailure(type, nameForMetadata(type).c_str(),
                              protocols[0], protocol_getName(protocols[0]));
 
@@ -1186,16 +1179,7 @@ const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
     break;
 
   // Other kinds of type can never conform to ObjC protocols.
-  case MetadataKind::Struct:
-  case MetadataKind::Enum:
-  case MetadataKind::Optional:
-  case MetadataKind::Opaque:
-  case MetadataKind::Tuple:
-  case MetadataKind::Function:
-  case MetadataKind::Existential:
-  case MetadataKind::Metatype:
-  case MetadataKind::ExistentialMetatype:
-  case MetadataKind::ForeignClass:
+  default:
     return nullptr;
 
   case MetadataKind::HeapLocalVariable:
@@ -1417,22 +1401,39 @@ bool swift::swift_isUniquelyReferencedOrPinned_native(const HeapObject *object){
 bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
                                                   const unsigned char *filename,
                                                   int32_t filenameLength,
-                                                  int32_t line) {
+                                                  int32_t line, int32_t column,
+                                                  unsigned verifcationType) {
+  assert((verifcationType == 0 || verifcationType == 1) &&
+         "Unknown verifcation type");
+
   bool isEscaping =
       object != nullptr && !object->refCounts.isUniquelyReferenced();
 
   // Print a message if the closure escaped.
   if (isEscaping) {
-    auto *message = "Fatal error: closure argument was escaped in "
-                              "withoutActuallyEscaping block";
+    auto *message = (verifcationType == 0)
+                        ? "closure argument was escaped in "
+                          "withoutActuallyEscaping block"
+                        : "closure argument passed as @noescape "
+                          "to Objective-C has escaped";
     auto messageLength = strlen(message);
 
-    if (_swift_shouldReportFatalErrorsToDebugger())
-      _swift_reportToDebugger(RuntimeErrorFlagFatal, message);
-
     char *log;
-    swift_asprintf(&log, "%.*s: file %.*s, line %" PRIu32 "\n", messageLength,
-                   message, filenameLength, filename, line);
+    swift_asprintf(
+        &log, "%.*s: file %.*s, line %" PRIu32 ", column %" PRIu32 " \n",
+        messageLength, message, filenameLength, filename, line, column);
+
+    printCurrentBacktrace(2/*framesToSkip*/);
+
+    if (_swift_shouldReportFatalErrorsToDebugger()) {
+      RuntimeErrorDetails details = {
+          .version = RuntimeErrorDetails::currentVersion,
+          .errorType = "escaping-closure-violation",
+          .currentStackDescription = "Closure has escaped",
+          .framesToSkip = 1,
+      };
+      _swift_reportToDebugger(RuntimeErrorFlagFatal, log, &details);
+    }
 
     swift_reportError(RuntimeErrorFlagFatal, log);
     free(log);
