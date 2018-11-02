@@ -161,6 +161,12 @@ func producesOptional() throws -> Int? { return nil }
 let singleOptional = try? producesOptional()
 let _: String = singleOptional // expected-error {{cannot convert value of type 'Int?' to specified type 'String'}}
 
+let _ = (try? foo())!!
+
+func producesDoubleOptional() throws -> Int?? { return 3 }
+
+let _: String = try? producesDoubleOptional() // expected-error {{ cannot convert value of type 'Int??' to specified type 'String'}}
+
 func maybeThrow() throws {}
 try maybeThrow() // okay
 try! maybeThrow() // okay
