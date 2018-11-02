@@ -3294,29 +3294,36 @@ extension FixedWidthInteger {
   }
   
   //  Default implementations, which override the BinaryInteger implementations
-  //  and make them unavailable, because they would be incorrect for any
-  //  FixedWidthInteger type. Concrete types must implement these operations.
-  @available(*, unavailable, message: "Concrete types must implement this operation.")
+  //  and make them unavailable; we can do this because these operations have
+  //  always been requirements of FixedWidthInteger, but they were added to
+  //  BinaryInteger after source stability was declared.
+  
+  @available(*, unavailable, message:
+  "Types conforming to FixedWidthInteger must implement addingReportingOverflow(_:Self).")
   public func addingReportingOverflow(_ rhs: Self) -> (partialValue: Self, overflow: Bool) {
     fatalError()
   }
   
-  @available(*, unavailable, message: "Concrete types must implement this operation.")
+  @available(*, unavailable, message:
+  "Types conforming to FixedWidthInteger must implement subtractingReportingOverflow(_:Self).")
   public func subtractingReportingOverflow(_ rhs: Self) -> (partialValue: Self, overflow: Bool) {
     fatalError()
   }
   
-  @available(*, unavailable, message: "Concrete types must implement this operation.")
+  @available(*, unavailable, message:
+  "Types conforming to FixedWidthInteger must implement multipliedReportingOverflow(by:Self).")
   public func multipliedReportingOverflow(by rhs: Self) -> (partialValue: Self, overflow: Bool) {
     fatalError()
   }
   
-  @available(*, unavailable, message: "Concrete types must implement this operation.")
+  @available(*, unavailable, message:
+  "Types conforming to FixedWidthInteger must implement dividedReportingOverflow(by:Self).")
   public func dividedReportingOverflow(by rhs: Self) -> (partialValue: Self, overflow: Bool) {
     fatalError()
   }
   
-  @available(*, unavailable, message: "Concrete types must implement this operation.")
+  @available(*, unavailable, message:
+  "Types conforming to FixedWidthInteger must implement remainderReportingOverflow(dividingBy:Self).")
   public func remainderReportingOverflow(dividingBy rhs: Self) -> (partialValue: Self, overflow: Bool) {
     fatalError()
   }
