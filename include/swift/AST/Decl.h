@@ -4851,8 +4851,6 @@ class ParamDecl : public VarDecl {
   llvm::PointerIntPair<StoredDefaultArgument *, 1> DefaultValueAndIsVariadic;
 
   /// `@autoclosure` flag associated with this parameter.
-  /// FIXME: This has to become declaration attribute after
-  /// `@autoclosure` is removed from function type.
   bool IsAutoClosure = false;
 
 public:

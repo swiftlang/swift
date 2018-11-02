@@ -486,8 +486,7 @@ mapParsedParameters(Parser &parser,
 
       // If there is `@autoclosure` attribute associated with the type
       // let's mark that in the declaration as well, because it
-      // belongs to both type flags and declaration at the moment, but
-      // should be removed from the type in the future.
+      // belongs to both type flags and declaration.
       if (auto *ATR = dyn_cast<AttributedTypeRepr>(type)) {
         auto &attrs = ATR->getAttrs();
         param->setAutoClosure(attrs.has(TypeAttrKind::TAK_autoclosure));

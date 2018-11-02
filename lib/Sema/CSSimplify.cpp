@@ -837,7 +837,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
                             : ConstraintKind::ArgumentConversion);
 
   // Check whether argument of the call at given position refers to
-  // parameter marked as `@autoclosure. This function is used to
+  // parameter marked as `@autoclosure`. This function is used to
   // maintain source compatibility with Swift versions < 5,
   // previously examples like following used to type-check:
   //
