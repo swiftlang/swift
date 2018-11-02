@@ -330,31 +330,6 @@ ParsedTypeIdentity::parse(const TypeContextDescriptor *type) {
 }
 
 #if SWIFT_OBJC_INTEROP
-/// For a mangled node that refers to an Objective-C class or protocol,
-/// return the class or protocol name.
-static Optional<StringRef> getObjCClassOrProtocolName(
-                                           const Demangle::NodePointer &node) {
-  if (node->getKind() != Demangle::Node::Kind::Class &&
-      node->getKind() != Demangle::Node::Kind::Protocol)
-    return None;
-
-  if (node->getNumChildren() != 2)
-    return None;
-
-  // Check whether we have the __ObjC module.
-  auto moduleNode = node->getChild(0);
-  if (moduleNode->getKind() != Demangle::Node::Kind::Module ||
-      moduleNode->getText() != MANGLING_MODULE_OBJC)
-    return None;
-
-  // Check whether we have an identifier.
-  auto nameNode = node->getChild(1);
-  if (nameNode->getKind() != Demangle::Node::Kind::Identifier)
-    return None;
-
-  return nameNode->getText();
-}
-
 /// Determine whether the two demangle trees both refer to the same
 /// Objective-C class or protocol referenced by name.
 static bool sameObjCTypeManglings(Demangle::NodePointer node1,
@@ -363,10 +338,10 @@ static bool sameObjCTypeManglings(Demangle::NodePointer node1,
   if (node1->getKind() != node2->getKind())
     return false;
 
-  auto name1 = getObjCClassOrProtocolName(node1);
+  auto name1 = Demangle::getObjCClassOrProtocolName(node1);
   if (!name1) return false;
 
-  auto name2 = getObjCClassOrProtocolName(node2);
+  auto name2 = Demangle::getObjCClassOrProtocolName(node2);
   if (!name2) return false;
 
   return *name1 == *name2;
@@ -950,45 +925,19 @@ public:
       lookupDependentMember(lookupDependentMember) { }
 
   using BuiltType = const Metadata *;
-
-  struct BuiltNominalTypeDecl :
-    llvm::PointerUnion<const TypeContextDescriptor *, const Metadata *>
-  {
-    using PointerUnion::PointerUnion;
-
-    explicit operator bool() const { return !isNull(); }
-  };
-
+  using BuiltNominalTypeDecl = const TypeContextDescriptor *;
   using BuiltProtocolDecl = ProtocolDescriptorRef;
 
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
 
   BuiltNominalTypeDecl createNominalTypeDecl(
                                      const Demangle::NodePointer &node) const {
-#if SWIFT_OBJC_INTEROP
-    // If we have an Objective-C class name, call into the Objective-C
-    // runtime to find them.
-    if (auto objcClassName = getObjCClassOrProtocolName(node)) {
-      auto objcClass = objc_getClass(objcClassName->str().c_str());
-      return swift_getObjCClassMetadata((const ClassMetadata *)objcClass);
-    }
-#endif
-
     // Look for a nominal type descriptor based on its mangled name.
     return _findNominalTypeDescriptor(node, demangler);
   }
 
   BuiltProtocolDecl createProtocolDecl(
                                     const Demangle::NodePointer &node) const {
-#if SWIFT_OBJC_INTEROP
-    // If we have an Objective-C protocol name, call into the Objective-C
-    // runtime to find them.
-    if (auto objcProtocolName = getObjCClassOrProtocolName(node)) {
-      return ProtocolDescriptorRef::forObjC(objc_getProtocol(
-                                              objcProtocolName->str().c_str()));
-    }
-#endif
-
     // Look for a protocol descriptor based on its mangled name.
     std::string mangledName;
     if (auto protocol = _findProtocolDescriptor(node, demangler, mangledName))
@@ -1006,6 +955,25 @@ public:
     return ProtocolDescriptorRef();
   }
 
+  BuiltProtocolDecl createObjCProtocolDecl(
+                                         const std::string &mangledName) const {
+#if SWIFT_OBJC_INTEROP
+    return ProtocolDescriptorRef::forObjC(
+        objc_getProtocol(mangledName.c_str()));
+#else
+    return ProtocolDescriptorRef();
+#endif
+  }
+  
+  BuiltType createObjCClassType(const std::string &mangledName) const {
+#if SWIFT_OBJC_INTEROP
+    auto objcClass = objc_getClass(mangledName.c_str());
+    return swift_getObjCClassMetadata((const ClassMetadata *)objcClass);
+#else
+    return BuiltType();
+#endif
+  }
+
   BuiltType createNominalType(BuiltNominalTypeDecl metadataOrTypeDecl,
                               BuiltType parent) const {
     // Treat nominal type creation the same way as generic type creation,
@@ -1013,15 +981,9 @@ public:
     return createBoundGenericType(metadataOrTypeDecl, { }, parent);
   }
 
-  BuiltType createBoundGenericType(BuiltNominalTypeDecl metadataOrTypeDecl,
+  BuiltType createBoundGenericType(BuiltNominalTypeDecl typeDecl,
                                    const ArrayRef<BuiltType> genericArgs,
                                    const BuiltType parent) const {
-    // If we already have metadata, return it.
-    if (auto metadata = metadataOrTypeDecl.dyn_cast<const Metadata *>())
-      return metadata;
-
-    auto typeDecl = metadataOrTypeDecl.get<const TypeContextDescriptor *>();
-
     // Figure out the various levels of generic parameters we have in
     // this type.
     std::vector<unsigned> genericParamCounts;
