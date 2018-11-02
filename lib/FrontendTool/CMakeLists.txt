@@ -5,7 +5,7 @@ add_swift_host_library(swiftFrontendTool STATIC
   TBD.cpp
   DEPENDS
     swift-syntax-generated-headers SwiftOptions
-  LINK_LIBS
+  LINK_LIBRARIES
     swiftIndex
     swiftIDE
     swiftTBDGen swiftIRGen swiftSIL swiftSILGen swiftSILOptimizer

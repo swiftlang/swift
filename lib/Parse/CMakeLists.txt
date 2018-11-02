@@ -13,7 +13,7 @@ add_swift_host_library(swiftParse STATIC
   Scope.cpp
   SyntaxParsingCache.cpp
   SyntaxParsingContext.cpp
-  LINK_LIBS
+  LINK_LIBRARIES
     swiftAST
     swiftSyntax
 )
