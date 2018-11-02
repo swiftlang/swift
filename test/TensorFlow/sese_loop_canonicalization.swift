@@ -5,6 +5,58 @@
 
 import TensorFlow
 
+// expected-warning @+1 {{value implicitly copied to the host}}
+public func testLoopMovementFromOutside(_ breakIndex: Int32) -> Tensor<Int32> {
+  var i: Int32 = 1
+  var sum = Tensor<Int32>(0)
+  let maxCount: Int32 = 100
+  while i <= maxCount { // expected-note {{value used here}}
+    sum += i
+    if i == breakIndex {
+      var k: Int32 = 0
+      while k < i {
+        sum += i
+        k += 1
+      }
+      // expected-warning @+1 {{value implicitly copied to the host}}
+      sum += 1
+      break // expected-note {{value used here}}
+    }
+    i += 1
+  }
+  return sum
+}
+
+// CHECK-LABEL: --- XLA CFG Loops Before Canonicalize: {{.*}}testLoopMovementFromOutside{{.*}}
+// CHECK: Loop at depth 1 containing: {{.*}}
+//--- The following loop is the inner while loop, but is unnested in the CFG due to the `break`
+// CHECK: Loop at depth 1 containing: {{.*}}
+
+// CHECK-LABEL: --- XLA CFG Loops After Canonicalize: {{.*}}testLoopMovementFromOutside{{.*}}
+// CHECK: Loop at depth 1 containing: {{.*}}
+//--- The inner while loop gets nested into the outer while loop by SESE canonicalzation.
+// CHECK:     Loop at depth 2 containing: {{.*}}
+
+// CHECK: --- XLA CFG Canonicalize:  {{.*}}testLoopMovementFromOutside{{.*}}
+// CHECK: [sequence
+// CHECK:   <while Preheader: {{.*}}, Header: {{.*}}, exit: {{.*}}
+// CHECK:     [sequence
+// CHECK:       {condition Header: {{.*}}
+// CHECK:         {condition Header: {{.*}}
+// CHECK:           [sequence
+// CHECK:             <while Preheader: {{.*}}, Header: {{.*}}, exit: {{.*}}
+// CHECK:               [sequence
+// CHECK:                 {condition Header: {{.*}}
+// CHECK:                   block {{.*}}
+// CHECK:                   block {{.*}}}
+// CHECK:                 block {{.*}}]>
+// CHECK:             block {{.*}}]
+// CHECK:           block {{.*}}}
+// CHECK:         block {{.*}}}
+// CHECK:       block {{.*}}]>
+// CHECK:   block {{.*}}]
+
+
 // This example checks that the loop structure is preserved when we unroll
 // the body of a loop during canonicalization.
 //expected-warning @+1 {{value implicitly copied to the host}}
