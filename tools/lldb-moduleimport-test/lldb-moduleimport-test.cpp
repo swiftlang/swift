@@ -17,13 +17,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
+#include "swift/AST/ASTDemangler.h"
+#include "swift/Basic/Dwarf.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Frontend/Frontend.h"
-#include "swift/IDE/Utils.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/Validation.h"
-#include "swift/Basic/Dwarf.h"
 #include "llvm/Object/ELFObjectFile.h"
-#include "swift/Basic/LLVMInitialize.h"
 #include "llvm/Object/MachO.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Support/CommandLine.h"
@@ -92,10 +92,8 @@ static void resolveDeclFromMangledNameList(
 
 static void resolveTypeFromMangledNameList(
     swift::ASTContext &Ctx, llvm::ArrayRef<std::string> MangledNames) {
-  std::string Error;
   for (auto &Mangled : MangledNames) {
-    swift::Type ResolvedType =
-        swift::ide::getTypeFromMangledSymbolname(Ctx, Mangled, Error);
+    auto ResolvedType = swift::Demangle::getTypeForMangling(Ctx, Mangled);
     if (!ResolvedType) {
       llvm::errs() << "Can't resolve type of " << Mangled << "\n";
     } else {
