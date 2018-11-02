@@ -2634,12 +2634,11 @@ private:
     Mangle::ASTMangler Mangler;
     std::string mangledName(Mangler.mangleTypeForDebugger(
                               T->mapTypeOutOfContext(), DC,
-        DC->getGenericEnvironmentOfContext()));
-    Type ReconstructedType = DC->mapTypeIntoContext(
-        Demangle::getTypeForMangling(Ctx, mangledName));
+                              DC->getGenericEnvironmentOfContext()));
+    Type ReconstructedType = Demangle::getTypeForMangling(Ctx, mangledName);
     Stream << "type: ";
     if (ReconstructedType) {
-      ReconstructedType->print(Stream);
+      DC->mapTypeIntoContext(ReconstructedType)->print(Stream);
     } else {
       Stream << "FAILURE";
     }

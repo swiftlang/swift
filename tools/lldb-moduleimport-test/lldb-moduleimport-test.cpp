@@ -75,21 +75,6 @@ validateModule(llvm::StringRef data, bool Verbose,
   return true;
 }
 
-static void resolveDeclFromMangledNameList(
-    swift::ASTContext &Ctx, llvm::ArrayRef<std::string> MangledNames) {
-  std::string Error;
-  for (auto &Mangled : MangledNames) {
-    swift::Decl *ResolvedDecl =
-        swift::ide::getDeclFromMangledSymbolName(Ctx, Mangled, Error);
-    if (!ResolvedDecl) {
-      llvm::errs() << "Can't resolve decl of " << Mangled << "\n";
-    } else {
-      ResolvedDecl->print(llvm::errs());
-      llvm::errs() << "\n";
-    }
-  }
-}
-
 static void resolveTypeFromMangledNameList(
     swift::ASTContext &Ctx, llvm::ArrayRef<std::string> MangledNames) {
   for (auto &Mangled : MangledNames) {
@@ -193,9 +178,6 @@ int main(int argc, char **argv) {
   llvm::cl::opt<std::string> ModuleCachePath(
     "module-cache-path", llvm::cl::desc("Clang module cache path"));
 
-  llvm::cl::opt<std::string> DumpDeclFromMangled(
-      "decl-from-mangled", llvm::cl::desc("dump decl from mangled names list"));
-
   llvm::cl::opt<std::string> DumpTypeFromMangled(
       "type-from-mangled", llvm::cl::desc("dump type from mangled names list"));
 
@@ -225,8 +207,6 @@ int main(int argc, char **argv) {
   };
 
   if (!validateInputFile(DumpTypeFromMangled))
-    return 1;
-  if (!validateInputFile(DumpDeclFromMangled))
     return 1;
 
   // Fetch the serialized module bitstreams from the Mach-O files and
@@ -313,11 +293,6 @@ int main(int argc, char **argv) {
       llvm::SmallVector<std::string, 8> MangledNames;
       collectMangledNames(DumpTypeFromMangled, MangledNames);
       resolveTypeFromMangledNameList(CI.getASTContext(), MangledNames);
-    }
-    if (!DumpDeclFromMangled.empty()) {
-      llvm::SmallVector<std::string, 8> MangledNames;
-      collectMangledNames(DumpDeclFromMangled, MangledNames);
-      resolveDeclFromMangledNameList(CI.getASTContext(), MangledNames);
     }
   }
   return 0;
