@@ -23,14 +23,11 @@ let scalars = Tensor<Float>([0, 1, 2])
 let dataset = Dataset(elements: scalars)
 var iterator = dataset.makeIterator()
 
-DatasetGlobalTests.testCPUOrGPU("DatasetAsGlobalVar") {
-  // This stmt makes sure the load inst from the global var `dataset` does not
-  // make dataset an input arg tensor.
-  //
-  // It can be removed when we convert arg tensors to Swift->TF tensor
-  // transfers.
-  _ = scalars + scalars
+DatasetGlobalTests.testCPUOrGPU("RuntimeConfigTest") {
+  expectTrue(_RuntimeConfig.usesTFEagerAPI)
+}
 
+DatasetGlobalTests.testCPUOrGPU("DatasetAsGlobalVar") {
   var expectedVal: Float = 0.0
   for item in dataset {
     _hostOp(item)
@@ -40,13 +37,6 @@ DatasetGlobalTests.testCPUOrGPU("DatasetAsGlobalVar") {
 }
 
 DatasetGlobalTests.testCPUOrGPU("IteratorAsGlobalVar") {
-  // This stmt makes sure the load inst from the global var `iterator` does not
-  // make iterator an input arg tensor.
-  //
-  // It can be removed when we convert arg tensors to Swift->TF tensor
-  // transfers.
-  _ = scalars + scalars
-
   var expectedVal: Float = 0.0
 	while let item = iterator.next() {
     _hostOp(item)
