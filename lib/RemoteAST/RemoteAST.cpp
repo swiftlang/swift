@@ -29,6 +29,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Demangling/Demangler.h"
 #include "llvm/ADT/StringSwitch.h"
 
 // TODO: Develop a proper interface for this.
@@ -1341,4 +1342,15 @@ RemoteASTContext::getDynamicTypeAndAddressForExistential(
     remote::RemoteAddress address, Type staticType) {
   return asImpl(Impl)->getDynamicTypeAndAddressForExistential(address,
                                                               staticType);
+}
+
+Type swift::remoteAST::getTypeForMangling(ASTContext &ctx,
+                                          StringRef mangling) {
+  Demangle::Context Dem;
+  auto node = Dem.demangleSymbolAsNode(mangling);
+  if (!node)
+    return Type();
+
+  RemoteASTTypeBuilder builder(ctx);
+  return swift::Demangle::decodeMangledType(builder, node);
 }
