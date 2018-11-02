@@ -1210,7 +1210,7 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
     auto accessor = vd->getAccessor(kind);
     if (!accessor) return;
 
-    // Only eit the accessor if it wasn't added to the surrounding decl
+    // Only emit the accessor if it wasn't added to the surrounding decl
     // list by the parser.  We can test that easily by looking at the impl
     // info, since all of these accessors have a corresponding access kind
     // whose impl should definitely point at the accessor if it was parsed.
