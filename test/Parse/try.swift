@@ -161,11 +161,10 @@ func producesOptional() throws -> Int? { return nil }
 let singleOptional = try? producesOptional()
 let _: String = singleOptional // expected-error {{cannot convert value of type 'Int?' to specified type 'String'}}
 
-let _ = (try? foo())!!
+let _ = (try? foo())!! // expected-error {{cannot force unwrap value of non-optional type 'Int'}}
 
 func producesDoubleOptional() throws -> Int?? { return 3 }
-
-let _: String = try? producesDoubleOptional() // expected-error {{ cannot convert value of type 'Int??' to specified type 'String'}}
+let _: String = try? producesDoubleOptional() // expected-error {{cannot convert value of type 'Int??' to specified type 'String'}}
 
 func maybeThrow() throws {}
 try maybeThrow() // okay
@@ -203,3 +202,61 @@ _ = "a\()b" // expected-error {{interpolation can throw but is not marked with '
               // expected-note@-2 {{did you mean to handle error as optional value?}} {{5-5=try? }}
               // expected-note@-3 {{did you mean to disable error propagation?}} {{5-5=try! }}
 _ = try "\() \(1)"
+
+func testGenericOptionalTry<T>(_ call: () throws -> T ) {
+  let _: String = try? call() // expected-error {{cannot convert value of type 'T?' to specified type 'String'}}
+}
+
+func genericOptionalTry<T>(_ call: () throws -> T ) -> T? {
+  let x = try? call() // no error expected
+  return x
+}
+
+// Test with a non-optional type
+let _: String = genericOptionalTry({ () throws -> Int in return 3 }) // expected-error {{cannot convert value of type 'Int?' to specified type 'String'}}
+
+// Test with an optional type
+let _: String = genericOptionalTry({ () throws -> Int? in return nil }) // expected-error {{cannot convert value of type 'Int??' to specified type 'String'}}
+
+func produceAny() throws -> Any {
+  return 3
+}
+
+let _: Int? = try? produceAny() as? Int // good
+let _: Int? = (try? produceAny()) as? Int // good
+let _: String = try? produceAny() as? Int // expected-error {{cannot convert value of type 'Int?' to specified type 'String'}}
+let _: String = (try? produceAny()) as? Int // expected-error {{cannot convert value of type 'Int?' to specified type 'String'}}
+
+
+struct ThingProducer {
+  func produceInt() throws -> Int { return 3 }
+  func produceIntNoThrowing() -> Int { return 3 }
+  func produceAny() throws -> Any { return 3 }
+  func produceOptionalAny() throws -> Any? { return 3 }
+  func produceDoubleOptionalInt() throws -> Int?? { return 3 }
+}
+
+let optProducer: ThingProducer? = ThingProducer()
+let _: Int? = try? optProducer?.produceInt()
+let _: Int = try? optProducer?.produceInt() // expected-error {{value of optional type 'Int?' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
+let _: String = try? optProducer?.produceInt() // expected-error {{cannot convert value of type 'Int?' to specified type 'String'}}
+let _: Int? = try? optProducer?.produceIntNoThrowing() // expected-warning {{no calls to throwing functions occur within 'try' expression}}
+
+let _: Int?? = try? optProducer?.produceInt() // This was the expected type before Swift 5, but this still works; just adds more optional-ness
+
+let _: Int? = (try? optProducer?.produceAny()) as? Int // good
+let _: Int? = try? optProducer?.produceAny() as? Int // good
+let _: Int?? = try? optProducer?.produceAny() as? Int // good
+let _: String = try? optProducer?.produceAny() as? Int // expected-error {{cannot convert value of type 'Int?' to specified type 'String'}}
+
+let _: Int? = try? optProducer?.produceDoubleOptionalInt() // expected-error {{value of optional type 'Int??' not unwrapped; did you mean to use 'try!' or chain with '?'?}} 
+let _: String = try? optProducer?.produceDoubleOptionalInt() // expected-error {{cannot convert value of type 'Int??' to specified type 'String'}}
+let _: String = try? optProducer?.produceDoubleOptionalInt() // expected-error {{cannot convert value of type 'Int??' to specified type 'String'}}
+
+let producer = ThingProducer()
+
+let _: Int = try? producer.produceDoubleOptionalInt() // expected-error {{cannot convert value of type 'Int??' to specified type 'Int'}}
+let _: Int? = try? producer.produceDoubleOptionalInt() // expected-error {{value of optional type 'Int??' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
+let _: Int?? = try? producer.produceDoubleOptionalInt() // good
+let _: Int??? = try? producer.produceDoubleOptionalInt() // good
+let _: String = try? producer.produceDoubleOptionalInt() // expected-error {{cannot convert value of type 'Int??' to specified type 'String'}}
