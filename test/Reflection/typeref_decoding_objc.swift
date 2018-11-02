@@ -11,10 +11,10 @@
 // CHECK: TypesToReflect.OC
 // CHECK: -----------------
 // CHECK: nsObject: __C.NSObject
-// CHECK: (class __C.NSObject)
+// CHECK: (objective_c_class name=NSObject)
 
 // CHECK: nsString: __C.NSString
-// CHECK: (class __C.NSString)
+// CHECK: (objective_c_class name=NSString)
 
 // CHECK: cfString: __C.CFStringRef
 // CHECK: (alias __C.CFStringRef)
@@ -25,7 +25,7 @@
 
 // CHECK: ocnss: TypesToReflect.GenericOC<__C.NSString>
 // CHECK: (bound_generic_class TypesToReflect.GenericOC
-// CHECK:   (class __C.NSString))
+// CHECK:   (objective_c_class name=NSString))
 
 // CHECK: occfs: TypesToReflect.GenericOC<__C.CFStringRef>
 // CHECK: (bound_generic_class TypesToReflect.GenericOC
@@ -37,7 +37,7 @@
 // CHECK: TypesToReflect.HasObjCClasses
 // CHECK: -----------------------------
 // CHECK: url: __C.NSURL
-// CHECK: (class __C.NSURL)
+// CHECK: (objective_c_class name=NSURL)
 
 // CHECK: integer: Swift.Int
 // CHECK: (struct Swift.Int)
@@ -47,13 +47,6 @@
 
 // CHECK: TypesToReflect.OP
 // CHECK: -----------------
-
-// CHECK: __C.NSBundle
-// CHECK: ----------
-// CHECK: __C.NSURL
-// CHECK: ---------
-// CHECK: __C.NSCoding
-// CHECK: ------------
 
 // CHECK: ASSOCIATED TYPES:
 // CHECK: =================
@@ -77,7 +70,7 @@
 // CHECK-NEXT: ====================
 
 // CHECK:      - Capture types:
-// CHECK-NEXT: (class __C.NSBundle)
+// CHECK-NEXT: (objective_c_class name=NSBundle)
 // CHECK-NEXT: (protocol_composition
-// CHECK-NEXT:   (protocol __C.NSCoding))
+// CHECK-NEXT:   (objective_c_protocol name=NSCoding))
 // CHECK-NEXT: - Metadata sources:

@@ -1045,12 +1045,6 @@ public:
   /// without knowledge of their contents. This includes imported structs
   /// and fixed-size multi-payload enums.
   llvm::SetVector<const NominalTypeDecl *> OpaqueTypes;
-  /// Imported classes referenced by types in this module when emitting
-  /// reflection metadata.
-  llvm::SetVector<const ClassDecl *> ImportedClasses;
-  /// Imported protocols referenced by types in this module when emitting
-  /// reflection metadata.
-  llvm::SetVector<const ProtocolDecl *> ImportedProtocols;
   /// Imported structs referenced by types in this module when emitting
   /// reflection metadata.
   llvm::SetVector<const StructDecl *> ImportedStructs;
