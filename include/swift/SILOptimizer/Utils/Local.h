@@ -640,7 +640,8 @@ struct LLVM_LIBRARY_VISIBILITY FindLocalApplySitesResult {
 ///
 /// 1. We discovered that the function_ref never escapes.
 /// 2. We were able to find either a partial apply or a full apply site.
-Optional<FindLocalApplySitesResult> findLocalApplySites(FunctionRefInst *FRI);
+Optional<FindLocalApplySitesResult>
+findLocalApplySites(FunctionRefBaseInst *FRI);
 
 } // end namespace swift
 

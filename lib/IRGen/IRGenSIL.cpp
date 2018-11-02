@@ -915,7 +915,10 @@ public:
   void visitPartialApplyInst(PartialApplyInst *i);
   void visitBuiltinInst(BuiltinInst *i);
 
+  void visitFunctionRefBaseInst(FunctionRefBaseInst *i);
   void visitFunctionRefInst(FunctionRefInst *i);
+  void visitDynamicFunctionRefInst(DynamicFunctionRefInst *i);
+  void visitPreviousDynamicFunctionRefInst(PreviousDynamicFunctionRefInst *i);
   void visitAllocGlobalInst(AllocGlobalInst *i);
   void visitGlobalAddrInst(GlobalAddrInst *i);
   void visitGlobalValueInst(GlobalValueInst *i);
@@ -1832,7 +1835,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
 }
 
-void IRGenSILFunction::visitFunctionRefInst(FunctionRefInst *i) {
+void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto fn = i->getReferencedFunction();
 
   llvm::Constant *fnPtr = IGM.getAddrOfSILFunction(fn, NotForDefinition);
@@ -1847,6 +1850,19 @@ void IRGenSILFunction::visitFunctionRefInst(FunctionRefInst *i) {
   // Store the function as a FunctionPointer so we can avoid bitcasting
   // or thunking if we don't need to.
   setLoweredFunctionPointer(i, fp);
+}
+
+void IRGenSILFunction::visitFunctionRefInst(FunctionRefInst *i) {
+  visitFunctionRefBaseInst(i);
+}
+
+void IRGenSILFunction::visitDynamicFunctionRefInst(DynamicFunctionRefInst *i) {
+  visitFunctionRefBaseInst(i);
+}
+
+void IRGenSILFunction::visitPreviousDynamicFunctionRefInst(
+    PreviousDynamicFunctionRefInst *i) {
+  visitFunctionRefBaseInst(i);
 }
 
 void IRGenSILFunction::visitAllocGlobalInst(AllocGlobalInst *i) {

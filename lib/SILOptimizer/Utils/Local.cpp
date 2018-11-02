@@ -220,6 +220,14 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
       auto *FRI = dyn_cast<FunctionRefInst>(I);
       if (FRI && FRI->getReferencedFunction())
         FRI->dropReferencedFunction();
+
+      auto *DFRI = dyn_cast<DynamicFunctionRefInst>(I);
+      if (DFRI && DFRI->getReferencedFunction())
+        DFRI->dropReferencedFunction();
+
+      auto *PFRI = dyn_cast<PreviousDynamicFunctionRefInst>(I);
+      if (PFRI && PFRI->getReferencedFunction())
+        PFRI->dropReferencedFunction();
     }
 
     for (auto I : DeadInsts) {
@@ -1635,7 +1643,7 @@ StaticInitCloner::clone(SingleValueInstruction *InitVal) {
 }
 
 Optional<FindLocalApplySitesResult>
-swift::findLocalApplySites(FunctionRefInst *FRI) {
+swift::findLocalApplySites(FunctionRefBaseInst *FRI) {
   SmallVector<Operand *, 32> worklist(FRI->use_begin(), FRI->use_end());
 
   Optional<FindLocalApplySitesResult> f;

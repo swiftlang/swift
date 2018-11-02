@@ -832,6 +832,14 @@ public:
       *this << "  // function_ref "
             << demangleSymbol(FRI->getReferencedFunction()->getName())
             << "\n";
+    else if (auto *FRI = dyn_cast<DynamicFunctionRefInst>(I))
+      *this << "  // dynamic_function_ref "
+            << demangleSymbol(FRI->getReferencedFunction()->getName())
+            << "\n";
+    else if (auto *FRI = dyn_cast<PreviousDynamicFunctionRefInst>(I))
+      *this << "  // prev_dynamic_function_ref "
+            << demangleSymbol(FRI->getReferencedFunction()->getName())
+            << "\n";
 
     *this << "  ";
 
@@ -1130,7 +1138,16 @@ public:
     FRI->getReferencedFunction()->printName(PrintState.OS);
     *this << " : " << FRI->getType();
   }
-  
+  void visitDynamicFunctionRefInst(DynamicFunctionRefInst *FRI) {
+    FRI->getReferencedFunction()->printName(PrintState.OS);
+    *this << " : " << FRI->getType();
+  }
+  void
+  visitPreviousDynamicFunctionRefInst(PreviousDynamicFunctionRefInst *FRI) {
+    FRI->getReferencedFunction()->printName(PrintState.OS);
+    *this << " : " << FRI->getType();
+  }
+
   void visitBuiltinInst(BuiltinInst *BI) {
     *this << QuotedString(BI->getName().str());
     printSubstitutions(BI->getSubstitutions());

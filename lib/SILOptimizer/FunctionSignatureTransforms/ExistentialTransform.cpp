@@ -384,7 +384,7 @@ void ExistentialTransform::populateThunkBody() {
   auto Loc = ThunkBody->getParent()->getLocation();
 
   /// Create the function_ref instruction to the NewF.
-  auto *FRI = Builder.createFunctionRef(Loc, NewF);
+  auto *FRI = Builder.createFunctionRefFor(Loc, NewF);
 
   auto GenCalleeType = NewF->getLoweredFunctionType();
   auto CalleeGenericSig = GenCalleeType->getGenericSignature();

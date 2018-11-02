@@ -2683,11 +2683,11 @@ void LoadableByAddress::run() {
   }
 
   // Scan the module for all references of the modified functions:
-  llvm::SetVector<FunctionRefInst *> funcRefs;
+  llvm::SetVector<FunctionRefBaseInst *> funcRefs;
   for (SILFunction &CurrF : *getModule()) {
     for (SILBasicBlock &BB : CurrF) {
       for (SILInstruction &I : BB) {
-        if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
+        if (auto *FRI = dyn_cast<FunctionRefBaseInst>(&I)) {
           SILFunction *RefF = FRI->getReferencedFunction();
           if (modFuncs.count(RefF) != 0) {
             // Go over the uses and add them to lists to modify
@@ -2792,11 +2792,11 @@ void LoadableByAddress::run() {
   // Note: We don't need to update the witness tables and vtables
   // They just contain a pointer to the function
   // The pointer does not change
-  for (FunctionRefInst *instr : funcRefs) {
+  for (auto *instr : funcRefs) {
     SILFunction *F = instr->getReferencedFunction();
     SILBuilderWithScope refBuilder(instr);
-    FunctionRefInst *newInstr =
-        refBuilder.createFunctionRef(instr->getLoc(), F);
+    SingleValueInstruction *newInstr =
+        refBuilder.createFunctionRef(instr->getLoc(), F, instr->getKind());
     instr->replaceAllUsesWith(newInstr);
     instr->getParent()->erase(instr);
   }

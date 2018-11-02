@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 459; // Last change: dynamically_replaceable
+const uint16_t SWIFTMODULE_VERSION_MINOR = 460; // Last change: Add dynamic_function_ref
 
 using DeclIDField = BCFixed<31>;
 
