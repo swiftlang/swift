@@ -1987,19 +1987,8 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
          "could not find TensorArrayProtocol protocol");
   assert(outputTensorGroupProto && "could not find TensorGroup protocol");
 
-  if (!llvm::TFDynamicCompilation) {
-    // If we are not in dynamic compilation mode, then deabstraction may not
-    // have transformed the graph_ops into a form that we can lower, so do not
-    // try to lower the graph_ops.
-    // TODO(marcrasi): Once we make deabstraction unnecessary for IRGen, we
-    // should be able to lower everything no matter what the mode is, so remove
-    // this check.
-    const std::string errMessage = "!!! Compiler bug -- graph_op " +
-                              opInfo.getOperationName().str() +
-                              " cannot be lowered to LLVM IR !!!\n";
-    abortOnGraphOp(*this, errMessage.c_str());
-
-    // Finally, we set up our explosion results full of undef values.
+  // Sets the results of this op to undef.
+  auto lowerResultsToUndef = [&]() {
     for (auto result : i->getResults()) {
       ExplosionSchema schema = getTypeInfo(result->getType()).getSchema();
       Explosion e;
@@ -2007,6 +1996,22 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
         e.add(llvm::UndefValue::get(elt.getScalarType()));
       setLoweredExplosion(result, e);
     }
+  };
+
+  // Makes this op cause a runtime error.
+  auto lowerOpToError = [&](const char *errorMessage) {
+    abortOnGraphOp(*this, errorMessage);
+    lowerResultsToUndef();
+  };
+
+  // These ops configure the `deviceInfo`. They do not do anything
+  // at runtime, so do not lower them.
+  // This must be above the GraphFunctionDeviceInfo::getForFunction() call,
+  // because GraphFunctionDeviceInfo::getForFunction() crashes when called in
+  // the `enableTPU` function, because the enableInfeed operand isn't an integer
+  // literal instruction.
+  if (GraphFunctionDeviceInfo::isConfigOp(opInfo)) {
+    lowerResultsToUndef();
     return;
   }
 
@@ -2015,11 +2020,6 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     deviceInfo = Optional<GraphFunctionDeviceInfo>(
         GraphFunctionDeviceInfo::getForFunction(*CurSILFn,
                                                 /*removeConfigInst*/false));
-
-  // These ops configure the `deviceInfo`. They do not do anything
-  // at runtime, so do not lower them.
-  if (GraphFunctionDeviceInfo::isConfigOp(opInfo))
-    return;
 
   LLVM_DEBUG(llvm::dbgs() << "IRGen for graph_op: "
                           << opInfo.getOperationName() << "\n");
@@ -2365,11 +2365,15 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
       if (astType->isEqual(getArrayType(
           astCtx, astCtx.getStringDecl()->getDeclaredInterfaceType()))) {
-        assert(0 && "TODO: dynamic string list attributes");
+        // TODO: dynamic string list attributes
+        lowerOpToError("dynamic string list attributes not supported");
+        return;
       }
 
-      if (astType->is<AnyFunctionType>()) {
-        assert(0 && "TODO: dynamic function attributes");
+      if (astType->is<SILFunctionType>()) {
+        // TODO: dynamic function attributes
+        lowerOpToError("dynamic function attributes not supported");
+        return;
       }
 
       assert(0 && "unknown NormalAttribute type");
@@ -2428,7 +2432,9 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       LLVM_DEBUG(llvm::dbgs() << "  Adding dynamic ShapeAttribute of type "
                  << astType << "\n");
 
-      assert(0 && "TODO: implement dynamic ShapeAttribute");
+      // TODO: dynamic shape attributes
+      lowerOpToError("dynamic shape attributes not supported");
+      return;
     }
   }
 

@@ -1,11 +1,6 @@
-// RUN: %target-run-simple-swift
 // TODO: Revert to %target-run-simple-swift once we fold dynamic compilation into -Onone.
 // RUN: %target-run-disable-deabstraction-swift
 // REQUIRES: executable_test
-// REQUIRES: swift_test_mode_optimize
-
-// This file contains testing over a dataset as a global variable. This requires
-// sends/recvs support for variant handles.
 
 import CTensorFlow
 import TensorFlow
