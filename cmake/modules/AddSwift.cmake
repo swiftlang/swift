@@ -1319,66 +1319,12 @@ endfunction()
 #
 # Usage:
 #   add_swift_host_library(name
-#     [SHARED]
-#     [STATIC]
-#     [DEPENDS dep1 ...]
-#     [LINK_LIBRARIES dep1 ...]
-#     [INTERFACE_LINK_LIBRARIES dep1 ...]
-#     [SWIFT_MODULE_DEPENDS dep1 ...]
-#     [LLVM_COMPONENT_DEPENDS comp1 ...]
-#     [FILE_DEPENDS target1 ...]
-#     [C_COMPILE_FLAGS flag1...]
-#     [LINK_FLAGS flag1...]
-#     [INSTALL]
-#     INSTALL_IN_COMPONENT comp
-#     source1 [source2 source3 ...])
-#
-# name
-#   Name of the library (e.g., swiftParse).
-#
-# SHARED
-#   Build a shared library.
-#
-# STATIC
-#   Build a static library.
-#
-# DEPENDS
-#   Targets that this library depends on.
-#
-# LINK_LIBRARIES
-#   Libraries this library depends on.
-#
-# LLVM_COMPONENT_DEPENDS
-#   LLVM components this library depends on.
-#
-# FILE_DEPENDS
-#   Additional files this library depends on.
-#
-# C_COMPILE_FLAGS
-#   Extra compiler flags (C, C++, ObjC).
-#
-# LINK_FLAGS
-#   Extra linker flags.
-#
-# INSTALL_IN_COMPONENT comp
-#   The Swift installation component that this library belongs to.
-#
-# source1 ...
-#   Sources to add into this library.
+#     [FORCE_BUILD_OPTIMIZED]
+#     [...]
 function(add_swift_host_library name)
-  set(options
-        FORCE_BUILD_OPTIMIZED
-        SHARED
-        STATIC)
+  set(options FORCE_BUILD_OPTIMIZED)
   set(single_parameter_options)
-  set(multiple_parameter_options
-        C_COMPILE_FLAGS
-        DEPENDS
-        FILE_DEPENDS
-        INTERFACE_LINK_LIBRARIES
-        LINK_FLAGS
-        LINK_LIBRARIES
-        LLVM_COMPONENT_DEPENDS)
+  set(multiple_parameter_options GYB_SOURCES)
 
   cmake_parse_arguments(ASHL
                         "${options}"
@@ -1387,29 +1333,13 @@ function(add_swift_host_library name)
                         ${ARGN})
   set(ASHL_SOURCES ${ASHL_UNPARSED_ARGUMENTS})
 
-  translate_flags(ASHL "${options}")
-
-  if(NOT ASHL_SHARED AND NOT ASHL_STATIC)
-    message(FATAL_ERROR "Either SHARED or STATIC must be specified")
+  handle_gyb_sources(gyb_generated_targets ASHL_GYB_SOURCES
+    ${SWIFT_HOST_VARIANT_ARCH})
+  llvm_add_library(${name} ${ASHL_GYB_SOURCES} ${ASHL_UNPARSED_ARGUMENTS}
+    DEPENDS ${gyb_generated_targets})
+  if(ASHL_FORCE_BUILD_OPTIMIZED)
+    target_compile_options(${name} PRIVATE "-O2")
   endif()
-
-  _add_swift_library_single(
-    ${name}
-    ${name}
-    ${ASHL_SHARED_keyword}
-    ${ASHL_STATIC_keyword}
-    ${ASHL_SOURCES}
-    SDK ${SWIFT_HOST_VARIANT_SDK}
-    ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
-    DEPENDS ${ASHL_DEPENDS}
-    LINK_LIBRARIES ${ASHL_LINK_LIBRARIES}
-    LLVM_COMPONENT_DEPENDS ${ASHL_LLVM_COMPONENT_DEPENDS}
-    FILE_DEPENDS ${ASHL_FILE_DEPENDS}
-    C_COMPILE_FLAGS ${ASHL_C_COMPILE_FLAGS}
-    LINK_FLAGS ${ASHL_LINK_FLAGS}
-    INTERFACE_LINK_LIBRARIES ${ASHL_INTERFACE_LINK_LIBRARIES}
-    INSTALL_IN_COMPONENT "dev"
-    )
 
   swift_install_in_component(dev
     TARGETS ${name}
