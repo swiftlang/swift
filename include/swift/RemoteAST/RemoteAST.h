@@ -221,9 +221,6 @@ public:
                                          Type staticType);
 };
 
-Type getTypeForMangling(ASTContext &ctx,
-                        StringRef mangling);
-
 } // end namespace remoteAST
 } // end namespace swift
 
