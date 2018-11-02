@@ -58,34 +58,64 @@
 //
 //
 // Phase 4: Same command as in phase 3, but check that none of the cached modules are rebuilt.
-// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s
+// (The initial touch commands here are redundant, but are repeated to remind the reader of context.)
+// RUN: touch -t 201401240006 %t/LeafModule.swiftinterface
+// RUN: touch -t 201401240007 %t/OtherModule.swiftinterface
+// RUN: touch -t 201401240007 %t/modulecache/LeafModule-*.swiftmodule
 // RUN: touch -t 201401240008 %t/TestModule.swiftmodule
+// RUN: touch -t 201401240008 %t/modulecache/OtherModule-*.swiftmodule
+// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s
+// (Reset TestModule to where it was moments ago)
+// RUN: touch -t 201401240008 %t/TestModule.swiftmodule
+// (Check that TestModule -- at minute 08 -- is still not-older than the two cached modules, which should still be at minutes 08 and 07.)
 // RUN: test ! %t/TestModule.swiftmodule -ot %t/modulecache/OtherModule-*.swiftmodule
 // RUN: test ! %t/TestModule.swiftmodule -ot %t/modulecache/LeafModule-*.swiftmodule
 //
 //
 // Phase 5: change the mtime on LeafModule.swiftinterface and watch LeafModule-*.swiftmodule and OtherModule-*.swiftmodule recompile.
+// (The initial touch commands here are redundant, but are repeated to remind the reader of context.)
+// RUN: touch -t 201401240006 %t/LeafModule.swiftinterface
+// RUN: touch -t 201401240007 %t/OtherModule.swiftinterface
+// RUN: touch -t 201401240007 %t/modulecache/LeafModule-*.swiftmodule
+// RUN: touch -t 201401240008 %t/TestModule.swiftmodule
+// RUN: touch -t 201401240008 %t/modulecache/OtherModule-*.swiftmodule
+// (Push LeafModule's interface forward 10 minutes from the minute 06 timestamp stored in both cached modules, invalidating them)
 // RUN: touch -t 201401240016 %t/LeafModule.swiftinterface
 // RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s
+// (Check that the two cached modules were rebuit -- that the LeafModule.swiftinterface at minute 16 is older than them.)
 // RUN: test %t/LeafModule.swiftinterface -ot %t/modulecache/LeafModule-*.swiftmodule
 // RUN: test %t/LeafModule.swiftinterface -ot %t/modulecache/OtherModule-*.swiftmodule
 //
 //
 // Phase 6: change the mtimes on LeafModule-*.swiftmodule and OtherModule.swiftinterface, and watch just OtherModule-*.swiftmodule recompile, leaving LeafModule-*.swiftmodule alone.
+// (The initial touch commands here are redundant, but are repeated to remind the reader of context.)
+// RUN: touch -t 201401240016 %t/LeafModule.swiftinterface
+// RUN: touch -t 201401240007 %t/OtherModule.swiftinterface
+// RUN: touch %t/modulecache/LeafModule-*.swiftmodule
+// RUN: touch %t/modulecache/OtherModule-*.swiftmodule
+// (Perturb LeafModule's cached module and OtherModule's interface mtimes, so they do not match values stored in OtherModule's cached module.)
 // RUN: touch -t 201401240016 %t/modulecache/LeafModule-*.swiftmodule
 // RUN: touch -t 201401240017 %t/OtherModule.swiftinterface
 // RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s
+// (Check that Othermodule.swiftinterface at minute 17 is not older than the LeafModule's cached module which should still be at minute 16.)
 // RUN: test ! %t/OtherModule.swiftinterface -ot %t/modulecache/LeafModule-*.swiftmodule
+// (Check that Othermodule.swiftinterface at minute 17 _is_ older than the OtherModule's cached module, which was just rebuilt.)
 // RUN: test %t/OtherModule.swiftinterface -ot %t/modulecache/OtherModule-*.swiftmodule
 //
 //
-// Phase 7: change the size on LeafModule.swiftinterface (keeping mtime fixed) and watch LeafModule-*.swiftmodule and OtherModule-*.swiftmodule recompile.
+// Phase 7: change the _size_ on LeafModule.swiftinterface (keeping mtime fixed) and watch LeafModule-*.swiftmodule and OtherModule-*.swiftmodule recompile.
+// (The initial touch commands here are redundant, but are repeated to remind the reader of context.)
+// RUN: touch -t 201401240016 %t/LeafModule.swiftinterface
+// RUN: touch -t 201401240016 %t/modulecache/LeafModule-*.swiftmodule
+// RUN: touch -t 201401240017 %t/OtherModule.swiftinterface
 // RUN: touch -t 201401240017 %t/modulecache/OtherModule-*.swiftmodule
+// (Perturb the size of the LeafModule interface while keeping its mtime fixed.)
 // RUN: echo '// size change' >>%t/LeafModule.swiftinterface
 // RUN: touch -t 201401240016 %t/LeafModule.swiftinterface
 // RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s
+// (Check that both of the cached modules were rebuilt and are now newer than their respective interfaces.)
 // RUN: test %t/LeafModule.swiftinterface -ot %t/modulecache/LeafModule-*.swiftmodule
-// RUN: test %t/LeafModule.swiftinterface -ot %t/modulecache/OtherModule-*.swiftmodule
+// RUN: test %t/OtherModule.swiftinterface -ot %t/modulecache/OtherModule-*.swiftmodule
 
 import OtherModule
 
