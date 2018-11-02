@@ -202,21 +202,16 @@ protected:
       if (IGM.getSwiftModule()->isStdlibModule() && isa<BuiltinType>(t))
         IGM.BuiltinTypes.insert(t);
 
-      // We need size/alignment information for imported value types,
-      // so emit builtin descriptors for them.
+      // We need size/alignment information for imported structs and
+      // enums, so emit builtin descriptors for them.
       //
       // In effect they're treated like an opaque blob, which is OK
       // for now, at least until we want to import C++ types or
       // something like that.
-      //
-      // Classes and protocols go down a different path.
       if (auto Nominal = t->getAnyNominal())
         if (Nominal->hasClangNode()) {
-          if (auto CD = dyn_cast<ClassDecl>(Nominal))
-            IGM.ImportedClasses.insert(CD);
-          else if (auto PD = dyn_cast<ProtocolDecl>(Nominal))
-            IGM.ImportedProtocols.insert(PD);
-          else
+          if (isa<StructDecl>(Nominal) ||
+              isa<EnumDecl>(Nominal))
             IGM.OpaqueTypes.insert(Nominal);
         }
     });
@@ -386,14 +381,6 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     B.addInt16(uint16_t(kind));
     B.addInt16(fieldRecordSize);
 
-    // Imported classes don't need field descriptors
-    if (NTD->hasClangNode() && isa<ClassDecl>(NTD)) {
-      B.addInt32(0);
-      return;
-    }
-
-    assert(!NTD->hasClangNode() || isa<StructDecl>(NTD));
-
     auto properties = NTD->getStoredProperties();
     B.addInt32(std::distance(properties.begin(), properties.end()));
     for (auto property : properties)
@@ -453,11 +440,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   }
 
   void layout() override {
-    if (NTD->hasClangNode() &&
-        !isa<ClassDecl>(NTD) &&
-        !isa<StructDecl>(NTD) &&
-        !isa<ProtocolDecl>(NTD))
-      return;
+    assert(!NTD->hasClangNode() || isa<StructDecl>(NTD));
 
     PrettyStackTraceDecl DebugStack("emitting field type metadata", NTD);
     addNominalRef(NTD);
@@ -948,12 +931,6 @@ void IRGenModule::emitBuiltinReflectionMetadata() {
       Context.TheAnyType);
     BuiltinTypes.insert(anyMetatype);
   }
-
-  for (auto CD : ImportedClasses)
-    emitFieldMetadataRecord(CD);
-
-  for (auto PD : ImportedProtocols)
-    emitFieldMetadataRecord(PD);
 
   for (auto SD : ImportedStructs)
     emitFieldMetadataRecord(SD);
