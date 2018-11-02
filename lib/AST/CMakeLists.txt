@@ -62,22 +62,40 @@ add_swift_host_library(swiftAST STATIC
   TypeWalker.cpp
   USRGeneration.cpp
 
-  LINK_LIBS
+  LINK_LIBRARIES
     swiftMarkup
     swiftBasic
     swiftSyntax
 
-  LINK_COMPONENTS
+  INTERFACE_LINK_LIBRARIES
+    # Clang dependencies.
+    # FIXME: Clang should really export these in some reasonable manner.
+    clangCodeGen
+    clangIndex
+    clangFormat
+    clangToolingCore
+    clangFrontendTool
+    clangFrontend
+    clangDriver
+    clangSerialization
+    clangParse
+    clangSema
+    clangAnalysis
+    clangEdit
+    clangRewriteFrontend
+    clangRewrite
+    clangAST
+    clangLex
+    clangAPINotes
+    clangBasic
+
+  LLVM_COMPONENT_DEPENDS
     bitreader bitwriter coroutines coverage irreader debuginfoDWARF
     profiledata instrumentation object objcarcopts mc mcparser
     bitreader bitwriter lto ipo option core support ${LLVM_TARGETS_TO_BUILD}
 
   ${EXTRA_AST_FLAGS}
   )
-target_link_libraries(swiftAST
-                      INTERFACE
-                        clangTooling
-                        clangFrontendTool)
 
 # intrinsics_gen is the LLVM tablegen target that generates the include files
 # where intrinsics and attributes are declared. swiftAST depends on these
