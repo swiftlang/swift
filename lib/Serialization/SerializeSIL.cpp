@@ -34,6 +34,7 @@
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/OnDiskHashTable.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 #include <type_traits>
 
@@ -624,7 +625,7 @@ SILSerializer::writeKeyPathPatternComponent(
     = [&](const KeyPathPatternComponent &component) {
       ListOfValues.push_back(S.addDeclRef(component.getExternalDecl()));
       ListOfValues.push_back(
-        S.addSubstitutionMapRef(component.getExternalSubstitutions()));
+        S.addSubstitutionMapRef(component.getExternalSubstitutions().getCanonical()));
   
       auto indices = component.getSubscriptIndices();
       ListOfValues.push_back(indices.size());
@@ -906,7 +907,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
                              SILAbbrCodes[SILInstApplyLayout::Code],
                              SIL_BUILTIN,
-                             S.addSubstitutionMapRef(BI->getSubstitutions()),
+                             S.addSubstitutionMapRef(BI->getSubstitutions().getCanonical()),
                              S.addTypeRef(BI->getType().getASTType()),
                              (unsigned)BI->getType().getCategory(),
                              S.addDeclBaseNameRef(BI->getName()),
@@ -927,7 +928,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstApplyLayout::Code],
         AI->isNonThrowing() ? SIL_NON_THROWING_APPLY : SIL_APPLY,
-        S.addSubstitutionMapRef(AI->getSubstitutionMap()),
+        S.addSubstitutionMapRef(AI->getSubstitutionMap().getCanonical()),
         S.addTypeRef(AI->getCallee()->getType().getASTType()),
         S.addTypeRef(AI->getSubstCalleeType()),
         addValueRef(AI->getCallee()),
@@ -948,7 +949,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstApplyLayout::Code],
         AI->isNonThrowing() ? SIL_NON_THROWING_BEGIN_APPLY : SIL_BEGIN_APPLY,
-        S.addSubstitutionMapRef(AI->getSubstitutionMap()),
+        S.addSubstitutionMapRef(AI->getSubstitutionMap().getCanonical()),
         S.addTypeRef(AI->getCallee()->getType().getASTType()),
         S.addTypeRef(AI->getSubstCalleeType()),
         addValueRef(AI->getCallee()),
@@ -971,7 +972,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     Args.push_back(BasicBlockMap[AI->getErrorBB()]);
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstApplyLayout::Code], SIL_TRY_APPLY,
-        S.addSubstitutionMapRef(AI->getSubstitutionMap()),
+        S.addSubstitutionMapRef(AI->getSubstitutionMap().getCanonical()),
         S.addTypeRef(AI->getCallee()->getType().getASTType()),
         S.addTypeRef(AI->getSubstCalleeType()),
         addValueRef(AI->getCallee()),
@@ -986,7 +987,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstApplyLayout::Code], SIL_PARTIAL_APPLY,
-        S.addSubstitutionMapRef(PAI->getSubstitutionMap()),
+        S.addSubstitutionMapRef(PAI->getSubstitutionMap().getCanonical()),
         S.addTypeRef(PAI->getCallee()->getType().getASTType()),
         S.addTypeRef(PAI->getType().getASTType()),
         addValueRef(PAI->getCallee()),
@@ -1993,7 +1994,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     ListOfValues.push_back(
        S.addTypeRef(IBSHI->getInvokeFunction()->getType().getASTType()));
     // Always a value, don't need to save category
-    ListOfValues.push_back(S.addSubstitutionMapRef(IBSHI->getSubstitutions()));
+    ListOfValues.push_back(S.addSubstitutionMapRef(IBSHI->getSubstitutions().getCanonical()));
     
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
              SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
@@ -2012,7 +2013,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     ListOfValues.push_back(S.addTypeRef(pattern->getValueType()));
     ListOfValues.push_back(pattern->getComponents().size());
     ListOfValues.push_back(pattern->getNumOperands());
-    ListOfValues.push_back(S.addSubstitutionMapRef(KPI->getSubstitutions()));
+    ListOfValues.push_back(S.addSubstitutionMapRef(KPI->getSubstitutions().getCanonical()));
 
     ListOfValues.push_back(S.addUniquedStringRef(pattern->getObjCString()));
 
@@ -2487,6 +2488,7 @@ void Serializer::writeSIL(const SILModule *SILMod, bool serializeAllSIL) {
   if (!SILMod)
     return;
 
+  llvm::SaveAndRestore<bool> serializingRAII(IsSerializingSIL, true);
   SILSerializer SILSer(*this, Out, serializeAllSIL);
   SILSer.writeSILModule(SILMod);
 }

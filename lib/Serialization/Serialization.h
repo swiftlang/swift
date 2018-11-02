@@ -298,6 +298,8 @@ private:
   /// module.
   uint32_t /*SubstitutionMapID*/ LastSubstitutionMapID = 0;
 
+  bool IsSerializingSIL = false;
+
   /// Returns the record code for serializing the given vector of offsets.
   ///
   /// This allows the offset-serialization code to be generic over all kinds

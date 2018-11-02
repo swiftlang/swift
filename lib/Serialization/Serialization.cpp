@@ -574,6 +574,9 @@ GenericSignatureID Serializer::addGenericSignatureRef(
                                                 const GenericSignature *env) {
   if (!env) return 0;
 
+  assert((!IsSerializingSIL || env->isCanonical()) &&
+         "reference to non-canonical GenericSignature from SIL");
+
   auto &id = GenericSignatureIDs[env];
   if (id != 0)
     return id;
@@ -599,6 +602,9 @@ GenericEnvironmentID Serializer::addGenericEnvironmentRef(
 SubstitutionMapID Serializer::addSubstitutionMapRef(
                                               SubstitutionMap substitutions) {
   if (!substitutions) return 0;
+
+  assert((!IsSerializingSIL || substitutions.isCanonical()) &&
+         "reference to non-canonical SubstitutionMap from SIL");
 
   auto &id = SubstitutionMapIDs[substitutions];
   if (id != 0)
@@ -667,6 +673,8 @@ serialization::TypeID Serializer::addTypeRef(Type ty) {
 #ifndef NDEBUG
   PrettyStackTraceType trace(M->getASTContext(), "serializing", ty);
   assert(!ty->hasError() && "Serializing error type");
+  assert((!IsSerializingSIL || ty->isCanonical()) &&
+         "reference to non-canonical type from SIL");
 #endif
 
   auto &id = DeclAndTypeIDs[ty];
@@ -1641,11 +1649,16 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
     auto type = conf->getType();
     if (genericEnv && type->hasArchetype())
       type = type->mapTypeOutOfContext();
+    if (IsSerializingSIL)
+      type = type->getCanonicalType();
+
+    SubstitutionMap subs = conf->getSubstitutionMap();
+    if (IsSerializingSIL)
+      subs = subs.getCanonical();
+
     SpecializedProtocolConformanceLayout::emitRecord(
-                           Out, ScratchRecord,
-                           abbrCode,
-                           addTypeRef(type),
-                           addSubstitutionMapRef(conf->getSubstitutionMap()));
+        Out, ScratchRecord, abbrCode, addTypeRef(type),
+        addSubstitutionMapRef(subs));
 
     writeConformance(conf->getGenericConformance(), abbrCodes, genericEnv);
     break;
@@ -1659,6 +1672,8 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
     auto type = conf->getType();
     if (genericEnv && type->hasArchetype())
       type = type->mapTypeOutOfContext();
+    if (IsSerializingSIL)
+      type = type->getCanonicalType();
 
     InheritedProtocolConformanceLayout::emitRecord(
       Out, ScratchRecord, abbrCode, addTypeRef(type));
