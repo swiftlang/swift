@@ -2645,7 +2645,6 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   }
 
   SILFunctionTypeRepresentation rep = extInfo.getSILRepresentation();
-  assert(!extInfo.isAutoClosure() && "autoclosures cannot be curried");
   assert(rep != SILFunctionType::Representation::Block
          && "objc blocks cannot be curried");
 

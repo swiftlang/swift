@@ -737,7 +737,6 @@ namespace decls_block {
     FUNCTION_TYPE,
     TypeIDField, // output
     FunctionTypeRepresentationField, // representation
-    BCFixed<1>,  // auto-closure?
     BCFixed<1>,  // noescape?
     BCFixed<1>   // throws?
 

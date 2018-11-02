@@ -4407,13 +4407,12 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   case decls_block::GENERIC_FUNCTION_TYPE: {
     TypeID resultID;
     uint8_t rawRepresentation;
-    bool autoClosure = false, noescape = false, throws;
+    bool noescape = false, throws;
     GenericSignature *genericSig = nullptr;
 
     if (recordID == decls_block::FUNCTION_TYPE) {
       decls_block::FunctionTypeLayout::readRecord(scratch, resultID,
                                                   rawRepresentation,
-                                                  autoClosure,
                                                   noescape,
                                                   throws);
     } else {
@@ -4432,8 +4431,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       return nullptr;
     }
     
-    auto info = FunctionType::ExtInfo(*representation, autoClosure, noescape,
-                                      throws);
+    auto info = FunctionType::ExtInfo(*representation, noescape, throws);
 
     auto resultTy = getTypeChecked(resultID);
     if (!resultTy)

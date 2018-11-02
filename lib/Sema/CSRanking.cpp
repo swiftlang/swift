@@ -1063,7 +1063,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         auto param2 = params[1].getOldType()->castTo<AnyFunctionType>();
 
         assert(param1->getOptionalObjectType());
-        assert(param2->isAutoClosure());
+        assert(params[1].isAutoClosure());
         assert(param2->getResult()->getOptionalObjectType());
 
         (void) param1;

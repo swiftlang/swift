@@ -2093,7 +2093,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
     // Resolve the function type directly with these attributes.
     FunctionType::ExtInfo extInfo(rep,
-                                  attrs.has(TAK_autoclosure),
                                   attrs.has(TAK_noescape),
                                   fnRepr->throws());
 

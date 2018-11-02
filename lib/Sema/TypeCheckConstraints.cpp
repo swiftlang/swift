@@ -1975,11 +1975,6 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
   // Take a look at the conversion type to check to make sure it is sensible.
   if (auto type = convertType.getType()) {
-#ifndef NDEBUG
-    if (auto *fnType = type->getAs<AnyFunctionType>())
-      assert(!fnType->isAutoClosure());
-#endif
-
     // If we're asked to convert to an UnresolvedType, then ignore the request.
     // This happens when CSDiags nukes a type.
     if (type->is<UnresolvedType>() ||
