@@ -2199,8 +2199,9 @@ static bool unpackTensorAggregates(
   auto tfModule = ctx.getLoadedModule(ctx.Id_TensorFlow);
   assert(tfModule && "could not find TensorFlow module");
   auto inputTensorGroupProto =
-      ctx.getProtocol(KnownProtocolKind::InputTensorGroup);
-  assert(inputTensorGroupProto && "could not find TensorGroup protocol");
+      ctx.getProtocol(KnownProtocolKind::TensorArrayProtocol);
+  assert(inputTensorGroupProto &&
+         "could not find TensorArrayProtocol protocol");
 
   std::function<bool(SILValue)> recurse;
   recurse = [&](SILValue aggregate) -> bool {
