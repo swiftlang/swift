@@ -31,7 +31,11 @@
         "swift-xcode-playground-support": {
             "remote": { "id": "apple/swift-xcode-playground-support" } },
         "ninja": {
-            "remote": { "id": "ninja-build/ninja" } }
+            "remote": { "id": "ninja-build/ninja" } },
+        "icu": {
+            "remote": { "id": "unicode-org/icu" },
+            "platforms": [ "Linux" ]
+        }
     },
     "default-branch-scheme": "master",
     "branch-schemes": {
@@ -52,7 +56,8 @@
                 "swift-corelibs-libdispatch": "master",
                 "swift-integration-tests": "master",
                 "swift-xcode-playground-support": "master",
-                "ninja": "release"
+                "ninja": "release",
+                "icu": "release-61-1"
             }
         },
         "next" : {
@@ -74,7 +79,8 @@
                 "swift-corelibs-libdispatch": "master",
                 "swift-integration-tests": "master",
                 "swift-xcode-playground-support": "master",
-                "ninja": "release"
+                "ninja": "release",
+                "icu": "release-61-1"
             }
         },
         "swift-3.0-branch" : {
@@ -194,7 +200,8 @@
                 "swift-corelibs-libdispatch": "master",
                 "swift-integration-tests": "master",
                 "swift-xcode-playground-support": "master",
-                "ninja": "release"
+                "ninja": "release",
+                "icu": "release-61-1"
             }
         }
     }
