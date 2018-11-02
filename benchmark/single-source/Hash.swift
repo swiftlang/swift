@@ -113,16 +113,16 @@ class Hash {
   /// \brief Left-rotate \p x by \p c.
   final
   func rol(_ x: UInt32, _ c: UInt32) -> UInt32 {
-    let a = UInt32(Int64(x) &<< Int64(c))
-    let b = UInt32(Int64(x) &>> (32 - Int64(c)))
+    let a = UInt32(truncatingIfNeeded: Int64(x) &<< Int64(c))
+    let b = UInt32(truncatingIfNeeded: Int64(x) &>> (32 - Int64(c)))
     return a|b
   }
 
   /// \brief Right-rotate \p x by \p c.
   final
   func ror(_ x: UInt32, _ c: UInt32) -> UInt32 {
-    let a = UInt32(Int64(x) &>> Int64(c))
-    let b = UInt32(Int64(x) &<< (32 - Int64(c)))
+    let a = UInt32(truncatingIfNeeded: Int64(x) &>> Int64(c))
+    let b = UInt32(truncatingIfNeeded: Int64(x) &<< (32 - Int64(c)))
     return a|b
   }
 }
