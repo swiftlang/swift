@@ -102,7 +102,7 @@ Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
     // constructed.  Apply the sugar onto it.
     if (auto FT = E->getType()->getAs<FunctionType>())
       if (FT->getResult()->isEqual(resultSugar) && !resultSugar->isCanonical()){
-        auto NFT = FunctionType::get(FT->getInput(), resultSugar,
+        auto NFT = FunctionType::get(FT->getParams(), resultSugar,
                                      FT->getExtInfo());
         E->setType(NFT);
         return E;
@@ -516,7 +516,8 @@ bool TypeChecker::requireArrayLiteralIntrinsics(SourceLoc loc) {
 Expr *TypeChecker::buildCheckedRefExpr(VarDecl *value, DeclContext *UseDC,
                                        DeclNameLoc loc, bool Implicit) {
   auto type = getUnopenedTypeOfReference(value, Type(), UseDC);
-  AccessSemantics semantics = value->getAccessSemanticsFromContext(UseDC);
+  auto semantics = value->getAccessSemanticsFromContext(UseDC,
+                                                       /*isAccessOnSelf*/false);
   return new (Context) DeclRefExpr(value, loc, Implicit, semantics, type);
 }
 
@@ -526,7 +527,8 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
   assert(!Decls.empty() && "Must have at least one declaration");
 
   if (Decls.size() == 1 && !isa<ProtocolDecl>(Decls[0]->getDeclContext())) {
-    AccessSemantics semantics = Decls[0]->getAccessSemanticsFromContext(UseDC);
+    auto semantics = Decls[0]->getAccessSemanticsFromContext(UseDC,
+                                                       /*isAccessOnSelf*/false);
     return new (Context) DeclRefExpr(Decls[0], NameLoc, Implicit, semantics);
   }
 
@@ -658,8 +660,9 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
     // Strip off one level of sugar; we don't actually want to print
     // the name of the typealias itself anywhere.
     if (type && *type) {
-      if (auto typeAlias = dyn_cast<NameAliasType>(type->getPointer()))
-        *type = typeAlias->getSinglyDesugaredType();
+      if (auto boundTypeAlias =
+                 dyn_cast<NameAliasType>(type->getPointer()))
+        *type = boundTypeAlias->getSinglyDesugaredType();
     }
   }
 

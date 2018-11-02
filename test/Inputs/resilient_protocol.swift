@@ -21,3 +21,9 @@ public protocol ResilientBaseProtocol {
 }
 
 public protocol ResilientDerivedProtocol : ResilientBaseProtocol {}
+
+public protocol ProtocolWithRequirements {
+  associatedtype T
+  func first()
+  func second()
+}

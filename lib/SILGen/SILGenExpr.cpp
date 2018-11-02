@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILGen.h"
 #include "ArgumentScope.h"
 #include "ArgumentSource.h"
 #include "Callee.h"
@@ -21,16 +20,19 @@
 #include "LValue.h"
 #include "RValue.h"
 #include "ResultPlan.h"
+#include "SILGen.h"
 #include "SILGenDynamicCast.h"
 #include "Scope.h"
+#include "SwitchEnumBuilder.h"
 #include "Varargs.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/ASTMangler.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
@@ -366,7 +368,6 @@ void SILGenFunction::emitExprInto(Expr *E, Initialization *I,
   // Handle the special case of copying an lvalue.
   if (auto load = dyn_cast<LoadExpr>(E)) {
     FormalEvaluationScope writeback(*this);
-    PostponedCleanup postpone(*this);
     auto lv = emitLValue(load->getSubExpr(), AccessKind::Read);
     emitCopyLValueInto(E, std::move(lv), I);
     return;
@@ -918,7 +919,6 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
   // Any writebacks for this access are tightly scoped.
   FormalEvaluationScope scope(*this);
-  PostponedCleanup postpone(*this);
 
   // If this is a decl that we have an lvalue for, produce and return it.
   ValueDecl *decl = declRef.getDecl();
@@ -1049,7 +1049,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
     assert(var->hasAccessorFunctions() && "Unknown rvalue case");
 
-    SILDeclRef getter = getGetterDeclRef(var);
+    SILDeclRef getter = SGM.getGetterDeclRef(var);
 
     ArgumentSource selfSource;
     
@@ -1118,10 +1118,10 @@ static SILDeclRef getRValueAccessorDeclRef(SILGenFunction &SGF,
 
   case AccessStrategy::DirectToAccessor:
   case AccessStrategy::DispatchToAccessor:
-    return SGF.getGetterDeclRef(storage);
+    return SGF.SGM.getGetterDeclRef(storage);
 
   case AccessStrategy::Addressor:
-    return SGF.getAddressorDeclRef(storage, AccessKind::Read);
+    return SGF.SGM.getAddressorDeclRef(storage, AccessKind::Read);
   }
   llvm_unreachable("should already have been filtered out!");
 }
@@ -1398,7 +1398,6 @@ RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
   // Any writebacks here are tightly scoped.
   FormalEvaluationScope writeback(SGF);
-  PostponedCleanup postpone(SGF);
   LValue lv = SGF.emitLValue(E->getSubExpr(), AccessKind::Read);
   // We can't load at immediate +0 from the lvalue without deeper analysis,
   // since the access will be immediately ended and might invalidate the value
@@ -2088,8 +2087,9 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   if (srcRepTy != srcTy)
     result = convertFunctionRepresentation(SGF, e, result, srcRepTy, srcTy);
 
-  if (srcTy != destTy)
-    result = SGF.emitTransformedValue(e, result, srcTy, destTy);
+  if (srcTy != destTy) {
+    result = SGF.emitTransformedValue(e, result, srcTy, destTy, SGFContext());
+  }
 
   if (destTy != destRepTy)
     result = convertFunctionRepresentation(SGF, e, result, destTy, destRepTy);
@@ -2411,10 +2411,28 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
       return RValue::forInContext();
     }
   }
-    
+
+  llvm::SmallVector<RValue, 8> tupleElts;
+  bool hasAtleastOnePlusOneValue = false;
+  for (Expr *elt : E->getElements()) {
+    RValue RV = SGF.emitRValue(elt);
+    hasAtleastOnePlusOneValue |= RV.isPlusOne(SGF);
+    tupleElts.emplace_back(std::move(RV));
+  }
+
+  // Once we have found if we have any plus one arguments, add each element of
+  // tuple elts into result, making sure each value is at plus 1.
   RValue result(type);
-  for (Expr *elt : E->getElements())
-    result.addElement(SGF.emitRValue(elt));
+  if (hasAtleastOnePlusOneValue) {
+    for (unsigned i : indices(tupleElts)) {
+      result.addElement(std::move(tupleElts[i]).ensurePlusOne(SGF, E));
+    }
+  } else {
+    for (unsigned i : indices(tupleElts)) {
+      result.addElement(std::move(tupleElts[i]));
+    }
+  }
+
   return result;
 }
 
@@ -2554,7 +2572,6 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
 
   // Any writebacks for this access are tightly scoped.
   FormalEvaluationScope scope(SGF);
-  PostponedCleanup postpone(SGF);
 
   LValue lv = SGF.emitLValue(E, AccessKind::Read);
   // We can't load at +0 without further analysis, since the formal access into
@@ -2576,7 +2593,6 @@ visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E, SGFContext C) {
 RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
   // Any writebacks for this access are tightly scoped.
   FormalEvaluationScope scope(SGF);
-  PostponedCleanup postpone(SGF);
 
   LValue lv = SGF.emitLValue(E, AccessKind::Read);
   // We can't load at +0 without further analysis, since the formal access into
@@ -2631,9 +2647,8 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   ResultPlanPtr resultPtr =
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
-  PostponedCleanup postpone(*this);
   return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef, subs,
-                   {}, calleeTypeInfo, ApplyOptions::None, C, postpone);
+                   {}, calleeTypeInfo, ApplyOptions::None, C);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
@@ -2655,9 +2670,8 @@ RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
   ResultPlanPtr resultPlan =
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
-  PostponedCleanup postpone(*this);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, fnRef, subs,
-                   {}, calleeTypeInfo, ApplyOptions::None, C, postpone);
+                   {}, calleeTypeInfo, ApplyOptions::None, C);
 }
 
 static void emitTupleShuffleExprInto(RValueEmitter &emitter,
@@ -2755,7 +2769,7 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
            shuffleIndex != TupleShuffleExpr::Variadic &&
            "Only argument tuples can have default initializers & varargs");
 
-    result.addElement(std::move(elements[shuffleIndex]));
+    result.addElement(std::move(elements[shuffleIndex]).ensurePlusOne(SGF, E));
     return result;
   }
 
@@ -2776,7 +2790,8 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
     // separately.
     if (shuffleIndex != TupleShuffleExpr::Variadic) {
       // Map from a different tuple element.
-      result.addElement(std::move(elements[shuffleIndex]));
+      result.addElement(
+          std::move(elements[shuffleIndex]).ensurePlusOne(SGF, E));
       continue;
     }
 
@@ -2798,8 +2813,9 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
     ManagedValue varargs = emitVarargs(SGF, E, field.getVarargBaseTy(),
                                        variadicValues,
                                        E->getVarargsArrayType());
-    result.addElement(RValue(SGF, E, field.getType()->getCanonicalType(),
-                             varargs));
+    result.addElement(
+        RValue(SGF, E, field.getType()->getCanonicalType(), varargs)
+            .ensurePlusOne(SGF, E));
     break;
   }
   
@@ -2982,29 +2998,39 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
                       CanType &baseType,
                       SubstitutionList &subs,
                       SmallVectorImpl<Substitution> &subsBuf) {
-  auto paramOrigValue = subSGF.emitManagedRValueWithCleanup(paramArg);
+  // If the storage is at global scope, then the base value () is a formality.
+  // There no real argument to pass to the underlying accessors.
+  if (!storage->getDeclContext()->isTypeContext())
+    return ManagedValue();
+  
+  ManagedValue paramOrigValue;
+  
+  if (subSGF.SGM.M.getOptions().EnableGuaranteedNormalArguments) {
+    paramOrigValue =
+      ManagedValue::forBorrowedRValue(paramArg).copy(subSGF, loc);
+  } else {
+    paramOrigValue = subSGF.emitManagedRValueWithCleanup(paramArg);
+  }
   auto paramSubstValue = subSGF.emitOrigToSubstValue(loc, paramOrigValue,
                                              AbstractionPattern::getOpaque(),
                                              baseType);
   
-  // Upcast a class instance to the property's declared type if necessary.
-  if (auto propertyClass = dyn_cast<ClassDecl>(storage->getDeclContext())) {
-    if (baseType->getClassOrBoundGenericClass() != propertyClass) {
-      baseType = baseType->getSuperclassForDecl(propertyClass)
-        ->getCanonicalType();
-      paramSubstValue = subSGF.B.createUpcast(loc, paramSubstValue,
-                                     SILType::getPrimitiveObjectType(baseType));
+  // Pop open an existential container base.
+  if (baseType->isAnyExistentialType()) {
+    // Use the opened archetype from the AST for a protocol member, or make a
+    // new one (which we'll upcast immediately below) for a class member.
+    ArchetypeType *opened;
+    if (storage->getDeclContext()->getAsClassOrClassExtensionContext()) {
+      opened = ArchetypeType::getOpened(baseType);
+    } else {
+      opened = subs[0].getReplacement()->castTo<ArchetypeType>();
     }
-  }
-  // …or pop open an existential container.
-  else if (baseType->isAnyExistentialType()) {
-    auto opened = subs[0].getReplacement()->castTo<ArchetypeType>();
     assert(opened->isOpenedExistential());
-
+    
     baseType = opened->getCanonicalType();
     auto openedOpaqueValue = subSGF.emitOpenExistential(loc, paramSubstValue,
-                                   opened, subSGF.SGM.getLoweredType(baseType),
-                                   AccessKind::Read);
+                                                        opened, subSGF.SGM.getLoweredType(baseType),
+                                                        AccessKind::Read);
     // Maybe we could peephole this if we know the property load can borrow the
     // base value…
     if (!openedOpaqueValue.IsConsumable) {
@@ -3013,8 +3039,22 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
       paramSubstValue = openedOpaqueValue.Value;
     }
   }
+  
+  // Upcast a class instance to the property's declared type if necessary.
+  if (auto propertyClass = storage->getDeclContext()
+                                  ->getAsClassOrClassExtensionContext()) {
+    if (baseType->getClassOrBoundGenericClass() != propertyClass) {
+      baseType = baseType->getSuperclassForDecl(propertyClass)
+        ->getCanonicalType();
+      paramSubstValue = subSGF.B.createUpcast(loc, paramSubstValue,
+                                     SILType::getPrimitiveObjectType(baseType));
+    }
+  }
+  // …or pop open an existential container.
   return paramSubstValue;
 }
+
+using IndexTypePair = std::pair<CanType, SILType>;
 
 /// Helper function to load the captured indexes out of a key path component
 /// in order to invoke the accessors on that key path. A component with captured
@@ -3022,16 +3062,16 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
 /// which we can copy out of to produce values we can pass to the real
 /// accessor functions.
 static RValue loadIndexValuesForKeyPathComponent(SILGenFunction &SGF,
-                         SILLocation loc,
-                         ArrayRef<KeyPathPatternComponent::Index> indexes,
-                         SILValue pointer) {
+                                               SILLocation loc,
+                                               ArrayRef<IndexTypePair> indexes,
+                                               SILValue pointer) {
   // If no indexes, do nothing.
   if (indexes.empty())
     return RValue();
   
   SmallVector<TupleTypeElt, 2> indexElts;
   for (auto &elt : indexes) {
-    indexElts.push_back(SGF.F.mapTypeIntoContext(elt.FormalType));
+    indexElts.push_back(SGF.F.mapTypeIntoContext(elt.first));
   }
   
   auto indexTupleTy = TupleType::get(indexElts, SGF.getASTContext())
@@ -3048,23 +3088,23 @@ static RValue loadIndexValuesForKeyPathComponent(SILGenFunction &SGF,
     if (indexes.size() > 1) {
       eltAddr = SGF.B.createTupleElementAddr(loc, eltAddr, i);
     }
-    auto ty = SGF.F.mapTypeIntoContext(indexes[i].LoweredType);
+    auto ty = SGF.F.mapTypeIntoContext(indexes[i].second);
     auto value = SGF.emitLoad(loc, eltAddr,
                               SGF.getTypeLowering(ty),
                               SGFContext(), IsNotTake);
-    indexValue.addElement(SGF, value, indexes[i].FormalType, loc);
+    indexValue.addElement(SGF, value, indexes[i].first, loc);
   }
   
   return indexValue;
 }
 
-static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
+static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
                          SILLocation loc,
                          AbstractStorageDecl *property,
                          SubstitutionList subs,
                          AccessStrategy strategy,
                          GenericEnvironment *genericEnv,
-                         ArrayRef<KeyPathPatternComponent::Index> indexes,
+                         ArrayRef<IndexTypePair> indexes,
                          CanType baseType,
                          CanType propertyType) {
   auto genericSig = genericEnv
@@ -3074,17 +3114,23 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
   // Build the signature of the thunk as expected by the keypath runtime.
   SILType loweredBaseTy, loweredPropTy;
   {
-    GenericContextScope scope(SGF.SGM.Types, genericSig);
-    loweredBaseTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
-                                       baseType);
-    loweredPropTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
-                                       propertyType);
+    GenericContextScope scope(SGM.Types, genericSig);
+    loweredBaseTy = SGM.Types.getLoweredType(AbstractionPattern::getOpaque(),
+                                             baseType);
+    loweredPropTy = SGM.Types.getLoweredType(AbstractionPattern::getOpaque(),
+                                             propertyType);
   }
   
+  ParameterConvention paramConvention;
+  if (SGM.M.getOptions().EnableGuaranteedNormalArguments)
+    paramConvention = ParameterConvention::Indirect_In_Guaranteed;
+  else
+    paramConvention = ParameterConvention::Indirect_In;
+
   SmallVector<SILParameterInfo, 2> params;
   params.push_back({loweredBaseTy.getSwiftRValueType(),
-                    ParameterConvention::Indirect_In});
-  auto &C = SGF.getASTContext();
+                    paramConvention});
+  auto &C = SGM.getASTContext();
   if (!indexes.empty())
     params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredType()
                                                  ->getCanonicalType(),
@@ -3099,7 +3145,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
                              /*noescape*/ false),
     SILCoroutineKind::None,
     ParameterConvention::Direct_Unowned,
-    params, {}, result, None, SGF.getASTContext());
+    params, {}, result, None, SGM.getASTContext());
   
   // Find the function and see if we already created it.
   SmallVector<CanType, 2> interfaceSubs;
@@ -3111,7 +3157,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
   auto name = Mangle::ASTMangler()
     .mangleKeyPathGetterThunkHelper(property, genericSig, baseType,
                                     interfaceSubs);
-  auto thunk = SGF.SGM.M.getOrCreateSharedFunction(
+  auto thunk = SGM.M.getOrCreateSharedFunction(
       loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
       ProfileCounter(), IsThunk);
   if (!thunk->empty())
@@ -3119,7 +3165,6 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
   
   // Emit the thunk, which accesses the underlying property normally with
   // reabstraction where necessary.
-  auto &SGM = SGF.SGM;
   if (genericEnv) {
     baseType = genericEnv->mapTypeIntoContext(baseType)->getCanonicalType();
     propertyType = genericEnv->mapTypeIntoContext(propertyType)
@@ -3147,7 +3192,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
   
   SmallVector<Substitution, 2> subsBuf;
   
-  auto paramSubstValue = emitKeyPathRValueBase(subSGF, property,
+  auto baseSubstValue = emitKeyPathRValueBase(subSGF, property,
                                                loc, baseArg,
                                                baseType, subs, subsBuf);
   
@@ -3155,7 +3200,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
                                                          indexes,
                                                          indexPtrArg);
   
-  auto resultSubst = subSGF.emitRValueForStorageLoad(loc, paramSubstValue,
+  auto resultSubst = subSGF.emitRValueForStorageLoad(loc, baseSubstValue,
                                    baseType, /*super*/false,
                                    property, std::move(indexValue),
                                    subs, AccessSemantics::Ordinary,
@@ -3174,13 +3219,13 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
   return thunk;
 }
 
-SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
+SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                           SILLocation loc,
                           AbstractStorageDecl *property,
                           SubstitutionList subs,
                           AccessStrategy strategy,
                           GenericEnvironment *genericEnv,
-                          ArrayRef<KeyPathPatternComponent::Index> indexes,
+                          ArrayRef<IndexTypePair> indexes,
                           CanType baseType,
                           CanType propertyType) {
   auto genericSig = genericEnv
@@ -3190,24 +3235,30 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
   // Build the signature of the thunk as expected by the keypath runtime.
   SILType loweredBaseTy, loweredPropTy;
   {
-    GenericContextScope scope(SGF.SGM.Types, genericSig);
-    loweredBaseTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
-                                       baseType);
-    loweredPropTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
-                                       propertyType);
+    GenericContextScope scope(SGM.Types, genericSig);
+    loweredBaseTy = SGM.Types.getLoweredType(AbstractionPattern::getOpaque(),
+                                             baseType);
+    loweredPropTy = SGM.Types.getLoweredType(AbstractionPattern::getOpaque(),
+                                             propertyType);
   }
   
-  auto &C = SGF.getASTContext();
+  auto &C = SGM.getASTContext();
   
+  ParameterConvention paramConvention;
+  if (SGM.M.getOptions().EnableGuaranteedNormalArguments)
+    paramConvention = ParameterConvention::Indirect_In_Guaranteed;
+  else
+    paramConvention = ParameterConvention::Indirect_In;
+
   SmallVector<SILParameterInfo, 3> params;
   // property value
   params.push_back({loweredPropTy.getSwiftRValueType(),
-                    ParameterConvention::Indirect_In});
+                    paramConvention});
   // base
   params.push_back({loweredBaseTy.getSwiftRValueType(),
                     property->isSetterMutating()
                       ? ParameterConvention::Indirect_Inout
-                      : ParameterConvention::Indirect_In});
+                      : paramConvention});
   // indexes
   if (!indexes.empty())
     params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredType()
@@ -3220,7 +3271,7 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
                              /*noescape*/ false),
     SILCoroutineKind::None,
     ParameterConvention::Direct_Unowned,
-    params, {}, {}, None, SGF.getASTContext());
+    params, {}, {}, None, SGM.getASTContext());
   
   // Mangle the name of the thunk to see if we already created it.
   SmallString<64> nameBuf;
@@ -3235,7 +3286,7 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
                                                                 genericSig,
                                                                 baseType,
                                                                 interfaceSubs);
-  auto thunk = SGF.SGM.M.getOrCreateSharedFunction(
+  auto thunk = SGM.M.getOrCreateSharedFunction(
       loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
       ProfileCounter(), IsThunk);
   if (!thunk->empty())
@@ -3243,7 +3294,6 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
   
   // Emit the thunk, which accesses the underlying property normally with
   // reabstraction where necessary.
-  auto &SGM = SGF.SGM;
   if (genericEnv) {
     baseType = genericEnv->mapTypeIntoContext(baseType)->getCanonicalType();
     propertyType = genericEnv->mapTypeIntoContext(propertyType)
@@ -3274,7 +3324,12 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
                                                          indexes,
                                                          indexPtrArg);
   
-  auto valueOrig = subSGF.emitManagedRValueWithCleanup(valueArg);
+  ManagedValue valueOrig;
+  if (SGM.M.getOptions().EnableGuaranteedNormalArguments)
+    valueOrig = ManagedValue::forBorrowedRValue(valueArg)
+      .copy(subSGF, loc);
+  else
+    valueOrig = subSGF.emitManagedRValueWithCleanup(valueArg);
   auto valueSubst = subSGF.emitOrigToSubstValue(loc, valueOrig,
                                                 AbstractionPattern::getOpaque(),
                                                 propertyType);
@@ -3330,7 +3385,7 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
 }
 
 static void
-getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
+getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
                               SILLocation loc,
                               GenericEnvironment *genericEnv,
                               ArrayRef<KeyPathPatternComponent::Index> indexes,
@@ -3346,7 +3401,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
     ? genericEnv->getGenericSignature()->getCanonicalSignature()
     : nullptr;
 
-  auto &C = SGF.getASTContext();
+  auto &C = SGM.getASTContext();
   auto unsafeRawPointerTy = C.getUnsafeRawPointerDecl()->getDeclaredType()
                                                        ->getCanonicalType();
   auto boolTy = C.getBoolDecl()->getDeclaredType()->getCanonicalType();
@@ -3361,18 +3416,18 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
 
   SmallVector<TupleTypeElt, 2> indexElts;
   for (auto &elt : indexes) {
-    indexElts.push_back(SGF.F.mapTypeIntoContext(elt.FormalType));
+    indexElts.push_back(GenericEnvironment::mapTypeIntoContext(genericEnv,
+                                                               elt.FormalType));
   }
 
-  auto indexTupleTy = TupleType::get(indexElts, SGF.getASTContext())
+  auto indexTupleTy = TupleType::get(indexElts, SGM.getASTContext())
                         ->getCanonicalType();
   RValue indexValue(indexTupleTy);
 
-  auto indexLoweredTy = SGF.getLoweredType(indexTupleTy);
-  auto &SGM = SGF.SGM;
+  auto indexLoweredTy = SGM.Types.getLoweredType(indexTupleTy);
   // Get or create the equals witness
   [&unsafeRawPointerTy, &boolTy, &genericSig, &C, &indexTypes, &equals, &loc,
-   &SGM, &genericEnv, &indexLoweredTy, &hashableProto, &indexes]{
+   &SGM, &genericEnv, &indexLoweredTy, &indexes]{
     // (RawPointer, RawPointer) -> Bool
     SmallVector<SILParameterInfo, 2> params;
     params.push_back({unsafeRawPointerTy,
@@ -3387,7 +3442,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
       SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                                /*pseudogeneric*/ false,
                                /*noescape*/ false),
-    SILCoroutineKind::None,
+      SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, /*yields*/ {}, results, None, C);
     
@@ -3425,37 +3480,37 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
     auto equalsRef = SILDeclRef(equalsMethod);
     auto equalsTy = subSGF.SGM.Types.getConstantType(equalsRef);
     
-    auto hashableSig = C.getExistentialSignature(
-      hashableProto->getDeclaredType()->getCanonicalType(),
-      SGM.M.getSwiftModule());
-    
     auto isFalseBB = subSGF.createBasicBlock();
     auto i1Ty = SILType::getBuiltinIntegerType(1, C);
     for (unsigned i : indices(indexes)) {
       auto &index = indexes[i];
       
-      auto formalTy = index.FormalType;
-      auto hashable = index.Hashable;
-      if (genericEnv) {
-        formalTy = genericEnv->mapTypeIntoContext(formalTy)->getCanonicalType();
-        hashable = hashable.subst(index.FormalType,
-          [&](Type t) -> Type { return genericEnv->mapTypeIntoContext(t); },
-          LookUpConformanceInSignature(*genericSig));
-      }
+      Type formalTy = index.FormalType;
+      ProtocolConformanceRef hashable = index.Hashable;
+      std::tie(formalTy, hashable)
+        = GenericEnvironment::mapConformanceRefIntoContext(genericEnv,
+                                                           formalTy,
+                                                           hashable);
+      auto formalCanTy = formalTy->getCanonicalType(genericSig);
       
-      // Get the Equatable conformance from the Hashable conformance
-      auto subMap = hashableSig->getSubstitutionMap(
-        Substitution(formalTy, hashable));
-      auto equatable = *subMap
-        .lookupConformance(CanType(hashableSig->getGenericParams()[0]),
-                           equatableProtocol);
-      auto equatableSub = Substitution(formalTy,
-                   C.AllocateCopy(ArrayRef<ProtocolConformanceRef>(equatable)));
+      // Get the Equatable conformance from the Hashable conformance.
+      auto equatable = hashable.getAssociatedConformance(formalTy,
+        GenericTypeParamType::get(0, 0, C),
+        equatableProtocol);
+      
+      assert(equatable.isAbstract() == hashable.isAbstract());
+      if (equatable.isConcrete())
+        assert(equatable.getConcrete()->getType()->isEqual(
+                  hashable.getConcrete()->getType()));
     
       auto equalsWitness = subSGF.B.createWitnessMethod(loc,
-        formalTy, equatable,
+        formalCanTy, equatable,
         equalsRef, equalsTy);
       
+      auto equatableSub
+        = SubstitutionMap::getProtocolSubstitutions(equatableProtocol,
+                                                    formalCanTy,
+                                                    equatable);
       auto equalsSubstTy = equalsTy.castTo<SILFunctionType>()
         ->substGenericArgs(SGM.M, equatableSub);
       auto equalsInfo = CalleeTypeInfo(equalsSubstTy,
@@ -3488,7 +3543,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
         rhsArg = subSGF.emitManagedBufferWithCleanup(rhsBuf);
       }
 
-      auto metaty = CanMetatypeType::get(formalTy,
+      auto metaty = CanMetatypeType::get(formalCanTy,
                                          MetatypeRepresentation::Thick);
       auto metatyValue = ManagedValue::forUnmanaged(subSGF.B.createMetatype(loc,
         SILType::getPrimitiveObjectType(metaty)));
@@ -3497,15 +3552,16 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
         auto equalsResultPlan = ResultPlanBuilder::computeResultPlan(subSGF,
           equalsInfo, loc, SGFContext());
         ArgumentScope argScope(subSGF, loc);
-        PostponedCleanup postpone(subSGF);
-        isEqual =
-            subSGF
-                .emitApply(std::move(equalsResultPlan), std::move(argScope),
-                           loc, ManagedValue::forUnmanaged(equalsWitness),
-                           equatableSub, {lhsArg, rhsArg, metatyValue},
-                           equalsInfo, ApplyOptions::None, SGFContext(),
-                           postpone)
-                .getUnmanagedSingleValue(subSGF, loc);
+        SmallVector<Substitution, 1> equatableSubListBuf;
+        equatableProtocol->getGenericSignature()
+          ->getSubstitutions(equatableSub, equatableSubListBuf);
+        isEqual = subSGF
+          .emitApply(std::move(equalsResultPlan), std::move(argScope),
+                     loc, ManagedValue::forUnmanaged(equalsWitness),
+                     C.AllocateCopy(equatableSubListBuf),
+                     {lhsArg, rhsArg, metatyValue},
+                     equalsInfo, ApplyOptions::None, SGFContext())
+          .getUnmanagedSingleValue(subSGF, loc);
       }
       
       branchScope.pop();
@@ -3584,8 +3640,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
 
     SILValue hashCode;
 
-    // TODO: Combine hashes of the indexes. There isn't a great hash combining
-    // interface in the standard library to do this yet.
+    // TODO: Combine hashes of the indexes using an inout Hasher
     {
       auto &index = indexes[0];
       
@@ -3634,13 +3689,11 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
         auto hashResultPlan = ResultPlanBuilder::computeResultPlan(subSGF,
           hashInfo, loc, SGFContext());
         ArgumentScope argScope(subSGF, loc);
-        PostponedCleanup postpone(subSGF);
         hashCode =
             subSGF
                 .emitApply(std::move(hashResultPlan), std::move(argScope), loc,
                            ManagedValue::forUnmanaged(hashWitness), hashableSub,
-                           {arg}, hashInfo, ApplyOptions::None, SGFContext(),
-                           postpone)
+                           {arg}, hashInfo, ApplyOptions::None, SGFContext())
                 .getUnmanagedSingleValue(subSGF, loc);
       }
     }
@@ -3652,7 +3705,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenFunction &SGF,
 }
 
 static KeyPathPatternComponent::ComputedPropertyId
-getIdForKeyPathComponentComputedProperty(SILGenFunction &SGF,
+getIdForKeyPathComponentComputedProperty(SILGenModule &SGM,
                                          AbstractStorageDecl *storage,
                                          AccessStrategy strategy) {
   switch (strategy) {
@@ -3668,16 +3721,211 @@ getIdForKeyPathComponentComputedProperty(SILGenFunction &SGF,
     // Clang-imported thing), we'll need some other sort of
     // stable identifier.
     auto getterRef = SILDeclRef(storage->getGetter(), SILDeclRef::Kind::Func);
-    return SGF.SGM.getFunction(getterRef, NotForDefinition);
+    return SGM.getFunction(getterRef, NotForDefinition);
   }
   case AccessStrategy::DispatchToAccessor: {
     // Identify the property by its vtable or wtable slot.
-    return SGF.getGetterDeclRef(storage);
+    return SGM.getGetterDeclRef(storage);
   }
   case AccessStrategy::BehaviorStorage:
     llvm_unreachable("unpossible");
   }
   llvm_unreachable("unhandled access strategy");
+}
+
+static void
+lowerKeyPathSubscriptIndexTypes(
+                 SILGenModule &SGM,
+                 SmallVectorImpl<IndexTypePair> &indexPatterns,
+                 SubscriptDecl *subscript,
+                 SubstitutionList subscriptSubs,
+                 bool &needsGenericContext) {
+  // Capturing an index value dependent on the generic context means we
+  // need the generic context captured in the key path.
+  auto subscriptSubstTy = subscript->getInterfaceType();
+  SubstitutionMap subMap;
+  auto sig = subscript->getGenericSignature();
+  if (sig) {
+    subMap = sig->getSubstitutionMap(subscriptSubs);
+    subscriptSubstTy = subscriptSubstTy.subst(subMap);
+  }
+  needsGenericContext |= subscriptSubstTy->hasArchetype();
+
+  for (auto *index : *subscript->getIndices()) {
+    auto indexTy = index->getInterfaceType();
+    if (sig) {
+      indexTy = indexTy.subst(subMap);
+    }
+    auto indexLoweredTy = SGM.Types.getLoweredType(
+                                                AbstractionPattern::getOpaque(),
+                                                indexTy);
+    indexLoweredTy = SILType::getPrimitiveType(
+                     indexLoweredTy.getSwiftRValueType()->mapTypeOutOfContext()
+                                                        ->getCanonicalType(),
+                     indexLoweredTy.getCategory());
+    indexPatterns.push_back({indexTy->mapTypeOutOfContext()
+                                    ->getCanonicalType(),
+                             indexLoweredTy});
+  }
+};
+
+static void
+lowerKeyPathSubscriptIndexPatterns(
+                 SmallVectorImpl<KeyPathPatternComponent::Index> &indexPatterns,
+                 ArrayRef<IndexTypePair> indexTypes,
+                 ArrayRef<ProtocolConformanceRef> indexHashables,
+                 unsigned &baseOperand) {
+  for (unsigned i : indices(indexTypes)) {
+    CanType formalTy;
+    SILType loweredTy;
+    std::tie(formalTy, loweredTy) = indexTypes[i];
+    auto hashable = indexHashables[i];
+    assert(hashable.isAbstract() ||
+           hashable.getConcrete()->getType()->mapTypeOutOfContext()
+                                 ->isEqual(formalTy));
+
+    indexPatterns.push_back({baseOperand++, formalTy, loweredTy, hashable});
+  }
+};
+
+KeyPathPatternComponent
+SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
+                                GenericEnvironment *genericEnv,
+                                unsigned &baseOperand,
+                                bool &needsGenericContext,
+                                SubstitutionList subs,
+                                AbstractStorageDecl *storage,
+                                ArrayRef<ProtocolConformanceRef> indexHashables,
+                                CanType baseTy,
+                                bool forPropertyDescriptor) {
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    CanType componentTy;
+    if (!var->getDeclContext()->isTypeContext()) {
+      componentTy = storage->getStorageInterfaceType()->getCanonicalType();
+    } else {
+      componentTy =
+        GenericEnvironment::mapTypeIntoContext(genericEnv, baseTy)
+          ->getTypeOfMember(SwiftModule, var)
+          ->getReferenceStorageReferent()
+          ->mapTypeOutOfContext()
+          ->getCanonicalType(
+                      genericEnv ? genericEnv->getGenericSignature() : nullptr);
+    }
+  
+    switch (auto strategy = var->getAccessStrategy(AccessSemantics::Ordinary,
+                                                    AccessKind::ReadWrite)) {
+    case AccessStrategy::Storage: {
+      // If the stored value would need to be reabstracted in fully opaque
+      // context, then we have to treat the component as computed.
+      auto componentObjTy = componentTy->getWithoutSpecifierType();
+      if (genericEnv)
+        componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
+      auto storageTy = Types.getSubstitutedStorageType(var,
+                                                           componentObjTy);
+      auto opaqueTy = Types
+        .getLoweredType(AbstractionPattern::getOpaque(), componentObjTy);
+      
+      if (storageTy.getAddressType() == opaqueTy.getAddressType()) {
+        return KeyPathPatternComponent::forStoredProperty(var, componentTy);
+      }
+      LLVM_FALLTHROUGH;
+    }
+    case AccessStrategy::Addressor:
+    case AccessStrategy::DirectToAccessor:
+    case AccessStrategy::DispatchToAccessor: {
+      // We need thunks to bring the getter and setter to the right signature
+      // expected by the key path runtime.
+      auto id = getIdForKeyPathComponentComputedProperty(*this, var,
+                                                         strategy);
+      auto getter = getOrCreateKeyPathGetter(*this, loc,
+               var, subs,
+               strategy,
+               needsGenericContext ? genericEnv : nullptr,
+               {},
+               baseTy, componentTy);
+      
+      if (var->isSettable(var->getDeclContext())) {
+        auto setter = getOrCreateKeyPathSetter(*this, loc,
+               var, subs,
+               strategy,
+               needsGenericContext ? genericEnv : nullptr,
+               {},
+               baseTy, componentTy);
+        return KeyPathPatternComponent::forComputedSettableProperty(id,
+            getter, setter, {}, nullptr, nullptr, componentTy);
+      } else {
+        return KeyPathPatternComponent::forComputedGettableProperty(id,
+            getter, {}, nullptr, nullptr, componentTy);
+      }
+    }
+    case AccessStrategy::BehaviorStorage:
+      llvm_unreachable("should not occur");
+    }
+  }
+  
+  if (auto decl = dyn_cast<SubscriptDecl>(storage)) {
+    auto strategy = decl->getAccessStrategy(AccessSemantics::Ordinary,
+                                            AccessKind::ReadWrite);
+    auto baseSubscriptTy =
+      decl->getInterfaceType()->castTo<AnyFunctionType>();
+    if (auto genSubscriptTy = baseSubscriptTy->getAs<GenericFunctionType>())
+      baseSubscriptTy = genSubscriptTy->substGenericArgs(subs);
+    auto baseSubscriptInterfaceTy = cast<AnyFunctionType>(
+      baseSubscriptTy->mapTypeOutOfContext()->getCanonicalType());
+    auto componentTy = baseSubscriptInterfaceTy.getResult();
+  
+    SmallVector<IndexTypePair, 4> indexTypes;
+    lowerKeyPathSubscriptIndexTypes(*this, indexTypes,
+                                    decl, subs,
+                                    needsGenericContext);
+    
+    SmallVector<KeyPathPatternComponent::Index, 4> indexPatterns;
+    SILFunction *indexEquals = nullptr, *indexHash = nullptr;
+    // Property descriptors get their index information from the client.
+    if (!forPropertyDescriptor) {
+      lowerKeyPathSubscriptIndexPatterns(indexPatterns,
+                                         indexTypes, indexHashables,
+                                         baseOperand);
+      
+      getOrCreateKeyPathEqualsAndHash(*this, loc,
+               needsGenericContext ? genericEnv : nullptr,
+               indexPatterns,
+               indexEquals, indexHash);
+    }
+    
+    auto id = getIdForKeyPathComponentComputedProperty(*this, decl, strategy);
+    auto getter = getOrCreateKeyPathGetter(*this, loc,
+             decl, subs,
+             strategy,
+             needsGenericContext ? genericEnv : nullptr,
+             indexTypes,
+             baseTy, componentTy);
+  
+    auto indexPatternsCopy = getASTContext().AllocateCopy(indexPatterns);
+    if (decl->isSettable()) {
+      auto setter = getOrCreateKeyPathSetter(*this, loc,
+             decl, subs,
+             strategy,
+             needsGenericContext ? genericEnv : nullptr,
+             indexTypes,
+             baseTy, componentTy);
+      return KeyPathPatternComponent::forComputedSettableProperty(id,
+                                                           getter, setter,
+                                                           indexPatternsCopy,
+                                                           indexEquals,
+                                                           indexHash,
+                                                           componentTy);
+    } else {
+      return KeyPathPatternComponent::forComputedGettableProperty(id,
+                                                           getter,
+                                                           indexPatternsCopy,
+                                                           indexEquals,
+                                                           indexHash,
+                                                           componentTy);
+    }
+  }
+  
+  llvm_unreachable("unknown kind of storage");
 }
 
 RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
@@ -3702,15 +3950,10 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
   auto baseTy = rootTy;
   SmallVector<SILValue, 4> operands;
   
-  auto lowerSubscriptIndices =
-    [this, &operands, &needsGenericContext, baseTy, E]
-    (const KeyPathExpr::Component &component) ->
-                                SmallVector<KeyPathPatternComponent::Index, 4> {
-      // Capturing an index value dependent on the generic context means we
-      // need the generic context captured in the key path.
-      needsGenericContext |=
-          component.getIndexExpr()->getType()->hasArchetype()
-        | baseTy->hasTypeParameter();
+  auto lowerSubscriptOperands =
+    [this, &operands, E](const KeyPathExpr::Component &component) {
+      if (!component.getIndexExpr())
+        return;
       
       // Evaluate the index arguments.
       SmallVector<RValue, 2> indexValues;
@@ -3721,26 +3964,10 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
         indexValues.push_back(std::move(indexResult));
       }
 
-      SmallVector<KeyPathPatternComponent::Index, 4> indexPatterns;
-      for (unsigned i : indices(indexValues)) {
-        auto hashable = component.getSubscriptIndexHashableConformances()[i];
-        assert(hashable.isAbstract() ||
-          hashable.getConcrete()->getType()->isEqual(indexValues[i].getType()));
-        auto &value = indexValues[i];
-        
-        auto indexTy = value.getType()->mapTypeOutOfContext()->getCanonicalType();
-        auto indexLoweredTy = SGF.getLoweredType(value.getType());
-        indexLoweredTy = SILType::getPrimitiveType(
-          indexLoweredTy.getSwiftRValueType()->mapTypeOutOfContext()
-             ->getCanonicalType(),
-          indexLoweredTy.getCategory());
-        indexPatterns.push_back({(unsigned)operands.size(),
-                 indexTy, indexLoweredTy,
-                 hashable});
+      for (auto &rv : indexValues) {
         operands.push_back(
-          std::move(indexValues[i]).forwardAsSingleValue(SGF, E));
+          std::move(rv).forwardAsSingleValue(SGF, E));
       }
-      return indexPatterns;
     };
   
   /// Returns true if a key path component for the given property or
@@ -3754,13 +3981,16 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
   /// Build an external key path component referencing a property or subscript
   /// from another module.
   auto makeExternalKeyPathComponent =
-    [&](const KeyPathExpr::Component &component,
-        CanType ty) -> KeyPathPatternComponent {
+    [&](const KeyPathExpr::Component &component) -> KeyPathPatternComponent {
       SmallVector<KeyPathPatternComponent::Index, 4> indices;
       SubstitutionList subs = component.getDeclRef().getSubstitutions();
-      
+      auto decl = cast<AbstractStorageDecl>(component.getDeclRef().getDecl());
+      auto ty = decl->getStorageInterfaceType();
       // Map the substitutions out of context.
       if (!subs.empty()) {
+        auto sig = decl->getInnermostDeclContext()
+                       ->getGenericSignatureOfContext();
+        auto subMap = sig->getSubstitutionMap(subs);
         // If any of the substitutions involve local archetypes, then the
         // key path pattern needs to capture the generic context, and we need
         // to map the pattern substitutions out of this context.
@@ -3769,98 +3999,68 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
                           return s.getReplacement()->hasArchetype();
                         })) {
           needsGenericContext = true;
-          auto sig = component.getDeclRef().getDecl()
-            ->getInnermostDeclContext()
-            ->getGenericSignatureOfContext();
-          auto subMap = sig
-            ->getSubstitutionMap(component.getDeclRef().getSubstitutions());
           subMap = subMap.mapReplacementTypesOutOfContext();
           SmallVector<Substitution, 4> subsBuf;
-          
           sig->getSubstitutions(subMap, subsBuf);
-          
           subs = SGF.getASTContext().AllocateCopy(subsBuf);
         }
+        ty = ty.subst(subMap);
       }
       
-      if (component.getKind() ==  KeyPathExpr::Component::Kind::Subscript)
-        indices = lowerSubscriptIndices(component);
+      SILFunction *indexEquals = nullptr, *indexHash = nullptr;
+      if (component.getKind() ==  KeyPathExpr::Component::Kind::Subscript) {
+        unsigned numOperands = operands.size();
+        SmallVector<IndexTypePair, 4> indexTypes;
+        auto sub = cast<SubscriptDecl>(component.getDeclRef().getDecl());
+        lowerKeyPathSubscriptIndexTypes(SGF.SGM, indexTypes,
+                                sub, component.getDeclRef().getSubstitutions(),
+                                needsGenericContext);
+        lowerKeyPathSubscriptIndexPatterns(indices, indexTypes,
+             component.getSubscriptIndexHashableConformances(),
+             numOperands);
+        
+        lowerSubscriptOperands(component);
+        
+        assert(numOperands == operands.size()
+               && "operand count out of sync");
+        getOrCreateKeyPathEqualsAndHash(SGF.SGM, SILLocation(E),
+                 needsGenericContext ? SGF.F.getGenericEnvironment() : nullptr,
+                 indices,
+                 indexEquals, indexHash);
+      }
       return KeyPathPatternComponent::forExternal(
-        cast<AbstractStorageDecl>(component.getDeclRef().getDecl()),
-        subs,
-        SGF.getASTContext().AllocateCopy(indices),
-        ty);
+        decl, subs, SGF.getASTContext().AllocateCopy(indices),
+        indexEquals, indexHash,
+        ty->getCanonicalType());
     };
   
   for (auto &component : E->getComponents()) {
     switch (auto kind = component.getKind()) {
-    case KeyPathExpr::Component::Kind::Property: {
-      auto decl = cast<VarDecl>(component.getDeclRef().getDecl());
-      auto oldBaseTy = baseTy;
-      baseTy = baseTy->getTypeOfMember(SGF.SGM.SwiftModule, decl)
-        ->getReferenceStorageReferent()
-        ->getCanonicalType();
-      
+    case KeyPathExpr::Component::Kind::Property:
+    case KeyPathExpr::Component::Kind::Subscript: {
+      auto decl = cast<AbstractStorageDecl>(component.getDeclRef().getDecl());
+
       if (shouldUseExternalKeyPathComponent(decl)) {
-        loweredComponents.push_back(makeExternalKeyPathComponent(component,
-                                                                 baseTy));
-        continue;
-      }
+        loweredComponents.push_back(makeExternalKeyPathComponent(component));
+      } else {
+        unsigned numOperands = operands.size();
+        loweredComponents.push_back(
+          SGF.SGM.emitKeyPathComponentForDecl(SILLocation(E),
+                              SGF.F.getGenericEnvironment(),
+                              numOperands,
+                              needsGenericContext,
+                              component.getDeclRef().getSubstitutions(),
+                              decl,
+                              component.getSubscriptIndexHashableConformances(),
+                              baseTy,
+                              /*for descriptor*/ false));
+        lowerSubscriptOperands(component);
       
-      switch (auto strategy = decl->getAccessStrategy(AccessSemantics::Ordinary,
-                                                      AccessKind::ReadWrite)) {
-      case AccessStrategy::Storage: {
-        // If the stored value would need to be reabstracted in fully opaque
-        // context, then we have to treat the component as computed.
-        auto componentObjTy =
-          component.getComponentType()->getWithoutSpecifierType();
-        auto storageTy = SGF.SGM.Types.getSubstitutedStorageType(decl,
-                                                                componentObjTy);
-        auto opaqueTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
-                                           componentObjTy);
-        
-        if (storageTy.getAddressType() == opaqueTy.getAddressType()) {
-          loweredComponents.push_back(
-                      KeyPathPatternComponent::forStoredProperty(decl, baseTy));
-          break;
-        }
-        LLVM_FALLTHROUGH;
+        assert(numOperands == operands.size()
+               && "operand count out of sync");
       }
-      case AccessStrategy::Addressor:
-      case AccessStrategy::DirectToAccessor:
-      case AccessStrategy::DispatchToAccessor: {
-        // We need thunks to bring the getter and setter to the right signature
-        // expected by the key path runtime.
-        auto id = getIdForKeyPathComponentComputedProperty(SGF, decl,
-                                                           strategy);
-        auto getter = getOrCreateKeyPathGetter(SGF, SILLocation(E),
-                 decl, component.getDeclRef().getSubstitutions(),
-                 strategy,
-                 needsGenericContext ? SGF.F.getGenericEnvironment() : nullptr,
-                 {},
-                 oldBaseTy, baseTy);
-        
-        if (decl->isSettable(decl->getDeclContext())) {
-          auto setter = getOrCreateKeyPathSetter(SGF, SILLocation(E),
-                 decl, component.getDeclRef().getSubstitutions(),
-                 strategy,
-                 needsGenericContext ? SGF.F.getGenericEnvironment() : nullptr,
-                 {},
-                 oldBaseTy, baseTy);
-          loweredComponents.push_back(
-            KeyPathPatternComponent::forComputedSettableProperty(id,
-              getter, setter, {}, nullptr, nullptr, baseTy));
-        } else {
-          loweredComponents.push_back(
-            KeyPathPatternComponent::forComputedGettableProperty(id,
-              getter, {}, nullptr, nullptr, baseTy));
-        }
-        break;
-      }
-      case AccessStrategy::BehaviorStorage:
-        llvm_unreachable("should not occur");
-      }
-      
+      baseTy = loweredComponents.back().getComponentType();
+
       break;
     }
         
@@ -3886,68 +4086,6 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
       }
       loweredComponents.push_back(
                     KeyPathPatternComponent::forOptional(loweredKind, baseTy));
-      break;
-    }
-        
-    case KeyPathExpr::Component::Kind::Subscript: {
-      auto decl = cast<SubscriptDecl>(component.getDeclRef().getDecl());
-      auto strategy = decl->getAccessStrategy(AccessSemantics::Ordinary,
-                                              AccessKind::ReadWrite);
-      auto oldBaseTy = baseTy;
-      auto baseSubscriptTy =
-        decl->getInterfaceType()->castTo<AnyFunctionType>();
-      if (auto genSubscriptTy = baseSubscriptTy->getAs<GenericFunctionType>())
-        baseSubscriptTy = genSubscriptTy
-          ->substGenericArgs(component.getDeclRef().getSubstitutions());
-      auto baseSubscriptInterfaceTy = cast<AnyFunctionType>(
-        baseSubscriptTy->mapTypeOutOfContext()->getCanonicalType());
-      baseTy = baseSubscriptInterfaceTy.getResult();
-    
-      if (shouldUseExternalKeyPathComponent(decl)) {
-        loweredComponents.push_back(makeExternalKeyPathComponent(component,
-                                                                 baseTy));
-        continue;
-      }
-      
-      auto indexPatterns = lowerSubscriptIndices(component);
-      SILFunction *indexEquals = nullptr, *indexHash = nullptr;
-      getOrCreateKeyPathEqualsAndHash(SGF, SILLocation(E),
-               needsGenericContext ? SGF.F.getGenericEnvironment() : nullptr,
-               indexPatterns,
-               indexEquals, indexHash);
-
-      auto id = getIdForKeyPathComponentComputedProperty(SGF, decl, strategy);
-      auto getter = getOrCreateKeyPathGetter(SGF, SILLocation(E),
-               decl, component.getDeclRef().getSubstitutions(),
-               strategy,
-               needsGenericContext ? SGF.F.getGenericEnvironment() : nullptr,
-               indexPatterns,
-               oldBaseTy, baseTy);
-    
-      auto indexPatternsCopy = SGF.getASTContext().AllocateCopy(indexPatterns);
-      if (decl->isSettable()) {
-        auto setter = getOrCreateKeyPathSetter(SGF, SILLocation(E),
-               decl, component.getDeclRef().getSubstitutions(),
-               strategy,
-               needsGenericContext ? SGF.F.getGenericEnvironment() : nullptr,
-               indexPatterns,
-               oldBaseTy, baseTy);
-        loweredComponents.push_back(
-          KeyPathPatternComponent::forComputedSettableProperty(id,
-                                                             getter, setter,
-                                                             indexPatternsCopy,
-                                                             indexEquals,
-                                                             indexHash,
-                                                             baseTy));
-      } else {
-        loweredComponents.push_back(
-          KeyPathPatternComponent::forComputedGettableProperty(id,
-                                                             getter,
-                                                             indexPatternsCopy,
-                                                             indexEquals,
-                                                             indexHash,
-                                                             baseTy));
-      }
       break;
     }
         
@@ -4093,6 +4231,9 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
 /// Flattens one level of optional from a nested optional value.
 static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
                                     ManagedValue optVal) {
+  // This code assumes that we have a +1 value.
+  assert(optVal.isPlusOne(SGF));
+
   // FIXME: Largely copied from SILGenFunction::emitOptionalToOptional.
   auto contBB = SGF.createBasicBlock();
   auto isNotPresentBB = SGF.createBasicBlock();
@@ -4103,57 +4244,54 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
   assert(resultTy.getSwiftRValueType().getOptionalObjectType() &&
          "input was not a nested optional value");
 
-  // If the result is address-only, we need to return something in memory,
-  // otherwise the result is the BBArgument in the merge point.
-  SILValue result;
-  if (resultTL.isAddressOnly())
-    result = SGF.emitTemporaryAllocation(loc, resultTy);
-  else
-    result = contBB->createPHIArgument(resultTy, ValueOwnershipKind::Owned);
-
-  // Branch on whether the input is optional, this doesn't consume the value.
-  auto isPresent = SGF.emitDoesOptionalHaveValue(loc, optVal.getValue());
-  SGF.B.createCondBranch(loc, isPresent, isPresentBB, isNotPresentBB);
-
-  // If it's present, apply the recursive transformation to the value.
-  SGF.B.emitBlock(isPresentBB);
-  SILValue branchArg;
-  {
-    // Don't allow cleanups to escape the conditional block.
-    FullExpr presentScope(SGF.Cleanups, CleanupLocation::get(loc));
-
-    // Pull the value out.  This will load if the value is not address-only.
-    auto &inputTL = SGF.getTypeLowering(optVal.getType());
-    auto resultValue = SGF.emitUncheckedGetOptionalValueFrom(loc, optVal,
-                                                             inputTL);
-
-    // Inject that into the result type if the result is address-only.
-    if (resultTL.isAddressOnly())
-      resultValue.forwardInto(SGF, loc, result);
-    else
-      branchArg = resultValue.forward(SGF);
-  }
-  if (branchArg)
-    SGF.B.createBranch(loc, contBB, branchArg);
-  else
-    SGF.B.createBranch(loc, contBB);
-
-  // If it's not present, inject 'nothing' into the result.
-  SGF.B.emitBlock(isNotPresentBB);
+  SILValue contBBArg;
+  TemporaryInitializationPtr addrOnlyResultBuf;
   if (resultTL.isAddressOnly()) {
-    SGF.emitInjectOptionalNothingInto(loc, result, resultTL);
-    SGF.B.createBranch(loc, contBB);
+    addrOnlyResultBuf = SGF.emitTemporary(loc, resultTL);
   } else {
-    branchArg = SGF.getOptionalNoneValue(loc, resultTL);
-    SGF.B.createBranch(loc, contBB, branchArg);
+    contBBArg = contBB->createPHIArgument(resultTy, ValueOwnershipKind::Owned);
   }
+
+  SwitchEnumBuilder SEB(SGF.B, loc, optVal);
+
+  SEB.addOptionalSomeCase(
+      isPresentBB, contBB, [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
+        if (resultTL.isAddressOnly()) {
+          SILValue addr =
+              addrOnlyResultBuf->getAddressForInPlaceInitialization(SGF, loc);
+          auto *someDecl = SGF.getASTContext().getOptionalSomeDecl();
+          input = SGF.B.createUncheckedTakeEnumDataAddr(
+              loc, input, someDecl, input.getType().getOptionalObjectType());
+          SGF.B.createCopyAddr(loc, input.getValue(), addr, IsNotTake,
+                               IsInitialization);
+          scope.exitAndBranch(loc);
+          return;
+        }
+        scope.exitAndBranch(loc, input.forward(SGF));
+      });
+  SEB.addOptionalNoneCase(
+      isNotPresentBB, contBB,
+      [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
+        if (resultTL.isAddressOnly()) {
+          SILValue addr =
+              addrOnlyResultBuf->getAddressForInPlaceInitialization(SGF, loc);
+          SGF.emitInjectOptionalNothingInto(loc, addr, resultTL);
+          scope.exitAndBranch(loc);
+          return;
+        }
+
+        auto mv = SGF.B.createManagedOptionalNone(loc, resultTy).forward(SGF);
+        scope.exitAndBranch(loc, mv);
+      });
+  std::move(SEB).emit();
 
   // Continue.
   SGF.B.emitBlock(contBB);
-  if (resultTL.isAddressOnly())
-    return SGF.emitManagedBufferWithCleanup(result, resultTL);
-
-  return SGF.emitManagedRValueWithCleanup(result, resultTL);
+  if (resultTL.isAddressOnly()) {
+    addrOnlyResultBuf->finishInitialization(SGF);
+    return addrOnlyResultBuf->getManagedAddress();
+  }
+  return SGF.emitManagedRValueWithCleanup(contBBArg, resultTL);
 }
 
 static ManagedValue
@@ -4162,7 +4300,6 @@ computeNewSelfForRebindSelfInConstructorExpr(SILGenFunction &SGF,
   // Get newSelf, forward the cleanup for newSelf and clean everything else
   // up.
   FormalEvaluationScope Scope(SGF);
-  PostponedCleanup postpone(SGF);
   ManagedValue newSelfWithCleanup =
       SGF.emitRValueAsSingleValue(E->getSubExpr());
 
@@ -4180,15 +4317,21 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   auto selfTy = ctorDecl->mapTypeIntoContext(selfIfaceTy);
   
   auto newSelfTy = E->getSubExpr()->getType();
-  bool outerIsOptional;
-  if (auto objTy = newSelfTy->getOptionalObjectType(outerIsOptional))
+  bool outerIsOptional = false;
+  bool innerIsOptional = false;
+  auto objTy = newSelfTy->getOptionalObjectType();
+  if (objTy) {
+    outerIsOptional = true;
     newSelfTy = objTy;
 
-  // "try? self.init()" can give us two levels of optional if the initializer
-  // we delegate to is failable.
-  bool innerIsOptional;
-  if (auto objTy = newSelfTy->getOptionalObjectType(innerIsOptional))
-    newSelfTy = objTy;
+    // "try? self.init()" can give us two levels of optional if the initializer
+    // we delegate to is failable.
+    objTy = newSelfTy->getOptionalObjectType();
+    if (objTy) {
+      innerIsOptional = true;
+      newSelfTy = objTy;
+    }
+  }
 
   // The subexpression consumes the current 'self' binding.
   assert(SGF.SelfInitDelegationState == SILGenFunction::NormalSelf
@@ -4710,7 +4853,6 @@ static void emitSimpleAssignment(SILGenFunction &SGF, SILLocation loc,
     if (dest->getType()->isEqual(srcLoad->getSubExpr()->getType())) {
       assert(!dest->getType()->is<TupleType>());
       FormalEvaluationScope writeback(SGF);
-      PostponedCleanup postpone(SGF);
       auto destLV = SGF.emitLValue(dest, AccessKind::Write);
       auto srcLV = SGF.emitLValue(srcLoad->getSubExpr(), AccessKind::Read);
       SGF.emitAssignLValueToLValue(loc, std::move(srcLV), std::move(destLV));
@@ -4732,14 +4874,12 @@ static void emitSimpleAssignment(SILGenFunction &SGF, SILLocation loc,
     }
     
     FormalEvaluationScope writeback(SGF);
-    PostponedCleanup postpone(SGF);
     LValue destLV = SGF.emitLValue(dest, AccessKind::Write);
     SGF.emitAssignToLValue(loc, src, std::move(destLV));
     return;
   }
 
   FormalEvaluationScope writeback(SGF);
-  PostponedCleanup postpone(SGF);
 
   // Produce a flattened queue of LValues.
   SmallVector<Optional<LValue>, 4> destLVs;
@@ -4759,24 +4899,78 @@ RValue RValueEmitter::visitAssignExpr(AssignExpr *E, SGFContext C) {
   return SGF.emitEmptyTupleRValue(E, C);
 }
 
-void SILGenFunction::emitBindOptional(SILLocation loc,
-                                      ManagedValue optionalAddrOrValue,
-                                      unsigned depth) {
+void SILGenFunction::emitBindOptionalAddress(SILLocation loc,
+                                             ManagedValue optAddress,
+                                             unsigned depth) {
+  assert(optAddress.getType().isAddress() && "Expected an address here");
+  assert(depth < BindOptionalFailureDests.size());
+  auto failureDest =
+      BindOptionalFailureDests[BindOptionalFailureDests.size() - depth - 1];
+  assert(failureDest.isValid() && "too big to fail");
+
+  // Since we know that we have an address, we do not need to worry about
+  // ownership invariants. Instead just use a select_enum_addr.
+  SILBasicBlock *someBB = createBasicBlock();
+  SILValue hasValue = emitDoesOptionalHaveValue(loc, optAddress.getValue());
+
+  auto noneBB = Cleanups.emitBlockForCleanups(failureDest, loc);
+  B.createCondBranch(loc, hasValue, someBB, noneBB);
+
+  // Reset the insertion point at the end of hasValueBB so we can
+  // continue to emit code there.
+  B.setInsertionPoint(someBB);
+}
+
+ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
+                                              ManagedValue optValue,
+                                              unsigned depth) {
+  assert(optValue.isPlusOne(*this) && "Can only bind plus one values");
   assert(depth < BindOptionalFailureDests.size());
   auto failureDest = BindOptionalFailureDests[BindOptionalFailureDests.size()
                                                 - depth - 1];
 
-  // Check whether the optional has a value.
   SILBasicBlock *hasValueBB = createBasicBlock();
-  auto hasValue =
-      emitDoesOptionalHaveValue(loc, optionalAddrOrValue.getValue());
+  SILBasicBlock *hasNoValueBB = createBasicBlock();
 
+  SILType optValueTy = optValue.getType();
+  SwitchEnumBuilder SEB(B, loc, optValue);
+  SEB.addOptionalSomeCase(hasValueBB, nullptr,
+                          [&](ManagedValue mv, SwitchCaseFullExpr &&expr) {
+                            // If mv is not an address, forward it. We will
+                            // recreate the cleanup outside when we return the
+                            // argument.
+                            if (mv.getType().isObject()) {
+                              mv.forward(*this);
+                            }
+                            expr.exit();
+                          });
   // If not, thread out through a bunch of cleanups.
-  SILBasicBlock *hasNoValueBB = Cleanups.emitBlockForCleanups(failureDest, loc);
-  B.createCondBranch(loc, hasValue, hasValueBB, hasNoValueBB);
-  
-  // If so, continue.
-  B.emitBlock(hasValueBB);
+  SEB.addOptionalNoneCase(hasNoValueBB, failureDest,
+                          [&](ManagedValue mv, SwitchCaseFullExpr &&expr) {
+                            expr.exitAndBranch(loc);
+                          });
+  std::move(SEB).emit();
+
+  // Reset the insertion point at the end of hasValueBB so we can
+  // continue to emit code there.
+  B.setInsertionPoint(hasValueBB);
+
+  // If optValue was loadable, we emitted a switch_enum. In such a case, return
+  // the argument from hasValueBB.
+  if (optValue.getType().isLoadable(F.getModule())) {
+    return emitManagedRValueWithCleanup(hasValueBB->getArgument(0));
+  }
+
+  // Otherwise, if we had an address only value, we emitted the value at +0. In
+  // such a case, since we want to model this as a consuming operation. Use
+  // ensure_plus_one and extract out the value from there.
+  auto *someDecl = getASTContext().getOptionalSomeDecl();
+  auto eltTy =
+      optValueTy.getObjectType().getOptionalObjectType().getAddressType();
+  assert(eltTy);
+  SILValue address = optValue.forward(*this);
+  return emitManagedBufferWithCleanup(
+      B.createUncheckedTakeEnumDataAddr(loc, address, someDecl, eltTy));
 }
 
 RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
@@ -4788,21 +4982,19 @@ RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
     optValue = SGF.emitRValueAsSingleValue(E->getSubExpr());
   } else {
     auto temp = SGF.emitTemporary(E, optTL);
-    optValue = temp->getManagedAddress();
 
     // Emit the operand into the temporary.
     SGF.emitExprInto(E->getSubExpr(), temp.get());
 
+    // And then greab the managed address.
+    optValue = temp->getManagedAddress();
   }
 
   // Check to see whether the optional is present, if not, jump to the current
-  // nil handler block.
-  SGF.emitBindOptional(E, optValue, E->getDepth());
-
-  // If we continued, get the value out as the result of the expression.
-  auto resultValue = SGF.emitUncheckedGetOptionalValueFrom(E, optValue,
-                                                           optTL, C);
-  return RValue(SGF, E, resultValue);
+  // nil handler block. Otherwise, return the value as the result of the
+  // expression.
+  optValue = SGF.emitBindOptional(E, optValue, E->getDepth());
+  return RValue(SGF, E, optValue);
 }
 
 namespace {
@@ -5266,29 +5458,51 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
 }
 
 RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
-    MakeTemporarilyEscapableExpr *E,
-    SGFContext C) {
+    MakeTemporarilyEscapableExpr *E, SGFContext C) {
   // Emit the non-escaping function value.
   auto functionValue =
     visit(E->getNonescapingClosureValue()).getAsSingleValue(SGF, E);
 
   auto escapingFnTy = SGF.getLoweredType(E->getOpaqueValue()->getType());
+  auto silFnTy = escapingFnTy.castTo<SILFunctionType>();
+
+  auto visitSubExpr = [&](ManagedValue escapingClosure,
+                          bool isClosureConsumable) -> RValue {
+    // Bind the opaque value to the escaping function.
+    SILGenFunction::OpaqueValueState opaqueValue{
+        escapingClosure,
+        /*consumable*/ isClosureConsumable,
+        /*hasBeenConsumed*/ false,
+    };
+    SILGenFunction::OpaqueValueRAII pushOpaqueValue(SGF, E->getOpaqueValue(),
+                                                    opaqueValue);
+
+    // Emit the guarded expression.
+    return visit(E->getSubExpr(), C);
+  };
+
+  // Handle @convention(block). No withoutActuallyEscaping verification yet.
+  if (silFnTy->getExtInfo().getRepresentation() !=
+      SILFunctionTypeRepresentation::Thick) {
+    auto escapingClosure =
+        SGF.B.createConvertFunction(E, functionValue, escapingFnTy);
+    return visitSubExpr(escapingClosure, true /*isClosureConsumable*/);
+  }
 
   // Convert it to an escaping function value.
-  functionValue =
+  auto escapingClosure =
       SGF.createWithoutActuallyEscapingClosure(E, functionValue, escapingFnTy);
+  auto loc = SILLocation(E);
+  auto borrowedClosure = escapingClosure.borrow(SGF, loc);
+  RValue rvalue = visitSubExpr(borrowedClosure, false /* isClosureConsumable */);
 
-  // Bind the opaque value to the escaping function.
-  SILGenFunction::OpaqueValueState opaqueValue{
-    functionValue,
-    /*consumable*/ true,
-    /*hasBeenConsumed*/ false,
-  };
-  SILGenFunction::OpaqueValueRAII pushOpaqueValue(SGF, E->getOpaqueValue(),
-                                                  opaqueValue);
-
-  // Emit the guarded expression.
-  return visit(E->getSubExpr(), C);
+  // Now create the verification of the withoutActuallyEscaping operand.
+  // Either we fail the uniquenes check (which means the closure has escaped)
+  // and abort or we continue and destroy the ultimate reference.
+  auto isEscaping =
+      SGF.B.createIsEscapingClosure(loc, borrowedClosure.getValue());
+  SGF.B.createCondFail(loc, isEscaping);
+  return rvalue;
 }
 
 RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
@@ -5327,6 +5541,8 @@ public:
                                AccessKind kind) const override {
     return kind;
   }
+
+  virtual bool isLoadingPure() const override { return true; }
   
   void set(SILGenFunction &SGF, SILLocation loc,
            ArgumentSource &&value, ManagedValue base) && override {
@@ -5467,7 +5683,6 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
 RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E,
                                               SGFContext C) {
   FormalEvaluationScope writeback(SGF);
-  PostponedCleanup postpone(SGF);
 
   auto subExpr = E->getSubExpr();
   auto accessInfo = SGF.getArrayAccessInfo(E->getType(),
@@ -5652,7 +5867,6 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
   if (E->getType()->hasLValueType()) {
     // Emit the l-value, but don't perform an access.
     FormalEvaluationScope scope(*this);
-    PostponedCleanup postpone(*this);
     emitLValue(E, AccessKind::Read);
     return;
   }
@@ -5661,11 +5875,11 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
   // (which could materialize a potentially expensive value with cleanups).
   if (auto *LE = dyn_cast<LoadExpr>(E)) {
     FormalEvaluationScope scope(*this);
-    PostponedCleanup postpone(*this);
     LValue lv = emitLValue(LE->getSubExpr(), AccessKind::Read);
-    // If the lvalue is purely physical, then it won't have any side effects,
-    // and we don't need to drill into it.
-    if (lv.isPhysical())
+
+    // If loading from the lvalue is guaranteed to have no side effects, we
+    // don't need to drill into it.
+    if (lv.isLoadingPure())
       return;
 
     // If the last component is physical, then we just need to drill through
@@ -5678,6 +5892,39 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
     // Otherwise, we must call the ultimate getter to get its potential side
     // effect.
     emitLoadOfLValue(E, std::move(lv), SGFContext::AllowImmediatePlusZero);
+    return;
+  }
+
+  auto findLoadThroughForceValueExprs = [](Expr *E,
+                                           SmallVectorImpl<ForceValueExpr *>
+                                             &forceValueExprs) -> LoadExpr * {
+    while (auto FVE = dyn_cast<ForceValueExpr>(E)) {
+      forceValueExprs.push_back(FVE);
+      E = FVE->getSubExpr();
+    }
+    return dyn_cast<LoadExpr>(E);
+  };
+
+  // Look through force unwrap(s) of an lvalue. If possible, we want to just to
+  // emit the precondition(s) without having to load the value.
+  SmallVector<ForceValueExpr *, 4> forceValueExprs;
+  if (auto *LE = findLoadThroughForceValueExprs(E, forceValueExprs)) {
+    FormalEvaluationScope scope(*this);
+    LValue lv = emitLValue(LE->getSubExpr(), AccessKind::Read);
+
+    ManagedValue value;
+    if (lv.isLastComponentPhysical()) {
+      value = emitAddressOfLValue(LE, std::move(lv), AccessKind::Read);
+    } else {
+      value = emitLoadOfLValue(LE, std::move(lv),
+          SGFContext::AllowImmediatePlusZero).getAsSingleValue(*this, LE);
+    }
+
+    for (auto &FVE : reversed(forceValueExprs)) {
+      const TypeLowering &optTL = getTypeLowering(FVE->getSubExpr()->getType());
+      value = emitCheckedGetOptionalValueFrom(
+          FVE, value, optTL, SGFContext::AllowImmediatePlusZero);
+    }
     return;
   }
 

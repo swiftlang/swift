@@ -471,12 +471,8 @@ public:
   /// Retrieve the declaration of Swift.==(Int, Int) -> Bool.
   FuncDecl *getEqualIntDecl() const;
 
-  /// Retrieve the declaration of
-  /// Swift._combineHashValues(Int, Int) -> Int.
-  FuncDecl *getCombineHashValuesDecl() const;
-
-  /// Retrieve the declaration of Swift._mixInt(Int) -> Int.
-  FuncDecl *getMixIntDecl() const;
+  /// Retrieve the declaration of Swift._hashValue<H>(for: H) -> Int.
+  FuncDecl *getHashValueForDecl() const;
 
   /// Retrieve the declaration of Array.append(element:)
   FuncDecl *getArrayAppendElementDecl() const;
@@ -532,6 +528,11 @@ public:
   /// as part of the current module or source file, but are otherwise not
   /// nested within it.
   void addExternalDecl(Decl *decl);
+
+  /// Add a declaration that was synthesized to a per-source file list if
+  /// if is part of a source file, or the external declarations list if
+  /// it is part of an imported type context.
+  void addSynthesizedDecl(Decl *decl);
 
   /// Add a cleanup function to be called when the ASTContext is deallocated.
   void addCleanup(std::function<void(void)> cleanup);

@@ -43,7 +43,6 @@ class CalleeTypeInfo;
 class ResultPlan;
 using ResultPlanPtr = std::unique_ptr<ResultPlan>;
 class ArgumentScope;
-class PostponedCleanup;
 class Scope;
 
 enum class ApplyOptions : unsigned {
@@ -247,10 +246,6 @@ public:
 
   /// \brief The current context where formal evaluation cleanups are managed.
   FormalEvaluationContext FormalEvalContext;
-
-  /// Currently active postponed cleanups.
-  PostponedCleanup *CurrentlyActivePostponedCleanup = nullptr;
-  void enterPostponedCleanup(SILValue forValue);
 
   /// \brief Values to end dynamic access enforcement on.  A hack for
   /// materializeForSet.
@@ -1110,14 +1105,12 @@ public:
                                         CanType baseFormalType,
                                         SILDeclRef accessor);
 
-  SILDeclRef getGetterDeclRef(AbstractStorageDecl *decl);
   RValue emitGetAccessor(SILLocation loc, SILDeclRef getter,
                          SubstitutionList substitutions,
                          ArgumentSource &&optionalSelfValue,
                          bool isSuper, bool isDirectAccessorUse,
                          RValue &&optionalSubscripts, SGFContext C);
 
-  SILDeclRef getSetterDeclRef(AbstractStorageDecl *decl);
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
                        SubstitutionList substitutions,
                        ArgumentSource &&optionalSelfValue,
@@ -1125,7 +1118,6 @@ public:
                        RValue &&optionalSubscripts,
                        ArgumentSource &&value);
 
-  SILDeclRef getMaterializeForSetDeclRef(AbstractStorageDecl *decl);
   MaterializedLValue
   emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                                 SubstitutionList substitutions,
@@ -1142,8 +1134,6 @@ public:
                                        SubstitutionList witnessSubs);
   void emitMaterializeForSet(AccessorDecl *decl);
 
-  SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
-                                 AccessKind accessKind);
   std::pair<ManagedValue,ManagedValue>
   emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                         SubstitutionList substitutions,
@@ -1151,11 +1141,6 @@ public:
                         bool isSuper, bool isDirectAccessorUse,
                         RValue &&optionalSubscripts,
                         SILType addressType);
-
-  RValue emitApplyConversionFunction(SILLocation loc,
-                                     Expr *funcExpr,
-                                     Type resultType,
-                                     RValue &&operand);
 
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v);
   ManagedValue emitManagedRetain(SILLocation loc, SILValue v,
@@ -1315,7 +1300,7 @@ public:
                    SILLocation loc, ManagedValue fn, SubstitutionList subs,
                    ArrayRef<ManagedValue> args,
                    const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
-                   SGFContext evalContext, PostponedCleanup &cleanup);
+                   SGFContext evalContext);
 
   RValue emitApplyOfDefaultArgGenerator(SILLocation loc,
                                         ConcreteDeclRef defaultArgsOwner,
@@ -1520,10 +1505,18 @@ public:
   /// active failure destination if the optional value addressed by optionalAddr
   /// is nil, and leaving the insertion point on the success branch.
   ///
-  /// NOTE: This operation does *not* consume the managed value.
+  /// NOTE: This operation does consume the managed value.
+  ManagedValue emitBindOptional(SILLocation loc,
+                                ManagedValue optionalAddrOrValue,
+                                unsigned depth);
+
+  /// Emit the control flow for an optional 'bind' operation, branching to the
+  /// active failure destination if the optional value addressed by optionalAddr
+  /// is nil, and leaving the insertion point on the success branch.
   ///
-  void emitBindOptional(SILLocation loc, ManagedValue optionalAddrOrValue,
-                        unsigned depth);
+  /// NOTE: This operation does not consume the managed address.
+  void emitBindOptionalAddress(SILLocation loc, ManagedValue optionalAddr,
+                               unsigned depth);
 
   void emitOptionalEvaluation(SILLocation loc, Type optionalType,
                               SmallVectorImpl<ManagedValue> &results,
@@ -1647,7 +1640,9 @@ public:
                                     CanType &inputSubstType,
                                     CanType &outputSubstType,
                                     GenericEnvironment *&genericEnv,
-                                    SubstitutionMap &interfaceSubs);
+                                    SubstitutionMap &interfaceSubs,
+                                    bool withoutActuallyEscaping=false);
+
   //===--------------------------------------------------------------------===//
   // NoEscaping to Escaping closure thunk
   //===--------------------------------------------------------------------===//
@@ -1684,6 +1679,10 @@ public:
     // No lowering support needed.
   }
   void visitAssociatedTypeDecl(AssociatedTypeDecl *D) {
+    // No lowering support needed.
+  }
+
+  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *D) {
     // No lowering support needed.
   }
 
@@ -1861,37 +1860,6 @@ public:
     }
     SGF.CurFunctionSection = SavedSection;
   }
-};
-
-/// Utility class to facilitate posponment of cleanup of @noescape
-/// partial_apply arguments into the 'right' scope.
-///
-/// If a Postponed cleanup is active at the end of a scope. The scope will
-/// actively push the cleanup into its surrounding scope.
-class PostponedCleanup {
-  friend SILGenFunction;
-  friend Scope;
-
-  SmallVector<std::pair<CleanupHandle, SILValue>, 16> deferredCleanups;
-  CleanupsDepth depth;
-  SILGenFunction &SGF;
-  PostponedCleanup *previouslyActiveCleanup;
-  bool active;
-  bool applyRecursively;
-
-  void postponeCleanup(CleanupHandle cleanup, SILValue forValue);
-public:
-  PostponedCleanup(SILGenFunction &SGF);
-  PostponedCleanup(SILGenFunction &SGF, bool applyRecursively);
-  ~PostponedCleanup();
-
-  void end();
-
-  PostponedCleanup() = delete;
-  PostponedCleanup(const PostponedCleanup &) = delete;
-  PostponedCleanup &operator=(const PostponedCleanup &) = delete;
-  PostponedCleanup &operator=(PostponedCleanup &&other) = delete;
-  PostponedCleanup(PostponedCleanup &&) = delete;
 };
 
 } // end namespace Lowering

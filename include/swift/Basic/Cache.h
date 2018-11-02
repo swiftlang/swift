@@ -57,7 +57,7 @@ struct CacheValueInfo : public CacheValueCostInfo<T> {
 /// It should be inherently thread-safe.
 class CacheImpl {
 public:
-  typedef void *ImplTy;
+  using ImplTy = void *;
 
   struct CallBacks {
     void *UserData;

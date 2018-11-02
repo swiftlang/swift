@@ -625,6 +625,8 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
 
   ASTContext &ctx = getContext();
   DeclContext *dc = getDeclContext(contextID);
+  assert(!isa<ClangModuleUnit>(dc->getModuleScopeContext())
+         && "should not have serialized a conformance from a clang module");
   Type conformingType = dc->getDeclaredInterfaceType();
   PrettyStackTraceType trace(ctx, "reading conformance for", conformingType);
 
@@ -1369,7 +1371,7 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
         break;
       }
       case XREF_INITIALIZER_PATH_PIECE:
-        result = getContext().Id_init;
+        result = DeclBaseName::createConstructor();
         break;
 
       case XREF_EXTENSION_PATH_PIECE:
@@ -1499,7 +1501,7 @@ giveUpFastPath:
         uint8_t kind;
         XRefInitializerPathPieceLayout::readRecord(scratch, TID, inProtocolExt,
                                                    kind);
-        memberName = getContext().Id_init;
+        memberName = DeclBaseName::createConstructor();
         ctorInit = getActualCtorInitializerKind(kind);
         break;
       }
@@ -1732,6 +1734,8 @@ DeclBaseName ModuleFile::getDeclBaseName(IdentifierID IID) {
         llvm_unreachable("Cannot get DeclBaseName of special module id");
     case SUBSCRIPT_ID:
       return DeclBaseName::createSubscript();
+    case serialization::CONSTRUCTOR_ID:
+      return DeclBaseName::createConstructor();
     case serialization::DESTRUCTOR_ID:
       return DeclBaseName::createDestructor();
     case NUM_SPECIAL_IDS:
@@ -1916,6 +1920,7 @@ ModuleDecl *ModuleFile::getModule(ModuleID MID) {
       return clangImporter->getImportedHeaderModule();
     }
     case SUBSCRIPT_ID:
+    case CONSTRUCTOR_ID:
     case DESTRUCTOR_ID:
       llvm_unreachable("Modules cannot be named with special names");
     case NUM_SPECIAL_IDS:
@@ -2077,6 +2082,25 @@ Optional<swift::ResilienceExpansion> getActualResilienceExpansion(uint8_t raw) {
   }
   return None;
 }
+
+/// Translate from the serialization VarDeclSpecifier enumerators, which are
+/// guaranteed to be stable, to the AST ones.
+static Optional<swift::VarDecl::Specifier>
+getActualVarDeclSpecifier(serialization::VarDeclSpecifier raw) {
+  switch (raw) {
+#define CASE(ID) \
+  case serialization::VarDeclSpecifier::ID: \
+    return swift::VarDecl::Specifier::ID;
+  CASE(Let)
+  CASE(Var)
+  CASE(InOut)
+  CASE(Shared)
+  CASE(Owned)
+  }
+#undef CASE
+  return None;
+}
+
 
 void ModuleFile::configureStorage(AbstractStorageDecl *decl,
                                   unsigned rawStorageKind,
@@ -2775,7 +2799,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     SmallVector<Identifier, 2> argNames;
     for (auto argNameID : argNameAndDependencyIDs.slice(0, numArgNames))
       argNames.push_back(getIdentifier(argNameID));
-    DeclName name(ctx, ctx.Id_init, argNames);
+    DeclName name(ctx, DeclBaseName::createConstructor(), argNames);
 
     Optional<swift::CtorInitializerKind> initKind =
         getActualCtorInitializerKind(storedInitKind);
@@ -2894,7 +2918,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     DeclContextID contextID;
     bool isImplicit, isObjC, isStatic, hasNonPatternBindingInit;
     bool isGetterMutating, isSetterMutating;
-    unsigned specifier;
+    unsigned rawSpecifier;
     uint8_t storageKind, rawAccessLevel, rawSetterAccessLevel;
     TypeID interfaceTypeID;
     DeclID getterID, setterID, materializeForSetID, willSetID, didSetID;
@@ -2902,7 +2926,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     ArrayRef<uint64_t> dependencyIDs;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID,
-                                       isImplicit, isObjC, isStatic, specifier,
+                                       isImplicit, isObjC, isStatic, rawSpecifier,
                                        hasNonPatternBindingInit,
                                        isGetterMutating, isSetterMutating,
                                        storageKind, interfaceTypeID,
@@ -2954,9 +2978,15 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto var = createDecl<VarDecl>(/*IsStatic*/isStatic,
-                                   (VarDecl::Specifier)specifier,
-                                   /*IsCaptureList*/false, SourceLoc(), name,
+    auto specifier = getActualVarDeclSpecifier(
+        (serialization::VarDeclSpecifier)rawSpecifier);
+    if (!specifier) {
+      error();
+      return nullptr;
+    }
+
+    auto var = createDecl<VarDecl>(/*IsStatic*/ isStatic, *specifier,
+                                   /*IsCaptureList*/ false, SourceLoc(), name,
                                    Type(), DC);
     var->setHasNonPatternBindingInit(hasNonPatternBindingInit);
     var->setIsGetterMutating(isGetterMutating);
@@ -2967,7 +2997,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     var->setInterfaceType(interfaceType);
 
     if (auto referenceStorage = interfaceType->getAs<ReferenceStorageType>())
-      AddAttribute(new (ctx) OwnershipAttr(referenceStorage->getOwnership()));
+      AddAttribute(
+          new (ctx) ReferenceOwnershipAttr(referenceStorage->getOwnership()));
 
     configureStorage(var, storageKind, getterID, setterID, materializeForSetID,
                      addressorID, mutableAddressorID, willSetID, didSetID);
@@ -3002,18 +3033,25 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
   case decls_block::PARAM_DECL: {
     IdentifierID argNameID, paramNameID;
     DeclContextID contextID;
-    unsigned specifier;
+    unsigned rawSpecifier;
     TypeID interfaceTypeID;
 
     decls_block::ParamLayout::readRecord(scratch, argNameID, paramNameID,
-                                         contextID, specifier, interfaceTypeID);
+                                         contextID, rawSpecifier,
+                                         interfaceTypeID);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto param = createDecl<ParamDecl>((VarDecl::Specifier)specifier,
-                                       SourceLoc(), SourceLoc(),
+    auto specifier = getActualVarDeclSpecifier(
+        (serialization::VarDeclSpecifier)rawSpecifier);
+    if (!specifier) {
+      error();
+      return nullptr;
+    }
+
+    auto param = createDecl<ParamDecl>(*specifier, SourceLoc(), SourceLoc(),
                                        getIdentifier(argNameID), SourceLoc(),
                                        getIdentifier(paramNameID), Type(), DC);
 
@@ -3512,6 +3550,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     IdentifierID nameID;
     DeclContextID contextID;
     bool isImplicit, isObjC, requiresStoredPropertyInits;
+    bool inheritsSuperclassInitializers;
     GenericEnvironmentID genericEnvID;
     TypeID superclassID;
     uint8_t rawAccessLevel;
@@ -3520,6 +3559,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
                                          isImplicit, isObjC,
                                          requiresStoredPropertyInits,
+                                         inheritsSuperclassInitializers,
                                          genericEnvID, superclassID,
                                          rawAccessLevel, numConformances,
                                          rawInheritedIDs);
@@ -3551,6 +3591,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     theClass->setSuperclass(getType(superclassID));
     if (requiresStoredPropertyInits)
       theClass->setRequiresStoredPropertyInits(true);
+    if (inheritsSuperclassInitializers)
+      theClass->setInheritsSuperclassInitializers();
 
     theClass->computeType();
 
@@ -3635,28 +3677,53 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
   }
 
   case decls_block::ENUM_ELEMENT_DECL: {
-    IdentifierID nameID;
     DeclContextID contextID;
     TypeID interfaceTypeID;
-    bool hasArgumentType;
-    bool isImplicit; bool isNegative;
+    bool isImplicit; bool hasPayload; bool isNegative;
     unsigned rawValueKindID;
+    IdentifierID blobData;
+    uint8_t rawResilienceExpansion;
+    unsigned numArgNames;
+    ArrayRef<uint64_t> argNameAndDependencyIDs;
 
-    decls_block::EnumElementLayout::readRecord(scratch, nameID,
-                                               contextID,
+    decls_block::EnumElementLayout::readRecord(scratch, contextID,
                                                interfaceTypeID,
-                                               hasArgumentType,
-                                               isImplicit, rawValueKindID,
-                                               isNegative);
+                                               isImplicit, hasPayload,
+                                               rawValueKindID, isNegative,
+                                               blobData,
+                                               rawResilienceExpansion,
+                                               numArgNames,
+                                               argNameAndDependencyIDs);
+
+    // Resolve the name ids.
+    Identifier baseName = getIdentifier(argNameAndDependencyIDs.front());
+    SmallVector<Identifier, 2> argNames;
+    for (auto argNameID : argNameAndDependencyIDs.slice(1, numArgNames-1))
+      argNames.push_back(getIdentifier(argNameID));
+    DeclName compoundName(ctx, baseName, argNames);
+    DeclName name = argNames.empty() ? baseName : compoundName;
+    
+    for (TypeID dependencyID : argNameAndDependencyIDs.slice(numArgNames+1)) {
+      auto dependency = getTypeChecked(dependencyID);
+      if (!dependency) {
+        return llvm::make_error<TypeError>(
+          name, takeErrorInfo(dependency.takeError()));
+      }
+    }
+
+    // Read payload parameter list, if it exists.
+    ParameterList *paramList = nullptr;
+    if (hasPayload) {
+      paramList = readParameterList();
+    }
 
     DeclContext *DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
     auto elem = createDecl<EnumElementDecl>(SourceLoc(),
-                                            getIdentifier(nameID),
-                                            TypeLoc(),
-                                            hasArgumentType,
+                                            name,
+                                            paramList,
                                             SourceLoc(),
                                             nullptr,
                                             DC);
@@ -3667,8 +3734,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     case EnumElementRawValueKind::None:
       break;
     case EnumElementRawValueKind::IntegerLiteral: {
-      auto literalText = getContext().AllocateCopy(blobData);
-      auto literal = new (getContext()) IntegerLiteralExpr(literalText,
+      auto literalText = getIdentifier(blobData);
+      auto literal = new (getContext()) IntegerLiteralExpr(literalText.get(),
                                                            SourceLoc(),
                                                            /*implicit*/ true);
       if (isNegative)
@@ -3685,6 +3752,13 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     elem->setAccess(std::max(cast<EnumDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
 
+    if (auto resilienceExpansion = getActualResilienceExpansion(
+                                       rawResilienceExpansion)) {
+      elem->setDefaultArgumentResilienceExpansion(*resilienceExpansion);
+    } else {
+      error();
+      return nullptr;
+    }
     break;
   }
 
@@ -3995,15 +4069,36 @@ getActualSILCoroutineKind(uint8_t rep) {
   }
 }
 
-/// Translate from the serialization Ownership enumerators, which are
+/// Translate from the serialization ReferenceOwnership enumerators, which are
 /// guaranteed to be stable, to the AST ones.
-static
-Optional<swift::Ownership> getActualOwnership(serialization::Ownership raw) {
+static Optional<swift::ReferenceOwnership>
+getActualReferenceOwnership(serialization::ReferenceOwnership raw) {
   switch (raw) {
-  case serialization::Ownership::Strong:   return swift::Ownership::Strong;
-  case serialization::Ownership::Unmanaged:return swift::Ownership::Unmanaged;
-  case serialization::Ownership::Unowned:  return swift::Ownership::Unowned;
-  case serialization::Ownership::Weak:     return swift::Ownership::Weak;
+  case serialization::ReferenceOwnership::Strong:
+    return swift::ReferenceOwnership::Strong;
+  case serialization::ReferenceOwnership::Unmanaged:
+    return swift::ReferenceOwnership::Unmanaged;
+  case serialization::ReferenceOwnership::Unowned:
+    return swift::ReferenceOwnership::Unowned;
+  case serialization::ReferenceOwnership::Weak:
+    return swift::ReferenceOwnership::Weak;
+  }
+  return None;
+}
+
+/// Translate from the serialization ValueOwnership enumerators, which are
+/// guaranteed to be stable, to the AST ones.
+static Optional<swift::ValueOwnership>
+getActualValueOwnership(serialization::ValueOwnership raw) {
+  switch (raw) {
+#define CASE(ID) \
+  case serialization::ValueOwnership::ID: \
+    return swift::ValueOwnership::ID;
+  CASE(Default)
+  CASE(InOut)
+  CASE(Shared)
+  CASE(Owned)
+#undef CASE
   }
   return None;
 }
@@ -4084,11 +4179,11 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     s->getFrontendCounters().NumTypesDeserialized++;
 
   switch (recordID) {
-  case decls_block::NAME_ALIAS_TYPE: {
+  case decls_block::BUILTIN_ALIAS_TYPE: {
     DeclID underlyingID;
     TypeID canonicalTypeID;
-    decls_block::NameAliasTypeLayout::readRecord(scratch, underlyingID,
-                                                 canonicalTypeID);
+    decls_block::BuiltinAliasTypeLayout::readRecord(scratch, underlyingID,
+                                                    canonicalTypeID);
     auto aliasOrError = getDeclChecked(underlyingID);
     if (!aliasOrError)
       return aliasOrError.takeError();
@@ -4119,6 +4214,62 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     break;
   }
 
+  case decls_block::NAME_ALIAS_TYPE: {
+    DeclID typealiasID;
+    TypeID parentTypeID;
+    TypeID underlyingTypeID;
+    decls_block::NameAliasTypeLayout::readRecord(scratch, typealiasID,
+                                                      parentTypeID,
+                                                      underlyingTypeID);
+    auto aliasOrError = getDeclChecked(typealiasID);
+    if (!aliasOrError)
+      return aliasOrError.takeError();
+    auto alias = dyn_cast<TypeAliasDecl>(aliasOrError.get());
+
+    Type underlyingType;
+    if (ctx.LangOpts.EnableDeserializationRecovery) {
+      Expected<Type> expectedType = getTypeChecked(underlyingTypeID);
+      if (!expectedType)
+        return expectedType.takeError();
+      if (expectedType.get()) {
+        if (!alias ||
+            !alias->getDeclaredInterfaceType()->isEqual(expectedType.get())) {
+          // Fall back to the canonical type.
+          typeOrOffset = expectedType.get()->getCanonicalType();
+          break;
+        }
+      }
+
+      underlyingType = expectedType.get();
+    } else {
+      underlyingType = getType(underlyingTypeID);
+    }
+
+    Type parentType = getType(parentTypeID);
+
+    // Read the substitutions.
+    SubstitutionMap subMap;
+    if (auto genericSig = alias->getGenericSignature()) {
+      SmallVector<Substitution, 4> substitutions;
+      for (unsigned i : range(genericSig->getSubstitutionListSize())) {
+        (void)i;
+        substitutions.push_back(*maybeReadSubstitution(DeclTypeCursor));
+      }
+
+      subMap = genericSig->getSubstitutionMap(substitutions);
+    }
+
+    // Look through compatibility aliases that are now unavailable.
+    if (alias->getAttrs().isUnavailable(ctx) &&
+        alias->isCompatibilityAlias()) {
+      typeOrOffset = alias->getUnderlyingTypeLoc().getType();
+      break;
+    }
+
+    typeOrOffset = NameAliasType::get(alias, parentType, subMap,
+                                           underlyingType);
+    break;
+  }
   case decls_block::NOMINAL_TYPE: {
     DeclID declID;
     TypeID parentID;
@@ -4148,19 +4299,25 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
   case decls_block::PAREN_TYPE: {
     TypeID underlyingID;
-    bool isVariadic, isAutoClosure, isEscaping, isInOut, isShared;
+    bool isVariadic, isAutoClosure, isEscaping;
+    unsigned rawOwnership;
     decls_block::ParenTypeLayout::readRecord(scratch, underlyingID, isVariadic,
                                              isAutoClosure, isEscaping,
-                                             isInOut, isShared);
+                                             rawOwnership);
+    auto ownership =
+        getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
+    if (!ownership) {
+      error();
+      return nullptr;
+    }
 
     auto underlyingTy = getTypeChecked(underlyingID);
     if (!underlyingTy)
       return underlyingTy.takeError();
-    
+
     typeOrOffset = ParenType::get(
         ctx, underlyingTy.get()->getInOutObjectType(),
-        ParameterTypeFlags(isVariadic, isAutoClosure, isEscaping,
-                           isInOut, isShared));
+        ParameterTypeFlags(isVariadic, isAutoClosure, isEscaping, *ownership));
     break;
   }
 
@@ -4180,19 +4337,27 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
       IdentifierID nameID;
       TypeID typeID;
-      bool isVariadic, isAutoClosure, isEscaping, isInOut, isShared;
-      decls_block::TupleTypeEltLayout::readRecord(
-          scratch, nameID, typeID, isVariadic, isAutoClosure, isEscaping,
-          isInOut, isShared);
+      bool isVariadic, isAutoClosure, isEscaping;
+      unsigned rawOwnership;
+      decls_block::TupleTypeEltLayout::readRecord(scratch, nameID, typeID,
+                                                  isVariadic, isAutoClosure,
+                                                  isEscaping, rawOwnership);
+
+      auto ownership =
+          getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
+      if (!ownership) {
+        error();
+        return nullptr;
+      }
 
       auto elementTy = getTypeChecked(typeID);
       if (!elementTy)
         return elementTy.takeError();
-      
-      elements.emplace_back(
-          elementTy.get()->getInOutObjectType(), getIdentifier(nameID),
-          ParameterTypeFlags(isVariadic, isAutoClosure, isEscaping,
-                             isInOut, isShared));
+
+      elements.emplace_back(elementTy.get()->getInOutObjectType(),
+                            getIdentifier(nameID),
+                            ParameterTypeFlags(isVariadic, isAutoClosure,
+                                               isEscaping, *ownership));
     }
 
     typeOrOffset = TupleType::get(elements, ctx);
@@ -4326,8 +4491,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     decls_block::ReferenceStorageTypeLayout::readRecord(scratch, rawOwnership,
                                                         objectTypeID);
 
-    auto ownership =
-      getActualOwnership((serialization::Ownership) rawOwnership);
+    auto ownership = getActualReferenceOwnership(
+        (serialization::ReferenceOwnership)rawOwnership);
     if (!ownership.hasValue()) {
       error();
       break;
@@ -4801,7 +4966,7 @@ Decl *handleErrorAndSupplyMissingClassMember(ASTContext &context,
     if (error.needsVTableEntry() || error.needsAllocatingVTableEntry())
       containingClass->setHasMissingVTableEntries();
 
-    if (error.getName().getBaseName() == context.Id_init) {
+    if (error.getName().getBaseName() == DeclBaseName::createConstructor()) {
       suppliedMissingMember = MissingMemberDecl::forInitializer(
           context, containingClass, error.getName(), error.needsVTableEntry(),
           error.needsAllocatingVTableEntry());
@@ -4830,7 +4995,7 @@ Decl *handleErrorAndSupplyMissingProtoMember(ASTContext &context,
         if (error.needsVTableEntry())
           containingProto->setHasMissingRequirements(true);
 
-        if (error.getName().getBaseName() == context.Id_init) {
+        if (error.getName().getBaseName() == DeclBaseName::createConstructor()) {
           suppliedMissingMember = MissingMemberDecl::forInitializer(
               context, containingProto, error.getName(),
               error.needsVTableEntry(), error.needsAllocatingVTableEntry());
@@ -5144,13 +5309,13 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     if (auto syntheticSig = getGenericSignature(*rawIDIter++)) {
       // Create the synthetic environment.
       syntheticEnv = syntheticSig->createGenericEnvironment();
+    }
 
-      // Requirement -> synthetic substitutions.
-      if (unsigned numReqSubstitutions = *rawIDIter++) {
-        while (numReqSubstitutions--) {
-          auto sub = maybeReadSubstitution(DeclTypeCursor, nullptr);
-          reqToSyntheticSubs.push_back(*sub);
-        }
+    // Requirement -> synthetic substitutions.
+    if (unsigned numReqSubstitutions = *rawIDIter++) {
+      while (numReqSubstitutions--) {
+        auto sub = maybeReadSubstitution(DeclTypeCursor, nullptr);
+        reqToSyntheticSubs.push_back(*sub);
       }
     }
 
@@ -5166,13 +5331,6 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     // Handle opaque witnesses that couldn't be deserialized.
     if (isOpaque) {
       trySetOpaqueWitness();
-      continue;
-    }
-
-    // Handle simple witnesses.
-    if (witnessSubstitutions.empty() && !syntheticSig && !syntheticEnv &&
-        reqToSyntheticSubs.empty()) {
-      trySetWitness(Witness(witness));
       continue;
     }
 

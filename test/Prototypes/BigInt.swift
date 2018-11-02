@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 // XFAIL: linux
-// RUN: rm -rf %t ; mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -swift-version 4 -o %t/a.out %s
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
@@ -712,7 +712,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
       return 0
     }
 
-    let i = _data.index(where: { $0 != 0 })!
+    let i = _data.firstIndex(where: { $0 != 0 })!
     _sanityCheck(_data[i] != 0)
     return i * Word.bitWidth + _data[i].trailingZeroBitCount
   }

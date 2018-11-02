@@ -672,7 +672,7 @@ bb0(%0 : $Int):
   %8 = function_ref @thunkForClosureWithConcreteReturn : $@convention(thin) (Int, @noescape @callee_owned (Int) -> Int) -> @out Int
   %9 = partial_apply %8(%7) : $@convention(thin) (Int, @noescape @callee_owned (Int) -> Int) -> @out Int
   %10 = convert_escape_to_noescape %9 : $@callee_owned (Int) -> @out Int to $@noescape @callee_owned (Int) -> @out Int
-  %11 = begin_access [modify] [unknown] %3 : $*Int // expected-warning {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %11 = begin_access [modify] [unknown] %3 : $*Int // expected-error {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
   %12 = apply %4<Int>(%11, %10) : $@convention(thin) <T_0> (@inout Int, @noescape @callee_owned (Int) -> @out T_0) -> ()
   end_access %11: $*Int
   destroy_value %2 : ${ var Int }
@@ -698,7 +698,7 @@ bb0(%0 : $Int):
   %10 = function_ref @thunkForCalleeGuaranteed : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> ()
   %11 = init_block_storage_header %7 : $*@block_storage @noescape @callee_guaranteed () -> (), invoke %10 : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> (), type $@convention(block) @noescape () -> ()
   %12 = copy_block %11 : $@convention(block) @noescape () -> ()
-  %13 = begin_access [modify] [unknown] %3 : $*Int // expected-warning {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %13 = begin_access [modify] [unknown] %3 : $*Int // expected-error {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
   %14 = apply %4(%13, %12) : $@convention(thin) (@inout Int, @owned @convention(block) @noescape () -> ()) -> ()
   end_access %13 : $*Int
   destroy_addr %8 : $*@callee_guaranteed @noescape () -> ()
@@ -725,7 +725,7 @@ bb0(%0 : $Int):
   %11 = init_block_storage_header %7 : $*@block_storage @noescape @callee_guaranteed () -> (), invoke %10 : $@convention(c) (@inout_aliasable @block_storage @noescape @callee_guaranteed () -> ()) -> (), type $@convention(block) @noescape () -> ()
   %12 = copy_block %11 : $@convention(block) @noescape () -> ()
   %13 = enum $Optional<@convention(block) @noescape () -> ()>, #Optional.some!enumelt.1, %12 : $@convention(block) @noescape () -> ()
-  %14 = begin_access [modify] [unknown] %3 : $*Int // expected-warning {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %14 = begin_access [modify] [unknown] %3 : $*Int // expected-error {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
   %15 = apply %4(%14, %13) : $@convention(thin) (@inout Int, @owned Optional<@convention(block) @noescape () -> ()>) -> ()
   end_access %14 : $*Int
   destroy_addr %8 : $*@callee_guaranteed @noescape () -> ()
@@ -877,4 +877,15 @@ bb0(%0 : $Int):
   destroy_value %2 : ${ var (Int, Int) }
   %10 = tuple ()
   return %10 : $()
+}
+
+sil hidden @passNilToNoEscape : $@convention(thin) (Int) -> () {
+bb0( %0 : $Int):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  %4 = enum $Optional<@convention(block) @noescape () -> ()>, #Optional.none!enumelt
+  %5 = function_ref @takesInoutAndNoEscapeOptionalBlockClosure : $@convention(thin) (@inout Int, @owned Optional<@convention(block) @noescape () -> ()>) -> ()
+  %6 = apply %5(%3, %4) : $@convention(thin) (@inout Int, @owned Optional<@convention(block) @noescape () -> ()>) -> ()
+  %7 = tuple ()
+  return %7 : $()
 }

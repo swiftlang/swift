@@ -78,9 +78,17 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   include(AddSwiftTableGen) # This imports TableGen from LLVM.
   include(HandleLLVMOptions)
 
-  # HACK: this ugly tweaking is to prevent the propagation of the flag from LLVM
-  # into swift.  The use of this flag pollutes all targets, and we are not able
-  # to remove it on a per-target basis which breaks cross-compilation.
+  # HACK: Not all targets support -z,defs as a linker flag. 
+  #
+  # Normally, LLVM would only add it as an option for known ELF targets;
+  # however, due to the custom scheme Swift uses for cross-compilation, the 
+  # CMAKE_SHARED_LINKER_FLAGS are determined based on the host system and 
+  # then applied to all targets. This causes issues in cross-compiling to
+  # Windows from a Linux host.
+  # 
+  # To work around this, we unconditionally remove the flag here and then 
+  # selectively add it to the per-target link flags; this is currently done
+  # in add_swift_library within AddSwift.cmake.
   string(REGEX REPLACE "-Wl,-z,defs" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
 
   set(PACKAGE_VERSION "${LLVM_PACKAGE_VERSION}")
@@ -201,6 +209,9 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
   swift_common_standalone_build_config_llvm(${product} ${is_cross_compiling})
   swift_common_standalone_build_config_clang(${product} ${is_cross_compiling})
   swift_common_standalone_build_config_cmark(${product})
+
+  # Enable groups for IDE generators (Xcode and MSVC).
+  set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 endmacro()
 
 # Common cmake project config for unified builds.
@@ -309,7 +320,7 @@ function(swift_common_llvm_config target)
     else()
       # HACK: Otherwise (for example, for executables), use a plain signature,
       # because LLVM CMake does that already.
-      target_link_libraries("${target}" ${libnames})
+      target_link_libraries("${target}" PRIVATE ${libnames})
     endif()
   else()
     # If Swift was not built standalone, dispatch to 'llvm_config()'.

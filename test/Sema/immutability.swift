@@ -430,7 +430,25 @@ func QoI() {
   get_only = 92            // expected-error {{cannot assign to value: 'get_only' is a get-only property}}
 }
 
+func func1() -> Int { return 7 }
 
+func func2() {
+  func func3() {}
+
+  func3() = 0 // expected-error {{expression is not assignable: 'func3' returns immutable value}}
+}
+
+func assignmentsToFuncs() {
+
+  LetClassMembers(arg: 7).f() = 5  // expected-error {{expression is not assignable: function call returns immutable value}}
+  LetStructMembers(arg: 7).f() = 5 // expected-error {{expression is not assignable: function call returns immutable value}}
+
+  func1() = 9     // expected-error {{expression is not assignable: 'func1' returns immutable value}}
+  func2() = "rrr" // expected-error {{expression is not assignable: 'func2' returns immutable value}}
+
+  var x = 0
+  (x, func1() = 0) = (4, 5) // expected-error {{expression is not assignable: 'func1' returns immutable value}}
+}
 
 // <rdar://problem/17051675> Structure initializers in an extension cannot assign to constant properties
 struct rdar17051675_S {
@@ -600,10 +618,9 @@ func testConditional(b : Bool) {
 
 
 
-// <rdar://problem/27384685> QoI: Poor diagnostic when assigning a value to a method
 func f(a : FooClass, b : LetStructMembers) {
-  a.baz = 1 // expected-error {{cannot assign to property: 'baz' is a method}}
-  b.f = 42     // expected-error {{cannot assign to property: 'f' is a method}}
+  a.baz = 1   // expected-error {{cannot assign to value: 'baz' is a method}}
+  b.f = 42    // expected-error {{cannot assign to value: 'f' is a method}}
 }
 
 // SR-2354: Reject subscript declarations with mutable parameters.

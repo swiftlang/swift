@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name types -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 class C {
   var member: Int = 0
@@ -69,17 +70,12 @@ enum ReferencedFromFunctionEnum {
   case g((ReferencedFromFunctionStruct) -> ())
 }
 
-// CHECK-LABEL: sil hidden @$S5types34referencedFromFunctionStructFieldsyyAA010ReferencedcdE0Vc_yAA0gcD4EnumOctADF{{.*}} : $@convention(thin) (@owned ReferencedFromFunctionStruct) -> (@owned @callee_guaranteed (@owned ReferencedFromFunctionStruct) -> (), @owned @callee_guaranteed (@owned ReferencedFromFunctionEnum) -> ()) {
-// CHECK: bb0([[X:%.*]] : @owned $ReferencedFromFunctionStruct):
-// CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
-// CHECK:   [[F:%.*]] = struct_extract [[BORROWED_X]] : $ReferencedFromFunctionStruct, #ReferencedFromFunctionStruct.f
-// CHECK:   [[COPIED_F:%.*]] = copy_value [[F]] : $@callee_guaranteed (@owned ReferencedFromFunctionStruct) -> ()
-// CHECK:   [[BORROWED_X_2:%.*]] = begin_borrow [[X]]
-// CHECK:   [[G:%.*]] = struct_extract [[BORROWED_X_2]] : $ReferencedFromFunctionStruct, #ReferencedFromFunctionStruct.g
-// CHECK:   [[COPIED_G:%.*]] = copy_value [[G]] : $@callee_guaranteed (@owned ReferencedFromFunctionEnum) -> ()
-// CHECK:   end_borrow [[BORROWED_X_2]] from [[X]]
-// CHECK:   end_borrow [[BORROWED_X]] from [[X]]
-// CHECK:   destroy_value [[X]]
+// CHECK-LABEL: sil hidden @$S5types34referencedFromFunctionStructFieldsyyAA010ReferencedcdE0Vc_yAA0gcD4EnumOctADF{{.*}} : $@convention(thin) (@guaranteed ReferencedFromFunctionStruct) -> (@owned @callee_guaranteed (@guaranteed ReferencedFromFunctionStruct) -> (), @owned @callee_guaranteed (@guaranteed ReferencedFromFunctionEnum) -> ()) {
+// CHECK: bb0([[X:%.*]] : @guaranteed $ReferencedFromFunctionStruct):
+// CHECK:   [[F:%.*]] = struct_extract [[X]] : $ReferencedFromFunctionStruct, #ReferencedFromFunctionStruct.f
+// CHECK:   [[COPIED_F:%.*]] = copy_value [[F]] : $@callee_guaranteed (@guaranteed ReferencedFromFunctionStruct) -> ()
+// CHECK:   [[G:%.*]] = struct_extract [[X]] : $ReferencedFromFunctionStruct, #ReferencedFromFunctionStruct.g
+// CHECK:   [[COPIED_G:%.*]] = copy_value [[G]] : $@callee_guaranteed (@guaranteed ReferencedFromFunctionEnum) -> ()
 // CHECK:   [[RESULT:%.*]] = tuple ([[COPIED_F]] : {{.*}}, [[COPIED_G]] : {{.*}})
 // CHECK:   return [[RESULT]]
 // CHECK: } // end sil function '$S5types34referencedFromFunctionStructFieldsyyAA010ReferencedcdE0Vc_yAA0gcD4EnumOctADF'
@@ -89,8 +85,8 @@ func referencedFromFunctionStructFields(_ x: ReferencedFromFunctionStruct)
 }
 
 // CHECK-LABEL: sil hidden @$S5types32referencedFromFunctionEnumFieldsyyAA010ReferencedcdE0OcSg_yAA0gcD6StructVcSgtADF
-// CHECK:       bb{{[0-9]+}}([[F:%.*]] : @owned $@callee_guaranteed (@owned ReferencedFromFunctionEnum) -> ()):
-// CHECK:       bb{{[0-9]+}}([[G:%.*]] : @owned $@callee_guaranteed (@owned ReferencedFromFunctionStruct) -> ()):
+// CHECK:       bb{{[0-9]+}}([[F:%.*]] : @owned $@callee_guaranteed (@guaranteed ReferencedFromFunctionEnum) -> ()):
+// CHECK:       bb{{[0-9]+}}([[G:%.*]] : @owned $@callee_guaranteed (@guaranteed ReferencedFromFunctionStruct) -> ()):
 func referencedFromFunctionEnumFields(_ x: ReferencedFromFunctionEnum)
     -> (
       ((ReferencedFromFunctionEnum) -> ())?,

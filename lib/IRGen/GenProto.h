@@ -31,6 +31,7 @@ namespace swift {
   class AssociatedType;
   class CanType;
   class FuncDecl;
+  enum class MetadataState : size_t;
   class ProtocolConformanceRef;
   struct SILDeclRef;
   class SILType;
@@ -38,11 +39,13 @@ namespace swift {
 
 namespace irgen {
   class Address;
+  class DynamicMetadataRequest;
   class Explosion;
   class FunctionPointer;
   class IRGenFunction;
   class IRGenModule;
   class MetadataPath;
+  class MetadataResponse;
   class ProtocolInfo;
   class TypeInfo;
 
@@ -73,10 +76,11 @@ namespace irgen {
   /// \param parentMetadata - the type metadata for T
   /// \param wtable - the witness table witnessing the conformance of T to P
   /// \param associatedType - the declaration of X; a member of P
-  llvm::Value *emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
-                                             llvm::Value *parentMetadata,
-                                             llvm::Value *wtable,
-                                             AssociatedType associatedType);
+  MetadataResponse emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
+                                                 llvm::Value *parentMetadata,
+                                                 llvm::Value *wtable,
+                                                 AssociatedType associatedType,
+                                                 DynamicMetadataRequest request);
 
   // Return the offset one should do on a witness table pointer to retrieve the
   // `index`th piece of private data.
@@ -125,7 +129,12 @@ namespace irgen {
                                  Explosion &args,
                                  WitnessMetadata *witnessMetadata,
                                  const GetParameterFn &getParameter);
-  
+ 
+  void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
+                                          NominalTypeDecl *typeDecl,
+                                          Address array,
+                                          MetadataState metadataState);
+
   /// When calling a polymorphic call, pass the arguments for the
   /// generics clause.
   void emitPolymorphicArguments(IRGenFunction &IGF,
@@ -145,6 +154,16 @@ namespace irgen {
   void emitWitnessTableRefs(IRGenFunction &IGF, const Substitution &sub,
                             llvm::Value **metadataCache,
                             SmallVectorImpl<llvm::Value *> &out);
+
+  /// \brief Load a reference to the protocol descriptor for the given protocol.
+  ///
+  /// For Swift protocols, this is a constant reference to the protocol
+  /// descriptor symbol.
+  /// For ObjC protocols, descriptors are uniqued at runtime by the ObjC
+  /// runtime. We need to load the unique reference from a global variable fixed up at
+  /// startup.
+  llvm::Value *emitProtocolDescriptorRef(IRGenFunction &IGF,
+                                         ProtocolDecl *protocol);
 
   /// Emit a witness table reference.
   llvm::Value *emitWitnessTableRef(IRGenFunction &IGF,
@@ -235,6 +254,8 @@ namespace irgen {
   void enumerateGenericParamFulfillments(IRGenModule &IGM,
     CanSILFunctionType fnType,
     GenericParamFulfillmentCallback callback);
+
+  bool isDependentConformance(const NormalProtocolConformance *conformance);
 
 } // end namespace irgen
 } // end namespace swift

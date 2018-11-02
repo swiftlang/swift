@@ -61,7 +61,7 @@ extension Sequence {
   ///     // Prints "Mateo"
   ///
   /// - Returns: A sequence of pairs enumerating the sequence.
-  @_inlineable
+  @inlinable
   public func enumerated() -> EnumeratedSequence<Self> {
     return EnumeratedSequence(_base: self)
   }
@@ -102,7 +102,7 @@ extension Sequence {
   /// - Returns: The sequence's minimum element, according to
   ///   `areInIncreasingOrder`. If the sequence has no elements, returns
   ///   `nil`.
-  @_inlineable
+  @inlinable
   @warn_unqualified_access
   public func min(
     by areInIncreasingOrder: (Element, Element) throws -> Bool
@@ -144,7 +144,7 @@ extension Sequence {
   ///   otherwise, `false`.
   /// - Returns: The sequence's maximum element if the sequence is not empty;
   ///   otherwise, `nil`.
-  @_inlineable
+  @inlinable
   @warn_unqualified_access
   public func max(
     by areInIncreasingOrder: (Element, Element) throws -> Bool
@@ -170,7 +170,7 @@ extension Sequence where Element: Comparable {
   ///
   /// - Returns: The sequence's minimum element. If the sequence has no
   ///   elements, returns `nil`.
-  @_inlineable
+  @inlinable
   @warn_unqualified_access
   public func min() -> Element? {
     return self.min(by: <)
@@ -187,7 +187,7 @@ extension Sequence where Element: Comparable {
   ///
   /// - Returns: The sequence's maximum element. If the sequence has no
   ///   elements, returns `nil`.
-  @_inlineable
+  @inlinable
   @warn_unqualified_access
   public func max() -> Element? {
     return self.max(by: <)
@@ -219,7 +219,7 @@ extension Sequence  {
   /// - Returns: `true` if the initial elements of the sequence are equivalent
   ///   to the elements of `possiblePrefix`; otherwise, `false`. If
   ///   `possiblePrefix` has no elements, the return value is `true`.
-  @_inlineable
+  @inlinable
   public func starts<PossiblePrefix: Sequence>(
     with possiblePrefix: PossiblePrefix,
     by areEquivalent: (Element, PossiblePrefix.Element) throws -> Bool
@@ -262,7 +262,7 @@ extension Sequence where Element: Equatable {
   /// - Returns: `true` if the initial elements of the sequence are the same as
   ///   the elements of `possiblePrefix`; otherwise, `false`. If
   ///   `possiblePrefix` has no elements, the return value is `true`.
-  @_inlineable
+  @inlinable
   public func starts<PossiblePrefix: Sequence>(
     with possiblePrefix: PossiblePrefix
   ) -> Bool where PossiblePrefix.Element == Element {
@@ -296,7 +296,7 @@ extension Sequence {
   ///     are equivalent; otherwise, `false`.
   /// - Returns: `true` if this sequence and `other` contain equivalent items,
   ///   using `areEquivalent` as the equivalence test; otherwise, `false.`
-  @_inlineable
+  @inlinable
   public func elementsEqual<OtherSequence: Sequence>(
     _ other: OtherSequence,
     by areEquivalent: (Element, OtherSequence.Element) throws -> Bool
@@ -336,7 +336,7 @@ extension Sequence where Element : Equatable {
   /// - Parameter other: A sequence to compare to this sequence.
   /// - Returns: `true` if this sequence and `other` contain the same elements
   ///   in the same order.
-  @_inlineable
+  @inlinable
   public func elementsEqual<OtherSequence: Sequence>(
     _ other: OtherSequence
   ) -> Bool where OtherSequence.Element == Element {
@@ -378,7 +378,7 @@ extension Sequence {
   ///   ordering, which has no connection to Unicode.  If you are sorting
   ///   strings to present to the end user, use `String` APIs that perform
   ///   localized comparison instead.
-  @_inlineable
+  @inlinable
   public func lexicographicallyPrecedes<OtherSequence: Sequence>(
     _ other: OtherSequence,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
@@ -429,7 +429,7 @@ extension Sequence where Element : Comparable {
   ///   ordering, which has no connection to Unicode.  If you are sorting
   ///   strings to present to the end user, use `String` APIs that
   ///   perform localized comparison.
-  @_inlineable
+  @inlinable
   public func lexicographicallyPrecedes<OtherSequence: Sequence>(
     _ other: OtherSequence
   ) -> Bool where OtherSequence.Element == Element {
@@ -477,7 +477,7 @@ extension Sequence {
   ///   the passed element represents a match.
   /// - Returns: `true` if the sequence contains an element that satisfies
   ///   `predicate`; otherwise, `false`.
-  @_inlineable
+  @inlinable
   public func contains(
     where predicate: (Element) throws -> Bool
   ) rethrows -> Bool {
@@ -487,6 +487,21 @@ extension Sequence {
       }
     }
     return false
+  }
+
+  /// Returns a Boolean value indicating whether every element of a sequence
+  /// satisfies a given predicate.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the sequence
+  ///   as its argument and returns a Boolean value that indicates whether
+  ///   the passed element satisfies a condition.
+  /// - Returns: `true` if the sequence contains only elements that satisfy
+  ///   `predicate`; otherwise, `false`.
+  @inlinable
+  public func allSatisfy(
+    _ predicate: (Element) throws -> Bool
+  ) rethrows -> Bool {
+    return try !contains { try !predicate($0) }
   }
 }
 
@@ -506,7 +521,7 @@ extension Sequence where Element : Equatable {
   /// - Parameter element: The element to find in the sequence.
   /// - Returns: `true` if the element was found in the sequence; otherwise,
   ///   `false`.
-  @_inlineable
+  @inlinable
   public func contains(_ element: Element) -> Bool {
     if let result = _customContainsEquatableElement(element) {
       return result
@@ -562,7 +577,7 @@ extension Sequence {
   ///     the caller.
   /// - Returns: The final accumulated value. If the sequence has no elements,
   ///   the result is `initialResult`.
-  @_inlineable
+  @inlinable
   public func reduce<Result>(
     _ initialResult: Result,
     _ nextPartialResult:
@@ -617,7 +632,7 @@ extension Sequence {
   ///     value with an element of the sequence.
   /// - Returns: The final accumulated value. If the sequence has no elements,
   ///   the result is `initialResult`.
-  @_inlineable
+  @inlinable
   public func reduce<Result>(
     into initialResult: Result,
     _ updateAccumulatingResult:
@@ -645,7 +660,7 @@ extension Sequence {
   ///
   /// - Returns: An array containing the elements of this sequence in
   ///   reverse order.
-  @_inlineable
+  @inlinable
   public func reversed() -> [Element] {
     // FIXME(performance): optimize to 1 pass?  But Array(self) can be
     // optimized to a memcpy() sometimes.  Those cases are usually collections,
@@ -675,10 +690,10 @@ extension Sequence {
   ///
   ///     let numbers = [1, 2, 3, 4]
   ///
-  ///     let mapped = numbers.map { Array(count: $0, repeatedValue: $0) }
+  ///     let mapped = numbers.map { Array(repeating: $0, count: $0) }
   ///     // [[1], [2, 2], [3, 3, 3], [4, 4, 4, 4]]
   ///
-  ///     let flatMapped = numbers.flatMap { Array(count: $0, repeatedValue: $0) }
+  ///     let flatMapped = numbers.flatMap { Array(repeating: $0, count: $0) }
   ///     // [1, 2, 2, 3, 3, 3, 4, 4, 4, 4]
   ///
   /// In fact, `s.flatMap(transform)`  is equivalent to
@@ -690,7 +705,7 @@ extension Sequence {
   ///
   /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
   ///   and *n* is the length of the result.
-  @_inlineable
+  @inlinable
   public func flatMap<SegmentOfResult : Sequence>(
     _ transform: (Element) throws -> SegmentOfResult
   ) rethrows -> [SegmentOfResult.Element] {
@@ -727,7 +742,7 @@ extension Sequence {
   ///
   /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
   ///   and *n* is the length of the result.
-  @_inlineable
+  @inlinable
   public func compactMap<ElementOfResult>(
     _ transform: (Element) throws -> ElementOfResult?
   ) rethrows -> [ElementOfResult] {
@@ -770,7 +785,7 @@ extension Sequence {
   // The implementation of flatMap accepting a closure with an optional result.
   // Factored out into a separate functions in order to be used in multiple
   // overloads.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   public func _compactMap<ElementOfResult>(
     _ transform: (Element) throws -> ElementOfResult?

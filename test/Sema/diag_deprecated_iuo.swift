@@ -201,15 +201,15 @@ func returnsFunc2Identifier() -> (Int) -> ImplicitlyUnwrappedOptional<Int> { // 
 let x0 = 1 as ImplicitlyUnwrappedOptional // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{15-42=Optional}}
 
 let x: Int? = 1
-let y0: Int = x as Int! // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{23-24=?}}
-let y1: Int = (x as Int!)! // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{24-25=?}}
-let z0: Int = x as! Int! // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{24-25=?}}
+let y0: Int = x as Int! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
+let y1: Int = (x as Int!)! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
+let z0: Int = x as! Int! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
+// expected-warning@-1 {{forced cast from 'Int?' to 'Int' only unwraps optionals; did you mean to use '!'?}}
+let z1: Int = (x as! Int!)! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
 // expected-warning@-1 {{forced cast of 'Int?' to same type has no effect}}
-let z1: Int = (x as! Int!)! // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{25-26=?}}
-// expected-warning@-1 {{forced cast of 'Int?' to same type has no effect}}
-let w0: Int = (x as? Int!)! // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{25-26=?}}
+let w0: Int = (x as? Int!)! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
 // expected-warning@-1 {{conditional cast from 'Int?' to 'Int?' always succeeds}}
-let w1: Int = (x as? Int!)!! // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{25-26=?}}
+let w1: Int = (x as? Int!)!! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
 // expected-warning@-1 {{conditional cast from 'Int?' to 'Int?' always succeeds}}
 
 func overloadedByOptionality(_ a: inout Int!) {}

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -stack-promotion-limit 48 -Onone -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -stack-promotion-limit 48 -Onone -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize
 //
 // REQUIRES: CPU=x86_64
 
@@ -15,9 +15,10 @@ class TestClass {
 
 sil_vtable TestClass {}
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @alloc_on_stack
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @alloc_on_stack
 // CHECK:      %reference.raw = alloca i8, i32 28, align 8
-// CHECK-NEXT: [[M:%[0-9]+]] = call %swift.type* @"$S{{[a-zA-Z0-9_]+}}Ma"()
+// CHECK-NEXT: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S{{[a-zA-Z0-9_]+}}Ma"([[INT]] 0)
+// CHECK-NEXT: [[M:%[0-9]+]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: [[O:%[0-9]+]] = bitcast i8* %reference.raw to %swift.refcounted*
 // CHECK-NEXT: %reference.new = call %swift.refcounted* @swift_initStackObject(%swift.type* [[M]], %swift.refcounted* [[O]])
 // CHECK-NEXT: [[R:%[0-9]+]] = bitcast %swift.refcounted* %reference.new to %[[C:.*TestClass.*]]*
@@ -33,8 +34,9 @@ bb0:
   return %r : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_on_heap
-// CHECK:      [[M:%[0-9]+]] = call %swift.type* @"$S{{[a-zA-Z0-9_]+}}Ma"()
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} {{.*}}* @alloc_on_heap
+// CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S{{[a-zA-Z0-9_]+}}Ma"([[INT]] 0)
+// CHECK:      [[M:%[0-9]+]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[M]], i64 28, i64 7)
 // CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C:.*TestClass.*]]*
 // CHECK-NEXT:  ret %[[C]]* [[O2]]
@@ -45,8 +47,9 @@ bb0:
   return %o1 : $TestClass
 }
 
-// CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_3_on_heap
-// CHECK:      [[M:%[0-9]+]] = call %swift.type* @"$S{{[a-zA-Z0-9_]+}}CMa"()
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} {{.*}}* @alloc_3_on_heap
+// CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S{{[a-zA-Z0-9_]+}}CMa"([[INT]] 0)
+// CHECK:      [[M:%[0-9]+]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[M]], i64 40, i64 7)
 // CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C:.*TestClass.*]]*
 // CHECK-NEXT:  ret %[[C]]* [[O2]]
@@ -59,8 +62,9 @@ bb0:
   return %o1 : $TestClass
 }
 
-// CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_non_const_count
-// CHECK:      [[M:%[0-9]+]] = call %swift.type* @"$S{{[a-zA-Z0-9_]+}}Ma"()
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} {{.*}}* @alloc_non_const_count
+// CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S{{[a-zA-Z0-9_]+}}Ma"([[INT]] 0)
+// CHECK:      [[M:%[0-9]+]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: [[S:%[0-9]+]] = mul i64 4, %0
 // CHECK-NEXT: [[A:%[0-9]+]] = add i64 20, [[S]]
 // CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[M]], i64 [[A]], i64 7)
@@ -72,8 +76,9 @@ bb0(%c : $Builtin.Word):
   return %o1 : $TestClass
 }
 
-// CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_2_non_const_count
-// CHECK:      [[M:%[0-9]+]] = call %swift.type* @"$S{{[a-zA-Z0-9_]+}}Ma"()
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} {{.*}}* @alloc_2_non_const_count
+// CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S{{[a-zA-Z0-9_]+}}Ma"([[INT]] 0)
+// CHECK:      [[M:%[0-9]+]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: [[S1:%[0-9]+]] = mul i64 1, %0
 // CHECK-NEXT: [[S2:%[0-9]+]] = add i64 17, [[S1]]
 // CHECK-NEXT: [[S3:%[0-9]+]] = add i64 [[S2]], 3
@@ -89,7 +94,7 @@ bb0(%c1 : $Builtin.Word, %c2 : $Builtin.Word):
   return %o1 : $TestClass
 }
 
-// CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_generic
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} {{.*}}* @alloc_generic
 // CHECK:      [[S1:%[0-9]+]] = add i64 17, %flags.alignmentMask
 // CHECK-NEXT: [[S2:%[0-9]+]] = xor i64 %flags.alignmentMask, -1
 // CHECK-NEXT: [[S3:%[0-9]+]] = and i64 [[S1]], [[S2]]
@@ -105,7 +110,7 @@ bb0(%0 : $Builtin.Word, %1 : $@thick T.Type):
   return %5 : $TestClass
 }
 
-// CHECK-LABEL: define{{( protected)?}} {{.*}}* @alloc_dynamic
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} {{.*}}* @alloc_dynamic
 // CHECK:      [[BYTE_PTR:%[0-9]+]] = bitcast %swift.type* %0 to i8*
 // CHECK-NEXT: [[SIZE_ADDR:%[0-9]+]] = getelementptr inbounds i8, i8* [[BYTE_PTR]], i32 48
 // CHECK-NEXT: [[INT_PTR:%[0-9]+]] = bitcast i8* [[SIZE_ADDR]] to i32*
@@ -129,7 +134,7 @@ bb0(%0 : $@thick TestClass.Type):
   return %o : $TestClass
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i8* @project_tail_byte
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @project_tail_byte
 // CHECK: getelementptr inbounds i8, i8* %{{[0-9]+}}, i64 17
 // CHECK: ret
 sil @project_tail_byte : $@convention(thin) (TestClass) -> Builtin.RawPointer {
@@ -139,7 +144,7 @@ bb0(%0 : $TestClass):
   return %p : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @project_tail_int
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @project_tail_int
 // CHECK: [[S:%[0-9]+]] = getelementptr inbounds i8, i8* %{{[0-9]+}}, i64 20
 // CHECK: bitcast i8* [[S]] to %Ts5Int32V*
 // CHECK: ret
@@ -151,7 +156,7 @@ bb0(%0 : $TestClass, %1 : $Int32):
   return %r : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i8* @project_tail_generic
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @project_tail_generic
 // CHECK:      [[S1:%[0-9]+]] = add i64 17, %flags.alignmentMask
 // CHECK-NEXT: [[S2:%[0-9]+]] = xor i64 %flags.alignmentMask, -1
 // CHECK-NEXT: [[S3:%[0-9]+]] = and i64 [[S1]], [[S2]]
@@ -170,7 +175,7 @@ struct Str<T> {
   var t: T
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i8* @project_tail_generic_struct
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @project_tail_generic_struct
 // CHECK:      [[S1:%[0-9]+]] = add i64 17, %flags.alignmentMask
 // CHECK-NEXT: [[S2:%[0-9]+]] = xor i64 %flags.alignmentMask, -1
 // CHECK-NEXT: [[S3:%[0-9]+]] = and i64 [[S1]], [[S2]]
@@ -185,7 +190,7 @@ bb0(%0 : $TestClass, %1 : $@thick T.Type):
   return %p : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @project_tail_index_byte_to_int
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @project_tail_index_byte_to_int
 // CHECK:      [[S1:%[0-9]+]] = bitcast i8* %0 to %Ts4Int8V*
 // CHECK-NEXT: [[S2:%[0-9]+]] = getelementptr inbounds %Ts4Int8V, %Ts4Int8V* [[S1]], i64 2
 // CHECK-NEXT: [[S3:%[0-9]+]] = ptrtoint %Ts4Int8V* [[S2]] to i64
@@ -204,8 +209,8 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Int32):
   return %r : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i8* @project_tail_index_generic_struct
-// CHECK: call %swift.type* @{{.*Str.*}}(%swift.type* %T)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @project_tail_index_generic_struct
+// CHECK: call swiftcc %swift.metadata_response @{{.*Str.*}}([[INT]] 0, %swift.type* %T)
 // CHECK: load
 // CHECK: and
 // CHECK: xor
@@ -226,7 +231,7 @@ class EmptyClass {
 
 sil_vtable EmptyClass {}
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i8 @test_align_1_int8
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8 @test_align_1_int8
 // CHECK: load i8, i8* %{{.*}}, align 1
 // CHECK: ret
 sil @test_align_1_int8 : $@convention(thin) (EmptyClass) -> Int8 {
@@ -238,7 +243,7 @@ bb0(%0 : $EmptyClass):
   return %l : $Int8
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i8 @test_align_2_int8
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8 @test_align_2_int8
 // CHECK: load i8, i8* %{{.*}}, align 2
 // CHECK: ret
 sil @test_align_2_int8 : $@convention(thin) (EmptyClass) -> Int8 {
@@ -250,7 +255,7 @@ bb0(%0 : $EmptyClass):
   return %l : $Int8
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i32 @test_align_int32
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @test_align_int32
 // CHECK: load i32, i32* %{{.*}}, align 4
 // CHECK: ret
 sil @test_align_int32 : $@convention(thin) (EmptyClass, Builtin.Word) -> Int32 {

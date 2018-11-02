@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -parse-as-library -parse-stdlib -emit-silgen %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name address_only_types -enable-sil-ownership -parse-as-library -parse-stdlib -emit-silgen %s | %FileCheck %s
 
 precedencegroup AssignmentPrecedence { assignment: true }
 
@@ -16,7 +17,6 @@ protocol Unloadable {
 func address_only_argument(_ x: Unloadable) {
   // CHECK: bb0([[XARG:%[0-9]+]] : @trivial $*Unloadable):
   // CHECK: debug_value_addr [[XARG]]
-  // CHECK-NEXT: destroy_addr [[XARG]]
   // CHECK-NEXT: tuple
   // CHECK-NEXT: return
 }
@@ -24,7 +24,6 @@ func address_only_argument(_ x: Unloadable) {
 // CHECK-LABEL: sil hidden @$S18address_only_types0a1_B17_ignored_argument{{[_0-9a-zA-Z]*}}F
 func address_only_ignored_argument(_: Unloadable) {
   // CHECK: bb0([[XARG:%[0-9]+]] : @trivial $*Unloadable):
-  // CHECK: destroy_addr [[XARG]]
   // CHECK-NOT: dealloc_stack {{.*}} [[XARG]]
   // CHECK: return
 }
@@ -35,7 +34,6 @@ func address_only_return(_ x: Unloadable, y: Int) -> Unloadable {
   // CHECK-NEXT: debug_value_addr [[XARG]] : $*Unloadable, let, name "x"
   // CHECK-NEXT: debug_value [[YARG]] : $Builtin.Int64, let, name "y"
   // CHECK-NEXT: copy_addr [[XARG]] to [initialization] [[RET]]
-  // CHECK-NEXT: destroy_addr [[XARG]]
   // CHECK-NEXT: [[VOID:%[0-9]+]] = tuple ()
   // CHECK-NEXT: return [[VOID]]
   return x
@@ -54,7 +52,6 @@ func address_only_conditional_missing_return(_ x: Unloadable) -> Unloadable {
   case .true_:
   // CHECK: [[TRUE]]:
     // CHECK:   copy_addr %1 to [initialization] %0 : $*Unloadable
-    // CHECK:   destroy_addr %1
   // CHECK:   return
     return x
   case .false_:
@@ -120,11 +117,8 @@ func address_only_call_2(_ x: Unloadable) {
   // CHECK: bb0([[XARG:%[0-9]+]] : @trivial $*Unloadable):
   // CHECK: debug_value_addr [[XARG]] : $*Unloadable
   some_address_only_function_2(x)
-  // CHECK: [[X_CALL_ARG:%[0-9]+]] = alloc_stack $Unloadable
-  // CHECK: copy_addr [[XARG]] to [initialization] [[X_CALL_ARG]]
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @$S18address_only_types05some_a1_B11_function_2{{[_0-9a-zA-Z]*}}F
-  // CHECK: apply [[FUNC]]([[X_CALL_ARG]])
-  // CHECK: dealloc_stack [[X_CALL_ARG]]
+  // CHECK: apply [[FUNC]]([[XARG]])
   // CHECK: return
 }
 

@@ -20,7 +20,8 @@ public struct NonFixedStruct {
   public var storedProperty = global
 }
 
-// CHECK-LABEL: sil hidden [transparent] @$S22fixed_layout_attribute14NonFixedStructV14storedPropertySivpfi : $@convention(thin) () -> Int
+// FRAGILE-LABEL: sil [transparent] @$S22fixed_layout_attribute14NonFixedStructV14storedPropertySivpfi : $@convention(thin) () -> Int
+// RESILIENT-LABEL: sil hidden [transparent] @$S22fixed_layout_attribute14NonFixedStructV14storedPropertySivpfi : $@convention(thin) () -> Int
 //
 //    ... okay to directly reference the addressor here:
 // CHECK: function_ref @$S22fixed_layout_attribute6globalSivau
@@ -63,9 +64,9 @@ public func usesStaticProperty() {
   _ = HasStaticProperty.staticProperty
 }
 
-// CHECK-LABEL: sil [serialized] @$S22fixed_layout_attribute28usesStaticPropertyInlineableyyF : $@convention(thin) () -> ()
+// CHECK-LABEL: sil [serialized] @$S22fixed_layout_attribute27usesStaticPropertyInlinableyyF : $@convention(thin) () -> ()
 
-@_inlineable
-public func usesStaticPropertyInlineable() {
+@inlinable
+public func usesStaticPropertyInlinable() {
   _ = HasStaticProperty.staticProperty
 }

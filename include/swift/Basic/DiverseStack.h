@@ -378,7 +378,7 @@ public:
 /// Allow stable_iterators to be put in things like TinyPtrVectors.
 namespace llvm {
   template <>
-  class PointerLikeTypeTraits<
+  struct PointerLikeTypeTraits<
                       swift::DiverseStackBase::stable_iterator::AsPointer> {
     using AsPointer = swift::DiverseStackBase::stable_iterator::AsPointer;
   public:

@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/globals.h -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name retaining_globals -import-objc-header %S/Inputs/globals.h -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 
@@ -25,10 +26,10 @@ func main() {
 
 
   // CHECK: [[globalString:%.*]] = load [copy] {{%.*}} : $*NSString
-  // CHECK: [[bridgeStringFunc:%.*]] = function_ref @{{.*}} : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
+  // CHECK: [[bridgeStringFunc:%.*]] = function_ref @{{.*}} : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
   // CHECK: [[wrappedString:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[globalString]] : $NSString
   // CHECK: [[stringMetaType:%.*]] = metatype $@thin String.Type
-  // CHECK: [[bridgedString:%.*]] = apply [[bridgeStringFunc]]([[wrappedString]], [[stringMetaType]]) : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
+  // CHECK: [[bridgedString:%.*]] = apply [[bridgeStringFunc]]([[wrappedString]], [[stringMetaType]]) : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
   let string = globalString // Problematic case, wasn't being retained
 
   // CHECK: [[load_1:%.*]] = load [copy] {{%.*}} : $*Optional<NSObject>
@@ -52,7 +53,7 @@ func main() {
   print(arr as Any)
   print(constArr as Any)
 
-  // CHECK: [[PRINT_FUN:%.*]] = function_ref @$Ss5print_9separator10terminatoryypd_S2StF : $@convention(thin) (@owned Array<Any>, @owned String, @owned String) -> ()
+  // CHECK: [[PRINT_FUN:%.*]] = function_ref @$Ss5print_9separator10terminatoryypd_S2StF : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> ()
   // CHECK: apply [[PRINT_FUN]]({{.*}})
   // CHECK: destroy_value [[load_4]]
   // CHECK: destroy_value [[load_3]]

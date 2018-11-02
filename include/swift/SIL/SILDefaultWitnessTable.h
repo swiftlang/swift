@@ -150,32 +150,8 @@ public:
     }
   }
 
-  /// Return the minimum witness table size, in words.
-  ///
-  /// This will not change if requirements with default implementations are
-  /// added at the end of the protocol.
-  unsigned getMinimumWitnessTableSize() const;
-
-  /// Return the default witness table size, in words.
-  ///
-  /// This is the number of resilient default entries that were known when the
-  /// protocol definition was compiled; at runtime, it may be smaller or larger,
-  /// so this should only be used when emitting metadata for the protocol
-  /// definition itself.
-  unsigned getDefaultWitnessTableSize() const {
-    return Entries.size() - getMinimumWitnessTableSize();
-  }
-
   /// Return all of the default witness table entries.
   ArrayRef<Entry> getEntries() const { return Entries; }
-
-  /// Return all of the resilient default implementations.
-  ///
-  /// This is the array of witnesses actually emitted as part of the protocol's
-  /// metadata; see the comment in getMinimumWitnessTableSize().
-  ArrayRef<Entry> getResilientDefaultEntries() {
-    return Entries.slice(getMinimumWitnessTableSize());
-  }
 
   /// Verify that the default witness table is well-formed.
   void verify(const SILModule &M) const;
@@ -198,7 +174,7 @@ namespace llvm {
 template <>
 struct ilist_traits<::swift::SILDefaultWitnessTable> :
 public ilist_default_traits<::swift::SILDefaultWitnessTable> {
-  typedef ::swift::SILDefaultWitnessTable SILDefaultWitnessTable;
+  using SILDefaultWitnessTable = ::swift::SILDefaultWitnessTable;
 
 public:
   static void deleteNode(SILDefaultWitnessTable *WT) { WT->~SILDefaultWitnessTable(); }

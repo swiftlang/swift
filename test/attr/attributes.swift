@@ -159,7 +159,15 @@ unowned
 var weak7 : Int // expected-error {{'unowned' may only be applied to class and class-bound protocol types, not 'Int'}}
 weak
 var weak8 : Class? = Ty0()
+// expected-warning@-1 {{instance will be immediately deallocated because variable 'weak8' is 'weak'}}
+// expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
+// expected-note@-3 {{'weak8' declared here}}
+
 unowned var weak9 : Class = Ty0()
+// expected-warning@-1 {{instance will be immediately deallocated because variable 'weak9' is 'unowned'}}
+// expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
+// expected-note@-3 {{'weak9' declared here}}
+
 weak
 var weak10 : NonClass? = Ty0() // expected-error {{'weak' must not be applied to non-class-bound 'NonClass'; consider adding a protocol conformance that has a class bound}}
 unowned
@@ -260,3 +268,8 @@ class SILStored {
 
 @_show_in_interface protocol _underscored {}
 @_show_in_interface class _notapplicable {} // expected-error {{may only be used on 'protocol' declarations}}
+
+// Error recovery after one invalid attribute
+@_invalid_attribute_ // expected-error {{unknown attribute '_invalid_attribute_'}}
+@inline(__always)
+public func sillyFunction() {}

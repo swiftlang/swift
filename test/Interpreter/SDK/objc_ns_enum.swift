@@ -8,7 +8,7 @@
 // strict checking if we get a guarantee that certain types don't have
 // hidden or future enumeration values.)
 
-#if os(OSX)
+#if os(macOS)
 import AppKit
 
 print(NSButtonType(rawValue: 20721)!.rawValue)

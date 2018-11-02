@@ -40,6 +40,21 @@ static bool isGlobalOrStaticVar(VarDecl *VD) {
   return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();
 }
 
+void TBDGenVisitor::visitPatternBindingDecl(PatternBindingDecl *PBD) {
+  for (auto &entry : PBD->getPatternList()) {
+    auto *var = entry.getAnchoringVarDecl();
+
+    // Non-global variables might have an explicit initializer symbol.
+    if (entry.getInit() && !isGlobalOrStaticVar(var)) {
+      auto declRef =
+          SILDeclRef(var, SILDeclRef::Kind::StoredPropertyInitializer);
+      // Stored property initializers for public properties are currently
+      // public.
+      addSymbol(declRef);
+    }
+  }
+}
+
 void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
   auto linkage = effectiveLinkageForClassMember(
     declRef.getLinkage(ForDefinition),
@@ -202,7 +217,7 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
   visitNominalTypeDecl(CD);
 
   // The below symbols are only emitted if the class is resilient.
-  if (!CD->isResilient(SwiftModule, ResilienceExpansion::Minimal))
+  if (!CD->isResilient())
     return;
 
   addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
@@ -256,7 +271,7 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
   if (!PD->isObjC()) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
 
-    if (PD->isResilient(SwiftModule, ResilienceExpansion::Minimal)) {
+    if (PD->isResilient()) {
       for (auto *member : PD->getMembers()) {
         if (auto *funcDecl = dyn_cast<FuncDecl>(member)) {
           addDispatchThunk(SILDeclRef(funcDecl));
@@ -282,6 +297,17 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
            "unexpected member of protocol during TBD generation");
   }
 #endif
+}
+
+void TBDGenVisitor::visitEnumDecl(EnumDecl *ED) {
+  if (!ED->isResilient())
+    return;
+
+  // Emit resilient tags.
+  for (auto *elt : ED->getAllElements()) {
+    auto entity = LinkEntity::forEnumCase(elt);
+    addSymbol(entity);
+  }
 }
 
 static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,

@@ -138,6 +138,14 @@ extension Dictionary : _ObjectiveCBridgeable {
   }
 }
 
+extension NSDictionary : _HasCustomAnyHashableRepresentation {
+  // Must be @nonobjc to avoid infinite recursion during bridging
+  @nonobjc
+  public func _toCustomAnyHashable() -> AnyHashable? {
+    return AnyHashable(self as! Dictionary<AnyHashable, AnyHashable>)
+  }
+}
+
 extension NSDictionary : Sequence {
   // FIXME: A class because we can't pass a struct with class fields through an
   // [objc] interface without prematurely destroying the references.

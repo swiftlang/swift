@@ -17,7 +17,7 @@
 extern "C" {
 #endif
 
-#if defined(SwiftDemangle_EXPORTS)
+#if defined(swiftDemangle_EXPORTS)
 # if defined(__ELF__)
 #   define SWIFT_DEMANGLE_LINKAGE __attribute__((__visibility__("protected")))
 # elif defined(__MACH__)

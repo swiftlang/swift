@@ -207,6 +207,26 @@ ManagedValue SILGenBuilder::createConvertFunction(SILLocation loc,
   return cloner.clone(result);
 }
 
+ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
+    SILLocation loc, ManagedValue fn, SILType resultTy,
+    bool isEscapedByUser) {
+
+  auto fnType = fn.getType().castTo<SILFunctionType>();
+  auto resultFnType = resultTy.castTo<SILFunctionType>();
+
+  // Escaping to noescape conversion.
+  assert(resultFnType->getRepresentation() ==
+             SILFunctionTypeRepresentation::Thick &&
+         fnType->getRepresentation() ==
+             SILFunctionTypeRepresentation::Thick &&
+         !fnType->isNoEscape() && resultFnType->isNoEscape() &&
+         "Expect a escaping to noescape conversion");
+  SILValue fnValue = fn.getValue();
+  SILValue result = createConvertEscapeToNoEscape(
+      loc, fnValue, resultTy, isEscapedByUser, false);
+  return ManagedValue::forTrivialObjectRValue(result);
+}
+
 ManagedValue SILGenBuilder::createInitExistentialValue(
     SILLocation loc, SILType existentialType, CanType formalConcreteType,
     ManagedValue concrete, ArrayRef<ProtocolConformanceRef> conformances) {
@@ -519,18 +539,56 @@ ManagedValue SILGenBuilder::createLoadCopy(SILLocation loc, ManagedValue v,
   return SGF.emitManagedRValueWithCleanup(result, lowering);
 }
 
-ManagedValue SILGenBuilder::createFunctionArgument(SILType type,
-                                                   ValueDecl *decl) {
-  SILFunction &F = getFunction();
+static ManagedValue createInputFunctionArgument(SILGenBuilder &B, SILType type,
+                                                SILLocation loc,
+                                                ValueDecl *decl = nullptr) {
+  auto &SGF = B.getSILGenFunction();
+  SILFunction &F = B.getFunction();
+  assert((F.isBare() || decl) &&
+         "Function arguments of non-bare functions must have a decl");
+  auto *arg = F.begin()->createFunctionArgument(type, decl);
+  switch (arg->getArgumentConvention()) {
+  case SILArgumentConvention::Indirect_In_Guaranteed:
+  case SILArgumentConvention::Direct_Guaranteed:
+    // Guaranteed parameters are passed at +0.
+    return ManagedValue::forUnmanaged(arg);
+  case SILArgumentConvention::Direct_Unowned:
+    // Unowned parameters are only guaranteed at the instant of the call, so we
+    // must retain them even if we're in a context that can accept a +0 value.
+    return ManagedValue::forUnmanaged(arg).copy(SGF, loc);
 
-  SILFunctionArgument *arg = F.begin()->createFunctionArgument(type, decl);
-  if (arg->getType().isObject()) {
-    if (arg->getOwnershipKind().isTrivialOr(ValueOwnershipKind::Owned))
-      return SGF.emitManagedRValueWithCleanup(arg);
-    return ManagedValue::forBorrowedRValue(arg);
+  case SILArgumentConvention::Direct_Owned:
+    return SGF.emitManagedRValueWithCleanup(arg);
+
+  case SILArgumentConvention::Indirect_In:
+    if (SGF.silConv.useLoweredAddresses())
+      return SGF.emitManagedBufferWithCleanup(arg);
+    return SGF.emitManagedRValueWithCleanup(arg);
+
+  case SILArgumentConvention::Indirect_Inout:
+  case SILArgumentConvention::Indirect_InoutAliasable:
+    // An inout parameter is +0 and guaranteed, but represents an lvalue.
+    return ManagedValue::forLValue(arg);
+  case SILArgumentConvention::Indirect_In_Constant:
+    llvm_unreachable("Convention not produced by SILGen");
+  case SILArgumentConvention::Direct_Deallocating:
+  case SILArgumentConvention::Indirect_Out:
+    llvm_unreachable("unsupported convention for API");
   }
+  llvm_unreachable("bad parameter convention");
+}
 
-  return SGF.emitManagedBufferWithCleanup(arg);
+ManagedValue SILGenBuilder::createInputFunctionArgument(SILType type,
+                                                        ValueDecl *decl) {
+  return ::createInputFunctionArgument(*this, type, SILLocation(decl), decl);
+}
+
+ManagedValue
+SILGenBuilder::createInputFunctionArgument(SILType type,
+                                           Optional<SILLocation> inputLoc) {
+  assert(inputLoc.hasValue() && "This optional is only for overload resolution "
+                                "purposes! Do not pass in None here!");
+  return ::createInputFunctionArgument(*this, type, *inputLoc);
 }
 
 ManagedValue
@@ -602,7 +660,7 @@ ManagedValue SILGenBuilder::createOptionalSome(SILLocation loc,
                                                ManagedValue arg) {
   CleanupCloner cloner(*this, arg);
   auto &argTL = SGF.getTypeLowering(arg.getType());
-  SILType optionalType = arg.getType().wrapAnyOptionalType(getFunction());
+  SILType optionalType = SILType::getOptionalType(arg.getType());
   if (argTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
     SILValue someValue =
         createOptionalSome(loc, arg.forward(SGF), optionalType);
@@ -664,7 +722,30 @@ ManagedValue SILGenBuilder::createUncheckedBitCast(SILLocation loc,
                                                    ManagedValue value,
                                                    SILType type) {
   CleanupCloner cloner(*this, value);
-  SILValue cast = createUncheckedBitCast(loc, value.forward(SGF), type);
+  SILValue cast = createUncheckedBitCast(loc, value.getValue(), type);
+
+  // Currently SILBuilder::createUncheckedBitCast only produces these
+  // instructions. We assert here to make sure if this changes, this code is
+  // updated.
+  assert((isa<UncheckedTrivialBitCastInst>(cast) ||
+          isa<UncheckedRefCastInst>(cast) ||
+          isa<UncheckedBitwiseCastInst>(cast)) &&
+         "SILGenBuilder is out of sync with SILBuilder.");
+
+  // If we have a trivial inst, just return early.
+  if (isa<UncheckedTrivialBitCastInst>(cast))
+    return ManagedValue::forUnmanaged(cast);
+
+  // If we perform an unchecked bitwise case, then we are producing a new RC
+  // identity implying that we need a copy of the casted value to be returned so
+  // that the inputs/outputs of the case have separate ownership.
+  if (isa<UncheckedBitwiseCastInst>(cast)) {
+    return ManagedValue::forUnmanaged(cast).copy(SGF, loc);
+  }
+
+  // Otherwise, we forward the cleanup of the input value and place the cleanup
+  // on the cast value since unchecked_ref_cast is "forwarding".
+  value.forward(SGF);
   return cloner.clone(cast);
 }
 
@@ -832,4 +913,30 @@ ManagedValue SILGenBuilder::createTuple(SILLocation loc, SILType type,
               return mv.forward(getSILGenFunction());
             });
   return cloner.clone(createTuple(loc, type, forwardedValues));
+}
+
+ManagedValue SILGenBuilder::createUncheckedAddrCast(SILLocation loc, ManagedValue op,
+                                                    SILType resultTy) {
+  CleanupCloner cloner(*this, op);
+  SILValue cast = createUncheckedAddrCast(loc, op.forward(SGF), resultTy);
+  return cloner.clone(cast);
+}
+
+ManagedValue SILGenBuilder::tryCreateUncheckedRefCast(SILLocation loc,
+                                                      ManagedValue original,
+                                                      SILType type) {
+  CleanupCloner cloner(*this, original);
+  SILValue result = tryCreateUncheckedRefCast(loc, original.getValue(), type);
+  if (!result)
+    return ManagedValue();
+  original.forward(SGF);
+  return cloner.clone(result);
+}
+
+ManagedValue SILGenBuilder::createUncheckedTrivialBitCast(SILLocation loc,
+                                                          ManagedValue original,
+                                                          SILType type) {
+  SILValue result =
+      SGF.B.createUncheckedTrivialBitCast(loc, original.getValue(), type);
+  return ManagedValue::forUnmanaged(result);
 }

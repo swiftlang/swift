@@ -35,19 +35,22 @@ _ = f0(X2(), {$0.g()})
 
 func inoutToSharedConversions() {
   func fooOW<T, U>(_ f : (__owned T) -> U) {}
-  fooOW({ (x : Int) in return Int(5) }) // '__owned'-to-'__owned' allowed
+  fooOW({ (x : Int) in return Int(5) }) // defaut-to-'__owned' allowed
+  fooOW({ (x : __owned Int) in return Int(5) }) // '__owned'-to-'__owned' allowed
   fooOW({ (x : __shared Int) in return Int(5) }) // '__shared'-to-'__owned' allowed
-  fooOW({ (x : inout Int) in return Int(5) }) // expected-error {{cannot convert value of type '(inout Int) -> Int' to expected argument type '(_) -> _'}}
+  fooOW({ (x : inout Int) in return Int(5) }) // expected-error {{cannot convert value of type '(inout Int) -> Int' to expected argument type '(__owned _) -> _'}}
   
   func fooIO<T, U>(_ f : (inout T) -> U) {}
   fooIO({ (x : inout Int) in return Int(5) }) // 'inout'-to-'inout' allowed
-  fooIO({ (x : __shared Int) in return Int(5) }) // expected-error {{cannot convert value of type '(__shared Int) -> Int' to expected argument type '(inout _) -> _'}}
   fooIO({ (x : Int) in return Int(5) }) // expected-error {{cannot convert value of type '(inout Int) -> Int' to expected argument type '(inout _) -> _'}}
+  fooIO({ (x : __shared Int) in return Int(5) }) // expected-error {{cannot convert value of type '(__shared Int) -> Int' to expected argument type '(inout _) -> _'}}
+  fooIO({ (x : __owned Int) in return Int(5) }) // expected-error {{cannot convert value of type '(__owned Int) -> Int' to expected argument type '(inout _) -> _'}}
 
   func fooSH<T, U>(_ f : (__shared T) -> U) {}
   fooSH({ (x : __shared Int) in return Int(5) }) // '__shared'-to-'__shared' allowed
+  fooSH({ (x : __owned Int) in return Int(5) }) // '__owned'-to-'__shared' allowed
   fooSH({ (x : inout Int) in return Int(5) }) // expected-error {{cannot convert value of type '(inout Int) -> Int' to expected argument type '(__shared _) -> _'}}
-  fooSH({ (x : Int) in return Int(5) }) // '__owned'-to-'__shared' allowed
+  fooSH({ (x : Int) in return Int(5) }) // default-to-'__shared' allowed
 }
 
 // Autoclosure
@@ -296,7 +299,7 @@ struct Thing {
   init?() {}
 }
 // This throws a compiler error
-let things = Thing().map { thing in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{34-34=-> (Thing) }}
+let things = Thing().map { thing in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{34-34=-> Thing }}
   // Commenting out this makes it compile
   _ = thing
   return thing
@@ -355,7 +358,7 @@ func someGeneric19997471<T>(_ x: T) {
 func rdar21078316() {
   var foo : [String : String]?
   var bar : [(String, String)]?
-  bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) -> [(String, String)]' expects 1 argument, but 2 were used in closure body}}
+  bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) throws -> [(String, String)]' expects 1 argument, but 2 were used in closure body}}
 }
 
 
@@ -549,7 +552,7 @@ extension A_SR_5030 {
   func foo() -> B_SR_5030<Int> {
     let tt : B_SR_5030<Int> = sr5030_exFalso()
     return tt.map { x in (idx: x) }
-    // expected-error@-1 {{cannot convert value of type '(idx: (Int))' to closure result type 'Int'}}
+    // expected-error@-1 {{cannot convert value of type '(idx: Int)' to closure result type 'Int'}}
   }
 }
 
@@ -651,4 +654,60 @@ func rdar36054961() {
   bar(dict: ["abc": { str, range, _ in
      str.replaceSubrange(range, with: str[range].reversed())
   }])
+}
+
+protocol P_37790062 {
+  associatedtype T
+  var elt: T { get }
+}
+
+func rdar37790062() {
+  struct S<T> {
+    init(_ a: () -> T, _ b: () -> T) {}
+  }
+
+  class C1 : P_37790062 {
+    typealias T = Int
+    var elt: T { return 42 }
+  }
+
+  class C2 : P_37790062 {
+    typealias T = (String, Int, Void)
+    var elt: T { return ("question", 42, ()) }
+  }
+
+  func foo() -> Int { return 42 }
+  func bar() -> Void {}
+  func baz() -> (String, Int) { return ("question", 42) }
+  func bzz<T>(_ a: T) -> T { return a }
+  func faz<T: P_37790062>(_ a: T) -> T.T { return a.elt }
+
+  _ = S({ foo() }, { bar() }) // expected-warning {{result of call to 'foo()' is unused}}
+  _ = S({ baz() }, { bar() }) // expected-warning {{result of call to 'baz()' is unused}}
+  _ = S({ bzz(("question", 42)) }, { bar() }) // expected-warning {{result of call to 'bzz' is unused}}
+  _ = S({ bzz(String.self) }, { bar() }) // expected-warning {{result of call to 'bzz' is unused}}
+  _ = S({ bzz(((), (()))) }, { bar() }) // expected-warning {{result of call to 'bzz' is unused}}
+  _ = S({ bzz(C1()) }, { bar() }) // expected-warning {{result of call to 'bzz' is unused}}
+  _ = S({ faz(C2()) }, { bar() }) // expected-warning {{result of call to 'faz' is unused}}
+}
+
+// <rdar://problem/39489003>
+typealias KeyedItem<K, T> = (key: K, value: T)
+
+protocol Node {
+  associatedtype T
+  associatedtype E
+  associatedtype K
+  var item: E {get set}
+  var children: [(key: K, value: T)] {get set}
+}
+
+extension Node {
+  func getChild(for key:K)->(key: K, value: T) {
+    return children.first(where: { (item:KeyedItem) -> Bool in
+        return item.key == key
+        // expected-error@-1 {{binary operator '==' cannot be applied to operands of type '_' and 'Self.K'}}
+        // expected-note@-2 {{overloads for '==' exist with these partially matching parameter lists:}}
+      })
+  }
 }

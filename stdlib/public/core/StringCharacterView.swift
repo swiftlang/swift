@@ -52,31 +52,31 @@ extension String {
   /// using the `String` type's `init(_:)` initializer.
   ///
   ///     let name = "Marie Curie"
-  ///     if let firstSpace = name.characters.index(of: " ") {
+  ///     if let firstSpace = name.characters.firstIndex(of: " ") {
   ///         let firstName = String(name.characters[..<firstSpace])
   ///         print(firstName)
   ///     }
   ///     // Prints "Marie"
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct _CharacterView {
-    @_versioned
+    @usableFromInline
     internal var _base: String
 
     /// The offset of this view's `_guts` from an original guts. This works
     /// around the fact that `_StringGuts` is always zero-indexed.
     /// `_baseOffset` should be subtracted from `Index.encodedOffset` before
     /// that value is used as a `_guts` index.
-    @_versioned
+    @usableFromInline
     internal var _baseOffset: Int
 
     /// Creates a view of the given string.
-    @_inlineable // FIXME(sil-serialize-all)
+    @inlinable // FIXME(sil-serialize-all)
     public init(_ text: String) {
       self._base = text
       self._baseOffset = 0
     }
 
-    @_inlineable // FIXME(sil-serialize-all)
+    @inlinable // FIXME(sil-serialize-all)
     public // @testable
     init(_ _base: String, baseOffset: Int = 0) {
       self._base = _base
@@ -96,7 +96,7 @@ extension String {
   }
 
   /// A view of the string's contents as a collection of characters.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.2, message:
     "Please use String or Substring directly")
   public var characters: CharacterView {
@@ -121,7 +121,7 @@ extension String {
   ///     var str = "All this happened, more or less."
   ///     let afterSpace = str.withMutableCharacters {
   ///         chars -> String.CharacterView in
-  ///         if let i = chars.index(of: " ") {
+  ///         if let i = chars.firstIndex(of: " ") {
   ///             let result = chars[chars.index(after: i)...]
   ///             chars.removeSubrange(i...)
   ///             return result
@@ -139,7 +139,7 @@ extension String {
   ///   value for the `withMutableCharacters(_:)` method. The `CharacterView`
   ///   argument is valid only for the duration of the closure's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.2, message:
     "Please mutate String or Substring directly")
   public mutating func withMutableCharacters<R>(
@@ -171,7 +171,7 @@ extension String {
   ///     // Prints "'Twas brillig, and the..."
   ///
   /// - Parameter characters: A character view to convert to a string.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.2, message:
     "Please use String or Substring directly")
   public init(_ characters: CharacterView) {
@@ -180,28 +180,24 @@ extension String {
 }
 
 extension String._CharacterView : _SwiftStringView {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal var _persistentContent : String {
     return _base
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal var _wholeString : String {
     return _base
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal var _encodedOffsetRange : Range<Int> {
     return _base._encodedOffsetRange
   }
 }
 
 extension String._CharacterView {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
   internal var _guts: _StringGuts {
     return _base._guts
   }
@@ -210,8 +206,7 @@ extension String._CharacterView {
 extension String._CharacterView {
   internal typealias UnicodeScalarView = String.UnicodeScalarView
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
   internal var unicodeScalars: UnicodeScalarView {
     return UnicodeScalarView(_base._guts, coreOffset: _baseOffset)
   }
@@ -224,8 +219,7 @@ extension String._CharacterView : BidirectionalCollection {
 
   /// Translates a view index into an index in the underlying base string using
   /// this view's `_baseOffset`.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal func _toBaseIndex(_ index: Index) -> Index {
     return Index(
       encodedOffset: index.encodedOffset - _baseOffset,
@@ -234,8 +228,7 @@ extension String._CharacterView : BidirectionalCollection {
 
   /// Translates an index in the underlying base string into a view index using
   /// this view's `_baseOffset`.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal func _toViewIndex(_ index: Index) -> Index {
     return Index(
       encodedOffset: index.encodedOffset + _baseOffset,
@@ -245,7 +238,7 @@ extension String._CharacterView : BidirectionalCollection {
   /// The position of the first character in a nonempty character view.
   /// 
   /// In an empty character view, `startIndex` is equal to `endIndex`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var startIndex: Index {
     return _toViewIndex(_base.startIndex)
   }
@@ -254,7 +247,7 @@ extension String._CharacterView : BidirectionalCollection {
   /// greater than the last valid subscript argument.
   ///
   /// In an empty character view, `endIndex` is equal to `startIndex`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var endIndex: Index {
     return _toViewIndex(_base.endIndex)
   }
@@ -262,7 +255,7 @@ extension String._CharacterView : BidirectionalCollection {
   /// Returns the next consecutive position after `i`.
   ///
   /// - Precondition: The next position is valid.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func index(after i: Index) -> Index {
     return _toViewIndex(_base.index(after: _toBaseIndex(i)))
   }
@@ -270,7 +263,7 @@ extension String._CharacterView : BidirectionalCollection {
   /// Returns the previous consecutive position before `i`.
   ///
   /// - Precondition: The previous position is valid.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func index(before i: Index) -> Index {
     return _toViewIndex(_base.index(before: _toBaseIndex(i)))
   }
@@ -281,14 +274,14 @@ extension String._CharacterView : BidirectionalCollection {
   /// letter and then prints the character at the found index:
   ///
   ///     let greeting = "Hello, friend!"
-  ///     if let i = greeting.characters.index(where: { "A"..."Z" ~= $0 }) {
+  ///     if let i = greeting.characters.firstIndex(where: { "A"..."Z" ~= $0 }) {
   ///         print("First capital letter: \(greeting.characters[i])")
   ///     }
   ///     // Prints "First capital letter: H"
   ///
   /// - Parameter position: A valid index of the character view. `position`
   ///   must be less than the view's end index.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public subscript(i: Index) -> Character {
     return _base[_toBaseIndex(i)]
   }
@@ -296,7 +289,7 @@ extension String._CharacterView : BidirectionalCollection {
 
 extension String._CharacterView : RangeReplaceableCollection {
   /// Creates an empty character view.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init() {
     self.init("")
   }
@@ -315,7 +308,7 @@ extension String._CharacterView : RangeReplaceableCollection {
   ///   view and `newElements`. If the call to `replaceSubrange(_:with:)`
   ///   simply removes characters at the end of the view, the complexity is
   ///   O(*n*), where *n* is equal to `bounds.count`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public mutating func replaceSubrange<C>(
     _ bounds: Range<Index>,
     with newElements: C
@@ -337,7 +330,7 @@ extension String._CharacterView : RangeReplaceableCollection {
   ///   to allocate.
   ///
   /// - Complexity: O(*n*), where *n* is the capacity being reserved.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ n: Int) {
     _base.reserveCapacity(n)
   }
@@ -345,7 +338,7 @@ extension String._CharacterView : RangeReplaceableCollection {
   /// Appends the given character to the character view.
   ///
   /// - Parameter c: The character to append to the character view.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public mutating func append(_ c: Character) {
     _base.append(c)
   }
@@ -353,7 +346,7 @@ extension String._CharacterView : RangeReplaceableCollection {
   /// Appends the characters in the given sequence to the character view.
   /// 
   /// - Parameter newElements: A sequence of characters.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public mutating func append<S : Sequence>(contentsOf newElements: S)
   where S.Element == Character {
     _base.append(contentsOf: newElements)
@@ -368,14 +361,14 @@ extension String._CharacterView {
   /// not including, the first comma (`","`) in the string.
   ///
   ///     let str = "All this happened, more or less."
-  ///     let i = str.characters.index(of: ",")!
+  ///     let i = str.characters.firstIndex(of: ",")!
   ///     let substring = str.characters[str.characters.startIndex ..< i]
   ///     print(String(substring))
   ///     // Prints "All this happened"
   ///
   /// - Complexity: O(*n*) if the underlying string is bridged from
   ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.2, message:
     "Please use String or Substring directly")
   public subscript(bounds: Range<Index>) -> String.CharacterView {

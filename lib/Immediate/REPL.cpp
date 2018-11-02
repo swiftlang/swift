@@ -869,7 +869,6 @@ private:
     if (!CI.getASTContext().hadError()) {
       sil = performSILGeneration(REPLInputFile, CI.getSILOptions(),
                                  RC.CurIRGenElem);
-      performSILLinking(sil.get());
       runSILDiagnosticPasses(*sil);
       runSILLoweringPasses(*sil);
     }
@@ -897,10 +896,11 @@ private:
     if (!ShouldRun)
       return true;
 
+    const PrimarySpecificPaths PSPs =
+        CI.getPrimarySpecificPathsForAtMostOnePrimary();
     // IRGen the current line(s).
     // FIXME: We shouldn't need to use the global context here, but
     // something is persisting across calls to performIRGeneration.
-    const auto PSPs = CI.getPrimarySpecificPathsForAtMostOnePrimary();
     auto LineModule = performIRGeneration(
         IRGenOpts, REPLInputFile, std::move(sil), "REPLLine", PSPs,
         getGlobalLLVMContext(), RC.CurIRGenElem);

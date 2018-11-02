@@ -83,6 +83,8 @@ struct SerializedSwiftName {
       return Name;
     case DeclBaseName::Kind::Subscript:
       return "subscript";
+    case DeclBaseName::Kind::Constructor:
+      return "init";
     case DeclBaseName::Kind::Destructor:
       return "deinit";
     }

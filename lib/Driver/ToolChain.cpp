@@ -21,24 +21,23 @@
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
-#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
 
-ToolChain::JobContext::JobContext(Compilation &C,
-                                  ArrayRef<const Job *> Inputs,
+ToolChain::JobContext::JobContext(Compilation &C, ArrayRef<const Job *> Inputs,
                                   ArrayRef<const Action *> InputActions,
                                   const CommandOutput &Output,
                                   const OutputInfo &OI)
-  : C(C), Inputs(Inputs), InputActions(InputActions), Output(Output),
-    OI(OI), Args(C.getArgs()) {}
+    : C(C), Inputs(Inputs), InputActions(InputActions), Output(Output), OI(OI),
+      Args(C.getArgs()) {}
 
 ArrayRef<InputPair> ToolChain::JobContext::getTopLevelInputFiles() const {
   return C.getInputFiles();
@@ -75,8 +74,9 @@ ToolChain::constructJob(const JobAction &JA,
 
   auto invocationInfo = [&]() -> InvocationInfo {
     switch (JA.getKind()) {
-  #define CASE(K) case Action::K: \
-      return constructInvocation(cast<K##Action>(JA), context);
+#define CASE(K)                                                                \
+  case Action::Kind::K:                                                        \
+    return constructInvocation(cast<K##Action>(JA), context);
     CASE(CompileJob)
     CASE(InterpretJob)
     CASE(BackendJob)
@@ -89,7 +89,7 @@ ToolChain::constructJob(const JobAction &JA,
     CASE(AutolinkExtractJob)
     CASE(REPLJob)
 #undef CASE
-    case Action::Input:
+    case Action::Kind::Input:
       llvm_unreachable("not a JobAction");
     }
 
@@ -147,8 +147,8 @@ ToolChain::findProgramRelativeToSwiftImpl(StringRef executableName) const {
   return {};
 }
 
-types::ID ToolChain::lookupTypeForExtension(StringRef Ext) const {
-  return types::lookupTypeForExtension(Ext);
+file_types::ID ToolChain::lookupTypeForExtension(StringRef Ext) const {
+  return file_types::lookupTypeForExtension(Ext);
 }
 
 /// Return a _single_ TY_Swift InputAction, if one exists;
@@ -159,7 +159,7 @@ findSingleSwiftInput(const CompileJobAction *CJA) {
   const InputAction *IA = nullptr;
   for (auto const *I : Inputs) {
     if (auto const *S = dyn_cast<InputAction>(I)) {
-      if (S->getType() == types::TY_Swift) {
+      if (S->getType() == file_types::TY_Swift) {
         if (IA == nullptr) {
           IA = S;
         } else {
@@ -233,7 +233,7 @@ ToolChain::jobsAreBatchCombinable(const Compilation &C,
 /// \c CommandOutputs of all the jobs passed.
 static std::unique_ptr<CommandOutput>
 makeBatchCommandOutput(ArrayRef<const Job *> jobs, Compilation &C,
-                       types::ID outputType) {
+                       file_types::ID outputType) {
   auto output =
       llvm::make_unique<CommandOutput>(outputType, C.getDerivedOutputFileMap());
   for (auto const *J : jobs) {
@@ -242,15 +242,19 @@ makeBatchCommandOutput(ArrayRef<const Job *> jobs, Compilation &C,
   return output;
 }
 
-/// Set-union the \c Inputs and \c Actions from each \c Job in \p jobs into the
-/// provided \p inputJobs and \p inputActions vectors, further adding all \c
-/// Actions from the resulting merger to \p batchCJA. Do set-union rather than
-/// concatenation here to avoid mentioning the same input multiple times.
+/// Set-union the \c Inputs and \c InputActions from each \c Job in \p jobs into
+/// the provided \p inputJobs and \p inputActions vectors, further adding all \c
+/// Actions in the \p jobs -- InputActions or otherwise -- to \p batchCJA. Do
+/// set-union rather than concatenation here to avoid mentioning the same input
+/// multiple times.
 static bool
 mergeBatchInputs(ArrayRef<const Job *> jobs,
                  llvm::SmallSetVector<const Job *, 16> &inputJobs,
                  llvm::SmallSetVector<const Action *, 16> &inputActions,
                  CompileJobAction *batchCJA) {
+
+  llvm::SmallSetVector<const Action *, 16> allActions;
+
   for (auto const *J : jobs) {
     for (auto const *I : J->getInputs()) {
       inputJobs.insert(I);
@@ -259,47 +263,74 @@ mergeBatchInputs(ArrayRef<const Job *> jobs,
     if (!CJA)
       return true;
     for (auto const *I : CJA->getInputs()) {
-      inputActions.insert(I);
+      // Capture _all_ input actions -- whether or not they are InputActions --
+      // in allActions, to set as the inputs for batchCJA below.
+      allActions.insert(I);
+      // Only collect input actions that _are InputActions_ in the inputActions
+      // array, to load into the JobContext in our caller.
+      if (auto const *IA = dyn_cast<InputAction>(I)) {
+        inputActions.insert(IA);
+      }
     }
   }
 
-  for (auto const *I : inputActions) {
+  for (auto const *I : allActions) {
     batchCJA->addInput(I);
   }
   return false;
+}
+
+/// Unfortunately the success or failure of a Swift compilation is currently
+/// sensitive to the order in which files are processed, at least in terms of
+/// the order of processing extensions (and likely other ways we haven't
+/// discovered yet). So long as this is true, we need to make sure any batch job
+/// we build names its inputs in an order that's a subsequence of the sequence
+/// of inputs the driver was initially invoked with.
+static void sortJobsToMatchCompilationInputs(ArrayRef<const Job *> unsortedJobs,
+                                             SmallVectorImpl<const Job *> &sortedJobs,
+                                             Compilation &C) {
+  llvm::StringMap<const Job *> jobsByInput;
+  for (const Job *J : unsortedJobs) {
+    const CompileJobAction *CJA = cast<CompileJobAction>(&J->getSource());
+    const InputAction* IA = findSingleSwiftInput(CJA);
+    auto R = jobsByInput.insert(std::make_pair(IA->getInputArg().getValue(),
+                                               J));
+    assert(R.second);
+  }
+  for (const InputPair &P : C.getInputFiles()) {
+    auto I = jobsByInput.find(P.second->getValue());
+    if (I != jobsByInput.end()) {
+      sortedJobs.push_back(I->second);
+    }
+  }
 }
 
 /// Construct a \c BatchJob by merging the constituent \p jobs' CommandOutput,
 /// input \c Job and \c Action members. Call through to \c constructInvocation
 /// on \p BatchJob, to build the \c InvocationInfo.
 std::unique_ptr<Job>
-ToolChain::constructBatchJob(ArrayRef<const Job *> jobs,
+ToolChain::constructBatchJob(ArrayRef<const Job *> unsortedJobs,
                              Compilation &C) const
 {
-#ifndef NDEBUG
-  // Verify that the equivalence relation on the jobs also holds pairwise.
-  for (auto *A : jobs) {
-    for (auto *B : jobs) {
-      assert(jobsAreBatchCombinable(C, A, B));
-    }
-  }
-#endif
-  if (jobs.size() == 0)
+  if (unsortedJobs.empty())
     return nullptr;
+
+  llvm::SmallVector<const Job *, 16> sortedJobs;
+  sortJobsToMatchCompilationInputs(unsortedJobs, sortedJobs, C);
 
   // Synthetic OutputInfo is a slightly-modified version of the initial
   // compilation's OI.
   auto OI = C.getOutputInfo();
   OI.CompilerMode = OutputInfo::Mode::BatchModeCompile;
 
-  auto const *executablePath = jobs[0]->getExecutable();
-  auto outputType = jobs[0]->getOutput().getPrimaryOutputType();
-  auto output = makeBatchCommandOutput(jobs, C, outputType);
+  auto const *executablePath = sortedJobs[0]->getExecutable();
+  auto outputType = sortedJobs[0]->getOutput().getPrimaryOutputType();
+  auto output = makeBatchCommandOutput(sortedJobs, C, outputType);
 
   llvm::SmallSetVector<const Job *, 16> inputJobs;
   llvm::SmallSetVector<const Action *, 16> inputActions;
   auto *batchCJA = C.createAction<CompileJobAction>(outputType);
-  if (mergeBatchInputs(jobs, inputJobs, inputActions, batchCJA))
+  if (mergeBatchInputs(sortedJobs, inputJobs, inputActions, batchCJA))
     return nullptr;
 
   JobContext context{C, inputJobs.getArrayRef(), inputActions.getArrayRef(),
@@ -312,12 +343,13 @@ ToolChain::constructBatchJob(ArrayRef<const Job *> jobs,
                                      std::move(invocationInfo.Arguments),
                                      std::move(invocationInfo.ExtraEnvironment),
                                      std::move(invocationInfo.FilelistInfos),
-                                     jobs);
+                                     sortedJobs);
 }
 
 bool
 ToolChain::sanitizerRuntimeLibExists(const ArgList &args,
-                                     StringRef sanitizerName) const {
+                                     StringRef sanitizerName,
+                                     bool shared) const {
   // Assume no sanitizers are supported by default.
   // This method should be overriden by a platform-specific subclass.
   return false;

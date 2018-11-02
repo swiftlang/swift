@@ -16,11 +16,11 @@ import Swift
 
 %{
 bnns2016 = [
-  ('OSX','10.12'), ('iOS','10.0'), ('tvOS','10.0'), ('watchOS','3.0')
+  ('macOS','10.12'), ('iOS','10.0'), ('tvOS','10.0'), ('watchOS','3.0')
 ]
 
 bnns2017 = [
-  ('OSX','10.13'), ('iOS','11.0'), ('tvOS','11.0'), ('watchOS','4.0')
+  ('macOS','10.13'), ('iOS','11.0'), ('tvOS','11.0'), ('watchOS','4.0')
 ]
 
 def relString(releases):
@@ -172,7 +172,7 @@ extension BNNSActivation {
   public init(function: BNNSActivationFunction,
               alpha: Float = .nan,
               beta: Float = .nan) {
-    if #available(OSX 10.13, iOS 11.0, tvOS 11.0, watchOS 4.0, *) {
+    if #available(macOS 10.13, iOS 11.0, tvOS 11.0, watchOS 4.0, *) {
       _precondition(function != .integerLinearSaturate,
                     "This initializer cannot be used with the integerLinearSaturate activation function; use BNNSActivation.integerLinearSaturate(scale:Int32, offset:Int32, shift:Int32) instead.")
       _precondition(function != .integerLinearSaturatePerChannel,

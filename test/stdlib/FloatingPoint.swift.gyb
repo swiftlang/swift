@@ -4,10 +4,6 @@
 // RUN: %line-directive %t/FloatingPoint.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
-%{
-from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
-}%
-
 import Swift
 import StdlibUnittest
 
@@ -49,7 +45,7 @@ extension Float80 {
       Builtin.zextOrBitCast_Int64_Int80((64 as Int64)._value))
     result = Builtin.or_Int80(
       result, Builtin.zextOrBitCast_Int64_Int80(bitPattern.significand._value))
-    self = Float80(_bits: Builtin.bitcast_Int80_FPIEEE80(result))
+    self = Float80(Builtin.bitcast_Int80_FPIEEE80(result))
   }
 }
 
@@ -64,14 +60,24 @@ extension Float80 {
 #if arch(i386) || arch(x86_64)
 %   end
 func expectBitwiseEqual(
-  _ expected: ${FloatTy}, _ actual: ${FloatTy}, ${TRACE}
+  _ expected: ${FloatTy}, _ actual: ${FloatTy},
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
 ) {
-  expectEqual(expected.bitPattern, actual.bitPattern, ${trace})
+  expectEqual(expected.bitPattern, actual.bitPattern, message(),
+  stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 }
 func expectBitwiseEqual(
-  bitPattern expected: ${BitPatternTy}, _ actual: ${FloatTy}, ${TRACE}
+  bitPattern expected: ${BitPatternTy}, _ actual: ${FloatTy},
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
 ) {
-  expectBitwiseEqual(${FloatTy}(bitPattern: expected), actual, ${trace})
+  expectBitwiseEqual(${FloatTy}(bitPattern: expected), actual, message(),
+  stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 }
 %   if FloatTy == 'Float80':
 #endif
@@ -105,11 +111,14 @@ FloatingPoint.test("BinaryFloatingPoint/genericIntegerConversion") {
   expectEqual(Float._convert(from: Int64.max).value, Float(Int64.max))
   expectEqual(Float._convert(from: Int64.min).value, Float(Int64.min))
 
+// FIXME: DoubleWidth is no longer part of the standard library
+#if false
   expectEqual(Float._convert(from: DoubleWidth<UInt64>.max).value, .infinity)
   expectEqual(
     Float._convert(from: DoubleWidth<DoubleWidth<Int64>>.max).value, .infinity)
   expectEqual(
     Float._convert(from: DoubleWidth<DoubleWidth<Int64>>.min).value, -.infinity)
+#endif
 }
 
 FloatingPoint.test("BinaryFloatingPoint/genericFloatingPointConversion") {
@@ -529,7 +538,6 @@ FloatingPoint.test("${Self}.significandWidth") {
 %end
 
 let floatNextUpDownTests: [(Float, Float)] = [
-  (.nan, .nan),
   (.greatestFiniteMagnitude, .infinity),
   (0x1.ffff_fe__p-1, 1.0), (1.0, 0x1.0000_02__p+0),
   (0.0, .leastNonzeroMagnitude),
@@ -553,7 +561,6 @@ FloatingPoint.test("Float.nextUp, .nextDown")
 }
 
 let doubleNextUpDownTests: [(Double, Double)] = [
-  (.nan, .nan),
   (.greatestFiniteMagnitude, .infinity),
   (0x1.ffff_ffff_ffff_fp-1, 1.0), (1.0, 0x1.0000_0000_0000_1p+0),
   (0.0, .leastNonzeroMagnitude),
@@ -575,6 +582,16 @@ FloatingPoint.test("Double.nextUp, .nextDown")
   expectBitwiseEqual(-succ, (-prev).nextDown)
   expectBitwiseEqual(-prev, (-succ).nextUp)
 }
+
+%for Self in ['Float', 'Double']:
+FloatingPoint.test("${Self}.nextUp, .nextDown/nan") {
+  let x = ${Self}.nan
+  expectTrue(x.nextUp.isNaN)
+  expectTrue(x.nextDown.isNaN)
+  expectTrue((-x).nextDown.isNaN)
+  expectTrue((-x).nextUp.isNaN)
+}
+%end
 
 #if arch(i386) || arch(x86_64)
 

@@ -17,6 +17,7 @@
 #include "clang/Basic/CharInfo.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringExtras.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
@@ -114,7 +115,7 @@ Optional<Version> Version::parseCompilerVersionString(
   bool isValidVersion = true;
 
   auto checkVersionComponent = [&](unsigned Component, SourceRange Range) {
-    unsigned limit = CV.Components.size() == 0 ? 9223371 : 999;
+    unsigned limit = CV.Components.empty() ? 9223371 : 999;
 
     if (Component > limit) {
       if (Diags)
@@ -303,6 +304,12 @@ Optional<Version> Version::getEffectiveLanguageVersion() const {
     return None;
   case 1:
     break;
+  case 2:
+    // The only valid explicit language version with a minor
+    // component is 4.2.
+    if (Components[0] == 4 && Components[1] == 2)
+      break;
+    return None;
   default:
     // We do not want to permit users requesting more precise effective language
     // versions since accepting such an argument promises more than we're able
@@ -319,13 +326,16 @@ Optional<Version> Version::getEffectiveLanguageVersion() const {
   switch (Components[0]) {
   case 3:
 #ifdef SWIFT_VERSION_PATCHLEVEL
-    return Version{3, 3, SWIFT_VERSION_PATCHLEVEL};
+    return Version{3, 4, SWIFT_VERSION_PATCHLEVEL};
 #else
-    return Version{3, 3};
+    return Version{3, 4};
 #endif
   case 4:
     static_assert(SWIFT_VERSION_MAJOR == 4,
                   "getCurrentLanguageVersion is no longer correct here");
+    // Version '4' on its own implies '4.1.50'.
+    if (size() == 1)
+      return Version{4, 1, 50};
     return Version::getCurrentLanguageVersion();
   case 5:
     return Version{5, 0};
@@ -340,6 +350,16 @@ Version Version::asMajorVersion() const {
   Version res;
   res.Components.push_back(Components[0]);
   return res;
+}
+
+std::string Version::asAPINotesVersionString() const {
+  // Other than for "4.2.x", map the Swift major version into
+  // the API notes version for Swift. This has the effect of allowing
+  // API notes to effect changes only on Swift major versions,
+  // not minor versions.
+  if (size() >= 2 && Components[0] == 4 && Components[1] == 2)
+    return "4.2";
+  return llvm::itostr(Components[0]);
 }
 
 bool operator>=(const class Version &lhs,

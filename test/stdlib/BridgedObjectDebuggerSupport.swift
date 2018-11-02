@@ -9,7 +9,7 @@ let StringForPrintObjectTests = TestSuite("StringForPrintObject")
 // Wrap stringForPrintObject for convenience. Note that the debugger uses
 // something slightly different to pretty-print (see: debugVal()).
 func printObj<T>(_ x: T) -> String {
-  return _DebuggerSupport.stringForPrintObject(x)
+  return _stringForPrintObject(x)
 }
 
 // Check if @x has a reference type.
@@ -24,7 +24,7 @@ func debugVal<T>(_ x: inout T) -> String {
     return printObj(x)
   }
   return withUnsafePointer(to: &x) {
-    return _DebuggerSupport.stringForPrintObject(Swift.unsafeBitCast($0.pointee, to: AnyObject.self))
+    return _stringForPrintObject(Swift.unsafeBitCast($0.pointee, to: AnyObject.self))
   }
 }
 

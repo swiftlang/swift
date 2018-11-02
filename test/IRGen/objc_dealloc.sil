@@ -100,7 +100,8 @@ bb0(%0 : @unowned $SwiftGizmo):
   // Call super -dealloc.
   // CHECK: [[SUPER:%[a-zA-Z0-9]+]] = bitcast [[SGIZMO]]* [[SGIZMOVAL]] to [[GIZMO]]*
   // CHECK-NEXT: [[SUPER_OBJ:%[a-zA-Z0-9]+]] = bitcast [[GIZMO]]* [[SUPER]] to %objc_object*
-  // CHECK-NEXT: [[T0:%.*]] = call %swift.type* @"$S12objc_dealloc10SwiftGizmoCMa"()
+  // CHECK-NEXT: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S12objc_dealloc10SwiftGizmoCMa"(i64 0)
+  // CHECK-NEXT: [[T0:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
   // CHECK-NEXT: [[T1:%.*]] = bitcast %swift.type* [[T0]] to %objc_class*
   // CHECK-NEXT: [[OBJC_SUPER_RECEIVER:%[a-zA-Z0-9]+]] = getelementptr inbounds %objc_super, %objc_super* [[OBJC_SUPER]], i32 0, i32 0
   // CHECK-NEXT: store %objc_object* [[SUPER_OBJ]], %objc_object** [[OBJC_SUPER_RECEIVER]], align 8

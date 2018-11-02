@@ -37,7 +37,7 @@ enum class InlineSelection {
   NoSemanticsAndGlobalInit
 };
 
-// Returns the callee of an apply_inst if it is basically inlineable.
+// Returns the callee of an apply_inst if it is basically inlinable.
 SILFunction *getEligibleFunction(FullApplySite AI,
                                  InlineSelection WhatToInline);
 

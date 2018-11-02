@@ -142,7 +142,7 @@ func assign_pod(_ x: Builtin.Int64, y: Builtin.RawPointer) {
 func assign_obj(_ x: Builtin.NativeObject, y: Builtin.RawPointer) {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*Builtin.NativeObject
   // CHECK: assign {{%.*}} to [[ADDR]]
-  // CHECK: destroy_value
+  // CHECK-NOT: destroy_value
   Builtin.assign(x, y)
 }
 
@@ -189,7 +189,7 @@ func init_obj(_ x: Builtin.NativeObject, y: Builtin.RawPointer) {
 func init_gen<T>(_ x: T, y: Builtin.RawPointer) {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*T
   // CHECK: copy_addr [[OTHER_LOC:%.*]] to [initialization]  [[ADDR]]
-  // CHECK: destroy_addr [[OTHER_LOC]]
+  // CHECK-NOT: destroy_addr [[OTHER_LOC]]
   Builtin.initialize(x, y)
 }
 
@@ -197,14 +197,11 @@ class C {}
 class D {}
 
 // CHECK-LABEL: sil hidden @$S8builtins22class_to_native_object{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[ARG:%.*]] : @owned $C):
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $C):
 // CHECK-NEXT:   debug_value
-// CHECK-NEXT:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK-NEXT:   [[COPY_BORROWED_ARG:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK-NEXT:   [[OBJ:%.*]] = unchecked_ref_cast [[COPY_BORROWED_ARG:%.*]] to $Builtin.NativeObject
-// CHECK-NEXT:   end_borrow [[BORROWED_ARG]] from [[ARG]]
-// CHECK-NEXT:   destroy_value [[ARG]]
-// CHECK-NEXT:   return [[OBJ]]
+// CHECK-NEXT:   [[OBJ:%.*]] = unchecked_ref_cast [[ARG:%.*]] to $Builtin.NativeObject
+// CHECK-NEXT:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
+// CHECK-NEXT:   return [[OBJ_COPY]]
 func class_to_native_object(_ c:C) -> Builtin.NativeObject {
   return Builtin.castToNativeObject(c)
 }
@@ -212,22 +209,20 @@ func class_to_native_object(_ c:C) -> Builtin.NativeObject {
 // CHECK-LABEL: sil hidden @$S8builtins32class_archetype_to_native_object{{[_0-9a-zA-Z]*}}F
 func class_archetype_to_native_object<T : C>(_ t: T) -> Builtin.NativeObject {
   // CHECK: [[OBJ:%.*]] = unchecked_ref_cast [[C:%.*]] to $Builtin.NativeObject
+  // CHECK-NEXT: [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK-NOT: destroy_value [[C]]
   // CHECK-NOT: destroy_value [[OBJ]]
-  // CHECK: return [[OBJ]]
+  // CHECK: return [[OBJ_COPY]]
   return Builtin.castToNativeObject(t)
 }
 
 // CHECK-LABEL: sil hidden @$S8builtins34class_existential_to_native_object{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[ARG:%.*]] : @owned $ClassProto):
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $ClassProto):
 // CHECK-NEXT:   debug_value
-// CHECK-NEXT:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK-NEXT:   [[COPY_BORROWED_ARG:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK-NEXT:   [[REF:%[0-9]+]] = open_existential_ref [[COPY_BORROWED_ARG]] : $ClassProto
+// CHECK-NEXT:   [[REF:%[0-9]+]] = open_existential_ref [[ARG]] : $ClassProto
 // CHECK-NEXT:   [[PTR:%[0-9]+]] = unchecked_ref_cast [[REF]] : $@opened({{.*}}) ClassProto to $Builtin.NativeObject
-// CHECK-NEXT:   end_borrow [[BORROWED_ARG]] from [[ARG]]
-// CHECK-NEXT:   destroy_value [[ARG]]
-// CHECK-NEXT:   return [[PTR]]
+// CHECK-NEXT:   [[PTR_COPY:%.*]] = copy_value [[PTR]]
+// CHECK-NEXT:   return [[PTR_COPY]]
 func class_existential_to_native_object(_ t:ClassProto) -> Builtin.NativeObject {
   return Builtin.unsafeCastToNativeObject(t)
 }
@@ -235,27 +230,30 @@ func class_existential_to_native_object(_ t:ClassProto) -> Builtin.NativeObject 
 // CHECK-LABEL: sil hidden @$S8builtins24class_from_native_object{{[_0-9a-zA-Z]*}}F
 func class_from_native_object(_ p: Builtin.NativeObject) -> C {
   // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] to $C
+  // CHECK: [[C_RETURN:%.*]] = copy_value [[C]]
   // CHECK-NOT: destroy_value [[C]]
   // CHECK-NOT: destroy_value [[OBJ]]
-  // CHECK: return [[C]]
+  // CHECK: return [[C_RETURN]]
   return Builtin.castFromNativeObject(p)
 }
 
 // CHECK-LABEL: sil hidden @$S8builtins34class_archetype_from_native_object{{[_0-9a-zA-Z]*}}F
 func class_archetype_from_native_object<T : C>(_ p: Builtin.NativeObject) -> T {
   // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] : $Builtin.NativeObject to $T
+  // CHECK: [[C_RETURN:%.*]] = copy_value [[C]]
   // CHECK-NOT: destroy_value [[C]]
   // CHECK-NOT: destroy_value [[OBJ]]
-  // CHECK: return [[C]]
+  // CHECK: return [[C_RETURN]]
   return Builtin.castFromNativeObject(p)
 }
 
 // CHECK-LABEL: sil hidden @$S8builtins41objc_class_existential_from_native_object{{[_0-9a-zA-Z]*}}F
 func objc_class_existential_from_native_object(_ p: Builtin.NativeObject) -> AnyObject {
   // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] : $Builtin.NativeObject to $AnyObject
+  // CHECK: [[C_RETURN:%.*]] = copy_value [[C]]
   // CHECK-NOT: destroy_value [[C]]
   // CHECK-NOT: destroy_value [[OBJ]]
-  // CHECK: return [[C]]
+  // CHECK: return [[C_RETURN]]
   return Builtin.castFromNativeObject(p)
 }
 
@@ -354,14 +352,9 @@ func allocWithTailElems_3<T1, T2, T3>(n1: Builtin.Word, ty1: T1.Type, n2: Builti
 
 // CHECK-LABEL: sil hidden @$S8builtins16projectTailElems{{[_0-9a-zA-Z]*}}F
 func projectTailElems<T>(h: Header, ty: T.Type) -> Builtin.RawPointer {
-  // CHECK: bb0([[ARG1:%.*]] : @owned $Header
-  // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
-  // CHECK:   [[ARG1_COPY:%.*]] = copy_value [[BORROWED_ARG1]]
-  // CHECK:   [[TA:%.*]] = ref_tail_addr [[ARG1_COPY]] : $Header
+  // CHECK: bb0([[ARG1:%.*]] : @guaranteed $Header
+  // CHECK:   [[TA:%.*]] = ref_tail_addr [[ARG1]] : $Header
   // CHECK:   [[A2P:%.*]] = address_to_pointer [[TA]]
-  // CHECK:   destroy_value [[ARG1_COPY]]
-  // CHECK:   end_borrow [[BORROWED_ARG1]] from [[ARG1]]
-  // CHECK:   destroy_value [[ARG1]]
   // CHECK:   return [[A2P]]
   return Builtin.projectTailElems(h, ty)
 }
@@ -374,6 +367,31 @@ func getTailAddr<T1, T2>(start: Builtin.RawPointer, i: Builtin.Word, ty1: T1.Typ
   // CHECK: [[A2P:%.*]] = address_to_pointer [[TA]]
   // CHECK: return [[A2P]]
   return Builtin.getTailAddr_Word(start, i, ty1, ty2)
+}
+
+// CHECK-LABEL: sil hidden @$S8builtins25beginUnpairedModifyAccess{{[_0-9a-zA-Z]*}}F
+func beginUnpairedModifyAccess<T1>(address: Builtin.RawPointer, scratch: Builtin.RawPointer, ty1: T1.Type) {
+  // CHECK: [[P2A_ADDR:%.*]] = pointer_to_address %0
+  // CHECK: [[P2A_SCRATCH:%.*]] = pointer_to_address %1
+  // CHECK: begin_unpaired_access [modify] [dynamic] [[P2A_ADDR]] : $*T1, [[P2A_SCRATCH]] : $*Builtin.UnsafeValueBuffer
+  // CHECK: [[RESULT:%.*]] = tuple ()
+  // CHECK: [[RETURN:%.*]] = tuple ()
+  // CHECK: return [[RETURN]] : $()
+
+  Builtin.beginUnpairedModifyAccess(address, scratch, ty1);
+}
+
+// CHECK-LABEL: sil hidden @$S8builtins30performInstantaneousReadAccess{{[_0-9a-zA-Z]*}}F
+func performInstantaneousReadAccess<T1>(address: Builtin.RawPointer, scratch: Builtin.RawPointer, ty1: T1.Type) {
+  // CHECK: [[P2A_ADDR:%.*]] = pointer_to_address %0
+  // CHECK: [[SCRATCH:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
+  // CHECK: begin_unpaired_access [read] [dynamic] [no_nested_conflict] [[P2A_ADDR]] : $*T1, [[SCRATCH]] : $*Builtin.UnsafeValueBuffer
+  // CHECK-NOT: end_{{.*}}access
+  // CHECK: [[RESULT:%.*]] = tuple ()
+  // CHECK: [[RETURN:%.*]] = tuple ()
+  // CHECK: return [[RETURN]] : $()
+
+  Builtin.performInstantaneousReadAccess(address, ty1);
 }
 
 // CHECK-LABEL: sil hidden @$S8builtins8condfail{{[_0-9a-zA-Z]*}}F
@@ -446,15 +464,10 @@ func canBeClassMetatype<T>(_: T) {
   Builtin.canBeClass(TT.self)
 }
 
-// CHECK-LABEL: sil hidden @$S8builtins11fixLifetimeyyAA1CCF : $@convention(thin) (@owned C) -> () {
+// CHECK-LABEL: sil hidden @$S8builtins11fixLifetimeyyAA1CCF : $@convention(thin) (@guaranteed C) -> () {
 func fixLifetime(_ c: C) {
-  // CHECK: bb0([[ARG:%.*]] : @owned $C):
-  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-  // CHECK:   fix_lifetime [[ARG_COPY]] : $C
-  // CHECK:   destroy_value [[ARG_COPY]]
-  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
-  // CHECK:   destroy_value [[ARG]]
+  // CHECK: bb0([[ARG:%.*]] : @guaranteed $C):
+  // CHECK:   fix_lifetime [[ARG]] : $C
   Builtin.fixLifetime(c)
 }
 // CHECK: } // end sil function '$S8builtins11fixLifetimeyyAA1CCF'
@@ -473,15 +486,10 @@ func assumeNonNegative(_ x: Builtin.Word) -> Builtin.Word {
   // CHECK: return [[APPLY]] : $Builtin.Word
 }
 
-// CHECK-LABEL: sil hidden @$S8builtins11autoreleaseyyAA1OCF : $@convention(thin) (@owned O) -> () {
+// CHECK-LABEL: sil hidden @$S8builtins11autoreleaseyyAA1OCF : $@convention(thin) (@guaranteed O) -> () {
 // ==> SEMANTIC ARC TODO: This will be unbalanced... should we allow it?
-// CHECK: bb0([[ARG:%.*]] : @owned $O):
-// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK:   unmanaged_autorelease_value [[ARG_COPY]]
-// CHECK:   destroy_value [[ARG_COPY]]
-// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
-// CHECK:   destroy_value [[ARG]]
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $O):
+// CHECK:   unmanaged_autorelease_value [[ARG]]
 // CHECK: } // end sil function '$S8builtins11autoreleaseyyAA1OCF'
 func autorelease(_ o: O) {
   Builtin.autorelease(o)
@@ -498,27 +506,18 @@ func unreachable() {
   Builtin.unreachable()
 }
 
-// CHECK-LABEL: sil hidden @$S8builtins15reinterpretCast_1xBw_AA1DCAA1CCSgAGtAG_BwtF : $@convention(thin) (@owned C, Builtin.Word) -> (Builtin.Word, @owned D, @owned Optional<C>, @owned C)
-// CHECK:       bb0([[ARG1:%.*]] : @owned $C, [[ARG2:%.*]] : @trivial $Builtin.Word):
+// CHECK-LABEL: sil hidden @$S8builtins15reinterpretCast_1xBw_AA1DCAA1CCSgAGtAG_BwtF : $@convention(thin) (@guaranteed C, Builtin.Word) -> (Builtin.Word, @owned D, @owned Optional<C>, @owned C)
+// CHECK:       bb0([[ARG1:%.*]] : @guaranteed $C, [[ARG2:%.*]] : @trivial $Builtin.Word):
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    debug_value
-// CHECK-NEXT:    [[BORROWED_ARG1_1:%.*]] = begin_borrow [[ARG1]]
-// CHECK-NEXT:    [[ARG1_COPY1:%.*]] = copy_value [[BORROWED_ARG1_1]] : $C
-// CHECK-NEXT:    [[ARG1_TRIVIAL:%.*]] = unchecked_trivial_bit_cast [[ARG1_COPY1]] : $C to $Builtin.Word
-// CHECK-NEXT:    [[BORROWED_ARG1_2:%.*]] = begin_borrow [[ARG1]]
-// CHECK-NEXT:    [[ARG1_COPY2:%.*]] = copy_value [[BORROWED_ARG1_2]] : $C
-// CHECK-NEXT:    [[ARG1_COPY2_CASTED:%.*]] = unchecked_ref_cast [[ARG1_COPY2]] : $C to $D
-// CHECK-NEXT:    [[BORROWED_ARG1_3:%.*]] = begin_borrow [[ARG1]]
-// CHECK-NEXT:    [[ARG1_COPY3:%.*]] = copy_value [[BORROWED_ARG1_3]]
-// CHECK-NEXT:    [[ARG1_COPY3_CAST:%.*]] = unchecked_ref_cast [[ARG1_COPY3]] : $C to $Optional<C>
-// CHECK-NEXT:    [[ARG2_OBJ_CASTED:%.*]] = unchecked_bitwise_cast [[ARG2]] : $Builtin.Word to $C
-// CHECK-NEXT:    [[ARG2_OBJ_CASTED_COPIED:%.*]] = copy_value [[ARG2_OBJ_CASTED]] : $C
-// CHECK-NEXT:    end_borrow [[BORROWED_ARG1_3]] from [[ARG1]]
-// CHECK-NEXT:    end_borrow [[BORROWED_ARG1_2]] from [[ARG1]]
-// CHECK-NEXT:    destroy_value [[ARG1_COPY1]]
-// CHECK-NEXT:    end_borrow [[BORROWED_ARG1_1]] from [[ARG1]]
-// CHECK-NEXT:    destroy_value [[ARG1]]
-// CHECK-NEXT:    [[RESULT:%.*]] = tuple ([[ARG1_TRIVIAL]] : $Builtin.Word, [[ARG1_COPY2_CASTED]] : $D, [[ARG1_COPY3_CAST]] : $Optional<C>, [[ARG2_OBJ_CASTED_COPIED:%.*]] : $C)
+// CHECK-NEXT:    [[ARG1_TRIVIAL:%.*]] = unchecked_trivial_bit_cast [[ARG1]] : $C to $Builtin.Word
+// CHECK-NEXT:    [[ARG1_D:%.*]] = unchecked_ref_cast [[ARG1]] : $C to $D
+// CHECK-NEXT:    [[ARG1_OPT:%.*]] = unchecked_ref_cast [[ARG1]] : $C to $Optional<C>
+// CHECK-NEXT:    [[ARG2_FROM_WORD:%.*]] = unchecked_bitwise_cast [[ARG2]] : $Builtin.Word to $C
+// CHECK-NEXT:    [[ARG2_FROM_WORD_COPY:%.*]] = copy_value [[ARG2_FROM_WORD]]
+// CHECK-NEXT:    [[ARG1_D_COPY:%.*]] = copy_value [[ARG1_D]]
+// CHECK-NEXT:    [[ARG1_OPT_COPY:%.*]] = copy_value [[ARG1_OPT]]
+// CHECK-NEXT:    [[RESULT:%.*]] = tuple ([[ARG1_TRIVIAL]] : $Builtin.Word, [[ARG1_D_COPY]] : $D, [[ARG1_OPT_COPY]] : $Optional<C>, [[ARG2_FROM_WORD_COPY:%.*]] : $C)
 // CHECK:         return [[RESULT]]
 func reinterpretCast(_ c: C, x: Builtin.Word) -> (Builtin.Word, D, C?, C) {
   return (Builtin.reinterpretCast(c) as Builtin.Word,
@@ -537,7 +536,7 @@ func reinterpretAddrOnly<T, U>(_ t: T) -> U {
 func reinterpretAddrOnlyToTrivial<T>(_ t: T) -> Int {
   // CHECK: [[ADDR:%.*]] = unchecked_addr_cast [[INPUT:%.*]] : $*T to $*Int
   // CHECK: [[VALUE:%.*]] = load [trivial] [[ADDR]]
-  // CHECK: destroy_addr [[INPUT]]
+  // CHECK-NOT: destroy_addr [[INPUT]]
   return Builtin.reinterpretCast(t)
 }
 
@@ -555,7 +554,8 @@ func reinterpretAddrOnlyLoadable<T>(_ a: Int, _ b: T) -> (T, Int) {
 
 // CHECK-LABEL: sil hidden @$S8builtins18castToBridgeObject{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[BO:%.*]] = ref_to_bridge_object {{%.*}} : $C, {{%.*}} : $Builtin.Word
-// CHECK:         return [[BO]]
+// CHECK:         [[BO_COPY:%.*]] = copy_value [[BO]]
+// CHECK:         return [[BO_COPY]]
 func castToBridgeObject(_ c: C, _ w: Builtin.Word) -> Builtin.BridgeObject {
   return Builtin.castToBridgeObject(c, w)
 }
@@ -568,33 +568,29 @@ func castRefFromBridgeObject(_ bo: Builtin.BridgeObject) -> C {
 
 // CHECK-LABEL: sil hidden @$S8builtins30castBitPatternFromBridgeObject{{[_0-9a-zA-Z]*}}F
 // CHECK:         bridge_object_to_word [[BO:%.*]] : $Builtin.BridgeObject to $Builtin.Word
-// CHECK:         destroy_value [[BO]]
+// CHECK-NOT:         destroy_value [[BO]]
 func castBitPatternFromBridgeObject(_ bo: Builtin.BridgeObject) -> Builtin.Word {
   return Builtin.castBitPatternFromBridgeObject(bo)
 }
 
 // CHECK-LABEL: sil hidden @$S8builtins8pinUnpin{{[_0-9a-zA-Z]*}}F
-// CHECK:       bb0([[ARG:%.*]] : @owned $Builtin.NativeObject):
+// CHECK:       bb0([[ARG:%.*]] : @guaranteed $Builtin.NativeObject):
 // CHECK-NEXT:    debug_value
 func pinUnpin(_ object : Builtin.NativeObject) {
-// CHECK-NEXT:    [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK-NEXT:    [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]] : $Builtin.NativeObject
-// CHECK-NEXT:    [[HANDLE:%.*]] = strong_pin [[ARG_COPY]] : $Builtin.NativeObject
+// String pin acts as a pin and a +1. The destroy is paired with the strong_pin,
+// but the unpin operation is later.  
+// CHECK-NEXT:    [[HANDLE:%.*]] = strong_pin [[ARG]] : $Builtin.NativeObject
 // CHECK-NEXT:    debug_value
-// CHECK-NEXT:    destroy_value [[ARG_COPY]] : $Builtin.NativeObject
-// CHECK-NEXT:    end_borrow [[BORROWED_ARG]] from [[ARG]]
   let handle : Builtin.NativeObject? = Builtin.tryPin(object)
 
 // CHECK-NEXT:    [[BORROWED_HANDLE:%.*]] = begin_borrow [[HANDLE]]
 // CHECK-NEXT:    [[HANDLE_COPY:%.*]] = copy_value [[BORROWED_HANDLE]] : $Optional<Builtin.NativeObject>
 // CHECK-NEXT:    strong_unpin [[HANDLE_COPY]] : $Optional<Builtin.NativeObject>
-// ==> SEMANTIC ARC TODO: This looks like a mispairing or a weird pairing.
   Builtin.unpin(handle)
 
 // CHECK-NEXT:    tuple ()
 // CHECK-NEXT:    end_borrow [[BORROWED_HANDLE]] from [[HANDLE]]
 // CHECK-NEXT:    destroy_value [[HANDLE]] : $Optional<Builtin.NativeObject>
-// CHECK-NEXT:    destroy_value [[ARG]] : $Builtin.NativeObject
 // CHECK-NEXT:    [[T0:%.*]] = tuple ()
 // CHECK-NEXT:    return [[T0]] : $()
 }
@@ -729,13 +725,11 @@ func refcast_generic_any<T>(_ o: T) -> AnyObject {
 }
 
 // CHECK-LABEL: sil hidden @$S8builtins17refcast_class_anyyyXlAA1ACF :
-// CHECK: bb0([[ARG:%.*]] : @owned $A):
-// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK:   [[ARG_COPY_CASTED:%.*]] = unchecked_ref_cast [[ARG_COPY]] : $A to $AnyObject
-// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
-// CHECK:   destroy_value [[ARG]]
-// CHECK:   return [[ARG_COPY_CASTED]]
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $A):
+// CHECK:   [[ARG_CASTED:%.*]] = unchecked_ref_cast [[ARG]] : $A to $AnyObject
+// CHECK:   [[ARG_CASTED_COPY:%.*]] = copy_value [[ARG_CASTED]]
+// CHECK-NOT:   destroy_value [[ARG]]
+// CHECK:   return [[ARG_CASTED_COPY]]
 // CHECK: } // end sil function '$S8builtins17refcast_class_anyyyXlAA1ACF'
 func refcast_class_any(_ o: A) -> AnyObject {
   return Builtin.castReference(o)
@@ -748,13 +742,10 @@ func refcast_punknown_any(_ o: PUnknown) -> AnyObject {
 }
 
 // CHECK-LABEL: sil hidden @$S8builtins18refcast_pclass_anyyyXlAA6PClass_pF :
-// CHECK: bb0([[ARG:%.*]] : @owned $PClass):
-// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK:   [[ARG_COPY_CAST:%.*]] = unchecked_ref_cast [[ARG_COPY]] : $PClass to $AnyObject
-// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
-// CHECK:   destroy_value [[ARG]]
-// CHECK:   return [[ARG_COPY_CAST]]
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $PClass):
+// CHECK:   [[ARG_CAST:%.*]] = unchecked_ref_cast [[ARG]] : $PClass to $AnyObject
+// CHECK:   [[ARG_CAST_COPY:%.*]] = copy_value [[ARG_CAST]]
+// CHECK:   return [[ARG_CAST_COPY]]
 // CHECK: } // end sil function '$S8builtins18refcast_pclass_anyyyXlAA6PClass_pF'
 func refcast_pclass_any(_ o: PClass) -> AnyObject {
   return Builtin.castReference(o)
@@ -769,9 +760,8 @@ func refcast_any_punknown(_ o: AnyObject) -> PUnknown {
 // => SEMANTIC ARC TODO: This function is missing a borrow + extract + copy.
 //
 // CHECK-LABEL: sil hidden @$S8builtins22unsafeGuaranteed_class{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[P:%.*]] : @owned $A):
-// CHECK:   [[BORROWED_P:%.*]] = begin_borrow [[P]]
-// CHECK:   [[P_COPY:%.*]] = copy_value  [[BORROWED_P]]
+// CHECK: bb0([[P:%.*]] : @guaranteed $A):
+// CHECK:   [[P_COPY:%.*]] = copy_value  [[P]]
 // CHECK:   [[T:%.*]] = builtin "unsafeGuaranteed"<A>([[P_COPY]] : $A)
 // CHECK:   [[BORROWED_T:%.*]] = begin_borrow [[T]]
 // CHECK:   [[R:%.*]] = tuple_extract [[BORROWED_T]] : $(A, Builtin.Int8), 0
@@ -780,11 +770,8 @@ func refcast_any_punknown(_ o: AnyObject) -> PUnknown {
 // CHECK:   destroy_value [[COPY_R]] : $A
 // CHECK:   end_borrow [[BORROWED_T]] from [[T]]
 // CHECK:   destroy_value [[T]]
-// CHECK:   end_borrow [[BORROWED_P]] from [[P]]
-// CHECK:   [[BORROWED_P:%.*]] = begin_borrow [[P]]
-// CHECK:   [[P_COPY:%.*]] = copy_value [[BORROWED_P]]
-// CHECK:   end_borrow [[BORROWED_P]] from [[P]]
-// CHECK:   destroy_value [[P]]
+// CHECK:   [[P_COPY:%.*]] = copy_value [[P]]
+// CHECK-NOT:   destroy_value [[P]]
 // CHECK:   return [[P_COPY]] : $A
 // CHECK: }
 func unsafeGuaranteed_class(_ a: A) -> A {
@@ -795,9 +782,8 @@ func unsafeGuaranteed_class(_ a: A) -> A {
 // => SEMANTIC ARC TODO: This function is missing a borrow + extract + copy.
 //
 // CHECK-LABEL: $S8builtins24unsafeGuaranteed_generic{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[P:%.*]] : @owned $T):
-// CHECK:   [[BORROWED_P:%.*]] = begin_borrow [[P]]
-// CHECK:   [[P_COPY:%.*]] = copy_value  [[BORROWED_P]]
+// CHECK: bb0([[P:%.*]] : @guaranteed $T):
+// CHECK:   [[P_COPY:%.*]] = copy_value  [[P]]
 // CHECK:   [[T:%.*]] = builtin "unsafeGuaranteed"<T>([[P_COPY]] : $T)
 // CHECK:   [[BORROWED_T:%.*]] = begin_borrow [[T]]
 // CHECK:   [[R:%.*]] = tuple_extract [[BORROWED_T]] : $(T, Builtin.Int8), 0
@@ -806,11 +792,8 @@ func unsafeGuaranteed_class(_ a: A) -> A {
 // CHECK:   destroy_value [[COPY_R]] : $T
 // CHECK:   end_borrow [[BORROWED_T]] from [[T]]
 // CHECK:   destroy_value [[T]]
-// CHECK:   end_borrow [[BORROWED_P]] from [[P]]
-// CHECK:   [[BORROWED_P:%.*]] = begin_borrow [[P]]
-// CHECK:   [[P_RETURN:%.*]] = copy_value [[BORROWED_P]]
-// CHECK:   end_borrow [[BORROWED_P]] from [[P]]
-// CHECK:   destroy_value [[P]]
+// CHECK:   [[P_RETURN:%.*]] = copy_value [[P]]
+// CHECK-NOT:   destroy_value [[P]]
 // CHECK:   return [[P_RETURN]] : $T
 // CHECK: }
 func unsafeGuaranteed_generic<T: AnyObject> (_ a: T) -> T {
@@ -819,9 +802,8 @@ func unsafeGuaranteed_generic<T: AnyObject> (_ a: T) -> T {
 }
 
 // CHECK_LABEL: sil hidden @$S8builtins31unsafeGuaranteed_generic_return{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[P:%.*]] : @owned $T):
-// CHECK:   [[BORROWED_P:%.*]] = begin_borrow [[P]]
-// CHECK:   [[P_COPY:%.*]] = copy_value [[BORROWED_P]]
+// CHECK: bb0([[P:%.*]] : @guaranteed $T):
+// CHECK:   [[P_COPY:%.*]] = copy_value [[P]]
 // CHECK:   [[T:%.*]] = builtin "unsafeGuaranteed"<T>([[P_COPY]] : $T)
 // CHECK:   [[BORROWED_T:%.*]] = begin_borrow [[T]]
 // CHECK:   [[R]] = tuple_extract [[BORROWED_T]] : $(T, Builtin.Int8), 0
@@ -829,8 +811,7 @@ func unsafeGuaranteed_generic<T: AnyObject> (_ a: T) -> T {
 // CHECK:   [[K]] = tuple_extract [[BORROWED_T]] : $(T, Builtin.Int8), 1
 // CHECK:   end_borrow [[BORROWED_T]] from [[T]]
 // CHECK:   destroy_value [[T]]
-// CHECK:   end_borrow [[BORROWED_P]] from [[P]]
-// CHECK:   destroy_value [[P]]
+// CHECK-NOT:   destroy_value [[P]]
 // CHECK:   [[S:%.*]] = tuple ([[COPY_R]] : $T, [[K]] : $Builtin.Int8)
 // CHECK:   return [[S]] : $(T, Builtin.Int8)
 // CHECK: }
@@ -863,19 +844,15 @@ func bindMemory<T>(ptr: Builtin.RawPointer, idx: Builtin.Word, _: T.Type) {
 
 // SILGen test:
 //
-// CHECK-LABEL: sil hidden @$S8builtins6retain{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-// CHECK: bb0([[P:%.*]] : @owned $Builtin.NativeObject):
-// CHECK:   [[BORROWED_P:%.*]] = begin_borrow [[P]]
-// CHECK:   [[COPIED_P:%.*]] = copy_value [[BORROWED_P]]
-// CHECK:   unmanaged_retain_value [[COPIED_P]]
-// CHECK:   destroy_value [[COPIED_P]]
-// CHECK:   end_borrow [[BORROWED_P]] from [[P]]
-// CHECK:   destroy_value [[P]]
+// CHECK-LABEL: sil hidden @$S8builtins6retain{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK: bb0([[P:%.*]] : @guaranteed $Builtin.NativeObject):
+// CHECK:   unmanaged_retain_value [[P]]
 // CHECK: } // end sil function '$S8builtins6retain{{[_0-9a-zA-Z]*}}F'
 
 // SIL Test. This makes sure that we properly clean up in -Onone SIL.
-// CANONICAL-LABEL: sil hidden @$S8builtins6retain{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CANONICAL-LABEL: sil hidden @$S8builtins6retain{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 // CANONICAL: bb0([[P:%.*]] : $Builtin.NativeObject):
+// CANONICAL: strong_retain [[P]]
 // CANONICAL-NOT: retain
 // CANONICAL-NOT: release
 // CANONICAL: } // end sil function '$S8builtins6retain{{[_0-9a-zA-Z]*}}F'
@@ -885,23 +862,18 @@ func retain(ptr: Builtin.NativeObject) {
 
 // SILGen test:
 //
-// CHECK-LABEL: sil hidden @$S8builtins7release{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-// CHECK: bb0([[P:%.*]] : @owned $Builtin.NativeObject):
-// CHECK:   [[BORROWED_P:%.*]] = begin_borrow [[P]]
-// CHECK:   [[COPIED_P:%.*]] = copy_value [[BORROWED_P]]
-// CHECK:   unmanaged_release_value [[COPIED_P]]
-// CHECK:   destroy_value [[COPIED_P]]
-// CHECK:   end_borrow [[BORROWED_P]] from [[P]]
-// CHECK:   destroy_value [[P]]
+// CHECK-LABEL: sil hidden @$S8builtins7release{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK: bb0([[P:%.*]] : @guaranteed $Builtin.NativeObject):
+// CHECK:   unmanaged_release_value [[P]]
+// CHECK-NOT:   destroy_value [[P]]
 // CHECK: } // end sil function '$S8builtins7release{{[_0-9a-zA-Z]*}}F'
 
 // SIL Test. Make sure even in -Onone code, we clean this up properly:
-// CANONICAL-LABEL: sil hidden @$S8builtins7release{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CANONICAL-LABEL: sil hidden @$S8builtins7release{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 // CANONICAL: bb0([[P:%.*]] : $Builtin.NativeObject):
 // CANONICAL-NEXT:   debug_value
+// CANONICAL-NEXT:   strong_release [[P]]
 // CANONICAL-NEXT:   tuple
-// CANONICAL-NEXT:   strong_release [[P]]
-// CANONICAL-NEXT:   strong_release [[P]]
 // CANONICAL-NEXT:   tuple
 // CANONICAL-NEXT:   return
 // CANONICAL: } // end sil function '$S8builtins7release{{[_0-9a-zA-Z]*}}F'

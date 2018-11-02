@@ -1,3 +1,4 @@
+
 // RUN: %target-swift-frontend -enable-sil-opaque-values -enable-sil-ownership -emit-sorted-sil -Xllvm -sil-full-demangle -emit-silgen -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck %s
 // RUN: %target-swift-frontend -target x86_64-apple-macosx10.9 -enable-sil-opaque-values -enable-sil-ownership -emit-sorted-sil -Xllvm -sil-full-demangle -emit-silgen -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck --check-prefix=CHECK-OSX %s
 
@@ -19,22 +20,20 @@ public protocol Decoder {
 
 // Test open_existential_value ownership
 // ---
-// CHECK-LABEL: sil @$Ss11takeDecoder4fromBi1_s0B0_p_tKF : $@convention(thin) (@in Decoder) -> (Builtin.Int1, @error Error) {
-// CHECK: bb0(%0 : @owned $Decoder):
-// CHECK:  [[BORROW1:%.*]] = begin_borrow %0 : $Decoder
-// CHECK:  [[OPENED:%.*]] = open_existential_value [[BORROW1]] : $Decoder to $@opened("{{.*}}") Decoder
-// CHECK:  [[WT:%.*]] = witness_method $@opened("{{.*}}") Decoder, #Decoder.unkeyedContainer!1 : <Self where Self : Decoder> (Self) -> () throws -> UnkeyedDecodingContainer, %4 : $@opened("{{.*}}") Decoder : $@convention(witness_method: Decoder) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out UnkeyedDecodingContainer, @error Error)
+// CHECK-LABEL: sil @$Ss11takeDecoder4fromBi1_s0B0_p_tKF : $@convention(thin) (@in_guaranteed Decoder) -> (Builtin.Int1, @error Error) {
+// CHECK: bb0(%0 : @guaranteed $Decoder):
+// CHECK:  [[OPENED:%.*]] = open_existential_value %0 : $Decoder to $@opened("{{.*}}") Decoder
+// CHECK:  [[WT:%.*]] = witness_method $@opened("{{.*}}") Decoder, #Decoder.unkeyedContainer!1 : <Self where Self : Decoder> (Self) -> () throws -> UnkeyedDecodingContainer, %3 : $@opened("{{.*}}") Decoder : $@convention(witness_method: Decoder) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out UnkeyedDecodingContainer, @error Error)
 // CHECK:  try_apply [[WT]]<@opened("{{.*}}") Decoder>([[OPENED]]) : $@convention(witness_method: Decoder) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out UnkeyedDecodingContainer, @error Error), normal bb2, error bb1
 //
 // CHECK:bb{{.*}}([[RET1:%.*]] : @owned $UnkeyedDecodingContainer):
-// CHECK:  end_borrow [[BORROW1]] from %0 : $Decoder, $Decoder
 // CHECK:  [[BORROW2:%.*]] = begin_borrow [[RET1]] : $UnkeyedDecodingContainer
 // CHECK:  [[OPENED2:%.*]] = open_existential_value [[BORROW2]] : $UnkeyedDecodingContainer to $@opened("{{.*}}") UnkeyedDecodingContainer
 // CHECK:  [[WT2:%.*]] = witness_method $@opened("{{.*}}") UnkeyedDecodingContainer, #UnkeyedDecodingContainer.isAtEnd!getter.1 : <Self where Self : UnkeyedDecodingContainer> (Self) -> () -> Builtin.Int1, [[OPENED2]] : $@opened("{{.*}}") UnkeyedDecodingContainer : $@convention(witness_method: UnkeyedDecodingContainer) <τ_0_0 where τ_0_0 : UnkeyedDecodingContainer> (@in_guaranteed τ_0_0) -> Builtin.Int1
 // CHECK:  [[RET2:%.*]] = apply [[WT2]]<@opened("{{.*}}") UnkeyedDecodingContainer>([[OPENED2]]) : $@convention(witness_method: UnkeyedDecodingContainer) <τ_0_0 where τ_0_0 : UnkeyedDecodingContainer> (@in_guaranteed τ_0_0) -> Builtin.Int1
 // CHECK:  end_borrow [[BORROW2]] from [[RET1]] : $UnkeyedDecodingContainer, $UnkeyedDecodingContainer
 // CHECK:  destroy_value [[RET1]] : $UnkeyedDecodingContainer
-// CHECK:  destroy_value %0 : $Decoder
+// CHECK-NOT:  destroy_value %0 : $Decoder
 // CHECK:  return [[RET2]] : $Builtin.Int1
 // CHECK-LABEL: } // end sil function '$Ss11takeDecoder4fromBi1_s0B0_p_tKF'
 public func takeDecoder(from decoder: Decoder) throws -> Builtin.Int1 {
@@ -44,16 +43,11 @@ public func takeDecoder(from decoder: Decoder) throws -> Builtin.Int1 {
 
 // Test unsafe_bitwise_cast nontrivial ownership.
 // ---
-// CHECK-LABEL: sil @$Ss13unsafeBitCast_2toq_x_q_mtr0_lF : $@convention(thin) <T, U> (@in T, @thick U.Type) -> @out U {
-// CHECK: bb0(%0 : @owned $T, %1 : @trivial $@thick U.Type):
-// CHECK:   %4 = begin_borrow %0 : $T
-// CHECK:   %5 = copy_value %4 : $T
-// CHECK:   %6 = unchecked_bitwise_cast %5 : $T to $U
-// CHECK:   %7 = copy_value %6 : $U
-// CHECK:   destroy_value %5 : $T
-// CHECK:   end_borrow %4 from %0 : $T, $T
-// CHECK:   destroy_value %0 : $T
-// CHECK:   return %7 : $U
+// CHECK-LABEL: sil @$Ss13unsafeBitCast_2toq_x_q_mtr0_lF : $@convention(thin) <T, U> (@in_guaranteed T, @thick U.Type) -> @out U {
+// CHECK: bb0([[ARG0:%.*]] : @guaranteed $T, [[ARG1:%.*]] : @trivial $@thick U.Type):
+// CHECK:   [[RESULT:%.*]] = unchecked_bitwise_cast [[ARG0]] : $T to $U
+// CHECK:   [[RESULT_COPY:%.*]] = copy_value [[RESULT]] : $U
+// CHECK:   return [[RESULT_COPY]] : $U
 // CHECK-LABEL: } // end sil function '$Ss13unsafeBitCast_2toq_x_q_mtr0_lF'
 public func unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
   return Builtin.reinterpretCast(x)
@@ -156,10 +150,10 @@ public struct Int64 : ExpressibleByIntegerLiteral, _ExpressibleByBuiltinIntegerL
 
 // Test ownership of multi-case Enum values in the context of @trivial to @in thunks.
 // ---
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @$Ss17FloatingPointSignOs9EquatablessACP2eeoiySbx_xtFZTW : $@convention(witness_method: Equatable) (@in FloatingPointSign, @in FloatingPointSign, @thick FloatingPointSign.Type) -> Bool {
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @$Ss17FloatingPointSignOs9EquatablessACP2eeoiySbx_xtFZTW : $@convention(witness_method: Equatable) (@in_guaranteed FloatingPointSign, @in_guaranteed FloatingPointSign, @thick FloatingPointSign.Type) -> Bool {
 // CHECK: bb0(%0 : @trivial $FloatingPointSign, %1 : @trivial $FloatingPointSign, %2 : @trivial $@thick FloatingPointSign.Type):
-// CHECK:   %3 = function_ref @$Ss2eeoiySbx_xts16RawRepresentableRzs9Equatable0B5ValueRpzlF : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
-// CHECK:   %4 = apply %3<FloatingPointSign, Int64>(%0, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
+// CHECK:   %3 = function_ref @$Ss2eeoiySbx_xts16RawRepresentableRzs9Equatable0B5ValueRpzlF : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
+// CHECK:   %4 = apply %3<FloatingPointSign, Int64>(%0, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
 // CHECK:   return %4 : $Bool
 // CHECK-LABEL: } // end sil function '$Ss17FloatingPointSignOs9EquatablessACP2eeoiySbx_xtFZTW'
 public enum FloatingPointSign: Int64 {
@@ -170,22 +164,20 @@ public enum FloatingPointSign: Int64 {
   case minus
 }
 
-#if os(OSX)
+#if os(macOS)
 // Test open_existential_value used in a conversion context.
 // (the actual bridging call is dropped because we don't import Swift).
 // ---
-// CHECK-OSX-LABEL: sil @$Ss26_unsafeDowncastToAnyObject04fromD0yXlyp_tF : $@convention(thin) (@in Any) -> @owned AnyObject {
-// CHECK-OSX: bb0(%0 : @owned $Any):
-// CHECK-OSX:   [[BORROW:%.*]] = begin_borrow %0 : $Any
-// CHECK-OSX:   [[COPY:%.*]] = copy_value [[BORROW]] : $Any
+// CHECK-OSX-LABEL: sil @$Ss26_unsafeDowncastToAnyObject04fromD0yXlyp_tF : $@convention(thin) (@in_guaranteed Any) -> @owned AnyObject {
+// CHECK-OSX: bb0(%0 : @guaranteed $Any):
+// CHECK-OSX:   [[COPY:%.*]] = copy_value %0 : $Any
 // CHECK-OSX:   [[BORROW2:%.*]] = begin_borrow [[COPY]] : $Any
 // CHECK-OSX:   [[VAL:%.*]] = open_existential_value [[BORROW2]] : $Any to $@opened
 // CHECK-OSX:   [[COPY2:%.*]] = copy_value [[VAL]] : $@opened
 // CHECK-OSX:   destroy_value [[COPY2]] : $@opened
 // CHECK-OSX:   end_borrow [[BORROW2]] from [[COPY]] : $Any, $Any
 // CHECK-OSX:   destroy_value [[COPY]] : $Any
-// CHECK-OSX:   end_borrow [[BORROW]] from %0 : $Any, $Any
-// CHECK-OSX:   destroy_value %0 : $Any
+// CHECK-OSX-NOT:   destroy_value %0 : $Any
 // CHECK-OSX:   return undef : $AnyObject
 // CHECK-OSX-LABEL: } // end sil function '$Ss26_unsafeDowncastToAnyObject04fromD0yXlyp_tF'
 public func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
@@ -195,10 +187,10 @@ public func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
 
 public protocol Error {}
 
-#if os(OSX)
+#if os(macOS)
 // Test open_existential_box_value in a conversion context.
 // ---
-// CHECK-OSX-LABEL: sil @$Ss3foo1eys5Error_pSg_tF : $@convention(thin) (@owned Optional<Error>) -> () {
+// CHECK-OSX-LABEL: sil @$Ss3foo1eys5Error_pSg_tF : $@convention(thin) (@guaranteed Optional<Error>) -> () {
 // CHECK-OSX: [[BORROW:%.*]] = begin_borrow %{{.*}} : $Error
 // CHECK-OSX: [[VAL:%.*]] = open_existential_box_value [[BORROW]] : $Error to $@opened
 // CHECK-OSX: [[COPY:%.*]] = copy_value [[VAL]] : $@opened

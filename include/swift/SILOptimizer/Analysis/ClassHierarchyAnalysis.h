@@ -80,10 +80,6 @@ public:
     return IndirectSubclassesCache[C];
   }
 
-  const NominalTypeList &getProtocolImplementations(ProtocolDecl *P) {
-    return ProtocolImplementationsCache[P];
-  }
-
   /// Returns true if the class is inherited by another class in this module.
   bool hasKnownDirectSubclasses(ClassDecl *C) {
     return DirectSubclassesCache.count(C);
@@ -93,12 +89,7 @@ public:
   /// in this module.
   bool hasKnownIndirectSubclasses(ClassDecl *C) {
     return IndirectSubclassesCache.count(C) &&
-           IndirectSubclassesCache[C].size() > 0;
-  }
-
-  /// Returns true if the protocol is implemented by any class in this module.
-  bool hasKnownImplementations(ProtocolDecl *C) {
-    return ProtocolImplementationsCache.count(C);
+           !IndirectSubclassesCache[C].empty();
   }
 
 private:
@@ -114,9 +105,6 @@ private:
 
   /// A cache that maps a class to all of its known indirect subclasses.
   llvm::DenseMap<ClassDecl*, ClassList> IndirectSubclassesCache;
-
-  /// A cache that maps a protocol to all of its known implementations.
-  ProtocolImplementations ProtocolImplementationsCache;
 };
 
 }

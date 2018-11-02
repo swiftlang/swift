@@ -33,6 +33,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
@@ -53,118 +54,6 @@ static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
 }
 
 namespace {
-
-enum class AccessedStorageKind : unsigned {
-  /// The access is to a location represented by a SIL value
-  /// (for example, an 'alloc_box' instruction for a local variable).
-  /// Two accesses accessing the exact same SILValue are considered to be
-  /// accessing the same storage location.
-  Value,
-
-  /// The access is to a global variable.
-  GlobalVar,
-
-  /// The access is to a stored class property.
-  ClassProperty
-};
-
-/// Represents the identity of a stored class property as a combination
-/// of a base and a single projection. Eventually the goal is to make this
-/// more precise and consider, casts, etc.
-class ObjectProjection {
-public:
-  ObjectProjection(SILValue Object, const Projection &Proj)
-      : Object(Object), Proj(Proj) {
-    assert(Object->getType().isObject());
-  }
-
-  SILValue getObject() const { return Object; }
-  const Projection &getProjection() const { return Proj; }
-
-  bool operator==(const ObjectProjection &Other) const {
-    return Object == Other.Object && Proj == Other.Proj;
-  }
-
-  bool operator!=(const ObjectProjection &Other) const {
-    return Object != Other.Object || Proj != Other.Proj;
-  }
-
-private:
-  SILValue Object;
-  Projection Proj;
-};
-
-/// Represents the identity of a storage location being accessed.
-/// This is used to determine when two 'begin_access' instructions
-/// definitely access the same underlying location.
-///
-/// The key invariant that this class must maintain is that if it says
-/// two storage locations are the same then they must be the same at run time.
-/// It is allowed to err on the other side: it may imprecisely fail to
-/// recognize that two storage locations that represent the same run-time
-/// location are in fact the same.
-class AccessedStorage {
-
-private:
-  AccessedStorageKind Kind;
-
-  union {
-    SILValue Value;
-    SILGlobalVariable *Global;
-    ObjectProjection ObjProj;
-  };
-
-public:
-  AccessedStorage(SILValue V)
-      : Kind(AccessedStorageKind::Value), Value(V) { }
-
-  AccessedStorage(SILGlobalVariable *Global)
-      : Kind(AccessedStorageKind::GlobalVar), Global(Global) {}
-
-  AccessedStorage(AccessedStorageKind Kind,
-                  const ObjectProjection &ObjProj)
-      : Kind(Kind), ObjProj(ObjProj) {}
-
-  AccessedStorageKind getKind() const { return Kind; }
-
-  SILValue getValue() const {
-    assert(Kind == AccessedStorageKind::Value);
-    return Value;
-  }
-
-  SILGlobalVariable *getGlobal() const {
-    assert(Kind == AccessedStorageKind::GlobalVar);
-    return Global;
-  }
-
-  const ObjectProjection &getObjectProjection() const {
-    assert(Kind == AccessedStorageKind::ClassProperty);
-    return ObjProj;
-  }
-
-  /// Returns the ValueDecl for the underlying storage, if it can be
-  /// determined. Otherwise returns null. For diagnostic purposes.
-  const ValueDecl *getStorageDecl() const {
-    switch(Kind) {
-    case AccessedStorageKind::GlobalVar:
-      return getGlobal()->getDecl();
-    case AccessedStorageKind::Value:
-      if (auto *Box = dyn_cast<AllocBoxInst>(getValue())) {
-        return Box->getLoc().getAsASTNode<VarDecl>();
-      }
-      if (auto *Arg = dyn_cast<SILFunctionArgument>(getValue())) {
-        return Arg->getDecl();
-      }
-      break;
-    case AccessedStorageKind::ClassProperty: {
-      const ObjectProjection &OP = getObjectProjection();
-      const Projection &P = OP.getProjection();
-      return P.getVarDecl(OP.getObject()->getType());
-    }
-    }
-    return nullptr;
-  }
-};
 
 enum class RecordedAccessKind {
   /// The access was for a 'begin_access' instruction in the current function
@@ -434,51 +323,6 @@ public:
 
 } // end anonymous namespace
 
-namespace llvm {
-/// Enable using AccessedStorage as a key in DenseMap.
-template <> struct DenseMapInfo<AccessedStorage> {
-  static AccessedStorage getEmptyKey() {
-    return AccessedStorage(swift::SILValue::getFromOpaqueValue(
-        llvm::DenseMapInfo<void *>::getEmptyKey()));
-  }
-
-  static AccessedStorage getTombstoneKey() {
-    return AccessedStorage(swift::SILValue::getFromOpaqueValue(
-        llvm::DenseMapInfo<void *>::getTombstoneKey()));
-  }
-
-  static unsigned getHashValue(AccessedStorage Storage) {
-    switch (Storage.getKind()) {
-    case AccessedStorageKind::Value:
-      return DenseMapInfo<swift::SILValue>::getHashValue(Storage.getValue());
-    case AccessedStorageKind::GlobalVar:
-      return DenseMapInfo<void *>::getHashValue(Storage.getGlobal());
-    case AccessedStorageKind::ClassProperty: {
-      const ObjectProjection &P = Storage.getObjectProjection();
-      return llvm::hash_combine(P.getObject(), P.getProjection());
-    }
-    }
-    llvm_unreachable("Unhandled AccessedStorageKind");
-  }
-
-  static bool isEqual(AccessedStorage LHS, AccessedStorage RHS) {
-    if (LHS.getKind() != RHS.getKind())
-      return false;
-
-    switch (LHS.getKind()) {
-    case AccessedStorageKind::Value:
-      return LHS.getValue() == RHS.getValue();
-    case AccessedStorageKind::GlobalVar:
-      return LHS.getGlobal() == RHS.getGlobal();
-    case AccessedStorageKind::ClassProperty:
-        return LHS.getObjectProjection() == RHS.getObjectProjection();
-    }
-    llvm_unreachable("Unhandled AccessedStorageKind");
-  }
-};
-
-} // end namespace llvm
-
 /// Returns whether an access of the given kind requires exclusive or shared
 /// access to its storage.
 static ExclusiveOrShared_t getRequiredAccess(SILAccessKind Kind) {
@@ -686,11 +530,11 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
   const AccessedStorage &Storage = Violation.Storage;
   const RecordedAccess &FirstAccess = Violation.FirstAccess;
   const RecordedAccess &SecondAccess = Violation.SecondAccess;
+  SILFunction *F = FirstAccess.getInstruction()->getFunction();
 
   DEBUG(llvm::dbgs() << "Conflict on " << *FirstAccess.getInstruction()
                      << "\n  vs " << *SecondAccess.getInstruction()
-                     << "\n  in function "
-                     << *FirstAccess.getInstruction()->getFunction());
+                     << "\n  in function " << *F);
 
   // Can't have a conflict if both accesses are reads.
   assert(!(FirstAccess.getAccessKind() == SILAccessKind::Read &&
@@ -713,7 +557,7 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
   bool DiagnoseAsWarning = Violation.getAlwaysDiagnoseAsWarning() ||
       Ctx.LangOpts.isSwiftVersion3();
 
-  if (const ValueDecl *VD = Storage.getStorageDecl()) {
+  if (const ValueDecl *VD = Storage.getDecl(F)) {
     // We have a declaration, so mention the identifier in the diagnostic.
     auto DiagnosticID = (DiagnoseAsWarning ?
                          diag::exclusivity_access_required_warn :
@@ -756,48 +600,14 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
       .highlight(NoteAccess.getAccessLoc().getSourceRange());
 }
 
-/// Make a best effort to find the underlying object for the purpose
-/// of identifying the base of a 'ref_element_addr'.
-static SILValue findUnderlyingObject(SILValue Value) {
-  assert(Value->getType().isObject());
-  SILValue Iter = Value;
-
-  while (true) {
-    // For now just look through begin_borrow instructions; we can likely
-    // make this more precise in the future.
-    if (auto *BBI = dyn_cast<BeginBorrowInst>(Iter)) {
-      Iter = BBI->getOperand();
-      continue;
-    }
-    break;
-  }
-
-  assert(Iter->getType().isObject());
-  return Iter;
-}
-
 /// Look through a value to find the underlying storage accessed.
-static AccessedStorage findAccessedStorage(SILValue Source) {
-  SILValue BaseAddress = findAccessedAddressBase(Source);
-  if (!BaseAddress) {
+static AccessedStorage findValidAccessedStorage(SILValue Source) {
+  const AccessedStorage &Storage = findAccessedStorage(Source);
+  if (!Storage) {
     llvm::dbgs() << "Bad memory access source: " << Source;
     llvm_unreachable("Unexpected access source.");
   }
-  // Base case for globals: make sure ultimate source is recognized.
-  if (auto *GAI = dyn_cast<GlobalAddrInst>(BaseAddress)) {
-    return AccessedStorage(GAI->getReferencedGlobal());
-  }
-  // Base case for class objects.
-  if (auto *REA = dyn_cast<RefElementAddrInst>(BaseAddress)) {
-    // Do a best-effort to find the identity of the object being projected
-    // from. It is OK to be unsound here (i.e. miss when two ref_element_addrs
-    // actually refer the same address) because these will be dynamically
-    // checked.
-    SILValue Object = findUnderlyingObject(REA->getOperand());
-    const ObjectProjection &OP = ObjectProjection(Object, Projection(REA));
-    return AccessedStorage(AccessedStorageKind::ClassProperty, OP);
-  }
-  return AccessedStorage(BaseAddress);
+  return Storage;
 }
 
 /// Returns true when the apply calls the Standard Library swap().
@@ -905,13 +715,13 @@ static void checkForViolationWithCall(
     const auto &SubAccesses = AS.getSubAccesses();
 
     // Is the capture accessed in the callee?
-    if (SubAccesses.size() == 0)
+    if (SubAccesses.empty())
       continue;
 
     SILValue Argument = Arguments[ArgumentIndex];
     assert(Argument->getType().isAddress());
 
-    const AccessedStorage &Storage = findAccessedStorage(Argument);
+    const AccessedStorage &Storage = findValidAccessedStorage(Argument);
     auto AccessIt = Accesses.find(Storage);
 
     // Are there any accesses in progress at the time of the call?
@@ -960,25 +770,13 @@ static void checkForViolationsInNoEscapeClosureArguments(
     if (!Callee || Callee->empty())
       continue;
 
-    // For source compatibility reasons, treat conflicts found by
-    // looking through reabstraction thunks as warnings. A future compiler
-    // will upgrade these to errors;
-    DiagnoseAsWarning |= result.isReabstructionThunk;
-
-    // For source compatibility reasons, treat conflicts found by
-    // looking through noescape blocks as warnings. A future compiler
-    // will upgrade these to errors.
-    DiagnoseAsWarning |=
-        (getSILFunctionTypeForValue(Argument)->getRepresentation()
-         == SILFunctionTypeRepresentation::Block);
-
     // Check the closure's captures, which are a suffix of the closure's
     // parameters.
     unsigned StartIndex =
         Callee->getArguments().size() - result.PAI->getNumArguments();
     checkForViolationWithCall(Accesses, Callee, StartIndex,
                               result.PAI->getArguments(), ASA,
-                              DiagnoseAsWarning, ConflictingAccesses);
+                              /*DiagnoseAsWarning=*/false, ConflictingAccesses);
   }
 }
 
@@ -1041,7 +839,7 @@ static void checkNoEscapePartialApply(PartialApplyInst *PAI) {
       uses.append(EI->getUses().begin(), EI->getUses().end());
       continue;
     }
-    if (auto apply = isa<ApplySite>(user)) {
+    if (isa<ApplySite>(user)) {
       SILValue arg = oper->get();
       auto ArgumentFnType = getSILFunctionTypeForValue(arg);
       if (ArgumentFnType && ArgumentFnType->isNoEscape()) {
@@ -1076,31 +874,6 @@ static void checkNoEscapePartialApply(PartialApplyInst *PAI) {
 }
 #endif
 
-// Check if the given memory instruction obviously initializes the memory
-// object at `root`. Initialization does not require exclusivity enforcement
-// because uninitialized variables can't be captured.
-static bool isSafeInitialization(SILInstruction *memInst, SILValue root) {
-  // Local variable initialization is already filtered out by the check for
-  // temporary buffer access. Handle globals.
-  if (auto *globalAddr = dyn_cast<GlobalAddrInst>(root)) {
-    // There doesn't seem to be a better way to check for initialization than
-    // scanning for the preceding alloc_global.
-    SILGlobalVariable *var = globalAddr->getReferencedGlobal();
-    auto I = globalAddr->getIterator();
-    auto beginI = globalAddr->getParent()->begin();
-    while (I != beginI) {
-      --I;
-      if (auto *allocGlobal = dyn_cast<AllocGlobalInst>(I)) {
-        if (allocGlobal->getReferencedGlobal() == var)
-          return true;
-      }
-      if (I->mayReadOrWriteMemory())
-        break;
-    }
-  }
-  return false;
-}
-
 // Check that the given address-type operand is guarded by begin/end access
 // markers.
 static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
@@ -1115,6 +888,11 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
     memInst->getFunction()->print(llvm::dbgs());
     abort();
   };
+
+  // If the memory instruction is only used for initialization, it doesn't need
+  // an access marker.
+  if (memInstMustInitialize(memOper))
+    return;
 
   if (auto apply = ApplySite::isa(memInst)) {
     SILArgumentConvention conv =
@@ -1139,25 +917,29 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
   }
 
   // Strip off address projections, but not ref_element_addr.
-  SILValue base = findAccessedAddressBase(address);
-  // `base` is null for address producers that are only used for local
-  // initialization.
-  if (!base || !isPossibleFormalAccessBase(base))
+  const AccessedStorage &storage = findAccessedStorage(address);
+  // findAccessedStorage may return an invalid storage object if the address
+  // producer is not recognized by its whitelist. For the purpose of
+  // verification, we assume that this can only happen for local
+  // initialization, not a formal memory access. The strength of
+  // verification rests on the completeness of the opcode list inside
+  // findAccessedStorage.
+  if (!storage || !isPossibleFormalAccessBase(storage, memInst->getFunction()))
     return;
 
-  // Skip local non-lvalue accesses. There are many local initialization
-  // patterns that don't require access markers.
+  // A box or stack variable may represent lvalues, but they can only conflict
+  // with call sites in the same scope. Some initialization patters (stores to
+  // the local value) aren't protected by markers, so we need this check.
   if (!isa<ApplySite>(memInst)
-      && (isa<AllocStackInst>(base) || isa<AllocBoxInst>(base))) {
+      && (storage.getKind() == AccessedStorage::Box
+          || storage.getKind() == AccessedStorage::Stack)) {
     return;
   }
 
-  if (isSafeInitialization(memInst, base))
-    return;
-
   // Otherwise, the address base should be an in-scope begin_access.
-  if (auto *BAI = dyn_cast<BeginAccessInst>(base)) {
-    const AccessedStorage &Storage = findAccessedStorage(BAI->getSource());
+  if (storage.getKind() == AccessedStorage::Nested) {
+    auto *BAI = cast<BeginAccessInst>(storage.getValue());
+    const AccessedStorage &Storage = findValidAccessedStorage(BAI->getSource());
     AccessInfo &Info = Accesses[Storage];
     if (!Info.hasAccessesInProgress())
       error();
@@ -1233,7 +1015,8 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
       // Ending onr decrements the count.
       if (auto *BAI = dyn_cast<BeginAccessInst>(&I)) {
         SILAccessKind Kind = BAI->getAccessKind();
-        const AccessedStorage &Storage = findAccessedStorage(BAI->getSource());
+        const AccessedStorage &Storage =
+          findValidAccessedStorage(BAI->getSource());
         AccessInfo &Info = Accesses[Storage];
         const IndexTrieNode *SubPath = ASA->findSubPathAccessed(BAI);
         if (auto Conflict = shouldReportAccess(Info, Kind, SubPath)) {
@@ -1246,7 +1029,7 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
       }
 
       if (auto *EAI = dyn_cast<EndAccessInst>(&I)) {
-        auto It = Accesses.find(findAccessedStorage(EAI->getSource()));
+        auto It = Accesses.find(findValidAccessedStorage(EAI->getSource()));
         AccessInfo &Info = It->getSecond();
 
         BeginAccessInst *BAI = EAI->getBeginAccess();
@@ -1297,7 +1080,7 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO,
       }
 #endif
       // Sanity check to make sure entries are properly removed.
-      assert((!isa<ReturnInst>(&I) || Accesses.size() == 0) &&
+      assert((!isa<ReturnInst>(&I) || Accesses.empty()) &&
              "Entries were not properly removed?!");
     }
   }

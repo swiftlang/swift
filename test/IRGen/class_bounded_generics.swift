@@ -1,7 +1,6 @@
-// RUN: %target-swift-frontend -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -module-name class_bounded_generics -enable-objc-interop -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s -DINT=i%target-ptrsize
 
 // REQUIRES: CPU=x86_64
-// XFAIL: linux
 
 protocol ClassBound : class {
   func classBoundMethod()
@@ -55,9 +54,9 @@ class ClassProtocolFieldClass {
   }
 }
 
-// CHECK: %T22class_bounded_generics017ClassGenericFieldD0C = type <{ %swift.refcounted, %TSi, %objc_object*, %TSi }>
-// CHECK: %T22class_bounded_generics23ClassGenericFieldStructV = type <{ %TSi, %objc_object*, %TSi }>
-// CHECK: %T22class_bounded_generics24ClassProtocolFieldStructV = type <{ %TSi, %T22class_bounded_generics10ClassBoundP, %TSi }>
+// CHECK-DAG: %T22class_bounded_generics017ClassGenericFieldD0C = type <{ %swift.refcounted, %TSi, %objc_object*, %TSi }>
+// CHECK-DAG: %T22class_bounded_generics23ClassGenericFieldStructV = type <{ %TSi, %objc_object*, %TSi }>
+// CHECK-DAG: %T22class_bounded_generics24ClassProtocolFieldStructV = type <{ %TSi, %T22class_bounded_generics10ClassBoundP, %TSi }>
 
 // CHECK-LABEL: define hidden swiftcc %objc_object* @"$S22class_bounded_generics0a1_B10_archetype{{[_0-9a-zA-Z]*}}F"(%objc_object*, %swift.type* %T, i8** %T.ClassBound)
 func class_bounded_archetype<T : ClassBound>(_ x: T) -> T {
@@ -93,11 +92,11 @@ func class_bounded_archetype_method<T : ClassBoundBinary>(_ x: T, y: T) {
   // CHECK: [[WITNESS_FUNC:%.*]] = bitcast i8* [[WITNESS]] to void (%objc_object*, %swift.type*, i8**)
   // CHECK: call swiftcc void [[WITNESS_FUNC]](%objc_object* swiftself %0, %swift.type* {{.*}}, i8** [[INHERITED_WTBL]])
   x.classBoundBinaryMethod(y)
-  // CHECK: call %objc_object* @swift_unknownRetain(%objc_object* returned [[Y:%.*]])
+  // CHECK-NOT: call %objc_object* @swift_unknownRetain(%objc_object* returned [[Y:%.*]])
   // CHECK: [[WITNESS_ENTRY:%.*]] = getelementptr inbounds i8*, i8** %T.ClassBoundBinary, i32 2
   // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ENTRY]], align 8
   // CHECK: [[WITNESS_FUNC:%.*]] = bitcast i8* [[WITNESS]] to void (%objc_object*, %objc_object*, %swift.type*, i8**)
-  // CHECK: call swiftcc void [[WITNESS_FUNC]](%objc_object* [[Y]], %objc_object* swiftself %0, %swift.type* %T, i8** %T.ClassBoundBinary)
+  // CHECK: call swiftcc void [[WITNESS_FUNC]](%objc_object* %1, %objc_object* swiftself %0, %swift.type* %T, i8** %T.ClassBoundBinary)
 }
 
 // CHECK-LABEL: define hidden swiftcc { %objc_object*, %objc_object* } @"$S22class_bounded_generics0a1_B16_archetype_tuple{{[_0-9a-zA-Z]*}}F"(%objc_object*, %swift.type* %T, i8** %T.ClassBound)
@@ -166,7 +165,8 @@ func class_bounded_protocol_method(_ x: ClassBound) {
 func class_bounded_archetype_cast<T : ClassBound>(_ x: T) -> ConcreteClass {
   return x as! ConcreteClass
   // CHECK: [[IN_PTR:%.*]] = bitcast %objc_object* {{%.*}} to i8*
-  // CHECK: [[T0:%.*]] = call %swift.type* @"$S22class_bounded_generics13ConcreteClassCMa"()
+  // CHECK: [[T0R:%.*]] = call swiftcc %swift.metadata_response @"$S22class_bounded_generics13ConcreteClassCMa"([[INT]] 0)
+  // CHECK: [[T0:%.*]] = extractvalue %swift.metadata_response [[T0R]], 0
   // CHECK: [[T1:%.*]] = bitcast %swift.type* [[T0]] to i8*
   // CHECK: [[OUT_PTR:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[IN_PTR]], i8* [[T1]])
   // CHECK: [[OUT:%.*]] = bitcast i8* [[OUT_PTR]] to %T22class_bounded_generics13ConcreteClassC*
@@ -177,7 +177,8 @@ func class_bounded_archetype_cast<T : ClassBound>(_ x: T) -> ConcreteClass {
 func class_bounded_protocol_cast(_ x: ClassBound) -> ConcreteClass {
   return x as! ConcreteClass
   // CHECK: [[IN_PTR:%.*]] = bitcast %objc_object* {{%.*}} to i8*
-  // CHECK: [[T0:%.*]] = call %swift.type* @"$S22class_bounded_generics13ConcreteClassCMa"()
+  // CHECK: [[T0R:%.*]] = call swiftcc %swift.metadata_response @"$S22class_bounded_generics13ConcreteClassCMa"([[INT]] 0)
+  // CHECK: [[T0:%.*]] = extractvalue %swift.metadata_response [[T0R]], 0
   // CHECK: [[T1:%.*]] = bitcast %swift.type* [[T0]] to i8*
   // CHECK: [[OUT_PTR:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[IN_PTR]], i8* [[T1]])
   // CHECK: [[OUT:%.*]] = bitcast i8* [[OUT_PTR]] to %T22class_bounded_generics13ConcreteClassC*
@@ -280,8 +281,8 @@ class M<T, S: A<T>> {
 // CHECK-LABEL: define hidden swiftcc void @"$S22class_bounded_generics14takes_metatypeyyxmlF"(%swift.type*, %swift.type* %T)
 func takes_metatype<T>(_: T.Type) {}
 
-// CHECK-LABEL: define hidden swiftcc void @"$S22class_bounded_generics023archetype_with_generic_A11_constraint1tyx_tAA1ACyq_GRbzr0_lF"(%T22class_bounded_generics1AC.2*, %swift.type* %T)
-// CHECK:      [[ISA_ADDR:%.*]] = bitcast %T22class_bounded_generics1AC.2* %0 to %swift.type**
+// CHECK-LABEL: define hidden swiftcc void @"$S22class_bounded_generics023archetype_with_generic_A11_constraint1tyx_tAA1ACyq_GRbzr0_lF"(%T22class_bounded_generics1AC.1*, %swift.type* %T)
+// CHECK:      [[ISA_ADDR:%.*]] = bitcast %T22class_bounded_generics1AC.1* %0 to %swift.type**
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
 // CHECK-NEXT: call swiftcc void @"$S22class_bounded_generics14takes_metatypeyyxmlF"(%swift.type* %T, %swift.type* %T)
 // CHECK-NEXT: [[ISA_PTR:%.*]] = bitcast %swift.type* [[ISA]] to %swift.type**
@@ -298,12 +299,13 @@ func archetype_with_generic_class_constraint<T, U>(t: T) where T : A<U> {
 // CHECK-LABEL: define hidden swiftcc void @"$S22class_bounded_generics029calls_archetype_with_generic_A11_constraint1ayAA1ACyxG_tlF"(%T22class_bounded_generics1AC*) #0 {
 // CHECK:      [[ISA_ADDR:%.*]] = getelementptr inbounds %T22class_bounded_generics1AC, %T22class_bounded_generics1AC* %0, i32 0, i32 0, i32 0
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
-// CHECK:      [[SELF:%.*]] = bitcast %T22class_bounded_generics1AC* %0 to %T22class_bounded_generics1AC.2*
+// CHECK:      [[SELF:%.*]] = bitcast %T22class_bounded_generics1AC* %0 to %T22class_bounded_generics1AC.1*
 // CHECK-NEXT: [[ISA_PTR:%.*]] = bitcast %swift.type* [[ISA]] to %swift.type**
 // CHECK-NEXT: [[T_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[ISA_PTR]], i64 10
 // CHECK-NEXT: [[T:%.*]] = load %swift.type*, %swift.type** [[T_ADDR]]
-// CHECK-NEXT: [[A_OF_T:%.*]] = call %swift.type* @"$S22class_bounded_generics1ACMa"(%swift.type* [[T]])
-// CHECK-NEXT: call swiftcc void @"$S22class_bounded_generics023archetype_with_generic_A11_constraint1tyx_tAA1ACyq_GRbzr0_lF"(%T22class_bounded_generics1AC.2* [[SELF]], %swift.type* [[A_OF_T]])
+// CHECK-NEXT: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S22class_bounded_generics1ACMa"([[INT]] 0, %swift.type* [[T]])
+// CHECK-NEXT: [[A_OF_T:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-NEXT: call swiftcc void @"$S22class_bounded_generics023archetype_with_generic_A11_constraint1tyx_tAA1ACyq_GRbzr0_lF"(%T22class_bounded_generics1AC.1* [[SELF]], %swift.type* [[A_OF_T]])
 // CHECK:      ret void
 
 func calls_archetype_with_generic_class_constraint<T>(a: A<T>) {

@@ -19,8 +19,13 @@
 #define SWIFT_REMOTE_MEMORYREADER_H
 
 #include "swift/Remote/RemoteAddress.h"
+#include "swift/SwiftRemoteMirror/MemoryReaderInterface.h"
 
+#include <cstring>
+#include <functional>
+#include <memory>
 #include <string>
+#include <tuple>
 
 namespace swift {
 namespace remote {
@@ -31,28 +36,21 @@ namespace remote {
 /// representation of the address space of a remote process.
 class MemoryReader {
 public:
-  /// Return the size of an ordinary pointer in the remote process, in bytes.
-  virtual uint8_t getPointerSize() = 0;
+  /// A convenient name for the return type from readBytes.
+  using ReadBytesResult = std::unique_ptr<const void, std::function<void(const void *)>>;
 
-  /// Return the size of size_t in the remote process, in bytes.
-  virtual uint8_t getSizeSize() = 0;
+  virtual bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
+                               void *outBuffer) = 0;
 
   /// Look up the given public symbol name in the remote process.
   virtual RemoteAddress getSymbolAddress(const std::string &name) = 0;
-
-  /// Attempts to read 'size' bytes from the given address in the
-  /// remote process.
-  ///
-  /// Returns false if the operation failed.
-  virtual bool readBytes(RemoteAddress address, uint8_t *dest,
-                         uint64_t size) = 0;
 
   /// Attempts to read a C string from the given address in the remote
   /// process.
   ///
   /// Returns false if the operation failed.
   virtual bool readString(RemoteAddress address, std::string &dest) = 0;
-
+  
   /// Attempts to read an integer from the given address in the remote
   /// process.
   ///
@@ -63,6 +61,42 @@ public:
                      sizeof(IntegerType));
   }
 
+  /// Attempts to read 'size' bytes from the given address in the remote process.
+  ///
+  /// Returns a pointer to the requested data and a function that must be called to
+  /// free that data when done. The pointer will be NULL if the operation failed.
+  ///
+  /// NOTE: subclasses MUST override at least one of the readBytes functions. The default
+  /// implementation calls through to the other one.
+  virtual ReadBytesResult
+    readBytes(RemoteAddress address, uint64_t size) {
+    auto *Buf = malloc(size);
+    ReadBytesResult Result(Buf, [](const void *ptr) {
+      free(const_cast<void *>(ptr));
+    });
+    bool success = readBytes(address, reinterpret_cast<uint8_t *>(Buf), size);
+    if (!success) {
+      Result.reset();
+    }
+    return Result;
+  }
+
+  /// Attempts to read 'size' bytes from the given address in the
+  /// remote process.
+  ///
+  /// Returns false if the operation failed.
+  ///
+  /// NOTE: subclasses MUST override at least one of the readBytes functions. The default
+  /// implementation calls through to the other one.
+  virtual bool readBytes(RemoteAddress address, uint8_t *dest, uint64_t size) {
+    auto Ptr = readBytes(address, size);
+    if (!Ptr)
+      return false;
+    
+    memcpy(dest, Ptr.get(), size);
+    return true;
+  }
+          
   virtual ~MemoryReader() = default;
 };
 

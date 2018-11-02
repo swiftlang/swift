@@ -40,8 +40,8 @@ open class d {
 // CHECK-DAG-NO-OPT: define dllexport swiftcc void @"$S9dllexport1dC1m33_C57BA610BA35E21738CC992438E660E9LLyyF"(%T9dllexport1dC*)
 // CHECK-DAG-NO-OPT: define dllexport swiftcc void @"$S9dllexport1dCfD"(%T9dllexport1dC*)
 // CHECK-DAG: define dllexport swiftcc %swift.refcounted* @"$S9dllexport1dCfd"(%T9dllexport1dC*{{.*}})
-// CHECK-DAG: define dllexport %swift.type* @"$S9dllexport1cCMa"()
-// CHECK-DAG: define dllexport %swift.type* @"$S9dllexport1dCMa"()
+// CHECK-DAG: define dllexport swiftcc %swift.metadata_response @"$S9dllexport1cCMa"(i32)
+// CHECK-DAG: define dllexport swiftcc %swift.metadata_response @"$S9dllexport1dCMa"(i32)
 // CHECK-DAG-NO-OPT: define dllexport swiftcc %T9dllexport1dC* @"$S9dllexport1dCACycfc"(%T9dllexport1dC*)
 // CHECK-DAG-OPT: define dllexport swiftcc void @"$S9dllexport1dCfD"(%T9dllexport1dC*)
 

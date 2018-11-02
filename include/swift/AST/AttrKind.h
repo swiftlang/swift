@@ -17,13 +17,14 @@
 #ifndef SWIFT_ATTRKIND_H
 #define SWIFT_ATTRKIND_H
 
+#include "swift/Basic/InlineBitfield.h"
 #include "swift/Config.h"
 #include "llvm/Support/DataTypes.h"
 
 namespace swift {
 
 /// The associativity of a binary operator.
-enum class Associativity : unsigned char {
+enum class Associativity : uint8_t {
   /// Non-associative operators cannot be written next to other
   /// operators with the same precedence.  Relational operators are
   /// typically non-associative.
@@ -64,8 +65,12 @@ enum class AccessLevel : uint8_t {
 
 enum class InlineKind : uint8_t {
   Never = 0,
-  Always = 1
+  Always = 1,
+  Last_InlineKind = Always
 };
+
+enum : unsigned { NumInlineKindBits =
+  countBitsUsed(static_cast<unsigned>(InlineKind::Last_InlineKind)) };
 
 /// This enum represents the possible values of the @effects attribute.
 /// These values are ordered from the strongest guarantee to the weakest,
@@ -73,9 +78,14 @@ enum class InlineKind : uint8_t {
 enum class EffectsKind : uint8_t {
   ReadNone,
   ReadOnly,
+  ReleaseNone,
   ReadWrite,
-  Unspecified
+  Unspecified,
+  Last_EffectsKind = Unspecified
 };
+
+enum : unsigned { NumEffectsKindBits =
+  countBitsUsed(static_cast<unsigned>(EffectsKind::Last_EffectsKind)) };
 
   
 enum DeclAttrKind : unsigned {
@@ -83,6 +93,9 @@ enum DeclAttrKind : unsigned {
 #include "swift/AST/Attr.def"
   DAK_Count
 };
+
+enum : unsigned { NumDeclAttrKindBits =
+  countBitsUsed(static_cast<unsigned>(DeclAttrKind::DAK_Count - 1)) };
 
 // Define enumerators for each type attribute, e.g. TAK_weak.
 enum TypeAttrKind {

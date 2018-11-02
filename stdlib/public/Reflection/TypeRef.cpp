@@ -145,14 +145,23 @@ public:
         OS << '\n';
       }
 
-      if (flags.isInOut())
+      switch (flags.getValueOwnership()) {
+      case ValueOwnership::Default:
+        /* nothing */
+        break;
+      case ValueOwnership::InOut:
         printHeader("inout");
+        break;
+      case ValueOwnership::Shared:
+        printHeader("shared");
+        break;
+      case ValueOwnership::Owned:
+        printHeader("owned");
+        break;
+      }
 
       if (flags.isVariadic())
         printHeader("variadic");
-
-      if (flags.isShared())
-        printHeader("shared");
 
       printRec(param.getType());
 

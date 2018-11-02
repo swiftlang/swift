@@ -120,6 +120,8 @@ protocol InheritingProtocol : BaseProtocol { }
 // CHECK: @_PROTOCOLS__TtC14objc_protocols17ImplementingClass {{.*}} @_PROTOCOL__TtP14objc_protocols12BaseProtocol_
 class ImplementingClass : InheritingProtocol { }
 
+// CHECK: @_PROTOCOL_PROTOCOLS_NSDoubleInheritedFunging = private constant{{.*}}i64 2{{.*}} @_PROTOCOL_NSFungingAndRuncing {{.*}}@_PROTOCOL_NSFunging
+
 // -- Force generation of witness for Zim.
 // CHECK: define hidden swiftcc { %objc_object*, i8** } @"$S14objc_protocols22mixed_heritage_erasure{{[_0-9a-zA-Z]*}}F"
 func mixed_heritage_erasure(_ x: Zim) -> Frungible {
@@ -208,4 +210,9 @@ func canter<T : Palomino>(_ t: Stirrup<T>) {}
 
 func gallop<T : Vanner>(_ t: Stirrup<T>) {
   canter(t)
+}
+
+// SR-7130
+func triggerDoubleInheritedFunging() -> AnyObject {
+  return NSDoubleInheritedFunging.self as AnyObject
 }

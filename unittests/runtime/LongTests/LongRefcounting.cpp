@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <functional>
+
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -42,8 +44,11 @@ struct TestObject : HeapObject {
   // On exit from deinit: is destroyed
   WeakReference *WeakRef;
   
+  // Callback invoked during the object's deinit.
+  std::function<void()> DeinitCallback;
+
   TestObject(size_t *addr, size_t value)
-    : Addr(addr), Value(value), CheckLifecycle(false), WeakRef(nullptr)
+    : Addr(addr), Value(value), CheckLifecycle(false), WeakRef(nullptr), DeinitCallback(nullptr)
   { }
 };
 
@@ -91,15 +96,19 @@ static SWIFT_CC(swift) void deinitTestObject(SWIFT_CONTEXT HeapObject *_object) 
     }
   }
 
+  if (object->DeinitCallback != nullptr) {
+    object->DeinitCallback();
+  }
+
   *object->Addr = object->Value;
   object->Addr = nullptr;
+  object->~TestObject();
   swift_deallocObject(object, sizeof(TestObject), alignof(TestObject) - 1);
 }
 
 static const FullMetadata<ClassMetadata> TestClassObjectMetadata = {
   { { &deinitTestObject }, { &VALUE_WITNESS_SYM(Bo) } },
-  { { { MetadataKind::Class } }, 0, SWIFT_CLASS_IS_SWIFT_MASK,
-  ClassFlags::UsesSwiftRefcounting, 0, 0, 0, 0, 0, 0 }
+  { { nullptr }, ClassFlags::UsesSwiftRefcounting, 0, 0, 0, 0, 0, 0 }
 };
 
 /// Create an object that, when deinited, stores the given value to
@@ -231,8 +240,6 @@ static void unownedReleaseALot(TestObject *object, uint64_t count) {
 }
 
 // Maximum legal unowned retain count. 31 bits with no implicit +1.
-// (FIXME 32-bit architecture has 7 bit inline count;
-// that bound does not yet have its own tests.)
 const uint64_t maxURC = (1ULL << (32 - 1)) - 1;
 
 TEST(LongRefcountingTest, unowned_retain_max) {
@@ -1046,4 +1053,40 @@ TEST(LongRefcountingTest, lifecycle_live_deiniting_deinited_freed_with_side_Deat
 
   EXPECT_UNALLOCATED(side);
   EXPECT_EQ(0, weakValue);
+}
+
+TEST(LongRefcountingTest, lifecycle_live_deiniting_urc_overflow_to_side) {
+  ::testing::FLAGS_gtest_death_test_style = "threadsafe";
+
+  uint64_t urcOverflowCount;
+  switch(sizeof(void *)) {
+  // 32-bit has a 7-bit inline refcount that overflows into the side table.
+  case 4: urcOverflowCount = 1 << 7; break;
+
+  // 64-bit can't store any extra count in the side table, so there's nothing to test.
+  case 8: return;
+
+  // We should never see any other bitness.
+  default: FAIL(); break;
+  }
+
+  size_t deinited = 0;
+  auto object = allocTestObject(&deinited, 1);
+  HeapObjectSideTableEntry *side = nullptr;
+  object->DeinitCallback = [&]() {
+    for (uint64_t i = 0; i < urcOverflowCount; i++) {
+      swift_unownedRetain(object);
+    }
+
+    side = reinterpret_cast<HeapObjectSideTableEntry *>(object->refCounts.getSideTable());
+    EXPECT_ALLOCATED(side);
+
+    for (uint64_t i = 0; i < urcOverflowCount; i++) {
+      swift_unownedRelease(object);
+    }
+  };
+
+  swift_release(object);
+  EXPECT_UNALLOCATED(object);
+  EXPECT_UNALLOCATED(side);
 }

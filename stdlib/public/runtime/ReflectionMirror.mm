@@ -39,6 +39,44 @@
 #include <objc/runtime.h>
 #endif
 
+#if defined(_WIN32)
+#include <stdarg.h>
+
+namespace {
+int asprintf(char **strp, const char *fmt, ...) {
+  va_list argp0, argp1;
+
+  va_start(argp0, fmt);
+  va_copy(argp1, argp0);
+
+  int length = _vscprintf(fmt, argp0);
+
+  *strp = reinterpret_cast<char *>(malloc(length + 1));
+  if (*strp == nullptr)
+    return -1;
+
+  length = _vsnprintf(*strp, length, fmt, argp1);
+
+  va_end(argp0);
+  va_end(argp1);
+
+  return length;
+}
+
+char *strndup(const char *s, size_t n) {
+  size_t length = std::min(strlen(s), n);
+
+  char *buffer = reinterpret_cast<char *>(malloc(length + 1));
+  if (buffer == nullptr)
+    return buffer;
+
+  strncpy(buffer, s, length);
+  buffer[length] = '\0';
+  return buffer;
+}
+}
+#endif
+
 using namespace swift;
 
 #if SWIFT_OBJC_INTEROP
@@ -268,22 +306,14 @@ struct EnumImpl : ReflectionMirrorImpl {
   bool isReflectable() {
     const auto *Enum = static_cast<const EnumMetadata *>(type);
     const auto &Description = Enum->getDescription();
-    return Description->IsReflectable;
+    return Description->getTypeContextDescriptorFlags().isReflectable();
   }
   
   const char *getInfo(unsigned *tagPtr = nullptr,
                       const Metadata **payloadTypePtr = nullptr,
                       bool *indirectPtr = nullptr) {
-    const auto *Enum = static_cast<const EnumMetadata *>(type);
-    const auto &Description = Enum->getDescription();;
-
-    unsigned payloadCases = Description->getNumPayloadCases();
-
-    // 'tag' is in the range [-ElementsWithPayload..ElementsWithNoPayload-1].
-    int tag = type->vw_getEnumTag(value);
-
-    // Convert resilient tag index to fragile tag index.
-    tag += payloadCases;
+    // 'tag' is in the range [0..NumElements-1].
+    unsigned tag = type->vw_getEnumTag(value);
 
     const Metadata *payloadType = nullptr;
     bool indirect = false;
@@ -321,9 +351,6 @@ struct EnumImpl : ReflectionMirrorImpl {
 
   AnyReturn subscript(intptr_t i, const char **outName,
                       void (**outFreeFunc)(const char *)) {
-    const auto *Enum = static_cast<const EnumMetadata *>(type);
-    const auto &Description = Enum->getDescription();
-
     unsigned tag;
     const Metadata *payloadType;
     bool indirect;
@@ -336,8 +363,7 @@ struct EnumImpl : ReflectionMirrorImpl {
 
     type->vw_destructiveProjectEnumData(const_cast<OpaqueValue *>(value));
     boxType->vw_initializeWithCopy(pair.buffer, const_cast<OpaqueValue *>(value));
-    type->vw_destructiveInjectEnumTag(const_cast<OpaqueValue *>(value),
-                                      (int) (tag - Description->getNumPayloadCases()));
+    type->vw_destructiveInjectEnumTag(const_cast<OpaqueValue *>(value), tag);
 
     value = pair.buffer;
 
@@ -525,7 +551,7 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
 
       // Look through artificial subclasses.
       while (isa->isTypeMetadata() && isa->isArtificialSubclass()) {
-        isa = isa->SuperClass;
+        isa = isa->Superclass;
       }
       passedType = isa;
     }
@@ -597,19 +623,20 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
 
     /// TODO: Implement specialized mirror witnesses for all kinds.
     case MetadataKind::Function:
-    case MetadataKind::Existential: {
-      OpaqueImpl impl;
-      return call(&impl);
-    }
+    case MetadataKind::Existential:
+      break;
 
     // Types can't have these kinds.
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::HeapGenericLocalVariable:
     case MetadataKind::ErrorObject:
       swift::crash("Swift mirror lookup failure");
-  }
+    }
 
-  swift_runtime_unreachable("Unhandled MetadataKind in switch.");
+    // If we have an unknown kind of type, or a type without special handling,
+    // treat it as opaque.
+    OpaqueImpl impl;
+    return call(&impl);
 }
 
 } // end anonymous namespace
@@ -700,7 +727,7 @@ const char *swift_OpaqueSummary(const Metadata *T) {
       return "(ErrorType Object)";
   }
 
-  swift_runtime_unreachable("Unhandled MetadataKind in switch.");
+  return "(Unknown)";
 }
 
 #if SWIFT_OBJC_INTEROP

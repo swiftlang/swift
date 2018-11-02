@@ -259,7 +259,7 @@ SwiftVersions:
         SwiftName: multiVersionedGlobal45Notes_5
       - Name: multiVersionedGlobal45Both
         SwiftName: multiVersionedGlobal45Both_5
-  - Version: 4 # Versions are deliberately ordered as "3, 5, 4" to catch bugs.
+  - Version: 4 # Versions are deliberately ordered as "3, 5, 4.2, 4" to catch bugs.
     Globals:
       - Name: multiVersionedGlobal34
         SwiftName: multiVersionedGlobal34_4
@@ -293,3 +293,39 @@ SwiftVersions:
         SwiftName: multiVersionedGlobal45Notes_4
       - Name: multiVersionedGlobal45Both
         SwiftName: multiVersionedGlobal45Both_4
+  - Version: 4.2
+    Globals:
+      - Name: multiVersionedGlobal34
+        SwiftName: multiVersionedGlobal34_4_2
+      - Name: multiVersionedGlobal34Header
+        SwiftName: multiVersionedGlobal34Header_4_2
+      - Name: multiVersionedGlobal34Notes
+        SwiftName: multiVersionedGlobal34Notes_4_2
+      - Name: multiVersionedGlobal34Both
+        SwiftName: multiVersionedGlobal34Both_4_2
+      - Name: multiVersionedGlobal345
+        SwiftName: multiVersionedGlobal345_4_2
+      - Name: multiVersionedGlobal345Header
+        SwiftName: multiVersionedGlobal345Header_4_2
+      - Name: multiVersionedGlobal345Notes
+        SwiftName: multiVersionedGlobal345Notes_4_2
+      - Name: multiVersionedGlobal345Both
+        SwiftName: multiVersionedGlobal345Both_4_2
+      - Name: multiVersionedGlobal4
+        SwiftName: multiVersionedGlobal4_4_2
+      - Name: multiVersionedGlobal4Header
+        SwiftName: multiVersionedGlobal4Header_4_2
+      - Name: multiVersionedGlobal4Notes
+        SwiftName: multiVersionedGlobal4Notes_4_2
+      - Name: multiVersionedGlobal4Both
+        SwiftName: multiVersionedGlobal4Both_4_2
+      - Name: multiVersionedGlobal45
+        SwiftName: multiVersionedGlobal45_4_2
+      - Name: multiVersionedGlobal45Header
+        SwiftName: multiVersionedGlobal45Header_4_2
+      - Name: multiVersionedGlobal45Notes
+        SwiftName: multiVersionedGlobal45Notes_4_2
+      - Name: multiVersionedGlobal45Both
+        SwiftName: multiVersionedGlobal45Both_4_2
+      - Name: multiVersionedGlobal34_4_2
+        SwiftName: multiVersionedGlobal34_4_2_not_5

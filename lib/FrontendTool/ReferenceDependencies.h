@@ -32,9 +32,9 @@ std::vector<std::string>
 reversePathSortedFilenames(const llvm::ArrayRef<std::string> paths);
 
 /// Emit a Swift-style dependencies file for \p SF.
-bool emitReferenceDependenciesIfNeeded(DiagnosticEngine &diags, SourceFile *SF,
-                                       DependencyTracker &depTracker,
-                                       StringRef outputPath);
+bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
+                               DependencyTracker &depTracker,
+                               StringRef outputPath);
 } // end namespace swift
 
 #endif

@@ -13,7 +13,7 @@ func testTrailingClosure() -> String {
     .filter({ $0 % 2 == 0 })
     .map({ $0 + 1 })
 }
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 
 // RUN: %refactor -trailingclosure -source-filename %s -pos=7:3 > %t.result/L7.swift
 // RUN: diff -u %S/Outputs/basic/L7.swift.expected %t.result/L7.swift

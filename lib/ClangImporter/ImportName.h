@@ -56,12 +56,35 @@ class ImportNameVersion : public RelationalOperationsBase<ImportNameVersion> {
 public:
   /// Map a language version into an import name version.
   static ImportNameVersion fromOptions(const LangOptions &langOpts) {
-    return ImportNameVersion(langOpts.EffectiveLanguageVersion[0]);
+    // We encode the 'rawValue' as just major version numbers with the
+    // exception of '4.2', which is a special minor version that can impact
+    // importing of names.  We treat that with a rawValue of 5, and treat
+    // all major values of 5 or higher as being rawValue = majorversion + 1.
+    const auto &version = langOpts.EffectiveLanguageVersion;
+    if (version.size() > 1 && version[0] == 4 && version[1] == 2) {
+      return ImportNameVersion::swift4_2();
+    }
+    unsigned major = version[0];
+    return ImportNameVersion(major >= 5 ? major + 1 : major);
   }
 
   unsigned majorVersionNumber() const {
     assert(*this != ImportNameVersion::raw());
-    return rawValue;
+    if (*this == ImportNameVersion::swift4_2())
+      return 4;
+    return rawValue < 5 ? rawValue : rawValue - 1;
+  }
+
+  unsigned minorVersionNumber() const {
+    assert(*this != ImportNameVersion::raw());
+    if (*this == ImportNameVersion::swift4_2())
+      return 2;
+    return 0;
+  }
+
+  clang::VersionTuple asClangVersionTuple() const {
+    assert(*this != ImportNameVersion::raw());
+    return clang::VersionTuple(majorVersionNumber(), minorVersionNumber());    
   }
 
   bool operator==(ImportNameVersion other) const {
@@ -105,12 +128,17 @@ public:
     return ImportNameVersion{2, AsConstExpr};
   }
 
+  /// Names as they appeared in Swift 4.2 family.
+  static constexpr inline ImportNameVersion swift4_2() {
+    return ImportNameVersion{5, AsConstExpr};
+  }
+
   /// The latest supported version.
   ///
   /// FIXME: All other version information is in Version.h. Can this go there
   /// instead?
   static constexpr inline ImportNameVersion maxVersion() {
-    return ImportNameVersion{5, AsConstExpr};
+    return ImportNameVersion{6, AsConstExpr};
   }
 
   /// The version which should be used for importing types, which need to have

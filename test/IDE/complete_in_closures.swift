@@ -320,7 +320,7 @@ func testClosureParam1() {
   }
 }
 // CLOSURE_PARAM_1: Begin completions
-// CLOSURE_PARAM_1-DAG: Decl[LocalVar]/Local:         theValue[#(Int)#]{{; name=.+$}}
+// CLOSURE_PARAM_1-DAG: Decl[LocalVar]/Local:         theValue[#Int#]{{; name=.+$}}
 func testClosureParam2() {
   closureTaker2 { (Value1, Value2) -> () in
     #^CLOSURE_PARAM_2^#

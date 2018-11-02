@@ -1343,10 +1343,16 @@ entry(%0 : $@convention(thin) (AnyObject) -> Optional<AnyObject>):
 }
 // CHECK-LABEL: sil @convert_function_trivial
 // CHECK:  %1 = convert_escape_to_noescape %0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject> to $@noescape @callee_guaranteed (Optional<AnyObject>) -> AnyObject
+// CHECK:  %2 = convert_escape_to_noescape [not_guaranteed] %0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject> to $@noescape @callee_guaranteed (Optional<AnyObject>) -> AnyObject
+// CHECK:  %3 = convert_escape_to_noescape [escaped] %0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject> to $@noescape @callee_guaranteed (Optional<AnyObject>) -> AnyObject
+// CHECK:  %4 = convert_escape_to_noescape [not_guaranteed] [escaped] %0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject> to $@noescape @callee_guaranteed (Optional<AnyObject>) -> AnyObject
 // CHECK: return
 sil @convert_function_trivial : $@convention(thin) (@owned @callee_guaranteed (AnyObject) -> Optional<AnyObject>) -> () {
 entry(%0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject>):
   %1 = convert_escape_to_noescape %0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject> to $@noescape @callee_guaranteed (Optional<AnyObject>) -> AnyObject
+  %2 = convert_escape_to_noescape [not_guaranteed] %0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject> to $@noescape @callee_guaranteed (Optional<AnyObject>) -> AnyObject
+  %3 = convert_escape_to_noescape [escaped] %0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject> to $@noescape @callee_guaranteed (Optional<AnyObject>) -> AnyObject
+  %4 = convert_escape_to_noescape [not_guaranteed] [escaped] %0 : $@callee_guaranteed (AnyObject) -> Optional<AnyObject> to $@noescape @callee_guaranteed (Optional<AnyObject>) -> AnyObject
   return undef : $()
 }
 
@@ -1468,6 +1474,13 @@ sil @is_unique_or_pinned : $@convention(thin) (@inout Builtin.NativeObject) -> B
 bb0(%0 : $*Builtin.NativeObject):
   // CHECK: %1 = is_unique_or_pinned %0 : $*Builtin.NativeObject
   %1 = is_unique_or_pinned %0 : $*Builtin.NativeObject
+  return %1 : $Builtin.Int1
+}
+// CHECK-LABEL: sil @is_escaping_closure
+sil @is_escaping_closure : $@convention(thin)(@guaranteed @callee_guaranteed () -> ()) -> Builtin.Int1 {
+bb0(%0 : $@callee_guaranteed () -> ()):
+  // CHECK: %1 = is_escaping_closure %0 : $@callee_guaranteed () -> ()
+  %1 = is_escaping_closure %0: $@callee_guaranteed () -> ()
   return %1 : $Builtin.Int1
 }
 
@@ -1611,6 +1624,41 @@ bb0(%0 : $(Builtin.NativeObject, Builtin.Int32), %1 : $TestArray2):
   (%4, %5, %6) = destructure_struct %1 : $TestArray2
   %7 = tuple(%2 : $Builtin.NativeObject, %3 : $Builtin.Int32, %4 : $TestArrayStorage, %5 : $Int32, %6 : $TestArrayStorage)
   return %7 : $(Builtin.NativeObject, Builtin.Int32, TestArrayStorage, Int32, TestArrayStorage)
+}
+
+class A {
+  @sil_stored var property: Any { get set }
+  deinit
+  init()
+}
+
+// CHECK-LABEL: sil @test_access : $@convention(thin) (@guaranteed A) -> () {
+// CHECK: begin_access [read] [dynamic]
+// CHECK: begin_access [read] [dynamic] [no_nested_conflict]
+// CHECK: begin_unpaired_access [read] [dynamic]
+// CHECK: begin_unpaired_access [read] [dynamic] [no_nested_conflict]
+// CHECK-LABEL: } // end sil function 'test_access'
+sil @test_access : $(@guaranteed A) -> () {
+bb0(%0 : $A):
+  %1 = alloc_stack $Any
+  %2 = ref_element_addr %0 : $A, #A.property
+  %3 = begin_access [dynamic] [read] %2 : $*Any
+  copy_addr %3 to [initialization] %1 : $*Any
+  end_access %3 : $*Any
+  %6 = begin_access [read] [dynamic] [no_nested_conflict] %2 : $*Any
+  copy_addr %6 to %1 : $*Any
+  end_access %6 : $*Any
+  %9 = alloc_stack $Builtin.UnsafeValueBuffer
+  begin_unpaired_access [read] [dynamic] %2 : $*Any, %9 : $*Builtin.UnsafeValueBuffer
+  copy_addr %2 to %1 : $*Any
+  end_unpaired_access [dynamic] %9 : $*Builtin.UnsafeValueBuffer
+  begin_unpaired_access [read] [dynamic] [no_nested_conflict] %2 : $*Any, %9 : $*Builtin.UnsafeValueBuffer
+  copy_addr %2 to %1 : $*Any
+  destroy_addr %1 : $*Any
+  dealloc_stack %9 : $*Builtin.UnsafeValueBuffer
+  dealloc_stack %1 : $*Any
+  %20 = tuple ()
+  return %20 : $()
 }
 
 struct EmptyStruct {}

@@ -15,21 +15,11 @@
 class C {
   class func fromMetatype() -> Self? { return nil }
   // CHECK-LABEL: define hidden swiftcc i64 @"$S21dynamic_self_metadata1CC12fromMetatypeACXDSgyFZ"(%swift.type* swiftself)
-  // CHECK: [[ALLOCA:%.+]] = alloca [[TYPE]], align 8
-  // CHECK: [[CAST1:%.+]] = bitcast [[TYPE]]* [[ALLOCA]] to i64*
-  // CHECK: store i64 0, i64* [[CAST1]], align 8
-  // CHECK: [[CAST2:%.+]] = bitcast [[TYPE]]* [[ALLOCA]] to i64*
-  // CHECK: [[LOAD:%.+]] = load i64, i64* [[CAST2]], align 8
-  // CHECK: ret i64 [[LOAD]]
+  // CHECK: ret i64 0
 
   func fromInstance() -> Self? { return nil }
   // CHECK-LABEL: define hidden swiftcc i64 @"$S21dynamic_self_metadata1CC12fromInstanceACXDSgyF"(%T21dynamic_self_metadata1CC* swiftself)
-  // CHECK: [[ALLOCA:%.+]] = alloca [[TYPE]], align 8
-  // CHECK: [[CAST1:%.+]] = bitcast [[TYPE]]* [[ALLOCA]] to i64*
-  // CHECK: store i64 0, i64* [[CAST1]], align 8
-  // CHECK: [[CAST2:%.+]] = bitcast [[TYPE]]* [[ALLOCA]] to i64*
-  // CHECK: [[LOAD:%.+]] = load i64, i64* [[CAST2]], align 8
-  // CHECK: ret i64 [[LOAD]]
+  // CHECK: ret i64 0
 
   func dynamicSelfArgument() -> Self? {
     return id(nil)
@@ -37,6 +27,7 @@ class C {
   // CHECK-LABEL: define hidden swiftcc i64 @"$S21dynamic_self_metadata1CC0A12SelfArgumentACXDSgyF"(%T21dynamic_self_metadata1CC* swiftself)
   // CHECK: [[CAST1:%.+]] = bitcast %T21dynamic_self_metadata1CC* %0 to [[METATYPE:%.+]]
   // CHECK: [[TYPE1:%.+]] = call %swift.type* @swift_getObjectType([[METATYPE]] [[CAST1]])
-  // CHECK: [[TYPE2:%.+]] = call %swift.type* @"$SSqMa"(%swift.type* [[TYPE1]])
+  // CHECK: [[T0:%.+]] = call swiftcc %swift.metadata_response @"$SSqMa"(i64 0, %swift.type* [[TYPE1]])
+  // CHECK: [[TYPE2:%.+]] = extractvalue %swift.metadata_response [[T0]], 0
   // CHECK: call swiftcc void @"$S21dynamic_self_metadata2idyxxlF"({{.*}}, %swift.type* [[TYPE2]])
 }

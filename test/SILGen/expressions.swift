@@ -1,6 +1,7 @@
+
 // RUN: %empty-directory(%t)
 // RUN: echo "public var x = Int()" | %target-swift-frontend -module-name FooBar -emit-module -o %t -
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen -enable-sil-ownership %s -I%t -disable-access-control | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -module-name expressions -emit-silgen -enable-sil-ownership %s -I%t -disable-access-control | %FileCheck %s
 
 import Swift
 import FooBar
@@ -555,31 +556,144 @@ func testDiscardLValue() {
 }
 
 
-func dynamicTypePlusZero(_ a : Super1) -> Super1.Type {
+func dynamicTypePlusZero(_ a: Super1) -> Super1.Type {
   return type(of: a)
 }
 // CHECK-LABEL: dynamicTypePlusZero
-// CHECK: bb0([[ARG:%.*]] : @owned $Super1):
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $Super1):
 // CHECK-NOT: copy_value
-// CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK-NOT: copy_value
-// CHECK: value_metatype  $@thick Super1.Type, [[BORROWED_ARG]] : $Super1
-// CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
-// CHECK: destroy_value [[ARG]]
+// CHECK: value_metatype  $@thick Super1.Type, [[ARG]] : $Super1
 
-struct NonTrivialStruct { var c : Super1 }
+struct NonTrivialStruct {
+  var c : Super1
+  var x: NonTrivialStruct? {
+    get { return nil }
+    set {}
+  }
+}
 
-func dontEmitIgnoredLoadExpr(_ a : NonTrivialStruct) -> NonTrivialStruct.Type {
+func dontEmitIgnoredLoadExpr(_ a: NonTrivialStruct) -> NonTrivialStruct.Type {
   return type(of: a)
 }
 // CHECK-LABEL: dontEmitIgnoredLoadExpr
-// CHECK: bb0(%0 : @owned $NonTrivialStruct):
+// CHECK: bb0(%0 : @guaranteed $NonTrivialStruct):
 // CHECK-NEXT: debug_value
-// CHECK-NEXT: begin_borrow
-// CHECK-NEXT: end_borrow
-// CHECK-NEXT: %4 = metatype $@thin NonTrivialStruct.Type
-// CHECK-NEXT: destroy_value %0
-// CHECK-NEXT: return %4 : $@thin NonTrivialStruct.Type
+// CHECK-NEXT: [[RESULT:%.*]] = metatype $@thin NonTrivialStruct.Type
+// CHECK-NEXT: return [[RESULT]] : $@thin NonTrivialStruct.Type
+
+// Test that we evaluate the force unwrap to get its side effects (a potential trap),
+// but don't actually need to perform the load of its value.
+func dontLoadIgnoredLValueForceUnwrap(_ a: inout NonTrivialStruct?) -> NonTrivialStruct.Type {
+  return type(of: a!)
+}
+// CHECK-LABEL: dontLoadIgnoredLValueForceUnwrap
+// CHECK: bb0(%0 : @trivial $*Optional<NonTrivialStruct>):
+// CHECK-NEXT: debug_value_addr %0
+// CHECK-NEXT: [[READ:%[0-9]+]] = begin_access [read] [unknown] %0
+// CHECK-NEXT: switch_enum_addr [[READ]] : $*Optional<NonTrivialStruct>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
+// CHECK: bb1:
+// CHECK: unreachable
+// CHECK: bb2:
+// CHECK-NEXT: unchecked_take_enum_data_addr [[READ]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt.1
+// CHECK-NEXT: end_access [[READ]]
+// CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin NonTrivialStruct.Type
+// CHECK-NEXT: return [[METATYPE]]
+
+func dontLoadIgnoredLValueDoubleForceUnwrap(_ a: inout NonTrivialStruct??) -> NonTrivialStruct.Type {
+  return type(of: a!!)
+}
+// CHECK-LABEL: dontLoadIgnoredLValueDoubleForceUnwrap
+// CHECK: bb0(%0 : @trivial $*Optional<Optional<NonTrivialStruct>>):
+// CHECK-NEXT: debug_value_addr %0
+// CHECK-NEXT: [[READ:%[0-9]+]] = begin_access [read] [unknown] %0
+// CHECK-NEXT: switch_enum_addr [[READ]] : $*Optional<Optional<NonTrivialStruct>>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
+// CHECK: bb1:
+// CHECK: unreachable
+// CHECK: bb2:
+// CHECK-NEXT: [[UNWRAPPED:%[0-9]+]] = unchecked_take_enum_data_addr [[READ]] : $*Optional<Optional<NonTrivialStruct>>, #Optional.some!enumelt.1
+// CHECK-NEXT: switch_enum_addr [[UNWRAPPED]] : $*Optional<NonTrivialStruct>, case #Optional.some!enumelt.1: bb4, case #Optional.none!enumelt: bb3
+// CHECK: bb3:
+// CHECK: unreachable
+// CHECK: bb4:
+// CHECK-NEXT: unchecked_take_enum_data_addr [[UNWRAPPED]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt.1
+// CHECK-NEXT: end_access [[READ]]
+// CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin NonTrivialStruct.Type
+// CHECK-NEXT: return [[METATYPE]]
+
+func loadIgnoredLValueForceUnwrap(_ a: inout NonTrivialStruct) -> NonTrivialStruct.Type {
+  return type(of: a.x!)
+}
+// CHECK-LABEL: loadIgnoredLValueForceUnwrap
+// CHECK: bb0(%0 : @trivial $*NonTrivialStruct):
+// CHECK-NEXT: debug_value_addr %0
+// CHECK-NEXT: [[READ:%[0-9]+]] = begin_access [read] [unknown] %0
+// CHECK-NEXT: [[BORROW:%[0-9]+]] = load_borrow [[READ]]
+// CHECK-NEXT: // function_ref NonTrivialStruct.x.getter
+// CHECK-NEXT: [[GETTER:%[0-9]+]] = function_ref @$S{{[_0-9a-zA-Z]*}}vg : $@convention(method) (@guaranteed NonTrivialStruct) -> @owned Optional<NonTrivialStruct>
+// CHECK-NEXT: [[X:%[0-9]+]] = apply [[GETTER]]([[BORROW]])
+// CHECK-NEXT: end_borrow [[BORROW]] from [[READ]]
+// CHECK-NEXT: end_access [[READ]]
+// CHECK-NEXT: switch_enum [[X]] : $Optional<NonTrivialStruct>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
+// CHECK: bb1:
+// CHECK: unreachable
+// CHECK: bb2([[UNWRAPPED_X:%[0-9]+]] : @owned $NonTrivialStruct):
+// CHECK-NEXT: destroy_value [[UNWRAPPED_X]]
+// CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin NonTrivialStruct.Type
+// CHECK-NEXT: return [[METATYPE]]
+
+func loadIgnoredLValueThroughForceUnwrap(_ a: inout NonTrivialStruct?) -> NonTrivialStruct.Type {
+  return type(of: a!.x!)
+}
+// CHECK-LABEL: loadIgnoredLValueThroughForceUnwrap
+// CHECK: bb0(%0 : @trivial $*Optional<NonTrivialStruct>):
+// CHECK-NEXT: debug_value_addr %0
+// CHECK-NEXT: [[READ:%[0-9]+]] = begin_access [read] [unknown] %0
+// CHECK-NEXT: switch_enum_addr [[READ]] : $*Optional<NonTrivialStruct>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
+// CHECK: bb1:
+// CHECK: unreachable
+// CHECK: bb2:
+// CHECK-NEXT: [[UNWRAPPED:%[0-9]+]] = unchecked_take_enum_data_addr [[READ]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt.1
+// CHECK-NEXT: [[BORROW:%[0-9]+]] = load_borrow [[UNWRAPPED]]
+// CHECK-NEXT: // function_ref NonTrivialStruct.x.getter
+// CHECK-NEXT: [[GETTER:%[0-9]+]] = function_ref @$S{{[_0-9a-zA-Z]*}}vg : $@convention(method) (@guaranteed NonTrivialStruct) -> @owned Optional<NonTrivialStruct>
+// CHECK-NEXT: [[X:%[0-9]+]] = apply [[GETTER]]([[BORROW]])
+// CHECK-NEXT: end_borrow [[BORROW]] from [[UNWRAPPED]]
+// CHECK-NEXT: end_access [[READ]]
+// CHECK-NEXT: switch_enum [[X]] : $Optional<NonTrivialStruct>, case #Optional.some!enumelt.1: bb4, case #Optional.none!enumelt: bb3
+// CHECK: bb3:
+// CHECK: unreachable
+// CHECK: bb4([[UNWRAPPED_X:%[0-9]+]] : @owned $NonTrivialStruct):
+// CHECK-NEXT: destroy_value [[UNWRAPPED_X]]
+// CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin NonTrivialStruct.Type
+// CHECK-NEXT: return [[METATYPE]]
+
+func evaluateIgnoredKeyPathExpr(_ s: inout NonTrivialStruct, _ kp: WritableKeyPath<NonTrivialStruct, Int>) -> Int.Type {
+  return type(of: s[keyPath: kp])
+}
+// CHECK-LABEL: evaluateIgnoredKeyPathExpr
+// CHECK: bb0(%0 : @trivial $*NonTrivialStruct, %1 : @guaranteed $WritableKeyPath<NonTrivialStruct, Int>):
+// CHECK-NEXT: debug_value_addr %0
+// CHECK-NEXT: debug_value %1
+// CHECK-NEXT: [[S_READ:%[0-9]+]] = begin_access [read] [unknown] %0
+// CHECK-NEXT: [[S_TEMP:%[0-9]+]] = alloc_stack $NonTrivialStruct
+// CHECK-NEXT: copy_addr [[S_READ]] to [initialization] [[S_TEMP]]
+// CHECK-NEXT: [[KP_TEMP:%[0-9]+]] = copy_value %1
+// CHECK-NEXT: [[KP:%[0-9]+]] = upcast [[KP_TEMP]]
+// CHECK-NEXT: [[RESULT:%[0-9]+]] = alloc_stack $Int
+// CHECK-NEXT: // function_ref
+// CHECK-NEXT: [[PROJECT_FN:%[0-9]+]] = function_ref @$Ss23_projectKeyPathReadOnly{{[_0-9a-zA-Z]*}}F
+// CHECK-NEXT: [[KP_BORROW:%.*]] = begin_borrow [[KP]]
+// CHECK-NEXT: apply [[PROJECT_FN]]<NonTrivialStruct, Int>([[RESULT]], [[S_TEMP]], [[KP_BORROW]])
+// CHECK-NEXT: end_access [[S_READ]]
+// CHECK-NEXT: end_borrow [[KP_BORROW]]
+// CHECK-NEXT: dealloc_stack [[RESULT]]
+// CHECK-NEXT: destroy_value [[KP]]
+// CHECK-NEXT: destroy_addr [[S_TEMP]]
+// CHECK-NEXT: dealloc_stack [[S_TEMP]]
+// CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin Int.Type
+// CHECK-NOT: destroy_value %1
+// CHECK-NEXT: return [[METATYPE]]
+
 
 
 // <rdar://problem/18851497> Swiftc fails to compile nested destructuring tuple binding

@@ -35,7 +35,7 @@ import SwiftShims
 ///
 ///     enum IntParsingError: Error {
 ///         case overflow
-///         case invalidInput(String)
+///         case invalidInput(Character)
 ///     }
 ///
 /// The `invalidInput` case includes the invalid character as an associated
@@ -48,8 +48,9 @@ import SwiftShims
 ///     extension Int {
 ///         init(validating input: String) throws {
 ///             // ...
-///             if !_isValid(s) {
-///                 throw IntParsingError.invalidInput(s)
+///             let c = _nextCharacter(from: input)
+///             if !_isValid(c) {
+///                 throw IntParsingError.invalidInput(c)
 ///             }
 ///             // ...
 ///         }
@@ -126,7 +127,7 @@ public protocol Error {
 #if _runtime(_ObjC)
 extension Error {
   /// Default implementation: there is no embedded NSError.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func _getEmbeddedNSError() -> AnyObject? { return nil }
 }
 #endif
@@ -159,7 +160,7 @@ internal func _getErrorEmbeddedNSErrorIndirect<T : Error>(
 }
 
 /// Called by compiler-generated code to extract an NSError from an Error value.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public // COMPILER_INTRINSIC
 func _getErrorEmbeddedNSError<T : Error>(_ x: T)
 -> AnyObject? {
@@ -178,14 +179,14 @@ public func _bridgeErrorToNSError(_ error: Error) -> AnyObject
 
 /// Invoked by the compiler when the subexpression of a `try!` expression
 /// throws an error.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_silgen_name("swift_unexpectedError")
 public func _unexpectedError(_ error: Error) {
   preconditionFailure("'try!' expression unexpectedly raised an error: \(String(reflecting: error))")
 }
 
 /// Invoked by the compiler when code at top level throws an uncaught error.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_silgen_name("swift_errorInMain")
 public func _errorInMain(_ error: Error) {
   fatalError("Error raised at top level: \(String(reflecting: error))")
@@ -197,12 +198,12 @@ public func _errorInMain(_ error: Error) {
 public func _getDefaultErrorCode<T : Error>(_ error: T) -> Int
 
 extension Error {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var _code: Int {
     return _getDefaultErrorCode(self)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var _domain: String {
     return String(reflecting: type(of: self))
   }
@@ -218,7 +219,7 @@ extension Error {
 
 extension Error where Self: RawRepresentable, Self.RawValue: SignedInteger {
   // The error code of Error with integral raw values is the raw value.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var _code: Int {
     return numericCast(self.rawValue)
   }
@@ -226,7 +227,7 @@ extension Error where Self: RawRepresentable, Self.RawValue: SignedInteger {
 
 extension Error where Self: RawRepresentable, Self.RawValue: UnsignedInteger {
   // The error code of Error with integral raw values is the raw value.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var _code: Int {
     return numericCast(self.rawValue)
   }

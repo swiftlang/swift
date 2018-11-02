@@ -126,7 +126,10 @@ public:
 
   /// Set the type of this pattern, given that it was previously not
   /// type-checked.
-  void setType(Type ty) { Ty = ty; }
+  void setType(Type ty) {
+    assert(!ty || !ty->hasTypeVariable());
+    Ty = ty;
+  }
 
   /// Retrieve the delayed interface type of this pattern, if it has one.
   ///

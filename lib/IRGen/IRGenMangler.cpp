@@ -15,7 +15,9 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/Demangle.h"
-#include "swift/Runtime/Metadata.h"
+#include "swift/ABI/MetadataValues.h"
+#include "swift/ClangImporter/ClangModule.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
 using namespace irgen;
@@ -79,10 +81,8 @@ std::string IRGenMangler::manglePartialApplyForwarder(StringRef FuncName) {
 
 SymbolicMangling
 IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
-                                      Type Ty,
-                                      ModuleDecl *Module,
-                                      bool isSingleFieldOfBox) {
-  Mod = Module;
+                                      Type Ty) {
+  Mod = IGM.getSwiftModule();
   OptimizeProtocolNames = false;
 
   llvm::SaveAndRestore<std::function<bool (const DeclContext *)>>
@@ -107,8 +107,6 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
   SymbolicReferences.clear();
   
   appendType(Ty);
-  if (isSingleFieldOfBox)
-    appendOperator("Xb");
   
   return {finalize(), std::move(SymbolicReferences)};
 }

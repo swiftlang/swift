@@ -8,7 +8,7 @@
 // RUN: %target-swift-frontend -DCATCHAS -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=CATCHAS
 // RUN: %target-swift-frontend -DGENERICONLY -emit-sil %s -import-objc-header %S/Inputs/enum-error.h | %FileCheck %s -check-prefix=GENERICONLY
 
-// RUN: not %target-swift-frontend -DEXHAUSTIVE -emit-sil %s -import-objc-header %S/Inputs/enum-error.h 2>&1 | %FileCheck %s -check-prefix=EXHAUSTIVE
+// RUN: not %target-swift-frontend -DEXHAUSTIVE -emit-sil %s -import-objc-header %S/Inputs/enum-error.h  -enable-nonfrozen-enum-exhaustivity-diagnostics 2>&1 | %FileCheck %s -check-prefix=EXHAUSTIVE
 // RUN: %target-swift-frontend -typecheck %s -import-objc-header %S/Inputs/enum-error.h -DERRORS -verify
 
 // RUN: echo '#include "enum-error.h"' > %t.m
@@ -84,18 +84,33 @@ func testError() {
 
 #elseif EXHAUSTIVE
 // CHECK: sil_witness_table shared [serialized] TestError: _BridgedStoredNSError module __ObjC
+// CHECK: sil_witness_table shared [serialized] ExhaustiveError: _BridgedStoredNSError module __ObjC
   let terr = getErr()
-  switch (terr) { case .TENone, .TEOne, .TETwo: break } // ok
+  switch (terr) { case .TENone, .TEOne, .TETwo: break }
+  // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: warning: switch must be exhaustive
+  // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: handle unknown values using "@unknown default"
 
+  // FIXME: This should still be an error because there are /known/ cases that
+  // aren't covered.
   switch (terr) { case .TENone, .TEOne: break }
   // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: error: switch must be exhaustive
   // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: add missing case: '.TETwo'
+
   let _ = TestError.Code(rawValue: 2)!
 
   do {
     throw TestError(.TEOne)
   } catch is TestError {
   } catch {}
+
+  // Allow exhaustive error codes as well.
+  let eerr = getExhaustiveErr()
+  switch eerr { case .EENone, .EEOne, .EETwo: break }
+  // EXHAUSTIVE-NOT: [[@LINE-1]]:{{.+}}: {{error|warning|note}}
+
+  switch eerr { case .EENone, .EEOne: break }
+  // EXHAUSTIVE: [[@LINE-1]]:{{.+}}: error: switch must be exhaustive
+  // EXHAUSTIVE: [[@LINE-2]]:{{.+}}: note: add missing case: '.EETwo'
 
 #endif
 

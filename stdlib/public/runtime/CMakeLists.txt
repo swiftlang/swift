@@ -40,6 +40,7 @@ set(swift_runtime_sources
     AnyHashableSupport.cpp
     Array.cpp
     Casting.cpp
+    CompatibilityOverride.cpp
     CygwinPort.cpp
     Demangle.cpp
     Enum.cpp
@@ -64,12 +65,19 @@ set(swift_runtime_sources
     ProtocolConformance.cpp
     RefCount.cpp
     RuntimeInvocationsTracking.cpp
+    SwiftDtoa.cpp
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldDemangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Demangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/NodePrinter.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Context.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/ManglingUtils.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Punycode.cpp")
+
+# When we're building with assertions, include the demangle node dumper to aid
+# in debugging.
+if (LLVM_ENABLE_ASSERTIONS)
+  list(APPEND swift_runtime_sources "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp")
+endif(LLVM_ENABLE_ASSERTIONS)
 
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES
@@ -101,6 +109,10 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
     LINK_FLAGS ${swift_runtime_linker_flags})
   set_target_properties(swiftImageInspectionShared PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY "${SWIFTSTATICLIB_DIR}/${lowercase_sdk}")
+
+  swift_install_in_component(stdlib
+    TARGETS swiftImageInspectionShared
+    DESTINATION "lib/swift_static/${lowercase_sdk}")
 
   # Generate the static-executable-args.lnk file used for ELF systems (eg linux)
   set(linkfile "${lowercase_sdk}/static-executable-args.lnk")

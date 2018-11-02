@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name existential_erasure -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 protocol P {
   func downgrade(_ m68k: Bool) -> Self
@@ -51,13 +52,11 @@ func openExistentialToP1(_ p: P) throws {
 // CHECK:   [[METHOD:%.*]] = witness_method $[[OPEN_TYPE]], #P.downgrade!1 : {{.*}}, [[OPEN]]
 // CHECK:   apply [[METHOD]]<[[OPEN_TYPE]]>([[RESULT_ADDR]], [[SUCCESS]], [[OPEN]])
 // CHECK:   dealloc_stack [[RESULT]]
-// CHECK:   destroy_addr %0
 // CHECK:   return
 //
 // CHECK: bb2([[FAILURE:%.*]] : @owned $Error):
 // CHECK:   deinit_existential_addr [[RESULT]]
 // CHECK:   dealloc_stack [[RESULT]]
-// CHECK:   destroy_addr %0
 // CHECK:   throw [[FAILURE]]
 //
   try useP(p.downgrade(throwingFunc()))
@@ -74,13 +73,11 @@ func openExistentialToP2(_ p: P) throws {
 //
 // CHECK: bb1
 // CHECK:  dealloc_stack [[RESULT]]
-// CHECK:  destroy_addr %0
 // CHECK:  return
 //
 // CHECK: bb2([[FAILURE:%.*]]: @owned $Error):
 // CHECK:  deinit_existential_addr [[RESULT]]
 // CHECK:  dealloc_stack [[RESULT]]
-// CHECK:  destroy_addr %0
 // CHECK:  throw [[FAILURE]]
 //
   try useP(p.upgrade())
@@ -96,22 +93,19 @@ extension Error {
 
 // CHECK-LABEL: sil hidden @$S19existential_erasure12errorHandlerys5Error_psAC_pKF
 func errorHandler(_ e: Error) throws -> Error {
-// CHECK: bb0([[ARG:%.*]] : @owned $Error):
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $Error):
 // CHECK:  debug_value [[ARG]] : $Error
-// CHECK:  [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK:  [[OPEN:%.*]] = open_existential_box [[BORROWED_ARG]] : $Error to $*[[OPEN_TYPE:@opened\(.*\) Error]]
+// CHECK:  [[OPEN:%.*]] = open_existential_box [[ARG]] : $Error to $*[[OPEN_TYPE:@opened\(.*\) Error]]
 // CHECK:  [[RESULT:%.*]] = alloc_existential_box $Error, $[[OPEN_TYPE]]
 // CHECK:  [[ADDR:%.*]] = project_existential_box $[[OPEN_TYPE]] in [[RESULT]] : $Error
 // CHECK:  [[FUNC:%.*]] = function_ref @$Ss5ErrorP19existential_erasureE17returnOrThrowSelf{{[_0-9a-zA-Z]*}}F
 // CHECK:  try_apply [[FUNC]]<[[OPEN_TYPE]]>([[ADDR]], [[OPEN]])
 //
 // CHECK: bb1
-// CHECK:  destroy_value %0 : $Error
 // CHECK:  return [[RESULT]] : $Error
 //
 // CHECK: bb2([[FAILURE:%.*]] : @owned $Error):
 // CHECK:  dealloc_existential_box [[RESULT]]
-// CHECK:  destroy_value %0 : $Error
 // CHECK:  throw [[FAILURE]] : $Error
 //
   return try e.returnOrThrowSelf()

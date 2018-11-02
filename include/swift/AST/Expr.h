@@ -104,7 +104,7 @@ enum class CheckedCastKind : unsigned {
   Last_CheckedCastKind = Swift3BridgingDowncast,
 };
 
-enum class AccessSemantics : unsigned char {
+enum class AccessSemantics : uint8_t {
   /// On a property or subscript reference, this is a direct access to
   /// the underlying storage.  On a function reference, this is a
   /// non-polymorphic access to a particular implementation.
@@ -113,7 +113,7 @@ enum class AccessSemantics : unsigned char {
   /// On a property or subscript reference, this is a direct,
   /// non-polymorphic access to the getter/setter accessors.
   DirectToAccessor,
-  
+
   /// On a property or subscript reference, this is an access to a property
   /// behavior that may be an initialization. Reads always go through the
   /// 'get' accessor on the property. Writes may go through the 'init' or
@@ -403,7 +403,7 @@ public:
   Type getType() const { return Ty; }
 
   /// setType - Sets the type of this expression.
-  void setType(Type T) { Ty = T; }
+  void setType(Type T);
 
   /// \brief Return the source range of the expression.
   SourceRange getSourceRange() const;
@@ -717,12 +717,19 @@ public:
 /// can help us preserve the context of the code completion position.
 class CodeCompletionExpr : public Expr {
   SourceRange Range;
+  bool Activated;
+
 public:
   CodeCompletionExpr(SourceRange Range, Type Ty = Type()) :
       Expr(ExprKind::CodeCompletion, /*Implicit=*/true, Ty),
-      Range(Range) {}
+      Range(Range) {
+    Activated = false;
+  }
 
   SourceRange getSourceRange() const { return Range; }
+
+  bool isActivated() const { return Activated; }
+  void setActivated() { Activated = true; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::CodeCompletion;
@@ -2353,11 +2360,16 @@ class UnresolvedDotExpr : public Expr {
   SourceLoc DotLoc;
   DeclNameLoc NameLoc;
   DeclName Name;
+  ArrayRef<ValueDecl *> OuterAlternatives;
+
 public:
-  UnresolvedDotExpr(Expr *subexpr, SourceLoc dotloc, DeclName name,
-                    DeclNameLoc nameloc, bool Implicit)
-    : Expr(ExprKind::UnresolvedDot, Implicit), SubExpr(subexpr), DotLoc(dotloc),
-      NameLoc(nameloc), Name(name) {
+  UnresolvedDotExpr(
+      Expr *subexpr, SourceLoc dotloc, DeclName name, DeclNameLoc nameloc,
+      bool Implicit,
+      ArrayRef<ValueDecl *> outerAlternatives = ArrayRef<ValueDecl *>())
+      : Expr(ExprKind::UnresolvedDot, Implicit), SubExpr(subexpr),
+        DotLoc(dotloc), NameLoc(nameloc), Name(name),
+        OuterAlternatives(outerAlternatives) {
     Bits.UnresolvedDotExpr.FunctionRefKind =
       static_cast<unsigned>(NameLoc.isCompound() ? FunctionRefKind::Compound
                                                  : FunctionRefKind::Unapplied);
@@ -2379,6 +2391,10 @@ public:
 
   DeclName getName() const { return Name; }
   DeclNameLoc getNameLoc() const { return NameLoc; }
+
+  ArrayRef<ValueDecl *> getOuterAlternatives() const {
+    return OuterAlternatives;
+  }
 
   /// Retrieve the kind of function reference.
   FunctionRefKind getFunctionRefKind() const {
@@ -4909,7 +4925,7 @@ public:
       case Kind::OptionalForce:
       case Kind::UnresolvedProperty:
       case Kind::Property:
-        llvm_unreachable("no index expr for this kind");
+        return nullptr;
       }
     }
 
@@ -4942,7 +4958,7 @@ public:
       case Kind::OptionalForce:
       case Kind::UnresolvedProperty:
       case Kind::Property:
-        llvm_unreachable("no hashable conformances for this kind");
+        return {};
       }
     }
     

@@ -199,8 +199,10 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     }
   };
 
-  typedef llvm::MapVector<ExtensionDecl*, SynthesizedExtensionInfo> ExtensionInfoMap;
-  typedef llvm::MapVector<ExtensionDecl*, ExtensionMergeInfo> ExtensionMergeInfoMap;
+  using ExtensionInfoMap =
+      llvm::MapVector<ExtensionDecl *, SynthesizedExtensionInfo>;
+  using ExtensionMergeInfoMap =
+      llvm::MapVector<ExtensionDecl *, ExtensionMergeInfo>;
 
   struct ExtensionMergeGroup {
 
@@ -240,7 +242,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     }
   };
 
-  typedef std::vector<ExtensionMergeGroup> MergeGroupVector;
+  using MergeGroupVector = std::vector<ExtensionMergeGroup>;
 
   NominalTypeDecl *Target;
   Type BaseType;

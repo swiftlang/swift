@@ -1,13 +1,14 @@
+
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -enable-sil-ownership -enable-resilience -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift
-// RUN: %target-swift-frontend -I %t -emit-silgen -enable-sil-ownership -enable-resilience %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name protocol_resilience -emit-module -enable-sil-ownership -enable-resilience -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift
+// RUN: %target-swift-frontend -module-name protocol_resilience -I %t -emit-silgen -enable-sil-ownership -enable-resilience %s | %FileCheck %s
 
 import resilient_protocol
 
-prefix operator ~~~ {}
-infix operator <*> {}
-infix operator <**> {}
-infix operator <===> {}
+prefix operator ~~~
+infix operator <*>
+infix operator <**>
+infix operator <===>
 
 public protocol P {}
 
@@ -221,13 +222,13 @@ extension ReabstractSelfBase {
   }
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvg : $@convention(witness_method: ReabstractSelfRefined) <τ_0_0 where τ_0_0 : ReabstractSelfRefined> (@guaranteed τ_0_0) -> @owned @callee_guaranteed (@owned τ_0_0) -> @owned τ_0_0
+// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_resilience21ReabstractSelfRefinedP8callbackyxxcvg : $@convention(witness_method: ReabstractSelfRefined) <τ_0_0 where τ_0_0 : ReabstractSelfRefined> (@guaranteed τ_0_0) -> @owned @callee_guaranteed (@guaranteed τ_0_0) -> @owned τ_0_0
 // CHECK: [[SELF_BOX:%.*]] = alloc_stack $τ_0_0
 // CHECK-NEXT: [[SELF_COPY:%.*]] = copy_value %0 : $τ_0_0
 // CHECK-NEXT: store [[SELF_COPY]] to [init] [[SELF_BOX]] : $*τ_0_0
 // CHECK: [[WITNESS:%.*]] = function_ref @$S19protocol_resilience18ReabstractSelfBasePAAE8callbackyxxcvg
 // CHECK-NEXT: [[RESULT:%.*]] = apply [[WITNESS]]<τ_0_0>([[SELF_BOX]])
-// CHECK: [[THUNK_FN:%.*]] = function_ref @$SxxIegir_xxIegxo_19protocol_resilience21ReabstractSelfRefinedRzlTR
+// CHECK: [[THUNK_FN:%.*]] = function_ref @$SxxIegnr_xxIeggo_19protocol_resilience21ReabstractSelfRefinedRzlTR
 // CHECK-NEXT: [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]<τ_0_0>([[RESULT]])
 // CHECK-NEXT: destroy_addr [[SELF_BOX]]
 // CHECK-NEXT: dealloc_stack [[SELF_BOX]]

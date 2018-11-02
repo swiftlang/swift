@@ -15,14 +15,14 @@ import _SwiftDispatchOverlayShims
 
 /// dispatch_assert
 
-@available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
+@available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
 public enum DispatchPredicate {
 	case onQueue(DispatchQueue)
 	case onQueueAsBarrier(DispatchQueue)
 	case notOnQueue(DispatchQueue)
 }
 
-@available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
+@available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
 public func _dispatchPreconditionTest(_ condition: DispatchPredicate) -> Bool {
 	switch condition {
 	case .onQueue(let q):
@@ -36,7 +36,7 @@ public func _dispatchPreconditionTest(_ condition: DispatchPredicate) -> Bool {
 }
 
 @_transparent
-@available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
+@available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
 public func dispatchPrecondition(condition: @autoclosure () -> DispatchPredicate) {
 	// precondition is able to determine release-vs-debug asserts where the overlay
 	// cannot, so formulating this into a call that we can call with precondition()
@@ -49,42 +49,42 @@ public struct DispatchQoS : Equatable {
 	public let qosClass: QoSClass
 	public let relativePriority: Int
 
-	@available(OSX 10.10, iOS 8.0, *)
+	@available(macOS 10.10, iOS 8.0, *)
 	public static let background = DispatchQoS(qosClass: .background, relativePriority: 0)
 
-	@available(OSX 10.10, iOS 8.0, *)
+	@available(macOS 10.10, iOS 8.0, *)
 	public static let utility = DispatchQoS(qosClass: .utility, relativePriority: 0)
 
-	@available(OSX 10.10, iOS 8.0, *)
+	@available(macOS 10.10, iOS 8.0, *)
 	public static let `default` = DispatchQoS(qosClass: .default, relativePriority: 0)
 
-	@available(OSX 10.10, iOS 8.0, *)
+	@available(macOS 10.10, iOS 8.0, *)
 	public static let userInitiated = DispatchQoS(qosClass: .userInitiated, relativePriority: 0)
 
-	@available(OSX 10.10, iOS 8.0, *)
+	@available(macOS 10.10, iOS 8.0, *)
 	public static let userInteractive = DispatchQoS(qosClass: .userInteractive, relativePriority: 0)
 
 	public static let unspecified = DispatchQoS(qosClass: .unspecified, relativePriority: 0)
 
 	public enum QoSClass {
-		@available(OSX 10.10, iOS 8.0, *)
+		@available(macOS 10.10, iOS 8.0, *)
 		case background
 
-		@available(OSX 10.10, iOS 8.0, *)
+		@available(macOS 10.10, iOS 8.0, *)
 		case utility
 
-		@available(OSX 10.10, iOS 8.0, *)
+		@available(macOS 10.10, iOS 8.0, *)
 		case `default`
 
-		@available(OSX 10.10, iOS 8.0, *)
+		@available(macOS 10.10, iOS 8.0, *)
 		case userInitiated
 
-		@available(OSX 10.10, iOS 8.0, *)
+		@available(macOS 10.10, iOS 8.0, *)
 		case userInteractive
 
 		case unspecified
 
-		@available(OSX 10.10, iOS 8.0, *)
+		@available(macOS 10.10, iOS 8.0, *)
 		public init?(rawValue: qos_class_t) {
 			switch rawValue {
 			case QOS_CLASS_BACKGROUND: self = .background
@@ -97,7 +97,7 @@ public struct DispatchQoS : Equatable {
 			}
 		}
 
-		@available(OSX 10.10, iOS 8.0, *)
+		@available(macOS 10.10, iOS 8.0, *)
 		public var rawValue: qos_class_t {
 			switch self {
 			case .background: return QOS_CLASS_BACKGROUND
@@ -114,14 +114,14 @@ public struct DispatchQoS : Equatable {
 		self.qosClass = qosClass
 		self.relativePriority = relativePriority
 	}
-}
 
-public func ==(a: DispatchQoS, b: DispatchQoS) -> Bool {
-	return a.qosClass == b.qosClass && a.relativePriority == b.relativePriority
+	public static func ==(a: DispatchQoS, b: DispatchQoS) -> Bool {
+		return a.qosClass == b.qosClass && a.relativePriority == b.relativePriority
+	}
 }
 
 /// 
-
+@_frozen
 public enum DispatchTimeoutResult {
 	case success
 	case timedOut
@@ -131,7 +131,7 @@ public enum DispatchTimeoutResult {
 
 public extension DispatchGroup {
 	public func notify(qos: DispatchQoS = .unspecified, flags: DispatchWorkItemFlags = [], queue: DispatchQueue, execute work: @escaping @convention(block) () -> Void) {
-		if #available(OSX 10.10, iOS 8.0, *), qos != .unspecified || !flags.isEmpty {
+		if #available(macOS 10.10, iOS 8.0, *), qos != .unspecified || !flags.isEmpty {
 			let item = DispatchWorkItem(qos: qos, flags: flags, block: work)
 			_swift_dispatch_group_notify(self, queue, item._block)
 		} else {
@@ -139,7 +139,7 @@ public extension DispatchGroup {
 		}
 	}
 
-	@available(OSX 10.10, iOS 8.0, *)
+	@available(macOS 10.10, iOS 8.0, *)
 	public func notify(queue: DispatchQueue, work: DispatchWorkItem) {
 		_swift_dispatch_group_notify(self, queue, work._block)
 	}

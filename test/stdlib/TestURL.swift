@@ -67,7 +67,7 @@ class TestURL : TestURLSuper {
         }
     }
     
-#if os(OSX)
+#if os(macOS)
     func testQuarantineProperties() {
         // Test the quarantine stuff; it has special logic
         if #available(OSX 10.11, iOS 9.0, *) {
@@ -383,7 +383,7 @@ var URLTests = TestSuite("TestURL")
 URLTests.test("testBasics") { TestURL().testBasics() }
 URLTests.test("testProperties") { TestURL().testProperties() }
 URLTests.test("testSetProperties") { TestURL().testSetProperties() }
-#if os(OSX)
+#if os(macOS)
 URLTests.test("testQuarantineProperties") { TestURL().testQuarantineProperties() }
 #endif
 URLTests.test("testMoreSetProperties") { TestURL().testMoreSetProperties() }

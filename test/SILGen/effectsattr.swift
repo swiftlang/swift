@@ -10,3 +10,5 @@
 //CHECK: [readwrite] @func3
 @effects(readwrite) @_silgen_name("func3") func func3() { }
 
+//CHECK: [releasenone] @func4
+@effects(releasenone) @_silgen_name("func4") func func4() { }

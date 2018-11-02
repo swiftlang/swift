@@ -39,7 +39,7 @@ private func privateFuncWithFileprivateAlias() -> Generic<Int>.Dependent {
   return 3
 }
 
-var y = privateFuncWithFileprivateAlias()
+var y = privateFuncWithFileprivateAlias() // expected-warning{{variable should be declared fileprivate because its type 'Generic<Int>.Dependent' (aka 'Int') uses a fileprivate type}}
 
 
 private typealias FnType = (_ x: Int) -> Void // expected-note * {{type declared here}}

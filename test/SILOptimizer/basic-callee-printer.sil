@@ -666,3 +666,40 @@ sil_vtable SomeChildItem {
   #SomeItem.init!initializer.1: @SomeChildItem_initializer
   #SomeChildItem.deinit!deallocator: @SomeChildItem_destructor
 }
+
+public protocol PublicProtocol {
+  func foo()
+}
+
+struct SingleConformance : PublicProtocol {
+  func foo()
+}
+
+public func testit(p: PublicProtocol)
+
+sil private [transparent] [thunk] @foo_impl : $@convention(witness_method: PublicProtocol) (@in_guaranteed SingleConformance) -> () {
+bb0(%0 : $*SingleConformance):
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK: Function call site:
+// CHECK:   witness_method $@opened{{.*}} PublicProtocol
+// CHECK:   apply {{.*}} PublicProtocol
+// CHECK-NOWMO: Incomplete callee list? : Yes
+// CHECK-WMO: Incomplete callee list? : Yes
+// CHECK: Known callees:
+sil @call_foo : $@convention(thin) (@in PublicProtocol) -> () {
+bb0(%0 : $*PublicProtocol):
+  %5 = open_existential_addr immutable_access %0 : $*PublicProtocol to $*@opened("2226A1AC-2B95-11E8-BDF4-D0817AD3F637") PublicProtocol
+  %6 = witness_method $@opened("2226A1AC-2B95-11E8-BDF4-D0817AD3F637") PublicProtocol, #PublicProtocol.foo!1 : <Self where Self : PublicProtocol> (Self) -> () -> (), %5 : $*@opened("2226A1AC-2B95-11E8-BDF4-D0817AD3F637") PublicProtocol : $@convention(witness_method: PublicProtocol) <τ_0_0 where τ_0_0 : PublicProtocol> (@in_guaranteed τ_0_0) -> ()
+  %7 = apply %6<@opened("2226A1AC-2B95-11E8-BDF4-D0817AD3F637") PublicProtocol>(%5) : $@convention(witness_method: PublicProtocol) <τ_0_0 where τ_0_0 : PublicProtocol> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %0 : $*PublicProtocol
+  %10 = tuple ()
+  return %10 : $()
+}
+
+sil_witness_table hidden SingleConformance: PublicProtocol module nix {
+  method #PublicProtocol.foo!1: <Self where Self : PublicProtocol> (Self) -> () -> () : @foo_impl
+}
+

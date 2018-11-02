@@ -14,9 +14,10 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Type.h"
+#include "swift/SIL/AbstractionPattern.h"
+#include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/SIL/AbstractionPattern.h"
 
 using namespace swift;
 using namespace swift::Lowering;
@@ -302,22 +303,23 @@ bool SILType::canPerformABICompatibleUnsafeCastValue(SILType fromType,
 // TODO: handle casting to a loadable existential by generating
 // init_existential_ref. Until then, only promote to a heap object dest.
 bool SILType::canRefCast(SILType operTy, SILType resultTy, SILModule &M) {
-  auto fromTy = operTy.unwrapAnyOptionalType();
-  auto toTy = resultTy.unwrapAnyOptionalType();
+  auto fromTy = operTy.unwrapOptionalType();
+  auto toTy = resultTy.unwrapOptionalType();
   return (fromTy.isHeapObjectReferenceType() || fromTy.isClassExistentialType())
     && toTy.isHeapObjectReferenceType();
 }
 
 SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
-  assert(field->getDeclContext() == getNominalOrBoundGenericNominal());
+  auto baseTy = getSwiftRValueType();
+
   AbstractionPattern origFieldTy = M.Types.getAbstractionPattern(field);
   CanType substFieldTy;
   if (field->hasClangNode()) {
     substFieldTy = origFieldTy.getType();
   } else {
     substFieldTy =
-      getSwiftRValueType()->getTypeOfMember(M.getSwiftModule(),
-                                            field, nullptr)->getCanonicalType();
+      baseTy->getTypeOfMember(M.getSwiftModule(),
+                              field, nullptr)->getCanonicalType();
   }
   auto loweredTy = M.Types.getLoweredType(origFieldTy, substFieldTy);
   if (isAddress() || getClassOrBoundGenericClass() != nullptr) {
@@ -350,6 +352,10 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
     M.Types.getLoweredType(M.Types.getAbstractionPattern(elt), substEltTy);
 
   return SILType(loweredTy.getSwiftRValueType(), getCategory());
+}
+
+bool SILType::isLoadableOrOpaque(SILModule &M) const {
+  return isLoadable(M) || !SILModuleConventions(M).useLoweredAddresses();
 }
 
 /// True if the type, or the referenced type of an address type, is
@@ -463,7 +469,7 @@ SILType SILType::getOptionalObjectType() const {
   return SILType();
 }
 
-SILType SILType::unwrapAnyOptionalType() const {
+SILType SILType::unwrapOptionalType() const {
   if (auto objectTy = getOptionalObjectType()) {
     return objectTy;
   }
@@ -633,16 +639,6 @@ bool SILModuleConventions::isPassedIndirectlyInSIL(SILType type, SILModule &M) {
 
 bool SILFunctionType::isNoReturnFunction() {
   return getDirectFormalResultsType().getSwiftRValueType()->isUninhabited();
-}
-
-SILType SILType::wrapAnyOptionalType(SILFunction &F) const {
-  SILModule &M = F.getModule();
-  EnumDecl *OptionalDecl = M.getASTContext().getOptionalDecl();
-  BoundGenericType *BoundEnumDecl =
-      BoundGenericType::get(OptionalDecl, Type(), {getSwiftRValueType()});
-  AbstractionPattern Pattern(F.getLoweredFunctionType()->getGenericSignature(),
-                             BoundEnumDecl->getCanonicalType());
-  return M.Types.getLoweredType(Pattern, BoundEnumDecl);
 }
 
 #ifndef NDEBUG

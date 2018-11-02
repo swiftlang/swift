@@ -1,8 +1,9 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 3 %s | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 3 %s | %FileCheck %s --check-prefix=NEGATIVE
 
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 4 %s | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 4 %s | %FileCheck %s --check-prefix=NEGATIVE
+// RUN: %target-swift-frontend -module-name default_arguments -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 3 %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name default_arguments -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 3 %s | %FileCheck %s --check-prefix=NEGATIVE
+
+// RUN: %target-swift-frontend -module-name default_arguments -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 4 %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name default_arguments -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 4 %s | %FileCheck %s --check-prefix=NEGATIVE
 
 // __FUNCTION__ used as top-level parameter produces the module name.
 // CHECK-LABEL: sil @main
@@ -36,8 +37,9 @@ func testDefaultArg1() {
   // CHECK: [[DEF0:%[0-9]+]] = apply [[DEF0FN]]()
   // CHECK: [[DEF2FN:%[0-9]+]] = function_ref @$S17default_arguments7defarg1{{.*}}A1_
   // CHECK: [[DEF2:%[0-9]+]] = apply [[DEF2FN]]()
+  // CHECK: [[BORROWED_DEF2:%.*]] = begin_borrow [[DEF2]]
   // CHECK: [[FNREF:%[0-9]+]] = function_ref @$S17default_arguments7defarg1{{[_0-9a-zA-Z]*}}F
-  // CHECK: apply [[FNREF]]([[DEF0]], [[FLOATVAL]], [[DEF2]])
+  // CHECK: apply [[FNREF]]([[DEF0]], [[FLOATVAL]], [[BORROWED_DEF2]])
   defarg1(d:3.125)
 }
 
@@ -53,8 +55,9 @@ func testDefaultArg2() {
 // CHECK:  [[D:%[0-9]+]] = apply [[DFN]]() : $@convention(thin) () -> Double
 // CHECK:  [[SFN:%[0-9]+]] = function_ref @$S17default_arguments7defarg2{{.*}}A1_ : $@convention(thin) () -> @owned String
 // CHECK:  [[S:%[0-9]+]] = apply [[SFN]]() : $@convention(thin) () -> @owned String
-// CHECK:  [[FNREF:%[0-9]+]] = function_ref @$S17default_arguments7defarg2{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Int, Double, @owned String) -> ()
-// CHECK:  apply [[FNREF]]([[I]], [[D]], [[S]]) : $@convention(thin) (Int, Double, @owned String) -> ()
+// CHECK:  [[BORROWED_S:%.*]] = begin_borrow [[S]]
+// CHECK:  [[FNREF:%[0-9]+]] = function_ref @$S17default_arguments7defarg2{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Int, Double, @guaranteed String) -> ()
+// CHECK:  apply [[FNREF]]([[I]], [[D]], [[BORROWED_S]]) : $@convention(thin) (Int, Double, @guaranteed String) -> ()
   defarg2(5)
 }
 
@@ -219,16 +222,16 @@ class ReabstractDefaultArgument<T> {
 
 // CHECK-LABEL: sil hidden @$S17default_arguments32testDefaultArgumentReabstractionyyF
 // function_ref default_arguments.ReabstractDefaultArgument.__allocating_init <A>(default_arguments.ReabstractDefaultArgument<A>.Type)(a : (A, A) -> Swift.Bool) -> default_arguments.ReabstractDefaultArgument<A>
-// CHECK: [[FN:%.*]] = function_ref @$S17default_arguments25ReabstractDefaultArgument{{.*}} : $@convention(thin) <τ_0_0> () -> @owned @callee_guaranteed (@in τ_0_0, @in τ_0_0) -> Bool
-// CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Int>() : $@convention(thin) <τ_0_0> () -> @owned @callee_guaranteed (@in τ_0_0, @in τ_0_0) -> Bool
-// CHECK-NEXT: function_ref reabstraction thunk helper from @escaping @callee_guaranteed (@in Swift.Int, @in Swift.Int) -> (@unowned Swift.Bool) to @escaping @callee_guaranteed (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool)
-// CHECK-NEXT: [[THUNK:%.*]] = function_ref @$SS2iSbIegiid_S2iSbIegyyd_TR : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (@in Int, @in Int) -> Bool) -> Bool
-// CHECK-NEXT: [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[RESULT]]) : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (@in Int, @in Int) -> Bool) -> Bool
-// CHECK-NEXT: [[CONV_FN:%.*]] = convert_escape_to_noescape [[FN]]
-// function_ref reabstraction thunk helper from @callee_guaranteed (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool) to @callee_guaranteed (@in Swift.Int, @in Swift.Int) -> (@unowned Swift.Bool)
-// CHECK: [[THUNK:%.*]] = function_ref @$SS2iSbIgyyd_S2iSbIegiid_TR : $@convention(thin) (@in Int, @in Int, @noescape @callee_guaranteed (Int, Int) -> Bool) -> Bool
-// CHECK-NEXT: [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[CONV_FN]]) : $@convention(thin) (@in Int, @in Int, @noescape @callee_guaranteed (Int, Int) -> Bool) -> Bool
-// CHECK-NEXT: [[CONV_FN:%.*]] = convert_escape_to_noescape [[FN]]
+// CHECK: [[FN:%.*]] = function_ref @$S17default_arguments25ReabstractDefaultArgument{{.*}} : $@convention(thin) <τ_0_0> () -> @owned @callee_guaranteed (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
+// CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]<Int>() : $@convention(thin) <τ_0_0> () -> @owned @callee_guaranteed (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
+// CHECK-NEXT: function_ref reabstraction thunk helper from @escaping @callee_guaranteed (@in_guaranteed Swift.Int, @in_guaranteed Swift.Int) -> (@unowned Swift.Bool) to @escaping @callee_guaranteed (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool)
+// CHECK-NEXT: [[THUNK:%.*]] = function_ref @$SS2iSbIegnnd_S2iSbIegyyd_TR : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (@in_guaranteed Int, @in_guaranteed Int) -> Bool) -> Bool
+// CHECK-NEXT: [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[RESULT]]) : $@convention(thin) (Int, Int, @guaranteed @callee_guaranteed (@in_guaranteed Int, @in_guaranteed Int) -> Bool) -> Bool
+// CHECK-NEXT: [[CONV_FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[FN]]
+// function_ref reabstraction thunk helper from @callee_guaranteed (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool) to @callee_guaranteed (@in_guaranteed Swift.Int, @in_guaranteed Swift.Int) -> (@unowned Swift.Bool)
+// CHECK: [[THUNK:%.*]] = function_ref @$SS2iSbIgyyd_S2iSbIegnnd_TR : $@convention(thin) (@in_guaranteed Int, @in_guaranteed Int, @noescape @callee_guaranteed (Int, Int) -> Bool) -> Bool
+// CHECK-NEXT: [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[CONV_FN]]) : $@convention(thin) (@in_guaranteed Int, @in_guaranteed Int, @noescape @callee_guaranteed (Int, Int) -> Bool) -> Bool
+// CHECK-NEXT: [[CONV_FN:%.*]] = convert_escape_to_noescape [not_guaranteed] [[FN]]
 // CHECK: [[INITFN:%[0-9]+]] = function_ref @$S17default_arguments25ReabstractDefaultArgumentC{{[_0-9a-zA-Z]*}}fC
 // CHECK-NEXT: apply [[INITFN]]<Int>([[CONV_FN]], 
 
@@ -317,47 +320,51 @@ func autoclosureDefaultEscaping(closure: @escaping @autoclosure () -> Bool  = tr
 
 // CHECK:  [[F:%.*]] = function_ref @$S17default_arguments15throwingDefault7closureySbyKXE_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
 // CHECK:  [[C:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
-// CHECK:  [[E:%.*]] = convert_escape_to_noescape [[C]] : $@callee_guaranteed () -> (Bool, @error Error) to $@noescape @callee_guaranteed () -> (Bool, @error Error)
+// CHECK:  [[E:%.*]] = convert_escape_to_noescape [not_guaranteed] [[C]]
 // CHECK:  [[R:%.*]] = function_ref @$S17default_arguments15throwingDefault7closureySbyKXE_tKF : $@convention(thin) (@noescape @callee_guaranteed () -> (Bool, @error Error)) -> @error Error
 // CHECK:  try_apply [[R]]([[E]])
 
 // CHECK:  [[F:%.*]] = function_ref @$S17default_arguments26throwingAutoclosureDefault7closureySbyKXK_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
 // CHECK:  [[C:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
-// CHECK:  [[E:%.*]] = convert_escape_to_noescape [[C]] : $@callee_guaranteed () -> (Bool, @error Error) to $@noescape @callee_guaranteed () -> (Bool, @error Error)
+// CHECK:  [[E:%.*]] = convert_escape_to_noescape [not_guaranteed] [[C]]
 // CHECK:  [[R:%.*]] = function_ref @$S17default_arguments26throwingAutoclosureDefault7closureySbyKXK_tKF : $@convention(thin) (@noescape @callee_guaranteed () -> (Bool, @error Error)) -> @error Error
 // CHECK:  try_apply [[R]]([[E]])
 
 // CHECK:   [[F:%.*]] = function_ref @$S17default_arguments0A3Arg7closureySbyXE_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
 // CHECK:   [[C:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
-// CHECK:   [[E:%.*]] = convert_escape_to_noescape [[C]] : $@callee_guaranteed () -> Bool to $@noescape @callee_guaranteed () -> Bool
+// CHECK:   [[E:%.*]] = convert_escape_to_noescape [not_guaranteed] [[C]]
 // CHECK:   [[R:%.*]] = function_ref @$S17default_arguments0A3Arg7closureySbyXE_tF : $@convention(thin) (@noescape @callee_guaranteed () -> Bool) -> ()
 // CHECK:   apply [[R]]([[E]])
 
 // CHECK:  [[F:%.*]] = function_ref @$S17default_arguments21autoclosureDefaultArg7closureySbyXK_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Boo
 // CHECK:  [[C:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
-// CHECK:  [[E:%.*]] = convert_escape_to_noescape [[C]] : $@callee_guaranteed () -> Bool to $@noescape @callee_guaranteed () -> Bool
+// CHECK:  [[E:%.*]] = convert_escape_to_noescape [not_guaranteed] [[C]]
 // CHECK:  [[R:%.*]] = function_ref @$S17default_arguments21autoclosureDefaultArg7closureySbyXK_tF : $@convention(thin) (@noescape @callee_guaranteed () -> Bool) -> ()
 // CHECK:  apply [[R]]([[E]])
 
 // CHECK:  [[F:%.*]] = function_ref @$S17default_arguments23throwingDefaultEscaping7closureySbyKc_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
 // CHECK:  [[E:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
-// CHECK:  [[R:%.*]] = function_ref @$S17default_arguments23throwingDefaultEscaping7closureySbyKc_tKF : $@convention(thin) (@owned @callee_guaranteed () -> (Bool, @error Error)) -> @error Erro
-// CHECK:  try_apply [[R]]([[E]])
+// CHECK:  [[BORROWED_E:%.*]] = begin_borrow [[E]]
+// CHECK:  [[R:%.*]] = function_ref @$S17default_arguments23throwingDefaultEscaping7closureySbyKc_tKF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (Bool, @error Error)) -> @error Erro
+// CHECK:  try_apply [[R]]([[BORROWED_E]])
 
 // CHECK:  [[F:%.*]] = function_ref @$S17default_arguments34throwingAutoclosureDefaultEscaping7closureySbyKXA_tKFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
 // CHECK:  [[E:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> (Bool, @error Error)
-// CHECK:  [[R:%.*]] = function_ref @$S17default_arguments34throwingAutoclosureDefaultEscaping7closureySbyKXA_tKF : $@convention(thin) (@owned @callee_guaranteed () -> (Bool, @error Error)) -> @error Error
-// CHECK:  try_apply [[R]]([[E]])
+// CHECK:  [[BORROWED_E:%.*]] = begin_borrow [[E]]
+// CHECK:  [[R:%.*]] = function_ref @$S17default_arguments34throwingAutoclosureDefaultEscaping7closureySbyKXA_tKF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (Bool, @error Error)) -> @error Error
+// CHECK:  try_apply [[R]]([[BORROWED_E]])
 
 // CHECK:  [[F:%.*]] = function_ref @$S17default_arguments0A8Escaping7closureySbyc_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
 // CHECK:  [[E:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
-// CHECK:  [[R:%.*]] = function_ref @$S17default_arguments0A8Escaping7closureySbyc_tF : $@convention(thin) (@owned @callee_guaranteed () -> Bool) -> ()
-// CHECK:  apply [[R]]([[E]])
+// CHECK:  [[BORROWED_E:%.*]] = begin_borrow [[E]]
+// CHECK:  [[R:%.*]] = function_ref @$S17default_arguments0A8Escaping7closureySbyc_tF : $@convention(thin) (@guaranteed @callee_guaranteed () -> Bool) -> ()
+// CHECK:  apply [[R]]([[BORROWED_E]])
 
 // CHECK:  [[F:%.*]] = function_ref @$S17default_arguments26autoclosureDefaultEscaping7closureySbyXA_tFfA_ : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
 // CHECK:  [[E:%.*]] = apply [[F]]() : $@convention(thin) () -> @owned @callee_guaranteed () -> Bool
-// CHECK:  [[R:%.*]] = function_ref @$S17default_arguments26autoclosureDefaultEscaping7closureySbyXA_tF : $@convention(thin) (@owned @callee_guaranteed () -> Bool) -> ()
-// CHECK:  apply [[R]]([[E]])
+// CHECK:  [[BORROWED_E:%.*]] = begin_borrow [[E]]
+// CHECK:  [[R:%.*]] = function_ref @$S17default_arguments26autoclosureDefaultEscaping7closureySbyXA_tF : $@convention(thin) (@guaranteed @callee_guaranteed () -> Bool) -> ()
+// CHECK:  apply [[R]]([[BORROWED_E]])
 
 func callThem() throws {
    try throwingDefault()

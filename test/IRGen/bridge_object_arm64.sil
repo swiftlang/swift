@@ -25,7 +25,7 @@ entry(%c : $C, %w : $Builtin.Word):
 }
 
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc { %objc_object*, i64 } @convert_from_bridge_object
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { %objc_object*, i64 } @convert_from_bridge_object
 // CHECK:         [[BOBITS:%.*]] = ptrtoint [[BRIDGE:%swift.bridge\*]] %0 to i64
 // --                                                     0x8000_0000_0000_0000
 // CHECK:         [[TAGBITS:%.*]] = and i64 [[BOBITS]], -9223372036854775808

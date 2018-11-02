@@ -18,6 +18,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Option/Options.h"
@@ -113,10 +114,7 @@ public:
 
 int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
                     void *MainAddr) {
-  llvm::InitializeAllTargets();
-  llvm::InitializeAllTargetMCs();
-  llvm::InitializeAllAsmPrinters();
-  llvm::InitializeAllAsmParsers();
+  INITIALIZE_LLVM();
 
   CompilerInstance Instance;
   PrintingDiagnosticConsumer PDC;

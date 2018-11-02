@@ -174,7 +174,9 @@ ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
   case Kind::RValue: {
     auto loc = getKnownRValueLocation();
     if (auto init = C.getEmitInto()) {
-      std::move(*this).asKnownRValue(SGF).forwardInto(SGF, loc, init);
+      std::move(*this).asKnownRValue(SGF)
+                      .ensurePlusOne(SGF, loc)
+                      .forwardInto(SGF, loc, init);
       return ManagedValue::forInContext();
     } else {
       return std::move(*this).asKnownRValue(SGF).getAsSingleValue(SGF, loc);
@@ -236,7 +238,7 @@ void ArgumentSource::forwardInto(SILGenFunction &SGF, Initialization *dest) && {
     llvm_unreachable("cannot forward an l-value");
   case Kind::RValue: {
     auto loc = getKnownRValueLocation();
-    std::move(*this).asKnownRValue(SGF).forwardInto(SGF, loc, dest);
+    std::move(*this).asKnownRValue(SGF).ensurePlusOne(SGF, loc).forwardInto(SGF, loc, dest);
     return;
   }
   case Kind::Expr: {
@@ -248,7 +250,7 @@ void ArgumentSource::forwardInto(SILGenFunction &SGF, Initialization *dest) && {
     auto loc = getKnownTupleLocation();
     auto rvalue = std::move(*this).getKnownTupleAsRValue(SGF, SGFContext(dest));
     if (!rvalue.isInContext())
-      std::move(rvalue).forwardInto(SGF, loc, dest);
+      std::move(rvalue).ensurePlusOne(SGF, loc).forwardInto(SGF, loc, dest);
     return;
   }
   }

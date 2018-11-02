@@ -7,3 +7,15 @@ struct Members {
     set {}
   }
 }
+
+struct PrivateConformance : PrivateProtocol {}
+
+private protocol PrivateProtocol {}
+
+extension PrivateProtocol {
+  public func publicExtensionMember() {}
+  // expected-note@-1 {{'publicExtensionMember' declared here}}
+
+  internal func internalExtensionMember() {}
+  // expected-note@-1 {{'internalExtensionMember' declared here}}
+}

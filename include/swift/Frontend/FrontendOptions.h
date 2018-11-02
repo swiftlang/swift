@@ -13,7 +13,6 @@
 #ifndef SWIFT_FRONTEND_FRONTENDOPTIONS_H
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
-#include "swift/AST/Module.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
@@ -39,7 +38,7 @@ public:
   InputFileKind InputKind = InputFileKind::IFK_Swift;
 
   void forAllOutputPaths(const InputFile &input,
-                         std::function<void(const std::string &)> fn) const;
+                         std::function<void(StringRef)> fn) const;
 
   bool isOutputFileDirectory() const;
 
@@ -54,9 +53,6 @@ public:
 
   /// The name of the library to link against when using this module.
   std::string ModuleLinkName;
-
-  /// The path to which we should output fixits as source edits.
-  std::string FixitsOutputPath;
 
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;
@@ -145,6 +141,9 @@ public:
   /// If set, emitted module files will always contain options for the
   /// debugger to use.
   bool AlwaysSerializeDebuggingOptions = false;
+
+  /// If set, inserts instrumentation useful for testing the debugger.
+  bool DebuggerTestingTransform = false;
 
   /// If set, dumps wall time taken to check each function body to llvm::errs().
   bool DebugTimeFunctionBodies = false;
@@ -273,8 +272,6 @@ public:
     return llvm::hash_value(0);
   }
 
-  StringRef originalPath() const;
-
   StringRef determineFallbackModuleName() const;
 
   bool isCompilingExactlyOneSwiftFile() const {
@@ -282,8 +279,10 @@ public:
            InputsAndOutputs.hasSingleInput();
   }
 
-  PrimarySpecificPaths getPrimarySpecificPathsForAtMostOnePrimary() const;
-  PrimarySpecificPaths getPrimarySpecificPathsForPrimary(StringRef) const;
+  const PrimarySpecificPaths &
+  getPrimarySpecificPathsForAtMostOnePrimary() const;
+  const PrimarySpecificPaths &
+      getPrimarySpecificPathsForPrimary(StringRef) const;
 
 private:
   static bool canActionEmitDependencies(ActionType);
@@ -296,7 +295,7 @@ public:
   static bool doesActionProduceOutput(ActionType);
   static bool doesActionProduceTextualOutput(ActionType);
   static bool needsProperModuleName(ActionType);
-  static const char *suffixForPrincipalOutputFileForAction(ActionType);
+  static StringRef suffixForPrincipalOutputFileForAction(ActionType);
 };
 
 }

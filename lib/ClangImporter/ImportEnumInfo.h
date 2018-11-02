@@ -35,11 +35,14 @@ namespace importer {
 /// into Swift. All of the possibilities have the same storage
 /// representation, but can be used in different ways.
 enum class EnumKind {
-  /// The enumeration type should map to an enum, which means that
-  /// all of the cases are independent.
-  Enum,
-  /// The enumeration type should map to an option set, which means
-  /// that
+  /// The enumeration type should map to a frozen enum, which means that
+  /// all of the cases are independent and there are no private cases.
+  FrozenEnum,
+  /// The enumeration type should map to a non-frozen enum, which means that
+  /// all of the cases are independent, but there may be values not represented
+  /// in the listed cases.
+  NonFrozenEnum,
+  /// The enumeration type should map to an option set, which means that
   /// the constants represent combinations of independent flags.
   Options,
   /// The enumeration type should map to a distinct type, but we don't
@@ -76,7 +79,15 @@ public:
 
   /// Whether this maps to an enum who also provides an error domain
   bool isErrorEnum() const {
-    return getKind() == EnumKind::Enum && !nsErrorDomain.empty();
+    switch (getKind()) {
+    case EnumKind::FrozenEnum:
+    case EnumKind::NonFrozenEnum:
+      return !nsErrorDomain.empty();
+    case EnumKind::Options:
+    case EnumKind::Unknown:
+    case EnumKind::Constants:
+      return false;
+    }
   }
 
   /// For this error enum, extract the name of the error domain constant

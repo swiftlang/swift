@@ -22,7 +22,9 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SILOptions.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -421,6 +423,13 @@ public:
     : SGF(SGF), PatternMatchStmt(S),
       CompletionHandler(completionHandler) {}
 
+  Optional<SILLocation> getSubjectLocationOverride(SILLocation loc) const {
+    if (auto *Switch = dyn_cast<SwitchStmt>(PatternMatchStmt))
+      if (!Switch->isImplicit())
+        return SILLocation(Switch->getSubjectExpr());
+    return None;
+  }
+
   void emitDispatch(ClauseMatrix &matrix, ArgArray args,
                     const FailureHandler &failure);
 
@@ -479,7 +488,8 @@ private:
                       const FailureHandler &failure);
   void emitEnumElementDispatchWithOwnership(
       ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
-      const SpecializationHandler &handleSpec, const FailureHandler &failure);
+      const SpecializationHandler &handleSpec, const FailureHandler &failure,
+      ProfileCounter defaultCaseCount);
   void emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
                                ConsumableManagedValue src,
                                const SpecializationHandler &handleSpec,
@@ -1144,6 +1154,7 @@ void PatternMatchEmission::bindRefutablePattern(Pattern *pattern,
 void PatternMatchEmission::bindExprPattern(ExprPattern *pattern,
                                            ConsumableManagedValue value,
                                            const FailureHandler &failure) {
+  DebugLocOverrideRAII LocOverride{SGF.B, getSubjectLocationOverride(pattern)};
   FullExpr scope(SGF.Cleanups, CleanupLocation(pattern));
   bindVariable(pattern, pattern->getMatchVar(), value,
                pattern->getType()->getCanonicalType(),
@@ -1681,32 +1692,63 @@ void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
 
 namespace {
   struct CaseInfo {
-    EnumElementDecl *FormalElement;
+    SmallVector<SpecializedRow, 2> SpecializedRows;
     Pattern *FirstMatcher;
     bool Irrefutable = false;
-    SmallVector<SpecializedRow, 2> SpecializedRows;
+  };
+
+  class CaseBlocks {
+    // These vectors are completely parallel, but the switch instructions want
+    // only the first two, so we split them up.
+    SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 4> CaseBBs;
+    SmallVector<ProfileCounter, 4> CaseCounts;
+    SmallVector<CaseInfo, 4> CaseInfos;
+    SILBasicBlock *DefaultBB = nullptr;
+
+  public:
+    /// Create destination blocks for switching over the cases in an enum
+    /// defined by \p rows.
+    CaseBlocks(SILGenFunction &SGF,
+               ArrayRef<RowToSpecialize> rows,
+               CanType sourceType,
+               SILBasicBlock *curBB);
+
+    ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>>
+    getCaseBlocks() const {
+      return CaseBBs;
+    }
+
+    ArrayRef<ProfileCounter> getCounts() const { return CaseCounts; }
+
+    SILBasicBlock *getDefaultBlock() const { return DefaultBB; }
+
+    void forEachCase(llvm::function_ref<void(EnumElementDecl *,
+                                             SILBasicBlock *,
+                                             const CaseInfo &)> op) const {
+      for_each(CaseBBs, CaseInfos,
+               [op](std::pair<EnumElementDecl *, SILBasicBlock *> casePair,
+                    const CaseInfo &info) {
+        op(casePair.first, casePair.second, info);
+      });
+    }
+
+    bool hasAnyRefutableCase() const {
+      return llvm::any_of(CaseInfos, [](const CaseInfo &info) {
+        return !info.Irrefutable;
+      });
+    }
   };
 } // end anonymous namespace
 
-/// Create destination blocks for switching over the cases in an enum defined
-/// by \p rows.
-static void generateEnumCaseBlocks(
+CaseBlocks::CaseBlocks(
     SILGenFunction &SGF,
     ArrayRef<RowToSpecialize> rows,
     CanType sourceType,
-    SILBasicBlock *curBB,
-    SmallVectorImpl<std::pair<EnumElementDecl *, SILBasicBlock *>> &caseBBs,
-    SmallVectorImpl<ProfileCounter> &caseCounts,
-    SmallVectorImpl<CaseInfo> &caseInfos,
-    SILBasicBlock *&defaultBB) {
+    SILBasicBlock *curBB) {
 
-  assert(caseBBs.empty());
-  assert(caseCounts.empty());
-  assert(caseInfos.empty());
-  assert(defaultBB == nullptr);
-
-  caseBBs.reserve(rows.size());
-  caseInfos.reserve(rows.size());
+  CaseBBs.reserve(rows.size());
+  CaseInfos.reserve(rows.size());
+  CaseCounts.reserve(rows.size());
 
   auto enumDecl = sourceType.getEnumOrBoundGenericEnum();
 
@@ -1722,25 +1764,23 @@ static void generateEnumCaseBlocks(
       formalElt = osp->getElementDecl();
       subPattern = osp->getSubPattern();
     }
-    auto elt = SGF.SGM.getLoweredEnumElementDecl(formalElt);
-    assert(elt->getParentEnum() == enumDecl);
+    assert(formalElt->getParentEnum() == enumDecl);
 
-    unsigned index = caseInfos.size();
-    auto insertionResult = caseToIndex.insert({elt, index});
+    unsigned index = CaseInfos.size();
+    auto insertionResult = caseToIndex.insert({formalElt, index});
     if (!insertionResult.second) {
       index = insertionResult.first->second;
     } else {
       curBB = SGF.createBasicBlock(curBB);
-      caseBBs.push_back({elt, curBB});
-      caseInfos.push_back(CaseInfo());
-      caseInfos.back().FormalElement = formalElt;
-      caseInfos.back().FirstMatcher = row.Pattern;
-      caseCounts.push_back(row.Count);
+      CaseBBs.push_back({formalElt, curBB});
+      CaseInfos.push_back(CaseInfo());
+      CaseInfos.back().FirstMatcher = row.Pattern;
+      CaseCounts.push_back(row.Count);
     }
-    assert(caseToIndex[elt] == index);
-    assert(caseBBs[index].first == elt);
+    assert(caseToIndex[formalElt] == index);
+    assert(CaseBBs[index].first == formalElt);
 
-    auto &info = caseInfos[index];
+    auto &info = CaseInfos[index];
     info.Irrefutable = (info.Irrefutable || row.Irrefutable);
     info.SpecializedRows.push_back(SpecializedRow());
     auto &specRow = info.SpecializedRows.back();
@@ -1757,7 +1797,7 @@ static void generateEnumCaseBlocks(
     }
   }
 
-  assert(caseBBs.size() == caseInfos.size());
+  assert(CaseBBs.size() == CaseInfos.size());
 
   // Check to see if the enum may have values beyond the cases we can see
   // at compile-time. This includes future cases (for resilient enums) and
@@ -1781,50 +1821,38 @@ static void generateEnumCaseBlocks(
   }
 
   if (!canAssumeExhaustive)
-    defaultBB = SGF.createBasicBlock(curBB);
+    DefaultBB = SGF.createBasicBlock(curBB);
 }
 
 /// Perform specialized dispatch for a sequence of EnumElementPattern or an
 /// OptionalSomePattern.
 void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
     ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
-    const SpecializationHandler &handleCase,
-    const FailureHandler &outerFailure) {
+    const SpecializationHandler &handleCase, const FailureHandler &outerFailure,
+    ProfileCounter defaultCastCount) {
   assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
          "SIL ownership does not support TakeOnSuccess");
 
   CanType sourceType = rows[0].Pattern->getType()->getCanonicalType();
 
   // Collect the cases and specialized rows.
-  //
-  // These vectors are completely parallel, but the switch
-  // instructions want only the first information, so we split them up.
-  SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 4> caseBBs;
-  SmallVector<ProfileCounter, 4> caseCounts;
-  SmallVector<CaseInfo, 4> caseInfos;
-  SILBasicBlock *defaultBB = nullptr;
-
-  generateEnumCaseBlocks(SGF, rows, sourceType, SGF.B.getInsertionBB(),
-                         caseBBs, caseCounts, caseInfos, defaultBB);
+  CaseBlocks blocks{SGF, rows, sourceType, SGF.B.getInsertionBB()};
 
   SILLocation loc = PatternMatchStmt;
   loc.setDebugLoc(rows[0].Pattern);
   // SEMANTIC SIL TODO: Once we have the representation of a switch_enum that
   // can take a +0 value, this extra copy should be a borrow.
   SILValue srcValue = src.getFinalManagedValue().copy(SGF, loc).forward(SGF);
-  // FIXME: Pass caseCounts in here as well, as it is in
-  // emitEnumElementDispatch.
-  SGF.B.createSwitchEnum(loc, srcValue, defaultBB, caseBBs);
+  SGF.B.createSwitchEnum(loc, srcValue, blocks.getDefaultBlock(),
+                         blocks.getCaseBlocks(), blocks.getCounts(),
+                         defaultCastCount);
 
   // Okay, now emit all the cases.
-  for (unsigned i = 0, e = caseInfos.size(); i != e; ++i) {
-    auto &caseInfo = caseInfos[i];
+  blocks.forEachCase([&](EnumElementDecl *elt, SILBasicBlock *caseBB,
+                         const CaseInfo &caseInfo) {
     SILLocation loc = caseInfo.FirstMatcher;
     auto &specializedRows = caseInfo.SpecializedRows;
 
-    EnumElementDecl *elt = caseBBs[i].first;
-    EnumElementDecl *formalElt = caseInfos[i].FormalElement;
-    SILBasicBlock *caseBB = caseBBs[i].second;
     SGF.B.setInsertionPoint(caseBB);
 
     // We're in conditionally-executed code; enter a scope.
@@ -1898,8 +1926,8 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
 
       CanType substEltTy =
           sourceType
-              ->getTypeOfMember(SGF.SGM.M.getSwiftModule(), formalElt,
-                                formalElt->getArgumentInterfaceType())
+              ->getTypeOfMember(SGF.SGM.M.getSwiftModule(), elt,
+                                elt->getArgumentInterfaceType())
               ->getCanonicalType();
 
       AbstractionPattern origEltTy =
@@ -1913,10 +1941,10 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
 
     handleCase(eltCMV, specializedRows, outerFailure);
     assert(!SGF.B.hasValidInsertionPoint() && "did not end block");
-  }
+  });
 
   // Emit the default block if we needed one.
-  if (defaultBB) {
+  if (SILBasicBlock *defaultBB = blocks.getDefaultBlock()) {
     SGF.B.setInsertionPoint(defaultBB);
     SGF.B.createOwnedPHIArgument(src.getType());
     outerFailure(rows.back().Pattern);
@@ -1933,22 +1961,13 @@ void PatternMatchEmission::emitEnumElementDispatch(
   // use the dispatch code path.
   if (SGF.getOptions().EnableSILOwnership && src.getType().isObject()) {
     return emitEnumElementDispatchWithOwnership(rows, src, handleCase,
-                                                outerFailure);
+                                                outerFailure, defaultCaseCount);
   }
 
   CanType sourceType = rows[0].Pattern->getType()->getCanonicalType();
 
   // Collect the cases and specialized rows.
-  //
-  // These vectors are completely parallel, but the switch
-  // instructions want only the first information, so we split them up.
-  SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 4> caseBBs;
-  SmallVector<CaseInfo, 4> caseInfos;
-  SmallVector<ProfileCounter, 4> caseCounts;
-  SILBasicBlock *defaultBB = nullptr;
-
-  generateEnumCaseBlocks(SGF, rows, sourceType, SGF.B.getInsertionBB(),
-                         caseBBs, caseCounts, caseInfos, defaultBB);
+  CaseBlocks blocks{SGF, rows, sourceType, SGF.B.getInsertionBB()};
 
   // Emit the switch_enum{_addr} instruction.
   bool addressOnlyEnum = src.getType().isAddress();
@@ -1967,12 +1986,9 @@ void PatternMatchEmission::emitEnumElementDispatch(
       assert(!SGF.F.getModule().getOptions().EnableSILOwnership &&
              "TakeOnSuccess is not supported when compiling with ownership");
       // If any of the specialization cases is refutable, we must copy.
-      for (auto caseInfo : caseInfos)
-        if (!caseInfo.Irrefutable)
-          goto refutable;
-      break;
+      if (!blocks.hasAnyRefutableCase())
+        break;
 
-    refutable:
       src = ConsumableManagedValue(ManagedValue::forUnmanaged(src.getValue()),
                                    CastConsumptionKind::CopyOnSuccess);
       break;
@@ -1982,24 +1998,22 @@ void PatternMatchEmission::emitEnumElementDispatch(
   SILValue srcValue = src.getFinalManagedValue().forward(SGF);
   SILLocation loc = PatternMatchStmt;
   loc.setDebugLoc(rows[0].Pattern);
-  ArrayRef<ProfileCounter> caseCountsArrayRef = caseCounts;
   if (addressOnlyEnum) {
-    SGF.B.createSwitchEnumAddr(loc, srcValue, defaultBB, caseBBs,
-                               caseCountsArrayRef, defaultCaseCount);
+    SGF.B.createSwitchEnumAddr(loc, srcValue, blocks.getDefaultBlock(),
+                               blocks.getCaseBlocks(), blocks.getCounts(),
+                               defaultCaseCount);
   } else {
-    SGF.B.createSwitchEnum(loc, srcValue, defaultBB, caseBBs,
-                           caseCountsArrayRef, defaultCaseCount);
+    SGF.B.createSwitchEnum(loc, srcValue, blocks.getDefaultBlock(),
+                           blocks.getCaseBlocks(), blocks.getCounts(),
+                           defaultCaseCount);
   }
 
   // Okay, now emit all the cases.
-  for (unsigned i = 0, e = caseInfos.size(); i != e; ++i) {
-    auto &caseInfo = caseInfos[i];
+  blocks.forEachCase([&](EnumElementDecl *elt, SILBasicBlock *caseBB,
+                         const CaseInfo &caseInfo) {
     SILLocation loc = caseInfo.FirstMatcher;
     auto &specializedRows = caseInfo.SpecializedRows;
 
-    EnumElementDecl *elt = caseBBs[i].first;
-    EnumElementDecl *formalElt = caseInfos[i].FormalElement;
-    SILBasicBlock *caseBB = caseBBs[i].second;
     SGF.B.setInsertionPoint(caseBB);
 
     // We're in conditionally-executed code; enter a scope.
@@ -2121,8 +2135,8 @@ void PatternMatchEmission::emitEnumElementDispatch(
       // Reabstract to the substituted type, if needed.
 
       CanType substEltTy =
-        sourceType->getTypeOfMember(SGF.SGM.M.getSwiftModule(), formalElt,
-                                    formalElt->getArgumentInterfaceType())
+        sourceType->getTypeOfMember(SGF.SGM.M.getSwiftModule(), elt,
+                                    elt->getArgumentInterfaceType())
                   ->getCanonicalType();
 
       AbstractionPattern origEltTy =
@@ -2145,10 +2159,10 @@ void PatternMatchEmission::emitEnumElementDispatch(
 
     handleCase(eltCMV, specializedRows, *innerFailure);
     assert(!SGF.B.hasValidInsertionPoint() && "did not end block");
-  }
+  });
 
   // Emit the default block if we needed one.
-  if (defaultBB) {
+  if (SILBasicBlock *defaultBB = blocks.getDefaultBlock()) {
     SGF.B.setInsertionPoint(defaultBB);
     outerFailure(rows.back().Pattern);
   }
@@ -2543,19 +2557,78 @@ void SILGenFunction::usingImplicitVariablesForPattern(Pattern *pattern, CaseStmt
   variableSwapper();
 }
 
+static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
+                                                  SILLocation loc,
+                                                  ManagedValue value,
+                                                  const EnumDecl *enumDecl) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto diagnoseFailure = ctx.getDiagnoseUnexpectedEnumCaseValue(nullptr);
+  if (!diagnoseFailure) {
+    SGF.B.createBuiltinTrap(loc);
+    return;
+  }
+
+  assert(enumDecl->isObjC());
+  assert(enumDecl->hasRawType());
+  assert(value.getType().isTrivial(SGF.getModule()));
+
+  // Get the enum type as an Any.Type value.
+  CanType switchedValueSwiftType = value.getType().getSwiftRValueType();
+  SILType metatypeType = SGF.getLoweredType(
+      CanMetatypeType::get(switchedValueSwiftType,
+                           MetatypeRepresentation::Thick));
+  SILValue metatype = SGF.B.createMetatype(loc, metatypeType);
+
+  // Bitcast the enum value to its raw type. (This is only safe for @objc
+  // enums.)
+  SILType loweredRawType = SGF.getLoweredType(enumDecl->getRawType());
+  assert(loweredRawType.isTrivial(SGF.getModule()));
+  assert(loweredRawType.isObject());
+  auto rawValue = SGF.B.createUncheckedTrivialBitCast(loc, value,
+                                                      loweredRawType);
+  auto materializedRawValue = rawValue.materialize(SGF, loc);
+
+  Substitution subs[] = {
+    {switchedValueSwiftType, /*Conformances*/None},
+    {enumDecl->getRawType(), /*Conformances*/None},
+  };
+
+  SGF.emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, subs,
+                                  {ManagedValue::forUnmanaged(metatype),
+                                   materializedRawValue},
+                                  SGFContext());
+}
+
+static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
+                                             SILLocation loc,
+                                             ManagedValue value) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto diagnoseFailure = ctx.getDiagnoseUnexpectedEnumCase(nullptr);
+  if (!diagnoseFailure) {
+    SGF.B.createBuiltinTrap(loc);
+    return;
+  }
+
+  // Get the switched-upon value's type.
+  CanType switchedValueSwiftType = value.getType().getSwiftRValueType();
+  SILType metatypeType = SGF.getLoweredType(
+      CanMetatypeType::get(switchedValueSwiftType,
+                           MetatypeRepresentation::Thick));
+  ManagedValue metatype = SGF.B.createValueMetatype(loc, metatypeType, value);
+
+  Substitution sub{switchedValueSwiftType, /*Conformances*/None};
+  auto genericArgsMap =
+      diagnoseFailure->getGenericSignature()->getSubstitutionMap(sub);
+
+  SGF.emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, sub,
+                                  metatype,
+                                  SGFContext());
+}
+
 void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   DEBUG(llvm::dbgs() << "emitting switch stmt\n";
         S->print(llvm::dbgs());
         llvm::dbgs() << '\n');
-  auto failure = [this](SILLocation location) {
-    // If we fail to match anything, we trap. This can happen with a switch
-    // over an @objc enum, which may contain any value of its underlying type.
-    // FIXME: Even if we can't say what the invalid value was, we should at
-    // least mention that this was because of a non-exhaustive enum.
-    B.createBuiltinTrap(location);
-    B.createUnreachable(location);
-  };
-  
   // If the subject expression is uninhabited, we're already dead.
   // Emit an unreachable in place of the switch statement.
   if (S->getSubjectExpr()->getType()->isStructurallyUninhabited()) {
@@ -2639,10 +2712,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   PatternMatchEmission emission(*this, S, completionHandler);
 
   // Add a row for each label of each case.
-  //
-  // We use std::vector because it supports emplace_back; moving a ClauseRow is
-  // expensive.
-  std::vector<ClauseRow> clauseRows;
+  SmallVector<ClauseRow, 8> clauseRows;
   clauseRows.reserve(S->getRawCases().size());
   bool hasFallthrough = false;
   for (auto caseBlock : S->getCases()) {
@@ -2682,6 +2752,27 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   // Emit the subject value. Dispatching will consume it.
   ManagedValue subjectMV = emitRValueAsSingleValue(S->getSubjectExpr());
   auto subject = ConsumableManagedValue::forOwned(subjectMV);
+
+  auto failure = [&](SILLocation location) {
+    // If we fail to match anything, we trap. This can happen with a switch
+    // over an @objc enum, which may contain any value of its underlying type,
+    // or a switch over a non-frozen Swift enum when the user hasn't written a
+    // catch-all case.
+    SWIFT_DEFER { B.createUnreachable(location); };
+
+    // Special case: if it's a single @objc enum, we can print the raw value.
+    CanType ty = S->getSubjectExpr()->getType()->getCanonicalType();
+    if (auto *singleEnumDecl = ty->getEnumOrBoundGenericEnum()) {
+      if (singleEnumDecl->isObjC()) {
+        emitDiagnoseOfUnexpectedEnumCaseValue(*this, location,
+                                              subject.getFinalManagedValue(),
+                                              singleEnumDecl);
+        return;
+      }
+    }
+    emitDiagnoseOfUnexpectedEnumCase(*this, location,
+                                     subject.getFinalManagedValue());
+  };
 
   // Set up an initial clause matrix.
   ClauseMatrix clauses(clauseRows);

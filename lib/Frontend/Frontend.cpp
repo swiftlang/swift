@@ -56,19 +56,56 @@ std::string CompilerInvocation::getPCHHash() const {
   return llvm::APInt(64, Code).toString(36, /*Signed=*/false);
 }
 
-PrimarySpecificPaths
+const PrimarySpecificPaths &
 CompilerInvocation::getPrimarySpecificPathsForAtMostOnePrimary() const {
   return getFrontendOptions().getPrimarySpecificPathsForAtMostOnePrimary();
 }
 
-PrimarySpecificPaths CompilerInvocation::getPrimarySpecificPathsForPrimary(
+const PrimarySpecificPaths &
+CompilerInvocation::getPrimarySpecificPathsForPrimary(
     StringRef filename) const {
   return getFrontendOptions().getPrimarySpecificPathsForPrimary(filename);
 }
 
-PrimarySpecificPaths CompilerInvocation::getPrimarySpecificPathsForSourceFile(
+const PrimarySpecificPaths &
+CompilerInvocation::getPrimarySpecificPathsForSourceFile(
     const SourceFile &SF) const {
   return getPrimarySpecificPathsForPrimary(SF.getFilename());
+}
+
+std::string CompilerInvocation::getOutputFilenameForAtMostOnePrimary() const {
+  return getPrimarySpecificPathsForAtMostOnePrimary().OutputFilename;
+}
+std::string
+CompilerInvocation::getMainInputFilenameForDebugInfoForAtMostOnePrimary()
+    const {
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+      .MainInputFilenameForDebugInfo;
+}
+std::string
+CompilerInvocation::getObjCHeaderOutputPathForAtMostOnePrimary() const {
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+      .SupplementaryOutputs.ObjCHeaderOutputPath;
+}
+std::string CompilerInvocation::getModuleOutputPathForAtMostOnePrimary() const {
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+      .SupplementaryOutputs.ModuleOutputPath;
+}
+std::string CompilerInvocation::getReferenceDependenciesFilePathForPrimary(
+    StringRef filename) const {
+  return getPrimarySpecificPathsForPrimary(filename)
+      .SupplementaryOutputs.ReferenceDependenciesFilePath;
+}
+std::string
+CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+      .SupplementaryOutputs.SerializedDiagnosticsPath;
+}
+std::string CompilerInvocation::getTBDPathForWholeModule() const {
+  assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
+         "TBDPath only makes sense in WMO mode");
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+      .SupplementaryOutputs.TBDPath;
 }
 
 void CompilerInstance::createSILModule() {
@@ -103,9 +140,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
 
   // If we are asked to emit a module documentation file, configure lexing and
   // parsing to remember comments.
-  if (!Invocation.getFrontendOptions()
-           .InputsAndOutputs.supplementaryOutputs()
-           .ModuleDocOutputPath.empty())
+  if (Invocation.getFrontendOptions().InputsAndOutputs.hasModuleDocOutputPath())
     Invocation.getLangOptions().AttachCommentsToDecls = true;
 
   // If we are doing index-while-building, configure lexing and parsing to
@@ -233,14 +268,13 @@ bool CompilerInstance::setUpForInput(const InputFile &input) {
     return false;
 
   if (isInSILMode() ||
-      (input.buffer() == nullptr && isInputSwift() &&
+      (isInputSwift() &&
        llvm::sys::path::filename(input.file()) == "main.swift")) {
     assert(MainBufferID == NO_SUCH_BUFFER && "re-setting MainBufferID");
     MainBufferID = *bufferID;
   }
 
   if (input.isPrimary()) {
-    assert(PrimaryBufferIDs.empty() && "re-setting PrimaryBufferID");
     recordPrimaryInputBuffer(*bufferID);
   }
   return false;
@@ -612,16 +646,11 @@ void CompilerInstance::parseLibraryFile(
       SourceFileKind::Library, implicitImports.kind, BufferID);
   addAdditionalInitialImportsTo(NextInput, implicitImports);
 
-  auto *DelayedCB = SecondaryDelayedCB;
-  if (isPrimaryInput(BufferID)) {
-    DelayedCB = PrimaryDelayedCB;
-  }
-  if (isWholeModuleCompilation())
-    DelayedCB = PrimaryDelayedCB;
+  auto IsPrimary = isWholeModuleCompilation() || isPrimaryInput(BufferID);
+  auto *DelayedCB = IsPrimary ? PrimaryDelayedCB : SecondaryDelayedCB;
 
   auto &Diags = NextInput->getASTContext().Diags;
   auto DidSuppressWarnings = Diags.getSuppressWarnings();
-  auto IsPrimary = isWholeModuleCompilation() || isPrimaryInput(BufferID);
   Diags.setSuppressWarnings(DidSuppressWarnings || !IsPrimary);
 
   bool Done;
@@ -720,6 +749,11 @@ void CompilerInstance::parseAndTypeCheckMainFile(
   } while (!Done);
 
   Diags.setSuppressWarnings(DidSuppressWarnings);
+
+  if (mainIsPrimary && !Context->hadError() &&
+      Invocation.getFrontendOptions().DebuggerTestingTransform) {
+    performDebuggerTestingTransform(MainFile);
+  }
 
   if (mainIsPrimary && !Context->hadError() &&
       Invocation.getFrontendOptions().PCMacro) {
@@ -849,20 +883,21 @@ void CompilerInstance::freeASTContext() {
 
 void CompilerInstance::freeSILModule() { TheSILModule.reset(); }
 
-PrimarySpecificPaths
+const PrimarySpecificPaths &
 CompilerInstance::getPrimarySpecificPathsForWholeModuleOptimizationMode()
     const {
   return getPrimarySpecificPathsForAtMostOnePrimary();
 }
-PrimarySpecificPaths
+const PrimarySpecificPaths &
 CompilerInstance::getPrimarySpecificPathsForAtMostOnePrimary() const {
   return Invocation.getPrimarySpecificPathsForAtMostOnePrimary();
 }
-PrimarySpecificPaths
+const PrimarySpecificPaths &
 CompilerInstance::getPrimarySpecificPathsForPrimary(StringRef filename) const {
   return Invocation.getPrimarySpecificPathsForPrimary(filename);
 }
-PrimarySpecificPaths CompilerInstance::getPrimarySpecificPathsForSourceFile(
+const PrimarySpecificPaths &
+CompilerInstance::getPrimarySpecificPathsForSourceFile(
     const SourceFile &SF) const {
   return Invocation.getPrimarySpecificPathsForSourceFile(SF);
 }

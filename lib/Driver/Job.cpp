@@ -24,20 +24,40 @@ using namespace swift;
 using namespace swift::driver;
 
 StringRef CommandOutput::getOutputForInputAndType(StringRef PrimaryInputFile,
-                                                  types::ID Type) const {
+                                                  file_types::ID Type) const {
+  if (Type == file_types::TY_Nothing)
+    return StringRef();
   auto const *M = DerivedOutputMap.getOutputMapForInput(PrimaryInputFile);
   if (!M)
     return StringRef();
   auto const Out = M->find(Type);
   if (Out == M->end())
     return StringRef();
+  assert(!Out->second.empty());
   return StringRef(Out->second);
 }
 
+struct CommandOutputInvariantChecker {
+  CommandOutput const &Out;
+  CommandOutputInvariantChecker(CommandOutput const &CO) : Out(CO) {
+#ifndef NDEBUG
+    Out.checkInvariants();
+#endif
+  }
+  ~CommandOutputInvariantChecker() {
+#ifndef NDEBUG
+    Out.checkInvariants();
+#endif
+  }
+};
+
 void CommandOutput::ensureEntry(StringRef PrimaryInputFile,
-                                types::ID Type,
+                                file_types::ID Type,
                                 StringRef OutputFile,
                                 bool Overwrite) {
+  assert(!PrimaryInputFile.empty());
+  assert(!OutputFile.empty());
+  assert(Type != file_types::TY_Nothing);
   auto &M = DerivedOutputMap.getOrCreateOutputMapForInput(PrimaryInputFile);
   if (Overwrite) {
     M[Type] = OutputFile;
@@ -52,10 +72,39 @@ void CommandOutput::ensureEntry(StringRef PrimaryInputFile,
   }
 }
 
+void CommandOutput::checkInvariants() const {
+  file_types::forAllTypes([&](file_types::ID Type) {
+      size_t numOutputsOfType = 0;
+      for (auto const &I : Inputs) {
+        // FIXME: At the moment, empty primary input names correspond to
+        // corner cases in the driver where it is doing TY_Nothing work
+        // and isn't even given a primary input; but at some point we
+        // ought to enable storing derived OFM entries under the empty
+        // name in general, for "whole build" additional outputs. They
+        // are presently (arbitrarily and wrongly) stored in entries
+        // associated with the first primary input of the CommandOutput
+        // that they were derived from.
+        assert(PrimaryOutputType == file_types::TY_Nothing || !I.Primary.empty());
+        auto const *M = DerivedOutputMap.getOutputMapForInput(I.Primary);
+        if (!M)
+          continue;
+        auto const Out = M->find(Type);
+        if (Out == M->end())
+          continue;
+        assert(!Out->second.empty());
+        ++numOutputsOfType;
+      }
+      assert(numOutputsOfType == 0 ||
+             numOutputsOfType == 1 ||
+             numOutputsOfType == Inputs.size());
+    });
+  assert(AdditionalOutputTypes.count(PrimaryOutputType) == 0);
+}
+
 bool CommandOutput::hasSameAdditionalOutputTypes(
     CommandOutput const &other) const {
   bool sameAdditionalOutputTypes = true;
-  types::forAllTypes([&](types::ID Type) {
+  file_types::forAllTypes([&](file_types::ID Type) {
       bool a = AdditionalOutputTypes.count(Type) == 0;
       bool b = other.AdditionalOutputTypes.count(Type) == 0;
       if (a != b)
@@ -65,6 +114,7 @@ bool CommandOutput::hasSameAdditionalOutputTypes(
 }
 
 void CommandOutput::addOutputs(CommandOutput const &other) {
+  CommandOutputInvariantChecker Check(*this);
   assert(PrimaryOutputType == other.PrimaryOutputType);
   assert(&DerivedOutputMap == &other.DerivedOutputMap);
   Inputs.append(other.Inputs.begin(),
@@ -78,63 +128,120 @@ void CommandOutput::addOutputs(CommandOutput const &other) {
   }
 }
 
-CommandOutput::CommandOutput(types::ID PrimaryOutputType,
+CommandOutput::CommandOutput(file_types::ID PrimaryOutputType,
                              OutputFileMap &Derived)
-    : PrimaryOutputType(PrimaryOutputType), DerivedOutputMap(Derived) {}
+    : PrimaryOutputType(PrimaryOutputType), DerivedOutputMap(Derived) {
+  CommandOutputInvariantChecker Check(*this);
+}
 
-types::ID CommandOutput::getPrimaryOutputType() const {
+file_types::ID CommandOutput::getPrimaryOutputType() const {
   return PrimaryOutputType;
 }
 
 void CommandOutput::addPrimaryOutput(CommandInputPair Input,
                                      StringRef PrimaryOutputFile) {
-  Inputs.push_back(Input);
   PrettyStackTraceDriverCommandOutputAddition CrashInfo(
-      "primary", this, Input.Primary, PrimaryOutputType, PrimaryOutputFile);
+    "primary", this, Input.Primary, PrimaryOutputType, PrimaryOutputFile);
+  if (PrimaryOutputType == file_types::TY_Nothing) {
+    // For TY_Nothing, we accumulate the inputs but do not add any outputs.
+    // The invariant holds on either side of this action because all primary
+    // outputs for this command will be absent (so the length == 0 case in the
+    // invariant holds).
+    CommandOutputInvariantChecker Check(*this);
+    Inputs.push_back(Input);
+    return;
+  }
+  // The invariant holds in the non-TY_Nothing case before an input is added and
+  // _after the corresponding output is added_, but not inbetween. Don't try to
+  // merge these two cases, they're different.
+  CommandOutputInvariantChecker Check(*this);
+  Inputs.push_back(Input);
+  assert(!PrimaryOutputFile.empty());
+  assert(AdditionalOutputTypes.count(PrimaryOutputType) == 0);
   ensureEntry(Input.Primary, PrimaryOutputType, PrimaryOutputFile, false);
 }
 
 StringRef CommandOutput::getPrimaryOutputFilename() const {
+  // FIXME: ideally this shouldn't exist, or should at least assert size() == 1,
+  // and callers should handle cases with multiple primaries explicitly.
   assert(Inputs.size() >= 1);
   return getOutputForInputAndType(Inputs[0].Primary, PrimaryOutputType);
 }
 
 SmallVector<StringRef, 16> CommandOutput::getPrimaryOutputFilenames() const {
   SmallVector<StringRef, 16> V;
+  size_t NonEmpty = 0;
   for (auto const &I : Inputs) {
     auto Out = getOutputForInputAndType(I.Primary, PrimaryOutputType);
     V.push_back(Out);
+    if (!Out.empty())
+      ++NonEmpty;
+    assert(!Out.empty() || PrimaryOutputType == file_types::TY_Nothing);
   }
+  assert(NonEmpty == 0 || NonEmpty == Inputs.size());
   return V;
 }
 
-void CommandOutput::setAdditionalOutputForType(types::ID Type,
+void CommandOutput::setAdditionalOutputForType(file_types::ID Type,
                                                StringRef OutputFilename) {
   PrettyStackTraceDriverCommandOutputAddition CrashInfo(
       "additional", this, Inputs[0].Primary, Type, OutputFilename);
+  CommandOutputInvariantChecker Check(*this);
   assert(Inputs.size() >= 1);
+  assert(!OutputFilename.empty());
+  assert(Type != file_types::TY_Nothing);
 
   // If we're given an "additional" output with the same type as the primary,
   // and we've not yet had such an additional type added, we treat it as a
   // request to overwrite the primary choice (which happens early and is
   // sometimes just inferred) with a refined value (eg. -emit-module-path).
-  bool Overwrite = (Type == PrimaryOutputType &&
-                    AdditionalOutputTypes.count(Type) == 0);
+  bool Overwrite = Type == PrimaryOutputType;
+  if (Overwrite) {
+    assert(AdditionalOutputTypes.count(Type) == 0);
+  } else {
+    AdditionalOutputTypes.insert(Type);
+  }
   ensureEntry(Inputs[0].Primary, Type, OutputFilename, Overwrite);
-  AdditionalOutputTypes.insert(Type);
 }
 
-StringRef CommandOutput::getAdditionalOutputForType(types::ID Type) const {
+StringRef CommandOutput::getAdditionalOutputForType(file_types::ID Type) const {
   if (AdditionalOutputTypes.count(Type) == 0)
     return StringRef();
+  assert(Inputs.size() >= 1);
+  // FIXME: ideally this shouldn't associate the additional output with the
+  // first primary, but with a specific primary (and/or possibly the primary "",
+  // for build-wide outputs) specified by the caller.
   assert(Inputs.size() >= 1);
   return getOutputForInputAndType(Inputs[0].Primary, Type);
 }
 
-StringRef CommandOutput::getAnyOutputForType(types::ID Type) const {
+SmallVector<StringRef, 16>
+CommandOutput::getAdditionalOutputsForType(file_types::ID Type) const {
+  SmallVector<StringRef, 16> V;
+  if (AdditionalOutputTypes.count(Type) != 0) {
+    for (auto const &I : Inputs) {
+      auto Out = getOutputForInputAndType(I.Primary, Type);
+      // FIXME: In theory this should always be non-empty -- and V.size() would
+      // always be either 0 or N like with primary outputs -- but in practice
+      // WMO currently associates additional outputs with the _first primary_ in
+      // a multi-primary job, which means that the 2nd..Nth primaries will have
+      // an empty result from getOutputForInputAndType, and V.size() will be 1.
+      if (!Out.empty())
+        V.push_back(Out);
+    }
+  }
+  assert(V.empty() || V.size() == 1 || V.size() == Inputs.size());
+  return V;
+}
+
+StringRef CommandOutput::getAnyOutputForType(file_types::ID Type) const {
   if (PrimaryOutputType == Type)
     return getPrimaryOutputFilename();
   return getAdditionalOutputForType(Type);
+}
+
+const OutputFileMap &CommandOutput::getDerivedOutputMap() const {
+  return DerivedOutputMap;
 }
 
 StringRef CommandOutput::getBaseInput(size_t Index) const {
@@ -181,7 +288,7 @@ void
 CommandOutput::print(raw_ostream &out) const {
   out
     << "{\n"
-    << "    PrimaryOutputType = " << types::getTypeName(PrimaryOutputType)
+    << "    PrimaryOutputType = " << file_types::getTypeName(PrimaryOutputType)
     << ";\n"
     << "    Inputs = [\n";
   interleave(Inputs,
@@ -205,6 +312,16 @@ void
 CommandOutput::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
+}
+
+void CommandOutput::writeOutputFileMap(llvm::raw_ostream &out) const {
+  SmallVector<StringRef, 4> inputs;
+  for (const CommandInputPair IP : Inputs) {
+    assert(IP.Base == IP.Primary && !IP.Base.empty() &&
+           "output file maps won't work if these differ");
+    inputs.push_back(IP.Primary);
+  }
+  getDerivedOutputMap().write(out, inputs);
 }
 
 Job::~Job() = default;

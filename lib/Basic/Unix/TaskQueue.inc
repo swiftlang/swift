@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/TaskQueue.h"
+#include "swift/Basic/Statistic.h"
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/DenseMap.h"
@@ -84,12 +85,16 @@ class Task {
   /// from the Task.
   std::string Errors;
 
+  /// Optional place to count I/O and subprocess events.
+  UnifiedStatsReporter *Stats;
+
 public:
   Task(const char *ExecPath, ArrayRef<const char *> Args,
-       ArrayRef<const char *> Env, void *Context, bool SeparateErrors)
+       ArrayRef<const char *> Env, void *Context, bool SeparateErrors,
+       UnifiedStatsReporter *USR)
       : ExecPath(ExecPath), Args(Args), Env(Env), Context(Context),
         SeparateErrors(SeparateErrors), Pid(-1), Pipe(-1), ErrorPipe(-1),
-        State(Preparing) {
+        State(Preparing), Stats(USR) {
     assert((Env.empty() || Env.back() == nullptr) &&
            "Env must either be empty or null-terminated!");
   }
@@ -108,8 +113,11 @@ public:
   bool execute();
 
   /// \brief Reads data from the pipes, if any is available.
-  /// \returns true on error, false on success
-  bool readFromPipes();
+  ///
+  /// If \p UntilEnd is true, reads until the end of the stream; otherwise reads
+  /// once (possibly with a retry on EINTR), and returns.
+  /// \returns true on error, false on success.
+  bool readFromPipes(bool UntilEnd = true);
 
   /// \brief Performs any post-execution work for this Task, such as reading
   /// piped output and closing the pipe.
@@ -241,7 +249,9 @@ bool Task::execute() {
   return false;
 }
 
-static bool readFromAPipe(int Pipe, std::string &Output) {
+static bool readFromAPipe(int Pipe, std::string &Output,
+                          UnifiedStatsReporter *Stats,
+                          bool UntilEnd) {
   char outputBuffer[1024];
   ssize_t readBytes = 0;
   while ((readBytes = read(Pipe, outputBuffer, sizeof(outputBuffer))) != 0) {
@@ -253,15 +263,19 @@ static bool readFromAPipe(int Pipe, std::string &Output) {
     }
 
     Output.append(outputBuffer, readBytes);
+    if (Stats)
+      Stats->getDriverCounters().NumDriverPipeReads++;
+    if (!UntilEnd)
+      break;
   }
 
   return false;
 }
 
-bool Task::readFromPipes() {
-  bool Ret = readFromAPipe(Pipe, Output);
+bool Task::readFromPipes(bool UntilEnd) {
+  bool Ret = readFromAPipe(Pipe, Output, Stats, UntilEnd);
   if (SeparateErrors) {
-    Ret |= readFromAPipe(ErrorPipe, Errors);
+    Ret |= readFromAPipe(ErrorPipe, Errors, Stats, UntilEnd);
   }
   return Ret;
 }
@@ -302,13 +316,13 @@ void TaskQueue::addTask(const char *ExecPath, ArrayRef<const char *> Args,
                         ArrayRef<const char *> Env, void *Context,
                         bool SeparateErrors) {
   std::unique_ptr<Task> T(
-      new Task(ExecPath, Args, Env, Context, SeparateErrors));
+      new Task(ExecPath, Args, Env, Context, SeparateErrors, Stats));
   QueuedTasks.push(std::move(T));
 }
 
 bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
                         TaskSignalledCallback Signalled) {
-  typedef llvm::DenseMap<pid_t, std::unique_ptr<Task>> PidToTaskMap;
+  using PidToTaskMap = llvm::DenseMap<pid_t, std::unique_ptr<Task>>;
 
   // Stores the current executing Tasks, organized by pid.
   PidToTaskMap ExecutingTasks;
@@ -346,7 +360,7 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
       ExecutingTasks[Pid] = std::move(T);
     }
 
-    assert(PollFds.size() > 0 &&
+    assert(!PollFds.empty() &&
            "We should only call poll() if we have fds to watch!");
     int ReadyFdCount = poll(PollFds.data(), PollFds.size(), -1);
     if (ReadyFdCount == -1) {
@@ -355,6 +369,8 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
         continue;
       return true;
     }
+    if (Stats)
+      Stats->getDriverCounters().NumDriverPipePolls++;
 
     // Holds all fds which have finished during this loop iteration.
     std::vector<int> FinishedFds;
@@ -373,8 +389,15 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
                "All outstanding fds must be associated with an executing Task");
         Task &T = *iter->second;
         if (fd.revents & POLLIN || fd.revents & POLLPRI) {
-          // There's data available to read.
-          T.readFromPipes();
+          // There's data available to read. Read _some_ of it here, but not
+          // necessarily _all_, since the pipe is in blocking mode and we might
+          // have other input pending (or soon -- before this subprocess is done
+          // writing) from other subprocesses.
+          //
+          // FIXME: longer term, this should probably either be restructured to
+          // use O_NONBLOCK, or at very least poll the stderr file descriptor as
+          // well; the whole loop here is a bit of a mess.
+          T.readFromPipes(/*UntilEnd = */false);
         }
 
         if (fd.revents & POLLHUP || fd.revents & POLLERR) {

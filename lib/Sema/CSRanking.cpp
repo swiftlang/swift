@@ -254,27 +254,6 @@ computeSelfTypeRelationship(TypeChecker &tc, DeclContext *dc, ValueDecl *decl1,
   return {SelfTypeRelationship::ConformsTo, conformance};
 }
 
-// Given a type and a declaration context, return a type with a curried
-// 'self' type as input if the declaration context describes a type.
-static Type addCurriedSelfType(ASTContext &ctx, Type type, DeclContext *dc) {
-  if (!dc->isTypeContext())
-    return type;
-
-  GenericSignature *sig = dc->getGenericSignatureOfContext();
-  if (auto *genericFn = type->getAs<GenericFunctionType>()) {
-    sig = genericFn->getGenericSignature();
-    type = FunctionType::get(genericFn->getInput(),
-                             genericFn->getResult(),
-                             genericFn->getExtInfo());
-  }
-
-  auto selfTy = dc->getDeclaredInterfaceType();
-  if (sig)
-    return GenericFunctionType::get(sig, selfTy, type,
-                                    AnyFunctionType::ExtInfo());
-  return FunctionType::get(selfTy, type);
-}
-
 /// \brief Given two generic function declarations, signal if the first is more
 /// "constrained" than the second by comparing the number of constraints
 /// applied to each type parameter.
@@ -384,6 +363,21 @@ static Type getAdjustedParamType(const AnyFunctionType::Param &param) {
   return param.getType();
 }
 
+// Is a particular parameter of a function or subscript declaration
+// declared to be an IUO?
+static bool paramIsIUO(Decl *decl, int paramNum) {
+  if (auto *fn = dyn_cast<AbstractFunctionDecl>(decl)) {
+    auto *paramList =
+        fn->getParameterList(fn->getDeclContext()->isTypeContext());
+    auto *param = paramList->get(paramNum);
+    return param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  }
+
+  auto *subscript = cast<SubscriptDecl>(decl);
+  auto *index = subscript->getIndices()->get(paramNum);
+  return index->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+}
+
 /// \brief Determine whether the first declaration is as "specialized" as
 /// the second declaration.
 ///
@@ -465,8 +459,8 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         }
       } else {
         // Add a curried 'self' type.
-        type1 = addCurriedSelfType(tc.Context, type1, outerDC1);
-        type2 = addCurriedSelfType(tc.Context, type2, outerDC2);
+        type1 = type1->addCurriedSelfType(outerDC1);
+        type2 = type2->addCurriedSelfType(outerDC2);
 
         // For a subscript declaration, only look at the input type (i.e., the
         // indices).
@@ -533,16 +527,22 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       }
 
       // Extract the self types from the declarations, if they have them.
+      auto getSelfType = [](AnyFunctionType *fnType) -> Type {
+        auto params = fnType->getParams();
+        assert(params.size() == 1);
+        return params.front().getType()->getRValueInstanceType();
+      };
+
       Type selfTy1;
       Type selfTy2;
       if (outerDC1->isTypeContext()) {
         auto funcTy1 = openedType1->castTo<FunctionType>();
-        selfTy1 = funcTy1->getInput()->getRValueInstanceType();
+        selfTy1 = getSelfType(funcTy1);
         openedType1 = funcTy1->getResult();
       }
       if (outerDC2->isTypeContext()) {
         auto funcTy2 = openedType2->castTo<FunctionType>();
-        selfTy2 = funcTy2->getInput()->getRValueInstanceType();
+        selfTy2 = getSelfType(funcTy2);
         openedType2 = funcTy2->getResult();
       }
       
@@ -603,8 +603,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         auto params1 = funcTy1->getParams();
         auto params2 = funcTy2->getParams();
         SmallVector<bool, 4> defaultMapType2;
-        computeDefaultMap(funcTy2->getInput(), decl2,
-                          outerDC2->isTypeContext(),
+        computeDefaultMap(params2, decl2, outerDC2->isTypeContext(),
                           defaultMapType2);
 
         unsigned numParams1 = params1.size();
@@ -675,6 +674,17 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
             fewerEffectiveParameters = true;
             continue;
           }
+
+          // Emulate behavior from when IUO was a type, where IUOs
+          // were considered subtypes of plain optionals, but not
+          // vice-versa.  This wouldn't normally happen, but there are
+          // cases where we can rename imported APIs so that we have a
+          // name collision, and where the parameter type(s) are the
+          // same except for details of the kind of optional declared.
+          auto param1IsIUO = paramIsIUO(decl1, param1);
+          auto param2IsIUO = paramIsIUO(decl2, param2);
+          if (param2IsIUO && !param1IsIUO)
+            return false;
 
           if (!maybeAddSubtypeConstraint(params1[param1], params2[param2]))
             return false;
@@ -986,15 +996,18 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
         // Check that the standard library hasn't added another overload of
         // the ?? operator.
-        auto inputTupleTy = fnTy->getInput()->castTo<TupleType>();
-        auto inputTypes = inputTupleTy->getElementTypes();
-        assert(inputTypes.size() == 2);
-        assert(inputTypes[0]->getOptionalObjectType());
-        auto autoclosure = inputTypes[1]->castTo<AnyFunctionType>();
-        assert(autoclosure->isAutoClosure());
-        auto secondParamTy = autoclosure->getResult();
-        assert(secondParamTy->getOptionalObjectType());
-        (void)secondParamTy;
+        auto params = fnTy->getParams();
+        assert(params.size() == 2);
+
+        auto param1 = params[0].getType();
+        auto param2 = params[1].getType()->castTo<AnyFunctionType>();
+
+        assert(param1->getOptionalObjectType());
+        assert(param2->isAutoClosure());
+        assert(param2->getResult()->getOptionalObjectType());
+
+        (void) param1;
+        (void) param2;
 
         return true;
       };

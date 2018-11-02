@@ -75,6 +75,7 @@ CONSTANT_OWNERSHIP_INST(Trivial, InitExistentialMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, IntegerLiteral)
 CONSTANT_OWNERSHIP_INST(Trivial, IsUnique)
 CONSTANT_OWNERSHIP_INST(Trivial, IsUniqueOrPinned)
+CONSTANT_OWNERSHIP_INST(Trivial, IsEscapingClosure)
 CONSTANT_OWNERSHIP_INST(Trivial, MarkUninitializedBehavior)
 CONSTANT_OWNERSHIP_INST(Trivial, Metatype)
 CONSTANT_OWNERSHIP_INST(Trivial, ObjCToThickMetatype)
@@ -147,6 +148,20 @@ CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, UnconditionalCheckedCastValue)
 // If both the operand and the result are nontrivial, then either the types must
 // be compatible so that TBAA doesn't allow the destroy to be hoisted above uses
 // of the cast, or the programmer must use Builtin.fixLifetime.
+//
+// FIXME
+// -----
+//
+// SR-7175: Since we model this as unowned, then we must copy the
+// value before use. This directly contradicts the semantics mentioned
+// above since we will copy the value upon any use lest we use an
+// unowned value in an owned or guaranteed way. So really all we will
+// do here is perhaps add a copy slightly earlier unless the unowned
+// value immediately is cast to something trivial. In such a case, we
+// should be able to simplify the cast to just a trivial value and
+// then eliminate the copy. That being said, we should investigate
+// this since this is used in reinterpret_cast which is important from
+// a performance perspective.
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Unowned, UncheckedBitwiseCast)
 
 // A thin_to_thick instruction can return a trivial (@noescape) type.
@@ -457,9 +472,13 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, BridgeToRawPointer)
 CONSTANT_OWNERSHIP_BUILTIN(Unowned, BridgeFromRawPointer)
 CONSTANT_OWNERSHIP_BUILTIN(Unowned, CastReference)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, AddressOf)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, AddressOfBorrow)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, GepRaw)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Gep)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, GetTailAddr)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, PerformInstantaneousReadAccess)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, BeginUnpairedModifyAccess)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, EndUnpairedAccess)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, OnFastPath)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, IsUnique)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, IsUniqueOrPinned)

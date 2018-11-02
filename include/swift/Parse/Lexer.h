@@ -64,8 +64,8 @@ enum class ConflictMarkerKind {
 class Lexer {
   const LangOptions &LangOpts;
   const SourceManager &SourceMgr;
-  DiagnosticEngine *Diags;
   const unsigned BufferID;
+  DiagnosticEngine *Diags;
 
   using State = LexerState;
 
@@ -91,22 +91,6 @@ class Lexer {
 
   /// Pointer to the next not consumed character.
   const char *CurPtr;
-
-  /// @{
-  /// Members that are *not* permanent lexer state.  The values only make sense
-  /// during the lexImpl() invocation.  These variables are declared as members
-  /// rather than locals so that we don't have to thread them through to all
-  /// lexing helpers.
-
-  /// Points to the point in the source buffer where we started scanning for
-  /// the current token.  Thus, the range [LastCommentBlockStart, CurPtr)
-  /// covers all comments and whitespace that we skipped, and the token itself.
-  const char *LastCommentBlockStart = nullptr;
-
-  /// True if we have seen a comment while scanning for the current token.
-  bool SeenComment = false;
-
-  /// @}
 
   Token NextToken;
   
@@ -137,20 +121,18 @@ class Lexer {
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
 
+  struct PrincipalTag {};
+
   /// The principal constructor used by public constructors below.
   /// Don't use this constructor for other purposes, it does not initialize
   /// everything.
-  Lexer(const LangOptions &Options,
-        const SourceManager &SourceMgr, DiagnosticEngine *Diags,
-        unsigned BufferID, bool InSILMode,
+  Lexer(const PrincipalTag &, const LangOptions &LangOpts,
+        const SourceManager &SourceMgr, unsigned BufferID,
+        DiagnosticEngine *Diags, bool InSILMode,
         CommentRetentionMode RetainComments,
         TriviaRetentionMode TriviaRetention);
 
-  /// @{
-  /// Helper routines used in \c Lexer constructors.
-  void primeLexer();
-  void initSubLexer(Lexer &Parent, State BeginState, State EndState);
-  /// @}
+  void initialize(unsigned Offset, unsigned EndOffset);
 
 public:
   /// \brief Create a normal lexer that scans the whole source buffer.
@@ -166,31 +148,18 @@ public:
   ///   means that APIs like getLocForEndOfToken really ought to take
   ///   this flag; it's just that we don't care that much about fidelity
   ///   when parsing SIL files.
-  Lexer(const LangOptions &Options,
-        const SourceManager &SourceMgr, unsigned BufferID,
-        DiagnosticEngine *Diags, bool InSILMode,
-        CommentRetentionMode RetainComments = CommentRetentionMode::None,
-        TriviaRetentionMode TriviaRetention = TriviaRetentionMode::WithoutTrivia)
-      : Lexer(Options, SourceMgr, Diags, BufferID, InSILMode, RetainComments,
-              TriviaRetention) {
-    primeLexer();
-  }
+  Lexer(
+      const LangOptions &Options, const SourceManager &SourceMgr,
+      unsigned BufferID, DiagnosticEngine *Diags, bool InSILMode,
+      CommentRetentionMode RetainComments = CommentRetentionMode::None,
+      TriviaRetentionMode TriviaRetention = TriviaRetentionMode::WithoutTrivia);
 
   /// \brief Create a lexer that scans a subrange of the source buffer.
-  Lexer(const LangOptions &Options,
-        const SourceManager &SourceMgr, unsigned BufferID,
-        DiagnosticEngine *Diags, bool InSILMode,
+  Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
+        unsigned BufferID, DiagnosticEngine *Diags, bool InSILMode,
         CommentRetentionMode RetainComments,
-        TriviaRetentionMode TriviaRetention,
-        unsigned Offset, unsigned EndOffset)
-      : Lexer(Options, SourceMgr, Diags, BufferID, InSILMode, RetainComments,
-              TriviaRetention) {
-    assert(Offset <= EndOffset && "invalid range");
-    initSubLexer(
-        *this,
-        State(getLocForStartOfBuffer().getAdvancedLoc(Offset)),
-        State(getLocForStartOfBuffer().getAdvancedLoc(EndOffset)));
-  }
+        TriviaRetentionMode TriviaRetention, unsigned Offset,
+        unsigned EndOffset);
 
   /// \brief Create a sub-lexer that lexes from the same buffer, but scans
   /// a subrange of the buffer.
@@ -198,12 +167,7 @@ public:
   /// \param Parent the parent lexer that scans the whole buffer
   /// \param BeginState start of the subrange
   /// \param EndState end of the subrange
-  Lexer(Lexer &Parent, State BeginState, State EndState)
-      : Lexer(Parent.LangOpts, Parent.SourceMgr, Parent.Diags, Parent.BufferID,
-              Parent.InSILMode, Parent.RetainComments,
-              Parent.TriviaRetention) {
-    initSubLexer(Parent, BeginState, EndState);
-  }
+  Lexer(Lexer &Parent, State BeginState, State EndState);
 
   /// \brief Returns true if this lexer will produce a code completion token.
   bool isCodeCompletion() const {
@@ -215,8 +179,10 @@ public:
   void lex(Token &Result, syntax::Trivia &LeadingTriviaResult,
            syntax::Trivia &TrailingTriviaResult) {
     Result = NextToken;
-    LeadingTriviaResult = {LeadingTrivia};
-    TrailingTriviaResult = {TrailingTrivia};
+    if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
+      LeadingTriviaResult = {LeadingTrivia};
+      TrailingTriviaResult = {TrailingTrivia};
+    }
     if (Result.isNot(tok::eof))
       lexImpl();
   }
@@ -352,7 +318,11 @@ public:
 
   /// Retrieve the string used to indent the line that contains the given
   /// source location.
-  static StringRef getIndentationForLine(SourceManager &SM, SourceLoc Loc);
+  ///
+  /// If \c ExtraIndentation is not null, it will be set to an appropriate
+  /// additional intendation for adding code in a smaller scope "within" \c Loc.
+  static StringRef getIndentationForLine(SourceManager &SM, SourceLoc Loc,
+                                         StringRef *ExtraIndentation = nullptr);
 
   /// \brief Determines if the given string is a valid non-operator
   /// identifier, without escaping characters.
@@ -461,18 +431,20 @@ public:
   };
 
 private:
+  /// Nul character meaning kind.
+  enum class NulCharacterKind {
+    /// String buffer terminator.
+    BufferEnd,
+    /// Embedded nul character.
+    Embedded,
+    /// Code completion marker.
+    CodeCompletion
+  };
+
   /// For a source location in the current buffer, returns the corresponding
   /// pointer.
   const char *getBufferPtrForSourceLoc(SourceLoc Loc) const {
     return BufferStart + SourceMgr.getLocOffsetInBuffer(Loc, BufferID);
-  }
-
-  StringRef getSubstring(const char *Start, unsigned Length) const {
-    assert(Start >= BufferStart && Start <= BufferEnd);
-    unsigned BytesUntilBufferEnd = BufferEnd - Start;
-    if (Length > BytesUntilBufferEnd)
-      Length = BytesUntilBufferEnd;
-    return StringRef(Start, Length);
   }
 
   void lexImpl();
@@ -515,11 +487,17 @@ private:
   void lexEscapedIdentifier();
 
   void tryLexEditorPlaceholder();
-  const char *findEndOfCurlyQuoteStringLiteral(const char*);
+  const char *findEndOfCurlyQuoteStringLiteral(const char *,
+                                               bool EmitDiagnostics);
 
   /// Try to lex conflict markers by checking for the presence of the start and
   /// end of the marker in diff3 or Perforce style respectively.
   bool tryLexConflictMarker(bool EatNewline);
+
+  /// Returns it should be tokenize.
+  bool lexUnknown(bool EmitDiagnosticsIfToken);
+
+  NulCharacterKind getNulCharacterKind(const char *Ptr) const;
 };
   
 /// Given an ordered token \param Array , get the iterator pointing to the first

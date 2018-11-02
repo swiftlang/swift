@@ -26,7 +26,8 @@ func outerGeneric<T>(t: T, x: AnyObject) {
   // Make sure we look through typealiases
   typealias TT = (a: T, b: T)
 
-  // CHECK: func_decl "localFunction(tt:)" interface type='<T> (tt: TT) -> ()' {{.*}} captures=(<generic> )
+  // FIXME: Losing some type sugar here.
+  // CHECK: func_decl "localFunction(tt:)" interface type='<T> (tt: (a: T, b: T)) -> ()' {{.*}} captures=(<generic> )
   func localFunction(tt: TT) {}
 
   // CHECK: closure_expr type='((a: T, b: T)) -> ()' {{.*}} captures=(<generic> )

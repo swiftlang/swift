@@ -104,6 +104,13 @@ def create_parser():
                         'member.')
     parser.add_argument('-swift-version', type=int, metavar='N',
                         help='the Swift version to use')
+    parser.add_argument('-show-overlay', action='store_true',
+                        help='Show overlay API in addition to Objective-C ' +
+                        'module API')
+    parser.add_argument('-show-doc-comments', action='store_true',
+                        help='Show documentation comments')
+    parser.add_argument('-show-unavailable', action='store_true',
+                        help='Show declarations that are unavailable in Swift')
     return parser
 
 
@@ -288,11 +295,20 @@ def main():
         '-print-module',
         '-source-filename',
         source_filename,
-        '-module-print-skip-overlay',
-        '-skip-unavailable',
-        '-skip-print-doc-comments',
         '-skip-overrides'
     ]
+
+    # Add -module-print-skip-overlay
+    if not args.show_overlay:
+        cmd_common += ['-module-print-skip-overlay']
+
+    # Add -skip-print-doc-comments
+    if not args.show_doc_comments:
+        cmd_common += ['-skip-print-doc-comments']
+
+    # Add -skip-unavailable
+    if not args.show_unavailable:
+        cmd_common += ['-skip-unavailable']
 
     # Add -F / -iframework / -I arguments.
     if args.framework_dir:

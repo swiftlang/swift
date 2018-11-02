@@ -13,11 +13,11 @@
 #ifndef SWIFT_DRIVER_TOOLCHAIN_H
 #define SWIFT_DRIVER_TOOLCHAIN_H
 
-#include "swift/Driver/Action.h"
-#include "swift/Driver/Types.h"
 #include "swift/Basic/LLVM.h"
-#include "llvm/Option/Option.h"
+#include "swift/Driver/Action.h"
+#include "swift/Frontend/FileTypes.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/Option/Option.h"
 
 #include <memory>
 
@@ -83,6 +83,34 @@ protected:
     /// arguments.
     const char *getTemporaryFilePath(const llvm::Twine &name,
                                      StringRef suffix = "") const;
+
+    /// For frontend, merge-module, and link invocations.
+    bool shouldUseInputFileList() const;
+
+    bool shouldUsePrimaryInputFileListInFrontendInvocation() const;
+
+    bool shouldUseMainOutputFileListInFrontendInvocation() const;
+
+    bool shouldUseSupplementaryOutputFileMapInFrontendInvocation() const;
+
+    /// Reify the existing behavior that SingleCompile compile actions do not
+    /// filter, but batch-mode and single-file compilations do. Some clients are
+    /// relying on this (i.e., they pass inputs that don't have ".swift" as an
+    /// extension.) It would be nice to eliminate this distinction someday.
+    bool shouldFilterFrontendInputsByType() const;
+
+    const char *computeFrontendModeForCompile() const;
+
+    void addFrontendInputAndOutputArguments(
+        llvm::opt::ArgStringList &Arguments,
+        std::vector<FilelistInfo> &FilelistInfos) const;
+
+  private:
+    void addFrontendCommandLineInputArguments(
+        bool mayHavePrimaryInputs, bool useFileList, bool usePrimaryFileList,
+        bool filterByType, llvm::opt::ArgStringList &arguments) const;
+    void addFrontendSupplementaryOutputArguments(
+        llvm::opt::ArgStringList &arguments) const;
   };
 
   /// Packs together information chosen by toolchains to create jobs.
@@ -193,15 +221,16 @@ public:
   /// Return the default language type to use for the given extension.
   /// If the extension is empty or is otherwise not recognized, return
   /// the invalid type \c TY_INVALID.
-  virtual types::ID lookupTypeForExtension(StringRef Ext) const;
+  virtual file_types::ID lookupTypeForExtension(StringRef Ext) const;
 
   /// Check whether a clang library with a given name exists.
   ///
   /// \param args Invocation arguments.
   /// \param sanitizer Sanitizer name.
+  /// \param shared Whether the library is shared
   virtual bool sanitizerRuntimeLibExists(const llvm::opt::ArgList &args,
-                                         StringRef sanitizer) const;
-
+                                         StringRef sanitizer,
+                                         bool shared=true) const;
 };
 } // end namespace driver
 } // end namespace swift

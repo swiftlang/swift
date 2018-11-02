@@ -83,8 +83,8 @@ public:
   }
 };
 
-typedef SmallVector<uint64_t, 64> RecordData;
-typedef SmallVectorImpl<uint64_t> RecordDataImpl;
+using RecordData = SmallVector<uint64_t, 64>;
+using RecordDataImpl = SmallVectorImpl<uint64_t>;
 
 struct SharedState : llvm::RefCountedBase<SharedState> {
   SharedState(StringRef serializedDiagnosticsPath)
@@ -113,8 +113,8 @@ struct SharedState : llvm::RefCountedBase<SharedState> {
   /// \brief The collection of files used.
   llvm::DenseMap<const char *, unsigned> Files;
 
-  typedef llvm::DenseMap<const void *, std::pair<unsigned, StringRef> >
-  DiagFlagsTy;
+  using DiagFlagsTy =
+      llvm::DenseMap<const void *, std::pair<unsigned, StringRef>>;
 
   /// \brief Map for uniquing strings.
   DiagFlagsTy DiagFlags;
@@ -222,9 +222,10 @@ private:
 };
 } // end anonymous namespace
 
-namespace swift { namespace serialized_diagnostics {
-  DiagnosticConsumer *createConsumer(StringRef serializedDiagnosticsPath) {
-    return new SerializedDiagnosticConsumer(serializedDiagnosticsPath);
+namespace swift {
+namespace serialized_diagnostics {
+  std::unique_ptr<DiagnosticConsumer> createConsumer(StringRef outputPath) {
+    return llvm::make_unique<SerializedDiagnosticConsumer>(outputPath);
   }
 } // namespace serialized_diagnostics
 } // namespace swift
@@ -559,4 +560,3 @@ void SerializedDiagnosticConsumer::handleDiagnostic(
   if (bracketDiagnostic)
     exitDiagBlock();
 }
-

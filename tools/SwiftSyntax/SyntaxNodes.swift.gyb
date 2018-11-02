@@ -196,7 +196,7 @@ public struct ${node.name}: ${base_type}, _SyntaxBase, Hashable {
 % end
 
 % for trait in TRAITS:
-public protocol ${trait.trait_name}Syntax {
+public protocol ${trait.trait_name}Syntax: Syntax {
 % for child in trait.children:
 %   ret_type = child.type_name
 %   if child.is_optional:

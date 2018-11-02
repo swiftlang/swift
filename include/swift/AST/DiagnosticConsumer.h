@@ -19,6 +19,7 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICCONSUMER_H
 #define SWIFT_BASIC_DIAGNOSTICCONSUMER_H
 
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/Support/SourceMgr.h"
 
@@ -110,6 +111,75 @@ public:
                         StringRef FormatString,
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info) override;
+};
+
+/// \brief DiagnosticConsumer that funnels diagnostics in certain files to
+/// particular sub-consumers.
+///
+/// The intended use case for such a consumer is "batch mode" compilations,
+/// where we want to record diagnostics for each file as if they were compiled
+/// separately. This is important for incremental builds, so that if a file has
+/// warnings but doesn't get recompiled in the next build, the warnings persist.
+///
+/// Diagnostics that are not in one of the special files are emitted into every
+/// sub-consumer. This is necessary to deal with, for example, diagnostics in a
+/// bridging header imported from Objective-C, which isn't really about the
+/// current file.
+class FileSpecificDiagnosticConsumer : public DiagnosticConsumer {
+public:
+  /// A diagnostic consumer, along with the name of the buffer that it should
+  /// be associated with. An empty string means that a consumer is not
+  /// associated with any particular buffer, and should only receive diagnostics
+  /// that are not in any of the other consumers' files.
+  using ConsumerPair =
+      std::pair<std::string, std::unique_ptr<DiagnosticConsumer>>;
+
+private:
+  /// All consumers owned by this FileSpecificDiagnosticConsumer.
+  const SmallVector<ConsumerPair, 4> SubConsumers;
+
+  using ConsumersOrderedByRangeEntry =
+    std::pair<CharSourceRange, DiagnosticConsumer *>;
+
+  /// The consumers owned by this FileSpecificDiagnosticConsumer, sorted by
+  /// the end locations of each file so that a lookup by position can be done
+  /// using binary search.
+  ///
+  /// Generated and cached when the first diagnostic with a location is emitted.
+  /// This allows diagnostics to be emitted before files are actually opened,
+  /// as long as they don't have source locations.
+  ///
+  /// \see #consumerForLocation
+  SmallVector<ConsumersOrderedByRangeEntry, 4> ConsumersOrderedByRange;
+
+  /// Indicates which consumer to send Note diagnostics too.
+  ///
+  /// Notes are always considered attached to the error, warning, or remark
+  /// that was most recently emitted.
+  ///
+  /// If null, Note diagnostics are sent to every consumer.
+  DiagnosticConsumer *ConsumerForSubsequentNotes = nullptr;
+
+public:
+  /// Takes ownership of the DiagnosticConsumers specified in \p consumers.
+  ///
+  /// There must not be two consumers for the same file (i.e., having the same
+  /// buffer name).
+  explicit FileSpecificDiagnosticConsumer(
+      SmallVectorImpl<ConsumerPair> &consumers);
+
+  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
+                        DiagnosticKind Kind,
+                        StringRef FormatString,
+                        ArrayRef<DiagnosticArgument> FormatArgs,
+                        const DiagnosticInfo &Info) override;
+
+   bool finishProcessing() override;
+
+private:
+  void computeConsumersOrderedByRange(SourceManager &SM);
+  DiagnosticConsumer *consumerForLocation(SourceManager &SM,
+                                          SourceLoc loc) const;
 };
   
 } // end namespace swift

@@ -221,7 +221,7 @@ func testP4(_ s4a: S4a, s4b: S4b, s4c: S4c, s4d: S4d) {
   s4c.extP4Int() // okay
   var b1 = s4d.extP4a() // okay, "Bool" version
   b1 = true // checks type above
-  s4d.extP4Int() // expected-error{{'Bool' is not convertible to 'Int'}}
+  s4d.extP4Int() // expected-error{{'S4d' requires the types 'Bool' and 'Int' be equivalent to use 'extP4Int'}}
   _ = b1
 }
 

@@ -782,17 +782,19 @@ bool CSE::processNode(DominanceInfoNode *Node) {
   bool Changed = false;
 
   // See if any instructions in the block can be eliminated.  If so, do it.  If
-  // not, add them to AvailableValues.
-  for (SILBasicBlock::iterator I = BB->begin(), E = BB->end(); I != E;) {
-    SILInstruction *Inst = &*I;
-    ++I;
+  // not, add them to AvailableValues. Assume the block terminator can't be
+  // erased.
+  for (SILBasicBlock::iterator nextI = BB->begin(), E = BB->end();
+       nextI != E;) {
+    SILInstruction *Inst = &*nextI;
+    ++nextI;
 
     DEBUG(llvm::dbgs() << "SILCSE VISITING: " << *Inst << "\n");
 
     // Dead instructions should just be removed.
     if (isInstructionTriviallyDead(Inst)) {
       DEBUG(llvm::dbgs() << "SILCSE DCE: " << *Inst << '\n');
-      eraseFromParentWithDebugInsts(Inst, I);
+      eraseFromParentWithDebugInsts(Inst, nextI);
       Changed = true;
       ++NumSimplify;
       continue;
@@ -803,8 +805,11 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     if (SILValue V = simplifyInstruction(Inst)) {
       DEBUG(llvm::dbgs() << "SILCSE SIMPLIFY: " << *Inst << "  to: " << *V
             << '\n');
-      cast<SingleValueInstruction>(Inst)->replaceAllUsesWith(V);
-      Inst->eraseFromParent();
+      replaceAllSimplifiedUsesAndErase(Inst, V,
+                                       [&nextI](SILInstruction *deleteI) {
+                                         if (nextI == deleteI->getIterator())
+                                           ++nextI;
+                                       });
       Changed = true;
       ++NumSimplify;
       continue;
@@ -828,10 +833,10 @@ bool CSE::processNode(DominanceInfoNode *Node) {
       // Instructions producing a new opened archetype need a special handling,
       // because replacing these instructions may require a replacement
       // of the opened archetype type operands in some of the uses.
-      if (!isa<OpenExistentialRefInst>(Inst) ||
-          processOpenExistentialRef(cast<OpenExistentialRefInst>(Inst),
-                                    cast<OpenExistentialRefInst>(AvailInst),
-                                    I)) {
+      if (!isa<OpenExistentialRefInst>(Inst)
+          || processOpenExistentialRef(cast<OpenExistentialRefInst>(Inst),
+                                       cast<OpenExistentialRefInst>(AvailInst),
+                                       nextI)) {
         Inst->replaceAllUsesPairwiseWith(AvailInst);
         Inst->eraseFromParent();
         Changed = true;
@@ -869,8 +874,8 @@ bool CSE::canHandle(SILInstruction *Inst) {
     
     // We can CSE function calls which do not read or write memory and don't
     // have any other side effects.
-    SideEffectAnalysis::FunctionEffects Effects;
-    SEA->getEffects(Effects, AI);
+    FunctionSideEffects Effects;
+    SEA->getCalleeEffects(Effects, AI);
 
     // Note that the function also may not contain any retains. And there are
     // functions which are read-none and have a retain, e.g. functions which

@@ -62,6 +62,12 @@ llvm::cl::opt<bool> IsSILOwnershipVerifierTestingEnabled(
                    "comment in SILOwnershipVerifier.cpp above option for more "
                    "information."));
 
+/// This is an option to turn off ownership verification on a specific file. We
+/// still emit code as if we are in ownership mode, but we do not verify. This
+/// is useful for temporarily turning off verification on tests.
+static llvm::cl::opt<bool>
+    DisableOwnershipVerification("disable-sil-ownership-verification");
+
 //===----------------------------------------------------------------------===//
 //                              Generalized User
 //===----------------------------------------------------------------------===//
@@ -150,7 +156,7 @@ SILBasicBlock *GeneralizedUser::getParent() const {
 
 namespace llvm {
 
-template <> class PointerLikeTypeTraits<GeneralizedUser> {
+template <> struct PointerLikeTypeTraits<GeneralizedUser> {
 
 public:
   static void *getAsVoidPointer(GeneralizedUser v) {
@@ -450,6 +456,7 @@ NO_OPERAND_INST(Unwind)
     return {compatibleWithOwnership(ValueOwnershipKind::OWNERSHIP),            \
             UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT};                   \
   }
+CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, IsEscapingClosure)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, RefElementAddr)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialValue)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialBoxValue)
@@ -1421,9 +1428,13 @@ BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(BridgeFromRawPointer)
 BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(CastReference)
 BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(ReinterpretCast)
 BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(AddressOf)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(AddressOfBorrow)
 BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(GepRaw)
 BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Gep)
 BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(GetTailAddr)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(PerformInstantaneousReadAccess)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(BeginUnpairedModifyAccess)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(EndUnpairedAccess)
 BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(CondFail)
 BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(FixLifetime)
 BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(IsUnique)
@@ -2205,6 +2216,9 @@ bool SILValueOwnershipChecker::checkDataflow() {
 
 void SILInstruction::verifyOperandOwnership() const {
 #ifndef NDEBUG
+  if (DisableOwnershipVerification)
+    return;
+
   if (isStaticInitializerInst())
     return;
 
@@ -2250,6 +2264,9 @@ void SILInstruction::verifyOperandOwnership() const {
 
 void SILValue::verifyOwnership(SILModule &Mod, DeadEndBlocks *DEBlocks) const {
 #ifndef NDEBUG
+  if (DisableOwnershipVerification)
+    return;
+
   // If we are SILUndef, just bail. SILUndef can pair with anything. Any uses of
   // the SILUndef will make sure that the matching checks out.
   if (isa<SILUndef>(*this))

@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-sil %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name unmanaged -enable-sil-ownership -emit-sil %s | %FileCheck %s
 
 class C {}
 
@@ -46,9 +47,9 @@ func get(holder holder: inout Holder) -> C {
 func project(fn fn: () -> Holder) -> C {
   return fn().value
 }
-// CHECK-LABEL:sil hidden @$S9unmanaged7project2fnAA1CCAA6HolderVyXE_tF : $@convention(thin) (@noescape @callee_guaranteed () -> Holder) -> @owned C
+// CHECK-LABEL: sil hidden @$S9unmanaged7project2fnAA1CCAA6HolderVyXE_tF : $@convention(thin) (@noescape @callee_guaranteed () -> Holder) -> @owned C
 // CHECK: bb0([[FN:%.*]] : $@noescape @callee_guaranteed () -> Holder):
-// CHECK: debug_value
+// CHECK-NEXT: debug_value
 // CHECK-NEXT: [[T0:%.*]] = apply [[FN]]()
 // CHECK-NEXT: [[T1:%.*]] = struct_extract [[T0]] : $Holder, #Holder.value
 // CHECK-NEXT: [[T2:%.*]] = unmanaged_to_ref [[T1]]

@@ -9,7 +9,7 @@
 // checking cannot be tested. The standard library always compiles with debug
 // checking enabled, so the behavior of the optimized test depends on whether
 // the inlining heuristics decide to inline these methods. To fix this, we need
-// a way to force @_inlineable UnsafeBufferPointer methods to be emitted inside
+// a way to force @inlinable UnsafeBufferPointer methods to be emitted inside
 // the client code, and thereby subject the stdlib implementation to the test
 // case's compile options.
 //

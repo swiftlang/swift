@@ -23,6 +23,7 @@
 #include "Explosion.h"
 #include "GenEnum.h"
 #include "LoadableTypeInfo.h"
+#include "Outlining.h"
 #include "TypeInfo.h"
 #include "StructLayout.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -44,7 +45,7 @@ template <class FieldImpl> class RecordField {
 
 protected:
   explicit RecordField(const TypeInfo &elementTI)
-    : Layout(ElementLayout::getIncomplete(elementTI)) {}
+    : Layout(ElementLayout::getIncomplete(elementTI, elementTI)) {}
 
   explicit RecordField(const ElementLayout &layout,
                        unsigned begin, unsigned end)
@@ -54,7 +55,7 @@ protected:
     return static_cast<const FieldImpl*>(this);
   }
 public:
-  const TypeInfo &getTypeInfo() const { return Layout.getType(); }
+  const TypeInfo &getTypeInfo() const { return Layout.getTypeForLayout(); }
 
   void completeFrom(const ElementLayout &layout) {
     Layout.completeFrom(layout);
@@ -100,7 +101,7 @@ class RecordTypeInfoImpl : public Base,
   friend class llvm::TrailingObjects<Impl, FieldImpl_>;
 
 public:
-  typedef FieldImpl_ FieldImpl;
+  using FieldImpl = FieldImpl_;
 
 private:
   const unsigned NumFields;
@@ -149,12 +150,7 @@ public:
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedAssignWithCopyFunction,
-          &typeToMetadataVec);
+      this->callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsNotTake);
     }
   }
 
@@ -172,12 +168,7 @@ public:
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedAssignWithTakeFunction,
-          &typeToMetadataVec);
+      this->callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsTake);
     }
   }
 
@@ -202,12 +193,7 @@ public:
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction,
-          &typeToMetadataVec);
+      this->callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsNotTake);
     }
   }
 
@@ -233,12 +219,7 @@ public:
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction,
-          &typeToMetadataVec);
+      this->callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsTake);
     }
   }
 
@@ -255,33 +236,19 @@ public:
                                     field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-      IGF.IGM.generateCallToOutlinedDestroy(IGF, *this, addr, T,
-                                            &typeToMetadataVec);
+      this->callOutlinedDestroy(IGF, addr, T);
     }
   }
 
-  void collectArchetypeMetadata(
-      IRGenFunction &IGF,
-      llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-      SILType T) const override {
-    auto canType = T.getSwiftRValueType();
-    // get the size before insertions
-    auto SZ = typeToMetadataVec.size();
+  void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                   SILType T) const override {
     for (auto &field : getFields()) {
       if (field.isEmpty())
         continue;
-      auto fType = field.getType(IGF.IGM, T);
-      field.getTypeInfo().collectArchetypeMetadata(IGF, typeToMetadataVec,
-                                                   fType);
+      auto fType = field.getType(collector.IGF.IGM, T);
+      field.getTypeInfo().collectMetadataForOutlining(collector, fType);
     }
-    if (typeToMetadataVec.find(canType) == typeToMetadataVec.end() &&
-        typeToMetadataVec.size() != SZ) {
-      auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
-      assert(metadata && "Expected Type Metadata Ref");
-      typeToMetadataVec.insert(std::make_pair(canType, metadata));
-    }
+    collector.collectTypeMetadataForLayout(T);
   }
 };
 
@@ -300,7 +267,7 @@ template <class Impl, class Base, class FieldImpl>
 class RecordTypeInfo<Impl, Base, FieldImpl,
                      /*IsFixedSize*/ false, /*IsLoadable*/ false>
     : public RecordTypeInfoImpl<Impl, Base, FieldImpl> {
-  typedef RecordTypeInfoImpl<Impl, Base, FieldImpl> super;
+  using super = RecordTypeInfoImpl<Impl, Base, FieldImpl>;
 
   /// The index+1 of the unique non-empty field, or zero if there is none.
   unsigned UniqueNonEmptyFieldIndexPlusOne;
@@ -380,7 +347,8 @@ template <class Impl, class Base, class FieldImpl>
 class RecordTypeInfo<Impl, Base, FieldImpl,
                      /*IsFixedSize*/ true, /*IsLoadable*/ false>
     : public RecordTypeInfoImpl<Impl, Base, FieldImpl> {
-  typedef RecordTypeInfoImpl<Impl, Base, FieldImpl> super;
+  using super = RecordTypeInfoImpl<Impl, Base, FieldImpl>;
+
 protected:
   template <class... As> 
   RecordTypeInfo(As&&...args) : super(std::forward<As>(args)...) {}
@@ -391,7 +359,7 @@ template <class Impl, class Base, class FieldImpl>
 class RecordTypeInfo<Impl, Base, FieldImpl,
                      /*IsFixedSize*/ true, /*IsLoadable*/ true>
     : public RecordTypeInfoImpl<Impl, Base, FieldImpl> {
-  typedef RecordTypeInfoImpl<Impl, Base, FieldImpl> super;
+  using super = RecordTypeInfoImpl<Impl, Base, FieldImpl>;
 
   unsigned ExplosionSize : 16;
 

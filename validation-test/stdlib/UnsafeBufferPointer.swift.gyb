@@ -5,7 +5,7 @@
 // checking cannot be tested. The standard library always compiles with debug
 // checking enabled, so the behavior of the optimized test depends on whether
 // the inlining heuristics decide to inline these methods. To fix this, we need
-// a way to force @_inlineable UnsafeBufferPointer methods to be emitted inside
+// a way to force @inlinable UnsafeBufferPointer methods to be emitted inside
 // the client code, and thereby subject the stdlib implementation to the test
 // case's compile options.
 //
@@ -324,6 +324,91 @@ UnsafeMutableBufferPointerTestSuite.test("changeElementViaBuffer") {
   expectEqual(1.0, allocated[2])
   expectEqual(-1.0, allocated[count-1])
 }
+
+let bufCount = 4
+let sliceRange: Range = 1..<bufCount-1
+% for mutable in [True, False]:
+% for raw in [True, False]:
+% for action in ['read', 'change']:
+% if action != 'change' or mutable:
+for testIndex in (0..<bufCount) {
+% Type = 'Unsafe' + ('Mutable' if mutable else '') + ('Raw' if raw else '') + 'BufferPointer'
+  ${Type}TestSuite.test("${action}Element\(testIndex)ViaSlice") {
+% if raw:
+    let allocated = UnsafeMutableRawPointer.allocate(bytes: bufCount, alignedTo: 8)
+    for i in 0..<bufCount {
+      allocated.storeBytes(of: UInt8(i), toByteOffset: i, as: UInt8.self)
+    }
+% else:
+    let allocated = UnsafeMutablePointer<Int>.allocate(capacity: bufCount)
+    for i in 0..<bufCount { allocated[i] = i }
+% end # if mutable
+    defer { allocated.deallocate() }
+
+    let buffer = ${Type}(start: allocated, count: bufCount)
+    ${'var' if mutable else 'let'} slice = buffer[sliceRange]
+
+    if _isDebugAssertConfiguration(),
+       testIndex < sliceRange.lowerBound ||
+       testIndex >= sliceRange.upperBound {
+      expectCrashLater()
+    }
+% if action == 'read':
+    let value = slice[testIndex]
+    expectEqual(buffer[testIndex], value)
+% else:
+    slice[testIndex] = 103
+    expectEqual(buffer[testIndex], 103)
+% end # if action
+  }
+}
+% end # if action or mutable
+% end # for action
+% end # for raw
+% end # for mutable
+
+let testRanges = (0..<bufCount-1).map({ i -> Range<Int> in i..<i+2 })
+% for mutable in [True, False]:
+% for raw in [True, False]:
+% for action in ['read', 'change']:
+% if action != 'change' or mutable:
+for testRange in testRanges {
+% Type = 'Unsafe' + ('Mutable' if mutable else '') + ('Raw' if raw else '') + 'BufferPointer'
+  ${Type}TestSuite.test("${action}Slice\(testRange)ViaSlice") {
+% if raw:
+    let allocated = UnsafeMutableRawPointer.allocate(bytes: bufCount+2, alignedTo: 8)
+    for i in 0..<bufCount+2 {
+      allocated.storeBytes(of: UInt8(i), toByteOffset: i, as: UInt8.self)
+    }
+% else:
+    let allocated = UnsafeMutablePointer<Int>.allocate(capacity: bufCount+2)
+    for i in 0..<bufCount+2 { allocated[i] = i }
+% end # if mutable
+    defer { allocated.deallocate() }
+
+    let buffer = ${Type}(start: allocated, count: bufCount+2)
+    ${'var' if mutable else 'let'} slice = buffer[sliceRange]
+
+    if _isDebugAssertConfiguration(),
+      testRange.lowerBound < sliceRange.lowerBound ||
+      testRange.upperBound > sliceRange.upperBound {
+      expectCrashLater()
+    }
+
+% if action == 'read':
+    let value = slice[testRange]
+    expectEqualSequence(buffer[testRange], value)
+% else:
+    let sourceSlice = buffer[bufCount..<bufCount+2]
+    slice[testRange] = sourceSlice
+    expectEqualSequence(buffer[testRange], sourceSlice)
+% end # if action
+  }
+}
+% end # if action or mutable
+% end # for action
+% end # for raw
+% end # for mutable
 
 protocol SubscriptTest {
   static var start: Int { get }
@@ -756,8 +841,11 @@ UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/${R
   defer { deallocateFor${Raw}Buffer(
       sliceMemory, count: replacementValues.count) }
 
-  // This produces a spurious compiler warning, someone take a look lol?
+% if RangeName == 'range':
+  let buffer = SubscriptSetTest.create${SelfName}(from: memory)
+% else:
   var buffer = SubscriptSetTest.create${SelfName}(from: memory)
+% end
 
 %     if IsRaw:
   // A raw buffer pointer has debug bounds checks on indices, and
@@ -792,6 +880,82 @@ UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/${R
 }
 
 %   end # RangeName
+
+UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/set/overlaps") {
+% if IsRaw:
+  let buffer = UnsafeMutableRawBufferPointer.allocate(count: 4)
+% else:
+  let buffer = UnsafeMutableBufferPointer<Int>.allocate(capacity: 4)
+% end
+  defer { buffer.deallocate() }
+
+  // Right Overlap
+  buffer[0] = 1
+  buffer[1] = 2
+  buffer[1..<3] = buffer[0..<2]
+  expectEqual(1, buffer[1])
+  expectEqual(2, buffer[2])
+  // Left Overlap
+  buffer[1] = 2
+  buffer[2] = 3
+  buffer[0..<2] = buffer[1..<3]
+  expectEqual(2, buffer[0])
+  expectEqual(3, buffer[1])
+  // Disjoint
+  buffer[2] = 2
+  buffer[3] = 3
+  buffer[0..<2] = buffer[2..<4]
+  expectEqual(2, buffer[0])
+  expectEqual(3, buffer[1])
+  buffer[0] = 0
+  buffer[1] = 1
+  buffer[2..<4] = buffer[0..<2]
+  expectEqual(0, buffer[2])
+  expectEqual(1, buffer[3])
+}
+
+UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("nonmutating-swapAt") {
+% if IsRaw:
+  let allocated = UnsafeMutableRawPointer.allocate(bytes: 4, alignedTo: 8)
+  let buffer = UnsafeMutableRawBufferPointer(start: allocated, count: 3)
+  allocated.storeBytes(of: UInt8.max, toByteOffset: 3, as: UInt8.self)
+% else:
+  let allocated = UnsafeMutablePointer<Int>.allocate(capacity: 4)
+  let buffer = UnsafeMutableBufferPointer(start: allocated, count: 3)
+  allocated[3] = Int.max
+% end
+  defer { allocated.deallocate() }
+
+  buffer[0] = 0
+  buffer[1] = 1
+  buffer[2] = 2
+
+  buffer.swapAt(0, 0)
+  expectEqual(Array(buffer), [0, 1, 2])
+
+  buffer.swapAt(0, 2)
+  expectEqual(Array(buffer), [2, 1, 0])
+
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  buffer.swapAt(2, 3)
+}
+
+% if not IsRaw:
+UnsafeMutableBufferPointerTestSuite.test("nonmutating-swapAt-withARC") {
+  let buffer = UnsafeMutableBufferPointer<String>.allocate(capacity: 3)
+  defer { buffer.deallocate() }
+
+  _ = buffer.initialize(from: (0..<3).map(String.init(describing:)))
+
+  buffer.swapAt(0, 0)
+  expectEqual(Array(buffer), ["0", "1", "2"])
+
+  buffer.swapAt(0, 2)
+  expectEqual(Array(buffer), ["2", "1", "0"])
+}
+% end
 
 % end # SelfName
 

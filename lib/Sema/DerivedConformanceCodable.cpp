@@ -300,9 +300,17 @@ static CodingKeysValidity hasValidCodingKeysEnum(TypeChecker &tc,
   if (!tc.conformsToProtocol(codingKeysType, codingKeyProto,
                              target->getDeclContext(),
                              ConformanceCheckFlags::Used)) {
-    tc.diagnose(codingKeysTypeDecl->getLoc(),
-                diag::codable_codingkeys_type_does_not_conform_here,
+    // If CodingKeys is a typealias which doesn't point to a valid nominal type,
+    // codingKeysTypeDecl will be nullptr here. In that case, we need to warn on
+    // the location of the usage, since there isn't an underlying type to
+    // diagnose on.
+    SourceLoc loc = codingKeysTypeDecl ?
+                    codingKeysTypeDecl->getLoc() :
+                    cast<TypeDecl>(result)->getLoc();
+
+    tc.diagnose(loc, diag::codable_codingkeys_type_does_not_conform_here,
                 proto->getDeclaredType());
+
     return CodingKeysValidity(/*hasType=*/true, /*isValid=*/false);
   }
 
@@ -356,8 +364,7 @@ static EnumDecl *synthesizeCodingKeysEnum(TypeChecker &tc,
     // TODO: Ensure the class doesn't already have or inherit a variable named
     // "`super`"; otherwise we will generate an invalid enum. In that case,
     // diagnose and bail.
-    auto *super = new (C) EnumElementDecl(SourceLoc(), C.Id_super, TypeLoc(),
-                                          /*HasArgumentType=*/false,
+    auto *super = new (C) EnumElementDecl(SourceLoc(), C.Id_super, nullptr,
                                           SourceLoc(), nullptr, enumDecl);
     super->setImplicit();
     enumDecl->addMember(super);
@@ -376,9 +383,8 @@ static EnumDecl *synthesizeCodingKeysEnum(TypeChecker &tc,
       case Conforms:
       {
         auto *elt = new (C) EnumElementDecl(SourceLoc(), varDecl->getName(),
-                                            TypeLoc(),
-                                            /*HasArgumentType=*/false,
-                                            SourceLoc(), nullptr, enumDecl);
+                                            nullptr, SourceLoc(), nullptr,
+                                            enumDecl);
         elt->setImplicit();
         enumDecl->addMember(elt);
         break;
@@ -484,9 +490,9 @@ static CallExpr *createContainerKeyedByCall(ASTContext &C, DeclContext *DC,
                                             Expr *base, Type returnType,
                                             NominalTypeDecl *param) {
   // (keyedBy:)
-  auto *keyedByDecl = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
-                                        SourceLoc(), C.Id_keyedBy, SourceLoc(),
-                                        C.Id_keyedBy, returnType, DC);
+  auto *keyedByDecl = new (C)
+      ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                C.Id_keyedBy, SourceLoc(), C.Id_keyedBy, returnType, DC);
   keyedByDecl->setImplicit();
   keyedByDecl->setInterfaceType(returnType);
 
@@ -598,10 +604,16 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
   // Now need to generate `try container.encode(x, forKey: .x)` for all
   // existing properties. Optional properties get `encodeIfPresent`.
   for (auto *elt : codingKeysEnum->getAllElements()) {
-    VarDecl *varDecl;
-    for (auto decl : targetDecl->lookupDirect(DeclName(elt->getName())))
-      if ((varDecl = dyn_cast<VarDecl>(decl)))
-        break;
+    VarDecl *varDecl = nullptr;
+    for (auto decl : targetDecl->lookupDirect(DeclName(elt->getName()))) {
+      if (auto *vd = dyn_cast<VarDecl>(decl)) {
+        if (!vd->isStatic()) {
+          varDecl = vd;
+          break;
+        }
+      }
+    }
+    assert(varDecl && "Should have found at least 1 var decl");
 
     // self.x
     auto *selfRef = createSelfDeclRef(encodeDecl);
@@ -727,9 +739,9 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
 
   // Params: (self [implicit], Encoder)
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), target);
-  auto *encoderParam = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
-                                         SourceLoc(), C.Id_to, SourceLoc(),
-                                         C.Id_encoder, encoderType, target);
+  auto *encoderParam = new (C)
+      ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_to,
+                SourceLoc(), C.Id_encoder, encoderType, target);
   encoderParam->setInterfaceType(encoderType);
 
   ParameterList *params[] = {ParameterList::createWithoutLoc(selfDecl),
@@ -744,13 +756,14 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
                                       TypeLoc::withoutLoc(returnType),
                                       target);
   encodeDecl->setImplicit();
+  encodeDecl->setSynthesized();
   encodeDecl->setBodySynthesizer(deriveBodyEncodable_encode);
 
   // This method should be marked as 'override' for classes inheriting Encodable
   // conformance from a parent class.
   auto *classDecl = dyn_cast<ClassDecl>(target);
   if (classDecl && superclassIsEncodable(classDecl)) {
-    auto *attr = new (C) SimpleDeclAttr<DAK_Override>(/*IsImplicit=*/true);
+    auto *attr = new (C) OverrideAttr(/*IsImplicit=*/true);
     encodeDecl->getAttrs().add(attr);
   }
 
@@ -768,13 +781,10 @@ static FuncDecl *deriveEncodable_encode(TypeChecker &tc, Decl *parentDecl,
   }
 
   encodeDecl->setInterfaceType(interfaceType);
-  encodeDecl->setAccess(target->getFormalAccess());
+  encodeDecl->setValidationStarted();
+  encodeDecl->copyFormalAccessFrom(target, /*sourceIsParentContext*/true);
 
-  // If the type was not imported, the derived conformance is either from the
-  // type itself or an extension, in which case we will emit the declaration
-  // normally.
-  if (target->hasClangNode())
-    tc.Context.addExternalDecl(encodeDecl);
+  tc.Context.addSynthesizedDecl(encodeDecl);
 
   target->addMember(encodeDecl);
   return encodeDecl;
@@ -962,7 +972,7 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
                                               SourceLoc(), /*Implicit=*/true);
 
         // super.init(from:)
-        auto initName = DeclName(C, C.Id_init, C.Id_from);
+        auto initName = DeclName(C, DeclBaseName::createConstructor(), C.Id_from);
         auto *initCall = new (C) UnresolvedDotExpr(superRef, SourceLoc(),
                                                    initName, DeclNameLoc(),
                                                    /*Implicit=*/true);
@@ -980,7 +990,7 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
         statements.push_back(tryExpr);
       } else {
         // The explicit constructor name is a compound name taking no arguments.
-        DeclName initName(C, C.Id_init, ArrayRef<Identifier>());
+        DeclName initName(C, DeclBaseName::createConstructor(), ArrayRef<Identifier>());
 
         // We need to look this up in the superclass to see if it throws.
         auto result = superclassDecl->lookupDirect(initName);
@@ -1065,29 +1075,28 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), target,
                                          /*isStatic=*/false,
                                          /*isInOut=*/inOut);
-  auto *decoderParamDecl = new (C) ParamDecl(VarDecl::Specifier::Owned,
-                                             SourceLoc(),
-                                             SourceLoc(), C.Id_from,
-                                             SourceLoc(), C.Id_decoder,
-                                             decoderType, target);
+  auto *decoderParamDecl = new (C)
+      ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                C.Id_from, SourceLoc(), C.Id_decoder, decoderType, target);
   decoderParamDecl->setImplicit();
   decoderParamDecl->setInterfaceType(decoderType);
 
   auto *paramList = ParameterList::createWithoutLoc(decoderParamDecl);
 
   // Func name: init(from: Decoder)
-  DeclName name(C, C.Id_init, paramList);
+  DeclName name(C, DeclBaseName::createConstructor(), paramList);
 
   auto *initDecl = new (C) ConstructorDecl(name, SourceLoc(), OTK_None,
                                            SourceLoc(), /*Throws=*/true,
                                            SourceLoc(), selfDecl, paramList,
                                            /*GenericParams=*/nullptr, target);
   initDecl->setImplicit();
+  initDecl->setSynthesized();
   initDecl->setBodySynthesizer(deriveBodyDecodable_init);
 
   // This constructor should be marked as `required` for non-final classes.
   if (isa<ClassDecl>(target) && !target->getAttrs().hasAttribute<FinalAttr>()) {
-    auto *reqAttr = new (C) SimpleDeclAttr<DAK_Required>(/*IsImplicit=*/true);
+    auto *reqAttr = new (C) RequiredAttr(/*IsImplicit=*/true);
     initDecl->getAttrs().add(reqAttr);
   }
 
@@ -1111,14 +1120,11 @@ static ValueDecl *deriveDecodable_init(TypeChecker &tc, Decl *parentDecl,
   }
 
   initDecl->setInterfaceType(interfaceType);
+  initDecl->setValidationStarted();
   initDecl->setInitializerInterfaceType(initializerType);
-  initDecl->setAccess(target->getFormalAccess());
+  initDecl->copyFormalAccessFrom(target, /*sourceIsParentContext*/true);
 
-  // If the type was not imported, the derived conformance is either from the
-  // type itself or an extension, in which case we will emit the declaration
-  // normally.
-  if (target->hasClangNode())
-    tc.Context.addExternalDecl(initDecl);
+  tc.Context.addSynthesizedDecl(initDecl);
 
   target->addMember(initDecl);
   return initDecl;
@@ -1162,7 +1168,7 @@ static bool canSynthesize(TypeChecker &tc, NominalTypeDecl *target,
         // super.init() must be accessible.
         // Passing an empty params array constructs a compound name with no
         // arguments (as opposed to a simple name when omitted).
-        memberName = DeclName(C, DeclBaseName(C.Id_init),
+        memberName = DeclName(C, DeclBaseName::createConstructor(),
                               ArrayRef<Identifier>());
       }
 
@@ -1285,7 +1291,7 @@ ValueDecl *DerivedConformance::deriveDecodable(TypeChecker &tc,
   if (!isa<StructDecl>(target) && !isa<ClassDecl>(target))
     return nullptr;
 
-  if (requirement->getBaseName() != tc.Context.Id_init) {
+  if (requirement->getBaseName() != DeclBaseName::createConstructor()) {
     // Unknown requirement.
     tc.diagnose(requirement->getLoc(), diag::broken_decodable_requirement);
     return nullptr;

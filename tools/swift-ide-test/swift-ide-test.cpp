@@ -1490,11 +1490,18 @@ static ModuleDecl *getModuleByFullName(ASTContext &Context, StringRef ModuleName
     AccessPath.push_back(
         { Context.getIdentifier(SubModuleName), SourceLoc() });
   }
-  return Context.getModule(AccessPath);
+  ModuleDecl *Result = Context.getModule(AccessPath);
+  if (!Result || Result->failedToLoad())
+    return nullptr;
+  return Result;
 }
 
 static ModuleDecl *getModuleByFullName(ASTContext &Context, Identifier ModuleName) {
-  return Context.getModule(std::make_pair(ModuleName, SourceLoc()));
+  ModuleDecl *Result = Context.getModule(std::make_pair(ModuleName,
+                                                        SourceLoc()));
+  if (!Result || Result->failedToLoad())
+    return nullptr;
+  return Result;
 }
 
 static int doPrintAST(const CompilerInvocation &InitInvok,
@@ -2442,6 +2449,8 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
           llvm::outs() << " (Clang)";
         llvm::outs() << "\n";
       }
+
+      return true;
     });
   }
 
@@ -2928,7 +2937,8 @@ static int doTestCompilerInvocationFromModule(StringRef ModuleFilePath) {
 void anchorForGetMainExecutable() {}
 
 int main(int argc, char *argv[]) {
-  INITIALIZE_LLVM(argc, argv);
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
 
   if (argc > 1) {
     // Handle integrated test tools which do not use

@@ -25,6 +25,36 @@
 using namespace swift;
 using namespace constraints;
 
+/// \brief Determine whether one type would be a valid substitution for an
+/// archetype.
+///
+/// \param type The potential type.
+///
+/// \param archetype The archetype for which type may (or may not) be
+/// substituted.
+///
+/// \param dc The context of the check.
+///
+/// \returns true if \c t1 is a valid substitution for \c t2.
+static bool isSubstitutableFor(Type type, ArchetypeType *archetype,
+                               DeclContext *dc) {
+  if (archetype->requiresClass() && !type->satisfiesClassConstraint())
+    return false;
+
+  if (auto superclass = archetype->getSuperclass()) {
+    if (!superclass->isExactSuperclassOf(type))
+      return false;
+  }
+
+  for (auto proto : archetype->getConformsTo()) {
+    if (!dc->getParentModule()->lookupConformance(
+          type, proto))
+      return false;
+  }
+
+  return true;
+}
+
 UncurriedCandidate::UncurriedCandidate(ValueDecl *decl, unsigned level)
 : declOrExpr(decl), level(level), substituted(false) {
   
@@ -54,20 +84,6 @@ UncurriedCandidate::UncurriedCandidate(ValueDecl *decl, unsigned level)
   }
 }
 
-/// Helper to gather the argument labels from a tuple or paren type, for use
-/// when the AST doesn't store argument-label information properly.
-static void gatherArgumentLabels(Type type,
-                                 SmallVectorImpl<Identifier> &labels) {
-  // Handle tuple types.
-  if (auto tupleTy = dyn_cast<TupleType>(type.getPointer())) {
-    for (auto i : range(tupleTy->getNumElements()))
-      labels.push_back(tupleTy->getElement(i).getName());
-    return;
-  }
-  
-  labels.push_back(Identifier());
-}
-
 ArrayRef<Identifier> UncurriedCandidate::getArgumentLabels(
                                        SmallVectorImpl<Identifier> &scratch) {
   scratch.clear();
@@ -90,20 +106,23 @@ ArrayRef<Identifier> UncurriedCandidate::getArgumentLabels(
       
       // The associated data of the case.
       if (level == 1) {
-        auto argTy = enumElt->getArgumentInterfaceType();
-        if (!argTy) return { };
-        gatherArgumentLabels(argTy, scratch);
+        auto *paramList = enumElt->getParameterList();
+        if (!paramList) return { };
+        for (auto param : *paramList) {
+          scratch.push_back(param->getArgumentName());
+        }
         return scratch;
       }
     }
   }
-  
-  if (auto argType = getArgumentType()) {
-    gatherArgumentLabels(argType, scratch);
-    return scratch;
-  }
-  
-  return { };
+
+  if (!hasParameters())
+    return {};
+
+  for (const auto &param : getParameters())
+    scratch.push_back(param.getLabel());
+
+  return scratch;
 }
 
 void UncurriedCandidate::dump() const {
@@ -284,11 +303,14 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
   auto *dc = candidate.getDecl()
   ? candidate.getDecl()->getInnermostDeclContext()
   : nullptr;
-  
-  auto candArgs = candidate.getUncurriedFunctionType()->getParams();
+
+  if (!candidate.hasParameters())
+    return {CC_GeneralMismatch, {}};
+
+  auto candArgs = candidate.getParameters();
   SmallVector<bool, 4> candDefaultMap;
-  computeDefaultMap(candidate.getArgumentType(), candidate.getDecl(),
-                    candidate.level, candDefaultMap);
+  computeDefaultMap(candArgs, candidate.getDecl(), candidate.level,
+                    candDefaultMap);
   
   struct OurListener : public MatchCallArgumentListener {
     CandidateCloseness result = CC_ExactMatch;
@@ -426,14 +448,14 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
             if (!archetype->isPrimary())
               return { CC_ArgumentMismatch, {}};
             
-            if (!CS.TC.isSubstitutableFor(substitution, archetype, CS.DC)) {
+            if (!isSubstitutableFor(substitution, archetype, CS.DC)) {
               // If we have multiple non-substitutable types, this is just a mismatched mess.
               if (!nonSubstitutableArchetype.isNull())
                 return { CC_ArgumentMismatch, {}};
               
               if (auto argOptType = argType->getOptionalObjectType())
                 mismatchesAreNearMisses &=
-                CS.TC.isSubstitutableFor(argOptType, archetype, CS.DC);
+                  isSubstitutableFor(argOptType, archetype, CS.DC);
               else
                 mismatchesAreNearMisses = false;
               
@@ -455,7 +477,7 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
               // type might be the one that we should be substituting for instead.
               // Note that failureInfo is already set correctly for that case.
               if (isNonSubstitutableArchetype && nonSubstitutableArgs == 1 &&
-                  CS.TC.isSubstitutableFor(substitution, archetype, CS.DC)) {
+                  isSubstitutableFor(substitution, archetype, CS.DC)) {
                 mismatchesAreNearMisses = argumentMismatchIsNearMiss(existingSubstitution, substitution);
                 allGenericSubstitutions[archetype] = substitution;
               } else {
@@ -663,7 +685,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
   // base uncurried by one level, and we refer to the name of the member, not to
   // the name of any base.
   if (auto UDE = dyn_cast<UnresolvedDotExpr>(fn)) {
-    declName = UDE->getName().getBaseIdentifier().str();
+    declName = UDE->getName().getBaseName().userFacingName();
     uncurryLevel = 1;
     
     // If we actually resolved the member to use, return it.
@@ -683,7 +705,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     
     // If we have useful information about the type we're
     // initializing, provide it.
-    if (UDE->getName().getBaseName() == CS.TC.Context.Id_init) {
+    if (UDE->getName().getBaseName() == DeclBaseName::createConstructor()) {
       auto selfTy = CS.getType(UDE->getBase())->getWithoutSpecifierType();
       if (!selfTy->hasTypeVariable())
         declName = selfTy->eraseDynamicSelfType().getString() + "." + declName;
@@ -731,7 +753,8 @@ void CalleeCandidateInfo::filterListArgs(ArrayRef<AnyFunctionType::Param> actual
   filterList([&](UncurriedCandidate candidate) -> ClosenessResultTy {
     // If this isn't a function or isn't valid at this uncurry level, treat it
     // as a general mismatch.
-    if (!candidate.getArgumentType()) return { CC_GeneralMismatch, {}};
+    if (!candidate.hasParameters())
+      return {CC_GeneralMismatch, {}};
     return evaluateCloseness(candidate, actualArgs);
   });
 }
@@ -742,10 +765,10 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
   // If the argument is not present then we expect members without arguments.
   if (!argExpr) {
     return filterList([&](UncurriedCandidate candidate) -> ClosenessResultTy {
-      auto inputType = candidate.getArgumentType();
       // If this candidate has no arguments, then we're a match.
-      if (!inputType) return { CC_ExactMatch, {}};
-      
+      if (!candidate.hasParameters())
+        return {CC_ExactMatch, {}};
+
       // Otherwise, if this is a function candidate with an argument, we
       // mismatch argument count.
       return { CC_ArgumentCountMismatch, {}};
@@ -858,7 +881,8 @@ suggestPotentialOverloads(SourceLoc loc, bool isResult) {
   // FIXME2: For (T,T) & (Self, Self), emit this as two candidates, one using
   // the LHS and one using the RHS type for T's.
   for (auto cand : candidates) {
-    auto type = isResult ? cand.getResultType() : cand.getArgumentType();
+    auto type = isResult ? cand.getResultType()
+                         : cand.getArgumentType(CS.getASTContext());
     if (type.isNull())
       continue;
     
@@ -959,7 +983,7 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
     
     // Check for optional near miss.
     if (auto argOptType = substitution->getOptionalObjectType()) {
-      if (CS.TC.isSubstitutableFor(argOptType, paramArchetype, CS.DC)) {
+      if (isSubstitutableFor(argOptType, paramArchetype, CS.DC)) {
         CS.TC.diagnose(badArgExpr->getLoc(), diag::missing_unwrap_optional,
                        argType);
         foundFailure = true;

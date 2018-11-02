@@ -11,18 +11,11 @@ open class Base {
   open var property: String {
     return "Base.property"
   }
+  open var nonOverriddenProperty: String {
+    return "Base.nonOverriddenProperty"
+  }
   open class var classProperty: String {
     return "Base.classProperty"
-  }
-}
-
-open class OtherBase {
-  public init() {}
-  open var property: String {
-    return "OtherBase.property"
-  }
-  open class var classProperty: String {
-    return "OtherBase.classProperty"
   }
 }
 
@@ -65,10 +58,4 @@ open class RemoveInterposingProperty : Base {}
 open class InsertSuperclass : Base {}
 #else
 open class InsertSuperclass : InBetween {}
-#endif
-
-#if BEFORE
-open class ChangeRoot : Base {}
-#else
-open class ChangeRoot : OtherBase {}
 #endif

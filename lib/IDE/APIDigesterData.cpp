@@ -24,7 +24,7 @@ using namespace api;
 inline raw_ostream &swift::ide::api::
 operator<<(raw_ostream &Out, const SDKNodeKind Value) {
   switch (Value) {
-#define NODE_KIND(Name) case SDKNodeKind::Name: return Out << #Name;
+#define NODE_KIND(Name, Value) case SDKNodeKind::Name: return Out << #Value;
 #include "swift/IDE/DigesterEnums.def"
   }
   llvm_unreachable("Undefined SDK node kind.");
@@ -39,14 +39,14 @@ operator<<(raw_ostream &Out, const NodeAnnotation Value) {
 
 SDKNodeKind swift::ide::api::parseSDKNodeKind(StringRef Content) {
   return llvm::StringSwitch<SDKNodeKind>(Content)
-#define NODE_KIND(NAME) .Case(#NAME, SDKNodeKind::NAME)
+#define NODE_KIND(NAME, VALUE) .Case(#VALUE, SDKNodeKind::NAME)
 #include "swift/IDE/DigesterEnums.def"
   ;
 }
 
 NodeAnnotation swift::ide::api::parseSDKNodeAnnotation(StringRef Content) {
   return llvm::StringSwitch<NodeAnnotation>(Content)
-#define NODE_ANNOTATION(NAME) .Case(#NAME, NodeAnnotation::NAME)
+#define NODE_ANNOTATION_CHANGE_KIND(NAME) .Case(#NAME, NodeAnnotation::NAME)
 #include "swift/IDE/DigesterEnums.def"
   ;
 }
@@ -309,7 +309,7 @@ serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
 #define DIFF_ITEM_KEY_KIND_STRING(NAME) StringRef NAME;
 #define DIFF_ITEM_KEY_KIND_INT(NAME) Optional<int> NAME;
 #include "swift/IDE/DigesterEnums.def"
-  for (auto Pair : *Node) {
+  for (auto &Pair : *Node) {
     switch(parseKeyKind(getScalarString(Pair.getKey()))) {
 #define DIFF_ITEM_KEY_KIND_STRING(NAME)                                       \
     case DiffItemKeyKind::KK_##NAME:                                          \
@@ -444,11 +444,36 @@ struct ArrayTraits<ArrayRef<APIDiffItem*>> {
     return const_cast<APIDiffItem *&>(seq[index]);
   }
 };
+
+template<>
+struct ObjectTraits<NameCorrectionInfo> {
+  static void mapping(Output &out, NameCorrectionInfo &value) {
+    out.mapRequired(getKeyContent(DiffItemKeyKind::KK_OldPrintedName),value.OriginalName);
+    out.mapRequired(getKeyContent(DiffItemKeyKind::KK_NewPrintedName), value.CorrectedName);
+    out.mapRequired(getKeyContent(DiffItemKeyKind::KK_ModuleName), value.ModuleName);
+  }
+};
+template<>
+struct ArrayTraits<ArrayRef<NameCorrectionInfo>> {
+  static size_t size(Output &out, ArrayRef<NameCorrectionInfo> &seq) {
+    return seq.size();
+  }
+  static NameCorrectionInfo &element(Output &, ArrayRef<NameCorrectionInfo> &seq,
+                                     size_t index) {
+    return const_cast<NameCorrectionInfo&>(seq[index]);
+  }
+};
 } // namespace json
 } // namespace swift
 
 void swift::ide::api::APIDiffItemStore::
 serialize(llvm::raw_ostream &os, ArrayRef<APIDiffItem*> Items) {
+  json::Output yout(os);
+  yout << Items;
+}
+
+void swift::ide::api::APIDiffItemStore::
+serialize(llvm::raw_ostream &os, ArrayRef<NameCorrectionInfo> Items) {
   json::Output yout(os);
   yout << Items;
 }

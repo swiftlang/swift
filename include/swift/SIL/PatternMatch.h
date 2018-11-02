@@ -140,17 +140,17 @@ struct OneOf_match;
 
 template <typename T0>
 struct OneOf_match<T0> {
-  typedef T0 Ty;
+  using Ty = T0;
 };
 
 template <typename T0, typename T1>
 struct OneOf_match<T0, T1> {
-  typedef match_combine_or<T0, T1> Ty;
+  using Ty = match_combine_or<T0, T1>;
 };
 
 template <typename T0, typename T1, typename ...Arguments>
 struct OneOf_match<T0, T1, Arguments ...> {
-  typedef typename OneOf_match<match_combine_or<T0, T1>, Arguments ...>::Ty Ty;
+  using Ty = typename OneOf_match<match_combine_or<T0, T1>, Arguments...>::Ty;
 };
 
 /// This is a vararg version of m_CombineOr. It is a boolean "or" of
@@ -584,18 +584,18 @@ struct Apply_match;
 
 template <typename CalleeTy>
 struct Apply_match<CalleeTy> {
-  typedef Callee_match<CalleeTy> Ty;
+  using Ty = Callee_match<CalleeTy>;
 };
 
 template <typename CalleeTy, typename T0>
 struct Apply_match<CalleeTy, T0> {
-  typedef match_combine_and<Callee_match<CalleeTy>, Argument_match<T0>> Ty;
+  using Ty = match_combine_and<Callee_match<CalleeTy>, Argument_match<T0>>;
 };
 
 template <typename CalleeTy, typename T0, typename ...Arguments>
 struct Apply_match<CalleeTy, T0, Arguments ...> {
-  typedef match_combine_and<typename Apply_match<CalleeTy, Arguments ...>::Ty,
-                            Argument_match<T0> > Ty;
+  using Ty = match_combine_and<typename Apply_match<CalleeTy, Arguments...>::Ty,
+                               Argument_match<T0>>;
 };
 
 /// Match only an ApplyInst's Callee.

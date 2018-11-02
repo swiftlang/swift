@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Module.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/Strings.h"
 
@@ -657,7 +658,7 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
   return true;
 }
 
-// Returns the callee of an apply_inst if it is basically inlineable.
+// Returns the callee of an apply_inst if it is basically inlinable.
 SILFunction *swift::getEligibleFunction(FullApplySite AI,
                                         InlineSelection WhatToInline) {
   // For now, we cannot inline begin_apply at all.
@@ -852,8 +853,8 @@ bool swift::isPureCall(FullApplySite AI, SideEffectAnalysis *SEA) {
   // If a call has only constant arguments and the call is pure, i.e. has
   // no side effects, then we should always inline it.
   // This includes arguments which are objects initialized with constant values.
-  SideEffectAnalysis::FunctionEffects ApplyEffects;
-  SEA->getEffects(ApplyEffects, AI);
+  FunctionSideEffects ApplyEffects;
+  SEA->getCalleeEffects(ApplyEffects, AI);
   auto GE = ApplyEffects.getGlobalEffects();
   if (GE.mayRead() || GE.mayWrite() || GE.mayRetain() || GE.mayRelease())
     return false;

@@ -1,3 +1,4 @@
+
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -sil-combine | %FileCheck %s
 
 sil_stage canonical
@@ -896,7 +897,7 @@ class C {
 }
 
 // CHECK-LABEL: sil [noinline] @callThrowing
-sil [noinline] @callThrowing : $@convention(method) <T> (@in T, @owned @callee_owned () -> (@out T, @error Error), @guaranteed C) -> @out T {
+sil [noinline] @callThrowing : $@convention(method) <T> (@in_guaranteed T, @guaranteed @callee_owned () -> (@out T, @error Error), @guaranteed C) -> @out T {
 bb0(%0 : $*T, %1 : $*T, %2 : $@callee_owned () -> (@out T, @error Error), %3 : $C):
   strong_retain %2 : $@callee_owned () -> (@out T, @error Error)
   try_apply %2(%0) : $@callee_owned () -> (@out T, @error Error), normal bb1, error bb4
@@ -932,8 +933,8 @@ bb0(%0 : $C):
   %7 = function_ref @reabstractionThunk : $@convention(thin) (@owned @callee_owned () -> (Int32, @error Error)) -> (@out Int32, @error Error)
   %8 = partial_apply %7(%6) : $@convention(thin) (@owned @callee_owned () -> (Int32, @error Error)) -> (@out Int32, @error Error)
   %9 = alloc_stack $Int32
-  %10 = function_ref @callThrowing : $@convention(method) <τ_0_0> (@in τ_0_0, @owned @callee_owned () -> (@out τ_0_0, @error Error), @guaranteed C) -> @out τ_0_0
-  %11 = apply %10<Int32>(%9, %3, %8, %0) : $@convention(method) <τ_0_0> (@in τ_0_0, @owned @callee_owned () -> (@out τ_0_0, @error Error), @guaranteed C) -> @out τ_0_0
+  %10 = function_ref @callThrowing : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @guaranteed @callee_owned () -> (@out τ_0_0, @error Error), @guaranteed C) -> @out τ_0_0
+  %11 = apply %10<Int32>(%9, %3, %8, %0) : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @guaranteed @callee_owned () -> (@out τ_0_0, @error Error), @guaranteed C) -> @out τ_0_0
   %12 = load %9 : $*Int32
   dealloc_stack %9 : $*Int32
   dealloc_stack %3 : $*Int32

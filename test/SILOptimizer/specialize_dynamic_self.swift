@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -sil-inline-generics -emit-sil -O -primary-file %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name specialize_dynamic_self -Xllvm -sil-inline-generics -emit-sil -O -primary-file %s | %FileCheck %s
 
 protocol P {}
 
@@ -21,7 +22,7 @@ class C<T> : P {
   }
 }
 
-// CHECK-LABEL: sil hidden [thunk] [always_inline] @$S23specialize_dynamic_self8usesCInt1cyAA1CCySiG_tF : $@convention(thin) (@owned C<Int>) -> () {
+// CHECK-LABEL: sil hidden @$S23specialize_dynamic_self8usesCInt1cyAA1CCySiG_tF : $@convention(thin) (@guaranteed C<Int>) -> () {
 // CHECK: function_ref @$S23specialize_dynamic_self1CC11returnsSelfACyxGXDyFSi_Tg5 : $@convention(method) (@guaranteed C<Int>) -> @owned C<Int>
 // CHECK: return
 func usesCInt(c: C<Int>) {

@@ -23,6 +23,7 @@
 
 #include "ImageInspectionELF.h"
 #include <cstdint>
+#include <cstddef>
 
 namespace swift {
 
@@ -58,6 +59,7 @@ void addImageTypeFieldDescriptorBlockCallback(const void *start,
                                               uintptr_t size);
 
 int lookupSymbol(const void *address, SymbolInfo *info);
+void *lookupSection(const char *segment, const char *section, size_t *outSize);
 
 } // end namespace swift
 

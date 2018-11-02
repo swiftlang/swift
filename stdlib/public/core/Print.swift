@@ -163,7 +163,7 @@ public func debugPrint(
 ///     default is a newline (`"\n"`).
 ///   - output: An output stream to receive the text representation of each
 ///     item.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @inline(__always)
 public func print<Target : TextOutputStream>(
   _ items: Any...,
@@ -212,7 +212,7 @@ public func print<Target : TextOutputStream>(
 ///     default is a newline (`"\n"`).
 ///   - output: An output stream to receive the text representation of each
 ///     item.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @inline(__always)
 public func debugPrint<Target : TextOutputStream>(
   _ items: Any...,
@@ -224,7 +224,7 @@ public func debugPrint<Target : TextOutputStream>(
     items, separator: separator, terminator: terminator, to: &output)
 }
 
-@_versioned
+@usableFromInline
 @inline(never)
 internal func _print<Target : TextOutputStream>(
   _ items: [Any],
@@ -243,7 +243,7 @@ internal func _print<Target : TextOutputStream>(
   output.write(terminator)
 }
 
-@_versioned
+@usableFromInline
 @inline(never)
 internal func _debugPrint<Target : TextOutputStream>(
   _ items: [Any],

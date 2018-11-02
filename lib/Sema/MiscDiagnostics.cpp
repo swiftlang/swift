@@ -210,7 +210,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         }
 
         // Verify noescape parameter uses.
-        checkNoEscapeParameterUse(DRE, nullptr, OperandKind::None);
+        checkNoEscapeParameterUse(DRE, Parent.getAsExpr(), OperandKind::None);
 
         // Verify warn_unqualified_access uses.
         checkUnqualifiedAccessUse(DRE);
@@ -371,15 +371,10 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             .highlight(IOE->getSubExpr()->getSourceRange());
       }
 
-      // Diagnose 'self.init' or 'super.init' nested in another expression.
+      // Diagnose 'self.init' or 'super.init' nested in another expression
+      // or closure.
       if (auto *rebindSelfExpr = dyn_cast<RebindSelfInConstructorExpr>(E)) {
-        bool inDefer = false;
-        auto *innerDecl = DC->getInnermostDeclarationDeclContext();
-        if (auto *FD = dyn_cast_or_null<FuncDecl>(innerDecl)) {
-          inDefer = FD->isDeferBody();
-        }
-
-        if (!Parent.isNull() || !IsExprStmt || inDefer) {
+        if (!Parent.isNull() || !IsExprStmt || DC->getParent()->isLocalContext()) {
           bool isChainToSuper;
           (void)rebindSelfExpr->getCalledConstructor(isChainToSuper);
           TC.diagnose(E->getLoc(), diag::init_delegation_nested,
@@ -559,14 +554,11 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // We care about whether the parameter list of the callee syntactically
       // has more than one argument.  It has to *syntactically* have a tuple
       // type as its argument.  A ParenType wrapping a TupleType is a single
-      // parameter. 
-      if (isa<TupleType>(FT->getInput().getPointer())) {
-        auto TT = FT->getInput()->getAs<TupleType>();
-        if (TT->getNumElements() > 1) {
-          TC.diagnose(Call->getLoc(), diag::tuple_splat_use,
-                      TT->getNumElements())
-            .highlight(Call->getArg()->getSourceRange());
-        }
+      // parameter.
+      auto params = FT->getParams();
+      if (params.size() > 1) {
+        TC.diagnose(Call->getLoc(), diag::tuple_splat_use, params.size())
+          .highlight(Call->getArg()->getSourceRange());
       }
     }
 
@@ -708,7 +700,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       // The only valid use of the noescape parameter is an immediate call,
       // either as the callee or as an argument (in which case, the typechecker
       // validates that the noescape bit didn't get stripped off), or as
-      // a special case, in the binding of a withoutActuallyEscaping block.
+      // a special case, e.g. in the binding of a withoutActuallyEscaping block
+      // or the argument of a type(of: ...).
       if (parent) {
         if (auto apply = dyn_cast<ApplyExpr>(parent)) {
           if (isa<ParamDecl>(DRE->getDecl()) && useKind == OperandKind::Callee)
@@ -718,6 +711,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
                    && useKind == OperandKind::Argument) {
           return;
         } else if (isa<MakeTemporarilyEscapableExpr>(parent)) {
+          return;
+        } else if (isa<DynamicTypeExpr>(parent)) {
           return;
         }
       }
@@ -875,7 +870,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       DeclContext *topLevelContext = DC->getModuleScopeContext();
       UnqualifiedLookup lookup(VD->getBaseName(), topLevelContext, &TC,
-                               /*knownPrivate*/true);
+                               /*Loc=*/SourceLoc(),
+                               UnqualifiedLookup::Flags::KnownPrivate);
 
       // Group results by module. Pick an arbitrary result from each module.
       llvm::SmallDenseMap<const ModuleDecl*,const ValueDecl*,4> resultsByModule;
@@ -1428,27 +1424,42 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
     }
     
-    /// Return true if this is 'nil' type checked as an Optional.  This looks
-    /// like this:
-    ///   (call_expr implicit type='Int?'
-    ///     (constructor_ref_call_expr implicit
-    ///       (declref_expr implicit decl=Optional.init(nilLiteral:)
-    static bool isTypeCheckedOptionalNil(Expr *E) {
-      auto CE = dyn_cast<CallExpr>(E->getSemanticsProvidingExpr());
+    /// Return true if this is a 'nil' literal.  This looks
+    /// like this if the type is Optional<T>:
+    ///
+    ///   (dot_syntax_call_expr implicit type='Int?'
+    ///     (declref_expr implicit decl=Optional.none)
+    ///     (type_expr type=Int?))
+    ///
+    /// Or like this if it is any other ExpressibleByNilLiteral type:
+    ///
+    ///   (dot_syntax_call_expr implicit type='Int?'
+    ///     (declref_expr implicit decl=Optional.none)
+    ///     (type_expr type=Int?))
+    ///
+    bool isTypeCheckedOptionalNil(Expr *E) {
+      auto CE = dyn_cast<ApplyExpr>(E->getSemanticsProvidingExpr());
       if (!CE || !CE->isImplicit())
         return false;
-      
+
+      // First case -- Optional.none
+      if (auto DRE = dyn_cast<DeclRefExpr>(CE->getSemanticFn()))
+        return DRE->getDecl() == TC.Context.getOptionalNoneDecl();
+
+      // Second case -- init(nilLiteral:)
       auto CRCE = dyn_cast<ConstructorRefCallExpr>(CE->getSemanticFn());
       if (!CRCE || !CRCE->isImplicit()) return false;
-      
-      auto DRE = dyn_cast<DeclRefExpr>(CRCE->getSemanticFn());
-      
-      SmallString<32> NameBuffer;
-      auto name = DRE->getDecl()->getFullName().getString(NameBuffer);
-      return name == "init(nilLiteral:)";
+
+      if (auto DRE = dyn_cast<DeclRefExpr>(CRCE->getSemanticFn())) {
+        SmallString<32> NameBuffer;
+        auto name = DRE->getDecl()->getFullName().getString(NameBuffer);
+        return name == "init(nilLiteral:)";
+      }
+
+      return false;
     }
-    
-    
+
+
     /// Warn about surprising implicit optional promotions involving operands to
     /// calls.  Specifically, we warn about these expressions when the 'x'
     /// operand is implicitly promoted to optional:
@@ -1997,6 +2008,182 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
   return true;
 }
 
+static const Expr *lookThroughExprsToImmediateDeallocation(const Expr *E) {
+  // Look through various expressions that don't affect the fact that the user
+  // will be assigning a class instance that will be immediately deallocated.
+  while (true) {
+    E = E->getValueProvidingExpr();
+
+    // We don't currently deal with tuple shuffles.
+    if (isa<TupleShuffleExpr>(E))
+      return E;
+
+    // If we have a TupleElementExpr with a child TupleExpr, dig into that
+    // element.
+    if (auto *TEE = dyn_cast<TupleElementExpr>(E)) {
+      auto *subExpr = lookThroughExprsToImmediateDeallocation(TEE->getBase());
+      if (auto *TE = dyn_cast<TupleExpr>(subExpr)) {
+        auto *element = TE->getElements()[TEE->getFieldNumber()];
+        return lookThroughExprsToImmediateDeallocation(element);
+      }
+      return subExpr;
+    }
+
+    if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E)) {
+      E = ICE->getSubExpr();
+      continue;
+    }
+    if (auto *CE = dyn_cast<CoerceExpr>(E)) {
+      E = CE->getSubExpr();
+      continue;
+    }
+    if (auto *OEE = dyn_cast<OpenExistentialExpr>(E)) {
+      E = OEE->getSubExpr();
+      continue;
+    }
+
+    // Look through optional evaluations, we still want to diagnose on
+    // things like initializers called through optional chaining and the
+    // unwrapping of failable initializers.
+    if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(E)) {
+      E = OEE->getSubExpr();
+      continue;
+    }
+    if (auto *OBE = dyn_cast<BindOptionalExpr>(E)) {
+      E = OBE->getSubExpr();
+      continue;
+    }
+    if (auto *FOE = dyn_cast<ForceValueExpr>(E)) {
+      E = FOE->getSubExpr();
+      continue;
+    }
+
+    if (auto *ATE = dyn_cast<AnyTryExpr>(E)) {
+      E = ATE->getSubExpr();
+      continue;
+    }
+    if (auto *DSBIE = dyn_cast<DotSyntaxBaseIgnoredExpr>(E)) {
+      E = DSBIE->getRHS();
+      continue;
+    }
+    return E;
+  }
+}
+
+static void diagnoseUnownedImmediateDeallocationImpl(TypeChecker &TC,
+                                                     const VarDecl *varDecl,
+                                                     const Expr *initExpr,
+                                                     SourceLoc diagLoc,
+                                                     SourceRange diagRange) {
+  auto *ownershipAttr =
+      varDecl->getAttrs().getAttribute<ReferenceOwnershipAttr>();
+  if (!ownershipAttr || ownershipAttr->isInvalid())
+    return;
+
+  // Only diagnose for non-owning ownerships such as 'weak' and 'unowned'.
+  switch (ownershipAttr->get()) {
+  case ReferenceOwnership::Strong:
+    return;
+  case ReferenceOwnership::Weak:
+  case ReferenceOwnership::Unowned:
+  case ReferenceOwnership::Unmanaged:
+    break;
+  }
+
+  // Try to find a call to a constructor.
+  initExpr = lookThroughExprsToImmediateDeallocation(initExpr);
+  auto *CE = dyn_cast<CallExpr>(initExpr);
+  if (!CE)
+    return;
+
+  auto *CRCE = dyn_cast<ConstructorRefCallExpr>(CE->getFn());
+  if (!CRCE)
+    return;
+
+  auto *DRE = dyn_cast<DeclRefExpr>(CRCE->getFn());
+  if (!DRE)
+    return;
+
+  auto *constructorDecl = dyn_cast<ConstructorDecl>(DRE->getDecl());
+  if (!constructorDecl)
+    return;
+
+  // Make sure the constructor constructs an instance that allows ownership.
+  // This is to ensure we don't diagnose on constructors such as
+  // Optional.init(nilLiteral:).
+  auto selfType = constructorDecl->getDeclContext()->getSelfTypeInContext();
+  if (!selfType->allowsOwnership())
+    return;
+
+  // This must stay in sync with
+  // diag::unowned_assignment_immediate_deallocation.
+  enum {
+    SK_Variable = 0,
+    SK_Property
+  } storageKind = SK_Variable;
+
+  if (varDecl->getDeclContext()->isTypeContext())
+    storageKind = SK_Property;
+
+  TC.diagnose(diagLoc, diag::unowned_assignment_immediate_deallocation,
+              varDecl->getName(), ownershipAttr->get(), unsigned(storageKind))
+    .highlight(diagRange);
+
+  TC.diagnose(diagLoc, diag::unowned_assignment_requires_strong)
+    .highlight(diagRange);
+
+  TC.diagnose(varDecl, diag::decl_declared_here, varDecl->getFullName());
+}
+
+void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
+                                                 const AssignExpr *assignExpr) {
+  auto *destExpr = assignExpr->getDest()->getValueProvidingExpr();
+  auto *initExpr = assignExpr->getSrc();
+
+  // Try to find a referenced VarDecl.
+  const VarDecl *VD = nullptr;
+  if (auto *DRE = dyn_cast<DeclRefExpr>(destExpr)) {
+    VD = dyn_cast<VarDecl>(DRE->getDecl());
+  } else if (auto *MRE = dyn_cast<MemberRefExpr>(destExpr)) {
+    VD = dyn_cast<VarDecl>(MRE->getMember().getDecl());
+  }
+
+  if (VD)
+    diagnoseUnownedImmediateDeallocationImpl(TC, VD, initExpr,
+                                             assignExpr->getLoc(),
+                                             initExpr->getSourceRange());
+}
+
+void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
+                                                 const Pattern *pattern,
+                                                 const Expr *initExpr) {
+  pattern = pattern->getSemanticsProvidingPattern();
+
+  if (auto *TP = dyn_cast<TuplePattern>(pattern)) {
+    initExpr = lookThroughExprsToImmediateDeallocation(initExpr);
+
+    // If we've found a matching tuple initializer with the same number of
+    // elements as our pattern, diagnose each element individually.
+    auto TE = dyn_cast<TupleExpr>(initExpr);
+    if (TE && TE->getNumElements() == TP->getNumElements()) {
+      for (unsigned i = 0, e = TP->getNumElements(); i != e; ++i) {
+        const TuplePatternElt &elt = TP->getElement(i);
+        const Pattern *subPattern = elt.getPattern();
+        Expr *subInitExpr = TE->getElement(i);
+
+        diagnoseUnownedImmediateDeallocation(TC, subPattern, subInitExpr);
+      }
+    }
+  } else if (auto *NP = dyn_cast<NamedPattern>(pattern)) {
+    // FIXME: Ideally the diagnostic location should be on the equals '=' token
+    // of the pattern binding rather than at the start of the initializer
+    // expression (matching the above diagnostic logic for an assignment).
+    diagnoseUnownedImmediateDeallocationImpl(TC, NP->getDecl(), initExpr,
+                                             initExpr->getStartLoc(),
+                                             initExpr->getSourceRange());
+  }
+}
+
 bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
                                           ValueDecl *decl,
                                           const ValueDecl *base) {
@@ -2416,7 +2603,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     // If this is a 'let' value, any stores to it are actually initializations,
     // not mutations.
     auto isWrittenLet = false;
-    if (var->isLet() || var->isShared()) {
+    if (var->isImmutable()) {
       isWrittenLet = (access & RK_Written) != 0;
       access &= ~RK_Written;
     }
@@ -2555,7 +2742,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     
     // If this is a mutable 'var', and it was never written to, suggest
     // upgrading to 'let'.  We do this even for a parameter.
-    if (!(var->isLet() || var->isShared()) && (access & RK_Written) == 0 &&
+    if (!var->isImmutable() && (access & RK_Written) == 0 &&
         // Don't warn if we have something like "let (x,y) = ..." and 'y' was
         // never mutated, but 'x' was.
         !isVarDeclPartOfPBDThatHadSomeMutation(var)) {
@@ -3335,7 +3522,7 @@ public:
 
         // Only print the parentheses if there are some argument
         // names, because "()" would indicate a call.
-        if (argNames.size() > 0) {
+        if (!argNames.empty()) {
           out << "(";
           for (auto argName : argNames) {
             if (argName.empty()) out << "_";
@@ -3915,7 +4102,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
     return None;
 
   // String'ify the arguments.
-  StringRef baseNameStr = name.getBaseIdentifier().str();
+  StringRef baseNameStr = name.getBaseName().userFacingName();
   SmallVector<StringRef, 4> argNameStrs;
   for (auto arg : name.getArgumentNames()) {
     if (arg.empty())
@@ -3963,23 +4150,24 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 
   /// Retrieve a replacement identifier.
   auto getReplacementIdentifier = [&](StringRef name,
-                                      Identifier old) -> Identifier{
+                                      DeclBaseName old) -> DeclBaseName{
     if (name.empty())
       return Identifier();
 
-    if (!old.empty() && name == old.str())
+    if (!old.empty() && name == old.userFacingName())
       return old;
 
     return Context.getIdentifier(name);
   };
 
-  Identifier newBaseName = getReplacementIdentifier(baseNameStr,
-                                                    name.getBaseIdentifier());
+  auto newBaseName = getReplacementIdentifier(
+      baseNameStr, name.getBaseName());
   SmallVector<Identifier, 4> newArgNames;
   auto oldArgNames = name.getArgumentNames();
   for (unsigned i = 0, n = argNameStrs.size(); i != n; ++i) {
-    newArgNames.push_back(getReplacementIdentifier(argNameStrs[i],
-                                                   oldArgNames[i]));
+    auto argBaseName = getReplacementIdentifier(argNameStrs[i],
+                                                oldArgNames[i]);
+    newArgNames.push_back(argBaseName.getIdentifier());
   }
 
   return DeclName(Context, newBaseName, newArgNames);

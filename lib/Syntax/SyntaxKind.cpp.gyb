@@ -18,8 +18,31 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Syntax/SyntaxKind.h"
+#include "swift/Syntax/TokenKinds.h"
 
 namespace swift {
+
+static StringRef getTokenTextInternal(tok kind) {
+  switch(kind) {
+% for token in SYNTAX_TOKENS:
+%   if token.text:
+  case tok::${token.kind}: return "${token.text}";
+%   end
+% end
+  default: return StringRef();
+  }
+}
+
+bool isTokenTextDetermined(tok kind) {
+  return !getTokenTextInternal(kind).empty();
+}
+
+StringRef getTokenText(tok kind) {
+  auto text = getTokenTextInternal(kind);
+  assert(!text.empty() && "token kind cannot be determined");
+  return text;
+}
+
 namespace syntax {
 
 void dumpSyntaxKind(llvm::raw_ostream &os, const SyntaxKind kind) {

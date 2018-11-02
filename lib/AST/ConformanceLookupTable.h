@@ -42,7 +42,7 @@ class ModuleDecl;
 class ConformanceLookupTable {
   /// Describes the stage at which a particular nominal type or
   /// extension's conformances has been processed.
-  enum class ConformanceStage : unsigned char {
+  enum class ConformanceStage : uint8_t {
     /// The explicit conformances have been recorded in the lookup table.
     RecordedExplicit,
 

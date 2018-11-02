@@ -370,12 +370,36 @@ public:
       return true;
 
     // We also need to open-code if the witness is defined in a
-    // protocol context because IRGen won't know how to reconstruct
-    // the type parameters.  (In principle, this can be done in the
-    // callback storage if we need to.)
+    // context that isn't ABI-compatible with the protocol witness,
+    // because IRGen won't know how to reconstruct
+    // the type parameters.  (In principle, this could be done in the
+    // callback storage.)
+    
+    // This can happen if the witness is in a protocol extension...
     if (Witness->getDeclContext()->getAsProtocolOrProtocolExtensionContext())
       return true;
 
+    // ...if the witness is in a constrained extension that adds protocol
+    // requirements...
+    if (auto ext = dyn_cast<ExtensionDecl>(Witness->getDeclContext())) {
+      if (ext->isConstrainedExtension()) {
+        // TODO: We could perhaps avoid open coding if the extension only adds
+        // same type or superclass constraints, which don't require any
+        // additional generic arguments.
+        return true;
+      }
+    }
+    
+    // ...or if the witness is a generic subscript with more general
+    // subscript-level constraints than the requirement.
+    if (auto witnessSub = dyn_cast<SubscriptDecl>(Witness->getStorage())) {
+      // TODO: We only really need to open-code if the witness has more general
+      // subscript-level constraints than the requirement. Our generic signature
+      // representation makes testing this difficult, unfortunately.
+      if (witnessSub->isGeneric())
+        return true;
+    }
+    
     return false;
   }
 
@@ -789,8 +813,8 @@ SILValue MaterializeForSetEmitter::emitUsingAddressor(SILGenFunction &SGF,
   bool isDirect = (TheAccessSemantics != AccessSemantics::Ordinary);
 
   // Call the mutable addressor.
-  auto addressor = SGF.getAddressorDeclRef(WitnessStorage,
-                                           AccessKind::ReadWrite);
+  auto addressor = SGF.SGM.getAddressorDeclRef(WitnessStorage,
+                                               AccessKind::ReadWrite);
   std::pair<ManagedValue, ManagedValue> result;
   {
     FormalEvaluationScope Scope(SGF);
@@ -964,7 +988,7 @@ MaterializeForSetEmitter::createSetterCallback(SILFunction &F,
     }
 
     // The callback gets the address of 'self' at +0.
-    ManagedValue mSelf = ManagedValue::forLValue(self);
+    ManagedValue mSelf = ManagedValue::forUnmanaged(self);
 
     // That's enough to build the l-value.
     LValue lvalue = buildLValue(SGF, loc, mSelf, std::move(indices),

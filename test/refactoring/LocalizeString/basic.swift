@@ -4,6 +4,6 @@ func testStringLiteral() -> String {
   return "abc"
 }
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -localize-string -source-filename %s -pos=4:12 > %t.result/L4.swift
 // RUN: diff -u %S/Outputs/basic/L4.swift.expected %t.result/L4.swift

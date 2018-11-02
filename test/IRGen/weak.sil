@@ -1,8 +1,7 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-objc-interop -emit-ir %s | %FileCheck %s
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -O -S %s | %FileCheck %s --check-prefix=TAILCALL
 
 // REQUIRES: CPU=x86_64
-// XFAIL: linux
 
 // CHECK-DAG: [[TYPE:%swift.type]] = type
 // CHECK-DAG: [[OPAQUE:%swift.opaque]] = type opaque
@@ -42,7 +41,7 @@ bb0(%0 : $*A, %1 : $Optional<C>):
   %4 = tuple ()
   return %4 : $()
 }
-// CHECK:    define{{( protected)?}} swiftcc void @test_weak_load_store([[A]]* nocapture dereferenceable({{.*}}), i64) {{.*}} {
+// CHECK:    define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_weak_load_store([[A]]* nocapture dereferenceable({{.*}}), i64) {{.*}} {
 // CHECK:      [[X:%.*]] = getelementptr inbounds [[A]], [[A]]* %0, i32 0, i32 0
 // CHECK-NEXT: [[T0:%.*]] = call [[C]]* bitcast ([[REF]]* ([[WEAK]]*)* @swift_weakLoadStrong to [[C]]* ([[WEAK]]*)*)([[WEAK]]* [[X]])
 // CHECK-NEXT: %3 = ptrtoint  %T4weak1CC* %2 to i64
@@ -65,7 +64,7 @@ bb0(%0 : $*B, %1 : $Optional<P>):
   %4 = tuple ()
   return %4 : $()
 }
-// CHECK:    define{{( protected)?}} swiftcc void @test_weak_load_store_proto([[B]]* nocapture dereferenceable({{.*}}), i64, i64)
+// CHECK:    define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_weak_load_store_proto([[B]]* nocapture dereferenceable({{.*}}), i64, i64)
 // CHECK:      [[X:%.*]] = getelementptr inbounds [[B]], [[B]]* %0, i32 0, i32 0
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 0
 // CHECK-NEXT: [[T1:%.*]] = call [[UNKNOWN]]* @swift_unknownWeakLoadStrong([[WEAK]]* [[T0]])
@@ -77,7 +76,7 @@ bb0(%0 : $*B, %1 : $Optional<P>):
 // CHECK-NEXT: store i8** [[TMPTAB]], i8*** [[T0]], align 8
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 0
 // CHECK-NEXT: call [[WEAK]]* @swift_unknownWeakAssign([[WEAK]]* returned [[T0]], [[UNKNOWN]]* [[TMPOBJ]])
-// CHECK: call void @"$SSqWe"
+// CHECK: call void @"$S4weak1P_pSgWOe"
 
 sil @test_weak_alloc_stack : $@convention(thin) (Optional<P>) -> () {
 bb0(%0 : $Optional<P>):
@@ -88,7 +87,7 @@ bb0(%0 : $Optional<P>):
   %4 = tuple ()
   return %4 : $()
 }
-// CHECK:    define{{( protected)?}} swiftcc void @test_weak_alloc_stack(i64, i64)
+// CHECK:    define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_weak_alloc_stack(i64, i64)
 // CHECK:      [[X:%.*]] = alloca { [[WEAK]], i8** }, align 8
 // CHECK: [[TMPOBJ:%.*]] = inttoptr {{.*}} to %objc_object*
 // CHECK: [[TMPTAB:%.*]] = inttoptr {{.*}} to i8**
@@ -96,7 +95,7 @@ bb0(%0 : $Optional<P>):
 // CHECK-NEXT: store i8** [[TMPTAB:%.*]], i8*** [[T0]], align 8
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 0
 // CHECK-NEXT: call [[WEAK]]* @swift_unknownWeakInit([[WEAK]]* returned [[T0]], [[UNKNOWN]]* [[TMPOBJ:%.*]])
-// CHECK-NEXT: call { %swift.weak, i8** }* @"$S4weak1P_pSgXwWh0_"({ %swift.weak, i8** }* [[X]])
+// CHECK-NEXT: call { %swift.weak, i8** }* @"$S4weak1P_pSgXwWOh"({ %swift.weak, i8** }* [[X]])
 // CHECK-NEXT: bitcast
 // CHECK-NEXT: llvm.lifetime.end
 // CHECK-NEXT: ret void
@@ -113,8 +112,8 @@ bb0(%0 : $Optional<P>):
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
 
-// TAILCALL: _$S4weak1AVwCP:
-// TAILCALL:  jmp     _swift_weakCopyInit
+// TAILCALL: {{_?}}$S4weak1AVwCP:
+// TAILCALL:  jmp     {{_?}}swift_weakCopyInit
 
 //   destroy
 // CHECK:    define linkonce_odr hidden void @"$S4weak1AVwxx"([[OPAQUE]]* noalias [[ARG:%.*]], [[TYPE]]*
@@ -123,8 +122,8 @@ bb0(%0 : $Optional<P>):
 // CHECK-NEXT: call void @swift_weakDestroy([[WEAK]]* [[T1]])
 // CHECK-NEXT: ret void
 
-// TAILCALL: _$S4weak1AVwxx:
-// TAILCALL:  jmp     _swift_weakDestroy
+// TAILCALL: {{_?}}$S4weak1AVwxx:
+// TAILCALL:  jmp     {{_?}}swift_weakDestroy
 
 //   initializeWithCopy
 // CHECK:    define linkonce_odr hidden [[OPAQUE]]* @"$S4weak1AVwcp"([[OPAQUE]]* noalias [[DEST_OPQ:%.*]], [[OPAQUE]]* noalias [[SRC_OPQ:%.*]], [[TYPE]]*
@@ -136,8 +135,8 @@ bb0(%0 : $Optional<P>):
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
 
-// TAILCALL: _$S4weak1AVwcp:
-// TAILCALL:  jmp     _swift_weakCopyInit
+// TAILCALL: {{_?}}$S4weak1AVwcp:
+// TAILCALL:  jmp     {{_?}}swift_weakCopyInit
 
 //   assignWithCopy
 // CHECK:    define linkonce_odr hidden [[OPAQUE]]* @"$S4weak1AVwca"([[OPAQUE]]* [[DEST_OPQ:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
@@ -149,8 +148,8 @@ bb0(%0 : $Optional<P>):
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
 
-// TAILCALL: _$S4weak1AVwca:
-// TAILCALL:  jmp     _swift_weakCopyAssign
+// TAILCALL: {{_?}}$S4weak1AVwca:
+// TAILCALL:  jmp     {{_?}}swift_weakCopyAssign
 
 //   assignWithTake
 // CHECK:    define linkonce_odr hidden [[OPAQUE]]* @"$S4weak1AVwta"([[OPAQUE]]* noalias [[DEST_OPQ:%.*]], [[OPAQUE]]* noalias [[SRC_OPQ:%.*]], [[TYPE]]*
@@ -162,11 +161,11 @@ bb0(%0 : $Optional<P>):
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
 
-// TAILCALL: _$S4weak1AVwtk:
-// TAILCALL:  jmp     _swift_weakTakeInit
+// TAILCALL: {{_?}}$S4weak1AVwtk:
+// TAILCALL:  jmp     {{_?}}swift_weakTakeInit
 
-// TAILCALL: _$S4weak1AVwta:
-// TAILCALL:  jmp     _swift_weakTakeAssign
+// TAILCALL: {{_?}}$S4weak1AVwta:
+// TAILCALL:  jmp     {{_?}}swift_weakTakeAssign
 
-// TAILCALL: _$S4weak1AVwTK:
-// TAILCALL:  jmp     _swift_weakTakeInit
+// TAILCALL: {{_?}}$S4weak1AVwTK:
+// TAILCALL:  jmp     {{_?}}swift_weakTakeInit

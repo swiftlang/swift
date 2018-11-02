@@ -1,12 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -parse-sil -sil-inline-threshold 0 %S/Inputs/function_param_convention_input.sil -o %t/FunctionInput.swiftmodule -emit-module -parse-as-library -parse-stdlib -module-name FunctionInput -O
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -I %t -linker %s -o - | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -I %t -performance-linker %s -o - | %FileCheck %s
 
 import Swift
 import FunctionInput
 
 // Make sure we can deserialize a SIL function with these various attributes.
-// CHECK: sil public_external [serialized] @foo : $@convention(thin) (@in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X) -> @out X {
+// CHECK: sil public_external [serialized] [canonical] @foo : $@convention(thin) (@in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X) -> @out X {
 
 sil @foo : $@convention(thin) (@in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X) -> @out X
 

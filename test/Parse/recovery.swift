@@ -128,7 +128,7 @@ func missingControllingExprInRepeatWhile() {
   }
 
   repeat {
-  } while { true }() // expected-error{{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{10-10=;}} expected-warning {{result of call is unused, but produces 'Bool'}}
+  } while { true }() // expected-error{{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{10-10=;}} expected-warning {{result of call to closure returning 'Bool' is unused}}
 }
 
 // SR-165
@@ -624,6 +624,9 @@ struct InitializerWithName {
 
 struct InitializerWithNameAndParam {
   init a(b: Int) {} // expected-error {{initializers cannot have a name}} {{8-9=}}
+  init? c(_ d: Int) {} // expected-error {{initializers cannot have a name}} {{9-10=}}
+  init e<T>(f: T) {} // expected-error {{initializers cannot have a name}} {{8-9=}}
+  init? g<T>(_: T) {} // expected-error {{initializers cannot have a name}} {{9-10=}}
 }
 
 struct InitializerWithLabels {
@@ -749,7 +752,7 @@ func test23550816(ss: [String], s: String) {
 // <rdar://problem/23719432> [practicalswift] Compiler crashes on &(Int:_)
 func test23719432() {
   var x = 42
-  &(Int:x)  // expected-error {{expression type 'inout _' is ambiguous without more context}}
+  &(Int:x) // expected-error {{use of extraneous '&'}}
 }
 
 // <rdar://problem/19911096> QoI: terrible recovery when using '·' for an operator

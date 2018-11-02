@@ -93,6 +93,24 @@ public struct ${node.name}: _SyntaxBase {
     return replacingLayout(newLayout)
   }
 
+  /// Creates a new `${node.name}` by replacing the syntax element
+  /// at the provided index.
+  ///
+  /// - Parameters:
+  ///   - index: The index at which to replace the element in the collection.
+  ///   - syntax: The element to replace with.
+  ///
+  /// - Returns: A new `${node.name}` with the new element at the provided index.
+  public func replacing(childAt index: Int,
+                        with syntax: ${node.collection_element_type}) -> ${node.name} {
+    var newLayout = data.raw.layout
+    /// Make sure the index is a valid index for replacing
+    precondition((newLayout.startIndex..<newLayout.endIndex).contains(index),
+                 "replacing node at invalid index \(index)")
+    newLayout[index] = syntax.raw
+    return replacingLayout(newLayout)
+  }
+
   /// Creates a new `${node.name}` by removing the syntax element at the
   /// provided index.
   ///

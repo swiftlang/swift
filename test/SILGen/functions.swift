@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name functions -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 import Swift // just for Optional
 
@@ -347,7 +348,7 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @$S9functions19standalone_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC_THIN]]
-  // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [[FUNC_THICK]]
+  // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[FUNC_THICK]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]
@@ -358,7 +359,7 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @$S9functions19standalone_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%.*]] = thin_to_thick_function [[FUNC_THIN]]
-  // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [[FUNC_THICK]]
+  // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[FUNC_THICK]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]
@@ -374,11 +375,12 @@ func calls(_ i:Int, j:Int, k:Int) {
 // CHECK:   [[CURRIED:%.*]] = partial_apply [callee_guaranteed] [[UNCURRIED]]
 // CHECK:   return [[CURRIED]]
 
-// CHECK-LABEL: sil shared [thunk] @$S9functions9SomeClassC6method{{[_0-9a-zA-Z]*}}FTc : $@convention(thin) (@owned SomeClass) -> @owned @callee_guaranteed (Builtin.Int64) -> ()
-// CHECK: bb0(%0 : @owned $SomeClass):
+// CHECK-LABEL: sil shared [thunk] @$S9functions9SomeClassC6method{{[_0-9a-zA-Z]*}}FTc : $@convention(thin) (@guaranteed SomeClass) -> @owned @callee_guaranteed (Builtin.Int64) -> ()
+// CHECK: bb0(%0 : @guaranteed $SomeClass):
 // CHECK:   class_method %0 : $SomeClass, #SomeClass.method!1 : (SomeClass) -> (Builtin.Int64) -> ()
-// CHECK:   %2 = partial_apply [callee_guaranteed] %1(%0)
-// CHECK:   return %2
+// CHECK:   %2 = copy_value %0 : $SomeClass
+// CHECK:   %3 = partial_apply [callee_guaranteed] %1(%2)
+// CHECK:   return %3
 
 func return_func() -> (_ x: Builtin.Int64, _ y: Builtin.Int64) -> Builtin.Int64 {
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @$S9functions19standalone_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
@@ -391,9 +393,9 @@ func standalone_generic<T>(_ x: T, y: T) -> T { return x }
 
 // CHECK-LABEL: sil hidden @$S9functions14return_genericBi64_Bi64__Bi64_tcyF
 func return_generic() -> (_ x:Builtin.Int64, _ y:Builtin.Int64) -> Builtin.Int64 {
-  // CHECK: [[GEN:%.*]] = function_ref @$S9functions18standalone_generic{{[_0-9a-zA-Z]*}}F : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> @out τ_0_0
+  // CHECK: [[GEN:%.*]] = function_ref @$S9functions18standalone_generic{{[_0-9a-zA-Z]*}}F : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> @out τ_0_0
   // CHECK: [[SPEC:%.*]] = partial_apply [callee_guaranteed] [[GEN]]<Builtin.Int64>()
-  // CHECK: [[THUNK:%.*]] = function_ref  @{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, @guaranteed @callee_guaranteed (@in Builtin.Int64, @in Builtin.Int64) -> @out Builtin.Int64) -> Builtin.Int64
+  // CHECK: [[THUNK:%.*]] = function_ref  @{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, @guaranteed @callee_guaranteed (@in_guaranteed Builtin.Int64, @in_guaranteed Builtin.Int64) -> @out Builtin.Int64) -> Builtin.Int64
   // CHECK: [[T0:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[SPEC]])
   // CHECK: return [[T0]]
   return standalone_generic
@@ -402,9 +404,9 @@ func return_generic() -> (_ x:Builtin.Int64, _ y:Builtin.Int64) -> Builtin.Int64
 // CHECK-LABEL: sil hidden @$S9functions20return_generic_tuple{{[_0-9a-zA-Z]*}}F
 func return_generic_tuple()
 -> (_ x: (Builtin.Int64, Builtin.Int64), _ y: (Builtin.Int64, Builtin.Int64)) -> (Builtin.Int64, Builtin.Int64) {
-  // CHECK: [[GEN:%.*]] = function_ref @$S9functions18standalone_generic{{[_0-9a-zA-Z]*}}F  : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> @out τ_0_0
+  // CHECK: [[GEN:%.*]] = function_ref @$S9functions18standalone_generic{{[_0-9a-zA-Z]*}}F  : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> @out τ_0_0
   // CHECK: [[SPEC:%.*]] = partial_apply [callee_guaranteed] [[GEN]]<(Builtin.Int64, Builtin.Int64)>()
-  // CHECK: [[THUNK:%.*]] = function_ref @{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, Builtin.Int64, Builtin.Int64, @guaranteed @callee_guaranteed (@in (Builtin.Int64, Builtin.Int64), @in (Builtin.Int64, Builtin.Int64)) -> @out (Builtin.Int64, Builtin.Int64)) -> (Builtin.Int64, Builtin.Int64)
+  // CHECK: [[THUNK:%.*]] = function_ref @{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, Builtin.Int64, Builtin.Int64, @guaranteed @callee_guaranteed (@in_guaranteed (Builtin.Int64, Builtin.Int64), @in_guaranteed (Builtin.Int64, Builtin.Int64)) -> @out (Builtin.Int64, Builtin.Int64)) -> (Builtin.Int64, Builtin.Int64)
   // CHECK: [[T0:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[SPEC]])
   // CHECK: return [[T0]]
   return standalone_generic
@@ -412,7 +414,7 @@ func return_generic_tuple()
 
 // CHECK-LABEL: sil hidden @$S9functions16testNoReturnAttrs5NeverOyF : $@convention(thin) () -> Never
 func testNoReturnAttr() -> Never {}
-// CHECK-LABEL: sil hidden @$S9functions20testNoReturnAttrPoly{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T> (@in T) -> Never
+// CHECK-LABEL: sil hidden @$S9functions20testNoReturnAttrPoly{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T> (@in_guaranteed T) -> Never
 func testNoReturnAttrPoly<T>(_ x: T) -> Never {}
 
 // CHECK-LABEL: sil hidden @$S9functions21testNoReturnAttrParam{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@noescape @callee_guaranteed () -> Never) -> ()
@@ -501,10 +503,11 @@ final class r17828355Class {
 
 // The curry thunk for the method should not include a class_method instruction.
 // CHECK-LABEL: sil shared [thunk] @$S9functions14r17828355ClassC6method
-// CHECK: bb0(%0 : @owned $r17828355Class):
+// CHECK: bb0(%0 : @guaranteed $r17828355Class):
 // CHECK-NEXT: // function_ref functions.r17828355Class.method(Builtin.Int64) -> ()
 // CHECK-NEXT:  %1 = function_ref @$S9functions14r17828355ClassC6method{{[_0-9a-zA-Z]*}}F : $@convention(method) (Builtin.Int64, @guaranteed r17828355Class) -> ()
-// CHECK-NEXT:  partial_apply [callee_guaranteed] %1(%0) : $@convention(method) (Builtin.Int64, @guaranteed r17828355Class) -> ()
+// CHECK-NEXT:  %2 = copy_value %0
+// CHECK-NEXT:  partial_apply [callee_guaranteed] %1(%2) : $@convention(method) (Builtin.Int64, @guaranteed r17828355Class) -> ()
 // CHECK-NEXT:  return
 
 
@@ -575,9 +578,15 @@ func partialApplyEnumCases(_ x: S, y: C) {
 // CHECK-LABEL: sil shared [transparent] [thunk] @$S9functions23PartialApplyEnumPayloadO4Left{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[UNCURRIED:%.*]] = function_ref @$S9functions23PartialApplyEnumPayloadO4Left{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[UNCURRIED]]<T, U>(%0)
-// CHECK:         return [[CLOSURE]]
+// CHECK:         [[CANONICAL_THUNK:%.*]] = function_ref @$Sx9functions23PartialApplyEnumPayloadOyxq_GIegir_xADIegnr_r0_lTR : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed @callee_guaranteed (@in τ_0_0) -> @out PartialApplyEnumPayload<τ_0_0, τ_0_1>) -> @out PartialApplyEnumPayload<τ_0_0, τ_0_1>
+// CHECK:         [[THUNKED_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CANONICAL_THUNK]]<T, U>([[CLOSURE]])
+// CHECK:         return [[THUNKED_CLOSURE]]
+// CHECK: } // end sil function '$S9functions23PartialApplyEnumPayloadO4Left{{[_0-9a-zA-Z]*}}F'
 
 // CHECK-LABEL: sil shared [transparent] [thunk] @$S9functions23PartialApplyEnumPayloadO5Right{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[UNCURRIED:%.*]] = function_ref @$S9functions23PartialApplyEnumPayloadO5Right{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[UNCURRIED]]<T, U>(%0)
-// CHECK:         return [[CLOSURE]]
+// CHECK:         [[CANONICAL_THUNK:%.*]] = function_ref @$Sq_9functions23PartialApplyEnumPayloadOyxq_GIegir_q_ADIegnr_r0_lTR : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_1, @guaranteed @callee_guaranteed (@in τ_0_1) -> @out PartialApplyEnumPayload<τ_0_0, τ_0_1>) -> @out PartialApplyEnumPayload<τ_0_0, τ_0_1>
+// CHECK:         [[THUNKED_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CANONICAL_THUNK]]<T, U>([[CLOSURE]])
+// CHECK:         return [[THUNKED_CLOSURE]]
+// CHECK: } // end sil function '$S9functions23PartialApplyEnumPayloadO5Right{{[_0-9a-zA-Z]*}}F'

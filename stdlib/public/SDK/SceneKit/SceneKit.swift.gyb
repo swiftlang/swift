@@ -142,7 +142,7 @@ extension double4x4 {
 // MARK: Swift Extensions
 
 @available(iOS, introduced: 8.0)
-@available(OSX, introduced: 10.8)
+@available(macOS, introduced: 10.8)
 extension SCNGeometryElement {
   /// Creates an instance from `indices` for a `primitiveType`
   /// that has a constant number of indices per primitive
@@ -175,7 +175,7 @@ extension SCNGeometryElement {
 }
 
 @available(iOS, introduced: 8.0)
-@available(OSX, introduced: 10.8)
+@available(macOS, introduced: 10.8)
 extension SCNGeometrySource {
   @nonobjc
   public convenience init(vertices: [SCNVector3]) {
@@ -192,7 +192,7 @@ extension SCNGeometrySource {
 }
 
 @available(iOS, introduced: 8.0)
-@available(OSX, introduced: 10.10)
+@available(macOS, introduced: 10.10)
 extension SCNBoundingVolume {
   public var boundingBox: (min: SCNVector3, max: SCNVector3) {
     get {
@@ -218,7 +218,7 @@ extension SCNBoundingVolume {
 // MARK: APIs refined for Swift
 
 @available(iOS, introduced: 8.0)
-@available(OSX, introduced: 10.8)
+@available(macOS, introduced: 10.8)
 extension SCNSceneSource {
   public func entryWithIdentifier<T: AnyObject>(_ uid: String, withClass entryClass: T.Type) -> T? {
     return self.__entry(withIdentifier: uid, with: entryClass) as! T?

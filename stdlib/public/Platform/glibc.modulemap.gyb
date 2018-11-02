@@ -38,6 +38,15 @@ module SwiftGlibc [system] {
 
   // C standard library
   module C {
+% if CMAKE_SDK in ["LINUX", "ANDROID", "CYGWIN"]:
+    module features {
+% if CMAKE_SDK == "LINUX":
+      header "${GLIBC_INCLUDE_PATH}/stdc-predef.h"
+% end
+      header "${GLIBC_INCLUDE_PATH}/features.h"
+      export *
+    }
+% end
 % if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN", "HAIKU"]:
     module complex {
       header "${GLIBC_INCLUDE_PATH}/complex.h"
@@ -67,13 +76,6 @@ module SwiftGlibc [system] {
 % if CMAKE_SDK == "HAIKU":
     module pty {
       header "${GLIBC_INCLUDE_PATH}/../bsd/pty.h"
-      export *
-    }
-% end
-
-% if CMAKE_SDK in ["LINUX", "ANDROID", "CYGWIN"]:
-    module features {
-      header "${GLIBC_INCLUDE_PATH}/features.h"
       export *
     }
 % end

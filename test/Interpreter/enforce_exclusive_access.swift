@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -swift-version 4 %s -o %t/a.out -enforce-exclusivity=checked -Onone
 //
 // RUN: %target-run %t/a.out
@@ -242,26 +241,95 @@ ExclusiveAccessTestSuite.test("InoutWriteEscapeWrite")
 }
 
 class ClassWithStoredProperty {
-  var f = 7
+  final var f = 7
 }
 
-// FIXME: This should trap with a modify/modify violation at run time.
-ExclusiveAccessTestSuite.test("KeyPathClassStoredProp")
+ExclusiveAccessTestSuite.test("KeyPathInoutDirectWriteClassStoredProp")
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
-//  .crashOutputMatches("Previous access (a modification) started at")
-//  .crashOutputMatches("Current access (a modification) started at")
+  .crashOutputMatches("Previous access (a modification) started at")
+  .crashOutputMatches("Current access (a modification) started at")
   .code
 {
   let getF = \ClassWithStoredProperty.f
   let c = ClassWithStoredProperty()
 
-//  expectCrashLater()
+  expectCrashLater()
+  modifyAndPerform(&c[keyPath: getF]) {
+    c.f = 12
+  }
+}
+
+ExclusiveAccessTestSuite.test("KeyPathInoutDirectReadClassStoredProp")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Previous access (a modification) started at")
+  .crashOutputMatches("Current access (a read) started at")
+  .code
+{
+  let getF = \ClassWithStoredProperty.f
+  let c = ClassWithStoredProperty()
+
+  expectCrashLater()
+  modifyAndPerform(&c[keyPath: getF]) {
+    let x = c.f
+    _blackHole(x)
+  }
+}
+
+// Unlike inout accesses, read-only inout-to-pointer conversions on key paths for
+// final stored-properties do not perform a long-term read access. Instead, they
+// materialize a location on the stack, perform an instantaneous read
+// from the storage indicated by the key path and write the read value to the
+// stack location. The stack location is then passed as the pointer for the
+// inout-to-pointer conversion.
+//
+// This means that there is no conflict between a read-only inout-to-pointer
+// conversion of the key path location for a call and an access to the
+// the same location within the call.
+ExclusiveAccessTestSuite.test("KeyPathReadOnlyInoutToPtrDirectWriteClassStoredProp") {
+  let getF = \ClassWithStoredProperty.f
+  let c = ClassWithStoredProperty()
+
+  // This performs an instantaneous read
+  readAndPerform(&c[keyPath: getF]) {
+    c.f = 12 // no-trap
+  }
+}
+
+ExclusiveAccessTestSuite.test("SequentialKeyPathWritesDontOverlap") {
+  let getF = \ClassWithStoredProperty.f
+  let c = ClassWithStoredProperty()
+
+  c[keyPath: getF] = 7
+  c[keyPath: getF] = 8 // no-trap
+  c[keyPath: getF] += c[keyPath: getF] + 1 // no-trap
+}
+
+// This does not trap, for now, because the standard library (and thus KeyPath) is
+// compiled in Swift 3 mode and we currently log rather than trap in Swift mode.
+ExclusiveAccessTestSuite.test("KeyPathInoutKeyPathWriteClassStoredProp")
+{
+  let getF = \ClassWithStoredProperty.f
+  let c = ClassWithStoredProperty()
+
   modifyAndPerform(&c[keyPath: getF]) {
     c[keyPath: getF] = 12
   }
 }
 
+// This does not currently trap because the standard library is compiled in Swift 3 mode,
+// which logs.
+ExclusiveAccessTestSuite.test("KeyPathInoutKeyPathReadClassStoredProp") {
+  let getF = \ClassWithStoredProperty.f
+  let c = ClassWithStoredProperty()
+
+  modifyAndPerform(&c[keyPath: getF]) {
+    let y = c[keyPath: getF]
+    _blackHole(y)
+  }
+}
 
 runAllTests()

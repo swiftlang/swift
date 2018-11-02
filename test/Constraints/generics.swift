@@ -543,3 +543,21 @@ func rdar35541153() {
   foo(x) // Ok
   bar(y, "ultimate question", 42) // Ok
 }
+
+// rdar://problem/38159133 - [SR-7125]: Swift 4.1 Xcode 9.3b4 regression
+
+protocol P_38159133 {}
+
+do {
+  class Super {}
+  class A: Super, P_38159133 {}
+  class B: Super, P_38159133 {}
+
+  func rdar38159133(_ a: A?, _ b: B?) {
+    let _: [P_38159133] = [a, b].compactMap { $0 } // Ok
+  }
+}
+
+func rdar35890334(_ arr: inout [Int]) {
+  _ = arr.popFirst() // expected-error {{'[Int]' requires the types '[Int]' and 'ArraySlice<Int>' be equivalent to use 'popFirst'}}
+}

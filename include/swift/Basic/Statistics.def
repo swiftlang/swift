@@ -41,6 +41,12 @@ DRIVER_STATISTIC(NumDriverJobsSkipped)
 /// EXIT_SUCCESS.
 DRIVER_STATISTIC(NumProcessFailures)
 
+/// Total number of driver poll() calls on subprocess pipes.
+DRIVER_STATISTIC(NumDriverPipePolls)
+
+/// Total number of driver read() calls on subprocess pipes.
+DRIVER_STATISTIC(NumDriverPipeReads)
+
 /// Next 10 statistics count dirtying-events in the driver's dependency graph,
 /// which it uses to decide which files are invalid (and thus which files to
 /// build). There are two dimensions to each dirtying event:
@@ -131,6 +137,9 @@ FRONTEND_STATISTIC(AST, NumPrecedenceGroups)
 
 /// Number of conformances used by code processed by this frontend job.
 FRONTEND_STATISTIC(AST, NumUsedConformances)
+
+/// Number of full function bodies parsed.
+FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
 
 /// Number of conformances that were deserialized by this frontend job.
 FRONTEND_STATISTIC(Sema, NumConformancesDeserialized)

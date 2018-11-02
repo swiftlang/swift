@@ -13,6 +13,10 @@
 // binaries.
 //===----------------------------------------------------------------------===//
 
+// FIXME davidino: this needs to be included first to avoid textual
+// replacement. It's silly and needs to be fixed.
+#include "llvm/Object/MachO.h"
+
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Basic/LLVMInitialize.h"
@@ -20,7 +24,6 @@
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
 #include "llvm/Object/Archive.h"
-#include "llvm/Object/MachO.h"
 #include "llvm/Object/MachOUniversal.h"
 #include "llvm/Object/ELF.h"
 #include "llvm/Object/ELFObjectFile.h"
@@ -119,17 +122,17 @@ findReflectionSection(const ObjectFile *objectFile,
 
 static ReflectionInfo findReflectionInfo(const ObjectFile *objectFile) {
   auto fieldSection = findReflectionSection<FieldSection>(
-      objectFile, {"__swift5_fieldmd", ".swift5_fieldmd", "swift5_fieldmd"});
+      objectFile, {"__swift4_fieldmd", ".swift4_fieldmd", "swift4_fieldmd"});
   auto associatedTypeSection = findReflectionSection<AssociatedTypeSection>(
-      objectFile, {"__swift5_assocty", ".swift5_assocty", "swift5_assocty"});
+      objectFile, {"__swift4_assocty", ".swift4_assocty", "swift4_assocty"});
   auto builtinTypeSection = findReflectionSection<BuiltinTypeSection>(
-      objectFile, {"__swift5_builtin", ".swift5_builtin", "swift5_builtin"});
+      objectFile, {"__swift4_builtin", ".swift4_builtin", "swift4_builtin"});
   auto captureSection = findReflectionSection<CaptureSection>(
-      objectFile, {"__swift5_capture", ".swift5_capture", "swift5_capture"});
+      objectFile, {"__swift4_capture", ".swift4_capture", "swift4_capture"});
   auto typeRefSection = findReflectionSection<GenericSection>(
-      objectFile, {"__swift5_typeref", ".swift5_typeref", "swift5_typeref"});
+      objectFile, {"__swift4_typeref", ".swift4_typeref", "swift4_typeref"});
   auto reflectionStringsSection = findReflectionSection<GenericSection>(
-      objectFile, {"__swift5_reflstr", ".swift5_reflstr", "swift5_reflstr"});
+      objectFile, {"__swift4_reflstr", ".swift4_reflstr", "swift4_reflstr"});
 
   // The entire object file is mapped into this process's memory, so the
   // local/remote mapping is identity.
@@ -158,12 +161,24 @@ public:
   {
   }
 
-  uint8_t getPointerSize() override {
-    return sizeof(uintptr_t);
+  bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
+                       void *outBuffer) override {
+    switch (type) {
+      case DLQ_GetPointerSize: {
+        auto result = static_cast<uint8_t *>(outBuffer);
+        *result = sizeof(void *);
+        return true;
+      }
+      case DLQ_GetSizeSize: {
+        auto result = static_cast<uint8_t *>(outBuffer);
+        *result = sizeof(size_t);
+        return true;
+      }
+    }
+
+    return false;
   }
-  uint8_t getSizeSize() override {
-    return sizeof(size_t);
-  }
+
   RemoteAddress getSymbolAddress(const std::string &name) override {
     for (auto &object : ObjectFiles) {
       for (auto &symbol : object->symbols()) {
@@ -191,15 +206,12 @@ public:
     return false;
   }
   
-  bool readBytes(RemoteAddress address, uint8_t *dest,
-                 uint64_t size) override {
+  ReadBytesResult readBytes(RemoteAddress address, uint64_t size) override {
     if (!isAddressValid(address, size))
-      return false;
+      return ReadBytesResult(nullptr, [](const void *){});
 
     // TODO: Account for offset in ELF binaries
-    auto src = (const void *)address.getAddressData();
-    memcpy(dest, (const void*)src, size);
-    return true;
+    return ReadBytesResult((const void *)address.getAddressData(), [](const void *) {});
   }
   
   bool readString(RemoteAddress address, std::string &dest) override {
@@ -246,12 +258,12 @@ static int doDumpReflectionSections(ArrayRef<std::string> binaryFilenames,
       objectFile = objectOwner.get();
     }
 
-    context.addReflectionInfo(findReflectionInfo(objectFile));
-
     // Retain the objects that own section memory
     binaryOwners.push_back(std::move(binaryOwner));
     objectOwners.push_back(std::move(objectOwner));
     objectFiles.push_back(objectFile);
+
+    context.addReflectionInfo(findReflectionInfo(objectFile));
   }
 
   switch (action) {
@@ -293,6 +305,7 @@ static int doDumpReflectionSections(ArrayRef<std::string> binaryFilenames,
 }
 
 int main(int argc, char *argv[]) {
+  PROGRAM_START(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Reflection Dump\n");
   return doDumpReflectionSections(options::BinaryFilename,
                                   options::Architecture,

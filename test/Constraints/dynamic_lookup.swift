@@ -117,7 +117,7 @@ obj.foo!(5)
 obj.foo!("hello")
 obj.wibble!()
 obj.wobble!() // expected-error{{value of type 'Id' (aka 'AnyObject') has no member 'wobble'}}
-obj.ext1!()  // expected-warning {{result of call is unused}}
+obj.ext1!()  // expected-warning {{result of call to function returning 'A' is unused}}
 obj.wonka!()
 
 // Same as above but without the '!'
@@ -126,7 +126,7 @@ obj.foo(5)
 obj.foo("hello")
 obj.wibble()
 obj.wobble() // expected-error{{value of type 'Id' (aka 'AnyObject') has no member 'wobble'}}
-obj.ext1()  // expected-warning {{result of call is unused}}
+obj.ext1()  // expected-warning {{result of call to function returning 'A' is unused}}
 obj.wonka()
 
 // Find class methods via dynamic method lookup.
@@ -144,7 +144,7 @@ var ovl1Result = obj.ovl1!()
 ovl1Result = A() // verify that we got an A, not a B
 
 // Same as above but without the '!'
-obj.ovl1()  // expected-warning {{result of call is unused}}
+obj.ovl1()  // expected-warning {{result of call to function returning 'A' is unused}}
 
 // Don't allow overload resolution between declarations from different
 // classes.
@@ -163,7 +163,7 @@ var ovl4Result = obj.ovl4!()
 var ovl5Result = obj.ovl5!() // expected-error{{ambiguous use of 'ovl5()'}}
 
 // Same as above but without the '!'
-obj.ovl4()  // expected-warning {{result of call is unused}}
+obj.ovl4()  // expected-warning {{result of call to function returning 'B' is unused}}
 
 // Generics
 
@@ -312,3 +312,27 @@ let _: DynamicIUO? = o[dyn_iuo]
 o[dyn_iuo] = dyn_iuo // expected-error {{cannot assign to immutable expression of type 'DynamicIUO??'}}
 o[dyn_iuo]! = dyn_iuo // expected-error {{cannot assign to immutable expression of type 'DynamicIUO?'}}
 o[dyn_iuo]!! = dyn_iuo // expected-error {{cannot assign to immutable expression of type 'DynamicIUO'}}
+
+
+// Check that we avoid picking an unavailable overload if there's an
+// alternative.
+class OverloadedWithUnavailable1 {
+  @objc func overloadedWithUnavailableA() { }
+
+  @objc
+  @available(swift, obsoleted: 3)
+  func overloadedWithUnavailableB() { }
+}
+
+class OverloadedWithUnavailable2 {
+  @available(swift, obsoleted: 3)
+  @objc func overloadedWithUnavailableA() { }
+
+  @objc func overloadedWithUnavailableB() { }
+}
+
+func testOverloadedWithUnavailable(ao: AnyObject) {
+  ao.overloadedWithUnavailableA()
+  ao.overloadedWithUnavailableB()
+}
+

@@ -425,19 +425,33 @@ number of ways:
   generic function with ``function_ref`` will give a value of
   generic function type.
 
+- A SIL function type may be declared ``@noescape``. This is required for any
+  function type passed to a parameter not declared with ``@escaping``
+  declaration modifier. ``@noescape`` function types may be either
+  ``@convention(thin)`` or ``@callee_guaranteed``. They have an
+  unowned context--the context's lifetime must be independently guaranteed.
+
 - A SIL function type declares its conventional treatment of its
   context value:
 
   - If it is ``@convention(thin)``, the function requires no context value.
+    Such types may also be declared ``@noescape``, which trivially has no effect
+    passing the context value.
 
-  - If it is ``@callee_owned``, the context value is treated as an
-    owned direct parameter.
+  - If it is ``@callee_guaranteed``, the context value is treated as a direct
+    parameter. This implies ``@convention(thick)``. If the function type is also
+    ``@noescape``, then the context value is unowned, otherwise it is
+    guaranteed.
 
-  - If it is ``@callee_guaranteed``, the context value is treated as
-    a guaranteed direct parameter.
+  - If it is ``@callee_owned``, the context value is treated as an owned direct
+    parameter. This implies ``@convention(thick)`` and is mutually exclusive
+    with ``@noescape``.
 
-  - Otherwise, the context value is treated as an unowned direct
-    parameter.
+  - If it is ``@convention(block)``, the context value is treated as an unowned
+    direct parameter.
+
+  - Other function type conventions are described in ``Properties of Types`` and
+    ``Calling Convention``.
 
 - A SIL function type declares the conventions for its parameters.
   The parameters are written as an unlabeled tuple; the elements of that
@@ -548,14 +562,6 @@ an autoreleased result has the effect of performing a strong retain in
 the caller.  A non-autoreleased ``apply`` of a function that is defined
 with an autoreleased result has the effect of performing an
 autorelease in the callee.
-
-- The ``@noescape`` declaration attribute on Swift parameters (which is valid only
-  on parameters of function type, and is implied by the ``@autoclosure`` attribute)
-  is turned into a ``@noescape`` type attribute on SIL arguments.  ``@noescape``
-  indicates that the lifetime of the closure parameter will not be extended by
-  the callee (e.g. the pointer will not be stored in a global variable).  It
-  corresponds to the LLVM "nocapture" attribute in terms of semantics (but is
-  limited to only work with parameters of function type in Swift).
 
 - SIL function types may provide an optional error result, written by
   placing ``@error`` on a result.  An error result is always
@@ -704,6 +710,7 @@ types. Function types are transformed in order to encode additional attributes:
   - ``@convention(thick)`` indicates a "thick" function reference, which
     uses the Swift calling convention and carries a reference-counted context
     object used to represent captures or other state required by the function.
+    This attribute is implied by ``@callee_owned`` or ``@callee_guaranteed``.
   - ``@convention(block)`` indicates an Objective-C compatible block reference.
     The function value is represented as a reference to the block object,
     which is an ``id``-compatible Objective-C object that embeds its invocation
@@ -2848,6 +2855,19 @@ memory object or a reference to a pinned object. Returns 1 if the
 strong reference count is 1 or the object has been marked pinned by
 strong_pin.
 
+is_escaping_closure
+```````````````````
+
+::
+  sil-instruction ::= 'is_escaping_closure' sil-operand
+
+  %1 = is_escaping_closure %0 : $@callee_guaranteed () -> ()
+  // %0 must be an escaping swift closure.
+  // %1 will be of type Builtin.Int1
+
+Checks whether the context reference is not nil and bigger than one and returns
+true if it is.
+
 copy_block
 ``````````
 ::
@@ -4605,7 +4625,15 @@ in the following ways:
   subclass of the source type's corresponding tuple element.
 
 The function types may also differ in attributes, except that the
-``convention`` attribute cannot be changed.
+``convention`` attribute cannot be changed and the ``@noescape`` attribute must
+not change for functions with context.
+
+A ``convert_function`` cannot be used to change a thick type's ``@noescape``
+attribute (``@noescape`` function types with context are not ABI compatible with
+escaping function types with context) -- however, thin function types with and
+without ``@noescape`` are ABI compatible because they have no context. To
+convert from an escaping to a ``@noescape`` thick function type use
+``convert_escape_to_noescape``.
 
 convert_escape_to_noescape
 ```````````````````````````
@@ -4621,6 +4649,14 @@ Converts an escaping (non-trivial) function type to an ``@noescape`` trivial
 function type. Something must guarantee the lifetime of the input ``%0`` for the
 duration of the use ``%1``.
 
+A ``convert_escape_to_noescape [not_guaranteed] %opd`` indicates that the
+lifetime of its operand was not guaranteed by SILGen and a mandatory pass must
+be run to ensure the lifetime of ``%opd``` for the conversion's uses.
+
+A ``convert_escape_to_noescape [escaped]`` indiciates that the result was
+passed to a function (materializeForSet) which escapes the closure in a way not
+expressed by the convert's users. The mandatory pass must ensure the lifetime
+in a conservative way.
 
 thin_function_to_pointer
 ````````````````````````

@@ -225,7 +225,8 @@ void removeUnwantedFunctions(SILModule *M, ArrayRef<std::string> MangledNames,
 }
 
 int main(int argc, char **argv) {
-  INITIALIZE_LLVM(argc, argv);
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL Extractor\n");
 

@@ -37,7 +37,7 @@
 
 
 #if MAIN
-#if os(OSX)
+#if os(macOS)
 import AppKit
 
 @NSApplicationMain

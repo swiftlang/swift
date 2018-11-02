@@ -379,6 +379,9 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(IsUniqueOrPinnedInst, is_unique_or_pinned,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 
+  SINGLE_VALUE_INST(IsEscapingClosureInst, is_escaping_closure,
+                    SingleValueInstruction, MayRead, DoesNotRelease)
+
   // Accessing memory
   SINGLE_VALUE_INST(LoadInst, load,
                     SingleValueInstruction, MayRead, DoesNotRelease)

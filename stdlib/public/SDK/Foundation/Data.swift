@@ -38,6 +38,22 @@ internal func __NSDataIsCompact(_ data: NSData) -> Bool {
 import _SwiftFoundationOverlayShims
 import _SwiftCoreFoundationOverlayShims
     
+internal func __NSDataIsCompact(_ data: NSData) -> Bool {
+    if #available(OSX 10.10, iOS 8.0, tvOS 9.0, watchOS 2.0, *) {
+        return data._isCompact()
+    } else {
+        var compact = true
+        let len = data.length
+        data.enumerateBytes { (_, byteRange, stop) in
+            if byteRange.length != len {
+                compact = false
+            }
+            stop.pointee = true
+        }
+        return compact
+    }
+}
+
 #endif
 
 public final class _DataStorage {
@@ -127,7 +143,7 @@ public final class _DataStorage {
         case .mutable:
             return try apply(UnsafeRawBufferPointer(start: _bytes?.advanced(by: range.lowerBound - _offset), count: Swift.min(range.count, _length)))
         case .customReference(let d):
-            if d._isCompact() {
+            if __NSDataIsCompact(d) {
                 let len = d.length
                 guard len > 0 else {
                     return try apply(UnsafeRawBufferPointer(start: nil, count: 0))
@@ -161,7 +177,7 @@ public final class _DataStorage {
                 return try apply(UnsafeRawBufferPointer(buffer))
             }
         case .customMutableReference(let d):
-            if d._isCompact() {
+            if __NSDataIsCompact(d) {
                 let len = d.length
                 guard len > 0 else {
                     return try apply(UnsafeRawBufferPointer(start: nil, count: 0))
@@ -509,7 +525,7 @@ public final class _DataStorage {
         case .mutable:
             return _bytes!.advanced(by: index - _offset).assumingMemoryBound(to: UInt8.self).pointee
         case .customReference(let d):
-            if d._isCompact() {
+            if __NSDataIsCompact(d) {
                 return d.bytes.advanced(by: index - _offset).assumingMemoryBound(to: UInt8.self).pointee
             } else {
                 var byte: UInt8 = 0
@@ -523,7 +539,7 @@ public final class _DataStorage {
                 return byte
             }
         case .customMutableReference(let d):
-            if d._isCompact() {
+            if __NSDataIsCompact(d) {
                 return d.bytes.advanced(by: index - _offset).assumingMemoryBound(to: UInt8.self).pointee
             } else {
                 var byte: UInt8 = 0
@@ -854,7 +870,7 @@ public final class _DataStorage {
     }
     
     public func withInteriorPointerReference<T>(_ range: Range<Int>, _ work: (NSData) throws -> T) rethrows -> T {
-        if range.count == 0 {
+        if range.isEmpty {
             return try work(NSData()) // zero length data can be optimized as a singleton
         }
         
@@ -886,7 +902,7 @@ public final class _DataStorage {
     }
     
     public func bridgedReference(_ range: Range<Int>) -> NSData {
-        if range.count == 0 {
+        if range.isEmpty {
             return NSData() // zero length data can be optimized as a singleton
         }
         
@@ -995,8 +1011,8 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public typealias Index = Int
     public typealias Indices = Range<Int>
     
-    @_versioned internal var _backing : _DataStorage
-    @_versioned internal var _sliceRange: Range<Index>
+    @usableFromInline internal var _backing : _DataStorage
+    @usableFromInline internal var _sliceRange: Range<Index>
     
     
     // A standard or custom deallocator for `Data`.
@@ -1247,18 +1263,18 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
 
-    @_versioned
+    @usableFromInline
     internal init(backing: _DataStorage, range: Range<Index>) {
         _backing = backing
         _sliceRange = range
     }
     
-    @_versioned
+    @usableFromInline
     internal func _validateIndex(_ index: Int, message: String? = nil) {
         precondition(_sliceRange.contains(index), message ?? "Index \(index) is out of bounds of range \(_sliceRange)")
     }
     
-    @_versioned
+    @usableFromInline
     internal func _validateRange<R: RangeExpression>(_ range: R) where R.Bound == Int {
         let lower = R.Bound(_sliceRange.lowerBound)
         let upper = R.Bound(_sliceRange.upperBound)
@@ -1425,9 +1441,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         let nsRange : NSRange
         if let r = range {
             _validateRange(r)
-            nsRange = NSRange(location: r.lowerBound, length: r.upperBound - r.lowerBound)
+            nsRange = NSRange(location: r.lowerBound - startIndex, length: r.upperBound - r.lowerBound)
         } else {
-            nsRange = NSRange(location: 0, length: _backing.length)
+            nsRange = NSRange(location: 0, length: count)
         }
         let result = _backing.withInteriorPointerReference(_sliceRange) {
             $0.range(of: dataToFind, options: options, in: nsRange)
@@ -1435,7 +1451,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         if result.location == NSNotFound {
             return nil
         }
-        return result.location..<(result.location + result.length)
+        return (result.location + startIndex)..<((result.location + startIndex) + result.length)
     }
     
     /// Enumerate the contents of the data.
@@ -1464,7 +1480,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter buffer: The buffer of bytes to append. The size is calculated from `SourceType` and `buffer.count`.
     @inline(__always)
     public mutating func append<SourceType>(_ buffer : UnsafeBufferPointer<SourceType>) {
-        if buffer.count == 0 { return }
+        if buffer.isEmpty { return }
         if !isKnownUniquelyReferenced(&_backing) {
             _backing = _backing.mutableCopy(_sliceRange)
         }
@@ -1543,7 +1559,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter buffer: The replacement bytes.
     @inline(__always)
     public mutating func replaceSubrange<SourceType>(_ subrange: Range<Index>, with buffer: UnsafeBufferPointer<SourceType>) {
-        guard buffer.count > 0  else { return }
+        guard !buffer.isEmpty  else { return }
         replaceSubrange(subrange, with: buffer.baseAddress!, count: buffer.count * MemoryLayout<SourceType>.stride)
     }
     
@@ -1588,7 +1604,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     @inline(__always)
     public func subdata(in range: Range<Index>) -> Data {
         _validateRange(range)
-        if count == 0 {
+        if isEmpty {
             return Data()
         }
         return _backing.subdata(in: range)
@@ -1625,7 +1641,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         var hashValue = 0
         let hashRange: Range<Int> = _sliceRange.lowerBound..<Swift.min(_sliceRange.lowerBound + 80, _sliceRange.upperBound)
         _withStackOrHeapBuffer(hashRange.count + 1) { buffer in
-            if hashRange.count > 0 {
+            if !hashRange.isEmpty {
                 _backing.withUnsafeBytes(in: hashRange) {
                     memcpy(buffer.pointee.memory, $0.baseAddress!, hashRange.count)
                 }
@@ -1762,14 +1778,23 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     }
     
     public struct Iterator : IteratorProtocol {
-        private let _data: Data
+        // Both _data and _endIdx should be 'let' rather than 'var'.
+        // They are 'var' so that the stored properties can be read
+        // independently of the other contents of the struct. This prevents
+        // an exclusivity violation when reading '_endIdx' and '_data'
+        // while simultaneously mutating '_buffer' with the call to
+        // withUnsafeMutablePointer(). Once we support accessing struct
+        // let properties independently we should make these variables
+        // 'let' again.
+
+        private var _data: Data
         private var _buffer: (
         UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
         UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
         UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
         UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
         private var _idx: Data.Index
-        private let _endIdx: Data.Index
+        private var _endIdx: Data.Index
         
         fileprivate init(_ data: Data) {
             _data = data

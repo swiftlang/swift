@@ -35,9 +35,10 @@ class Obj {
 // CHECK: return
 sil @outline_global_simple : $@convention(thin) () -> () {
 bb0:
+  %0 = integer_literal $Builtin.Word, 0
   %1 = integer_literal $Builtin.Int64, 1
   %4 = struct $Int64 (%1 : $Builtin.Int64)
-  %7 = alloc_ref $Obj
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
   %9 = ref_element_addr %7 : $Obj, #Obj.value
   store %4 to %9 : $*Int64
   strong_release %7 : $Obj
@@ -83,13 +84,30 @@ bb0:
 // CHECK-NEXT: return
 sil @handle_deallocation : $@convention(thin) () -> () {
 bb0:
+  %0 = integer_literal $Builtin.Word, 0
   %3 = integer_literal $Builtin.Int64, 3
   %4 = struct $Int64 (%3 : $Builtin.Int64)
-  %5 = alloc_ref $Obj
+  %5 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
   %6 = ref_element_addr %5 : $Obj, #Obj.value
   store %4 to %6 : $*Int64
   set_deallocating %5 : $Obj
   dealloc_ref %5 : $Obj
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_outline_without_tail_elems
+// CHECK: alloc_ref
+// CHECK: store
+// CHECK: return
+sil @dont_outline_without_tail_elems : $@convention(thin) () -> () {
+bb0:
+  %1 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %7 = alloc_ref $Obj
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  strong_release %7 : $Obj
   %r = tuple ()
   return %r : $()
 }
@@ -100,9 +118,10 @@ bb0:
 // CHECK: return
 sil @dont_outline_global_double_store : $@convention(thin) () -> () {
 bb0:
+  %0 = integer_literal $Builtin.Word, 0
   %1 = integer_literal $Builtin.Int64, 1
   %4 = struct $Int64 (%1 : $Builtin.Int64)
-  %7 = alloc_ref $Obj
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
   %9 = ref_element_addr %7 : $Obj, #Obj.value
   store %4 to %9 : $*Int64
   store %4 to %9 : $*Int64
@@ -116,9 +135,10 @@ bb0:
 // CHECK: return
 sil @dont_outline_global_missing_store : $@convention(thin) () -> () {
 bb0:
+  %0 = integer_literal $Builtin.Word, 0
   %1 = integer_literal $Builtin.Int64, 1
   %4 = struct $Int64 (%1 : $Builtin.Int64)
-  %7 = alloc_ref $Obj
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
   %9 = ref_element_addr %7 : $Obj, #Obj.value
   strong_release %7 : $Obj
   %r = tuple ()
@@ -148,9 +168,10 @@ sil @take_pointer : $@convention(thin) (Builtin.RawPointer) -> ()
 // CHECK: return
 sil @dont_outline_global_unknown_addr_use : $@convention(thin) () -> () {
 bb0:
+  %0 = integer_literal $Builtin.Word, 0
   %1 = integer_literal $Builtin.Int64, 1
   %4 = struct $Int64 (%1 : $Builtin.Int64)
-  %7 = alloc_ref $Obj
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
   %9 = ref_element_addr %7 : $Obj, #Obj.value
   store %4 to %9 : $*Int64
   %10 = address_to_pointer %9 : $*Int64 to $Builtin.RawPointer
@@ -167,8 +188,9 @@ bb0:
 sil @dont_outline_global_escaping_obj : $@convention(thin) (@inout Obj) -> () {
 bb0(%0: $*Obj):
   %1 = integer_literal $Builtin.Int64, 1
+  %2 = integer_literal $Builtin.Word, 0
   %4 = struct $Int64 (%1 : $Builtin.Int64)
-  %7 = alloc_ref $Obj
+  %7 = alloc_ref [tail_elems $Int64 * %2 : $Builtin.Word] $Obj
   %9 = ref_element_addr %7 : $Obj, #Obj.value
   store %4 to %9 : $*Int64
   store %7 to %0 : $*Obj

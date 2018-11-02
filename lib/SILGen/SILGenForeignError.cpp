@@ -254,6 +254,7 @@ void SILGenFunction::emitForeignErrorBlock(SILLocation loc,
                                            Optional<ManagedValue> errorSlot) {
   SILGenSavedInsertionPoint savedIP(*this, errorBB,
                                     FunctionSection::Postmatter);
+  Scope scope(Cleanups, CleanupLocation::get(loc));
 
   // Load the error (taking responsibility for it).  In theory, this
   // is happening within conditional code, so we need to be only
@@ -274,10 +275,10 @@ void SILGenFunction::emitForeignErrorBlock(SILLocation loc,
   ManagedValue error = emitManagedRValueWithCleanup(errorV);
 
   // Turn the error into an Error value.
-  error = emitBridgedToNativeError(loc, error);
+  error = scope.popPreservingValue(emitBridgedToNativeError(loc, error));
 
   // Propagate.
-  FullExpr scope(Cleanups, CleanupLocation::get(loc));
+  FullExpr throwScope(Cleanups, CleanupLocation::get(loc));
   emitThrow(loc, error);
 }
 
@@ -393,7 +394,7 @@ emitErrorIsNonNilErrorCheck(SILGenFunction &SGF, SILLocation loc,
 
   // Switch on the optional error.
   SILBasicBlock *errorBB = SGF.createBasicBlock(FunctionSection::Postmatter);
-  errorBB->createPHIArgument(optionalError->getType().unwrapAnyOptionalType(),
+  errorBB->createPHIArgument(optionalError->getType().unwrapOptionalType(),
                              ValueOwnershipKind::Owned);
   SILBasicBlock *contBB = SGF.createBasicBlock();
   SGF.B.createSwitchEnum(loc, optionalError, /*default*/ nullptr,

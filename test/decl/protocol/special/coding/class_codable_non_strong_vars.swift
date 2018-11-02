@@ -8,7 +8,15 @@ class NonStrongClass : Codable {
   }
 
   weak var x: NestedClass? = NestedClass()
+  // expected-warning@-1 {{instance will be immediately deallocated because property 'x' is 'weak'}}
+  // expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-note@-3 {{'x' declared here}}
+
   unowned var y: NestedClass = NestedClass()
+  // expected-warning@-1 {{instance will be immediately deallocated because property 'y' is 'unowned'}}
+  // expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-note@-3 {{'y' declared here}}
+
   static var z: String = "foo"
 
   // These lines have to be within the NonStrongClass type because CodingKeys

@@ -31,7 +31,7 @@ func parseQuotedField(_ remainder: inout Substring) throws -> Substring? {
     var result: Substring = "" // we accumulate the result
 
     while !remainder.isEmpty {
-        guard let nextQuoteIndex = remainder.index(of: "\"") else {
+        guard let nextQuoteIndex = remainder.firstIndex(of: "\"") else {
             throw ParseError(message: "Expected a closing \"")
         }
 

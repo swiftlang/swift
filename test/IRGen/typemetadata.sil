@@ -1,8 +1,7 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
-// RUN: %target-swift-frontend -Osize -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s --check-prefix=OSIZE
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-objc-interop -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -Osize -assume-parsing-unqualified-ownership-sil -enable-objc-interop -emit-ir %s | %FileCheck %s --check-prefix=OSIZE -DINT=i%target-ptrsize
 
 // REQUIRES: CPU=x86_64
-// XFAIL: linux
 
 sil_stage canonical
 
@@ -26,7 +25,8 @@ bb0:
   return %100 : $()
 }
 
-// CHECK-LABEL: define hidden %swift.type* @"$S12typemetadata1CCMa"()
+// CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$S12typemetadata1CCMa"
+// CHECK-SAME:    ([[INT]])
 // CHECK:      [[T0:%.*]] = load %swift.type*, %swift.type**  @"$S12typemetadata1CCML", align 8
 // CHECK-NEXT: [[T1:%.*]] = icmp eq %swift.type* [[T0]], null
 // CHECK-NEXT: br i1 [[T1]]
@@ -35,20 +35,32 @@ bb0:
 // CHECK:      store atomic %swift.type* [[T1]], %swift.type** @"$S12typemetadata1CCML" release, align 8
 // CHECK-NEXT: br label
 // CHECK:      [[RES:%.*]] = phi
-// CHECK-NEXT: ret %swift.type* [[RES]]
+// CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[RES]], 0
+// CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], i64 0, 1
+// CHECK-NEXT: ret %swift.metadata_response [[T1]]
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.type* @"$S12typemetadata1SV_AA1CCtMa"()
+// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$S12typemetadata1SV_AA1CCtMa"
+// CHECK-SAME:    ([[INT]])
 // CHECK:      [[T0:%.*]] = load %swift.type*, %swift.type**  @"$S12typemetadata1SV_AA1CCtML", align 8
 // CHECK-NEXT: [[T1:%.*]] = icmp eq %swift.type* [[T0]], null
 // CHECK-NEXT: br i1 [[T1]]
-// CHECK:      [[T0:%.*]] = call %swift.type* @"$S12typemetadata1CCMa"()
-// CHECK-NEXT: [[T1:%.*]] = call %swift.type* @swift_getTupleTypeMetadata2(%swift.type* {{.*}} @"$S12typemetadata1SVMf", {{.*}} %swift.type* [[T0]], i8* null, i8** null)
-// CHECK-NEXT: store atomic %swift.type* [[T1]], %swift.type** @"$S12typemetadata1SV_AA1CCtML" release, align 8
+// CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S12typemetadata1CCMa"([[INT]] 255)
+// CHECK:      [[T0:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+// CHECK-NEXT: extractvalue %swift.metadata_response [[TMP]], 1
+// CHECK-NEXT: [[T1:%.*]] = call swiftcc %swift.metadata_response @swift_getTupleTypeMetadata2([[INT]] %0, %swift.type* {{.*}} @"$S12typemetadata1SVMf", {{.*}} %swift.type* [[T0]], i8* null, i8** null)
+// CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T1]], 0
+// CHECK-NEXT: [[STATE:%.*]] = extractvalue %swift.metadata_response [[T1]], 1
+// CHECK-NEXT: [[T0:%.*]] = icmp eq [[INT]] [[STATE]], 0
+// CHECK-NEXT: br i1 [[T0]],
+// CHECK:      store atomic %swift.type* [[METADATA]], %swift.type** @"$S12typemetadata1SV_AA1CCtML" release, align 8
 // CHECK-NEXT: br label
-// CHECK:      [[RES:%.*]] = phi
-// CHECK-NEXT: ret %swift.type* [[RES]]
+// CHECK:      [[RES:%.*]] = phi %swift.type*
+// CHECK-NEXT: [[RES_STATE:%.*]] = phi [[INT]]
+// CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[RES]], 0
+// CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[RES_STATE]], 1
+// CHECK-NEXT: ret %swift.metadata_response [[T1]]
 
-
-// OSIZE: define hidden %swift.type* @"$S12typemetadata1CCMa"() [[ATTR:#[0-9]+]] {
+// OSIZE: define hidden swiftcc %swift.metadata_response @"$S12typemetadata1CCMa"
+// OSIZE-SAME:   ([[INT]]) [[ATTR:#[0-9]+]] {
 // OSIZE: [[ATTR]] = {{{.*}}noinline
 

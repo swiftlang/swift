@@ -1,6 +1,7 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen %s -enable-sil-ownership | %FileCheck %s
+
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name objc_imported_generic -emit-silgen %s -enable-sil-ownership | %FileCheck %s
 // For integration testing, ensure we get through IRGen too.
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir -verify -DIRGEN_INTEGRATION_TEST %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name objc_imported_generic -emit-ir -verify -DIRGEN_INTEGRATION_TEST %s
 
 // REQUIRES: objc_interop
 
@@ -25,9 +26,8 @@ public func genericMethodOnAnyObjectChained(o: AnyObject, b: Bool) -> AnyObject?
 }
 
 // CHECK-LABEL: sil @$S21objc_imported_generic0C24MethodOnAnyObjectChained1o1byXlSgyXl_SbtF
-// CHECK: bb0([[ANY:%.*]] : @owned $AnyObject, [[BOOL:%.*]] : @trivial $Bool):
-// CHECK:   [[BORROWED_ANY:%.*]] = begin_borrow [[ANY]]
-// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[BORROWED_ANY]]
+// CHECK: bb0([[ANY:%.*]] : @guaranteed $AnyObject, [[BOOL:%.*]] : @trivial $Bool):
+// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened([[TAG:.*]]) AnyObject, #GenericClass.thing!1.foreign, bb1
 // CHECK:   bb1({{%.*}} : @trivial $@convention(objc_method) @pseudogeneric (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>):
@@ -50,9 +50,8 @@ public func genericPropertyOnAnyObject(o: AnyObject, b: Bool) -> AnyObject?? {
 }
 
 // CHECK-LABEL: sil @$S21objc_imported_generic0C19PropertyOnAnyObject1o1byXlSgSgyXl_SbtF
-// CHECK: bb0([[ANY:%.*]] : @owned $AnyObject, [[BOOL:%.*]] : @trivial $Bool):
-// CHECK:   [[BORROWED_ANY:%.*]] = begin_borrow [[ANY]]
-// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[BORROWED_ANY]]
+// CHECK: bb0([[ANY:%.*]] : @guaranteed $AnyObject, [[BOOL:%.*]] : @trivial $Bool):
+// CHECK:   [[OPENED_ANY:%.*]] = open_existential_ref [[ANY]]
 // CHECK:   [[OPENED_ANY_COPY:%.*]] = copy_value [[OPENED_ANY]]
 // CHECK:   dynamic_method_br [[OPENED_ANY_COPY]] : $@opened([[TAG:.*]]) AnyObject, #GenericClass.propertyThing!getter.1.foreign, bb1
 // CHECK:   bb1({{%.*}} : @trivial $@convention(objc_method) @pseudogeneric (@opened([[TAG]]) AnyObject) -> @autoreleased Optional<AnyObject>):
@@ -71,14 +70,6 @@ public protocol ThingHolder {
   var propertyArrayOfThings: [Thing]? { get set }
 }
 
-// TODO: Crashes in IRGen because the type metadata for `T` is not found in
-// the witness thunk to satisfy the associated type requirement. This could be
-// addressed by teaching IRGen to fulfill erased type parameters from protocol
-// witness tables (rdar://problem/26602097).
-#if !IRGEN_INTEGRATION_TEST
-extension GenericClass: ThingHolder {}
-#endif
-
 public protocol Ansible: class {
   associatedtype Anser: ThingHolder
 }
@@ -89,9 +80,9 @@ public func genericBlockBridging<T: Ansible>(x: GenericClass<T>) {
 }
 
 // CHECK-LABEL: sil @$S21objc_imported_generic0C13BlockBridging{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[BLOCK_TO_FUNC:%.*]] = function_ref @$SxxIeyBya_xxIegxo_21objc_imported_generic7AnsibleRzlTR
+// CHECK:         [[BLOCK_TO_FUNC:%.*]] = function_ref @$SxxIeyBya_xxIeggo_21objc_imported_generic7AnsibleRzlTR
 // CHECK:         partial_apply [callee_guaranteed] [[BLOCK_TO_FUNC]]<T>
-// CHECK:         [[FUNC_TO_BLOCK:%.*]] = function_ref @$SxxIegxo_xxIeyBya_21objc_imported_generic7AnsibleRzlTR
+// CHECK:         [[FUNC_TO_BLOCK:%.*]] = function_ref @$SxxIeggo_xxIeyBya_21objc_imported_generic7AnsibleRzlTR
 // CHECK:         init_block_storage_header {{.*}} invoke [[FUNC_TO_BLOCK]]<T>
 
 // CHECK-LABEL: sil @$S21objc_imported_generic20arraysOfGenericParam{{[_0-9a-zA-Z]*}}F
@@ -118,8 +109,7 @@ func genericFunc<V: AnyObject>(_ v: V.Type) {
 }
 
 // CHECK-LABEL: sil hidden @$S21objc_imported_generic23configureWithoutOptionsyyF : $@convention(thin) () -> ()
-// CHECK: [[NIL_FN:%.*]] = function_ref @$SSq10nilLiteralxSgyt_tcfC : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.Type) -> @out Optional<τ_0_0>
-// CHECK: apply [[NIL_FN]]<[GenericOption : Any]>({{.*}})
+// CHECK: enum $Optional<Dictionary<GenericOption, Any>>, #Optional.none!enumelt
 // CHECK: return
 func configureWithoutOptions() {
   _ = GenericClass<NSObject>(options: nil)

@@ -1,8 +1,7 @@
 // RUN: %target-swift-frontend -primary-file %s -import-objc-header %S/Inputs/usr/include/NSOption.h -emit-ir | %FileCheck %s
 
-// UNSUPPORTED: resilient_stdlib
-
 // REQUIRES: objc_interop
+// XFAIL: *
 
 import Swift
 

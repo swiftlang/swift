@@ -100,40 +100,5 @@ print(Array(m1))
 // CHECK-NEXT: [2, 4, 6, 8]
 print(Array(m1))
 
-// lazy.map.map chain should fold two layers of LazyMapSequence
-func foldingLevelsSequence<S : Sequence>(_ xs: S) {
-  let result = xs.lazy.map { $0 }.map { $0 }
-  print(type(of: result))
-}
-// CHECK-NEXT: LazyMapSequence<Array<Int>, Int>
-foldingLevelsSequence(Array(0..<10))
-
-// ... but the old way should also be available given explicit type context
-func backwardCompatibleSequence<S : Sequence>(_ xs: S) {
-  typealias ExpectedType = LazyMapSequence<LazyMapSequence<S, S.Element>, S.Element>
-  let result: ExpectedType = xs.lazy.map { $0 }.map { $0 }
-  print(type(of: result))
-}
-// CHECK-NEXT: LazyMapSequence<LazyMapSequence<Array<Int>, Int>, Int>
-backwardCompatibleSequence(Array(0..<10))
-
-// lazy.map.map chain should fold two layers of LazyMapCollection
-func foldingLevelsCollection<C : Collection>(_ xs: C) {
-  let result = xs.lazy.map { $0 }.map { $0 }
-  print(type(of: result))
-}
-// CHECK-NEXT: LazyMapCollection<Array<Int>, Int>
-foldingLevelsCollection(Array(0..<10))
-
-// ... but the old way should also be available given explicit type context
-func backwardCompatibleCollection<C : Collection>(_ xs: C) {
-  typealias ExpectedType =
-    LazyMapCollection<LazyMapCollection<C, C.Element>, C.Element>
-  let result: ExpectedType = xs.lazy.map { $0 }.map { $0 }
-  print(type(of: result))
-}
-// CHECK-NEXT: LazyMapCollection<LazyMapCollection<Array<Int>, Int>, Int>
-backwardCompatibleCollection(Array(0..<10))
-
 // CHECK-NEXT: all done.
 print("all done.")

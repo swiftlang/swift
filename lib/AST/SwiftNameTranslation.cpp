@@ -73,12 +73,16 @@ printSwiftEnumElemNameInObjC(const EnumElementDecl *EL, llvm::raw_ostream &OS,
 std::pair<Identifier, ObjCSelector> swift::objc_translation::
 getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
   ASTContext &Ctx = VD->getASTContext();
-  LazyResolver *Resolver = Ctx.getLazyResolver();
+  Identifier BaseName;
+  if (PreferredName) {
+    auto BaseNameStr = PreferredName.getBaseName().userFacingName();
+    BaseName = Ctx.getIdentifier(BaseNameStr);
+  }
   if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    return {Identifier(), FD->getObjCSelector(Resolver, PreferredName)};
+    return {Identifier(), FD->getObjCSelector(PreferredName)};
   } else if (auto *VAD = dyn_cast<VarDecl>(VD)) {
     if (PreferredName)
-      return {PreferredName.getBaseIdentifier(), ObjCSelector()};
+      return {BaseName, ObjCSelector()};
     return {VAD->getObjCPropertyName(), ObjCSelector()};
   } else if (auto *SD = dyn_cast<SubscriptDecl>(VD)) {
     return getObjCNameForSwiftDecl(SD->getGetter(), PreferredName);
@@ -86,7 +90,7 @@ getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
     SmallString<64> Buffer;
     {
       llvm::raw_svector_ostream OS(Buffer);
-      printSwiftEnumElemNameInObjC(EL, OS, PreferredName.getBaseIdentifier());
+      printSwiftEnumElemNameInObjC(EL, OS, BaseName);
     }
     return {Ctx.getIdentifier(Buffer.str()), ObjCSelector()};
   } else {
@@ -94,8 +98,8 @@ getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
     StringRef Name = getNameForObjC(VD, CustomNamesOnly);
     if (!Name.empty())
       return {Ctx.getIdentifier(Name), ObjCSelector()};
-    if (!PreferredName.getBaseName().empty())
-      return {PreferredName.getBaseIdentifier(), ObjCSelector()};
+    if (PreferredName)
+      return {BaseName, ObjCSelector()};
     return {Ctx.getIdentifier(getNameForObjC(VD)), ObjCSelector()};
   }
 }

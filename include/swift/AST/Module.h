@@ -62,7 +62,6 @@ namespace swift {
   class LinkLibrary;
   class LookupCache;
   class ModuleLoader;
-  class NameAliasType;
   class NominalTypeDecl;
   class EnumElementDecl;
   class OperatorDecl;
@@ -108,13 +107,13 @@ enum class SourceFileKind {
 /// Discriminator for resilience strategy.
 enum class ResilienceStrategy : unsigned {
   /// Public nominal types: fragile
-  /// Non-inlineable function bodies: resilient
+  /// Non-inlinable function bodies: resilient
   ///
   /// This is the default behavior without any flags.
   Default,
 
   /// Public nominal types: resilient
-  /// Non-inlineable function bodies: resilient
+  /// Non-inlinable function bodies: resilient
   ///
   /// This is the behavior with -enable-resilience.
   Resilient
@@ -206,7 +205,7 @@ private:
   struct {
     unsigned TestingEnabled : 1;
     unsigned FailedToLoad : 1;
-    unsigned ResilienceStrategy : 2;
+    unsigned ResilienceStrategy : 1;
   } Flags;
 
   ModuleDecl(Identifier name, ASTContext &ctx);
@@ -401,45 +400,13 @@ public:
   ///
   /// \param topLevelAccessPath If present, include the top-level module in the
   ///        results, with the given access path.
-  /// \param includePrivateTopLevelImports If true, imports listed in all
-  ///        file units within this module are traversed. Otherwise (the
-  ///        default), only re-exported imports are traversed.
   /// \param fn A callback of type bool(ImportedModule) or void(ImportedModule).
   ///        Return \c false to abort iteration.
   ///
   /// \return True if the traversal ran to completion, false if it ended early
   ///         due to the callback.
   bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            bool includePrivateTopLevelImports,
                             llvm::function_ref<bool(ImportedModule)> fn);
-
-  bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            bool includePrivateTopLevelImports,
-                            llvm::function_ref<void(ImportedModule)> fn) {
-    return forAllVisibleModules(topLevelAccessPath,
-                                includePrivateTopLevelImports,
-                                [=](const ImportedModule &import) -> bool {
-      fn(import);
-      return true;
-    });
-  }
-
-  template <typename Fn>
-  bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            bool includePrivateTopLevelImports,
-                            Fn &&fn) {
-    using RetTy = typename std::result_of<Fn(ImportedModule)>::type;
-    llvm::function_ref<RetTy(ImportedModule)> wrapped{std::forward<Fn>(fn)};
-    return forAllVisibleModules(topLevelAccessPath,
-                                includePrivateTopLevelImports,
-                                wrapped);
-  }
-
-  template <typename Fn>
-  bool forAllVisibleModules(AccessPathTy topLevelAccessPath, Fn &&fn) {
-    return forAllVisibleModules(topLevelAccessPath, false,
-                                std::forward<Fn>(fn));
-  }
 
   /// @}
 
@@ -492,7 +459,9 @@ public:
   SourceRange getSourceRange() const { return SourceRange(); }
 
   static bool classof(const DeclContext *DC) {
-    return DC->getContextKind() == DeclContextKind::Module;
+    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+      return classof(D);
+    return false;
   }
 
   static bool classof(const Decl *D) {
@@ -686,23 +655,6 @@ public:
   bool
   forAllVisibleModules(llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn);
 
-  bool
-  forAllVisibleModules(llvm::function_ref<void(ModuleDecl::ImportedModule)> fn) {
-    return forAllVisibleModules([=](ModuleDecl::ImportedModule import) -> bool {
-      fn(import);
-      return true;
-    });
-  }
-  
-  template <typename Fn>
-  bool forAllVisibleModules(Fn &&fn) {
-    using RetTy = typename std::result_of<Fn(ModuleDecl::ImportedModule)>::type;
-    llvm::function_ref<RetTy(ModuleDecl::ImportedModule)> wrapped{
-      std::forward<Fn>(fn)
-    };
-    return forAllVisibleModules(wrapped);
-  }
-
   /// @}
 
   /// True if this file contains the main class for the module.
@@ -852,6 +804,14 @@ public:
   /// module is still not imported by the time type checking is
   /// complete, we diagnose.
   llvm::SetVector<const DeclAttribute *> AttrsRequiringFoundation;
+
+  /// A set of synthesized declarations that need to be type checked.
+  llvm::SmallVector<Decl *, 8> SynthesizedDecls;
+
+  /// We might perform type checking on the same source file more than once,
+  /// if its the main file or a REPL instance, so keep track of the last
+  /// checked synthesized declaration to avoid duplicating work.
+  unsigned LastCheckedSynthesizedDecl = 0;
 
   /// A mapping from Objective-C selectors to the methods that have
   /// those selectors.
@@ -1218,6 +1178,18 @@ public:
 
   explicit operator bool() const { return !Mod.isNull(); }
 };
+
+inline bool DeclContext::isModuleContext() const {
+  if (auto D = getAsDeclOrDeclExtensionContext())
+    return ModuleDecl::classof(D);
+  return false;
+}
+
+inline bool DeclContext::isModuleScopeContext() const {
+  if (ParentAndKind.getInt() == ASTHierarchy::FileUnit)
+    return true;
+  return isModuleContext();
+}
 
 } // end namespace swift
 

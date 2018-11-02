@@ -18,6 +18,7 @@
 
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
@@ -217,8 +218,14 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   }
 
   (void)ParamTypes;
-  assert(ParamTypes[0].getConvention() == ParameterConvention::Direct_Owned &&
-         "Parameter should be @owned");
+  if (M.getOptions().EnableGuaranteedNormalArguments) {
+    assert(ParamTypes[0].getConvention() ==
+               ParameterConvention::Direct_Guaranteed &&
+           "Parameter should be @owned");
+  } else {
+    assert(ParamTypes[0].getConvention() == ParameterConvention::Direct_Owned &&
+           "Parameter should be @owned");
+  }
 
   // Emit a retain.
   Builder.createRetainValue(Loc, SrcOp, Builder.getDefaultAtomicity());
@@ -231,6 +238,13 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   Conf.getRequirement()->getGenericSignature()->getSubstitutions(SubMap, Subs);
 
   auto *AI = Builder.createApply(Loc, FuncRef, Subs, Args, false);
+
+  // If we have guaranteed normal arguments, insert the destroy.
+  //
+  // TODO: Is it safe to just eliminate the initial retain?
+  if (M.getOptions().EnableGuaranteedNormalArguments) {
+    Builder.createReleaseValue(Loc, SrcOp, Builder.getDefaultAtomicity());
+  }
 
   // If the source of a cast should be destroyed, emit a release.
   if (isa<UnconditionalCheckedCastAddrInst>(Inst)) {
@@ -1380,9 +1394,17 @@ static bool optimizeStaticallyKnownProtocolConformance(
     auto Proto = dyn_cast<ProtocolDecl>(TargetType->getAnyNominal());
     if (Proto) {
       auto Conformance = SM->lookupConformance(SourceType, Proto);
-      if (Conformance.hasValue()) {
-        // SourceType is a non-existential type conforming to a
-        // protocol represented by the TargetType.
+      if (Conformance.hasValue() &&
+          Conformance->getConditionalRequirements().empty()) {
+        // SourceType is a non-existential type with a non-conditional
+        // conformance to a protocol represented by the TargetType.
+        //
+        // Conditional conformances are complicated: they may depend on
+        // information not known until runtime. For instance, if `X: P` where `T
+        // == Int` in `func foo<T>(_: T) { ... X<T>() as? P ... }`, the cast
+        // will succeed for `foo(0)` but not for `foo("string")`. There are many
+        // cases where everything is completely static (`X<Int>() as? P`), but
+        // we don't try to handle that at the moment.
         SILBuilder B(Inst);
         SmallVector<ProtocolConformanceRef, 1> NewConformances;
         NewConformances.push_back(Conformance.getValue());

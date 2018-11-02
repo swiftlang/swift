@@ -98,6 +98,7 @@ public:
                            BufID, 
                            /* Offset = */ 0,
                            /* EndOffset = */ 0,
+                           /* Diags = */nullptr,
                            /* KeepComments = */ true,
                            /* TokenizeInterpolatedString = */ true,
                            SplitTokens);

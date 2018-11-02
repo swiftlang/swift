@@ -641,6 +641,9 @@ void Remangler::mangleFunctionSignatureSpecializationParam(Node *node) {
     if (kindValue &
         unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed))
       Out << 'g';
+    if (kindValue &
+        unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned))
+      Out << 'o';
     if (kindValue & unsigned(FunctionSigSpecializationParamKind::SROA))
       Out << 's';
     Out << '_';
@@ -712,6 +715,11 @@ void Remangler::mangleTypeMetadataInstantiationFunction(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::mangleTypeMetadataCompletionFunction(Node *node) {
+  Out << "Mr";
+  mangleSingleChildNode(node); // type
+}
+
 void Remangler::mangleTypeMetadataLazyCache(Node *node) {
   Out << "ML";
   mangleSingleChildNode(node); // type
@@ -749,6 +757,14 @@ void Remangler::mangleFullTypeMetadata(Node *node) {
 void Remangler::mangleProtocolDescriptor(Node *node) {
   Out << "Mp";
   mangleProtocolWithoutPrefix(node->begin()[0]);
+}
+
+void Remangler::mangleProtocolRequirementArray(Node *node) {
+  unreachable("todo");
+}
+
+void Remangler::mangleProtocolWitnessTablePattern(Node *node) {
+  unreachable("todo");
 }
 
 void Remangler::mangleProtocolConformanceDescriptor(Node *node) {
@@ -806,6 +822,11 @@ void Remangler::mangleFieldOffset(Node *node) {
   mangleChildNodes(node); // directness, entity
 }
 
+void Remangler::mangleEnumCase(Node *node) {
+  Out << "WC";
+  mangleSingleChildNode(node); // enum case
+}
+
 void Remangler::mangleProtocolWitnessTable(Node *node) {
   Out << "WP";
   mangleSingleChildNode(node); // protocol conformance
@@ -814,6 +835,10 @@ void Remangler::mangleProtocolWitnessTable(Node *node) {
 void Remangler::mangleGenericProtocolWitnessTable(Node *node) {
   Out << "WG";
   mangleSingleChildNode(node); // protocol conformance
+}
+
+void Remangler::mangleResilientProtocolWitnessTable(Node *node) {
+  unreachable("todo");
 }
 
 void Remangler::mangleGenericProtocolWitnessTableInstantiationFunction(
@@ -1462,6 +1487,11 @@ void Remangler::mangleWeak(Node *node) {
 
 void Remangler::mangleShared(Node *node) {
   Out << 'h';
+  mangleSingleChildNode(node); // type
+}
+
+void Remangler::mangleOwned(Node *node) {
+  Out << 'n';
   mangleSingleChildNode(node); // type
 }
 

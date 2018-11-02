@@ -22,7 +22,7 @@ extension MyNonGenericType {}
 
 // CHECK-DAG: typealias MyGenericType<T> = GenericType<T>
 typealias MyGenericType<T: NSObject> = GenericType<T>
-// CHECK-DAG: extension GenericType where Element : AnyObject
+// CHECK-DAG: extension GenericType where Element : NSObject
 extension MyGenericType {}
 // CHECK-DAG: extension GenericType where Element == NSObject
 extension MyGenericType where Element == NSObject {}

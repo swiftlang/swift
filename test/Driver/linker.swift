@@ -33,6 +33,9 @@
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-cygnus -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.cygwin.txt
 // RUN: %FileCheck -check-prefix CYGWIN-x86_64 %s < %t.cygwin.txt
 
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -Ffoo -Fsystem car -F cdr -framework bar -Lbaz -lboo -Xlinker -undefined %s 2>&1 > %t.windows.txt
+// RUN: %FileCheck -check-prefix WINDOWS-x86_64 %s < %t.windows.txt
+
 // RUN: %swiftc_driver -driver-print-jobs -emit-library -target x86_64-unknown-linux-gnu %s -Lbar -o dynlib.out 2>&1 > %t.linux.dynlib.txt
 // RUN: %FileCheck -check-prefix LINUX_DYNLIB-x86_64 %s < %t.linux.dynlib.txt
 
@@ -56,11 +59,12 @@
 // RUN: %empty-directory(%t)
 // RUN: touch %t/a.o
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -o linker 2>&1 | %FileCheck -check-prefix COMPILE_AND_LINK %s
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -driver-use-filelists -o linker 2>&1 | %FileCheck -check-prefix FILELIST %s
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -driver-filelist-threshold=0 -o linker 2>&1 | %FileCheck -check-prefix FILELIST %s
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_DARWIN %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_LINUX %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-cygnus -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_WINDOWS %s
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_WINDOWS %s
 
 // Here we specify an output file name using '-o'. For ease of writing these
 // tests, we happen to specify the same file name as is inferred in the
@@ -239,6 +243,20 @@
 // CYGWIN-x86_64-DAG: -lboo
 // CYGWIN-x86_64-DAG: -Xlinker -undefined
 // CYGWIN-x86_64: -o linker
+
+// WINDOWS-x86_64: swift
+// WINDOWS-x86_64: -o [[OBJECTFILE:.*]]
+
+// WINDOWS-x86_64: clang++{{"? }}
+// WINDOWS-x86_64-DAG: [[OBJECTFILE]]
+// WINDOWS-x86_64-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift/windows/x86_64]]
+// WINDOWS-x86_64-DAG: -F foo -iframework car -F cdr
+// WINDOWS-x86_64-DAG: -framework bar
+// WINDOWS-x86_64-DAG: -L baz
+// WINDOWS-x86_64-DAG: -lboo
+// WINDOWS-x86_64-DAG: -Xlinker -undefined
+// WINDOWS-x86_64: -o linker
+
 
 // COMPLEX: bin/ld{{"? }}
 // COMPLEX-DAG: -dylib

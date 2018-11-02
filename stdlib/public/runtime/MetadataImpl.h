@@ -751,15 +751,16 @@ struct FixedSizeBufferValueWitnesses<Impl, Size, Alignment,
                                      true /*hasExtraInhabitants*/>
     : BufferValueWitnesses<Impl, Size, Alignment> {
 
-  static int getEnumTagSinglePayload(const OpaqueValue *enumAddr,
-                                     unsigned numEmptyCases,
-                                     const Metadata *self) {
+  static unsigned getEnumTagSinglePayload(const OpaqueValue *enumAddr,
+                                          unsigned numEmptyCases,
+                                          const Metadata *self) {
     return getEnumTagSinglePayloadImpl(enumAddr, numEmptyCases, self, Size,
                                        Impl::numExtraInhabitants,
                                        Impl::getExtraInhabitantIndex);
   }
 
-  static void storeEnumTagSinglePayload(OpaqueValue *enumAddr, int whichCase,
+  static void storeEnumTagSinglePayload(OpaqueValue *enumAddr,
+                                        unsigned whichCase,
                                         unsigned numEmptyCases,
                                         const Metadata *self) {
     return storeEnumTagSinglePayloadImpl(enumAddr, whichCase, numEmptyCases,
@@ -775,14 +776,15 @@ struct FixedSizeBufferValueWitnesses<Impl, Size, Alignment,
                                      false /*hasExtraInhabitants*/>
     : BufferValueWitnesses<Impl, Size, Alignment> {
 
-  static int getEnumTagSinglePayload(const OpaqueValue *enumAddr,
-                                     unsigned numEmptyCases,
-                                     const Metadata *self) {
+  static unsigned getEnumTagSinglePayload(const OpaqueValue *enumAddr,
+                                          unsigned numEmptyCases,
+                                          const Metadata *self) {
     return getEnumTagSinglePayloadImpl(enumAddr, numEmptyCases, self, Size, 0,
                                        nullptr);
   }
 
-  static void storeEnumTagSinglePayload(OpaqueValue *enumAddr, int whichCase,
+  static void storeEnumTagSinglePayload(OpaqueValue *enumAddr,
+                                        unsigned whichCase,
                                         unsigned numEmptyCases,
                                         const Metadata *self) {
     return storeEnumTagSinglePayloadImpl(enumAddr, whichCase, numEmptyCases,
@@ -917,9 +919,9 @@ struct NonFixedValueWitnesses :
                                               self);
   }
 
-  static int getEnumTagSinglePayload(const OpaqueValue *enumAddr,
-                                     unsigned numEmptyCases,
-                                     const Metadata *self) {
+  static unsigned getEnumTagSinglePayload(const OpaqueValue *enumAddr,
+                                          unsigned numEmptyCases,
+                                          const Metadata *self) {
     auto *payloadWitnesses = self->getValueWitnesses();
     auto size = payloadWitnesses->getSize();
     auto getExtraInhabitantIndex =
@@ -932,7 +934,8 @@ struct NonFixedValueWitnesses :
                                        getExtraInhabitantIndex);
   }
 
-  static void storeEnumTagSinglePayload(OpaqueValue *enumAddr, int whichCase,
+  static void storeEnumTagSinglePayload(OpaqueValue *enumAddr,
+                                        unsigned whichCase,
                                         unsigned numEmptyCases,
                                         const Metadata *self) {
     auto *payloadWitnesses = self->getValueWitnesses();

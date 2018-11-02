@@ -37,6 +37,7 @@
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/Signals.h"
+#include "llvm/Support/StringSaver.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -71,7 +72,7 @@ extern int swift_format_main(ArrayRef<const char *> Args, const char *Argv0,
 static bool shouldRunAsSubcommand(StringRef ExecName,
                                   SmallString<256> &SubcommandName,
                                   SmallVectorImpl<const char *> &Args) {
-  assert(Args.size() > 0);
+  assert(!Args.empty());
 
   // If we are not run as 'swift', don't do anything special. This doesn't work
   // with symlinks with alternate names, but we can't detect 'swift' vs 'swiftc'
@@ -110,7 +111,7 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
 extern int apinotes_main(ArrayRef<const char *> Args);
 
 int main(int argc_, const char **argv_) {
-  INITIALIZE_LLVM(argc_, argv_);
+  PROGRAM_START(argc_, argv_);
 
   SmallVector<const char *, 256> argv;
   llvm::SpecificBumpPtrAllocator<char> ArgAllocator;
@@ -120,6 +121,18 @@ int main(int argc_, const char **argv_) {
     llvm::errs() << "error: couldn't get arguments: " << EC.message() << '\n';
     return 1;
   }
+
+  // Expand any response files in the command line argument vector - arguments
+  // may be passed through response files in the event of command line length
+  // restrictions.
+  llvm::BumpPtrAllocator Allocator;
+  llvm::StringSaver Saver(Allocator);
+  llvm::cl::ExpandResponseFiles(
+      Saver,
+      llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows() ?
+      llvm::cl::TokenizeWindowsCommandLine :
+      llvm::cl::TokenizeGNUCommandLine,
+      argv);
 
   // Check if this invocation should execute a subcommand.
   StringRef ExecName = llvm::sys::path::stem(argv[0]);

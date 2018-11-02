@@ -10,7 +10,7 @@ open class Cities {
   open func noosa() -> [[String : Cities]?] { return [] }
   open func maroochy(x: Int?, y: Int?) {}
   public struct CityKind {
-    static public let Town = 1
+    public static let Town = 1
   }
 }
 
@@ -33,3 +33,24 @@ public func globalCityFunc3(_ c : Cities, _ p : Int) -> Int { return 0 }
 public func globalCityFunc4(_ c : Cities, _ p : Int, _ q: Int) -> Int { return 0 }
 public func globalCityFunc5() -> Int { return 0 }
 public func globalCityPointerTaker(_ c : UnsafePointer<Cities>, _ p : Int, _ q: Int) -> Int { return 0 }
+
+public class Container {
+  public var Value: String = ""
+  public var attrDict: [String: Any] = [:]
+  public var attrArr: [String] = []
+  public var optionalAttrDict: [String: Any]? = nil
+  public func addingAttributes(_ input: [String: Any]) {}
+  public func adding(attributes: [String: Any]) {}
+  public func adding(optionalAttributes: [String: Any]?) {}
+  public init(optionalAttributes: [String: Any]?) {}
+  public func adding(attrArray: [String]) {}
+  public init(optionalAttrArray: [String]?) {}
+  public func add(single: String) {}
+  public func add(singleOptional: String?) {}
+  public func getAttrArray() -> [String] { return [] }
+  public func getOptionalAttrArray() -> [String]? { return [] }
+  public func getAttrDictionary() -> [String: Any] { return [:] }
+  public func getOptionalAttrDictionary() -> [String: Any]? { return nil }
+  public func getSingleAttr() -> String { return "" }
+  public func getOptionalSingleAttr() -> String? { return nil }
+}

@@ -121,6 +121,8 @@ ERROR(lex_invalid_curly_quote,none,
 NOTE(lex_confusable_character,none,
       "unicode character '%0' looks similar to '%1'; did you mean to use '%1'?",
       (StringRef, StringRef))
+WARNING(lex_nonbreaking_space,none,
+        "non-breaking space (U+00A0) used instead of regular space", ())
 
 ERROR(lex_unterminated_block_comment,none,
       "unterminated '/*' comment", ())
@@ -600,6 +602,9 @@ ERROR(sil_keypath_unknown_component_kind,none,
 ERROR(sil_keypath_computed_property_missing_part,none,
       "keypath %select{gettable|settable}0_property component needs an "
       "%select{id and getter|id, getter, and setter}0", (bool))
+ERROR(sil_keypath_external_missing_part,none,
+      "keypath external component with indices needs an indices_equals and "
+      "indices_hash function", ())
 ERROR(sil_keypath_no_components,none,
       "keypath must have at least one component", ())
 ERROR(sil_keypath_no_root,none,
@@ -832,6 +837,8 @@ ERROR(no_default_arg_subscript,none,
       "default arguments are not allowed in subscripts", ())
 ERROR(no_default_arg_curried,none,
       "default arguments are not allowed in curried parameter lists", ())
+ERROR(no_default_arg_enum_elt,none,
+      "default arguments are not allowed in enum cases", ())
 ERROR(var_pattern_in_var,none,
       "'%select{var|let}0' cannot appear nested inside another 'var' or "
       "'let' pattern", (unsigned))
@@ -855,8 +862,8 @@ ERROR(multiple_parameter_ellipsis,none,
       "only a single variadic parameter '...' is permitted", ())
 ERROR(parameter_vararg_default,none,
       "variadic parameter cannot have a default value", ())
-ERROR(inout_as_attr_disallowed,none,
-      "%0 before a parameter name is not allowed, place it before the parameter type instead",
+ERROR(parameter_specifier_as_attr_disallowed,none,
+      "'%0' before a parameter name is not allowed, place it before the parameter type instead",
       (StringRef))
 ERROR(parameter_specifier_repeated,none,
       "parameter must not have multiple '__owned', 'inout', '__shared',"
@@ -874,7 +881,8 @@ WARNING(parameter_extraneous_double_up,none,
         "extraneous duplicate parameter name; %0 already has an argument "
         "label", (Identifier))
 ERROR(parameter_operator_keyword_argument,none,
-      "%select{operator|closure}0 cannot have keyword arguments", (bool))
+      "%select{operator|closure|enum case}0 cannot have keyword arguments", 
+      (unsigned))
 
 ERROR(parameter_unnamed,none,
       "unnamed parameters must be written with the empty name '_'", ())
@@ -1090,6 +1098,8 @@ ERROR(expected_operator_ref,none,
       "expected operator name in operator reference", ())
 ERROR(invalid_postfix_operator,none,
       "operator with postfix spacing cannot start a subexpression", ())
+ERROR(extraneous_amp_prefix,none,
+      "use of extraneous '&'", ())
 
 ERROR(expected_member_name,PointsToFirstBadToken,
       "expected member name following '.'", ())
@@ -1187,14 +1197,15 @@ ERROR(expected_rsquare_array_expr,PointsToFirstBadToken,
       "expected ']' in container literal expression", ())
 
 // Object literal expressions
-ERROR(expected_object_literal_identifier,none,
-      "expected identifier after '#' in object literal expression", ())
-ERROR(expected_arg_list_in_object_literal,none,
+ERROR(expected_arg_list_in_object_literal,PointsToFirstBadToken,
       "expected argument list in object literal", ())
-ERROR(object_literal_legacy_name,none,
-      "'%0' has been renamed to '%1", (StringRef, StringRef))
-ERROR(legacy_object_literal_syntax,none,
-       "object literal syntax no longer uses '[# ... #]'", ())
+ERROR(legacy_object_literal,none,
+      "'%select{|[}0#%1(...)%select{|#]}0' has been renamed to '#%2(...)'",
+      (bool, StringRef, StringRef))
+
+// Unknown pound expression.
+ERROR(unknown_pound_expr,none,
+      "use of unknown directive '#%0'", (StringRef))
 
 // If expressions
 ERROR(expected_expr_after_if_question,none,
@@ -1254,6 +1265,8 @@ ERROR(expected_attribute_name,none,
       "expected an attribute name", ())
 ERROR(unknown_attribute,none,
       "unknown attribute '%0'", (StringRef))
+ERROR(unexpected_lparen_in_attribute,none,
+      "unexpected '(' in attribute '%0'", (StringRef))
 ERROR(duplicate_attribute,none,
       "duplicate %select{attribute|modifier}0", (bool))
 NOTE(previous_attribute,none,
@@ -1302,6 +1315,12 @@ ERROR(attr_only_on_parameters_parse, none,
 ERROR(attr_access_expected_set,none,
       "expected 'set' as subject of '%0' modifier", (StringRef))
 
+// Attributes
+ERROR(attr_renamed, none,
+      "'@%0' has been renamed to '@%1'", (StringRef, StringRef))
+WARNING(attr_renamed_warning, none,
+        "'@%0' has been renamed to '@%1'", (StringRef, StringRef))
+
 // availability
 ERROR(attr_availability_platform,none,
       "expected platform name or '*' for '%0' attribute", (StringRef))
@@ -1310,7 +1329,7 @@ ERROR(attr_availability_unavailable_deprecated,none,
       "'deprecated'", (StringRef))
 
 WARNING(attr_availability_unknown_platform,none,
-"unknown platform '%0' for attribute '%1'", (StringRef, StringRef))
+      "unknown platform '%0' for attribute '%1'", (StringRef, StringRef))
 ERROR(attr_availability_invalid_renamed,none,
       "'renamed' argument of '%0' attribute must be an operator, identifier, "
       "or full function name, optionally prefixed by a type name", (StringRef))
@@ -1324,9 +1343,6 @@ ERROR(attr_availability_expected_equal,none,
 
 ERROR(attr_availability_expected_version,none,
       "expected version number in '%0' attribute", (StringRef))
-
-ERROR(attr_availability_renamed, none,
-      "@availability has been renamed to @available", ())
 
 // autoclosure
 ERROR(attr_autoclosure_expected_r_paren,PointsToFirstBadToken,
@@ -1569,8 +1585,8 @@ ERROR(availability_query_repeated_platform, none,
 //------------------------------------------------------------------------------
 // syntax parsing diagnostics
 //------------------------------------------------------------------------------
-WARNING(unknown_syntax_entity, PointsToFirstBadToken,
-        "unknown %0 syntax exists in the source", (StringRef))
+ERROR(unknown_syntax_entity, PointsToFirstBadToken,
+      "unknown %0 syntax exists in the source", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

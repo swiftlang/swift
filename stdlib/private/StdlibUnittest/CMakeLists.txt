@@ -15,20 +15,20 @@ endif()
 add_swift_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the
   # filename.
-  StdlibUnittest.swift.gyb
+  StdlibUnittest.swift
 
-  CheckStrideable.swift.gyb
+  CheckStrideable.swift
   InspectValue.cpp
   InspectValue.swift
   InterceptTraps.cpp
   LifetimeTracked.swift
-  MinimalTypes.swift.gyb
+  MinimalTypes.swift
   OpaqueIdentityFunctions.cpp
   OpaqueIdentityFunctions.swift
   RaceTest.swift
   Statistics.swift
   StdlibCoreExtras.swift
-  StringConvertible.swift.gyb
+  StringConvertible.swift
   TestHelpers.swift
   TypeIndexed.swift
   GetOSVersion.mm

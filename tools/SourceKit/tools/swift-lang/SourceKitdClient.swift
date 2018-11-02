@@ -23,7 +23,22 @@ public class SourceKitdService {
   deinit {
     sourcekitd_shutdown()
   }
+
+  /// Send a request synchronously with a handler for its response.
+  /// - Parameter request: The request to send.
+  /// - Returns: The response from the sourcekitd service.
   public func sendSyn(request: SourceKitdRequest) -> SourceKitdResponse {
     return SourceKitdResponse(resp: sourcekitd_send_request_sync(request.rawRequest))
+  }
+
+  /// Send a request asynchronously with a handler for its response.
+  /// - Parameter request: The request to send.
+  /// - Parameter handler: The handler for the response in the future.
+  public func send(request: SourceKitdRequest,
+                   handler: @escaping (SourceKitdResponse) -> ())  {
+    sourcekitd_send_request(request.rawRequest, nil) { response in
+      guard let response = response else { return }
+      handler(SourceKitdResponse(resp: response))
+    }
   }
 }

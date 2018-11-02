@@ -11,10 +11,10 @@ import gizmo
 // CHECK: @"$SSo16NSRuncingOptionsVWV" = linkonce_odr hidden constant
 // CHECK: @"$SSo16NSRuncingOptionsVMn" = linkonce_odr hidden constant
 // CHECK: @"$SSo16NSRuncingOptionsVN" = linkonce_odr hidden global
-// CHECK: @"$SSo28NeverActuallyMentionedByNameVs9EquatableSCWP" = linkonce_odr hidden constant
+// CHECK: @"$SSo28NeverActuallyMentionedByNameVs9EquatableSCWp" = linkonce_odr hidden constant
 
-// CHECK-LABEL: define{{( protected)?}} i32 @main
-// CHECK:         call %swift.type* @"$SSo16NSRuncingOptionsVMa"()
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} i32 @main
+// CHECK:         call swiftcc %swift.metadata_response @"$SSo16NSRuncingOptionsVMa"(i64 0)
 
 // CHECK: define hidden swiftcc i16 @"$S12objc_ns_enum09imported_C9_inject_aSo16NSRuncingOptionsVyF"()
 // CHECK:   ret i16 123
@@ -85,7 +85,7 @@ func test_enum_without_name_Equatable(_ obj: TestThatEnumType) -> Bool {
 func use_metadata<T>(_ t:T){}
 use_metadata(NSRuncingOptions.mince)
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.type* @"$SSo16NSRuncingOptionsVMa"()
+// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$SSo16NSRuncingOptionsVMa"(i64)
 // CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @"$SSo16NSRuncingOptionsVN" {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
 
 @objc enum ExportedToObjC: Int {

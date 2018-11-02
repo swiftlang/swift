@@ -12,7 +12,7 @@ class SomeClass {
 
 func testOptionalImport() {
   var x = 0
-  // expected-warning@+2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-error@+2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@+1{{conflicting access is here}}
   SomeObjCInterface.perform(&x) { x += 1 }
 }

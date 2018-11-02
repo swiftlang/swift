@@ -1,3 +1,4 @@
+
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-sil -O -Xllvm -sil-fso-enable-generics=false %s | %FileCheck %s
 
 sil_stage raw
@@ -90,9 +91,10 @@ entry(%0: $*R<T>, %1 : $*Int, %b : $<τ_0_0> { var E< (R<τ_0_0>)->Int > } <T>):
   %a = project_box %b : $<τ_0_0> { var E<(R<τ_0_0>)->Int> } <T>, 0
   %e = load %a : $*E<(R<T>)->Int>
   switch_enum %e : $E<(R<T>)->Int>, case #E.Some!enumelt.1 : bb1, default bb2
-bb1(%f : $@callee_guaranteed (@in R<T>) -> @out Int):
+
+bb1(%f : $@callee_guaranteed (@in_guaranteed R<T>) -> @out Int):
   %t = tuple ()
-  apply %f(%1, %0) : $@callee_guaranteed (@in R<T>) -> @out Int
+  apply %f(%1, %0) : $@callee_guaranteed (@in_guaranteed R<T>) -> @out Int
   br exit
 bb2:
   br exit

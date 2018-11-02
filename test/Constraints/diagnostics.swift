@@ -335,7 +335,7 @@ f7(1)(b: 1.0)    // expected-error{{extraneous argument label 'b:' in call}}
 
 let f8 = f7(2)
 _ = f8(1)
-f8(10)          // expected-warning {{result of call is unused, but produces 'Int'}}
+f8(10)          // expected-warning {{result of call to function returning 'Int' is unused}}
 f8(1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 f8(b: 1.0)         // expected-error {{extraneous argument label 'b:' in call}}
 
@@ -457,8 +457,7 @@ func testTypeSugar(_ a : Int) {
 
 // <rdar://problem/21974772> SegFault in FailureDiagnosis::visitInOutExpr
 func r21974772(_ y : Int) {
-  let x = &(1.0 + y)  // expected-error {{binary operator '+' cannot be applied to operands of type 'Double' and 'Int'}}
-   //expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: }}
+  let x = &(1.0 + y) // expected-error {{use of extraneous '&'}}
 }
 
 // <rdar://problem/22020088> QoI: missing member diagnostic on optional gives worse error message than existential/bound generic/etc
@@ -751,7 +750,7 @@ func rdar27391581(_ a : Int, b : Int) -> Int {
 func read2(_ p: UnsafeMutableRawPointer, maxLength: Int) {}
 func read<T : BinaryInteger>() -> T? {
   var buffer : T 
-  let n = withUnsafePointer(to: &buffer) { (p) in
+  let n = withUnsafeMutablePointer(to: &buffer) { (p) in
     read2(UnsafePointer(p), maxLength: MemoryLayout<T>.size) // expected-error {{cannot convert value of type 'UnsafePointer<_>' to expected argument type 'UnsafeMutableRawPointer'}}
   }
 }

@@ -17,6 +17,8 @@ add_swift_library(swiftSema STATIC
   ConstraintGraph.cpp
   ConstraintLocator.cpp
   ConstraintSystem.cpp
+  DebuggerTestingTransform.cpp
+  DerivedConformanceCaseIterable.cpp
   DerivedConformanceCodable.cpp
   DerivedConformanceCodingKey.cpp
   DerivedConformanceEquatableHashable.cpp
@@ -25,7 +27,6 @@ add_swift_library(swiftSema STATIC
   DerivedConformances.cpp
   ITCDecl.cpp
   ITCNameLookup.cpp
-  ITCType.cpp
   InstrumenterSupport.cpp
   IterativeTypeChecker.cpp
   MiscDiagnostics.cpp

@@ -51,7 +51,8 @@ task's inputs as an array of paths under the "inputs" key. It may specify the
 task's outputs as an array of objects under the "outputs" key. An "outputs"
 object will have two fields, a "kind" describing the type of the output, and a
 "path" containing the path to the output. A "began" message will specify the
-command which was executed under the "command" key.
+command which was executed under the "command_executable" and "command_arguments"
+keys.
 
 Example::
 
@@ -74,7 +75,8 @@ Example::
           "path": "/build/foo.dia"
         },
      ],
-     "command": "swift -frontend -c -primary-file /src/foo.swift /src/bar.swift -emit-module-path /build/foo.swiftmodule -emit-diagnostics-path /build/foo.dia"
+     "command_executable": "swift",
+     "command_arguments" : ["-frontend", "-c", "-primary-file", "/src/foo.swift", "/src/bar.swift", "-emit-module-path", "/build/foo.swiftmodule", "-emit-diagnostics-path", "/build/foo.dia"]
    }
 
 Finished Message
@@ -145,7 +147,8 @@ Example::
           "path": "/build/foo.dia"
         },
      ],
-     "command": "swift -frontend -c -primary-file /src/foo.swift /src/bar.swift -emit-module-path /build/foo.swiftmodule -emit-diagnostics-path /build/foo.dia"
+     "command_executable": "swift",
+     "command_arguments": ["-frontend", "-c", "-primary-file", "/src/foo.swift", "/src/bar.swift", "-emit-module-path", "/build/foo.swiftmodule", "-emit-diagnostics-path", "/build/foo.dia"]
    }
 
 Message Names

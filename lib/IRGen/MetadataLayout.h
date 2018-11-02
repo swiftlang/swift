@@ -227,6 +227,10 @@ public:
     return HasResilientSuperclass;
   }
 
+  constexpr static bool areImmediateMembersNegative() {
+    return false;
+  }
+
   Size getMetadataSizeOffset() const;
 
   Size getMetadataAddressPointOffset() const;
@@ -389,6 +393,19 @@ Size getClassFieldOffsetOffset(IRGenModule &IGM,
 Address emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
                                        llvm::Value *metadata,
                                        NominalTypeDecl *theDecl);
+
+/// Given a reference to class type metadata of the given type,
+/// decide the offset to the given field.  This assumes that the
+/// offset is stored in the metadata, i.e. its offset is potentially
+/// dependent on generic arguments.  The result is a ptrdiff_t.
+llvm::Value *emitClassFieldOffset(IRGenFunction &IGF,
+                                  ClassDecl *theClass,
+                                  VarDecl *field,
+                                  llvm::Value *metadata);
+
+/// Given a class metadata pointer, emit the address of its superclass field.  
+Address emitAddressOfSuperclassRefInClassMetadata(IRGenFunction &IGF,
+                                                  llvm::Value *metadata);
 
 } // end namespace irgen
 } // end namespace swift

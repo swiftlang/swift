@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/ADT/STLExtras.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILArgument.h"
@@ -379,4 +380,11 @@ bool SILBasicBlock::isTrampoline() const {
 
 bool SILBasicBlock::isLegalToHoistInto() const {
   return true;
+}
+
+const SILDebugScope *SILBasicBlock::getScopeOfFirstNonMetaInstruction() {
+  for (auto &Inst : *this)
+    if (Inst.isMetaInstruction())
+      return Inst.getDebugScope();
+  return begin()->getDebugScope();
 }

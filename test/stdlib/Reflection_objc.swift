@@ -15,7 +15,7 @@
 import Swift
 import Foundation
 
-#if os(OSX)
+#if os(macOS)
 import AppKit
 
 typealias OSImage = NSImage

@@ -152,7 +152,7 @@ public:
 
 // Teach SmallPtrSet that FlaggedPointer is "basically a pointer".
 template <typename PointerTy, unsigned BitPosition, typename PtrTraits>
-class llvm::PointerLikeTypeTraits<
+struct llvm::PointerLikeTypeTraits<
   swift::FlaggedPointer<PointerTy, BitPosition, PtrTraits>> {
 public:
   static inline void *

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize
 
 // REQUIRES: objc_interop
 
@@ -29,7 +29,8 @@ entry:
 
   // All instances of the generic ObjC class are erased to the same metadata
   // at runtime.
-  // CHECK: [[METADATA:%.*]] = call %swift.type* @"$SSo12GenericClassCMa"()
+  // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$SSo12GenericClassCMa"([[INT]] 0)
+  // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
   %a = metatype $@thick GenericClass<NSString>.Type
   // CHECK: call swiftcc void @metatype_sink(%swift.type* [[METADATA]], %swift.type* [[METADATA]])
   apply %z<GenericClass<NSString>>(%a) : $@convention(thin) <T> (@thick T.Type) -> ()
@@ -38,14 +39,15 @@ entry:
   %b = metatype $@thick GenericClass<NSObject>.Type
   apply %z<GenericClass<NSObject>>(%b) : $@convention(thin) <T> (@thick T.Type) -> ()
 
-  // CHECK: [[T0:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_GenericClass",
+  // CHECK: [[T0:%.*]] = load %objc_class*, %objc_class** @"\01l_OBJC_CLASS_REF_$_GenericClass",
   // CHECK: [[OBJC_CLASS:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[T0]])
   // CHECK: call swiftcc void @objc_class_sink(%objc_class* [[OBJC_CLASS]], %swift.type* [[METADATA]])
   %c = metatype $@objc_metatype GenericClass<NSString>.Type
   apply %y<GenericClass<NSString>>(%c) : $@convention(thin) <T: AnyObject> (@objc_metatype T.Type) -> ()
 
   // Check that generic classes are erased at depth.
-  // CHECK: [[TUPLE_METADATA:%.*]] = call %swift.type* @"$SSaySo12GenericClassC_SitGMa"()
+  // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$SSaySo12GenericClassC_SitGMa"([[INT]] 0)
+  // CHECK: [[TUPLE_METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
   %d = metatype $@thick Array<(GenericClass<NSString>, Int)>.Type
   // CHECK: call swiftcc void @metatype_sink(%swift.type* [[TUPLE_METADATA]], %swift.type* [[TUPLE_METADATA]])
   apply %z<Array<(GenericClass<NSString>, Int)>>(%d) : $@convention(thin) <T> (@thick T.Type) -> ()
@@ -76,14 +78,18 @@ entry(%0: $Subclass, %1: $NSDictionary):
   unreachable
 }
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.type* @"$SSo12GenericClassCMa"()
-// CHECK:         [[T0:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_GenericClass",
+// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$SSo12GenericClassCMa"(
+// CHECK:         [[T0:%.*]] = load %objc_class*, %objc_class** @"\01l_OBJC_CLASS_REF_$_GenericClass",
 // CHECK:         call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[T0]])
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.type* @"$SSaySo12GenericClassC_SitGMa"()
-// CHECK:         [[TUPLE:%.*]] = call %swift.type* @"$SSo12GenericClassC_SitMa"()
-// CHECK:         call %swift.type* @"$SSaMa"(%swift.type* [[TUPLE]])
+// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$SSaySo12GenericClassC_SitGMa"
+// CHECK-SAME:    ([[INT]])
+// CHECK:         [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$SSo12GenericClassC_SitMa"([[INT]] 255)
+// CHECK:         [[TUPLE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+// CHECK:         call swiftcc %swift.metadata_response @"$SSaMa"([[INT]] %0, %swift.type* [[TUPLE]])
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.type* @"$SSo12GenericClassC_SitMa"()
-// CHECK:         [[CLASS:%.*]] = call %swift.type* @"$SSo12GenericClassCMa"()
-// CHECK:         call %swift.type* @swift_getTupleTypeMetadata2(%swift.type* [[CLASS]], %swift.type* @"$SSiN",
+// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$SSo12GenericClassC_SitMa"
+// CHECK-SAME:    ([[INT]])
+// CHECK:         [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$SSo12GenericClassCMa"([[INT]] 255)
+// CHECK:         [[CLASS:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+// CHECK:         call swiftcc %swift.metadata_response @swift_getTupleTypeMetadata2([[INT]] %0, %swift.type* [[CLASS]], %swift.type* @"$SSiN", i8* null,

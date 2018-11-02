@@ -137,25 +137,51 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
   return ResultExpr;
 }
 
+/// Returns whether the parser's current position is the start of a switch case,
+/// given that we're in the middle of a switch already.
+static bool isAtStartOfSwitchCase(Parser &parser,
+                                  bool needsToBacktrack = true) {
+  Optional<Parser::BacktrackingScope> backtrack;
+
+  // Check for and consume attributes. The only valid attribute is `@unknown`
+  // but that's a semantic restriction.
+  while (parser.Tok.is(tok::at_sign)) {
+    if (!parser.peekToken().is(tok::identifier))
+      return false;
+
+    if (needsToBacktrack && !backtrack)
+      backtrack.emplace(parser);
+
+    parser.consumeToken(tok::at_sign);
+    parser.consumeIdentifier();
+    if (parser.Tok.is(tok::l_paren))
+      parser.skipSingle();
+  }
+
+  return parser.Tok.isAny(tok::kw_case, tok::kw_default);
+}
+
 bool Parser::isTerminatorForBraceItemListKind(BraceItemListKind Kind,
                                               ArrayRef<ASTNode> ParsedDecls) {
   switch (Kind) {
   case BraceItemListKind::Brace:
     return false;
-  case BraceItemListKind::Case:
+  case BraceItemListKind::Case: {
     if (Tok.is(tok::pound_if)) {
+      // Backtracking scopes are expensive, so avoid setting one up if possible.
+      Parser::BacktrackingScope Backtrack(*this);
       // '#if' here could be to guard 'case:' or statements in cases.
       // If the next non-directive line starts with 'case' or 'default', it is
       // for 'case's.
-      Parser::BacktrackingScope Backtrack(*this);
       do {
         consumeToken();
         while (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof))
           skipSingle();
       } while (Tok.isAny(tok::pound_if, tok::pound_elseif, tok::pound_else));
-      return Tok.isAny(tok::kw_case, tok::kw_default);
+      return isAtStartOfSwitchCase(*this, /*needsToBacktrack*/false);
     }
-    return Tok.isAny(tok::kw_case, tok::kw_default);
+    return isAtStartOfSwitchCase(*this);
+  }
   case BraceItemListKind::TopLevelCode:
     // When parsing the top level executable code for a module, if we parsed
     // some executable code, then we're done.  We want to process (name bind,
@@ -264,6 +290,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
          Tok.isNot(tok::kw_sil_global) &&
          Tok.isNot(tok::kw_sil_witness_table) &&
          Tok.isNot(tok::kw_sil_default_witness_table) &&
+         Tok.isNot(tok::kw_sil_property) &&
          (isConditionalBlock ||
           !isTerminatorForBraceItemListKind(Kind, Entries))) {
 
@@ -610,8 +637,11 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
 
   ParserStatus Status = parseBraceItems(Entries, BraceItemListKind::Brace,
                                         BraceItemListKind::Brace);
-  parseMatchingToken(tok::r_brace, RBLoc,
-                     diag::expected_rbrace_in_brace_stmt, LBLoc);
+  if (parseMatchingToken(tok::r_brace, RBLoc,
+                         diag::expected_rbrace_in_brace_stmt, LBLoc)) {
+    // Synthesize a r-brace if the source doesn't have any.
+    LocalContext.synthesize(tok::r_brace);
+  }
 
   return makeParserResult(Status,
                           BraceStmt::create(Context, LBLoc, Entries, RBLoc));
@@ -1123,11 +1153,15 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
 
 ParserStatus
 Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
+  SyntaxParsingContext AvailabilitySpecContext(
+      SyntaxContext, SyntaxKind::AvailabilitySpecList);
   ParserStatus Status = makeParserSuccess();
 
   // We don't use parseList() because we want to provide more specific
   // diagnostics disallowing operators in version specs.
   while (1) {
+    SyntaxParsingContext AvailabilityEntryContext(
+        SyntaxContext, SyntaxKind::AvailabilityArgument);
     auto SpecResult = parseAvailabilitySpec();
     if (auto *Spec = SpecResult.getPtrOrNull()) {
       Specs.push_back(Spec);
@@ -1599,6 +1633,7 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
 ///   stmt-while:
 ///     (identifier ':')? 'while' expr-basic stmt-brace
 ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
+  SyntaxContext->setCreateSyntax(SyntaxKind::WhileStmt);
   SourceLoc WhileLoc = consumeToken(tok::kw_while);
 
   Scope S(this, ScopeKind::WhileVars);
@@ -1964,6 +1999,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
 ///    stmt-switch:
 ///      (identifier ':')? 'switch' expr-basic '{' stmt-case+ '}'
 ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
+  SyntaxContext->setCreateSyntax(SyntaxKind::SwitchStmt);
   SourceLoc SwitchLoc = consumeToken(tok::kw_switch);
 
   ParserStatus Status;
@@ -2018,10 +2054,11 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
 
 ParserStatus
 Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
+  SyntaxParsingContext CasesContext(SyntaxContext, SyntaxKind::SwitchCaseList);
   ParserStatus Status;
   while (Tok.isNot(tok::r_brace, tok::eof,
                    tok::pound_endif, tok::pound_elseif, tok::pound_else)) {
-    if (Tok.isAny(tok::kw_case, tok::kw_default)) {
+    if (isAtStartOfSwitchCase(*this)) {
       ParserResult<CaseStmt> Case = parseStmtCase(IsActive);
       Status |= Case;
       if (Case.isNonNull())
@@ -2074,21 +2111,29 @@ static ParserStatus parseStmtCase(Parser &P, SourceLoc &CaseLoc,
                                   SmallVectorImpl<CaseLabelItem> &LabelItems,
                                   SmallVectorImpl<VarDecl *> &BoundDecls,
                                   SourceLoc &ColonLoc) {
+  SyntaxParsingContext CaseContext(P.SyntaxContext,
+                                   SyntaxKind::SwitchCaseLabel);
   ParserStatus Status;
   bool isFirst = true;
   
   CaseLoc = P.consumeToken(tok::kw_case);
 
-  do {
-    GuardedPattern PatternResult;
-    parseGuardedPattern(P, PatternResult, Status, BoundDecls,
-                        GuardedPatternContext::Case, isFirst);
-    LabelItems.push_back(CaseLabelItem(/*IsDefault=*/false,
-                                       PatternResult.ThePattern,
-                                       PatternResult.WhereLoc,
-                                       PatternResult.Guard));
-    isFirst = false;
-  } while (P.consumeIf(tok::comma));
+  {
+    SyntaxParsingContext ListContext(P.SyntaxContext, SyntaxKind::CaseItemList);
+
+    while (true) {
+      SyntaxParsingContext ItemContext(P.SyntaxContext, SyntaxKind::CaseItem);
+      GuardedPattern PatternResult;
+      parseGuardedPattern(P, PatternResult, Status, BoundDecls,
+                          GuardedPatternContext::Case, isFirst);
+      LabelItems.push_back(
+          CaseLabelItem(PatternResult.ThePattern, PatternResult.WhereLoc,
+                        PatternResult.Guard));
+      isFirst = false;
+      if (!P.consumeIf(tok::comma))
+        break;
+    }
+  }
 
   ColonLoc = P.Tok.getLoc();
   if (!P.Tok.is(tok::colon)) {
@@ -2104,6 +2149,8 @@ static ParserStatus
 parseStmtCaseDefault(Parser &P, SourceLoc &CaseLoc,
                      SmallVectorImpl<CaseLabelItem> &LabelItems,
                      SourceLoc &ColonLoc) {
+  SyntaxParsingContext CaseContext(P.SyntaxContext,
+                                   SyntaxKind::SwitchDefaultLabel);
   ParserStatus Status;
 
   CaseLoc = P.consumeToken(tok::kw_default);
@@ -2129,12 +2176,13 @@ parseStmtCaseDefault(Parser &P, SourceLoc &CaseLoc,
   // Create an implicit AnyPattern to represent the default match.
   auto Any = new (P.Context) AnyPattern(CaseLoc);
   LabelItems.push_back(
-      CaseLabelItem(/*IsDefault=*/true, Any, WhereLoc, Guard.getPtrOrNull()));
+      CaseLabelItem::getDefault(Any, WhereLoc, Guard.getPtrOrNull()));
 
   return Status;
 }
 
 ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
+  SyntaxParsingContext CaseContext(SyntaxContext, SyntaxKind::SwitchCase);
   // A case block has its own scope for variables bound out of the pattern.
   Scope S(this, ScopeKind::CaseVars, !IsActive);
 
@@ -2143,13 +2191,45 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
   SmallVector<CaseLabelItem, 2> CaseLabelItems;
   SmallVector<VarDecl *, 4> BoundDecls;
 
+  SourceLoc UnknownAttrLoc;
+  while (Tok.is(tok::at_sign)) {
+    SyntaxParsingContext AttrCtx(SyntaxContext, SyntaxKind::Attribute);
+
+    if (peekToken().isContextualKeyword("unknown")) {
+      if (!UnknownAttrLoc.isValid()) {
+        UnknownAttrLoc = consumeToken(tok::at_sign);
+      } else {
+        diagnose(Tok, diag::duplicate_attribute, false);
+        diagnose(UnknownAttrLoc, diag::previous_attribute, false);
+        consumeToken(tok::at_sign);
+      }
+      consumeIdentifier();
+
+      SyntaxParsingContext Args(SyntaxContext, SyntaxKind::TokenList);
+      if (Tok.is(tok::l_paren)) {
+        diagnose(Tok, diag::unexpected_lparen_in_attribute, "unknown");
+        skipSingle();
+      }
+    } else {
+      consumeToken(tok::at_sign);
+      diagnose(Tok, diag::unknown_attribute, Tok.getText());
+      consumeIdentifier();
+
+      SyntaxParsingContext Args(SyntaxContext, SyntaxKind::TokenList);
+      if (Tok.is(tok::l_paren))
+        skipSingle();
+    }
+  }
+
   SourceLoc CaseLoc;
   SourceLoc ColonLoc;
   if (Tok.is(tok::kw_case)) {
     Status |=
         ::parseStmtCase(*this, CaseLoc, CaseLabelItems, BoundDecls, ColonLoc);
-  } else {
+  } else if (Tok.is(tok::kw_default)) {
     Status |= parseStmtCaseDefault(*this, CaseLoc, CaseLabelItems, ColonLoc);
+  } else {
+    llvm_unreachable("isAtStartOfSwitchCase() lied.");
   }
 
   assert(!CaseLabelItems.empty() && "did not parse any labels?!");
@@ -2157,8 +2237,7 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
   SmallVector<ASTNode, 8> BodyItems;
 
   SourceLoc StartOfBody = Tok.getLoc();
-  if (Tok.isNot(tok::kw_case) && Tok.isNot(tok::kw_default) &&
-      Tok.isNot(tok::r_brace)) {
+  if (Tok.isNot(tok::r_brace) && !isAtStartOfSwitchCase(*this)) {
     Status |= parseBraceItems(BodyItems, BraceItemListKind::Case);
   } else if (Status.isSuccess()) {
     diagnose(CaseLoc, diag::case_stmt_without_body,
@@ -2177,5 +2256,6 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
 
   return makeParserResult(
       Status, CaseStmt::create(Context, CaseLoc, CaseLabelItems,
-                               !BoundDecls.empty(), ColonLoc, Body));
+                               !BoundDecls.empty(), UnknownAttrLoc, ColonLoc,
+                               Body));
 }

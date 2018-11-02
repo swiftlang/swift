@@ -188,3 +188,20 @@ protocol X {
 // CHECK-DAG: .noRedundancyWarning@
 // CHECK: Generic signature: <C where C : X, C.Y == B>
 func noRedundancyWarning<C : X>(_ wrapper: C) where C.Y == B {}
+
+// Qualified lookup bug -- <https://bugs.swift.org/browse/SR-2190>
+
+protocol Init {
+  init(x: ())
+}
+
+class Base {
+  required init(y: ()) {}
+}
+
+class Derived : Base {}
+
+func g<T : Init & Derived>(_: T.Type) {
+  _ = T(x: ())
+  _ = T(y: ())
+}

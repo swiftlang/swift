@@ -31,7 +31,7 @@ comparableOperators = [
 /// - Parameters:
 ///   - lhs: An empty tuple.
 ///   - rhs: An empty tuple.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public func ==(lhs: (), rhs: ()) -> Bool {
   return true
 }
@@ -44,7 +44,7 @@ public func ==(lhs: (), rhs: ()) -> Bool {
 /// - Parameters:
 ///   - lhs: An empty tuple.
 ///   - rhs: An empty tuple.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public func !=(lhs: (), rhs: ()) -> Bool {
     return false
 }
@@ -58,7 +58,7 @@ public func !=(lhs: (), rhs: ()) -> Bool {
 /// - Parameters:
 ///   - lhs: An empty tuple.
 ///   - rhs: An empty tuple.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public func <(lhs: (), rhs: ()) -> Bool {
     return false
 }
@@ -72,7 +72,7 @@ public func <(lhs: (), rhs: ()) -> Bool {
 /// - Parameters:
 ///   - lhs: An empty tuple.
 ///   - rhs: An empty tuple.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public func <=(lhs: (), rhs: ()) -> Bool {
     return true
 }
@@ -86,7 +86,7 @@ public func <=(lhs: (), rhs: ()) -> Bool {
 /// - Parameters:
 ///   - lhs: An empty tuple.
 ///   - rhs: An empty tuple.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public func >(lhs: (), rhs: ()) -> Bool {
     return false
 }
@@ -100,7 +100,7 @@ public func >(lhs: (), rhs: ()) -> Bool {
 /// - Parameters:
 ///   - lhs: An empty tuple.
 ///   - rhs: An empty tuple.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public func >=(lhs: (), rhs: ()) -> Bool {
     return true
 }
@@ -132,7 +132,7 @@ public func >=(lhs: (), rhs: ()) -> Bool {
 /// - Parameters:
 ///   - lhs: A tuple of `Equatable` elements.
 ///   - rhs: Another tuple of elements of the same type as `lhs`.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public func == <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
   guard lhs.0 == rhs.0 else { return false }
   /*tail*/ return (
@@ -161,7 +161,7 @@ public func == <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool 
 /// - Parameters:
 ///   - lhs: A tuple of `Equatable` elements.
 ///   - rhs: Another tuple of elements of the same type as `lhs`.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public func != <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
   guard lhs.0 == rhs.0 else { return true }
   /*tail*/ return (
@@ -184,7 +184,7 @@ public func != <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool 
 /// - Parameters:
 ///   - lhs: A tuple of `Comparable` elements.
 ///   - rhs: Another tuple of elements of the same type as `lhs`.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public func ${op} <${comparableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
   if lhs.0 != rhs.0 { return lhs.0 ${op} rhs.0 }
   /*tail*/ return (

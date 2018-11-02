@@ -65,9 +65,7 @@ public:
   bool isNull() const { return getType().isNull() && TyR == nullptr; }
 
   void setInvalidType(ASTContext &C);
-  void setType(Type Ty, bool validated = false) {
-    TAndValidBit.setPointerAndInt(Ty, validated);
-  }
+  void setType(Type Ty, bool validated = false);
 
   TypeLoc clone(ASTContext &ctx) const;
 };

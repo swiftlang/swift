@@ -41,6 +41,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ArraySetElement
     single-source/ArraySubscript
     single-source/BinaryFloatingPointConversionFromBinaryInteger
+    single-source/BinaryFloatingPointProperties
     single-source/BitCount
     single-source/ByteSwap
     single-source/COWTree
@@ -48,19 +49,23 @@ set(SWIFT_BENCH_MODULES
     single-source/CSVParsing
     single-source/Calculator
     single-source/CaptureProp
+    single-source/ChainedFilterMap
     single-source/CharacterLiteralsLarge
     single-source/CharacterLiteralsSmall
     single-source/CharacterProperties
     single-source/Chars
     single-source/ClassArrayGetter
     single-source/Combos
+    single-source/DataBenchmarks
     single-source/DeadArray
     single-source/DictOfArraysToArrayOfDicts
     single-source/DictTest
     single-source/DictTest2
     single-source/DictTest3
     single-source/DictTest4
+    single-source/DictTest4Legacy
     single-source/DictionaryBridge
+    single-source/DictionaryCopy
     single-source/DictionaryGroup
     single-source/DictionaryLiteral
     single-source/DictionaryRemove
@@ -74,6 +79,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Exclusivity
     single-source/ExistentialPerformance
     single-source/Fibonacci
+    single-source/FloatingPointPrinting
     single-source/Hanoi
     single-source/Hash
     single-source/HashQuadratic
@@ -225,6 +231,17 @@ if(NOT SWIFT_OPTIMIZATION_LEVELS)
                                 ${SWIFT_EXTRA_BENCH_CONFIGS})
 endif()
 
+set(SWIFT_BENCHMARK_EXTRA_FLAGS "" CACHE STRING
+    "Extra options to pass to swiftc when building the benchmarks")
+
+if (SWIFT_BENCHMARK_BUILT_STANDALONE)
+  # This option's value must match the value of the same option used when
+  # building the swift runtime.
+  option(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
+    "Should the runtime be built with support for non-thread-safe leak detecting entrypoints"
+    FALSE)
+endif()
+
 set(SWIFT_BENCHMARK_NUM_O_ITERATIONS "" CACHE STRING
     "Number of iterations to perform when running -O benchmarks via cmake")
 set(SWIFT_BENCHMARK_NUM_ONONE_ITERATIONS "" CACHE STRING
@@ -289,6 +306,7 @@ message("--")
 message("-- Swift Benchmark Suite:")
 message("--   SWIFT_BENCHMARK_BUILT_STANDALONE = ${SWIFT_BENCHMARK_BUILT_STANDALONE}")
 message("--   SWIFT_EXEC = ${SWIFT_EXEC}")
+message("--   SWIFT_BENCHMARK_EXTRA_FLAGS = ${SWIFT_BENCHMARK_EXTRA_FLAGS}")
 message("--   SWIFT_LIBRARY_PATH = ${SWIFT_LIBRARY_PATH}")
 message("--   CLANG_EXEC = ${CLANG_EXEC}")
 message("--   SWIFT_OPTIMIZATION_LEVELS = ${SWIFT_OPTIMIZATION_LEVELS}")

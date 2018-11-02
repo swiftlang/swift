@@ -13,9 +13,8 @@
 %{
 
 # Don't need 64-bit (Double/CDouble) overlays. The ordinary C imports work fine.
-# FIXME: need 80-bit (Float80/long double) versions when long double is imported
-overlayFloatBits = [32] # 80
-allFloatBits = [32, 64] # 80
+overlayFloatBits = [32, 80]
+allFloatBits = [32, 64, 80]
 
 def floatName(bits):
     if bits == 32:
@@ -62,12 +61,17 @@ def TypedUnaryIntrinsicFunctions():
 // Unary intrinsic functions
 // Note these have a corresponding LLVM intrinsic
 % for T, CT, bits, ufunc in TypedUnaryIntrinsicFunctions():
-@_inlineable // FIXME(sil-serialize-all)
+%  if bits == 80:
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+%  end
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public func _${ufunc}(_ x: ${T}) -> ${T} {
-  return ${T}(_bits: Builtin.int_${ufunc}_FPIEEE${bits}(x._value))
+  return ${T}(Builtin.int_${ufunc}_FPIEEE${bits}(x._value))
 }
-
+%  if bits == 80:
+#endif
+%  end
 % end
 
 // ${'Local Variables'}:

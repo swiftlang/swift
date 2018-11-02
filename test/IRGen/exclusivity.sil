@@ -25,8 +25,8 @@ bb0(%0 : $A):
   // CHECK: [[T0:%.*]] = bitcast [[BUFFER_T]]* [[SCRATCH0]] to i8*
   // CHECK: call void @llvm.lifetime.start.p0i8(i64 -1, i8* [[T0]])
   // CHECK: [[T0:%.*]] = bitcast [[INT:%TSi]]* [[PROP]] to i8*
-  // CHECK-SWIFT3: call void @swift_beginAccess(i8* [[T0]], [[BUFFER_T]]* [[SCRATCH0]], [[SIZE_T:i32|i64]] 16, i8* null)
-  // CHECK-SWIFT4: call void @swift_beginAccess(i8* [[T0]], [[BUFFER_T]]* [[SCRATCH0]], [[SIZE_T:i32|i64]] 0, i8* null)
+  // CHECK-SWIFT3: call void @swift_beginAccess(i8* [[T0]], [[BUFFER_T]]* [[SCRATCH0]], [[SIZE_T:i32|i64]] 48, i8* null)
+  // CHECK-SWIFT4: call void @swift_beginAccess(i8* [[T0]], [[BUFFER_T]]* [[SCRATCH0]], [[SIZE_T:i32|i64]] 32, i8* null)
     %4 = begin_access [read] [dynamic] %3 : $*Int
 
   // CHECK: [[T0:%.*]] = getelementptr inbounds [[INT]], [[INT]]* %1, i32 0, i32 0
@@ -46,8 +46,8 @@ bb0(%0 : $A):
   // CHECK: [[T0:%.*]] = bitcast [[BUFFER_T]]* [[SCRATCH1]] to i8*
   // CHECK: call void @llvm.lifetime.start.p0i8(i64 -1, i8* [[T0]])
   // CHECK: [[T0:%.*]] = bitcast [[INT:%TSi]]* [[PROP]] to i8*
-  // CHECK-SWIFT3: call void @swift_beginAccess(i8* [[T0]], [[BUFFER_T]]* [[SCRATCH1]], [[SIZE_T:i32|i64]] 17, i8* null)
-  // CHECK-SWIFT4: call void @swift_beginAccess(i8* [[T0]], [[BUFFER_T]]* [[SCRATCH1]], [[SIZE_T:i32|i64]] 1, i8* null)
+  // CHECK-SWIFT3: call void @swift_beginAccess(i8* [[T0]], [[BUFFER_T]]* [[SCRATCH1]], [[SIZE_T:i32|i64]] 49, i8* null)
+  // CHECK-SWIFT4: call void @swift_beginAccess(i8* [[T0]], [[BUFFER_T]]* [[SCRATCH1]], [[SIZE_T:i32|i64]] 33, i8* null)
   %12 = begin_access [modify] [dynamic] %11 : $*Int
 
   // CHECK: call {{.*}} @changeInt([[INT]]*{{.*}} [[PROP]])

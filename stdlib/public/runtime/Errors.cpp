@@ -292,6 +292,12 @@ void swift::_swift_reportToDebugger(uintptr_t flags, const char *message,
   _swift_runtime_on_report(flags, message, details);
 }
 
+bool swift::_swift_reportFatalErrorsToDebugger = true;
+
+bool swift::_swift_shouldReportFatalErrorsToDebugger() {
+  return _swift_reportFatalErrorsToDebugger;
+}
+
 /// Report a fatal error to system console, stderr, and crash logs.
 /// Does not crash by itself.
 void swift::swift_reportError(uint32_t flags,

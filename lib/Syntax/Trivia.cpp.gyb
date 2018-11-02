@@ -1,0 +1,154 @@
+%{
+  # -*- mode: C++ -*-
+  from gyb_syntax_support import *
+  from gyb_syntax_support.Trivia import TRIVIAS
+  # Ignore the following admonition; it applies to the resulting .h file only
+}%
+//// Automatically Generated From Trivia.cpp.gyb.
+//// Do Not Edit Directly!
+//===--- Trivia.cpp - Swift Syntax Trivia Implementation ------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#include "swift/Syntax/RawSyntax.h"
+#include "swift/Syntax/Trivia.h"
+
+using namespace swift;
+using namespace swift::syntax;
+
+void TriviaPiece::dump(llvm::raw_ostream &OS, unsigned Indent) const {
+  for (decltype(Count) i = 0; i < Indent; ++i)
+    OS << ' ';
+  OS << "(trivia ";
+
+  switch (Kind) {
+% for trivia in TRIVIAS:
+  case TriviaKind::${trivia.name}:
+     OS << "${trivia.lower_name} ";
+% if trivia.is_collection():
+    OS << Count;
+% else:
+    OS.write_escaped(Text.str());
+% end
+  break;
+% end
+  }
+  OS << ')';
+}
+
+bool TriviaPiece::isComment() const {
+  switch (Kind) {
+% for trivia in TRIVIAS:
+  case TriviaKind::${trivia.name}:
+% if trivia.is_comment:
+    return true;
+% else:
+    return false;
+% end
+% end
+  }
+}
+
+void TriviaPiece::accumulateAbsolutePosition(AbsolutePosition &Pos) const {
+  switch (Kind) {
+% for trivia in TRIVIAS:
+  case TriviaKind::${trivia.name}:
+% if not trivia.is_collection():
+    Pos.addText(Text.str());
+% elif trivia.is_new_line:
+    Pos.addNewlines(Count, ${trivia.characters_len()});
+% else:
+    Pos.addColumns(Count);
+% end
+  break;
+% end
+  }
+}
+
+bool TriviaPiece::trySquash(const TriviaPiece &Next) {
+  if (Kind != Next.Kind) { return false; }
+  switch (Kind) {
+% for trivia in TRIVIAS:
+  case TriviaKind::${trivia.name}:
+% if trivia.is_collection():
+    Count+= Next.Count;
+    return true;
+% else:
+    return false;
+% end
+% end
+  }
+}
+
+void TriviaPiece::print(llvm::raw_ostream &OS) const {
+  switch (Kind) {
+% for trivia in TRIVIAS:
+  case TriviaKind::${trivia.name}:
+% if trivia.is_collection():
+%   joined = ''.join(trivia.characters)
+    for (unsigned i = 0; i < Count; i ++)
+      OS << "${joined}";
+% else:
+    OS << Text.str();
+% end
+    return;
+% end
+  }
+}
+
+#pragma mark - Trivia collection
+
+void Trivia::appendOrSquash(const TriviaPiece &Next) {
+  if (Pieces.size() > 0) {
+    TriviaPiece &last = Pieces.back();
+    if (last.trySquash(Next)) {
+      return;
+    }
+  }
+
+  push_back(Next);
+}
+
+Trivia Trivia::appending(const Trivia &Other) const {
+  auto NewPieces = Pieces;
+  std::copy(Other.begin(), Other.end(), std::back_inserter(NewPieces));
+  return { NewPieces };
+}
+
+void Trivia::dump(llvm::raw_ostream &OS, unsigned Indent) const {
+  for (const auto &Piece : Pieces) {
+    Piece.dump(OS, Indent);
+  }
+}
+
+void Trivia::dump() const {
+  dump(llvm::errs());
+}
+
+void Trivia::print(llvm::raw_ostream &OS) const {
+  for (const auto &Piece : Pieces) {
+    Piece.print(OS);
+  }
+}
+
+TriviaList::const_iterator Trivia::find(const TriviaKind DesiredKind) const {
+  return std::find_if(Pieces.begin(), Pieces.end(),
+                      [=](const TriviaPiece &Piece) -> bool {
+                        return Piece.getKind() == DesiredKind;
+                      });
+}
+
+Trivia Trivia::operator+(const Trivia &Other) const {
+  auto NewPieces = Pieces;
+  std::copy(Other.Pieces.begin(), Other.Pieces.end(),
+            std::back_inserter(NewPieces));
+  return { NewPieces };
+}

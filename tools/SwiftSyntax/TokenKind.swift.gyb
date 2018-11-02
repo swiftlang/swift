@@ -19,7 +19,6 @@
 
 /// Enumerates the kinds of tokens in the Swift language.
 public enum TokenKind: Codable {
-  case unknown
   case eof
 % for token in SYNTAX_TOKENS:
 %   kind = token.swift_kind()
@@ -35,7 +34,6 @@ public enum TokenKind: Codable {
   /// The textual representation of this token kind.
   var text: String {
     switch self {
-    case .unknown: return "unknown"
     case .eof: return ""
 % for token in SYNTAX_TOKENS:
 %   if token.text:
@@ -60,7 +58,6 @@ public enum TokenKind: Codable {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     let kind = try container.decode(String.self, forKey: .kind)
     switch kind {
-    case "unknown": self = .unknown
     case "eof": self = .eof
 % for token in SYNTAX_TOKENS:
     case "${token.kind}":
@@ -83,7 +80,6 @@ public enum TokenKind: Codable {
   
   var kind: String {
     switch self {
-    case .unknown: return "unknown"
     case .eof: return "eof"
 % for token in SYNTAX_TOKENS:
 %   kind = token.swift_kind()
@@ -99,7 +95,6 @@ public enum TokenKind: Codable {
 extension TokenKind: Equatable {
   public static func ==(lhs: TokenKind, rhs: TokenKind) -> Bool {
     switch (lhs, rhs) {
-    case (.unknown, .unknown): return true
     case (.eof, .eof): return true
 % for token in SYNTAX_TOKENS:
 %   kind = token.swift_kind()

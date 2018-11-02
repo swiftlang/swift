@@ -171,7 +171,7 @@ func foo(x: E, intVal: Int) {
 #if !ENABLE_C
       break
 #else
-    case .C: // expected-error {{'case' label can only appear inside a 'switch' statement}} expected-error {{extraneous '.' in enum 'case' declaration}}
+    case .C: // expected-error {{'case' label can only appear inside a 'switch' statement}}
       break
 #endif
   }

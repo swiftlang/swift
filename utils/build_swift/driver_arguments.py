@@ -105,6 +105,12 @@ def _apply_default_arguments(args):
     if args.swift_stdlib_assertions is None:
         args.swift_stdlib_assertions = args.assertions
 
+    if args.llbuild_assertions is None:
+        args.llbuild_assertions = args.assertions
+
+    if args.lldb_assertions is None:
+        args.lldb_assertions = args.assertions
+
     # Set the default CMake generator.
     if args.cmake_generator is None:
         args.cmake_generator = 'Ninja'
@@ -439,8 +445,11 @@ def create_argument_parser():
     option('--enable-sil-ownership', store_true,
            help='Enable the SIL ownership model')
 
-    option('--enable-guaranteed-normal-arguments', store_true,
-           help='Enable guaranteed normal arguments')
+    option('--disable-guaranteed-normal-arguments', store_true,
+           help='Disable guaranteed normal arguments')
+
+    option('--enable-stdlibcore-exclusivity-checking', store_true,
+           help='Enable exclusivity checking in stdlibCore')
 
     option('--force-optimized-typechecker', store_true,
            help='Force the type checker to be built with '
@@ -642,6 +651,13 @@ def create_argument_parser():
            const=False,
            help='disable assertions in LLDB')
 
+    option('--llbuild-assertions', store,
+           const=True,
+           help='enable assertions in llbuild')
+    option('--no-llbuild-assertions', store('llbuild_assertions'),
+           const=False,
+           help='disable assertions in llbuild')
+
     # -------------------------------------------------------------------------
     in_group('Select the CMake generator')
 
@@ -689,6 +705,9 @@ def create_argument_parser():
 
     option('--long-test', toggle_true,
            help='run the long test suite')
+
+    option('--stress-test', toggle_true,
+           help='run the stress test suite')
 
     option('--host-test', toggle_true,
            help='run executable tests on host devices (such as iOS or tvOS)')

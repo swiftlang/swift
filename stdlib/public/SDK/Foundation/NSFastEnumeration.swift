@@ -12,6 +12,10 @@
 
 @_exported import Foundation // Clang module
 
+/// A dummy value to be used as the target for `mutationsPtr` in fast enumeration implementations.
+fileprivate var _fastEnumerationMutationsTarget: CUnsignedLong = 0
+/// A dummy pointer to be used as `mutationsPtr` in fast enumeration implementations.
+fileprivate let _fastEnumerationMutationsPtr = UnsafeMutablePointer<CUnsignedLong>(&_fastEnumerationMutationsTarget)
 
 //===----------------------------------------------------------------------===//
 // Fast enumeration
@@ -19,7 +23,7 @@
 public struct NSFastEnumerationIterator : IteratorProtocol {
     var enumerable: NSFastEnumeration
     var objects: (Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?) = (nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
-    var state = NSFastEnumerationState(state: 0, itemsPtr: nil, mutationsPtr: _fastEnumerationStorageMutationsPtr, extra: (0, 0, 0, 0, 0))
+    var state = NSFastEnumerationState(state: 0, itemsPtr: nil, mutationsPtr: _fastEnumerationMutationsPtr, extra: (0, 0, 0, 0, 0))
     var index = 0
     var count = 0
     var useObjectsBuffer = false

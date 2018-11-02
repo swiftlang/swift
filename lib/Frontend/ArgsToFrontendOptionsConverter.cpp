@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Frontend/ArgsToFrontendOptionsConverter.h"
+#include "ArgsToFrontendOptionsConverter.h"
 
+#include "ArgsToFrontendInputsConverter.h"
+#include "ArgsToFrontendOutputsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
-#include "swift/Frontend/ArgsToFrontendInputsConverter.h"
-#include "swift/Frontend/ArgsToFrontendOutputsConverter.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
@@ -45,7 +45,8 @@ static void debugFailWithAssertion() {
 LLVM_ATTRIBUTE_NOINLINE
 static void debugFailWithCrash() { LLVM_BUILTIN_TRAP; }
 
-bool ArgsToFrontendOptionsConverter::convert() {
+bool ArgsToFrontendOptionsConverter::convert(
+    SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> *buffers) {
   using namespace options;
 
   handleDebugCrashGroupArguments();
@@ -78,6 +79,8 @@ bool ArgsToFrontendOptionsConverter::convert() {
   setUnsignedIntegerArgument(OPT_solver_expression_time_threshold_EQ, 10,
                              Opts.SolverExpressionTimeThreshold);
 
+  Opts.DebuggerTestingTransform = Args.hasArg(OPT_debugger_testing_transform);
+
   computePlaygroundOptions();
 
   // This can be enabled independently of the playground transform.
@@ -93,9 +96,11 @@ bool ArgsToFrontendOptionsConverter::convert() {
 
   computeDumpScopeMapLocations();
 
-  if (ArgsToFrontendInputsConverter(Diags, Args, Opts.InputsAndOutputs)
-          .convert())
+  Optional<FrontendInputsAndOutputs> inputsAndOutputs =
+      ArgsToFrontendInputsConverter(Diags, Args).convert(buffers);
+  if (!inputsAndOutputs)
     return true;
+  Opts.InputsAndOutputs = std::move(inputsAndOutputs).getValue();
 
   Opts.RequestedAction = determineRequestedAction(Args);
 
@@ -116,9 +121,6 @@ bool ArgsToFrontendOptionsConverter::convert() {
 
   if (checkUnusedSupplementaryOutputPaths())
     return true;
-
-  if (const Arg *A = Args.getLastArg(OPT_emit_fixits_path))
-    Opts.FixitsOutputPath = A->getValue();
 
   if (const Arg *A = Args.getLastArg(OPT_module_link_name))
     Opts.ModuleLinkName = A->getValue();
@@ -427,12 +429,12 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
       OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(Args,
                                                                        Diags);
 
-  auto nameToStem =
+  std::string nameToStem =
       outputFilenames && outputFilenames->size() == 1 &&
               outputFilenames->front() != "-" &&
               !llvm::sys::fs::is_directory(outputFilenames->front())
           ? outputFilenames->front()
-          : Opts.InputsAndOutputs.getFilenameOfFirstInput().str();
+          : Opts.InputsAndOutputs.getFilenameOfFirstInput();
 
   Opts.ModuleName = llvm::sys::path::stem(nameToStem);
   return false;
@@ -441,7 +443,7 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
 bool ArgsToFrontendOptionsConverter::
     computeMainAndSupplementaryOutputFilenames() {
   std::vector<std::string> mainOutputs;
-  SupplementaryOutputPaths supplementaryOutputs;
+  std::vector<SupplementaryOutputPaths> supplementaryOutputs;
   const bool hadError = ArgsToFrontendOutputsConverter(
                             Args, Opts.ModuleName, Opts.InputsAndOutputs, Diags)
                             .convert(mainOutputs, supplementaryOutputs);
@@ -487,9 +489,7 @@ void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
   using namespace options;
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
-    Opts.SerializeBridgingHeader |=
-        !Opts.InputsAndOutputs.hasPrimaryInputs() &&
-        !Opts.InputsAndOutputs.supplementaryOutputs().ModuleOutputPath.empty();
+    Opts.SerializeBridgingHeader |= !Opts.InputsAndOutputs.hasPrimaryInputs();
   }
 }
 void ArgsToFrontendOptionsConverter::computeImplicitImportModuleNames() {

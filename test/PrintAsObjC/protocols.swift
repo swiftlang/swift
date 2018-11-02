@@ -190,5 +190,17 @@ extension NSString : A, ZZZ {}
 // CHECK-LABEL: @interface Subclass : RootClass1 <ZZZ>{{$}}
 @objc class Subclass : RootClass1, ZZZ {}
 
+// CHECK-LABEL: @protocol UnownedProperty
+// CHECK-NEXT: @property (nonatomic, assign) id _Nonnull unownedProp;
+@objc protocol UnownedProperty {
+  unowned var unownedProp: AnyObject { get set }
+}
+
+// CHECK-LABEL: @protocol WeakProperty
+// CHECK-NEXT: @property (nonatomic, weak) id _Nullable weakProp;
+@objc protocol WeakProperty {
+  weak var weakProp: AnyObject? { get set }
+}
+
 // Deliberately at the end of the file.
 @objc protocol ZZZ {}

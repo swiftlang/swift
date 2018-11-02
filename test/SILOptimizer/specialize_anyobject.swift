@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend  -O -sil-inline-threshold 0 -emit-sil -primary-file %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name specialize_anyobject -O -sil-inline-threshold 0 -emit-sil -primary-file %s | %FileCheck %s
 
 // rdar://problem/20338028
 protocol PA: class { }
@@ -17,6 +18,6 @@ struct S<A: PB> {
 
 // CHECK-LABEL: sil hidden @$S20specialize_anyobject6callit{{[_0-9a-zA-Z]*}}F
 func callit(s: S<CB>) {
-  // CHECK: function_ref @$Ss3eeeoiySbyXlSg_ABtF : $@convention(thin) (@owned Optional<AnyObject>, @owned Optional<AnyObject>) -> Bool
+  // CHECK: function_ref @$Ss3eeeoiySbyXlSg_ABtF : $@convention(thin) (@guaranteed Optional<AnyObject>, @guaranteed Optional<AnyObject>) -> Bool
   s.crash()
 }

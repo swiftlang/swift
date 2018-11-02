@@ -231,6 +231,8 @@ SWIFT_RUNTIME_EXPORT
 size_t swift_retainCount(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
 size_t swift_unownedRetainCount(HeapObject *object);
+SWIFT_RUNTIME_EXPORT
+size_t swift_weakRetainCount(HeapObject *object);
 
 /// Is this pointer a non-null unique reference to an object
 /// that uses Swift reference counting?
@@ -279,6 +281,16 @@ bool swift_isUniquelyReferenced_nonNull_native(const struct HeapObject *);
 SWIFT_RUNTIME_EXPORT
 bool swift_isUniquelyReferencedOrPinned_nonNull_native(
   const struct HeapObject *);
+
+/// Is this native Swift pointer non-null and has a reference count greater than
+/// one.
+/// This runtime call will print an error message with file name and location if
+/// the closure is escaping but it will not abort.
+SWIFT_RUNTIME_EXPORT
+bool swift_isEscapingClosureAtFileLocation(const struct HeapObject *object,
+                                           const unsigned char *filename,
+                                           int32_t filenameLength,
+                                           int32_t line);
 
 /// Deallocate the given memory.
 ///

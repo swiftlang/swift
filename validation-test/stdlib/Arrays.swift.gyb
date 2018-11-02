@@ -189,6 +189,59 @@ ArrayTestSuite.test("init(repeating:count:)") {
   }
 }
 
+ArrayTestSuite.test("Hashable") {
+  let a1: [Array<Int>] = [
+    [1, 2, 3],
+    [1, 3, 2],
+    [3, 1, 2],
+    [1, 2],
+    [1],
+    [],
+    [1, 1, 1]
+  ]
+  checkHashable(a1, equalityOracle: { $0 == $1 })
+
+  let a2: [Array<Array<Int>>] = [
+    [[], [1], [1, 2], [2, 1]],
+    [[], [1], [2, 1], [2, 1]],
+    [[1], [], [2, 1], [2, 1]],
+    [[1], [], [2, 1], [2]],
+    [[1], [], [2, 1]]
+  ]
+  checkHashable(a2, equalityOracle: { $0 == $1 })
+
+  // These arrays share the same sequence of leaf integers, but they must
+  // still all hash differently.
+  let a3: [Array<Array<Int>>] = [
+    // Grouping changes must perturb the hash.
+    [[1], [2], [3], [4], [5]],
+    [[1, 2], [3], [4], [5]],
+
+    [[1], [2, 3], [4], [5]],
+    [[1], [2], [3, 4], [5]],
+    [[1], [2], [3], [4, 5]],
+
+    [[1, 2, 3], [4], [5]],
+    [[1], [2, 3, 4], [5]],
+    [[1], [2], [3, 4, 5]],
+
+    [[1, 2, 3, 4], [5]],
+    [[1], [2, 3, 4, 5]],
+
+    [[1, 2], [3, 4], [5]],
+    [[1], [2, 3], [4, 5]],
+    [[1, 2, 3, 4, 5]],
+
+    // Empty arrays must perturb the hash.
+    [[], [1], [2], [3], [4], [5]],
+    [[1], [], [2], [3], [4], [5]],
+    [[1], [2], [3], [4], [5], []],
+    [[1], [], [], [2], [3], [], [4], [], [5]],
+  ]
+  checkHashable(a3, equalityOracle: { $0 == $1 })
+}
+
+
 #if _runtime(_ObjC)
 //===----------------------------------------------------------------------===//
 // NSArray -> Array bridging tests.
@@ -1513,7 +1566,7 @@ ArrayTestSuite.test("Native/isEmpty") {
   expectFalse(a.isEmpty)
 }
 
-% for Kind in ['Array', 'ContiguousArray']:
+% for Kind in ['Array', 'ContiguousArray', 'ArraySlice']:
 ArrayTestSuite.test("${Kind}/popLast") {
   // Empty
   do {

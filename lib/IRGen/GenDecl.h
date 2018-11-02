@@ -53,6 +53,8 @@ namespace irgen {
                                        DebugTypeInfo DebugType=DebugTypeInfo(),
                                        Optional<SILLocation> DebugLoc = None,
                                        StringRef DebugName = StringRef());
+
+  void disableAddressSanitizer(IRGenModule &IGM, llvm::GlobalVariable *var);
 }
 }
 

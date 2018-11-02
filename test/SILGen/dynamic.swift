@@ -1,8 +1,9 @@
+
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift -emit-silgen | %FileCheck %s
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift -emit-sil -verify
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name dynamic -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift -emit-silgen | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name dynamic -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift -emit-sil -verify
 
 // REQUIRES: objc_interop
 
@@ -195,7 +196,7 @@ class Subclass: Foo {
   override subscript(objc objc: AnyObject) -> Int {
     get { return super[objc: objc] }
     // CHECK-LABEL: sil hidden @$S7dynamic8SubclassC4objcSiyXl_tcig
-    // CHECK:         function_ref @$S7dynamic3FooC4objcSiyXl_tcig : $@convention(method) (@owned AnyObject, @guaranteed Foo) -> Int
+    // CHECK:         function_ref @$S7dynamic3FooC4objcSiyXl_tcig : $@convention(method) (@guaranteed AnyObject, @guaranteed Foo) -> Int
     set { super[objc: objc] = newValue }
     // CHECK-LABEL: sil hidden @$S7dynamic8SubclassC4objcSiyXl_tcis
     // CHECK:         function_ref @$S7dynamic3FooC4objcSiyXl_tcis : $@convention(method) (Int, @owned AnyObject, @guaranteed Foo) -> ()
@@ -352,11 +353,9 @@ extension Gizmo {
 // CHECK-LABEL: sil hidden @$S7dynamic24foreignExtensionDispatchyySo5GizmoCF
 // CHECK: bb0([[ARG:%.*]] : $Gizmo):
 func foreignExtensionDispatch(_ g: Gizmo) {
-  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK: objc_method [[BORROWED_ARG]] : $Gizmo, #Gizmo.foreignObjCExtension!1.foreign : (Gizmo)
+  // CHECK: objc_method [[ARG]] : $Gizmo, #Gizmo.foreignObjCExtension!1.foreign : (Gizmo)
   g.foreignObjCExtension()
-  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK: objc_method [[BORROWED_ARG]] : $Gizmo, #Gizmo.foreignDynamicExtension!1.foreign
+  // CHECK: objc_method [[ARG]] : $Gizmo, #Gizmo.foreignDynamicExtension!1.foreign
   g.foreignDynamicExtension()
 }
 
@@ -491,7 +490,7 @@ public class ConcreteDerived : GenericBase<Int> {
 // so after re-abstracting the signature we must dispatch to the dynamic
 // thunk.
 
-// CHECK-LABEL: sil private @$S7dynamic15ConcreteDerivedC6methodyySiFAA11GenericBaseCADyyxFTV : $@convention(method) (@in Int, @guaranteed ConcreteDerived) -> ()
+// CHECK-LABEL: sil private @$S7dynamic15ConcreteDerivedC6methodyySiFAA11GenericBaseCADyyxFTV : $@convention(method) (@in_guaranteed Int, @guaranteed ConcreteDerived) -> ()
 // CHECK: bb0(%0 : $*Int, %1 : $ConcreteDerived):
 // CHECK-NEXT:  [[VALUE:%.*]] = load [trivial] %0 : $*Int
 // CHECK:       [[DYNAMIC_THUNK:%.*]] = function_ref @$S7dynamic15ConcreteDerivedC6methodyySiFTD : $@convention(method) (Int, @guaranteed ConcreteDerived) -> ()

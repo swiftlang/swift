@@ -42,9 +42,10 @@ well. For more, see the [Code of Conduct](https://swift.org/community/#code-of-c
 ## Getting Started
 
 These instructions give the most direct path to a working Swift development
-environment. To build from source you will need 2 GB of disk space for the
-source code and over 20 GB of disk space for the build artifacts. A clean
-build can take multiple hours, but incremental builds will finish much faster.
+environment. To build from source you will need about 2 GB of disk space for the
+source code and up to 70 GB of disk space for the build artifacts with full
+debugging. Depending on your machine, a clean build can take a few minutes to
+several hours. Naturally, incremental builds are much faster.
 
 
 ### System Requirements
@@ -54,7 +55,7 @@ supported host development operating systems.
 
 #### macOS
 
-To build for macOS, you need [Xcode 9.3 beta](https://developer.apple.com/xcode/downloads/).
+To build for macOS, you need [Xcode 9.3](https://developer.apple.com/xcode/downloads/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document or the host information on <https://ci.swift.org> for the
 current required version.
@@ -76,7 +77,7 @@ Instructions for installing CMake and Ninja directly can be found [below](#build
 
 For Ubuntu, you'll need the following development dependencies:
 
-    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev libcurl4-openssl-dev autoconf libtool systemtap-sdt-dev tzdata
+    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev libcurl4-openssl-dev systemtap-sdt-dev tzdata rsync
 
 **Note:** LLDB currently requires at least `swig-1.3.40` but will successfully build
 with version 2 shipped with Ubuntu.

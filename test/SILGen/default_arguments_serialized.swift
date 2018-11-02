@@ -1,11 +1,12 @@
+
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/default_arguments_other.swiftmodule -emit-module -swift-version 4 -primary-file %S/Inputs/default_arguments_other.swift
 
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 3 -I %t %s | %FileCheck %s --check-prefix=SWIFT3 --check-prefix=CHECK
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 4 -I %t %s | %FileCheck %s --check-prefix=SWIFT4 --check-prefix=CHECK
+// RUN: %target-swift-frontend -module-name default_arguments_serialized -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 3 -I %t %s | %FileCheck %s --check-prefix=SWIFT3 --check-prefix=CHECK
+// RUN: %target-swift-frontend -module-name default_arguments_serialized -Xllvm -sil-full-demangle -enable-sil-ownership -emit-silgen -swift-version 4 -I %t %s | %FileCheck %s --check-prefix=SWIFT4 --check-prefix=CHECK
 
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-sil -O -swift-version 3 -I %t %s | %FileCheck %s --check-prefix=OPT
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -enable-sil-ownership -emit-sil -O -swift-version 4 -I %t %s | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend -module-name default_arguments_serialized -Xllvm -sil-full-demangle -enable-sil-ownership -emit-sil -O -swift-version 3 -I %t %s | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend -module-name default_arguments_serialized -Xllvm -sil-full-demangle -enable-sil-ownership -emit-sil -O -swift-version 4 -I %t %s | %FileCheck %s --check-prefix=OPT
 
 // Check that default arguments are serialized in Swift 4 mode.
 
@@ -25,7 +26,7 @@ public func hasDefaultArguments(x: Int = 0, y: String = defaultString()) {}
 // CHECK-LABEL: sil @$S28default_arguments_serialized21callsDefaultArgumentsyyF : $@convention(thin) () -> ()
 // CHECK: function_ref @$S28default_arguments_serialized19hasDefaultArguments1x1yySi_SStFfA_ : $@convention(thin) () -> Int
 // CHECK: function_ref @$S28default_arguments_serialized19hasDefaultArguments1x1yySi_SStFfA0_ : $@convention(thin) () -> @owned String
-// CHECK: function_ref @$S28default_arguments_serialized19hasDefaultArguments1x1yySi_SStF : $@convention(thin) (Int, @owned String) -> ()
+// CHECK: function_ref @$S28default_arguments_serialized19hasDefaultArguments1x1yySi_SStF : $@convention(thin) (Int, @guaranteed String) -> ()
 // CHECK: apply
 // CHECK: return
 public func callsDefaultArguments() {

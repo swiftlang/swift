@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name reabstract_lvalue -emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 struct MyMetatypeIsThin {}
 
@@ -18,22 +19,22 @@ func reabstractFunctionInOut() {
   // CHECK: [[THICK_ARG:%.*]] = thin_to_thick_function [[ARG]]
   // CHECK: store [[THICK_ARG:%.*]] to [init] [[PB]]
   // CHECK:  [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]] : $*@callee_guaranteed (Int) -> Double
-  // CHECK: [[ABSTRACTED_BOX:%.*]] = alloc_stack $@callee_guaranteed (@in Int) -> @out Double
+  // CHECK: [[ABSTRACTED_BOX:%.*]] = alloc_stack $@callee_guaranteed (@in_guaranteed Int) -> @out Double
   // CHECK: [[THICK_ARG:%.*]] = load [copy] [[WRITE]]
-  // CHECK: [[THUNK1:%.*]] = function_ref @$SSiSdIegyd_SiSdIegir_TR
+  // CHECK: [[THUNK1:%.*]] = function_ref @$SSiSdIegyd_SiSdIegnr_TR
   // CHECK: [[ABSTRACTED_ARG:%.*]] = partial_apply [callee_guaranteed] [[THUNK1]]([[THICK_ARG]])
   // CHECK: store [[ABSTRACTED_ARG]] to [init] [[ABSTRACTED_BOX]]
   // CHECK: [[FUNC:%.*]] = function_ref @$S17reabstract_lvalue19consumeGenericInOut{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[FUNC]]<(Int) -> Double>([[ABSTRACTED_BOX]])
   // CHECK: [[NEW_ABSTRACTED_ARG:%.*]] = load [take] [[ABSTRACTED_BOX]]
-  // CHECK: [[THUNK2:%.*]] = function_ref @$SSiSdIegir_SiSdIegyd_TR
+  // CHECK: [[THUNK2:%.*]] = function_ref @$SSiSdIegnr_SiSdIegyd_TR
   // CHECK: [[NEW_ARG:%.*]] = partial_apply [callee_guaranteed] [[THUNK2]]([[NEW_ABSTRACTED_ARG]])
   var minimallyAbstracted = transform
   consumeGenericInOut(&minimallyAbstracted)
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SSiSdIegyd_SiSdIegir_TR : $@convention(thin) (@in Int, @guaranteed @callee_guaranteed (Int) -> Double) -> @out Double
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SSiSdIegir_SiSdIegyd_TR : $@convention(thin) (Int, @guaranteed @callee_guaranteed (@in Int) -> @out Double) -> Double
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SSiSdIegyd_SiSdIegnr_TR : $@convention(thin) (@in_guaranteed Int, @guaranteed @callee_guaranteed (Int) -> Double) -> @out Double
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SSiSdIegnr_SiSdIegyd_TR : $@convention(thin) (Int, @guaranteed @callee_guaranteed (@in_guaranteed Int) -> @out Double) -> Double
 
 // CHECK-LABEL: sil hidden @$S17reabstract_lvalue0A13MetatypeInOutyyF : $@convention(thin) () -> ()
 func reabstractMetatypeInOut() {

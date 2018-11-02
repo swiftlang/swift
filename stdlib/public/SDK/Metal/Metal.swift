@@ -12,7 +12,6 @@
 
 @_exported import Metal // Clang module
 
-@available(swift 4)
 @available(macOS 10.11, iOS 8.0, tvOS 8.0, *)
 extension MTLBlitCommandEncoder {
     
@@ -21,7 +20,6 @@ extension MTLBlitCommandEncoder {
     }
 }
 
-@available(swift 4)
 @available(macOS 10.11, iOS 8.0, tvOS 8.0, *)
 extension MTLBuffer {
     
@@ -38,7 +36,6 @@ extension MTLBuffer {
     }
 }
 
-@available(swift 4)
 @available(macOS 10.11, iOS 8.0, tvOS 8.0, *)
 extension MTLComputeCommandEncoder {
     
@@ -69,7 +66,6 @@ extension MTLComputeCommandEncoder {
     }
 }
 
-@available(swift 4)
 @available(macOS 10.11, iOS 8.0, tvOS 8.0, *)
 extension MTLDevice {
     
@@ -92,7 +88,6 @@ public func MTLCopyAllDevicesWithObserver(handler: @escaping MTLDeviceNotificati
 }
 #endif
 
-@available(swift 4)
 @available(macOS 10.12, iOS 10.0, tvOS 10.0, *)
 extension MTLFunctionConstantValues {
     
@@ -102,7 +97,6 @@ extension MTLFunctionConstantValues {
     
 }
 
-@available(swift 4)
 @available(macOS 10.13, iOS 11.0, tvOS 11.0, *)
 extension MTLArgumentEncoder {
     
@@ -119,7 +113,6 @@ extension MTLArgumentEncoder {
     }
 }
 
-@available(swift 4)
 @available(macOS 10.11, iOS 8.0, tvOS 8.0, *)
 extension MTLRenderCommandEncoder {
     
@@ -201,7 +194,6 @@ extension MTLRenderCommandEncoder {
 #endif
 }
 
-@available(swift 4)
 @available(macOS 10.11, iOS 8.0, tvOS 8.0, *)
 extension MTLRenderPassDescriptor {
     
@@ -220,7 +212,6 @@ extension MTLRenderPassDescriptor {
     
 }
 
-@available(swift 4)
 @available(macOS 10.11, iOS 8.0, tvOS 8.0, *)
 extension MTLTexture {
     

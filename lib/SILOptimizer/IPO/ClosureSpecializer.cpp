@@ -662,8 +662,8 @@ SILValue ClosureSpecCloner::cloneCalleeConversion(SILValue calleeValue,
 
   auto *Cvt = cast<ConvertEscapeToNoEscapeInst>(calleeValue);
   calleeValue = cloneCalleeConversion(Cvt->getOperand(), NewClosure, Builder);
-  return Builder.createConvertEscapeToNoEscape(CallSiteDesc.getLoc(),
-                                               calleeValue, Cvt->getType());
+  return Builder.createConvertEscapeToNoEscape(
+      CallSiteDesc.getLoc(), calleeValue, Cvt->getType(), false, true);
 }
 
 /// \brief Populate the body of the cloned closure, modifying instructions as

@@ -9,7 +9,7 @@ class C: NSObject {}
 @objc protocol Q {}
 protocol NonObjC: class {}
 
-// CHECK: @"$S34type_layout_reference_storage_objc26ReferenceStorageTypeLayoutVMn" = hidden constant {{.*}} @"$S34type_layout_reference_storage_objc26ReferenceStorageTypeLayoutVMi"
+// CHECK: @"$S34type_layout_reference_storage_objc26ReferenceStorageTypeLayoutVMn" = hidden constant {{.*}} @"$S34type_layout_reference_storage_objc26ReferenceStorageTypeLayoutVMP"
 // CHECK: define internal %swift.type* @"$S34type_layout_reference_storage_objc26ReferenceStorageTypeLayoutVMi"
 struct ReferenceStorageTypeLayout<T, ObjC: C> {
   var z: T

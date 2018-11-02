@@ -200,10 +200,11 @@ AssumeUnqualifiedOwnershipWhenParsing(
     "assume-parsing-unqualified-ownership-sil", llvm::cl::Hidden, llvm::cl::init(false),
     llvm::cl::desc("Assume all parsed functions have unqualified ownership"));
 
-static llvm::cl::opt<bool>
-EnableGuaranteedNormalArguments(
-    "enable-guaranteed-normal-arguments", llvm::cl::Hidden, llvm::cl::init(false),
-    llvm::cl::desc("Assume that the input module was compiled with -enable-guaranteed-normal-arguments enabled"));
+static llvm::cl::opt<bool> DisableGuaranteedNormalArguments(
+    "disable-guaranteed-normal-arguments", llvm::cl::Hidden,
+    llvm::cl::init(false),
+    llvm::cl::desc("Assume that the input module was compiled with "
+                   "-disable-guaranteed-normal-arguments enabled"));
 
 /// Regular expression corresponding to the value given in one of the
 /// -pass-remarks* command line flags. Passes whose name matches this regexp
@@ -264,7 +265,8 @@ static void runCommandLineSelectedPasses(SILModule *Module,
 void anchorForGetMainExecutable() {}
 
 int main(int argc, char **argv) {
-  INITIALIZE_LLVM(argc, argv);
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL optimizer\n");
 
@@ -325,8 +327,7 @@ int main(int argc, char **argv) {
   SILOpts.EnableSILOwnership = EnableSILOwnershipOpt;
   SILOpts.AssumeUnqualifiedOwnershipWhenParsing =
     AssumeUnqualifiedOwnershipWhenParsing;
-  SILOpts.EnableGuaranteedNormalArguments =
-    EnableGuaranteedNormalArguments;
+  SILOpts.EnableGuaranteedNormalArguments &= !DisableGuaranteedNormalArguments;
 
   SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {
@@ -427,9 +428,9 @@ int main(int argc, char **argv) {
   } else {
     auto *SILMod = CI.getSILModule();
     {
-      const auto PSPs = CI.getPrimarySpecificPathsForAtMostOnePrimary();
       auto T = irgen::createIRGenModule(
-          SILMod, PSPs.OutputFilename, PSPs.MainInputFilenameForDebugInfo,
+          SILMod, Invocation.getOutputFilenameForAtMostOnePrimary(),
+          Invocation.getMainInputFilenameForDebugInfoForAtMostOnePrimary(),
           getGlobalLLVMContext());
       runCommandLineSelectedPasses(SILMod, T.second);
       irgen::deleteIRGenModule(T);

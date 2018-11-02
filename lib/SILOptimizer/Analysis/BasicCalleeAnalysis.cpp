@@ -151,12 +151,28 @@ void CalleeCache::computeWitnessMethodCalleesForWitnessTable(
       continue;
     }
 
-    auto Witness = WT.getConformance()->getWitness(Requirement.getDecl(),
-                                                   nullptr);
-    auto DeclRef = SILDeclRef(Witness.getDecl());
+    bool canCallUnknown = false;
 
-    bool canCallUnknown = !calleesAreStaticallyKnowable(M, DeclRef);
-
+    auto Conf = WT.getConformance();
+    switch (Conf->getProtocol()->getEffectiveAccess()) {
+      case AccessLevel::Open:
+        llvm_unreachable("protocols cannot have open access level");
+      case AccessLevel::Public:
+        canCallUnknown = true;
+        break;
+      case AccessLevel::Internal:
+        if (!M.isWholeModule()) {
+          canCallUnknown = true;
+          break;
+        }
+        LLVM_FALLTHROUGH;
+      case AccessLevel::FilePrivate:
+      case AccessLevel::Private: {
+        auto Witness = Conf->getWitness(Requirement.getDecl(), nullptr);
+        auto DeclRef = SILDeclRef(Witness.getDecl());
+        canCallUnknown = !calleesAreStaticallyKnowable(M, DeclRef);
+      }
+    }
     if (canCallUnknown)
       TheCallees.setInt(true);
   }

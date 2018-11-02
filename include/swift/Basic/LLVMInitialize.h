@@ -10,34 +10,33 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// A file that declares a macro for initializing all parts of LLVM that various
-// binaries in swift use. Please call the macro in the main routine of all
-// binaries.
+// A file that declares macros for initializing all parts of LLVM that various
+// binaries in swift use. Please call PROGRAM_START in the main routine of all
+// binaries, and INITIALIZE_LLVM in anything that uses Clang or LLVM IR.
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_BASIC_LLVMINITIALIZE_H
 #define SWIFT_BASIC_LLVMINITIALIZE_H
 
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Host.h"
 #include "llvm/Support/ManagedStatic.h"
-#include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
-#include "llvm/Support/Process.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
-#include "llvm/Support/raw_ostream.h"
 
-#define INITIALIZE_LLVM(argc, argv) \
+#define PROGRAM_START(argc, argv) \
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]); \
   llvm::PrettyStackTraceProgram _INITIALIZE_LLVM_STACKTRACE(argc, argv); \
-  llvm::llvm_shutdown_obj _INITIALIZE_LLVM_SHUTDOWN_OBJ; \
-  llvm::InitializeAllTargets(); \
-  llvm::InitializeAllTargetMCs(); \
-  llvm::InitializeAllAsmPrinters(); \
-  llvm::InitializeAllAsmParsers(); \
-  llvm::InitializeAllDisassemblers(); \
-  llvm::InitializeAllTargetInfos();
+  llvm::llvm_shutdown_obj _INITIALIZE_LLVM_SHUTDOWN_OBJ
+
+#define INITIALIZE_LLVM() \
+  do { \
+    llvm::InitializeAllTargets(); \
+    llvm::InitializeAllTargetMCs(); \
+    llvm::InitializeAllAsmPrinters(); \
+    llvm::InitializeAllAsmParsers(); \
+    llvm::InitializeAllDisassemblers(); \
+    llvm::InitializeAllTargetInfos(); \
+  } while (0)
 
 #endif // SWIFT_BASIC_LLVMINITIALIZE_H

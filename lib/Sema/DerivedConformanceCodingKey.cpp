@@ -74,16 +74,15 @@ static void deriveRawValueInit(AbstractFunctionDecl *initDecl) {
                                              DeclNameLoc(), /*Implicit=*/true);
 
   // rawValue param to init(rawValue:)
-  auto *rawValueDecl = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
-                                         SourceLoc(), C.Id_rawValue,
-                                         SourceLoc(), C.Id_rawValue,
-                                         valueParam->getType(), parentDC);
+  auto *rawValueDecl = new (C) ParamDecl(
+      VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_rawValue,
+      SourceLoc(), C.Id_rawValue, valueParam->getType(), parentDC);
   rawValueDecl->setInterfaceType(C.getIntDecl()->getDeclaredType());
   rawValueDecl->setImplicit();
   auto *paramList = ParameterList::createWithoutLoc(rawValueDecl);
 
   // init(rawValue:) constructor name
-  DeclName ctorName(C, C.Id_init, paramList);
+  DeclName ctorName(C, DeclBaseName::createConstructor(), paramList);
 
   // self.init(rawValue:) expr
   auto *selfRef = createSelfDeclRef(initDecl);
@@ -124,15 +123,15 @@ static ValueDecl *deriveInitDecl(TypeChecker &tc, Decl *parentDecl,
   auto *parentDC = cast<DeclContext>(parentDecl);
 
   // rawValue
-  auto *rawDecl = new (C) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(), SourceLoc(),
-                                    paramName, SourceLoc(), paramName,
-                                    paramType, parentDC);
+  auto *rawDecl =
+      new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+                        paramName, SourceLoc(), paramName, paramType, parentDC);
   rawDecl->setInterfaceType(paramType);
   rawDecl->setImplicit();
 
   // init(rawValue:) name
   auto *paramList = ParameterList::createWithoutLoc(rawDecl);
-  DeclName name(C, C.Id_init, paramList);
+  DeclName name(C, DeclBaseName::createConstructor(), paramList);
 
   // init(rawValue:) decl
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC,
@@ -182,12 +181,9 @@ static ValueDecl *deriveInitDecl(TypeChecker &tc, Decl *parentDecl,
   initDecl->setInterfaceType(allocIfaceType);
   initDecl->setInitializerInterfaceType(initIfaceType);
   initDecl->setAccess(enumDecl->getFormalAccess());
+  initDecl->setValidationStarted();
 
-  // If the enum was not imported, the derived conformance is either from the
-  // enum itself or an extension, in which case we will emit the declaration
-  // normally.
-  if (enumDecl->hasClangNode())
-    tc.Context.addExternalDecl(initDecl);
+  tc.Context.addSynthesizedDecl(initDecl);
 
   cast<IterableDeclContext>(parentDecl)->addMember(initDecl);
   return initDecl;
@@ -272,8 +268,7 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl) {
                                              Identifier(), elt, nullptr);
       pat->setImplicit();
 
-      auto labelItem = CaseLabelItem(/*IsDefault=*/false, pat, SourceLoc(),
-                                     nullptr);
+      auto labelItem = CaseLabelItem(pat);
 
       auto *caseValue = new (C) StringLiteralExpr(elt->getNameStr(),
                                                   SourceRange(),
@@ -283,7 +278,7 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl) {
                                          SourceLoc());
       cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
                                        /*HasBoundDecls=*/false, SourceLoc(),
-                                       caseBody));
+                                       SourceLoc(), caseBody));
     }
 
     auto *selfRef = createSelfDeclRef(strValDecl);
@@ -338,8 +333,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
                                        nullptr);
     litPat->setImplicit();
 
-    auto labelItem = CaseLabelItem(/*IsDefault=*/false, litPat, SourceLoc(),
-                                   nullptr);
+    auto labelItem = CaseLabelItem(litPat);
 
     auto *eltRef = new (C) DeclRefExpr(elt, DeclNameLoc(), /*Implicit=*/true);
     auto *metaTyRef = TypeExpr::createImplicit(enumType, C);
@@ -352,20 +346,19 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
                                    SourceLoc());
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
                                      /*HasBoundDecls=*/false, SourceLoc(),
-                                     body));
+                                     SourceLoc(), body));
   }
 
   auto *anyPat = new (C) AnyPattern(SourceLoc());
   anyPat->setImplicit();
-  auto dfltLabelItem = CaseLabelItem(/*IsDefault=*/true, anyPat, SourceLoc(),
-                                     nullptr);
+  auto dfltLabelItem = CaseLabelItem::getDefault(anyPat);
 
   auto *dfltReturnStmt = new (C) FailStmt(SourceLoc(), SourceLoc());
   auto *dfltBody = BraceStmt::create(C, SourceLoc(), ASTNode(dfltReturnStmt),
                                      SourceLoc());
   cases.push_back(CaseStmt::create(C, SourceLoc(), dfltLabelItem,
                                    /*HasBoundDecls=*/false, SourceLoc(),
-                                   dfltBody));
+                                   SourceLoc(), dfltBody));
 
   auto *stringValueDecl = initDecl->getParameterList(1)->get(0);
   auto *stringValueRef = new (C) DeclRefExpr(stringValueDecl, DeclNameLoc(),
@@ -488,7 +481,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
 
     return deriveProperty(tc, parentDecl, enumDecl, optionalIntType,
                           C.Id_intValue, synth);
-  } else if (name == C.Id_init) {
+  } else if (name == DeclBaseName::createConstructor()) {
     auto argumentNames = requirement->getFullName().getArgumentNames();
     if (argumentNames.size() == 1) {
       if (argumentNames[0] == C.Id_stringValue) {

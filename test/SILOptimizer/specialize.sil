@@ -637,14 +637,14 @@ bb0:
 
 // Test a specialization of a self-recursive generic closure.
 
-// CHECK-LABEL: sil shared @$S27selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lIetnny_Tp5 : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, @in_guaranteed Builtin.Int64, Builtin.Int64) -> ()
-// CHECK: [[SPECIALIZED_FN:%[0-9]+]] = function_ref @$S27selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lIetnny_Tp5
-// CHECK: partial_apply [[SPECIALIZED_FN]]{{.*}}({{.*}}) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, @in_guaranteed Builtin.Int64, Builtin.Int64) -> ()
+// CHECK-LABEL: sil shared @$S27selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lIetnyy_Tp5 : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, Builtin.Int64, Builtin.Int64) -> () {
+// CHECK: [[SPECIALIZED_FN:%[0-9]+]] = function_ref @$S27selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lIetnyy_Tp5
+// CHECK: partial_apply [[SPECIALIZED_FN]]{{.*}}({{.*}}) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, Builtin.Int64, Builtin.Int64) -> ()
 
 // CHECK-LABEL: sil @selfReferringGenericClosure : $@convention(thin) <R, S> (@in_guaranteed R, @in_guaranteed S, Builtin.Int64) -> ()
 // Refer to the specialized version of the function
-// CHECK: [[SPECIALIZED_FN:%[0-9]+]] = function_ref @$S27selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lIetnny_Tp5
-// CHECK: partial_apply [[SPECIALIZED_FN]]<R>({{.*}}) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, @in_guaranteed Builtin.Int64, Builtin.Int64) -> ()
+// CHECK: [[SPECIALIZED_FN:%[0-9]+]] = function_ref @$S27selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lIetnyy_Tp5
+// CHECK: partial_apply [[SPECIALIZED_FN]]<R>({{.*}}) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, Builtin.Int64, Builtin.Int64) -> ()
 sil @selfReferringGenericClosure : $@convention(thin) <R, S> (@in_guaranteed R, @in_guaranteed S, Builtin.Int64) -> () {
 bb0(%0 : $*R, %1 : $*S, %2 : $Builtin.Int64):
   %4 = integer_literal $Builtin.Int64, 100

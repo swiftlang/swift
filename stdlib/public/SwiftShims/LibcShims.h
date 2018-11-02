@@ -38,7 +38,7 @@ typedef           int __swift_ssize_t;
 #elif defined(_WIN32)
 #if defined(_M_ARM) || defined(_M_IX86)
 typedef           int __swift_ssize_t;
-#elif defined(_M_X64)
+#elif defined(_M_X64) || defined(_M_ARM64)
 typedef long long int __swift_ssize_t;
 #else
 #error unsupported machine type
@@ -170,16 +170,26 @@ double _stdlib_squareRoot(double _self) {
   return __builtin_sqrt(_self);
 }
 
-// Apple's math.h does not declare lgamma_r() etc by default
-#if defined(__APPLE__)
-SWIFT_RUNTIME_STDLIB_INTERNAL
-float _stdlib_lgammaf_r(float x, int *psigngam);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-double _stdlib_lgamma_r(double x, int *psigngam);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-long double _stdlib_lgammal_r(long double x, int *psigngam);
-#endif // defined(__APPLE__)
+#if !defined _WIN32 && (defined __i386__ || defined __x86_64__)
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_remainderl(long double _self, long double _other) {
+  return __builtin_remainderl(_self, _other);
+}
+  
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_squareRootl(long double _self) {
+  return __builtin_sqrtl(_self);
+}
+#endif
 
+// Apple's math.h does not declare lgamma_r() etc by default, but they're
+// unconditionally exported by libsystem_m.dylib in all OS versions that
+// support Swift development; we simply need to provide declarations here.
+#if defined(__APPLE__)
+float lgammaf_r(float x, int *psigngam);
+double lgamma_r(double x, int *psigngam);
+long double lgammal_r(long double x, int *psigngam);
+#endif // defined(__APPLE__)
 
 // TLS - thread local storage
 
@@ -209,21 +219,6 @@ void * _Nullable _stdlib_thread_getspecific(__swift_thread_key_t key);
 SWIFT_RUNTIME_STDLIB_INTERNAL
 int _stdlib_thread_setspecific(__swift_thread_key_t key,
                                const void * _Nullable value);
-
-// TODO: Remove horrible workaround when importer does Float80 <-> long double.
-#if (defined __i386__ || defined __x86_64__) && !defined _MSC_VER
-static inline SWIFT_ALWAYS_INLINE
-void _stdlib_remainderl(void *_self, const void *_other) {
-  long double *_f80self = (long double *)_self;
-  *_f80self = __builtin_remainderl(*_f80self, *(const long double *)_other);
-}
-
-static inline SWIFT_ALWAYS_INLINE
-void _stdlib_squareRootl(void *_self) {
-  long double *_f80self = (long double *)_self;
-  *_f80self = __builtin_sqrtl(*_f80self);
-}
-#endif // Have Float80
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift

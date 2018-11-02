@@ -1,11 +1,12 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -parse-as-library -Xllvm -sil-full-demangle -emit-sil -Onone -enforce-exclusivity=checked %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name access_marker_mandatory -enable-sil-ownership -parse-as-library -Xllvm -sil-full-demangle -emit-sil -Onone -enforce-exclusivity=checked %s | %FileCheck %s
 
 public struct S {
   var i: Int
   var o: AnyObject
 }
 
-// CHECK-LABEL: sil [noinline] @$S23access_marker_mandatory5initSyAA1SVSi_yXltF : $@convention(thin) (Int, @owned AnyObject) -> @owned S {
+// CHECK-LABEL: sil [noinline] @$S23access_marker_mandatory5initSyAA1SVSi_yXltF : $@convention(thin) (Int, @guaranteed AnyObject) -> @owned S {
 // CHECK: bb0(%0 : $Int, %1 : $AnyObject):
 // CHECK: [[STK:%.*]] = alloc_stack $S, var, name "s"
 // CHECK: cond_br %{{.*}}, bb1, bb2
@@ -39,11 +40,11 @@ public func initS(_ x: Int, _ o: AnyObject) -> S {
 @inline(never)
 func takeS(_ s: S) {}
 
-// CHECK-LABEL: sil @$S23access_marker_mandatory14modifyAndReadS1oyyXl_tF : $@convention(thin) (@owned AnyObject) -> () {
+// CHECK-LABEL: sil @$S23access_marker_mandatory14modifyAndReadS1oyyXl_tF : $@convention(thin) (@guaranteed AnyObject) -> () {
 // CHECK: bb0(%0 : $AnyObject):
 // CHECK: [[STK:%.*]] = alloc_stack $S, var, name "s"
-// CHECK: [[FINIT:%.*]] = function_ref @$S23access_marker_mandatory5initSyAA1SVSi_yXltF : $@convention(thin) (Int, @owned AnyObject) -> @owned S
-// CHECK: [[INITS:%.*]] = apply [[FINIT]](%{{.*}}, %0) : $@convention(thin) (Int, @owned AnyObject) -> @owned S
+// CHECK: [[FINIT:%.*]] = function_ref @$S23access_marker_mandatory5initSyAA1SVSi_yXltF : $@convention(thin) (Int, @guaranteed AnyObject) -> @owned S
+// CHECK: [[INITS:%.*]] = apply [[FINIT]](%{{.*}}, %0) : $@convention(thin) (Int, @guaranteed AnyObject) -> @owned S
 // CHECK: store [[INITS]] to [[STK]] : $*S
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [static] [[STK]] : $*S
 // CHECK: [[ADDRI:%.*]] = struct_element_addr [[WRITE]] : $*S, #S.i
@@ -51,8 +52,8 @@ func takeS(_ s: S) {}
 // CHECK: end_access [[WRITE]]
 // CHECK: [[READ:%.*]] = begin_access [read] [static] [[STK]] : $*S
 // CHECK: end_access [[READ]]
-// CHECK: [[FTAKE:%.*]] = function_ref @$S23access_marker_mandatory5takeSyyAA1SVF : $@convention(thin) (@owned S) -> ()
-// CHECK: apply [[FTAKE]](%{{.*}}) : $@convention(thin) (@owned S) -> ()
+// CHECK: [[FTAKE:%.*]] = function_ref @$S23access_marker_mandatory5takeSyyAA1SVF : $@convention(thin) (@guaranteed S) -> ()
+// CHECK: apply [[FTAKE]](%{{.*}}) : $@convention(thin) (@guaranteed S) -> ()
 // CHECK-LABEL: } // end sil function '$S23access_marker_mandatory14modifyAndReadS1oyyXl_tF'
 public func modifyAndReadS(o: AnyObject) {
   var s = initS(3, o)

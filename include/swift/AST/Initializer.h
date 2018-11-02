@@ -162,7 +162,7 @@ public:
   /// Change the parent of this context.  This is necessary because
   /// the function signature is parsed before the function
   /// declaration/expression itself is built.
-  void changeFunction(AbstractFunctionDecl *parent);
+  void changeFunction(DeclContext *parent, MutableArrayRef<ParameterList *> paramLists);
 
   static bool classof(const DeclContext *DC) {
     if (auto init = dyn_cast<Initializer>(DC))

@@ -8,110 +8,53 @@ import StdlibUnittest
 
 var HashingTestSuite = TestSuite("Hashing")
 
-HashingTestSuite.test("_mixUInt32/GoldenValues") {
-  expectEqual(0x11b882c9, _mixUInt32(0x0))
-  expectEqual(0x60d0aafb, _mixUInt32(0x1))
-  expectEqual(0x636847b5, _mixUInt32(0xffff))
-  expectEqual(0x203f5350, _mixUInt32(0xffff_ffff))
-
-  expectEqual(0xb8747ef6, _mixUInt32(0xa62301f9))
-  expectEqual(0xef4eeeb2, _mixUInt32(0xfe1b46c6))
-  expectEqual(0xd44c9cf1, _mixUInt32(0xe4daf7ca))
-  expectEqual(0xfc1eb1de, _mixUInt32(0x33ff6f5c))
-  expectEqual(0x5605f0c0, _mixUInt32(0x13c2a2b8))
-  expectEqual(0xd9c48026, _mixUInt32(0xf3ad1745))
-  expectEqual(0x471ab8d0, _mixUInt32(0x656eff5a))
-  expectEqual(0xfe265934, _mixUInt32(0xfd2268c9))
+func checkHash(
+  for value: UInt64,
+  withSeed seed: (UInt64, UInt64),
+  expected: UInt64,
+  file: String = #file, line: UInt = #line
+) {
+  var hasher = Hasher(_seed: seed)
+  hasher._combine(value)
+  let hash = hasher.finalize()
+  expectEqual(
+    hash, Int(truncatingIfNeeded: expected),
+    file: file, line: line)
 }
 
-HashingTestSuite.test("_mixInt32/GoldenValues") {
-  expectEqual(Int32(bitPattern: 0x11b882c9 as UInt32), _mixInt32(0x0))
+HashingTestSuite.test("Hasher/CustomKeys") {
+  // This assumes Hasher implements SipHash-1-3.
+  checkHash(for: 0, withSeed: (0, 0), expected: 0xbd60acb658c79e45)
+  checkHash(for: 0, withSeed: (0, 1), expected: 0x1ce32b0b44e61175)
+  checkHash(for: 0, withSeed: (1, 0), expected: 0x9c44b7c8df2ca74b)
+  checkHash(for: 0, withSeed: (1, 1), expected: 0x9653ca0a3b455506)
+  checkHash(for: 0, withSeed: (.max, .max), expected: 0x3ab336a4895e4d36)
+
+  checkHash(for: 1, withSeed: (0, 0), expected: 0x1e9f734161d62dd9)
+  checkHash(for: 1, withSeed: (0, 1), expected: 0xb6fcf32d09f76cba)
+  checkHash(for: 1, withSeed: (1, 0), expected: 0xacb556b13007504a)
+  checkHash(for: 1, withSeed: (1, 1), expected: 0x7defec680db51d24)
+  checkHash(for: 1, withSeed: (.max, .max), expected: 0x212798441870ef6b)
+
+  checkHash(for: .max, withSeed: (0, 0), expected: 0x2f205be2fec8e38d)
+  checkHash(for: .max, withSeed: (0, 1), expected: 0x3ff7fa33381ecf7b)
+  checkHash(for: .max, withSeed: (1, 0), expected: 0x404afd8eb2c4b22a)
+  checkHash(for: .max, withSeed: (1, 1), expected: 0x855642d657c1bd46)
+  checkHash(for: .max, withSeed: (.max, .max), expected: 0x5b16b7a8181980c2)
 }
 
-HashingTestSuite.test("_mixUInt64/GoldenValues") {
-  expectEqual(0xb2b2_4f68_8dc4_164d, _mixUInt64(0x0))
-  expectEqual(0x792e_33eb_0685_57de, _mixUInt64(0x1))
-  expectEqual(0x9ec4_3423_1b42_3dab, _mixUInt64(0xffff))
-  expectEqual(0x4cec_e9c9_01fa_9a84, _mixUInt64(0xffff_ffff))
-  expectEqual(0xcba5_b650_bed5_b87c, _mixUInt64(0xffff_ffff_ffff))
-  expectEqual(0xe583_5646_3fb8_ac99, _mixUInt64(0xffff_ffff_ffff_ffff))
+HashingTestSuite.test("Hasher/DefaultKey") {
+  let value: UInt64 = 0x0102030405060708
 
-  expectEqual(0xf5d0079f828d43a5, _mixUInt64(0x94ce7d9319f8d233))
-  expectEqual(0x61900a6be9db9c3f, _mixUInt64(0x2728821e8c5b1f7))
-  expectEqual(0xf2fd34b1b7d4b46e, _mixUInt64(0xe7f67ec98c64f482))
-  expectEqual(0x216199ed628c821, _mixUInt64(0xd7c277b5438873ac))
-  expectEqual(0xb1b486ff5f2e0e53, _mixUInt64(0x8399f1d563c42f82))
-  expectEqual(0x61acc92bd91c030, _mixUInt64(0x488cefd48a2c4bfd))
-  expectEqual(0xa7a52d6e4a8e3ddf, _mixUInt64(0x270a15116c351f95))
-  expectEqual(0x98ceedc363c4e56a, _mixUInt64(0xe5fb9b5f6c426a84))
-}
+  let defaultHash = _hashValue(for: value)
 
-HashingTestSuite.test("_mixUInt64/GoldenValues") {
-  expectEqual(Int64(bitPattern: 0xb2b2_4f68_8dc4_164d as UInt64), _mixInt64(0x0))
-}
+  var defaultHasher = Hasher()
+  defaultHasher._combine(value)
+  expectEqual(defaultHasher.finalize(), defaultHash)
 
-HashingTestSuite.test("_mixUInt/GoldenValues") {
-#if arch(i386) || arch(arm)
-  expectEqual(0x11b8_82c9, _mixUInt(0x0))
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  expectEqual(0xb2b2_4f68_8dc4_164d, _mixUInt(0x0))
-#else
-  fatalError("unimplemented")
-#endif
-}
-
-HashingTestSuite.test("_mixInt/GoldenValues") {
-#if arch(i386) || arch(arm)
-  expectEqual(Int(bitPattern: 0x11b8_82c9 as UInt), _mixInt(0x0))
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  expectEqual(Int(bitPattern: 0xb2b2_4f68_8dc4_164d as UInt), _mixInt(0x0))
-#else
-  fatalError("unimplemented")
-#endif
-}
-
-HashingTestSuite.test("_squeezeHashValue/Int") {
-  // Check that the function can return values that cover the whole range.
-  func checkRange(_ r: Int) {
-    var results = Set<Int>()
-    for _ in 0..<(14 * r) {
-      let v = _squeezeHashValue(randInt(), r)
-      expectTrue(v < r)
-      results.insert(v)
-    }
-    expectEqual(r, results.count)
-  }
-  checkRange(1)
-  checkRange(2)
-  checkRange(4)
-  checkRange(8)
-  checkRange(16)
-}
-
-HashingTestSuite.test("String/hashValue/topBitsSet") {
-#if _runtime(_ObjC)
-#if arch(x86_64) || arch(arm64)
-  // Make sure that we don't accidentally throw away bits by storing the result
-  // of NSString.hash into an int in the runtime.
-
-  // This is the bit pattern that we xor to NSString's hash value.
-  let hashOffset = UInt(bitPattern: 0x429b_1266_0000_0000 as Int)
-  let hash = "efghijkl".hashValue
-  // When we are not equal to the top bit of the xor'ed hashOffset pattern
-  // there where some bits set.
-  let topHashBits = UInt(bitPattern: hash) & 0xffff_ffff_0000_0000
-  expectTrue(hash > 0)
-  expectTrue(topHashBits != hashOffset)
-#endif
-#endif
-}
-
-HashingTestSuite.test("overridePerExecutionHashSeed/overflow") {
-  // Test that we don't use checked arithmetic on the seed.
-  _HashingDetail.fixedSeedOverride = UInt64.max
-  expectEqual(0x4344_dc3a_239c_3e81, _mixUInt64(0xffff_ffff_ffff_ffff))
-  _HashingDetail.fixedSeedOverride = 0
+  var customHasher = Hasher(_seed: Hasher._seed)
+  customHasher._combine(value)
+  expectEqual(customHasher.finalize(), defaultHash)
 }
 
 runAllTests()
-

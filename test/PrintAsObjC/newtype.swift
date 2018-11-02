@@ -43,6 +43,12 @@ class TestStructLike : NSObject {
   @objc func takesNewtypeDictionary(_ a: [StructLikeStringWrapper: StructLikeStringWrapper]) {}
   // CHECK: - (void)takesNewtypeOptional:(StructLikeStringWrapper _Nullable)a;
   @objc func takesNewtypeOptional(_ a: StructLikeStringWrapper?) {}
+
+  // CHECK: - (void)takesNewtypeObjectDictionary:(NSDictionary<StructLikeObjectWrapper, StructLikeObjectWrapper> * _Nonnull)a;
+  @objc func takesNewtypeObjectDictionary(_ a: [StructLikeObjectWrapper: StructLikeObjectWrapper]) {}
+
+  // CHECK: - (void)takesNewtypeErrorArray:(NSArray<StructLikeErrorWrapper> * _Nonnull)a;
+  @objc func takesNewtypeErrorArray(_ a: [StructLikeErrorWrapper]) {}
 }
 // CHECK: @end
 

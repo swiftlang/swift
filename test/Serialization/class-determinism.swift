@@ -4,7 +4,7 @@
 // RUN: diff <(llvm-bcanalyzer -dump %t/def_class.1.swiftmodule | sed -e 's/\.[0-9]\.swiftmodule/\.x\.swiftmodule/g') <(llvm-bcanalyzer -dump %t/def_class.2.swiftmodule | sed -e 's/\.[0-9]\.swiftmodule/\.x\.swiftmodule/g')
 
 // Compiling the same set of files twice, without modifying them (and without
-// generating inlineable SIL) should produce the same swiftmodule. We don't
+// generating inlinable SIL) should produce the same swiftmodule. We don't
 // promise more than that at this time...
 
 // RUN: %S/../Inputs/getmtime.py %t/def_class.1.swiftmodule > %t/orig-mtime.txt

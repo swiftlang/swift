@@ -5,6 +5,24 @@
   "children": [
     {
       "kind": "TypeDecl",
+      "name": "P1",
+      "printedName": "P1",
+      "declKind": "Protocol",
+      "usr": "s:4cake2P1P",
+      "location": "",
+      "moduleName": "cake"
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "P2",
+      "printedName": "P2",
+      "declKind": "Protocol",
+      "usr": "s:4cake2P2P",
+      "location": "",
+      "moduleName": "cake"
+    },
+    {
+      "kind": "TypeDecl",
       "name": "C0",
       "printedName": "C0",
       "declKind": "Class",
@@ -25,6 +43,7 @@
               "kind": "TypeNominal",
               "name": "C0",
               "printedName": "C0<T1, T2, T3>",
+              "usr": "s:4cake2C0C",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -93,6 +112,13 @@
       "usr": "s:4cake2S1V",
       "location": "",
       "moduleName": "cake",
+      "conformingProtocols": [
+        "P1",
+        "P2"
+      ],
+      "declAttributes": [
+        "fixedLayout"
+      ],
       "children": [
         {
           "kind": "Function",
@@ -163,7 +189,8 @@
             {
               "kind": "TypeNominal",
               "name": "S1",
-              "printedName": "S1"
+              "printedName": "S1",
+              "usr": "s:4cake2S1V"
             }
           ]
         }
@@ -224,11 +251,13 @@
                   "kind": "TypeNominal",
                   "name": "Optional",
                   "printedName": "C1?",
+                  "usr": "s:Sq",
                   "children": [
                     {
                       "kind": "TypeNominal",
                       "name": "C1",
-                      "printedName": "C1"
+                      "printedName": "C1",
+                      "usr": "s:4cake2C1C"
                     }
                   ]
                 }
@@ -252,11 +281,13 @@
                   "kind": "TypeNominal",
                   "name": "Optional",
                   "printedName": "C1?",
+                  "usr": "s:Sq",
                   "children": [
                     {
                       "kind": "TypeNominal",
                       "name": "C1",
-                      "printedName": "C1"
+                      "printedName": "C1",
+                      "usr": "s:4cake2C1C"
                     }
                   ]
                 }
@@ -291,7 +322,8 @@
                 {
                   "kind": "TypeNominal",
                   "name": "C1",
-                  "printedName": "C1"
+                  "printedName": "C1",
+                  "usr": "s:4cake2C1C"
                 }
               ]
             },
@@ -312,7 +344,8 @@
                 {
                   "kind": "TypeNominal",
                   "name": "C1",
-                  "printedName": "C1"
+                  "printedName": "C1",
+                  "usr": "s:4cake2C1C"
                 }
               ]
             }
@@ -330,7 +363,293 @@
             {
               "kind": "TypeNominal",
               "name": "C1",
-              "printedName": "C1"
+              "printedName": "C1",
+              "usr": "s:4cake2C1C"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "Function",
+      "name": "foo1",
+      "printedName": "foo1(_:b:)",
+      "declKind": "Func",
+      "usr": "s:4cake4foo1_1bySi_AA2S1VtF",
+      "location": "",
+      "moduleName": "cake",
+      "children": [
+        {
+          "kind": "TypeNominal",
+          "name": "Void",
+          "printedName": "()"
+        },
+        {
+          "kind": "TypeNominal",
+          "name": "Int",
+          "printedName": "Int",
+          "hasDefaultArg": true,
+          "usr": "s:Si"
+        },
+        {
+          "kind": "TypeNominal",
+          "name": "S1",
+          "printedName": "S1",
+          "usr": "s:4cake2S1V"
+        }
+      ]
+    },
+    {
+      "kind": "Function",
+      "name": "foo2",
+      "printedName": "foo2(_:b:)",
+      "declKind": "Func",
+      "usr": "s:4cake4foo2_1bySi_AA2S1VtF",
+      "location": "",
+      "moduleName": "cake",
+      "children": [
+        {
+          "kind": "TypeNominal",
+          "name": "Void",
+          "printedName": "()"
+        },
+        {
+          "kind": "TypeNominal",
+          "name": "Int",
+          "printedName": "Int",
+          "hasDefaultArg": true,
+          "usr": "s:Si"
+        },
+        {
+          "kind": "TypeNominal",
+          "name": "S1",
+          "printedName": "S1",
+          "usr": "s:4cake2S1V"
+        }
+      ]
+    },
+    {
+      "kind": "Function",
+      "name": "foo3",
+      "printedName": "foo3(_:)",
+      "declKind": "Func",
+      "usr": "s:4cake4foo3yys10DictionaryVySiSSGF",
+      "location": "",
+      "moduleName": "cake",
+      "children": [
+        {
+          "kind": "TypeNominal",
+          "name": "Void",
+          "printedName": "()"
+        },
+        {
+          "kind": "TypeNominal",
+          "name": "Dictionary",
+          "printedName": "[Int : String]",
+          "usr": "s:s10DictionaryV",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "String",
+              "printedName": "String",
+              "usr": "s:SS"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "Number",
+      "printedName": "Number",
+      "declKind": "Enum",
+      "usr": "s:4cake6NumberO",
+      "location": "",
+      "moduleName": "cake",
+      "conformingProtocols": [
+        "Equatable",
+        "Hashable",
+        "RawRepresentable"
+      ],
+      "enumRawTypeName": "Int",
+      "children": [
+        {
+          "kind": "Var",
+          "name": "one",
+          "printedName": "one",
+          "declKind": "EnumElement",
+          "usr": "s:4cake6NumberO3oneyA2CmF",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeFunc",
+              "name": "Function",
+              "printedName": "(Number.Type) -> Number",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Number",
+                  "printedName": "Number",
+                  "usr": "s:4cake6NumberO"
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "Metatype",
+                  "printedName": "Number.Type",
+                  "children": [
+                    {
+                      "kind": "TypeNominal",
+                      "name": "Number",
+                      "printedName": "Number",
+                      "usr": "s:4cake6NumberO"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "TypeAlias",
+          "name": "RawValue",
+          "printedName": "RawValue",
+          "declKind": "TypeAlias",
+          "usr": "s:4cake6NumberO8RawValuea",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            }
+          ]
+        },
+        {
+          "kind": "Var",
+          "name": "hashValue",
+          "printedName": "hashValue",
+          "declKind": "Var",
+          "usr": "s:4cake6NumberO9hashValueSivp",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            },
+            {
+              "kind": "Getter",
+              "name": "_",
+              "printedName": "_()",
+              "declKind": "Accessor",
+              "usr": "s:4cake6NumberO9hashValueSivg",
+              "location": "",
+              "moduleName": "cake",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "Function",
+          "name": "hash",
+          "printedName": "hash(into:)",
+          "declKind": "Func",
+          "usr": "s:4cake6NumberO4hash4intoys6HasherVz_tF",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "InOut",
+              "printedName": "inout Hasher"
+            }
+          ]
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init(rawValue:)",
+          "declKind": "Constructor",
+          "usr": "s:4cake6NumberO8rawValueACSgSi_tcfc",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Optional",
+              "printedName": "Number?",
+              "usr": "s:Sq",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Number",
+                  "printedName": "Number",
+                  "usr": "s:4cake6NumberO"
+                }
+              ]
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            }
+          ]
+        },
+        {
+          "kind": "Var",
+          "name": "rawValue",
+          "printedName": "rawValue",
+          "declKind": "Var",
+          "usr": "s:4cake6NumberO8rawValueSivp",
+          "location": "",
+          "moduleName": "cake",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            },
+            {
+              "kind": "Getter",
+              "name": "_",
+              "printedName": "_()",
+              "declKind": "Accessor",
+              "usr": "s:4cake6NumberO8rawValueSivg",
+              "location": "",
+              "moduleName": "cake",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                }
+              ]
             }
           ]
         }

@@ -525,7 +525,7 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     void visitOptionalSomePattern(OptionalSomePattern *P) {
-      printCommon(P, "optional_some_element");
+      printCommon(P, "pattern_optional_some");
       OS << '\n';
       printRec(P->getSubPattern());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -757,9 +757,9 @@ namespace {
 
       if (NTD->hasInterfaceType()) {
         if (NTD->isResilient())
-          OS << " @_resilient_layout";
+          OS << " resilient";
         else
-          OS << " @_fixed_layout";
+          OS << " non-resilient";
       }
     }
 
@@ -950,12 +950,23 @@ namespace {
         PrintWithColorRAII(OS, InterfaceTypeColor) << "'";
       }
 
-      if (P->getSpecifier() == VarDecl::Specifier::Var)
+      switch (P->getSpecifier()) {
+      case VarDecl::Specifier::Let:
+        /* nothing */
+        break;
+      case VarDecl::Specifier::Var:
         OS << " mutable";
-      if (P->getSpecifier() == VarDecl::Specifier::InOut)
+        break;
+      case VarDecl::Specifier::InOut:
         OS << " inout";
-      if (P->isShared())
+        break;
+      case VarDecl::Specifier::Shared:
         OS << " shared";
+        break;
+      case VarDecl::Specifier::Owned:
+        OS << " owned";
+        break;
+      }
 
       if (P->isVariadic())
         OS << " variadic";
@@ -1545,11 +1556,15 @@ public:
   }
   void visitCaseStmt(CaseStmt *S) {
     printCommon(S, "case_stmt");
+    if (S->hasUnknownAttr())
+      OS << " @unknown";
     for (const auto &LabelItem : S->getCaseLabelItems()) {
       OS << '\n';
       OS.indent(Indent + 2);
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
       PrintWithColorRAII(OS, StmtColor) << "case_label_item";
+      if (LabelItem.isDefault())
+        OS << " default";
       if (auto *CasePattern = LabelItem.getPattern()) {
         OS << '\n';
         printRec(CasePattern);
@@ -2750,6 +2765,12 @@ public:
     printRec(T->getBase());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+
+  void visitOwnedTypeRepr(OwnedTypeRepr *T) {
+    printCommon("type_owned") << '\n';
+    printRec(T->getBase());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
 };
 
 } // end anonymous namespace
@@ -2857,12 +2878,13 @@ void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
         }
         PrintWithColorRAII(out, ParenthesisColor) << ')';
       });
+
+      for (auto conformance : normal->getSignatureConformances()) {
+        out << '\n';
+        conformance.dump(out, indent + 2);
+      }
     }
 
-    for (auto conformance : normal->getSignatureConformances()) {
-      out << '\n';
-      conformance.dump(out, indent + 2);
-    }
     for (auto requirement : normal->getConditionalRequirements()) {
       out << '\n';
       out.indent(indent + 2);
@@ -3015,6 +3037,11 @@ namespace {
     void visitNameAliasType(NameAliasType *T, StringRef label) {
       printCommon(label, "name_alias_type");
       printField("decl", T->getDecl()->printRef());
+      if (T->getParent())
+        printRec("parent", T->getParent());
+
+      for (auto arg : T->getInnermostGenericArgs())
+        printRec(arg);
       OS << ")";
     }
 

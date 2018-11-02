@@ -43,18 +43,12 @@ namespace swift {
 
 class SILInstruction;
   
-/// Returns true if the instruction \p Inst is an instruction which is only
-/// relevant for debug information and has no other impact on program semantics.
-inline bool isDebugInst(SILInstruction *Inst) {
-  return isa<DebugValueInst>(Inst) || isa<DebugValueAddrInst>(Inst);
-}
-
 /// Deletes all of the debug instructions that use \p Inst.
 inline void deleteAllDebugUses(ValueBase *Inst) {
   for (auto UI = Inst->use_begin(), E = Inst->use_end(); UI != E;) {
     auto *Inst = UI->getUser();
     UI++;
-    if (isDebugInst(Inst))
+    if (Inst->isDebugInstruction())
       Inst->eraseFromParent();
   }
 }
@@ -76,7 +70,7 @@ template <bool nonDebugInsts> class DebugUseIterator
         return;
       
       SILInstruction *User = BaseIterator->getUser();
-      if (isDebugInst(User) != nonDebugInsts)
+      if (User->isDebugInstruction() != nonDebugInsts)
         return;
       
       BaseIterator++;
@@ -188,7 +182,7 @@ inline void eraseFromParentWithDebugInsts(SILInstruction *I,
       while (!result->use_empty()) {
         foundAny = true;
         auto *User = result->use_begin()->getUser();
-        assert(isDebugInst(User));
+        assert(User->isDebugInstruction());
         if (InstIter != SILBasicBlock::iterator() &&
             InstIter != I->getParent()->end() &&
             &*InstIter == User) {
@@ -209,6 +203,11 @@ inline void eraseFromParentWithDebugInsts(SILInstruction *I) {
   SILBasicBlock::iterator nullIter;
   eraseFromParentWithDebugInsts(I, nullIter);
 }
+
+/// Return true if the def-use graph rooted at \p V contains any non-debug,
+/// non-trivial users.
+bool hasNonTrivialNonDebugTransitiveUsers(
+    PointerUnion<SILInstruction *, SILArgument *> V);
 
 } // end namespace swift
 

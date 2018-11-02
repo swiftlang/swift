@@ -1,5 +1,6 @@
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module  %s | %FileCheck %s --check-prefix=GUARANTEED
+
+// RUN: %target-swift-frontend -module-name dynamic_lookup -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name dynamic_lookup -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module  %s | %FileCheck %s --check-prefix=GUARANTEED
 
 // REQUIRES: objc_interop
 
@@ -25,14 +26,11 @@ class X {
 // CHECK-LABEL: sil hidden @$S14dynamic_lookup15direct_to_class{{[_0-9a-zA-Z]*}}F
 func direct_to_class(_ obj: AnyObject) {
   // CHECK: bb0([[ARG:%.*]] : $AnyObject):
-  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK: [[OPENED_ARG:%[0-9]+]] = open_existential_ref [[BORROWED_ARG]] : $AnyObject to $@opened({{.*}}) AnyObject
+  // CHECK: [[OPENED_ARG:%[0-9]+]] = open_existential_ref [[ARG]] : $AnyObject to $@opened({{.*}}) AnyObject
   // CHECK: [[OPENED_ARG_COPY:%.*]] = copy_value [[OPENED_ARG]]
   // CHECK: [[METHOD:%[0-9]+]] = objc_method [[OPENED_ARG_COPY]] : $@opened({{.*}}) AnyObject, #X.f!1.foreign : (X) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK: apply [[METHOD]]([[OPENED_ARG_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK: destroy_value [[OPENED_ARG_COPY]]
-  // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
-  // CHECK: destroy_value [[ARG]]
   obj.f!()
 }
 // CHECK: } // end sil function '$S14dynamic_lookup15direct_to_class{{[_0-9a-zA-Z]*}}F'
@@ -40,14 +38,11 @@ func direct_to_class(_ obj: AnyObject) {
 // CHECK-LABEL: sil hidden @$S14dynamic_lookup18direct_to_protocol{{[_0-9a-zA-Z]*}}F
 func direct_to_protocol(_ obj: AnyObject) {
   // CHECK: bb0([[ARG:%.*]] : $AnyObject):
-  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   [[OPENED_ARG:%[0-9]+]] = open_existential_ref [[BORROWED_ARG]] : $AnyObject to $@opened({{.*}}) AnyObject
+  // CHECK:   [[OPENED_ARG:%[0-9]+]] = open_existential_ref [[ARG]] : $AnyObject to $@opened({{.*}}) AnyObject
   // CHECK:   [[OPENED_ARG_COPY:%.*]] = copy_value [[OPENED_ARG]]
   // CHECK:   [[METHOD:%[0-9]+]] = objc_method [[OPENED_ARG_COPY]] : $@opened({{.*}}) AnyObject, #P.g!1.foreign : <Self where Self : P> (Self) -> () -> (), $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK:   apply [[METHOD]]([[OPENED_ARG_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> ()
   // CHECK:   destroy_value [[OPENED_ARG_COPY]]
-  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
-  // CHECK:   destroy_value [[ARG]]
   obj.g!()
 }
 // CHECK: } // end sil function '$S14dynamic_lookup18direct_to_protocol{{[_0-9a-zA-Z]*}}F'
@@ -58,10 +53,8 @@ func direct_to_static_method(_ obj: AnyObject) {
   var obj = obj
   // CHECK: [[OBJBOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJBOX]]
-  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
+  // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK: store [[ARG_COPY]] to [init] [[PBOBJ]] : $*AnyObject
-  // CHECK: end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
   // CHECK-NEXT: [[OBJCOPY:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK: end_access [[READ]]
@@ -70,7 +63,6 @@ func direct_to_static_method(_ obj: AnyObject) {
   // CHECK-NEXT: [[METHOD:%[0-9]+]] = objc_method [[OPENMETA]] : $@thick (@opened([[UUID]]) AnyObject).Type, #X.staticF!1.foreign : (X.Type) -> () -> (), $@convention(objc_method) (@thick (@opened([[UUID]]) AnyObject).Type) -> ()
   // CHECK: apply [[METHOD]]([[OPENMETA]]) : $@convention(objc_method) (@thick (@opened([[UUID]]) AnyObject).Type) -> ()
   // CHECK: destroy_value [[OBJBOX]]
-  // CHECK: destroy_value [[ARG]]
   type(of: obj).staticF!()
 }
 // } // end sil function '_TF14dynamic_lookup23direct_to_static_method{{.*}}'
@@ -81,10 +73,8 @@ func opt_to_class(_ obj: AnyObject) {
   var obj = obj
   // CHECK:   [[EXISTBOX:%[0-9]+]] = alloc_box ${ var AnyObject } 
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[EXISTBOX]]
-  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[PBOBJ]]
-  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_guaranteed () -> ()> }
   // CHECK:   [[PBOPT:%.*]] = project_box [[OPTBOX]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
@@ -118,7 +108,6 @@ func opt_to_class(_ obj: AnyObject) {
   // CHECK:   destroy_value [[OBJ_SELF]] : $@opened({{".*"}}) AnyObject
   // CHECK:   destroy_value [[OPTBOX]] : ${ var Optional<@callee_guaranteed () -> ()> }
   // CHECK:   destroy_value [[EXISTBOX]] : ${ var AnyObject }
-  // CHECK:   destroy_value %0
   // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
   // CHECK:   return [[RESULT]] : $()
 }
@@ -135,10 +124,8 @@ func opt_to_static_method(_ obj: AnyObject) {
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
   // CHECK:   [[OBJBOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJBOX]]
-  // CHECK:   [[BORROWED_OBJ:%.*]] = begin_borrow [[OBJ]]
-  // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[BORROWED_OBJ]]
+  // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
-  // CHECK:   end_borrow [[BORROWED_OBJ]] from [[OBJ]]
   // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_guaranteed () -> ()> }
   // CHECK:   [[PBO:%.*]] = project_box [[OPTBOX]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
@@ -157,10 +144,8 @@ func opt_to_property(_ obj: AnyObject) {
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
   // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
-  // CHECK:   [[BORROWED_OBJ:%.*]] = begin_borrow [[OBJ]]
-  // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[BORROWED_OBJ]]
+  // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
-  // CHECK:   end_borrow [[BORROWED_OBJ]] from [[OBJ]]
   // CHECK:   [[INT_BOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK:   project_box [[INT_BOX]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
@@ -188,10 +173,8 @@ func opt_to_property(_ obj: AnyObject) {
   // GUARANTEED: bb0([[OBJ:%[0-9]+]] : $AnyObject):
   // GUARANTEED:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // GUARANTEED:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
-  // GUARANTEED:   [[BORROWED_OBJ:%.*]] = begin_borrow [[OBJ]]
-  // GUARANTEED:   [[OBJ_COPY:%.*]] = copy_value [[BORROWED_OBJ]]
+  // GUARANTEED:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // GUARANTEED:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
-  // GUARANTEED:   end_borrow [[BORROWED_OBJ]] from [[OBJ]]
   // GUARANTEED:   [[INT_BOX:%[0-9]+]] = alloc_box ${ var Int }
   // GUARANTEED:   project_box [[INT_BOX]]
   // GUARANTEED:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
@@ -219,10 +202,8 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
   // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
-  // CHECK:   [[BORROWED_OBJ:%.*]] = begin_borrow [[OBJ]]
-  // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[BORROWED_OBJ]]
+  // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
-  // CHECK:   end_borrow [[BORROWED_OBJ]] from [[OBJ]]
   // CHECK:   [[I_BOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK:   [[PBI:%.*]] = project_box [[I_BOX]]
   // CHECK:   store [[I]] to [trivial] [[PBI]] : $*Int
@@ -255,10 +236,8 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   // GUARANTEED: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
   // GUARANTEED:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // GUARANTEED:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
-  // GUARANTEED:   [[BORROWED_OBJ:%.*]] = begin_borrow [[OBJ]]
-  // GUARANTEED:   [[OBJ_COPY:%.*]] = copy_value [[BORROWED_OBJ]]
+  // GUARANTEED:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // GUARANTEED:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
-  // GUARANTEED:   end_borrow [[BORROWED_OBJ]] from [[OBJ]]
   // GUARANTEED:   [[I_BOX:%[0-9]+]] = alloc_box ${ var Int }
   // GUARANTEED:   [[PBI:%.*]] = project_box [[I_BOX]]
   // GUARANTEED:   store [[I]] to [trivial] [[PBI]] : $*Int
@@ -291,10 +270,8 @@ func opt_to_subscript(_ obj: AnyObject, i: Int) {
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
   // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
-  // CHECK:   [[BORROWED_OBJ:%.*]] = begin_borrow [[OBJ]]
-  // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[BORROWED_OBJ]]
+  // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
-  // CHECK:   end_borrow [[BORROWED_OBJ]] from [[OBJ]]
   // CHECK:   [[I_BOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK:   [[PBI:%.*]] = project_box [[I_BOX]]
   // CHECK:   store [[I]] to [trivial] [[PBI]] : $*Int
@@ -326,15 +303,12 @@ func downcast(_ obj: AnyObject) -> X {
   // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
   // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_BOX]]
-  // CHECK:   [[BORROWED_OBJ:%.*]] = begin_borrow [[OBJ]]
-  // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[BORROWED_OBJ]]
+  // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
-  // CHECK:   end_borrow [[BORROWED_OBJ]] from [[OBJ]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
   // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK:   [[X:%[0-9]+]] = unconditional_checked_cast [[OBJ]] : $AnyObject to $X
   // CHECK:   destroy_value [[OBJ_BOX]] : ${ var AnyObject }
-  // CHECK:   destroy_value %0
   // CHECK:   return [[X]] : $X
   return obj as! X
 }

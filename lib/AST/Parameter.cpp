@@ -127,10 +127,10 @@ Type ParameterList::getType(
 
   for (auto P : *this) {
     auto type = getType(P);
-    argumentInfo.emplace_back(type->getInOutObjectType(), P->getArgumentName(),
-                              ParameterTypeFlags::fromParameterType(
-                                  type, P->isVariadic(), P->isShared())
-                                  .withInOut(P->isInOut()));
+    argumentInfo.emplace_back(
+        type->getInOutObjectType(), P->getArgumentName(),
+        ParameterTypeFlags::fromParameterType(type, P->isVariadic(),
+                                              P->getValueOwnership()));
   }
 
   return TupleType::get(argumentInfo, C);

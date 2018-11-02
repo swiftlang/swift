@@ -21,9 +21,11 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/Syntax/Serialization/SyntaxDeserialization.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
@@ -43,6 +45,7 @@ enum class ActionType {
   FullLexRoundTrip,
   FullParseRoundTrip,
   SerializeRawTree,
+  DeserializeRawTree,
   ParseOnly,
   ParserGen,
   EOFPos,
@@ -78,6 +81,10 @@ Action(llvm::cl::desc("Action (required):"),
                    "serialize-raw-tree",
                    "Parse the source file and serialize the raw tree"
                    "to JSON"),
+        clEnumValN(ActionType::DeserializeRawTree,
+                   "deserialize-raw-tree",
+                   "Parse the JSON file from the serialized raw tree"
+                   "to the original"),
         clEnumValN(ActionType::EOFPos,
                    "eof",
                    "Parse the source file, calculate the absolute position"
@@ -87,6 +94,16 @@ Action(llvm::cl::desc("Action (required):"),
 static llvm::cl::opt<std::string>
 InputSourceFilename("input-source-filename",
                     llvm::cl::desc("Path to the input .swift file"));
+
+static llvm::cl::opt<std::string>
+InputSourceDirectory("input-source-directory",
+                     llvm::cl::desc("Directory to be scanned recursively and"
+                                    "run the selected action on every .swift"
+                                    "file"));
+  
+static llvm::cl::opt<std::string>
+OutputFilename("output-filename",
+               llvm::cl::desc("Path to the output file"));
 
 static llvm::cl::opt<bool>
 PrintNodeKind("print-node-kind",
@@ -101,6 +118,12 @@ PrintTrivialNodeKind("print-trivial-node-kind",
                      llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+VerifySyntaxTree("verify-syntax-tree",
+                 llvm::cl::desc("Emit warnings for unknown nodes"),
+                 llvm::cl::cat(Category),
+                 llvm::cl::init(true));
+
+static llvm::cl::opt<bool>
 Visual("v",
        llvm::cl::desc("Print visually"),
        llvm::cl::cat(Category),
@@ -111,11 +134,13 @@ namespace {
 int getTokensFromFile(unsigned BufferID,
                       LangOptions &LangOpts,
                       SourceManager &SourceMgr,
-                      DiagnosticEngine &Diags,
+                      swift::DiagnosticEngine &Diags,
                       std::vector<std::pair<RC<syntax::RawSyntax>,
                       syntax::AbsolutePosition>> &Tokens) {
-  Tokens = tokenizeWithTrivia(LangOpts, SourceMgr, BufferID);
-  return Diags.hadAnyError() ? EXIT_FAILURE : EXIT_SUCCESS;
+  Tokens = tokenizeWithTrivia(LangOpts, SourceMgr, BufferID,
+                              /*Offset=*/0, /*EndOffset=*/0,
+                              &Diags);
+  return EXIT_SUCCESS;
 }
 
 
@@ -145,7 +170,7 @@ SourceFile *getSourceFile(CompilerInstance &Instance,
                           const char *MainExecutablePath) {
   CompilerInvocation Invocation;
   Invocation.getLangOptions().BuildSyntaxTree = true;
-  Invocation.getLangOptions().VerifySyntaxTree = true;
+  Invocation.getLangOptions().VerifySyntaxTree = options::VerifySyntaxTree;
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(InputFileName);
   Invocation.setMainExecutablePath(
     llvm::sys::fs::getMainExecutable(MainExecutablePath,
@@ -190,7 +215,7 @@ int doFullLexRoundTrip(const StringRef InputFilename) {
     TokAndPos.first->print(llvm::outs(), {});
   }
 
-  return Diags.hadAnyError() ? EXIT_FAILURE : EXIT_SUCCESS;
+  return EXIT_SUCCESS;
 }
 
 int doDumpRawTokenSyntax(const StringRef InputFilename) {
@@ -214,7 +239,7 @@ int doDumpRawTokenSyntax(const StringRef InputFilename) {
     llvm::outs() << "\n";
   }
 
-  return Diags.hadAnyError() ? EXIT_FAILURE : EXIT_SUCCESS;
+  return EXIT_SUCCESS;
 }
 
 int doFullParseRoundTrip(const char *MainExecutablePath,
@@ -235,6 +260,20 @@ int doSerializeRawTree(const char *MainExecutablePath,
   out << *Root;
   llvm::outs() << "\n";
 
+  return EXIT_SUCCESS;
+}
+
+int doDeserializeRawTree(const char *MainExecutablePath,
+                         const StringRef InputFileName,
+                         const StringRef OutputFileName) {
+
+  auto Buffer = llvm::MemoryBuffer::getFile(InputFileName);
+  std::error_code errorCode;
+  auto os = llvm::make_unique<llvm::raw_fd_ostream>(
+              OutputFileName, errorCode, llvm::sys::fs::F_None);
+  swift::json::SyntaxDeserializer deserializer(llvm::MemoryBufferRef(*(Buffer.get())));
+  swift::SyntaxPrintOptions opt;
+  deserializer.getSourceFileSyntax()->print(*os);
   return EXIT_SUCCESS;
 }
 
@@ -280,13 +319,67 @@ int dumpEOFSourceLoc(const char *MainExecutablePath,
 }
 }// end of anonymous namespace
 
+int invokeCommand(const char *MainExecutablePath,
+                  const StringRef InputSourceFilename) {
+  int ExitCode = EXIT_SUCCESS;
+  
+  switch (options::Action) {
+    case ActionType::DumpRawTokenSyntax:
+      ExitCode = doDumpRawTokenSyntax(InputSourceFilename);
+      break;
+    case ActionType::FullLexRoundTrip:
+      ExitCode = doFullLexRoundTrip(InputSourceFilename);
+      break;
+    case ActionType::FullParseRoundTrip:
+      ExitCode = doFullParseRoundTrip(MainExecutablePath, InputSourceFilename);
+      break;
+    case ActionType::SerializeRawTree:
+      ExitCode = doSerializeRawTree(MainExecutablePath, InputSourceFilename);
+      break;
+    case ActionType::DeserializeRawTree:
+      ExitCode = doDeserializeRawTree(MainExecutablePath, InputSourceFilename,
+                                      options::OutputFilename);
+      break;
+    case ActionType::ParseOnly:
+      ExitCode = doParseOnly(MainExecutablePath, InputSourceFilename);
+      break;
+    case ActionType::ParserGen:
+      ExitCode = dumpParserGen(MainExecutablePath, InputSourceFilename);
+      break;
+    case ActionType::EOFPos:
+      ExitCode = dumpEOFSourceLoc(MainExecutablePath, InputSourceFilename);
+      break;
+    case ActionType::None:
+      llvm::errs() << "an action is required\n";
+      llvm::cl::PrintHelpMessage();
+      ExitCode = EXIT_FAILURE;
+      break;
+  }
+  
+  return ExitCode;
+}
+
 int main(int argc, char *argv[]) {
+  PROGRAM_START(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Syntax Test\n");
 
   int ExitCode = EXIT_SUCCESS;
 
-  if (options::InputSourceFilename.empty()) {
+  if (options::InputSourceFilename.empty() &&
+      options::InputSourceDirectory.empty()) {
     llvm::errs() << "input source file is required\n";
+    ExitCode = EXIT_FAILURE;
+  }
+  
+  if (!options::InputSourceFilename.empty() &&
+      !options::InputSourceDirectory.empty()) {
+    llvm::errs() << "input-source-filename and input-source-directory cannot "
+                    "be used together\n\n";
+    ExitCode = EXIT_FAILURE;
+  }
+  
+  if (options::Action == ActionType::None) {
+    llvm::errs() << "an action is required\n";
     ExitCode = EXIT_FAILURE;
   }
 
@@ -295,33 +388,21 @@ int main(int argc, char *argv[]) {
     return ExitCode;
   }
 
-  switch (options::Action) {
-  case ActionType::DumpRawTokenSyntax:
-    ExitCode = doDumpRawTokenSyntax(options::InputSourceFilename);
-    break;
-  case ActionType::FullLexRoundTrip:
-    ExitCode = doFullLexRoundTrip(options::InputSourceFilename);
-    break;
-  case ActionType::FullParseRoundTrip:
-    ExitCode = doFullParseRoundTrip(argv[0], options::InputSourceFilename);
-    break;
-  case ActionType::SerializeRawTree:
-    ExitCode = doSerializeRawTree(argv[0], options::InputSourceFilename);
-    break;
-  case ActionType::ParseOnly:
-    ExitCode = doParseOnly(argv[0], options::InputSourceFilename);
-    break;
-  case ActionType::ParserGen:
-    ExitCode = dumpParserGen(argv[0], options::InputSourceFilename);
-    break;
-  case ActionType::EOFPos:
-    ExitCode = dumpEOFSourceLoc(argv[0], options::InputSourceFilename);
-    break;
-  case ActionType::None:
-    llvm::errs() << "an action is required\n";
-    llvm::cl::PrintHelpMessage();
-    ExitCode = EXIT_FAILURE;
-    break;
+  if (!options::InputSourceFilename.empty()) {
+    ExitCode = invokeCommand(argv[0], options::InputSourceFilename);
+  } else {
+    assert(!options::InputSourceDirectory.empty());
+    std::error_code errorCode;
+    llvm::sys::fs::recursive_directory_iterator DI(options::InputSourceDirectory, errorCode);
+    llvm::sys::fs::recursive_directory_iterator endIterator;
+    for (; DI != endIterator; DI.increment(errorCode)) {
+      auto entry = *DI;
+      auto path = entry.path();
+      if (!llvm::sys::fs::is_directory(path) &&
+          StringRef(path).endswith(".swift")) {
+        ExitCode = invokeCommand(argv[0], path);
+      }
+    }
   }
 
   return ExitCode;

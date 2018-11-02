@@ -28,16 +28,14 @@ public class M {
 
 // Make sure the expanded sequence gets the right scope.
 
-// CHECK:   %49 = begin_access [modify] [dynamic] %48 : $*C, loc{{.*}}:23:20, scope 2
-// CHECK:   %50 = integer_literal $Builtin.Int2, 1, loc {{.*}}:20:12, scope 2
-// CHECK:   %51 = load [trivial] %2 : $*Builtin.Int2, loc {{.*}}:20:12, scope 2
-// CHECK:   %52 = builtin "or_Int2"(%51 : $Builtin.Int2, %50 : $Builtin.Int2) : $Builtin.Int2, loc {{.*}}:20:12, scope 2
-// CHECK:   store %52 to [trivial] %2 : $*Builtin.Int2, loc {{.*}}:20:12, scope 2
-// CHECK:   store %47 to [init] %49 : $*C, loc {{.*}}:23:20, scope 2
-// CHECK:   end_access %49 : $*C, loc {{.*}}:23:20, scope 2
+// CHECK:   [[I:%.*]] = integer_literal $Builtin.Int2, 1, loc {{.*}}:20:12, scope 2
+// CHECK:   [[V:%.*]] = load [trivial] %2 : $*Builtin.Int2, loc {{.*}}:20:12, scope 2
+// CHECK:   [[OR:%.*]] = builtin "or_Int2"([[V]] : $Builtin.Int2, [[I]] : $Builtin.Int2) : $Builtin.Int2, loc {{.*}}:20:12, scope 2
+// CHECK:   store [[OR]] to [trivial] %2 : $*Builtin.Int2, loc {{.*}}:20:12, scope 2
+// CHECK:   store %{{.*}} to [init] %{{.*}} : $*C, loc {{.*}}:23:20, scope 2
 
 // Make sure the dealloc_stack gets the same scope of the instructions surrounding it.
 
 // CHECK:   destroy_addr %0 : $*WithDelegate, loc {{.*}}:26:5, scope 2
 // CHECK:   dealloc_stack %2 : $*Builtin.Int2, loc {{.*}}:20:12, scope 2
-// CHECK:   throw %92 : $Error, loc {{.*}}:20:12, scope 2
+// CHECK:   throw %{{.*}} : $Error, loc {{.*}}:20:12, scope 2

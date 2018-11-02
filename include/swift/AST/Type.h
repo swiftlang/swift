@@ -368,15 +368,19 @@ public:
   /// class D { }
   /// \endcode
   ///
-  /// The join of B and C is A, the join of A and B is A. However, there is no
-  /// join of D and A (or D and B, or D and C) because there is no common
-  /// superclass. One would have to jump to an existential (e.g., \c AnyObject)
-  /// to find a common type.
+  /// The join of B and C is A, the join of A and B is A.
+  ///
+  /// The Any type is considered the common supertype by default when no
+  /// closer common supertype exists.
+  ///
+  /// In unsupported cases where we cannot yet compute an accurate join,
+  /// we return None.
   ///
   /// \returns the join of the two types, if there is a concrete type
   /// that can express the join, or Any if the only join would be a
-  /// more-general existential type
-  static Type join(Type first, Type second);
+  /// more-general existential type, or None if we cannot yet compute a
+  /// correct join but one better than Any may exist.
+  static Optional<Type> join(Type first, Type second);
 
 private:
   // Direct comparison is disabled for types, because they may not be canonical.
@@ -394,7 +398,7 @@ class CanType : public Type {
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
   static bool isObjCExistentialTypeImpl(CanType type);
-  static CanType getOptionalObjectTypeImpl(CanType type, bool &isOptional);
+  static CanType getOptionalObjectTypeImpl(CanType type);
   static CanType getReferenceStorageReferentImpl(CanType type);
   static CanType getWithoutSpecifierTypeImpl(CanType type);
 
@@ -462,12 +466,7 @@ public:
   GenericTypeDecl *getAnyGeneric() const;
 
   CanType getOptionalObjectType() const {
-    bool isOptional;
-    return getOptionalObjectTypeImpl(*this, isOptional);
-  }
-
-  CanType getOptionalObjectType(bool &isOptional) const {
-    return getOptionalObjectTypeImpl(*this, isOptional);
+    return getOptionalObjectTypeImpl(*this);
   }
 
   CanType getReferenceStorageReferent() const {
@@ -670,7 +669,7 @@ namespace llvm {
 
   // A Type is "pointer like".
   template<>
-  class PointerLikeTypeTraits<swift::Type> {
+  struct PointerLikeTypeTraits<swift::Type> {
   public:
     static inline void *getAsVoidPointer(swift::Type I) {
       return (void*)I.getPointer();
@@ -682,7 +681,7 @@ namespace llvm {
   };
   
   template<>
-  class PointerLikeTypeTraits<swift::CanType> :
+  struct PointerLikeTypeTraits<swift::CanType> :
     public PointerLikeTypeTraits<swift::Type> {
   public:
     static inline swift::CanType getFromVoidPointer(void *P) {
@@ -691,7 +690,7 @@ namespace llvm {
   };
 
   template<>
-  class PointerLikeTypeTraits<swift::CanGenericSignature> {
+  struct PointerLikeTypeTraits<swift::CanGenericSignature> {
   public:
     static inline swift::CanGenericSignature getFromVoidPointer(void *P) {
       return swift::CanGenericSignature((swift::GenericSignature*)P);

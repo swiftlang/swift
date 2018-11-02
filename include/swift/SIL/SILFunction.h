@@ -17,13 +17,13 @@
 #ifndef SWIFT_SIL_SILFUNCTION_H
 #define SWIFT_SIL_SILFUNCTION_H
 
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILPrintContext.h"
-#include "swift/SIL/SILProfiler.h"
 #include "llvm/ADT/StringMap.h"
 
 /// The symbol name used for the program entry point function.
@@ -35,6 +35,7 @@ namespace swift {
 class ASTContext;
 class SILInstruction;
 class SILModule;
+class SILProfiler;
 
 enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
@@ -97,7 +98,7 @@ private:
 class SILFunction
   : public llvm::ilist_node<SILFunction>, public SILAllocated<SILFunction> {
 public:
-  typedef llvm::iplist<SILBasicBlock> BlockListType;
+  using BlockListType = llvm::iplist<SILBasicBlock>;
 
 private:
   friend class SILBasicBlock;
@@ -266,10 +267,7 @@ public:
     Profiler = InheritedProfiler;
   }
 
-  void createProfiler(ASTNode Root) {
-    assert(!Profiler && "Function already has a profiler");
-    Profiler = SILProfiler::create(Module, Root);
-  }
+  void createProfiler(ASTNode Root, ForDefinition_t forDefinition);
 
   void discardProfiler() { Profiler = nullptr; }
 
@@ -349,7 +347,9 @@ public:
   /// SIL). If so, diagnostics should not be reapplied.
   bool wasDeserializedCanonical() const { return WasDeserializedCanonical; }
 
-  void setWasDeserializedCanonical() { WasDeserializedCanonical = true; }
+  void setWasDeserializedCanonical(bool val = true) {
+    WasDeserializedCanonical = val;
+  }
 
   /// Returns the calling convention used by this entry point.
   SILFunctionTypeRepresentation getRepresentation() const {
@@ -471,7 +471,7 @@ public:
   /// \returns True if the function is marked with the @_semantics attribute
   /// and has special semantics that the optimizer can use to optimize the
   /// function.
-  bool hasSemanticsAttrs() const { return SemanticsAttrSet.size() > 0; }
+  bool hasSemanticsAttrs() const { return !SemanticsAttrSet.empty(); }
 
   /// \returns True if the function has a semantic attribute that starts with a
   /// specific string.
@@ -692,9 +692,9 @@ public:
   BlockListType &getBlocks() { return BlockList; }
   const BlockListType &getBlocks() const { return BlockList; }
 
-  typedef BlockListType::iterator iterator;
-  typedef BlockListType::reverse_iterator reverse_iterator;
-  typedef BlockListType::const_iterator const_iterator;
+  using iterator = BlockListType::iterator;
+  using reverse_iterator = BlockListType::reverse_iterator;
+  using const_iterator = BlockListType::const_iterator;
 
   bool empty() const { return BlockList.empty(); }
   iterator begin() { return BlockList.begin(); }
@@ -879,7 +879,7 @@ namespace llvm {
 template <>
 struct ilist_traits<::swift::SILFunction> :
 public ilist_default_traits<::swift::SILFunction> {
-  typedef ::swift::SILFunction SILFunction;
+  using SILFunction = ::swift::SILFunction;
 
 public:
   static void deleteNode(SILFunction *V) { V->~SILFunction(); }

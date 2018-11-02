@@ -10,6 +10,10 @@
 #define RANGE_REFACTORING(KIND, NAME, ID) SEMANTIC_REFACTORING(KIND, NAME, ID)
 #endif
 
+#ifndef INTERNAL_RANGE_REFACTORING
+#define INTERNAL_RANGE_REFACTORING(KIND, NAME, ID) RANGE_REFACTORING(KIND, NAME, ID)
+#endif
+
 #ifndef CURSOR_REFACTORING
 #define CURSOR_REFACTORING(KIND, NAME, ID) SEMANTIC_REFACTORING(KIND, NAME, ID)
 #endif
@@ -60,7 +64,14 @@ RANGE_REFACTORING(ExpandTernaryExpr, "Expand Ternary Expression", expand.ternary
 
 RANGE_REFACTORING(ConvertToTernaryExpr, "Convert To Ternary Expression", convert.ternary.expr)
 
+// These internal refactorings are designed to be helpful for working on
+// the compiler/standard library, etc., but are likely to be just confusing and
+// noise for general development.
+
+INTERNAL_RANGE_REFACTORING(ReplaceBodiesWithFatalError, "Replace Function Bodies With 'fatalError()'", replace.bodies.with.fatalError)
+
 #undef CURSOR_REFACTORING
+#undef INTERNAL_RANGE_REFACTORING
 #undef RANGE_REFACTORING
 #undef SEMANTIC_REFACTORING
 #undef REFACTORING

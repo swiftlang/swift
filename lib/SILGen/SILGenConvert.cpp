@@ -66,7 +66,8 @@ SILGenFunction::emitInjectOptional(SILLocation loc,
         TemporaryInitialization init(objectBuf, CleanupHandle::invalid());
         ManagedValue objectResult = generator(SGFContext(&init));
         if (!objectResult.isInContext()) {
-          objectResult.forwardInto(*this, loc, objectBuf);
+          objectResult.ensurePlusOne(*this, loc)
+              .forwardInto(*this, loc, objectBuf);
         }
 
         // Finalize the outer optional buffer.
@@ -190,8 +191,11 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
   bool hadCleanup = optional.hasCleanup();
   bool hadLValue = optional.isLValue();
 
-  auto noneDecl = getASTContext().getOptionalNoneDecl();
   auto someDecl = getASTContext().getOptionalSomeDecl();
+  auto noneDecl = getASTContext().getOptionalNoneDecl();
+
+  // If we have an object, make sure the object is at +1. All switch_enum of
+  // objects is done at +1.
   if (optional.getType().isAddress()) {
     // We forward in the creation routine for
     // unchecked_take_enum_data_addr. switch_enum_addr is a +0 operation.
@@ -199,6 +203,9 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
                            /*defaultDest*/ nullptr,
                            {{someDecl, contBB}, {noneDecl, failBB}});
   } else {
+    optional = optional.ensurePlusOne(*this, loc);
+    hadCleanup = true;
+    hadLValue = false;
     B.createSwitchEnum(loc, optional.forward(*this),
                        /*defaultDest*/ nullptr,
                        {{someDecl, contBB}, {noneDecl, failBB}});
@@ -365,17 +372,36 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
                                        SILType resultTy,
                                        ValueTransformRef transformValue,
                                        SGFContext C) {
+  auto &Ctx = getASTContext();
+
+  // If the input is known to be 'none' just emit a 'none' value of the right
+  // result type right away.
+  auto &resultTL = getTypeLowering(resultTy);
+
+  if (auto *EI = dyn_cast<EnumInst>(input.getValue())) {
+    if (EI->getElement() == Ctx.getOptionalNoneDecl()) {
+      if (!(resultTL.isAddressOnly() && silConv.useLoweredAddresses())) {
+        SILValue none = B.createEnum(loc, SILValue(), EI->getElement(),
+                                     resultTy);
+        return emitManagedRValueWithCleanup(none);
+      }
+    }
+  }
+
+  // Otherwise perform a dispatch.
   auto contBB = createBasicBlock();
   auto isNotPresentBB = createBasicBlock();
   auto isPresentBB = createBasicBlock();
+
+  // All conversions happen at +1.
+  input = input.ensurePlusOne(*this, loc);
 
   SwitchEnumBuilder SEBuilder(B, loc, input);
   SILType noOptResultTy = resultTy.getOptionalObjectType();
   assert(noOptResultTy);
 
   // Create a temporary for the output optional.
-  auto &resultTL = getTypeLowering(resultTy);
-
+  //
   // If the result is address-only, we need to return something in memory,
   // otherwise the result is the BBArgument in the merge point.
   // TODO: use the SGFContext passed in.
@@ -388,16 +414,15 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
     finalResult = B.createOwnedPHIArgument(resultTL.getLoweredType());
   }
 
-  SEBuilder.addCase(
-      getASTContext().getOptionalSomeDecl(), isPresentBB, contBB,
-      [&](ManagedValue input, SwitchCaseFullExpr &scope) {
+  SEBuilder.addOptionalSomeCase(
+      isPresentBB, contBB, [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
         // If we have an address only type, we want to match the old behavior of
         // transforming the underlying type instead of the optional type. This
         // ensures that we use the more efficient non-generic code paths when
         // possible.
         if (getTypeLowering(input.getType()).isAddressOnly() &&
             silConv.useLoweredAddresses()) {
-          auto *someDecl = B.getASTContext().getOptionalSomeDecl();
+          auto *someDecl = Ctx.getOptionalSomeDecl();
           input = B.createUncheckedTakeEnumDataAddr(
               loc, input, someDecl, input.getType().getOptionalObjectType());
         }
@@ -417,9 +442,9 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
         return scope.exitAndBranch(loc);
       });
 
-  SEBuilder.addCase(
-      getASTContext().getOptionalNoneDecl(), isNotPresentBB, contBB,
-      [&](ManagedValue input, SwitchCaseFullExpr &scope) {
+  SEBuilder.addOptionalNoneCase(
+      isNotPresentBB, contBB,
+      [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
         if (!(resultTL.isAddressOnly() && silConv.useLoweredAddresses())) {
           SILValue none =
               B.createManagedOptionalNone(loc, resultTy).forward(*this);
@@ -757,7 +782,8 @@ ManagedValue SILGenFunction::emitExistentialErasure(
                                             *this));
           ManagedValue mv = F(SGFContext(init.get()));
           if (!mv.isInContext()) {
-            init->copyOrInitValueInto(*this, loc, mv, /*init*/ true);
+            init->copyOrInitValueInto(*this, loc, mv.ensurePlusOne(*this, loc),
+                                      /*init*/ true);
             init->finishInitialization(*this);
           }
         });

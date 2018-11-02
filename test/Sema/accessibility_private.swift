@@ -147,14 +147,14 @@ private class VIPPrivateSetPropSub : VIPPrivateSetPropBase, VeryImportantProto {
 }
 
 extension Container {
-  private typealias ExtensionConflictingType = Int // expected-note {{found candidate with type}} expected-note {{previously declared here}}
+  private typealias ExtensionConflictingType = Int // expected-note {{found candidate with type}} expected-note {{previously declared here}} expected-note{{found this candidate}}
 }
 extension Container {
-  private typealias ExtensionConflictingType = Double  // expected-error {{invalid redeclaration of 'ExtensionConflictingType'}} expected-note {{found candidate with type}}
+  private typealias ExtensionConflictingType = Double  // expected-error {{invalid redeclaration of 'ExtensionConflictingType'}} expected-note {{found candidate with type}} expected-note{{found this candidate}}
 }
 extension Container {
   func test() {
-    let a: ExtensionConflictingType? = nil
+    let a: ExtensionConflictingType? = nil // expected-error{{'ExtensionConflictingType' is ambiguous for type lookup in this context}}
     let b: Container.ExtensionConflictingType? = nil // expected-error {{ambiguous type name 'ExtensionConflictingType' in 'Container'}}
     _ = ExtensionConflictingType()
     _ = Container.ExtensionConflictingType()

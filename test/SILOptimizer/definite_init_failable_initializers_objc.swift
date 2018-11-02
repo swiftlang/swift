@@ -34,9 +34,7 @@ class Cat : FakeNSObject {
     // CHECK-NEXT: [[SELF_BOX:%.*]] = alloc_stack $Cat
     // CHECK:      store %2 to [[SELF_BOX]] : $*Cat
     // CHECK:      [[FIELD_ADDR:%.*]] = ref_element_addr %2 : $Cat, #Cat.x
-    // CHECK-NEXT: [[ACCESS:%.*]] = begin_access [modify] [dynamic] %12 : $*LifetimeTracked
-    // CHECK-NEXT: store {{%.*}} to [[ACCESS]] : $*LifetimeTracked
-    // CHECK-NEXT: end_access [[ACCESS]] : $*LifetimeTracked
+    // CHECK-NEXT: store {{%.*}} to [[FIELD_ADDR]] : $*LifetimeTracked
     // CHECK-NEXT: [[COND:%.*]] = struct_extract %1 : $Bool, #Bool._value
     // CHECK-NEXT: cond_br [[COND]], bb1, bb2
 
@@ -46,7 +44,7 @@ class Cat : FakeNSObject {
   // CHECK: bb2:
     // CHECK-NEXT: [[SUPER:%.*]] = upcast %2 : $Cat to $FakeNSObject
     // CHECK-NEXT: [[SUB:%.*]] = unchecked_ref_cast [[SUPER]] : $FakeNSObject to $Cat
-    // CHECK-NEXT: [[SUPER_FN:%.*]] = objc_super_method %20 : $Cat, #FakeNSObject.init!initializer.1.foreign : (FakeNSObject.Type) -> () -> FakeNSObject, $@convention(objc_method) (@owned FakeNSObject) -> @owned FakeNSObject
+    // CHECK-NEXT: [[SUPER_FN:%.*]] = objc_super_method [[SUB]] : $Cat, #FakeNSObject.init!initializer.1.foreign : (FakeNSObject.Type) -> () -> FakeNSObject, $@convention(objc_method) (@owned FakeNSObject) -> @owned FakeNSObject
     // CHECK-NEXT: [[NEW_SUPER_SELF:%.*]] = apply [[SUPER_FN]]([[SUPER]]) : $@convention(objc_method) (@owned FakeNSObject) -> @owned FakeNSObject
     // CHECK-NEXT: [[NEW_SELF:%.*]] = unchecked_ref_cast [[NEW_SUPER_SELF]] : $FakeNSObject to $Cat
     // CHECK-NEXT: store [[NEW_SELF]] to [[SELF_BOX]] : $*Cat

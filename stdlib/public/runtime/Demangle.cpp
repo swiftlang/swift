@@ -151,10 +151,10 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
         
         // Override the node kind if this is a Clang-imported type so we give it
         // a stable mangling.
-        auto typeFlags = type->Flags.getKindSpecificFlags();
-        if (typeFlags & (uint16_t)TypeContextDescriptorFlags::IsCTag) {
+        auto typeFlags = type->getTypeContextDescriptorFlags();
+        if (typeFlags.isCTag()) {
           nodeKind = Node::Kind::Structure;
-        } else if (typeFlags & (uint16_t)TypeContextDescriptorFlags::IsCTypedef) {
+        } else if (typeFlags.isCTypedef()) {
           nodeKind = Node::Kind::TypeAlias;
         }
         
@@ -263,7 +263,7 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
 #if SWIFT_OBJC_INTEROP
     // Peek through artificial subclasses.
     while (classType->isTypeMetadata() && classType->isArtificialSubclass())
-      classType = classType->SuperClass;
+      classType = classType->Superclass;
 #endif
     description = classType->getDescription();
     break;
@@ -277,6 +277,11 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
   case MetadataKind::Struct: {
     auto structType = static_cast<const StructMetadata *>(type);
     description = structType->Description;
+    break;
+  }
+  case MetadataKind::ForeignClass: {
+    auto foreignType = static_cast<const ForeignClassMetadata *>(type);
+    description = foreignType->Description;
     break;
   }
   default:
@@ -349,6 +354,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
   case MetadataKind::Enum:
   case MetadataKind::Optional:
   case MetadataKind::Struct:
+  case MetadataKind::ForeignClass:
     return _buildDemanglingForNominalType(type, Dem);
   case MetadataKind::ObjCClassWrapper: {
 #if SWIFT_OBJC_INTEROP
@@ -366,10 +372,6 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     assert(false && "no ObjC interop");
     return nullptr;
 #endif
-  }
-  case MetadataKind::ForeignClass: {
-    auto foreign = static_cast<const ForeignClassMetadata *>(type);
-    return Dem.demangleType(foreign->getName());
   }
   case MetadataKind::Existential: {
     auto exis = static_cast<const ExistentialTypeMetadata *>(type);
@@ -495,14 +497,24 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
       auto flags = func->getParameterFlags(i);
       auto input = _swift_buildDemanglingForMetadata(param, Dem);
 
-      if (flags.isInOut()) {
-        NodePointer inout = Dem.createNode(Node::Kind::InOut);
-        inout->addChild(input, Dem);
-        input = inout;
-      } else if (flags.isShared()) {
-        NodePointer shared = Dem.createNode(Node::Kind::Shared);
-        shared->addChild(input, Dem);
-        input = shared;
+      auto wrapInput = [&](Node::Kind kind) {
+        auto parent = Dem.createNode(kind);
+        parent->addChild(input, Dem);
+        input = parent;
+      };
+      switch (flags.getValueOwnership()) {
+      case ValueOwnership::Default:
+        /* nothing */
+        break;
+      case ValueOwnership::InOut:
+        wrapInput(Node::Kind::InOut);
+        break;
+      case ValueOwnership::Shared:
+        wrapInput(Node::Kind::Shared);
+        break;
+      case ValueOwnership::Owned:
+        wrapInput(Node::Kind::Owned);
+        break;
       }
 
       inputs.push_back({input, flags.isVariadic()});
