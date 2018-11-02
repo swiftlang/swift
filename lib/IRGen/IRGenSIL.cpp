@@ -2162,6 +2162,9 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       // See the comment on the declaration of the enum case
       // `GraphOperationInfo::ArgumentLowering::TensorAttribute` for more
       // information on why this cannot be dynamic.
+      // TODO(SR-9166): Emit a nice diagnostic earlier in the compiler, so that
+      // we don't get an assertion failure when we write a
+      // #tfop(..., value$tensor: ...).
       assert(0 && "TensorAttributes cannot be dynamic");
     case GraphOperationInfo::ArgumentLowering::Input: {
       assert(argumentName.empty() && "inputs cannot have names");
