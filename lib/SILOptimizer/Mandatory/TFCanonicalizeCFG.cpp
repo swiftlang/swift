@@ -1494,9 +1494,8 @@ void SESERegionBuilder::processLoop(SILLoop *loop) {
   SmallVector<SILBasicBlock *, 8> exitingBlocks;
   loop->getExitingBlocks(exitingBlocks);
 
-  if (exitingBlocks.size() != 1) {
-    llvm_unreachable("SESE FIXME: Loops with multiple exits not handled yet!");
-  }
+  assert(exitingBlocks.size() == 1 &&
+         "Canonicalization should have given us one loop exit!");
 
   // Loop canonicalization also gives us the property that exits out of the
   // loop have critical edges split, and that any exit block jumps to a block
@@ -1528,11 +1527,8 @@ void SESERegionBuilder::processLoop(SILLoop *loop) {
     return;
   }
 
-  llvm_unreachable("SESE FIXME: Imperfect loop exits not handled yet!");
-  // splitCriticalEdge
-
-  // FIXME: Need to handle "break" edges that exit the loop, preventing the
-  // body from being an SESE region.
+  llvm_unreachable("Canonicalization should have made loop header to be the "
+                   "only loop exit!");
 }
 
 /// Transform the function into a properly nested series of
