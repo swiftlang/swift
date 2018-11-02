@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Swift
 import SwiftShims
 
 /// Convert the given numeric value to a hexadecimal string.

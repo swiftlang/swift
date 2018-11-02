@@ -1,4 +1,5 @@
 import Swift
+import SwiftPrivate
 import StdlibUnittest
 #if _runtime(_ObjC)
 import Darwin

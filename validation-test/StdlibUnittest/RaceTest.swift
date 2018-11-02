@@ -3,6 +3,7 @@
 // REQUIRES: stress_test
 // UNSUPPORTED: nonatomic_rc
 
+import SwiftPrivate
 import StdlibUnittest
 #if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
