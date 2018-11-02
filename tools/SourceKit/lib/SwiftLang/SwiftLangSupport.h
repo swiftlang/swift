@@ -43,6 +43,10 @@ namespace swift {
   class ValueDecl;
   enum class AccessorKind;
 
+namespace syntax {
+  class SourceFileSyntax;
+}
+
 namespace ide {
   class CodeCompletionCache;
   class OnDiskCodeCompletionCache;
@@ -111,7 +115,7 @@ public:
   static void reportDocumentStructure(swift::SourceFile &SrcFile,
                                       EditorConsumer &Consumer);
 
-  const llvm::Optional<swift::SourceFileSyntax> &getSyntaxTree() const;
+  const llvm::Optional<swift::syntax::SourceFileSyntax> &getSyntaxTree() const;
 
   std::string getFilePath() const;
 
