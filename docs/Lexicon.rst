@@ -97,6 +97,11 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
        context. This type may contain `archetypes <archetype>` and cannot be
        used directly from outside the context. Compare with `interface type`.
 
+  customization point
+    Informal term for a protocol requirement that has a default implementation,
+    i.e. one that conforming types don't *have* to implement but have the option
+    to "customize".
+
   DI (definite initialization / definitive initialization)
     The feature that no uninitialized variables, constants, or properties will
     be read by a program, or the analysis pass that operates on SIL to
