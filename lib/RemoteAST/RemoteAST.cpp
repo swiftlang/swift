@@ -158,7 +158,7 @@ protected:
   }
 
 private:
-  virtual RemoteASTTypeBuilder &getBuilder() = 0;
+  virtual ASTBuilder &getBuilder() = 0;
   virtual MemoryReader &getReader() = 0;
   virtual bool readWordOffset(RemoteAddress address, int64_t *offset) = 0;
   virtual std::unique_ptr<IRGenContext> createIRGenContext() = 0;
@@ -397,9 +397,9 @@ private:
 /// RemoteASTContext interface.
 template <class Runtime>
 class RemoteASTContextConcreteImpl final : public RemoteASTContextImpl {
-  MetadataReader<Runtime, RemoteASTTypeBuilder> Reader;
+  MetadataReader<Runtime, ASTBuilder> Reader;
 
-  RemoteASTTypeBuilder &getBuilder() override {
+  ASTBuilder &getBuilder() override {
     return Reader.Builder;
   }
 

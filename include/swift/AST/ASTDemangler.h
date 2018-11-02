@@ -38,7 +38,7 @@ Type getTypeForMangling(ASTContext &ctx,
 
 /// An implementation of MetadataReader's BuilderType concept that
 /// just finds and builds things in the AST.
-class RemoteASTTypeBuilder {
+class ASTBuilder {
   ASTContext &Ctx;
   Demangle::NodeFactory Factory;
 
@@ -50,7 +50,7 @@ public:
   using BuiltType = swift::Type;
   using BuiltNominalTypeDecl = swift::NominalTypeDecl *;
   using BuiltProtocolDecl = swift::ProtocolDecl *;
-  explicit RemoteASTTypeBuilder(ASTContext &ctx) : Ctx(ctx) {}
+  explicit ASTBuilder(ASTContext &ctx) : Ctx(ctx) {}
 
   ASTContext &getASTContext() { return Ctx; }
   DeclContext *getNotionalDC();

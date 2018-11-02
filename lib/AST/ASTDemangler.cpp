@@ -41,19 +41,19 @@ Type swift::Demangle::getTypeForMangling(ASTContext &ctx,
   if (!node)
     return Type();
 
-  RemoteASTTypeBuilder builder(ctx);
+  ASTBuilder builder(ctx);
   return swift::Demangle::decodeMangledType(builder, node);
 }
 
 
 Type
-RemoteASTTypeBuilder::createBuiltinType(const std::string &mangledName) {
+ASTBuilder::createBuiltinType(const std::string &mangledName) {
   // TODO
   return Type();
 }
 
 NominalTypeDecl *
-RemoteASTTypeBuilder::createNominalTypeDecl(StringRef mangledName) {
+ASTBuilder::createNominalTypeDecl(StringRef mangledName) {
   Demangle::Demangler Dem;
   Demangle::NodePointer node = Dem.demangleType(mangledName);
   if (!node) return nullptr;
@@ -62,11 +62,11 @@ RemoteASTTypeBuilder::createNominalTypeDecl(StringRef mangledName) {
 }
 
 ProtocolDecl *
-RemoteASTTypeBuilder::createProtocolDecl(const Demangle::NodePointer &node) {
+ASTBuilder::createProtocolDecl(const Demangle::NodePointer &node) {
   return dyn_cast_or_null<ProtocolDecl>(createNominalTypeDecl(node));
 }
 
-Type RemoteASTTypeBuilder::createNominalType(NominalTypeDecl *decl) {
+Type ASTBuilder::createNominalType(NominalTypeDecl *decl) {
   // If the declaration is generic, fail.
   if (decl->isGenericContext())
     return Type();
@@ -74,7 +74,7 @@ Type RemoteASTTypeBuilder::createNominalType(NominalTypeDecl *decl) {
   return decl->getDeclaredType();
 }
 
-Type RemoteASTTypeBuilder::createNominalType(NominalTypeDecl *decl, Type parent) {
+Type ASTBuilder::createNominalType(NominalTypeDecl *decl, Type parent) {
   // If the declaration is generic, fail.
   if (decl->getGenericParams())
     return Type();
@@ -86,8 +86,8 @@ Type RemoteASTTypeBuilder::createNominalType(NominalTypeDecl *decl, Type parent)
   return NominalType::get(decl, parent, Ctx);
 }
 
-Type RemoteASTTypeBuilder::createBoundGenericType(NominalTypeDecl *decl,
-                                                  ArrayRef<Type> args) {
+Type ASTBuilder::createBoundGenericType(NominalTypeDecl *decl,
+                                        ArrayRef<Type> args) {
   // If the declaration isn't generic, fail.
   if (!decl->isGenericContext())
     return Type();
@@ -123,9 +123,9 @@ Type RemoteASTTypeBuilder::createBoundGenericType(NominalTypeDecl *decl,
   return substType;
 }
 
-Type RemoteASTTypeBuilder::createBoundGenericType(NominalTypeDecl *decl,
-                                                  ArrayRef<Type> args,
-                                                  Type parent) {
+Type ASTBuilder::createBoundGenericType(NominalTypeDecl *decl,
+                                        ArrayRef<Type> args,
+                                        Type parent) {
   // If the declaration isn't generic, fail.
   if (!decl->getGenericParams())
     return Type();
@@ -220,9 +220,9 @@ Type RemoteASTTypeBuilder::createBoundGenericType(NominalTypeDecl *decl,
   return genericType;
 }
 
-Type RemoteASTTypeBuilder::createTupleType(ArrayRef<Type> eltTypes,
-                                           StringRef labels,
-                                           bool isVariadic) {
+Type ASTBuilder::createTupleType(ArrayRef<Type> eltTypes,
+                                 StringRef labels,
+                                 bool isVariadic) {
   // Just bail out on variadic tuples for now.
   if (isVariadic) return Type();
 
@@ -242,7 +242,7 @@ Type RemoteASTTypeBuilder::createTupleType(ArrayRef<Type> eltTypes,
   return TupleType::get(elements, Ctx);
 }
 
-Type RemoteASTTypeBuilder::createFunctionType(
+Type ASTBuilder::createFunctionType(
     ArrayRef<Demangle::FunctionParam<Type>> params,
     Type output, FunctionTypeFlags flags) {
   FunctionTypeRepresentation representation;
@@ -293,7 +293,7 @@ Type RemoteASTTypeBuilder::createFunctionType(
   return FunctionType::get(funcParams, output, einfo);
 }
 
-Type RemoteASTTypeBuilder::createProtocolCompositionType(
+Type ASTBuilder::createProtocolCompositionType(
     ArrayRef<ProtocolDecl *> protocols,
     Type superclass,
     bool isClassBound) {
@@ -305,27 +305,27 @@ Type RemoteASTTypeBuilder::createProtocolCompositionType(
   return ProtocolCompositionType::get(Ctx, members, isClassBound);
 }
 
-Type RemoteASTTypeBuilder::createExistentialMetatypeType(Type instance) {
+Type ASTBuilder::createExistentialMetatypeType(Type instance) {
   if (!instance->isAnyExistentialType())
     return Type();
   return ExistentialMetatypeType::get(instance);
 }
 
-Type RemoteASTTypeBuilder::createMetatypeType(Type instance,
-                                              bool wasAbstract) {
+Type ASTBuilder::createMetatypeType(Type instance,
+                                    bool wasAbstract) {
   // FIXME: Plumb through metatype representation and generalize silly
   // 'wasAbstract' flag
   return MetatypeType::get(instance);
 }
 
-Type RemoteASTTypeBuilder::createGenericTypeParameterType(unsigned depth,
-                                                          unsigned index) {
+Type ASTBuilder::createGenericTypeParameterType(unsigned depth,
+                                                unsigned index) {
   return GenericTypeParamType::get(depth, index, Ctx);
 }
 
-Type RemoteASTTypeBuilder::createDependentMemberType(StringRef member,
-                                                     Type base,
-                                                     ProtocolDecl *protocol) {
+Type ASTBuilder::createDependentMemberType(StringRef member,
+                                           Type base,
+                                           ProtocolDecl *protocol) {
   if (!base->isTypeParameter())
     return Type();
 
@@ -341,18 +341,18 @@ Type RemoteASTTypeBuilder::createDependentMemberType(StringRef member,
 }
 
 #define REF_STORAGE(Name, ...) \
-Type RemoteASTTypeBuilder::create##Name##StorageType(Type base) { \
+Type ASTBuilder::create##Name##StorageType(Type base) { \
   if (!base->allowsOwnership()) \
     return Type(); \
   return Name##StorageType::get(base, Ctx); \
 }
 #include "swift/AST/ReferenceStorage.def"
 
-Type RemoteASTTypeBuilder::createSILBoxType(Type base) {
+Type ASTBuilder::createSILBoxType(Type base) {
   return SILBoxType::get(base->getCanonicalType());
 }
 
-Type RemoteASTTypeBuilder::createObjCClassType(StringRef name) {
+Type ASTBuilder::createObjCClassType(StringRef name) {
   auto typeDecl =
       findForeignNominalTypeDecl(name, /*relatedEntityKind*/{},
                                  ForeignModuleKind::Imported,
@@ -361,7 +361,7 @@ Type RemoteASTTypeBuilder::createObjCClassType(StringRef name) {
   return createNominalType(typeDecl, /*parent*/ Type());
 }
 
-ProtocolDecl *RemoteASTTypeBuilder::createObjCProtocolDecl(StringRef name) {
+ProtocolDecl *ASTBuilder::createObjCProtocolDecl(StringRef name) {
   auto typeDecl =
       findForeignNominalTypeDecl(name, /*relatedEntityKind*/{},
                                  ForeignModuleKind::Imported,
@@ -371,23 +371,23 @@ ProtocolDecl *RemoteASTTypeBuilder::createObjCProtocolDecl(StringRef name) {
   return nullptr;
 }
 
-Type RemoteASTTypeBuilder::createForeignClassType(StringRef mangledName) {
+Type ASTBuilder::createForeignClassType(StringRef mangledName) {
   auto typeDecl = createNominalTypeDecl(mangledName);
   if (!typeDecl) return Type();
 
   return createNominalType(typeDecl, /*parent*/ Type());
 }
 
-Type RemoteASTTypeBuilder::getUnnamedForeignClassType() {
+Type ASTBuilder::getUnnamedForeignClassType() {
   return Type();
 }
 
-Type RemoteASTTypeBuilder::getOpaqueType() {
+Type ASTBuilder::getOpaqueType() {
   return Type();
 }
 
-bool RemoteASTTypeBuilder::validateNominalParent(NominalTypeDecl *decl,
-                                                 Type parent) {
+bool ASTBuilder::validateNominalParent(NominalTypeDecl *decl,
+                                       Type parent) {
   auto parentDecl = decl->getDeclContext()->getSelfNominalTypeDecl();
 
   // If we don't have a parent type, fast-path.
@@ -405,7 +405,7 @@ bool RemoteASTTypeBuilder::validateNominalParent(NominalTypeDecl *decl,
   return true;
 }
 
-Type RemoteASTTypeBuilder::checkTypeRepr(TypeRepr *repr) {
+Type ASTBuilder::checkTypeRepr(TypeRepr *repr) {
   DeclContext *dc = getNotionalDC();
 
   TypeLoc loc(repr);
@@ -416,8 +416,8 @@ Type RemoteASTTypeBuilder::checkTypeRepr(TypeRepr *repr) {
 }
 
 NominalTypeDecl *
-RemoteASTTypeBuilder::getAcceptableNominalTypeCandidate(ValueDecl *decl, 
-                                                    Demangle::Node::Kind kind) {
+ASTBuilder::getAcceptableNominalTypeCandidate(ValueDecl *decl, 
+                                              Demangle::Node::Kind kind) {
   if (kind == Demangle::Node::Kind::Class) {
     return dyn_cast<ClassDecl>(decl);
   } else if (kind == Demangle::Node::Kind::Enum) {
@@ -430,7 +430,7 @@ RemoteASTTypeBuilder::getAcceptableNominalTypeCandidate(ValueDecl *decl,
   }
 }
 
-DeclContext *RemoteASTTypeBuilder::getNotionalDC() {
+DeclContext *ASTBuilder::getNotionalDC() {
   if (!NotionalDC) {
     NotionalDC = ModuleDecl::create(Ctx.getIdentifier(".RemoteAST"), Ctx);
     NotionalDC = new (Ctx) TopLevelCodeDecl(NotionalDC);
@@ -439,7 +439,7 @@ DeclContext *RemoteASTTypeBuilder::getNotionalDC() {
 }
 
 NominalTypeDecl *
-RemoteASTTypeBuilder::createNominalTypeDecl(const Demangle::NodePointer &node) {
+ASTBuilder::createNominalTypeDecl(const Demangle::NodePointer &node) {
   auto DC = findDeclContext(node);
   if (!DC)
     return nullptr;
@@ -451,14 +451,14 @@ RemoteASTTypeBuilder::createNominalTypeDecl(const Demangle::NodePointer &node) {
 }
 
 ModuleDecl *
-RemoteASTTypeBuilder::findModule(const Demangle::NodePointer &node) {
+ASTBuilder::findModule(const Demangle::NodePointer &node) {
   assert(node->getKind() == Demangle::Node::Kind::Module);
   const auto &moduleName = node->getText();
   return Ctx.getModuleByName(moduleName);
 }
 
 Demangle::NodePointer
-RemoteASTTypeBuilder::findModuleNode(const Demangle::NodePointer &node) {
+ASTBuilder::findModuleNode(const Demangle::NodePointer &node) {
   if (node->getKind() == Demangle::Node::Kind::Module)
     return node;
 
@@ -470,8 +470,8 @@ RemoteASTTypeBuilder::findModuleNode(const Demangle::NodePointer &node) {
   return findModuleNode(child->getFirstChild());
 }
 
-Optional<RemoteASTTypeBuilder::ForeignModuleKind>
-RemoteASTTypeBuilder::getForeignModuleKind(const Demangle::NodePointer &node) {
+Optional<ASTBuilder::ForeignModuleKind>
+ASTBuilder::getForeignModuleKind(const Demangle::NodePointer &node) {
   if (node->getKind() == Demangle::Node::Kind::DeclContext)
     return getForeignModuleKind(node->getFirstChild());
 
@@ -486,7 +486,7 @@ RemoteASTTypeBuilder::getForeignModuleKind(const Demangle::NodePointer &node) {
 }
 
 DeclContext *
-RemoteASTTypeBuilder::findDeclContext(const Demangle::NodePointer &node) {
+ASTBuilder::findDeclContext(const Demangle::NodePointer &node) {
   switch (node->getKind()) {
   case Demangle::Node::Kind::DeclContext:
   case Demangle::Node::Kind::Type:
@@ -570,10 +570,10 @@ RemoteASTTypeBuilder::findDeclContext(const Demangle::NodePointer &node) {
 }
 
 NominalTypeDecl *
-RemoteASTTypeBuilder::findNominalTypeDecl(DeclContext *dc,
-                                          Identifier name,
-                                          Identifier privateDiscriminator,
-                                          Demangle::Node::Kind kind) {
+ASTBuilder::findNominalTypeDecl(DeclContext *dc,
+                                Identifier name,
+                                Identifier privateDiscriminator,
+                                Demangle::Node::Kind kind) {
   auto module = dc->getParentModule();
 
   SmallVector<ValueDecl *, 4> lookupResults;
@@ -618,10 +618,10 @@ getClangTypeKindForNodeKind(Demangle::Node::Kind kind) {
 }
 
 NominalTypeDecl *
-RemoteASTTypeBuilder::findForeignNominalTypeDecl(StringRef name,
-                                                 StringRef relatedEntityKind,
-                                                 ForeignModuleKind foreignKind,
-                                                 Demangle::Node::Kind kind) {
+ASTBuilder::findForeignNominalTypeDecl(StringRef name,
+                                       StringRef relatedEntityKind,
+                                       ForeignModuleKind foreignKind,
+                                       Demangle::Node::Kind kind) {
   // Check to see if we have an importer loaded.
   auto importer = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
   if (!importer) return nullptr;
