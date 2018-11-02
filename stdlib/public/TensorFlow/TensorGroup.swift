@@ -16,30 +16,32 @@
 
 import CTensorFlow
 
-/// A protocol for types that can be used as tensor operation inputs. When a
-/// TensorGroup is used as an input, it gets passed to the tensor operation as
-/// an input list whose elements are the tensor fields of the type.
+/// A protocol for types that can be mapped to Array<CTensorHandle>.
 ///
-/// This protocol is divided from OutputTensorGroup in order for the number of
-/// tensors to be determined at runtime. For example, Array<Tensor<Float>> may
+/// This protocol is divided from TensorGroup in order for the number of
+/// tensors to be determined at runtime.  For example, Array<Tensor<Float>> may
 /// have an unknown number of elements compile time.
-public protocol InputTensorGroup {
+public protocol TensorArrayProtocol {
   /// Writes the tensor handles to `address`, which must be allocated
   /// with enough capacity to hold `_tensorHandleCount` handles. The tensor
   /// handles written to `address` are borrowed: this container still
   /// owns them.
   func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>?)
 
-  var _inputTensorHandleCount : Int32 { get }
+  var _tensorHandleCount: Int32 { get }
 }
 
-/// A protocol for types that can be used as tensor operation outputs. When a
-/// TensorGroup is used as an output, it gets initialized with its tensor fields
-/// set to the tensor operation's tensor outputs.
-/// The number of tensors must be known at compile time.
-public protocol OutputTensorGroup {
+/// A protocol for types that can be mapped to and from Array<CTensorHandle>.
+/// When a TensorGroup is used as an argument, it gets passed to the
+/// tensor operation as an argument list whose elements are the tensor fields of
+/// the type.  When a TensorGroup is used as a result, it gets initialized
+/// with its tensor fields set to the tensor operation's tensor results.
+///
+/// TODO: Add a derived conformance to TensorGroup so that users don't have
+/// to write the conformance themselves.
+public protocol TensorGroup : TensorArrayProtocol {
   /// The types of the tensor stored properties in this type.
-  static var _outputTypeList: [TensorDataType] { get }
+  static var _typeList: [TensorDataType] { get }
 
   /// An array of `nil`s with the same number of elements as `_outputTypeList`.
   /// The `nil` represents unknown shape.
@@ -54,28 +56,17 @@ public protocol OutputTensorGroup {
   init(_owning tensorHandles: UnsafePointer<CTensorHandle>?)
 }
 
-public extension OutputTensorGroup {
+public extension TensorGroup {
   /// The number of tensor fields in this type.
-  static var _outputTensorHandleCount: Int32 {
-    return Int32(_outputTypeList.count)
-  }
+  static var _tensorHandleCount: Int32 { return Int32(Self._typeList.count) }
+  var _tensorHandleCount: Int32 { return Int32(Self._typeList.count) }
 
   /// An array of `nil`s with the same number of elements as `_outputTypeList`.
   /// The `nil` represents unknown shape.
   static var _unknownShapeList: [TensorShape?] {
-    return Array(repeating: nil, count: Int(_outputTensorHandleCount))
+    return Array(repeating: nil, count: _typeList.count)
   }
 }
-
-/// A protocol for types that can be used as tensor operation inputs and
-/// outputs. When a TensorGroup is used as an input, it gets passed to the
-/// tensor operation as an input list whose elements are the tensor fields of
-/// the type. When a TensorGroup is used as an output, it gets initialized
-/// with its tensor fields set to the tensor operation's tensor outputs.
-///
-/// TODO: Add a derived conformance to TensorGroup so that users don't have
-/// to write the conformance themselves.
-public protocol TensorGroup : InputTensorGroup & OutputTensorGroup {}
 
 //===----------------------------------------------------------------------===//
 // Conform standard TensorFlow types to TensorGroup
@@ -83,17 +74,13 @@ public protocol TensorGroup : InputTensorGroup & OutputTensorGroup {}
 
 extension TensorHandle : TensorGroup {
   @inlinable
-  public static var _outputTypeList: [TensorDataType] {
-    return [Scalar.tensorFlowDataType]
-  }
-
-  @inlinable
   public static var _unknownShapeList: [TensorShape?] {
     return [nil]
   }
 
-  public var _inputTensorHandleCount : Int32 {
-    return Int32(TensorHandle._outputTypeList.count)
+  @inlinable
+  public static var _typeList: [TensorDataType] {
+    return [Scalar.tensorFlowDataType]
   }
 
   public func _unpackTensorHandles(
@@ -108,17 +95,13 @@ extension TensorHandle : TensorGroup {
 
 extension ResourceHandle : TensorGroup {
   @inlinable
-  public static var _outputTypeList: [TensorDataType] {
-    return [TensorDataType(TF_RESOURCE)]
-  }
-
-  @inlinable
   public static var _unknownShapeList: [TensorShape?] {
     return [nil]
   }
 
-  public var _inputTensorHandleCount : Int32 {
-    return Int32(ResourceHandle._outputTypeList.count)
+  @inlinable
+  public static var _typeList: [TensorDataType] {
+    return [TensorDataType(TF_RESOURCE)]
   }
 
   public func _unpackTensorHandles(
@@ -133,17 +116,13 @@ extension ResourceHandle : TensorGroup {
 
 extension VariantHandle : TensorGroup {
   @inlinable
-  public static var _outputTypeList: [TensorDataType] {
-    return [TensorDataType(TF_VARIANT)]
-  }
-
-  @inlinable
   public static var _unknownShapeList: [TensorShape?] {
     return [nil]
   }
 
-  public var _inputTensorHandleCount : Int32 {
-    return Int32(VariantHandle._outputTypeList.count)
+  @inlinable
+  public static var _typeList: [TensorDataType] {
+    return [TensorDataType(TF_VARIANT)]
   }
 
   public func _unpackTensorHandles(
@@ -158,17 +137,13 @@ extension VariantHandle : TensorGroup {
 
 extension Tensor : TensorGroup {
   @inlinable
-  public static var _outputTypeList: [TensorDataType] {
-    return [Scalar.tensorFlowDataType]
-  }
-
-  @inlinable
   public static var _unknownShapeList: [TensorShape?] {
     return [nil]
   }
 
-  public var _inputTensorHandleCount : Int32 {
-    return Int32(Tensor._outputTypeList.count)
+  @inlinable
+  public static var _typeList: [TensorDataType] {
+    return [Scalar.tensorFlowDataType]
   }
 
   public func _unpackTensorHandles(
@@ -183,17 +158,13 @@ extension Tensor : TensorGroup {
 
 extension TensorElementLiteral : TensorGroup {
   @inlinable
-  public static var _outputTypeList: [TensorDataType] {
-    return [Scalar.tensorFlowDataType]
-  }
-
-  @inlinable
   public static var _unknownShapeList: [TensorShape?] {
     return [nil]
   }
 
-  public var _inputTensorHandleCount : Int32 {
-    return Int32(TensorElementLiteral._outputTypeList.count)
+  @inlinable
+  public static var _typeList: [TensorDataType] {
+    return [Scalar.tensorFlowDataType]
   }
 
   public func _unpackTensorHandles(
@@ -206,17 +177,17 @@ extension TensorElementLiteral : TensorGroup {
   }
 }
 
-extension Array : InputTensorGroup where Element : InputTensorGroup {
+extension Array : TensorArrayProtocol where Element : TensorArrayProtocol {
   public func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>?) {
     var ptr = address
     for elem in self {
       elem._unpackTensorHandles(into: ptr)
-      ptr = ptr!.advanced(by: Int(elem._inputTensorHandleCount))
+      ptr = ptr!.advanced(by: Int(elem._tensorHandleCount))
     }
   }
-  public var _inputTensorHandleCount : Int32 {
+  public var _tensorHandleCount: Int32 {
     var count: Int32 = 0
-    for elem in self { count += elem._inputTensorHandleCount }
+    for elem in self { count += elem._tensorHandleCount }
     return count
   }
 }
