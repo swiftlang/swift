@@ -797,3 +797,11 @@ func test<Instances : Collection>(
 ) { fatalError() }
 
 test([1]) { _, _ in fatalError(); () }
+
+// rdar://problem/45659733
+func rdar_45659733() {
+  func foo<T : BinaryInteger>(_: AnyHashable, _: T) {}
+  func bar(_ a: Int, _ b: Int) {
+    _ = (a ..< b).map { i in foo(i, i) } // Ok
+  }
+}
