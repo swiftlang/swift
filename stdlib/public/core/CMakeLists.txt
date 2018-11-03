@@ -39,7 +39,6 @@ set(SWIFTLIB_ESSENTIAL
   Builtin.swift
   BuiltinMath.swift.gyb
   Character.swift
-  CharacterUnicodeScalars.swift
   CocoaArray.swift
   Codable.swift.gyb
   Collection.swift
@@ -47,6 +46,7 @@ set(SWIFTLIB_ESSENTIAL
   Comparable.swift
   CompilerProtocols.swift
   ContiguousArray.swift
+  ContiguouslyStored.swift
   ClosedRange.swift
   ContiguousArrayBuffer.swift
   CString.swift

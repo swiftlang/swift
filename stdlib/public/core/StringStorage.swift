@@ -12,308 +12,288 @@
 
 import SwiftShims
 
+// TODO(UTF8): We can drop the nonobjc annotations soon
+
 @_fixed_layout
 @usableFromInline
-class _SwiftRawStringStorage : __SwiftNativeNSString {
-  @nonobjc
-  @usableFromInline
-  final var capacity: Int
-
-  @nonobjc
-  @usableFromInline
-  final var count: Int
-
-  @nonobjc
-  internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("Use the create method")
-  }
-
-  @inlinable
-  @nonobjc
-  internal var rawStart: UnsafeMutableRawPointer {
-    _abstract()
-  }
-
-  @inlinable
-  @nonobjc
-  final var unusedCapacity: Int {
-    _sanityCheck(capacity >= count)
-    return capacity - count
-  }
+@objc
+internal class _AbstractStringStorage: _SwiftNativeNSString, _NSStringCore {
+  // Abstract interface
+  internal var asString: String { get { Builtin.unreachable() } }
+  internal var count: Int { get { Builtin.unreachable() } }
 }
 
-internal typealias _ASCIIStringStorage = _SwiftStringStorage<UInt8>
-@usableFromInline // FIXME(sil-serialize-all)
-internal typealias _UTF16StringStorage = _SwiftStringStorage<UTF16.CodeUnit>
-
-@_fixed_layout
-@usableFromInline
-final class _SwiftStringStorage<CodeUnit>
-  : _SwiftRawStringStorage, _NSStringCore
-where CodeUnit : UnsignedInteger & FixedWidthInteger {
-
-  /// Create uninitialized storage of at least the specified capacity.
-  @usableFromInline
-  @nonobjc
-  @_specialize(where CodeUnit == UInt8)
-  @_specialize(where CodeUnit == UInt16)
-  internal static func create(
-    capacity: Int,
-    count: Int = 0
-  ) -> _SwiftStringStorage<CodeUnit> {
-    _sanityCheck(count >= 0 && count <= capacity)
-
-#if arch(i386) || arch(arm)
-#else
-    // TODO(SR-7594): Restore below invariant
-    // _sanityCheck(
-    //   CodeUnit.self != UInt8.self || capacity > _SmallUTF8String.capacity,
-    //   "Should prefer a small representation")
-#endif // 64-bit
-
-    let storage = Builtin.allocWithTailElems_1(
-      _SwiftStringStorage<CodeUnit>.self,
-      capacity._builtinWordValue, CodeUnit.self)
-
-    let storageAddr = UnsafeMutableRawPointer(
-      Builtin.bridgeToRawPointer(storage))
-    let endAddr = (
-      storageAddr + _swift_stdlib_malloc_size(storageAddr)
-    ).assumingMemoryBound(to: CodeUnit.self)
-    storage.capacity = endAddr - storage.start
-    storage.count = count
-    _sanityCheck(storage.capacity >= capacity)
-    return storage
-  }
-
-  @inlinable
-  @nonobjc
-  internal override final var rawStart: UnsafeMutableRawPointer {
-    return UnsafeMutableRawPointer(start)
-  }
-
+// ObjC interfaces
 #if _runtime(_ObjC)
-  // NSString API
-
-  @objc(initWithCoder:)
-  @usableFromInline
-  convenience init(coder aDecoder: AnyObject) {
-    _sanityCheckFailure("init(coder:) not implemented for _SwiftStringStorage")
-  }
-
+extension _AbstractStringStorage {
   @objc(length)
-  @usableFromInline
-  var length: Int {
-    return count
-  }
+  final internal var length: Int { return asString._utf16Length() }
 
   @objc(characterAtIndex:)
-  @usableFromInline
-  func character(at index: Int) -> UInt16 {
-    defer { _fixLifetime(self) }
-    precondition(index >= 0 && index < count, "Index out of bounds")
-    return UInt16(start[index])
+  final func character(at index: Int) -> UInt16 {
+    return asString._utf16CodeUnitAtOffset(index)
   }
 
   @objc(getCharacters:range:)
-  @usableFromInline
-  func getCharacters(
-    _ buffer: UnsafeMutablePointer<UInt16>,
-    range aRange: _SwiftNSRange
-  ) {
+  final func getCharacters(
+   _ buffer: UnsafeMutablePointer<UInt16>,
+   range aRange: _SwiftNSRange) {
     _precondition(aRange.location >= 0 && aRange.length >= 0,
       "Range out of bounds")
     _precondition(aRange.location + aRange.length <= Int(count),
       "Range out of bounds")
-    let slice = unmanagedView[
-      aRange.location ..< aRange.location + aRange.length]
-    slice._copy(
-      into: UnsafeMutableBufferPointer<UTF16.CodeUnit>(
-        start: buffer,
-        count: aRange.length))
-    _fixLifetime(self)
+
+    let range = Range(
+      uncheckedBounds: (aRange.location, aRange.location+aRange.length))
+    let slice = asString.utf16[asString._utf16OffsetToIndex(range)]
+    let outputBufPtr = UnsafeMutableBufferPointer(
+      start: buffer, count: range.count)
+
+    let _ = slice._copyContents(initializing: outputBufPtr)
   }
 
   @objc(_fastCharacterContents)
-  @usableFromInline
-  func _fastCharacterContents() -> UnsafePointer<UInt16>? {
-    guard CodeUnit.self == UInt16.self else { return nil }
-    return UnsafePointer(rawStart.assumingMemoryBound(to: UInt16.self))
+  final func _fastCharacterContents() -> UnsafePointer<UInt16>? {
+    return nil
+  }
+
+  @objc(_fastCStringContents)
+  final func _fastCStringContents() -> UnsafePointer<CChar>? {
+    if let native = self as? _StringStorage {
+      return native.start._asCChar
+    }
+
+    // TODO(UTF8 perf): shared from literals are nul-terminated...
+
+    return nil
   }
 
   @objc(copyWithZone:)
   @usableFromInline
-  func copy(with zone: _SwiftNSZone?) -> AnyObject {
-    // While _SwiftStringStorage instances aren't immutable in general,
+  final func copy(with zone: _SwiftNSZone?) -> AnyObject {
+    // While _StringStorage instances aren't immutable in general,
     // mutations may only occur when instances are uniquely referenced.
     // Therefore, it is safe to return self here; any outstanding Objective-C
     // reference will make the instance non-unique.
     return self
   }
+}
 #endif // _runtime(_ObjC)
-}
 
-extension _SwiftStringStorage {
-  // Basic properties
-
-  @inlinable
+@_fixed_layout
+@usableFromInline
+final internal class _StringStorage: _AbstractStringStorage {
   @nonobjc
-  internal final var start: UnsafeMutablePointer<CodeUnit> {
-    return UnsafeMutablePointer(Builtin.projectTailElems(self, CodeUnit.self))
+  @usableFromInline
+  internal var capacity: Int
+
+  @nonobjc
+  @usableFromInline
+  internal var _count: Int
+
+  @nonobjc
+  @inlinable
+  override internal var count: Int { @inline(__always) get { return _count } }
+
+  @nonobjc
+  @inlinable
+  override internal var asString: String {
+    @inline(__always) get { return String(_StringGuts(self)) }
   }
 
-  @inlinable
   @nonobjc
-  internal final var end: UnsafeMutablePointer<CodeUnit> {
-    return start + count
-  }
-
-  @inlinable
-  @nonobjc
-  internal final var capacityEnd: UnsafeMutablePointer<CodeUnit> {
-    return start + capacity
-  }
-
-  @inlinable
-  @nonobjc
-  var usedBuffer: UnsafeMutableBufferPointer<CodeUnit> {
-    return UnsafeMutableBufferPointer(start: start, count: count)
-  }
-
-  @inlinable
-  @nonobjc
-  var unusedBuffer: UnsafeMutableBufferPointer<CodeUnit> {
-    @inline(__always)
-    get {
-      return UnsafeMutableBufferPointer(start: end, count: capacity - count)
-    }
-  }
-
-  @inlinable
-  @nonobjc
-  var unmanagedView: _UnmanagedString<CodeUnit> {
-    return _UnmanagedString(start: self.start, count: self.count)
+  internal init(_doNotCallMe: ()) {
+    _sanityCheckFailure("Use the create method")
   }
 }
 
-extension _SwiftStringStorage {
-  // Append operations
-
+// Creation
+extension _StringStorage {
   @nonobjc
-  internal final func _appendInPlace<OtherCodeUnit>(
-    _ other: _UnmanagedString<OtherCodeUnit>
-  )
-  where OtherCodeUnit : FixedWidthInteger & UnsignedInteger {
-    let otherCount = Int(other.count)
-    _sanityCheck(self.count + otherCount <= self.capacity)
-    other._copy(into: self.unusedBuffer)
-    self.count += otherCount
+  internal static func create(
+    capacity: Int, count: Int = 0
+  ) -> _StringStorage {
+    _sanityCheck(capacity >= count)
+
+    // Reserve enough capacity for a trailing nul character
+    let capacity = 1 + Swift.max(capacity, _SmallUTF8String.capacity)
+    _sanityCheck(capacity > count)
+
+    let storage = Builtin.allocWithTailElems_1(
+      _StringStorage.self,
+      capacity._builtinWordValue, UInt8.self)
+
+    let storageAddr = UnsafeRawPointer(
+      Builtin.bridgeToRawPointer(storage))
+    let endAddr = (
+      storageAddr + _stdlib_malloc_size(storageAddr)
+    ).assumingMemoryBound(to: UInt8.self)
+
+    storage.capacity = endAddr - storage.start
+    storage._count = count
+    _sanityCheck(storage.capacity >= capacity)
+    storage.unusedStorage[0] = 0 // nul-terminated
+    storage._invariantCheck()
+
+    return storage
   }
 
   @nonobjc
-  internal final func _appendInPlace(_ other: _UnmanagedOpaqueString) {
-    let otherCount = Int(other.count)
-    _sanityCheck(self.count + otherCount <= self.capacity)
-    other._copy(into: self.unusedBuffer)
-    self.count += otherCount
+  internal static func create(
+    initializingFrom bufPtr: UnsafeBufferPointer<UInt8>, capacity: Int
+  ) -> _StringStorage {
+    _sanityCheck(capacity >= bufPtr.count)
+    let storage = _StringStorage.create(
+      capacity: capacity, count: bufPtr.count)
+    let addr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
+    storage.mutableStart.initialize(from: addr, count: bufPtr.count)
+    return storage
   }
 
   @nonobjc
-  internal final func _appendInPlace<C: Collection>(contentsOf other: C)
-  where C.Element == CodeUnit {
-    let otherCount = Int(other.count)
-    _sanityCheck(self.count + otherCount <= self.capacity)
-    var (remainder, writtenUpTo) =
-      other._copyContents(initializing: self.unusedBuffer)
-    _precondition(remainder.next() == nil, "Collection underreported its count")
-    _precondition(writtenUpTo == otherCount, "Collection misreported its count")
-    count += otherCount
+  internal static func create(
+    initializingFrom bufPtr: UnsafeBufferPointer<UInt8>
+  ) -> _StringStorage {
+    return _StringStorage.create(
+      initializingFrom: bufPtr, capacity: bufPtr.count)
   }
 
-  @_specialize(where C == Character._SmallUTF16, CodeUnit == UInt8)
   @nonobjc
-  internal final func _appendInPlaceUTF16<C: Collection>(contentsOf other: C)
-  where C.Element == UInt16 {
-    let otherCount = Int(other.count)
-    _sanityCheck(self.count + otherCount <= self.capacity)
-    // TODO: Use _copyContents(initializing:) for UTF16->UTF16 case
-    var it = other.makeIterator()
-    for p in end ..< end + otherCount {
-      p.pointee = CodeUnit(it.next()!)
-    }
-    _precondition(it.next() == nil, "Collection underreported its count")
-    count += otherCount
+  internal static func create(
+    initializingFrom bufPtr: UnsafeBufferPointer<UInt8>,
+    andAppending secondBufPtr: UnsafeBufferPointer<UInt8>
+  ) -> _StringStorage {
+    let size = bufPtr.count + secondBufPtr.count
+    let storage = _StringStorage.create(
+      capacity: size, count: size)
+
+    let addr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
+    storage.mutableStart.initialize(from: addr, count: bufPtr.count)
+
+    let secondAddr = secondBufPtr.baseAddress._unsafelyUnwrappedUnchecked
+    (storage.mutableStart + bufPtr.count).initialize(
+      from: secondAddr, count: secondBufPtr.count)
+    return storage
   }
 }
 
-extension _SwiftStringStorage {
-  @nonobjc
-  internal final func _appendInPlace(_ other: _StringGuts, range: Range<Int>) {
-    if _slowPath(other._isOpaque) {
-      _opaqueAppendInPlace(opaqueOther: other, range: range)
-      return
-    }
+// TODO(UTF8 perf): Append helpers, which can keep nul-termination
 
-    defer { _fixLifetime(other) }
-    if other.isASCII {
-      _appendInPlace(other._unmanagedASCIIView[range])
-    } else {
-      _appendInPlace(other._unmanagedUTF16View[range])
+// Usage
+extension _StringStorage {
+  @nonobjc
+  @inlinable
+  internal var mutableStart: UnsafeMutablePointer<UInt8> {
+    @inline(__always) get {
+      return UnsafeMutablePointer(Builtin.projectTailElems(self, UInt8.self))
     }
   }
-
-  @usableFromInline // @opaque
-  internal final func _opaqueAppendInPlace(
-    opaqueOther other: _StringGuts, range: Range<Int>
-  ) {
-    _sanityCheck(other._isOpaque)
-    if other._isSmall {
-      other._smallUTF8String[range].withUnmanagedUTF16 {
-        self._appendInPlace($0)
-      }
-      return
-    }
-    defer { _fixLifetime(other) }
-    _appendInPlace(other._asOpaque()[range])
+  @nonobjc
+  @inlinable
+  internal var mutableEnd: UnsafeMutablePointer<UInt8> {
+    @inline(__always) get { return mutableStart + count }
   }
 
   @nonobjc
-  internal final func _appendInPlace(_ other: _StringGuts) {
-    if _slowPath(other._isOpaque) {
-      _opaqueAppendInPlace(opaqueOther: other)
-      return
-    }
-
-    defer { _fixLifetime(other) }
-    if other.isASCII {
-      _appendInPlace(other._unmanagedASCIIView)
-    } else {
-      _appendInPlace(other._unmanagedUTF16View)
-    }
-  }
-
-  @usableFromInline // @opaque
-  internal final func _opaqueAppendInPlace(opaqueOther other: _StringGuts) {
-    _sanityCheck(other._isOpaque)
-    if other._isSmall {
-      other._smallUTF8String.withUnmanagedUTF16 {
-        self._appendInPlace($0)
-      }
-      return
-    }
-    defer { _fixLifetime(other) }
-    _appendInPlace(other._asOpaque())
+  @inlinable
+  internal var start: UnsafePointer<UInt8> {
+    @inline(__always) get { return UnsafePointer(mutableStart) }
   }
 
   @nonobjc
-  internal final func _appendInPlace(_ other: String) {
-    self._appendInPlace(other._guts)
+  @inlinable
+  internal final var end: UnsafePointer<UInt8> {
+    @inline(__always) get { return UnsafePointer(mutableEnd) }
   }
 
   @nonobjc
-  internal final func _appendInPlace<S : StringProtocol>(_ other: S) {
-    self._appendInPlace(
-      other._wholeString._guts,
-      range: other._encodedOffsetRange)
+  @inlinable
+  internal var codeUnits: UnsafeBufferPointer<UInt8> {
+    @inline(__always) get {
+      return UnsafeBufferPointer(start: start, count: count)
+    }
+  }
+
+  @inlinable
+  @nonobjc
+  internal var unusedStorage: UnsafeMutableBufferPointer<UInt8> {
+    @inline(__always) get {
+      return UnsafeMutableBufferPointer(
+        start: mutableEnd, count: unusedCapacity)
+    }
+  }
+
+  @nonobjc
+  @inlinable
+  internal var unusedCapacity: Int {
+    @inline(__always) get { return capacity &- count }
+  }
+
+  @nonobjc
+  @inlinable @inline(__always)
+  internal func _invariantCheck() {
+    #if INTERNAL_CHECKS_ENABLED
+    let rawSelf = UnsafeRawPointer(Builtin.bridgeToRawPointer(self))
+    let rawStart = UnsafeRawPointer(start)
+    _sanityCheck(rawSelf + Int(_StringObject.nativeBias) == rawStart)
+    _sanityCheck(self.capacity > self.count, "no room for nul-terminator")
+    _sanityCheck(self.unusedStorage[0] == 0, "not nul terminated")
+    #endif
   }
 }
+
+// For bridging literals
+//
+// TODO(UTF8): Unify impls with _StringStorage
+//
+@_fixed_layout
+@usableFromInline
+final internal class _SharedStringStorage: _AbstractStringStorage {
+  @nonobjc
+  @usableFromInline
+  internal var owner: AnyObject?
+
+  @nonobjc
+  @usableFromInline
+  internal var contents: UnsafeBufferPointer<UInt8>
+
+  @nonobjc
+  @usableFromInline
+  internal var start: UnsafePointer<UInt8> {
+    return contents.baseAddress._unsafelyUnwrappedUnchecked
+  }
+
+  @nonobjc
+  @usableFromInline
+  override internal var count: Int { return contents.count }
+
+  @nonobjc
+  internal init(owner: AnyObject, contents bufPtr: UnsafeBufferPointer<UInt8>) {
+    self.owner = owner
+    self.contents = bufPtr
+    super.init()
+    self._invariantCheck()
+  }
+
+  @nonobjc
+  internal init(immortal bufPtr: UnsafeBufferPointer<UInt8>) {
+    self.owner = nil
+    self.contents = bufPtr
+    super.init()
+    self._invariantCheck()
+  }
+
+  @nonobjc
+  override internal var asString: String { return String(_StringGuts(self)) }
+}
+
+extension _SharedStringStorage {
+  @nonobjc
+  @inlinable @inline(__always)
+  internal func _invariantCheck() {
+    #if INTERNAL_CHECKS_ENABLED
+    #endif
+  }
+}
+
+

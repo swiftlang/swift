@@ -9,66 +9,131 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-extension String {
-  /// A position of a character or code unit in a string.
-  @_fixed_layout // FIXME(sil-serialize-all)
-  public struct Index {
-    @usableFromInline
-    internal typealias _UTF8Buffer = UTF8.EncodedScalar
 
-    @usableFromInline // FIXME(sil-serialize-all)
-    internal var _compoundOffset: UInt64
+import SwiftShims
 
-    @usableFromInline
-    internal var _utf8Buffer = _UTF8Buffer()
+/*
 
-    @usableFromInline
-    internal var _graphemeStrideCache: UInt16 = 0
-  }
-}
+String's Index has the following layout:
 
-/// Convenience accessors
+ ┌──────────┬───────────────────┬────────────────┬──────────┐
+ │ b63:b16  │      b15:b14      │     b13:b8     │ b7:b0    │
+ ├──────────┼───────────────────┼────────────────┼──────────┤
+ │ position │ transcoded offset │ grapheme cache │ reserved │
+ └──────────┴───────────────────┴────────────────┴──────────┘
+
+- grapheme cache: A 6-bit value remembering the distance to the next grapheme
+boundary
+- position aka `encodedOffset`: An offset into the string's code units
+- transcoded offset: a sub-scalar offset, derived from transcoding
+
+The use and interpretation of both `reserved` and `grapheme cache` is not part
+of Index's ABI; it should be hidden behind non-inlinable calls. However, the
+position of the sequence of 14 bits allocated is part of Index's ABI, as well as
+the default value being `0`.
+
+*/
+
 extension String.Index {
-  @inlinable // FIXME(sil-serialize-all)
-  internal var utf8Buffer: String.Index._UTF8Buffer? {
-    guard !_utf8Buffer.isEmpty else { return nil }
-    return _utf8Buffer
+
+}
+
+extension String.Index {
+  @inlinable
+  internal var orderingValue: UInt64 {
+    @inline(__always) get { return _rawBits &>> 14 }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  /// The offset into a string's code units for this index.
+  @inlinable
+  public var encodedOffset: Int {
+    @inline(__always) get { return Int(truncatingIfNeeded: _rawBits &>> 16) }
+  }
+
+  @inlinable
+  internal var transcodedOffset: Int {
+    @inline(__always) get {
+      return Int(truncatingIfNeeded: orderingValue & 0x3)
+    }
+  }
+
+  @usableFromInline
   internal var characterStride: Int? {
-    guard _graphemeStrideCache > 0 else { return nil }
-    return Int(truncatingIfNeeded: _graphemeStrideCache)
+    let value = (_rawBits & 0x00FC_0000_0000_0000) &>> 50
+    return value > 0 ? Int(truncatingIfNeeded: value) : nil
   }
 
-  // TODO: Probably worth carving a bit for, or maybe a isSubScalar bit...
-  @inlinable // FIXME(sil-serialize-all)
-  internal var isUTF8: Bool {
-    return self.utf8Buffer != nil || self.transcodedOffset > 0
+  @inlinable @inline(__always)
+  internal init(encodedOffset: Int, transcodedOffset: Int) {
+#if arch(i386) || arch(arm)
+    unimplemented_utf8_32bit()
+#else
+    _sanityCheck(encodedOffset == encodedOffset & 0x0000_FFFF_FFFF_FFFF)
+    _sanityCheck(transcodedOffset <= 3)
+    let pos = UInt64(truncatingIfNeeded: encodedOffset)
+    let trans = UInt64(truncatingIfNeeded: transcodedOffset)
+
+    self.init((pos &<< 16) | (trans &<< 14))
+#endif
+  }
+
+  /// Creates a new index at the specified code unit offset.
+  ///
+  /// - Parameter offset: An offset in code units.
+  @inlinable @inline(__always)
+  public init(encodedOffset: Int) {
+    self.init(encodedOffset: encodedOffset, transcodedOffset: 0)
+  }
+
+  @usableFromInline
+  internal init(
+    encodedOffset: Int, transcodedOffset: Int, characterStride: Int
+  ) {
+    self.init(encodedOffset: encodedOffset, transcodedOffset: transcodedOffset)
+    if _slowPath(characterStride > 63) { return }
+
+    _sanityCheck(characterStride == characterStride & 0x3F)
+    self._rawBits |= UInt64(truncatingIfNeeded: characterStride)
+    self._invariantCheck()
+  }
+
+  @usableFromInline
+  internal init(encodedOffset pos: Int, characterStride char: Int) {
+    self.init(encodedOffset: pos, transcodedOffset: 0, characterStride: char)
   }
 }
 
-extension String.Index : Equatable {
-  // A combined code unit and transcoded offset, for comparison purposes
-  @inlinable // FIXME(sil-serialize-all)
-  internal var _orderingValue: UInt64 {
-    return _compoundOffset
+// Creation helpers
+extension String.Index {
+  @inlinable @inline(__always)
+  internal init(transcodedAfter i: String.Index) {
+    _sanityCheck((0...2) ~= i.transcodedOffset)
+    self.init(
+      encodedOffset: i.encodedOffset, transcodedOffset: i.transcodedOffset &+ 1)
   }
+  @inlinable @inline(__always)
+  internal init(transcodedBefore i: String.Index) {
+    _sanityCheck((1...3) ~= i.transcodedOffset)
+    self.init(
+      encodedOffset: i.encodedOffset, transcodedOffset: i.transcodedOffset &- 1)
+  }
+}
 
-  @inlinable // FIXME(sil-serialize-all)
+extension String.Index: Equatable {
+  @inlinable @inline(__always)
   public static func == (lhs: String.Index, rhs: String.Index) -> Bool {
-    return lhs._orderingValue == rhs._orderingValue
+    return lhs.orderingValue == rhs.orderingValue
   }
 }
 
-extension String.Index : Comparable {
-  @inlinable // FIXME(sil-serialize-all)
+extension String.Index: Comparable {
+  @inlinable @inline(__always)
   public static func < (lhs: String.Index, rhs: String.Index) -> Bool {
-    return lhs._orderingValue < rhs._orderingValue
+    return lhs.orderingValue < rhs.orderingValue
   }
 }
 
-extension String.Index : Hashable {
+extension String.Index: Hashable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
@@ -76,66 +141,115 @@ extension String.Index : Hashable {
   ///   of this instance.
   @inlinable
   public func hash(into hasher: inout Hasher) {
-    hasher.combine(_orderingValue)
+    hasher.combine(orderingValue)
   }
 }
 
+// TODO(UTF8): restore these to StringIndexConversions.swift
 extension String.Index {
-  @inline(__always)
-  @inlinable
-  internal init(encodedOffset: Int, transcodedOffset: Int) {
-    let cuOffset = UInt64(truncatingIfNeeded: encodedOffset)
-    _sanityCheck(
-      cuOffset & 0xFFFF_0000_0000_0000 == 0, "String length capped at 48bits")
-    let transOffset = UInt64(truncatingIfNeeded: transcodedOffset)
-    _sanityCheck(transOffset <= 4, "UTF-8 max transcoding is 4 code units")
-
-    self._compoundOffset = cuOffset &<< 2 | transOffset
-  }
-
-  @inline(__always)
-  @inlinable
-  internal init(from other: String.Index, adjustingEncodedOffsetBy adj: Int) {
-    self.init(
-      encodedOffset: other.encodedOffset &+ adj,
-      transcodedOffset: other.transcodedOffset)
-    self._utf8Buffer = other._utf8Buffer
-    self._graphemeStrideCache = other._graphemeStrideCache
-  }
-
-  /// Creates a new index at the specified UTF-16 offset.
+  /// Creates an index in the given string that corresponds exactly to the
+  /// specified position.
   ///
-  /// - Parameter offset: An offset in UTF-16 code units.
-  @inlinable // FIXME(sil-serialize-all)
-  public init(encodedOffset offset: Int) {
-    self.init(encodedOffset: offset, transcodedOffset: 0)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal init(
-    encodedOffset offset: Int, transcodedOffset: Int, buffer: _UTF8Buffer
+  /// If the index passed as `sourcePosition` represents the start of an
+  /// extended grapheme cluster---the element type of a string---then the
+  /// initializer succeeds.
+  ///
+  /// The following example converts the position of the Unicode scalar `"e"`
+  /// into its corresponding position in the string. The character at that
+  /// position is the composed `"é"` character.
+  ///
+  ///     let cafe = "Cafe\u{0301}"
+  ///     print(cafe)
+  ///     // Prints "Café"
+  ///
+  ///     let scalarsIndex = cafe.unicodeScalars.firstIndex(of: "e")!
+  ///     let stringIndex = String.Index(scalarsIndex, within: cafe)!
+  ///
+  ///     print(cafe[...stringIndex])
+  ///     // Prints "Café"
+  ///
+  /// If the index passed as `sourcePosition` doesn't have an exact
+  /// corresponding position in `target`, the result of the initializer is
+  /// `nil`. For example, an attempt to convert the position of the combining
+  /// acute accent (`"\u{0301}"`) fails. Combining Unicode scalars do not have
+  /// their own position in a string.
+  ///
+  ///     let nextScalarsIndex = cafe.unicodeScalars.index(after: scalarsIndex)
+  ///     let nextStringIndex = String.Index(nextScalarsIndex, within: cafe)
+  ///
+  ///     print(nextStringIndex)
+  ///     // Prints "nil"
+  ///
+  /// - Parameters:
+  ///   - sourcePosition: A position in a view of the `target` parameter.
+  ///     `sourcePosition` must be a valid index of at least one of the views
+  ///     of `target`.
+  ///   - target: The string referenced by the resulting index.
+  public init?(
+    _ sourcePosition: String.Index,
+    within target: String
   ) {
-    self.init(encodedOffset: offset, transcodedOffset: transcodedOffset)
-    self._utf8Buffer = buffer
-  }
-
-  @inlinable
-  internal init(encodedOffset: Int, characterStride: Int) {
-    self.init(encodedOffset: encodedOffset, transcodedOffset: 0)
-    if characterStride < UInt16.max {
-      self._graphemeStrideCache = UInt16(truncatingIfNeeded: characterStride)
+    guard target._guts.isOnGraphemeClusterBoundary(sourcePosition) else {
+      return nil
     }
+    self = sourcePosition
   }
 
-  /// The offset into a string's UTF-16 encoding for this index.
+  /// Returns the position in the given UTF-8 view that corresponds exactly to
+  /// this index.
+  ///
+  /// This example first finds the position of the character `"é"`, and then
+  /// uses this method find the same position in the string's `utf8` view.
+  ///
+  ///     let cafe = "Café"
+  ///     if let i = cafe.firstIndex(of: "é") {
+  ///         let j = i.samePosition(in: cafe.utf8)!
+  ///         print(Array(cafe.utf8[j...]))
+  ///     }
+  ///     // Prints "[195, 169]"
+  ///
+  /// - Parameter utf8: The view to use for the index conversion. This index
+  ///   must be a valid index of at least one view of the string shared by
+  ///   `utf8`.
+  /// - Returns: The position in `utf8` that corresponds exactly to this index.
+  ///   If this index does not have an exact corresponding position in `utf8`,
+  ///   this method returns `nil`. For example, an attempt to convert the
+  ///   position of a UTF-16 trailing surrogate returns `nil`.
   @inlinable // FIXME(sil-serialize-all)
-  public var encodedOffset : Int {
-    return Int(truncatingIfNeeded: _compoundOffset &>> 2)
+  public func samePosition(
+    in utf8: String.UTF8View
+    ) -> String.UTF8View.Index? {
+    return String.UTF8View.Index(self, within: utf8)
   }
 
-  /// The offset of this index within whatever encoding this is being viewed as
+  /// Returns the position in the given UTF-16 view that corresponds exactly to
+  /// this index.
+  ///
+  /// The index must be a valid index of `String(utf16)`.
+  ///
+  /// This example first finds the position of the character `"é"` and then
+  /// uses this method find the same position in the string's `utf16` view.
+  ///
+  ///     let cafe = "Café"
+  ///     if let i = cafe.firstIndex(of: "é") {
+  ///         let j = i.samePosition(in: cafe.utf16)!
+  ///         print(cafe.utf16[j])
+  ///     }
+  ///     // Prints "233"
+  ///
+  /// - Parameter utf16: The view to use for the index conversion. This index
+  ///   must be a valid index of at least one view of the string shared by
+  ///   `utf16`.
+  /// - Returns: The position in `utf16` that corresponds exactly to this
+  ///   index. If this index does not have an exact corresponding position in
+  ///   `utf16`, this method returns `nil`. For example, an attempt to convert
+  ///   the position of a UTF-8 continuation byte returns `nil`.
   @inlinable // FIXME(sil-serialize-all)
-  internal var transcodedOffset: Int {
-    return Int(truncatingIfNeeded: _compoundOffset & 0x3)
+  public func samePosition(
+    in utf16: String.UTF16View
+  ) -> String.UTF16View.Index? {
+    return String.UTF16View.Index(self, within: utf16)
   }
 }
+
+
