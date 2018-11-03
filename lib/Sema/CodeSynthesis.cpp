@@ -1205,6 +1205,16 @@ namespace {
           CLE.Init->setDeclContext(NewDC);
         }
       }
+      
+      // Unlike a closure, a TapExpr is not a DeclContext, so we need to
+      // recontextualize its variable and then anything else in its body.
+      // FIXME: Might be better to change walkToDeclPre() and walkToStmtPre()
+      // below, but I don't know what other effects that might have.
+      if (auto TE = dyn_cast<TapExpr>(E)) {
+        TE->getVar()->setDeclContext(NewDC);
+        for (auto node : TE->getBody()->getElements())
+          node.walk(RecontextualizeClosures(NewDC));
+      }
 
       return { true, E };
     }

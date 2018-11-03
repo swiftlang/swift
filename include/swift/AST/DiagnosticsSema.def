@@ -1904,6 +1904,22 @@ NOTE(req_near_match_access,none,
      "make %0 %select{ERROR|private|private|non-public|non-public}1 to silence this "
      "warning", (DeclName, AccessLevel))
 
+// appendInterpolation methods
+ERROR(missing_append_interpolation,none,
+      "type conforming to 'StringInterpolationProtocol' does not implement "
+      "a valid 'appendInterpolation' method", ())
+WARNING(append_interpolation_static,none,
+      "'appendInterpolation' method will never be used because it is static",
+      ())
+WARNING(append_interpolation_void_or_discardable,none,
+      "'appendInterpolation' method does not return 'Void' or have a "
+      "discardable result", ())
+WARNING(append_interpolation_access_control,none,
+      "'appendInterpolation' method is %select{private|fileprivate|internal|"
+      "public|open}0, but %1 is %select{private|fileprivate|internal|public|"
+      "open}2",
+      (AccessLevel, DeclName, AccessLevel))
+
 // Protocols and existentials
 ERROR(assoc_type_outside_of_protocol,none,
       "associated type %0 can only be used with a concrete type or "
@@ -2747,10 +2763,10 @@ ERROR(optional_used_as_boolean,none,
      "test for '!= nil' instead", (Type))
 
 ERROR(interpolation_missing_proto,none,
-      "string interpolation requires the protocol '_ExpressibleByStringInterpolation' to be defined",
+      "string interpolation requires the protocol 'ExpressibleByStringInterpolation' to be defined",
       ())
 ERROR(interpolation_broken_proto,none,
-      "protocol '_ExpressibleByStringInterpolation' is broken",
+      "protocol 'ExpressibleByStringInterpolation' is broken",
       ())
 
 ERROR(object_literal_broken_proto,none,
@@ -3362,6 +3378,8 @@ ERROR(throw_in_illegal_context,none,
 
 ERROR(throwing_operator_without_try,none,
       "operator can throw but expression is not marked with 'try'", ())
+ERROR(throwing_interpolation_without_try,none,
+      "interpolation can throw but is not marked with 'try'", ())
 ERROR(throwing_call_without_try,none,
       "call can throw but is not marked with 'try'", ())
 NOTE(note_forgot_try,none,

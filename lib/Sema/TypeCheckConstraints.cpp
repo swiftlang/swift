@@ -2256,58 +2256,6 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
   return false;
 }
 
-bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc) {
-  FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr-shallow", expr);
-  PrettyStackTraceExpr stackTrace(Context, "shallow type-checking", expr);
-
-  // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
-  if (auto generatedExpr = cs.generateConstraintsShallow(expr))
-    expr = generatedExpr;
-  else
-    return true;
-
-  if (getLangOpts().DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Initial constraints for the given expression---\n";
-    expr->dump(log);
-    log << "\n";
-    cs.print(log);
-  }
-
-  // Attempt to solve the constraint system.
-  SmallVector<Solution, 4> viable;
-  if ((cs.solve(expr, viable) || viable.size() != 1) &&
-      cs.salvage(viable, expr)) {
-    return true;
-  }
-
-  auto &solution = viable[0];
-  if (getLangOpts().DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Solution---\n";
-    solution.dump(log);
-  }
-
-  // Apply the solution to the expression.
-  auto result = cs.applySolutionShallow(solution, expr, 
-                                        /*suppressDiagnostics=*/false);
-  if (!result) {
-    // Failure already diagnosed, above, as part of applying the solution.
-    return true;
-  }
-
-  if (getLangOpts().DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Type-checked expression---\n";
-    result->dump(log);
-    log << "\n";
-  }
-
-  expr = result;
-  return false;
-}
-
 bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                                    DeclContext *DC, bool skipApplyingSolution) {
 
