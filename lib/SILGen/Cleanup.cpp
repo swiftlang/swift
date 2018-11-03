@@ -108,6 +108,13 @@ void CleanupManager::emitCleanups(CleanupsDepth depth, CleanupLocation loc,
 
     // Pop now if that was requested.
     if (popCleanups) {
+#ifndef NDEBUG
+      // This is an implicit deactivation.
+      if (stackCleanup.isActive()) {
+        SGF.FormalEvalContext.checkCleanupDeactivation(cleanupHandle);
+      }
+#endif
+
       stack.pop();
 
 #ifndef NDEBUG
