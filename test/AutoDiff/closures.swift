@@ -13,12 +13,3 @@ public func closureCapture() {
 // CHECK: [[PARTIAL_APPLIED:%.*]] = partial_apply [callee_guaranteed] [[ORIG_FN]]
 // CHECK: [[GRAD_FN:%.*]] = function_ref @{{.*}}closureCapture{{.*}}___grad
 // CHECK: [[PARTIAL_APPLIED_GRAD:%.*]] = partial_apply [callee_guaranteed] [[GRAD_FN]]
-
-public func closureCaptureMutable() {
-  var val: Float = 10
-  let clo: (Float) -> Float = { x in
-    val += 2
-    return val * x
-  }
-  _ = #gradient(clo)
-}
