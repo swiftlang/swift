@@ -196,6 +196,8 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
                                              SGFContext ctxt) {
   assert(inputType != outputType);
 
+  FormalEvaluationScope scope(SGF);
+
   SILGenFunction::OpaqueValueState state;
   ArchetypeType *openedArchetype = nullptr;
 
@@ -578,6 +580,8 @@ ManagedValue Transform::transform(ManagedValue v,
 
       // Unwrap zero or more metatype levels
       auto openedArchetype = getOpenedArchetype(openedType);
+
+      FormalEvaluationScope scope(SGF);
 
       auto state = SGF.emitOpenExistential(Loc, v, openedArchetype,
                                            loweredOpenedType,

@@ -12,7 +12,7 @@
 
 #include "SILGenFunction.h"
 #include "RValue.h"
-#include "Scope.h"
+#include "ArgumentScope.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/TypeLowering.h"
@@ -74,19 +74,19 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
     resultSelfValue = selfValue;
   }
 
-  {
-    Scope S(Cleanups, cleanupLoc);
-    ManagedValue borrowedValue =
-        ManagedValue::forUnmanaged(resultSelfValue).borrow(*this, cleanupLoc);
+  ArgumentScope S(*this, Loc);
+  ManagedValue borrowedValue =
+      ManagedValue::forUnmanaged(resultSelfValue).borrow(*this, cleanupLoc);
 
-    if (classTy != borrowedValue.getType()) {
-      borrowedValue =
-          B.createUncheckedRefCast(cleanupLoc, borrowedValue, classTy);
-    }
-
-    // Release our members.
-    emitClassMemberDestruction(borrowedValue, cd, cleanupLoc);
+  if (classTy != borrowedValue.getType()) {
+    borrowedValue =
+        B.createUncheckedRefCast(cleanupLoc, borrowedValue, classTy);
   }
+
+  // Release our members.
+  emitClassMemberDestruction(borrowedValue, cd, cleanupLoc);
+
+  S.pop();
 
   if (resultSelfValue->getType() != objectPtrTy) {
     resultSelfValue =
