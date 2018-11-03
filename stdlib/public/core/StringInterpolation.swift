@@ -197,14 +197,11 @@ extension DefaultStringInterpolation: CustomStringConvertible {
 extension DefaultStringInterpolation: TextOutputStream {
   @inlinable
   public mutating func write(_ string: String) {
-    // Most interpolations will not append to an empty string, so we bypass the
-    // empty-singleton check.
-    _storage._guts._appendSlow(string._guts)
+    _storage.append(string)
   }
   
-  @inlinable
   public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
-    _storage._guts.append(_UnmanagedString(buffer))
+    _storage._guts.append(_StringGuts(buffer, isKnownASCII: true))
   }
 }
 

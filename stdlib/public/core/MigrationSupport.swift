@@ -582,19 +582,14 @@ extension String.UTF8View {
 extension String {
   @available(swift, obsoleted: 4)
   public subscript(bounds: Range<Index>) -> String {
-    // TODO: Make unreachable when the Foundation overlay is off of Swift 3
     _boundsCheck(bounds)
-    return String(Substring(_slice: Slice(base: self, bounds: bounds)))
+    return String(self[bounds])
   }
 
   @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String {
-    // TODO: Make unreachable when the Foundation overlay is off of Swift 3
-    let r = bounds.relative(to: self)
-    _boundsCheck(r)
-    return String(Substring(_slice: Slice(
-          base: self,
-          bounds: r)))
+    _boundsCheck(bounds)
+    return String(self[bounds])
   }
 }
 

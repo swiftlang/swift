@@ -30,8 +30,6 @@ public protocol StringProtocol
 
   associatedtype UnicodeScalarView : BidirectionalCollection
   where UnicodeScalarView.Element == Unicode.Scalar
-  
-  associatedtype SubSequence = Substring
 
   var utf8: UTF8View { get }
   var utf16: UTF16View { get }
@@ -112,75 +110,16 @@ public protocol StringProtocol
     encodedAs targetEncoding: Encoding.Type,
     _ body: (UnsafePointer<Encoding.CodeUnit>) throws -> Result
   ) rethrows -> Result
-
-  /// The entire String onto whose slice this view is a projection.
-  var _wholeString : String { get }
-  /// The range of storage offsets of this view in `_wholeString`.
-  var _encodedOffsetRange : Range<Int> { get }
 }
 
 extension StringProtocol {
-  public var _wholeString: String {
-    return String(self)
-  }
-
-  public var _encodedOffsetRange: Range<Int> {
-    return 0 ..< numericCast(self.utf16.count)
-  }
-}
-
-/// A protocol that provides fast access to a known representation of String.
-///
-/// Can be used to specialize generic functions that would otherwise end up
-/// doing grapheme breaking to vend individual characters.
-@usableFromInline // FIXME(sil-serialize-all)
-internal protocol _SwiftStringView {
-  /// A `String`, having the same contents as `self`, that may be unsuitable for
-  /// long-term storage.
-  var _ephemeralContent : String { get }
-
-  /// A `String`, having the same contents as `self`, that is suitable for
-  /// long-term storage.
-  //
-  // FIXME: Remove once _StringGuts has append(contentsOf:).
-  var _persistentContent : String { get }
-
-  /// The entire String onto whose slice this view is a projection.
-  var _wholeString : String { get }
-  /// The range of storage offsets of this view in `_wholeString`.
-  var _encodedOffsetRange : Range<Int> { get }
-}
-
-extension _SwiftStringView {
-  @inlinable // FIXME(sil-serialize-all)
-  internal var _ephemeralContent : String { return _persistentContent }
-}
-
-extension StringProtocol {
-  @inlinable // FIXME(sil-serialize-all)
-  public // Used in the Foundation overlay
-  var _ephemeralString : String {
-    if _fastPath(self is _SwiftStringView) {
-      return (self as! _SwiftStringView)._ephemeralContent
+  // TODO(UTF8): Wean NSStringAPI.swift off of this
+  public // @SPI(NSStringAPI.swift)
+  var _ephemeralString: String {
+    if let str = self as? String {
+      return str
     }
+    // TODO: Smol check and then shared storage substring
     return String(self)
   }
 }
-
-extension String : _SwiftStringView {
-  @inlinable // FIXME(sil-serialize-all)
-  internal var _persistentContent : String {
-    return self
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public var _wholeString : String {
-    return self
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public var _encodedOffsetRange : Range<Int> {
-    return 0..<_guts.count
-  }
-}
-

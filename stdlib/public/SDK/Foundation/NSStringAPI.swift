@@ -66,6 +66,21 @@ extension Optional {
 }
 #endif
 
+/// From a non-`nil` `UnsafePointer` to a null-terminated string
+/// with possibly-transient lifetime, create a null-terminated array of 'C' char.
+/// Returns `nil` if passed a null pointer.
+internal func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
+  guard let cString = p else {
+    return nil
+  }
+  let len = UTF8._nullCodeUnitOffset(in: cString)
+  var result = [CChar](repeating: 0, count: len + 1)
+  for i in 0..<len {
+    result[i] = cString[i]
+  }
+  return result
+}
+
 extension String {
   //===--- Class Methods --------------------------------------------------===//
   //===--------------------------------------------------------------------===//
