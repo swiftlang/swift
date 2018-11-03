@@ -53,24 +53,6 @@ static bool hasAnyActiveCleanups(DiverseStackImpl<Cleanup>::iterator begin,
   return false;
 }
 
-namespace {
-  /// A CleanupBuffer is a location to which to temporarily copy a
-  /// cleanup.
-  class CleanupBuffer {
-    SmallVector<char, sizeof(Cleanup) + 10 * sizeof(void *)> data;
-
-  public:
-    CleanupBuffer(const Cleanup &cleanup) {
-      size_t size = cleanup.allocated_size();
-      data.reserve(size);
-      data.set_size(size);
-      memcpy(data.data(), reinterpret_cast<const void *>(&cleanup), size);
-    }
-
-    Cleanup &getCopy() { return *reinterpret_cast<Cleanup *>(data.data()); }
-  };
-} // end anonymous namespace
-
 void CleanupManager::popTopDeadCleanups() {
   auto end = (innermostScope ? innermostScope->depth : stack.stable_end());
   assert(end.isValid());
@@ -82,6 +64,8 @@ void CleanupManager::popTopDeadCleanups() {
     stack.checkIterator(end);
   }
 }
+
+using CleanupBuffer = DiverseValueBuffer<Cleanup>;
 
 void CleanupManager::popAndEmitCleanup(CleanupHandle handle,
                                        CleanupLocation loc,

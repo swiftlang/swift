@@ -23,6 +23,7 @@
 #define SWIFT_BASIC_DIVERSESTACK_H
 
 #include "swift/Basic/Malloc.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
 #include <cassert>
 #include <cstring>
@@ -375,6 +376,22 @@ public:
     Begin = iter.Ptr;
 #endif
   }
+};
+
+/// A helper class for copying value off a DiverseStack.
+template <class T>
+class DiverseValueBuffer {
+  llvm::SmallVector<char, sizeof(T) + 10 * sizeof(void*)> data;
+
+public:
+  DiverseValueBuffer(const T &value) {
+    size_t size = value.allocated_size();
+    data.reserve(size);
+    data.set_size(size);
+    memcpy(data.data(), reinterpret_cast<const void *>(&value), size);
+  }
+
+  T &getCopy() { return *reinterpret_cast<T *>(data.data()); }
 };
 
 } // end namespace swift
