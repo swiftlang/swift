@@ -4432,6 +4432,9 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   ConstraintLocatorBuilder outerLocator =
     getConstraintLocator(anchor, parts, locator.getSummaryFlags());
 
+  // Before stripping optional types, save original type for handling
+  // @dynamicCallable applications. This supports the fringe case where
+  // `Optional` itself is extended with @dynamicCallable functionality.
   auto origType2 = desugar2;
   unsigned unwrapCount = 0;
   if (shouldAttemptFixes()) {

@@ -201,8 +201,8 @@ func testExistential(
   c: CallableStruct, d: CallableClass
 ) -> Int {
   // Types that define only the `withKeywordsArguments` method can be called
-  // with no arguments.
-  _ = b() + d()
+  // with no argument labels.
+  _ = b() + b(1, 2) + d() + d(1, 2)
   return a(1, 2, 3) + b(label1: 1, 2, label2: 3) + c(1, 2, 3) + d(label1: 1, 2, 3)
 }
 
@@ -243,7 +243,7 @@ func testRefinedProtocolType<P : FloatingPoint>(
 extension Optional : KeywordCallableProtocol {}
 extension Array : KeywordCallableProtocol {}
 
-func testOptionalExtension() {
+func testExtensions() {
   let x: Int? = 3
   // Test `Optional` extension.
   print(x())
