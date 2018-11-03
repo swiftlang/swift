@@ -1607,9 +1607,9 @@ void Remangler::mangleProtocol(Node *node) {
 }
 
 void Remangler::mangleRetroactiveConformance(Node *node) {
-  mangleProtocolConformance(node->getChild(1));
+  mangleAnyProtocolConformance(node->getChild(0));
   Buffer << 'g';
-  mangleIndex(node->getChild(0)->getIndex());
+  mangleIndex(node->getIndex());
 }
 
 void Remangler::mangleProtocolConformance(Node *node) {

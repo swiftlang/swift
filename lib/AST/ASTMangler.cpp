@@ -1112,6 +1112,48 @@ void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
   }
 }
 
+/// Determine whether the given protocol conformance is itself retroactive,
+/// meaning that there might be multiple conflicting conformances of the
+/// same type to the same protocol.
+static bool isRetroactiveConformance(
+                               const NormalProtocolConformance *conformance) {
+  /// Non-retroactive conformances are... never retroactive.
+  if (!conformance->isRetroactive())
+    return false;
+
+  /// Synthesized non-unique conformances all get collapsed together at run
+  /// time.
+  if (conformance->isSynthesizedNonUnique())
+    return false;
+
+  /// Objective-C protocol conformances don't have identity.
+  if (conformance->getProtocol()->isObjC())
+    return false;
+
+  return true;
+}
+
+/// Determine whether the given protocol conformance contains a retroactive
+/// protocol conformance anywhere in it.
+static bool containsRetroactiveConformance(
+                                      const ProtocolConformance *conformance,
+                                      ModuleDecl *module) {
+  // If the root conformance is retroactive, it's retroactive.
+  if (isRetroactiveConformance(conformance->getRootNormalConformance()))
+    return true;
+
+  // If any of the substitutions used to form this conformance are retroactive,
+  // it's retroactive.
+  auto subMap = conformance->getSubstitutions(module);
+  for (auto conformance : subMap.getConformances()) {
+    if (conformance.isConcrete() &&
+        containsRetroactiveConformance(conformance.getConcrete(), module))
+      return true;
+  }
+
+  return false;
+}
+
 void ASTMangler::appendRetroactiveConformances(Type type) {
   auto nominal = type->getAnyNominal();
   if (!nominal) return;
@@ -1124,28 +1166,20 @@ void ASTMangler::appendRetroactiveConformances(Type type) {
   if (subMap.empty()) return;
 
   unsigned numProtocolRequirements = 0;
-  for (const auto &req: genericSig->getRequirements()) {
-    if (req.getKind() != RequirementKind::Conformance)
-      continue;
-
+  for (auto conformance : subMap.getConformances()) {
     SWIFT_DEFER {
       ++numProtocolRequirements;
     };
 
-    // Fast path: we're in the module of the protocol.
-    auto proto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
-    if (proto->getModuleContext() == module)
+    // Ignore abstract conformances.
+    if (!conformance.isConcrete())
       continue;
 
-    auto conformance =
-      subMap.lookupConformance(req.getFirstType()->getCanonicalType(), proto);
-    if (!conformance || !conformance->isConcrete()) continue;
-
-    auto normal = conformance->getConcrete()->getRootNormalConformance();
-    if (!normal->isRetroactive() || normal->isSynthesizedNonUnique())
+    // Skip non-retroactive conformances.
+    if (!containsRetroactiveConformance(conformance.getConcrete(), module))
       continue;
 
-    appendProtocolConformance(normal);
+    appendConcreteProtocolConformance(conformance.getConcrete());
     appendOperator("g", Index(numProtocolRequirements));
   }
 }

@@ -1397,13 +1397,18 @@ NodePointer Demangler::demangleDependentProtocolConformanceAssociated() {
 }
 
 NodePointer Demangler::demangleRetroactiveConformance() {
-  NodePointer Index = demangleIndexAsNode();
-  NodePointer Conformance = popProtocolConformance();
-  if (!Index || !Conformance)
+  int index = demangleIndex();
+  if (index < 0)
     return nullptr;
 
-  return createWithChildren(Node::Kind::RetroactiveConformance,
-                            Index, Conformance);
+  NodePointer conformance = popAnyProtocolConformance();
+  if (!conformance)
+    return nullptr;
+
+  auto retroactiveConformance =
+    createNode(Node::Kind::RetroactiveConformance, index);
+  retroactiveConformance->addChild(conformance, *this);
+  return retroactiveConformance;
 }
 
 NodePointer Demangler::demangleBoundGenericType() {

@@ -717,7 +717,7 @@ from any character in a ``<GENERIC-PARAM-COUNT>``.
 
 ::
 
-  retroactive-conformance ::= protocol-conformance 'g' INDEX
+  retroactive-conformance ::= any-protocol-conformance 'g' INDEX
 
 When a protocol conformance used to satisfy one of a bound generic type's
 generic requirements is retroactive (i.e., it is specified in a module other
