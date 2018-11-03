@@ -98,9 +98,9 @@ Protocol _ExpressibleByStringInterpolation has been renamed to Protocol Expressi
 Constructor String.init(stringInterpolation:) has parameter 0 type change from Array<String> to DefaultStringInterpolation
 Constructor _ExpressibleByStringInterpolation.init(stringInterpolation:) has parameter 0 type change from Array<τ_0_0> to τ_0_0.StringInterpolation
 Func MutableCollection._partition(within:by:) has parameter 0 type change from Range<τ_0_0.Index> to (τ_0_0.Element) throws -> Bool
-Func __ContiguousArrayStorageBase._getNonVerbatimBridgingBuffer() is added to a non-resilient type
-Struct _BridgeableMetatype is now without @_fixed_layout
 Var Hasher._core has declared type change from _BufferingHasher<_SipHash13Core> to _BufferingHasher<Hasher._Core>
+Struct _BridgeableMetatype is now without @_fixed_layout
+Func __ContiguousArrayStorageBase._getNonVerbatimBridgingBuffer() is added to a non-resilient type
 Var _CocoaDictionary.Index._offset is added to a non-resilient type
 Var _CocoaDictionary.Index._storage in a non-resilient type changes position from 1 to 0
 Var _CocoaSet.Index._offset is added to a non-resilient type
