@@ -426,7 +426,8 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
 };
 
 ASTContext::Implementation::Implementation()
-    : IdentifierTable(Allocator), TheSyntaxArena(new SyntaxArena()) {}
+    : IdentifierTable(Allocator),
+      TheSyntaxArena(new syntax::SyntaxArena()) {}
 ASTContext::Implementation::~Implementation() {
   delete Resolver;
 
