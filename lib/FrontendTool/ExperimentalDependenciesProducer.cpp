@@ -89,41 +89,37 @@ template <typename T1, typename T2> using CPPairVec = std::vector<std::pair<cons
 namespace {
   /// Takes all the Decls in a SourceFile, and collects them into buckets by groups of DeclKinds.
   /// Also casts them to more specific types.
+  
   class SourceFileDeclDemux {
-    /// A bucket for Decls. Knows the desired kinds and desired type.
-    template <typename SpecificDeclType, DeclKind ...desiredKinds>
-    class Bucket {
-    public:
-      CPVec<SpecificDeclType> decls;
-      
-      template <DeclKind f, DeclKind ...r>
-      bool take(const Decl *const D) {
-        if (D->getKind() != f)
-          return take<r...>(D);
-        decls.push_back(cast<SpecificDeclType>(D));
-        return true;
-      }
-      bool take(const Decl *const D) {
-        return false;
-      }
-    };
+  private:
+    template <typename SpecificDeclType, DeclKind f, DeclKind ...r>
+    bool take(const Decl *const D, CPVec<SpecificDeclType> &decls) {
+      if (D->getKind() != f)
+        return take<SpecificDeclType, r...>(D, decls);
+      decls.push_back(cast<SpecificDeclType>(D));
+      return true;
+    }
+    template <typename SpecificDeclType>
+    bool take(const Decl *const D, CPVec<SpecificDeclType> &decls) {
+      return false;
+    }
   public:
-        Bucket<ExtensionDecl, DeclKind::Extension> extensions;
-        Bucket<OperatorDecl, DeclKind::InfixOperator, DeclKind::PrefixOperator, DeclKind::PostfixOperator> operators;
-        Bucket<PrecedenceGroupDecl, DeclKind::PrecedenceGroup> precedenceGroups;
-        Bucket<NominalTypeDecl, DeclKind::Enum, DeclKind::Struct, DeclKind::Class, DeclKind::Protocol> nominals;
-        Bucket<ValueDecl, DeclKind::TypeAlias, DeclKind::Var, DeclKind::Func, DeclKind::Accessor> values;
-
-        SourceFileDeclDemux(const SourceFile *const SF) {
-            for (const Decl *const D: SF->Decls) {
-                extensions.take(D)
-                || operators.take(D)
-                || precedenceGroups.take(D)
-                || nominals.take(D)
-                ||   values.take(D);
-            }
-        }
-    };
+    CPVec<ExtensionDecl> extensions;
+    CPVec<OperatorDecl> operators;
+    CPVec<PrecedenceGroupDecl> precedenceGroups;
+    CPVec<NominalTypeDecl> nominals;
+    CPVec<ValueDecl> values;
+    
+    SourceFileDeclDemux(const SourceFile *const SF) {
+      for (const Decl *const D: SF->Decls) {
+        take<ExtensionDecl, DeclKind::Extension>(D, extensions)
+        || take<OperatorDecl, DeclKind::InfixOperator, DeclKind::PrefixOperator, DeclKind::PostfixOperator>(D, operators)
+        || take<PrecedenceGroupDecl, DeclKind::PrecedenceGroup> (D, precedenceGroups)
+        || take<NominalTypeDecl, DeclKind::Enum, DeclKind::Struct, DeclKind::Class, DeclKind::Protocol>(D, nominals)
+        || take<ValueDecl, DeclKind::TypeAlias, DeclKind::Var, DeclKind::Func, DeclKind::Accessor>(D, values);
+      }
+    }
+  };
     
     template <typename DeclT>
     bool isVisible(const DeclT *const D) {
@@ -304,9 +300,9 @@ namespace {
     public:
         ProviderDecls(const SourceFile *SF) :
         tops(SF),
-        filteredExtensions(filter(tops.extensions.decls)),
-        filteredTopNominals(filter(tops.nominals.decls)),
-        filteredTopValues(filter(tops.values.decls)),
+        filteredExtensions(filter(tops.extensions)),
+        filteredTopNominals(filter(tops.nominals)),
+        filteredTopValues(filter(tops.values)),
         innerDeclCollector(filteredExtensions, filteredTopNominals),
         _extendedNominalsThatCanChangeExernallyObservableShape(filter(innerDeclCollector.extendedNominals)),
         allExtendedNominals(getKeysOf(innerDeclCollector.extendedNominals)),
@@ -316,8 +312,8 @@ namespace {
         // Tops:
         const CPVec<FuncDecl>& operatorFunctions() const { return innerDeclCollector.memberOperatorDecls; }
         const CPVec<NominalTypeDecl>& topNominals() const { return filteredTopNominals; }
-        const CPVec<PrecedenceGroupDecl>& precedenceGroups() const { return tops.precedenceGroups.decls; }
-        const CPVec<OperatorDecl>& topOperators() const {return tops.operators.decls; }
+        const CPVec<PrecedenceGroupDecl>& precedenceGroups() const { return tops.precedenceGroups; }
+        const CPVec<OperatorDecl>& topOperators() const {return tops.operators; }
         const CPVec<ValueDecl>& topValues() const {return filteredTopValues; }
         
         // Nominals:
