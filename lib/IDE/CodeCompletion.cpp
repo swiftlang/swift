@@ -5241,6 +5241,7 @@ namespace  {
     friend class CodeCompletionTypeContextAnalyzer;
     Expr *ChildExpr;
     llvm::function_ref<bool(ParentTy, ParentTy)> Predicate;
+    bool AncestorsWithinBrace;
 
     bool arePositionsSame(Expr *E1, Expr *E2) {
       return E1->getSourceRange().Start == E2->getSourceRange().Start &&
@@ -5249,9 +5250,15 @@ namespace  {
 
   public:
     llvm::SmallVector<ParentTy, 5> Ancestors;
+    llvm::SmallVector<size_t, 1> FarthestAncestorIndex;
+    ParentTy ParentClosest;
+    ParentTy ParentFarthest;
     ExprParentFinder(Expr* ChildExpr,
-                     llvm::function_ref<bool(ParentTy, ParentTy)> Predicate) :
-                     ChildExpr(ChildExpr), Predicate(Predicate) {}
+                     llvm::function_ref<bool(ParentTy, ParentTy)> Predicate,
+                     bool AncestorsWithinBrace = false) :
+                     ChildExpr(ChildExpr), Predicate(Predicate),
+                     AncestorsWithinBrace(AncestorsWithinBrace),
+                     FarthestAncestorIndex({0}) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       // Finish if we found the target. 'ChildExpr' might have been replaced
@@ -5259,8 +5266,17 @@ namespace  {
       if (E == ChildExpr || arePositionsSame(E, ChildExpr))
         return { false, nullptr };
 
-      if (Predicate(E, Parent))
+      if (E != ChildExpr && Predicate(E, Parent)) {
         Ancestors.push_back(E);
+        return { true, E };
+      }
+      if (E == ChildExpr || arePositionsSame(E, ChildExpr)) {
+        if (!Ancestors.empty()) {
+          ParentClosest = Ancestors.back();
+          ParentFarthest = Ancestors[FarthestAncestorIndex.back()];
+        }
+        return {false, nullptr};
+      }
       return { true, E };
     }
 
@@ -5273,10 +5289,14 @@ namespace  {
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
       if (Predicate(S, Parent))
         Ancestors.push_back(S);
+      if (AncestorsWithinBrace && isa<BraceStmt>(S))
+        FarthestAncestorIndex.push_back(Ancestors.size());
       return { true, S };
     }
 
     Stmt *walkToStmtPost(Stmt *S) override {
+      if (AncestorsWithinBrace && isa<BraceStmt>(S))
+        FarthestAncestorIndex.pop_back();
       if (Predicate(S, Parent))
         Ancestors.pop_back();
       return S;
@@ -5318,7 +5338,8 @@ class CodeCompletionTypeContextAnalyzer {
   ExprParentFinder Finder;
 
 public:
-  CodeCompletionTypeContextAnalyzer(DeclContext *DC, Expr *ParsedExpr) : DC(DC),
+  CodeCompletionTypeContextAnalyzer(DeclContext *DC, Expr *ParsedExpr,
+                                    bool AncestorsWithinBrace = false) : DC(DC),
     ParsedExpr(ParsedExpr), SM(DC->getASTContext().SourceMgr),
     Context(DC->getASTContext()),
     Finder(ParsedExpr,  [](ASTWalker::ParentTy Node, ASTWalker::ParentTy Parent) {
@@ -5368,7 +5389,7 @@ public:
         }
       } else
         return false;
-    }) {}
+    }, /*AncestorsWithinBrace=*/AncestorsWithinBrace) {}
 
   void analyzeExpr(Expr *Parent, llvm::function_ref<void(Type)> Callback,
                    SmallVectorImpl<StringRef> &PossibleNames) {
@@ -5823,8 +5844,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::UnresolvedMember: {
     Lookup.setHaveDot(DotLoc);
     SmallVector<Type, 2> PossibleTypes;
-    ::CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext,
-                                                     CodeCompleteTokenExpr);
+    ::CodeCompletionTypeContextAnalyzer
+        TypeAnalyzer(CurDeclContext, CodeCompleteTokenExpr,
+                     /*AncestorsWithinBrace=*/true);
     if (TypeAnalyzer.Analyze(PossibleTypes))
       Lookup.setExpectedTypes(PossibleTypes);
     Lookup.getUnresolvedMemberCompletions(PossibleTypes);
