@@ -1047,6 +1047,24 @@ StringTests.test("UnicodeScalarViewReplace") {
   }
 }
 
+StringTests.test("StringRRC") {
+  let narrow = "01234567890"
+  let wide = "ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪ"
+  for s1 in [narrow, wide] {
+    for s2 in [narrow, wide] {
+      let doubleS2 = Array(String(makeStringGuts(s2 + s2)).utf16)
+      checkRangeReplaceable(
+        { () -> String in String(makeStringGuts(s1)) },
+        { String(decoding: doubleS2[0..<$0], as: UTF16.self) }
+      )
+      checkRangeReplaceable(
+        { String(makeStringGuts(s1)) },
+        { Array(String(makeStringGuts(s2 + s2)))[0..<$0] }
+      )
+    }
+  }
+}
+
 StringTests.test("reserveCapacity") {
   var s = ""
   let id0 = s.bufferID

@@ -446,7 +446,7 @@ extension _StringStorage {
   ) {
     _sanityCheck(lower <= upper)
     let replCount = replacement.count
-    _sanityCheck((upper - lower) + replCount <= unusedCapacity)
+    _sanityCheck(replCount - (upper - lower) <= unusedCapacity)
 
     // Position the tail
     let lowerPtr = mutableStart + lower
@@ -459,9 +459,8 @@ extension _StringStorage {
         mutating: replacement.baseAddress._unsafelyUnwrappedUnchecked),
       count: replCount)
 
-    _postRRCAdjust(
-      newCount: lower + replCount + tailCount,
-      newIsASCII: self.isASCII && isASCII)
+    let isASCII = self.isASCII && _allASCII(replacement)
+    _postRRCAdjust(newCount: lower + replCount + tailCount, newIsASCII: isASCII)
   }
 
 
@@ -473,7 +472,7 @@ extension _StringStorage {
     replacementCount replCount: Int
   ) where C.Element == UInt8 {
     _sanityCheck(lower <= upper)
-    _sanityCheck((upper - lower) + replCount <= unusedCapacity)
+    _sanityCheck(replCount - (upper - lower) <= unusedCapacity)
 
     // Position the tail
     let lowerPtr = mutableStart + lower
@@ -481,7 +480,7 @@ extension _StringStorage {
       src: mutableStart + upper, dst: lowerPtr + replCount)
 
     // Copy in the contents
-    var isASCII = true
+    var isASCII = self.isASCII
     var srcCount = 0
     for cu in replacement {
       if cu >= 0x80 { isASCII = false }
@@ -491,8 +490,7 @@ extension _StringStorage {
     _sanityCheck(srcCount == replCount)
 
     _postRRCAdjust(
-      newCount: lower + replCount + tailCount,
-      newIsASCII: self.isASCII && isASCII)
+      newCount: lower + replCount + tailCount, newIsASCII: isASCII)
   }
 }
 
