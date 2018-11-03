@@ -294,6 +294,15 @@ public:
     return stable_iterator(End - it.Ptr);
   } 
 
+  T &findAndAdvance(stable_iterator &i) {
+    auto unstable_i = find(i);
+    assert(unstable_i != end());
+    T &value = *unstable_i;
+    ++unstable_i;
+    i = stabilize(unstable_i);
+    return value;
+  }
+
   class const_iterator {
     const char *Ptr;
     friend class DiverseStackImpl;

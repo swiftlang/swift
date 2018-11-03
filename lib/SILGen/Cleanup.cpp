@@ -91,19 +91,20 @@ void CleanupManager::emitCleanups(CleanupsDepth depth, CleanupLocation loc,
   auto topOfStack = cur;
 #endif
   while (cur != depth) {
+    // Advance the iterator.
+    auto cleanupHandle = cur;
+    auto iter = stack.find(cleanupHandle);
+    Cleanup &stackCleanup = *iter;
+    cur = stack.stabilize(++iter);
+
     // Copy the cleanup off the stack if it needs to be emitted.
     // This is necessary both because we might need to pop the cleanup and
     // because the cleanup might push other cleanups that will invalidate
     // references onto the stack.
-    auto iter = stack.find(cur);
-    Cleanup &stackCleanup = *iter;
     Optional<CleanupBuffer> copiedCleanup;
     if (stackCleanup.isActive() && SGF.B.hasValidInsertionPoint()) {
       copiedCleanup.emplace(stackCleanup);
     }
-
-    // Advance the iterator.
-    cur = stack.stabilize(++iter);
 
     // Pop now if that was requested.
     if (popCleanups) {
