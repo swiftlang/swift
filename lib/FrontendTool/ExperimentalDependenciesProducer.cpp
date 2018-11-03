@@ -87,38 +87,40 @@ template <typename T1 = std::string, typename T2 = std::string> using PairVec = 
 template <typename T1, typename T2> using CPPairVec = std::vector<std::pair<const T1*, const T2*>>;
 
 namespace {
- 
-    class SourceFileDeclDemux {
-      template <typename DeclT, DeclKind ...kinds>
-      class Sink {
-      public:
-        CPVec<DeclT> decls;
-        
-        template <DeclKind f, DeclKind ...r>
-        bool didSink(const Decl *const D) {
-          if (D->getKind() != f)
-            return didSink<r...>(D);
-          decls.push_back(cast<DeclT>(D));
-          return true;
-        }
-        bool didSink(const Decl *const D) {
-          return false;
-        }
-      };
+  /// Takes all the Decls in a SourceFile, and collects them into buckets by groups of DeclKinds.
+  /// Also casts them to more specific types.
+  class SourceFileDeclDemux {
+    /// A bucket for Decls. Knows the desired kinds and desired type.
+    template <typename SpecificDeclType, DeclKind ...desiredKinds>
+    class Bucket {
     public:
-        Sink<ExtensionDecl, DeclKind::Extension> extensions;
-        Sink<OperatorDecl, DeclKind::InfixOperator, DeclKind::PrefixOperator, DeclKind::PostfixOperator> operators;
-        Sink<PrecedenceGroupDecl, DeclKind::PrecedenceGroup> precedenceGroups;
-        Sink<NominalTypeDecl, DeclKind::Enum, DeclKind::Struct, DeclKind::Class, DeclKind::Protocol> nominals;
-        Sink<ValueDecl, DeclKind::TypeAlias, DeclKind::Var, DeclKind::Func, DeclKind::Accessor> values;
+      CPVec<SpecificDeclType> decls;
+      
+      template <DeclKind f, DeclKind ...r>
+      bool take(const Decl *const D) {
+        if (D->getKind() != f)
+          return take<r...>(D);
+        decls.push_back(cast<SpecificDeclType>(D));
+        return true;
+      }
+      bool take(const Decl *const D) {
+        return false;
+      }
+    };
+  public:
+        Bucket<ExtensionDecl, DeclKind::Extension> extensions;
+        Bucket<OperatorDecl, DeclKind::InfixOperator, DeclKind::PrefixOperator, DeclKind::PostfixOperator> operators;
+        Bucket<PrecedenceGroupDecl, DeclKind::PrecedenceGroup> precedenceGroups;
+        Bucket<NominalTypeDecl, DeclKind::Enum, DeclKind::Struct, DeclKind::Class, DeclKind::Protocol> nominals;
+        Bucket<ValueDecl, DeclKind::TypeAlias, DeclKind::Var, DeclKind::Func, DeclKind::Accessor> values;
 
         SourceFileDeclDemux(const SourceFile *const SF) {
             for (const Decl *const D: SF->Decls) {
-                extensions.didSink(D)
-                || operators.didSink(D)
-                || precedenceGroups.didSink(D)
-                || nominals.didSink(D)
-                ||   values.didSink(D);
+                extensions.take(D)
+                || operators.take(D)
+                || precedenceGroups.take(D)
+                || nominals.take(D)
+                ||   values.take(D);
             }
         }
     };
