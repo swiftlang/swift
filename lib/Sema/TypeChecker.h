@@ -2163,6 +2163,13 @@ public:
   const StringRef Message;
 };
 
+/// Returns true if a method is an valid implementation of a @dynamicCallable
+/// attribute requirement. The method is given to be defined as one of the
+/// following: `dynamicallyCall(withArguments:)` or
+/// `dynamicallyCall(withKeywordArguments:)`.
+bool isValidDynamicCallableMethod(FuncDecl *funcDecl, DeclContext *DC,
+                                  TypeChecker &TC, bool hasKeywordArguments);
+
 /// Given a subscript defined as "subscript(dynamicMember:)->T", return true if
 /// it is an acceptable implementation of the @dynamicMemberLookup attribute's
 /// requirement.

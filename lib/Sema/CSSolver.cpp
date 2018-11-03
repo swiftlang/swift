@@ -1550,6 +1550,7 @@ void ConstraintSystem::ArgumentInfoCollector::walk(Type argType) {
       case ConstraintKind::CheckedCast:
       case ConstraintKind::OpenedExistentialOf:
       case ConstraintKind::ApplicableFunction:
+      case ConstraintKind::DynamicCallableApplicableFunction:
       case ConstraintKind::BindOverload:
       case ConstraintKind::FunctionInput:
       case ConstraintKind::FunctionResult:
