@@ -2240,7 +2240,8 @@ public:
       return;
     SILClonerWithScopes::postProcess(orig, cloned);
     auto &indices = getDifferentiationTask()->getIndices();
-    if (!(activityInfo.getActivity(orig, indices) & ActivityFlags::Active))
+    if (!activityInfo.getActivity(orig, indices)
+            .contains(ActivityFlags::Active))
       return;
     switch (classifyPrimalValue(orig)) {
     case PrimalValueKind::Conversion:

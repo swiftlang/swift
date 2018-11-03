@@ -89,7 +89,6 @@ bb0(%0 : @trivial $Builtin.FPIEEE32):
 // CHECK-LABEL: struct AD__fanout__Type__src_0_wrt_0_1 {
 // CHECK:   @sil_stored var v_0: Builtin.FPIEEE32
 // CHECK:   @sil_stored var v_1: Builtin.FPIEEE32
-// CHECK:   @sil_stored var v_2: Builtin.FPIEEE32
 // CHECK: }
 
 // CHECK-LABEL: [reverse_differentiable source 0 wrt 0, 1 primal @AD__simple_mul__primal_src_0_wrt_0_1 adjoint @AD__simple_mul__adjoint_src_0_wrt_0_1] @simple_mul
@@ -128,11 +127,10 @@ bb0(%0 : @trivial $Builtin.FPIEEE32):
 // CHECK-LABEL: @AD__fanout__primal_src_0_wrt_0_1
 // CHECK: bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32):
 // CHECK:   %2 = builtin "fmul_FPIEEE32"(%0 : $Builtin.FPIEEE32, %0 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %3 = builtin "fmul_FPIEEE32"(%1 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %4 = builtin "fmul_FPIEEE32"(%0 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
-// CHECK:   %5 = struct $AD__fanout__Type__src_0_wrt_0_1 (%2 : $Builtin.FPIEEE32, %3 : $Builtin.FPIEEE32, %4 : $Builtin.FPIEEE32)
-// CHECK:   %6 = tuple (%5 : $AD__fanout__Type__src_0_wrt_0_1, %4 : $Builtin.FPIEEE32)
-// CHECK:   return %6 : $(AD__fanout__Type__src_0_wrt_0_1, Builtin.FPIEEE32)
+// CHECK:   %3 = builtin "fmul_FPIEEE32"(%0 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+// CHECK:   %4 = struct $AD__fanout__Type__src_0_wrt_0_1 (%2 : $Builtin.FPIEEE32, %3 : $Builtin.FPIEEE32)
+// CHECK:   %5 = tuple (%4 : $AD__fanout__Type__src_0_wrt_0_1, %3 : $Builtin.FPIEEE32)
+// CHECK:   return %5 : $(AD__fanout__Type__src_0_wrt_0_1, Builtin.FPIEEE32)
 // CHECK: }
 
 // CHECK-LABEL: @AD__simple_mul__adjoint_src_0_wrt_0_1
