@@ -57,12 +57,21 @@ SimpleMathTests.test("ResultSelection") {
 }
 
 
-SimpleMathTests.test("CaptureGlobal") {
+SimpleMathTests.test("CaptureLocal") {
   let z: Float = 10
   func foo(_ x: Float) -> Float {
     return z * x
   }
   expectEqual(10, #gradient(foo)(0))
+}
+
+var globalVar: Float = 10
+SimpleMathTests.test("CaptureGlobal") {
+  let foo: (Float) -> Float = { x in
+    globalVar += 20
+    return globalVar * x
+  }
+  expectEqual(30, #gradient(foo)(0))
 }
 
 runAllTests()
