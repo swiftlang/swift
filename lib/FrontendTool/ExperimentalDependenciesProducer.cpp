@@ -86,6 +86,11 @@ template <typename T> using CPVec = std::vector<const T*>;
 template <typename T1 = std::string, typename T2 = std::string> using PairVec = std::vector<std::pair<T1, T2>>;
 template <typename T1, typename T2> using CPPairVec = std::vector<std::pair<const T1*, const T2*>>;
 
+static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
+  Mangle::ASTMangler Mangler;
+  return Mangler.mangleTypeAsContextUSR(type);
+}
+
 namespace {
   /// Takes all the Decls in a SourceFile, and collects them into buckets by groups of DeclKinds.
   /// Also casts them to more specific types.
@@ -185,161 +190,98 @@ namespace {
     }
     
  
+  
     
+  
+        
+    
+  struct InnerDeclCollector {
+    // Records every nominal declaration, and whether or not the declaration
+    /// changes the externally-observable shape of the type.
+    llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
+    
+    /// Records operator declarations so they can be included as top-level
+    /// declarations.
+    CPVec<FuncDecl> memberOperatorDecls;
+    
+    /// Records extension declarations which are not introducing a conformance
+    /// to a public protocol and add a public member.
+    CPVec<ExtensionDecl> extensionsWithJustMembers;
+    
+    InnerDeclCollector(const CPVec<ExtensionDecl> &filteredExtensions, const CPVec<NominalTypeDecl> &filteredTopNominals);
+    
+    /// Recursively computes the transitive closure over members
+    /// adding memberOperatorDecls and extendedNominals to the receiver.
+    void findNominalsAndOperators(const DeclRange members);
+  };
+    
+  
+    
+  class ProviderDecls {
+  private:
+    SourceFileDeclDemux tops;
+    CPVec<ExtensionDecl> filteredExtensions;
+    CPVec<NominalTypeDecl> filteredTopNominals;
+    CPVec<ValueDecl> filteredTopValues;
+    InnerDeclCollector innerDeclCollector;
+    CPVec<NominalTypeDecl> _extendedNominalsThatCanChangeExernallyObservableShape;
+    CPVec<NominalTypeDecl> allExtendedNominals;
+    std::vector<std::pair<const NominalTypeDecl*, const ValueDecl*>> _holdersAndMembers;
+    CPVec<ValueDecl> _classMembers;
+    
+    
+    static CPVec<NominalTypeDecl> filterMap(llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals);
+
     template <typename DeclT>
-    CPVec<DeclT> filter(const CPVec<DeclT> &in) {
-        CPVec<DeclT> out;
-        std::copy_if(in.begin(), in.end(), std::back_inserter(out), hasVisibleName<DeclT>);
-        return out;
-    }
-    template <>
-    CPVec<ExtensionDecl>  filter<ExtensionDecl>(const CPVec<ExtensionDecl> &in)  {
-        CPVec<ExtensionDecl> out;
-        std::copy_if(in.begin(), in.end(), std::back_inserter(out),
-                     [](const ExtensionDecl *const ED) -> bool {
-                         return extendsVisibleNominal(ED)  &&  (hasVisibleMember(ED) || introducesConformanceToVisibleProtocol(ED));
-                     });
-        return out;
-    }
+    static CPVec<DeclT> filter(const CPVec<DeclT> &in);
+
+    static CPVec<ExtensionDecl>  filterExtensions(const CPVec<ExtensionDecl> &in);
+    static CPVec<NominalTypeDecl> getKeysOf(const llvm::MapVector<const NominalTypeDecl *, bool>& extendedNominals);
+    static std::vector<std::pair<const NominalTypeDecl*, const ValueDecl*>>
+    constructHoldersAndMembers(const CPVec<ExtensionDecl> &in );
     
-    CPVec<NominalTypeDecl> getKeysOf(const llvm::MapVector<const NominalTypeDecl *, bool>& extendedNominals) {
-        CPVec<NominalTypeDecl> out;
-        for (auto &p: extendedNominals)
-            out.push_back(p.first);
-        return out;
-    }
+    static CPVec<ValueDecl> findClassMembers(const SourceFile* SF);
+
     
-    std::vector<std::pair<const NominalTypeDecl*, const ValueDecl*>>
-    constructHoldersAndMembers(const CPVec<ExtensionDecl> &in ) {
-        std::vector<std::pair<const NominalTypeDecl*, const ValueDecl*>> out;
-        for (const auto *const ED: in) {
-            for (const auto *const member: ED->getMembers()) {
-                const auto *const VD = dyn_cast<ValueDecl>(member);
-                if (hasVisibleName(VD))
-                    out.push_back(std::make_pair(ED->getExtendedNominal(), VD));
-            }
-        }
-        return out;
-    }
-        
+  public:
+    ProviderDecls(const SourceFile *SF) :
+    tops(SF),
+    filteredExtensions(filterExtensions(tops.extensions)),
+    filteredTopNominals(filter(tops.nominals)),
+    filteredTopValues(filter(tops.values)),
+    innerDeclCollector(filteredExtensions, filteredTopNominals),
+    _extendedNominalsThatCanChangeExernallyObservableShape(filterMap(innerDeclCollector.extendedNominals)),
+    allExtendedNominals(getKeysOf(innerDeclCollector.extendedNominals)),
+    _holdersAndMembers(constructHoldersAndMembers(innerDeclCollector.extensionsWithJustMembers)),
+    _classMembers(findClassMembers(SF))
+    { }
+    // Tops:
+    const CPVec<FuncDecl>& operatorFunctions() const { return innerDeclCollector.memberOperatorDecls; }
+    const CPVec<NominalTypeDecl>& topNominals() const { return filteredTopNominals; }
+    const CPVec<PrecedenceGroupDecl>& precedenceGroups() const { return tops.precedenceGroups; }
+    const CPVec<OperatorDecl>& topOperators() const {return tops.operators; }
+    const CPVec<ValueDecl>& topValues() const {return filteredTopValues; }
     
-    struct InnerDeclCollector {
-        // Records every nominal declaration, and whether or not the declaration
-        /// changes the externally-observable shape of the type.
-        llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
-        
-        /// Records operator declarations so they can be included as top-level
-        /// declarations.
-        CPVec<FuncDecl> memberOperatorDecls;
-        
-        /// Records extension declarations which are not introducing a conformance
-        /// to a public protocol and add a public member.
-        CPVec<ExtensionDecl> extensionsWithJustMembers;
-        
-        InnerDeclCollector(const CPVec<ExtensionDecl> &filteredExtensions, const CPVec<NominalTypeDecl> &filteredTopNominals) {
-            for (auto *ED: filteredExtensions) {
-                if (!introducesConformanceToVisibleProtocol(ED))
-                    extensionsWithJustMembers.push_back(ED);
-                extendedNominals[ED->getExtendedNominal()] |= introducesConformanceToVisibleProtocol(ED);
-                findNominalsAndOperators(ED->getMembers());
-            }
-            for (auto *NTD: filteredTopNominals) {
-                extendedNominals[NTD] |= true;
-                findNominalsAndOperators(NTD->getMembers());
-            }
-        }
-        
-        /// Recursively computes the transitive closure over members
-        /// adding memberOperatorDecls and extendedNominals to the receiver.
-        void findNominalsAndOperators(const DeclRange members) {
-            CPVec<Decl> visibleValues;
-            std::copy_if(members.begin(), members.end(), std::back_inserter(visibleValues),
-                         [](const Decl *const D) -> bool { return isVisible(dyn_cast<ValueDecl>(D)); } );
-            for (auto *D: visibleValues) {
-                if (dyn_cast<ValueDecl>(D)->getFullName().isOperator())
-                    memberOperatorDecls.push_back(cast<FuncDecl>(D));
-                else if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
-                    extendedNominals[nominal] |= true;
-                    findNominalsAndOperators(nominal->getMembers());
-                }
-            }
-        }
-    };
-    
-    CPVec<NominalTypeDecl> filter(llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals) {
-        CPVec<NominalTypeDecl> out;
-        for (const auto entry: extendedNominals)
-            if (entry.second)
-                out.push_back(entry.first);
-        return out;
+    // Nominals:
+    const CPVec<NominalTypeDecl>& extendedNominalsThatCanChangeExernallyObservableShape() const {
+      return _extendedNominalsThatCanChangeExernallyObservableShape;
     }
     
-    class ProviderDecls {
-    private:
-        SourceFileDeclDemux tops;
-        CPVec<ExtensionDecl> filteredExtensions;
-        CPVec<NominalTypeDecl> filteredTopNominals;
-        CPVec<ValueDecl> filteredTopValues;
-        InnerDeclCollector innerDeclCollector;
-        CPVec<NominalTypeDecl> _extendedNominalsThatCanChangeExernallyObservableShape;
-        CPVec<NominalTypeDecl> allExtendedNominals;
-        std::vector<std::pair<const NominalTypeDecl*, const ValueDecl*>> _holdersAndMembers;
-        CPVec<ValueDecl> _classMembers;
-        
-        CPVec<ValueDecl> findClassMembers(const SourceFile* SF) {
-            struct Collector: public VisibleDeclConsumer {
-                CPVec<ValueDecl> members;
-                void foundDecl(ValueDecl *VD, DeclVisibilityKind) override {
-                    members.push_back(VD);
-                }
-            } collector;
-            SF->lookupClassMembers({}, collector);
-            return collector.members;
-        }
-        
-    public:
-        ProviderDecls(const SourceFile *SF) :
-        tops(SF),
-        filteredExtensions(filter(tops.extensions)),
-        filteredTopNominals(filter(tops.nominals)),
-        filteredTopValues(filter(tops.values)),
-        innerDeclCollector(filteredExtensions, filteredTopNominals),
-        _extendedNominalsThatCanChangeExernallyObservableShape(filter(innerDeclCollector.extendedNominals)),
-        allExtendedNominals(getKeysOf(innerDeclCollector.extendedNominals)),
-        _holdersAndMembers(constructHoldersAndMembers(innerDeclCollector.extensionsWithJustMembers)),
-        _classMembers(findClassMembers(SF))
-        { }
-        // Tops:
-        const CPVec<FuncDecl>& operatorFunctions() const { return innerDeclCollector.memberOperatorDecls; }
-        const CPVec<NominalTypeDecl>& topNominals() const { return filteredTopNominals; }
-        const CPVec<PrecedenceGroupDecl>& precedenceGroups() const { return tops.precedenceGroups; }
-        const CPVec<OperatorDecl>& topOperators() const {return tops.operators; }
-        const CPVec<ValueDecl>& topValues() const {return filteredTopValues; }
-        
-        // Nominals:
-        const CPVec<NominalTypeDecl>& extendedNominalsThatCanChangeExernallyObservableShape() const {
-            return _extendedNominalsThatCanChangeExernallyObservableShape;
-        }
-        
-        // Members:
-        const CPVec<NominalTypeDecl>& extendedNominalsThatCouldAddMembers() const {
-            return allExtendedNominals;
-        }
-        const std::vector<std::pair<const NominalTypeDecl*, const ValueDecl*>>& holdersAndMembers() const {
-            return _holdersAndMembers;
-        }
-        
-        // Dynamic lookup:
-        const CPVec<ValueDecl> classMembers() const { return _classMembers; }
-        
-    };
+    // Members:
+    const CPVec<NominalTypeDecl>& extendedNominalsThatCouldAddMembers() const {
+      return allExtendedNominals;
+    }
+    const std::vector<std::pair<const NominalTypeDecl*, const ValueDecl*>>& holdersAndMembers() const {
+      return _holdersAndMembers;
+    }
+    
+    // Dynamic lookup:
+    const CPVec<ValueDecl> classMembers() const { return _classMembers; }
+  };
 }
 
-static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
-  Mangle::ASTMangler Mangler;
-  return Mangler.mangleTypeAsContextUSR(type);
-}
 
+////////////////////////////
 
 namespace {
   using MemberTableEntryTy = std::pair<ReferencedNameTracker::MemberPair, bool>;
@@ -355,78 +297,6 @@ namespace {
     bool operator< (const DependName &other) const {return compare(other) == -1; }
   };
   
-  std::vector<DependName> linearizeAndSort(const llvm::DenseMap<DeclBaseName, bool> &map) {
-    std::vector<DependName> out;
-    for (const auto &p: map)
-      out.push_back(DependName{p.getFirst(), p.getSecond()});
-
-    std::sort(out.begin(), out.end());
-    return out;
-  }
-  
-  std::vector<MemberTableEntryTy> sort(const llvm::DenseMap<ReferencedNameTracker::MemberPair, bool> &members) {
-    std::vector<MemberTableEntryTy> out{members.begin(), members.end()};
-    llvm::array_pod_sort(out.begin(), out.end(),
-                         [](const MemberTableEntryTy *lhs,
-                            const MemberTableEntryTy *rhs) -> int {
-                           if (auto cmp = lhs->first.first->getName().compare(rhs->first.first->getName()))
-                             return cmp;
-                           
-                           if (auto cmp = lhs->first.second.compare(rhs->first.second))
-                             return cmp;
-                           
-                           // We can have two entries with the same member name if one of them
-                           // was the special 'init' name and the other is the plain 'init' token.
-                           if (lhs->second != rhs->second)
-                             return lhs->second ? -1 : 1;
-                           
-                           // Break type name ties by mangled name.
-                           auto lhsMangledName = mangleTypeAsContext(lhs->first.first);
-                           auto rhsMangledName = mangleTypeAsContext(rhs->first.first);
-                           return lhsMangledName.compare(rhsMangledName);
-                         });
-    return out;
-  }
-  
-  
-  std::vector<MemberTableEntryTy> filter(const std::vector<MemberTableEntryTy> &in) {
-    std::vector<MemberTableEntryTy> out;
-    std::copy_if(in.begin(), in.end(), std::back_inserter(out),
-                 [] (const MemberTableEntryTy &mte) -> bool {
-                   assert(mte.first.first != nullptr);
-                   return isVisible(mte.first.first);
-                 });
-    return out;
-  }
-
-std::unordered_set<const NominalTypeDecl*> findCascadingHolders(const std::vector<MemberTableEntryTy> &in) {
-  std::unordered_set<const NominalTypeDecl*> out;
-  for (const auto &entry: in)
-    if (entry.second)
-      out.insert(entry.first.first);
-  return out;
-}
- 
-  std::vector<MemberTableEntryTy> spreadCascades(const std::vector<MemberTableEntryTy> &members,
-                                                 const std::unordered_set<const NominalTypeDecl*> &cascades) {
-    std::vector<MemberTableEntryTy> out;
-    std::transform(members.begin(), members.end(), std::back_inserter(out),
-                   [&cascades] (MemberTableEntryTy entry) -> MemberTableEntryTy {
-                     entry.second = cascades.count(entry.first.first) != 0 ? true : false;
-                     return entry;
-                   });
-    return out;
-  }
-  
-  StringVec reversePathSortedFilenames(const ArrayRef<std::string> in) {
-    StringVec out{in.begin(), in.end()};
-    std::sort(out.begin(), out.end(),  [](const std::string &a,
-                                          const std::string &b) -> bool {
-      return std::lexicographical_compare(a.rbegin(), a.rend(),
-                                          b.rbegin(), b.rend());
-    });
-    return out;
-  }
   
   class DependsArcs {
   private:
@@ -438,7 +308,15 @@ std::unordered_set<const NominalTypeDecl*> findCascadingHolders(const std::vecto
     std::vector<MemberTableEntryTy> sortedMembersWithPropagatedCascades;
     std::vector<DependName> sortedDynamicLookupNames;
     StringVec externalNames;
-
+    
+    
+    static std::vector<DependName> linearizeAndSort(const llvm::DenseMap<DeclBaseName, bool> &map);
+    static std::vector<MemberTableEntryTy> sort(const llvm::DenseMap<ReferencedNameTracker::MemberPair, bool> &members);
+    static std::vector<MemberTableEntryTy> filter(const std::vector<MemberTableEntryTy> &in);
+    static std::unordered_set<const NominalTypeDecl*> findCascadingHolders(const std::vector<MemberTableEntryTy> &in);
+    static std::vector<MemberTableEntryTy> spreadCascades(const std::vector<MemberTableEntryTy> &members,
+                                                          const std::unordered_set<const NominalTypeDecl*> &cascades);
+    static StringVec reversePathSortedFilenames(const ArrayRef<std::string> in);
  
   public:
     DependsArcs(const SourceFile *const SF, const DependencyTracker &depTracker) :
@@ -460,7 +338,171 @@ std::unordered_set<const NominalTypeDecl*> findCascadingHolders(const std::vecto
   };
 }
 
+////////////////////////
 
+InnerDeclCollector::InnerDeclCollector(const CPVec<ExtensionDecl> &filteredExtensions, const CPVec<NominalTypeDecl> &filteredTopNominals) {
+  for (auto *ED: filteredExtensions) {
+    if (!introducesConformanceToVisibleProtocol(ED))
+      extensionsWithJustMembers.push_back(ED);
+    extendedNominals[ED->getExtendedNominal()] |= introducesConformanceToVisibleProtocol(ED);
+    findNominalsAndOperators(ED->getMembers());
+  }
+  for (auto *NTD: filteredTopNominals) {
+    extendedNominals[NTD] |= true;
+    findNominalsAndOperators(NTD->getMembers());
+  }
+}
+
+/// Recursively computes the transitive closure over members
+/// adding memberOperatorDecls and extendedNominals to the receiver.
+void InnerDeclCollector::findNominalsAndOperators(const DeclRange members) {
+  CPVec<Decl> visibleValues;
+  std::copy_if(members.begin(), members.end(), std::back_inserter(visibleValues),
+               [](const Decl *const D) -> bool { return isVisible(dyn_cast<ValueDecl>(D)); } );
+  for (auto *D: visibleValues) {
+    if (dyn_cast<ValueDecl>(D)->getFullName().isOperator())
+      memberOperatorDecls.push_back(cast<FuncDecl>(D));
+    else if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
+      extendedNominals[nominal] |= true;
+      findNominalsAndOperators(nominal->getMembers());
+    }
+  }
+}
+
+/////////////////////////
+
+CPVec<NominalTypeDecl> ProviderDecls::filterMap(llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals) {
+  CPVec<NominalTypeDecl> out;
+  for (const auto entry: extendedNominals)
+    if (entry.second)
+      out.push_back(entry.first);
+  return out;
+}
+
+template <typename DeclT>
+CPVec<DeclT> ProviderDecls::filter(const CPVec<DeclT> &in) {
+  CPVec<DeclT> out;
+  std::copy_if(in.begin(), in.end(), std::back_inserter(out), hasVisibleName<DeclT>);
+  return out;
+}
+
+CPVec<ExtensionDecl>  ProviderDecls::filterExtensions(const CPVec<ExtensionDecl> &in)  {
+  CPVec<ExtensionDecl> out;
+  std::copy_if(in.begin(), in.end(), std::back_inserter(out),
+               [](const ExtensionDecl *const ED) -> bool {
+                 return extendsVisibleNominal(ED)  &&  (hasVisibleMember(ED) || introducesConformanceToVisibleProtocol(ED));
+               });
+  return out;
+}
+
+
+
+CPVec<NominalTypeDecl> ProviderDecls::getKeysOf(const llvm::MapVector<const NominalTypeDecl *, bool>& extendedNominals) {
+  CPVec<NominalTypeDecl> out;
+  for (auto &p: extendedNominals)
+    out.push_back(p.first);
+  return out;
+}
+
+std::vector<std::pair<const NominalTypeDecl*, const ValueDecl*>>
+ProviderDecls::constructHoldersAndMembers(const CPVec<ExtensionDecl> &in ) {
+  std::vector<std::pair<const NominalTypeDecl*, const ValueDecl*>> out;
+  for (const auto *const ED: in) {
+    for (const auto *const member: ED->getMembers()) {
+      const auto *const VD = dyn_cast<ValueDecl>(member);
+      if (hasVisibleName(VD))
+        out.push_back(std::make_pair(ED->getExtendedNominal(), VD));
+    }
+  }
+  return out;
+}
+
+CPVec<ValueDecl> ProviderDecls::findClassMembers(const SourceFile* SF) {
+  struct Collector: public VisibleDeclConsumer {
+    CPVec<ValueDecl> members;
+    void foundDecl(ValueDecl *VD, DeclVisibilityKind) override {
+      members.push_back(VD);
+    }
+  } collector;
+  SF->lookupClassMembers({}, collector);
+  return collector.members;
+}
+
+
+///////////////////////
+
+
+std::vector<DependName> DependsArcs::linearizeAndSort(const llvm::DenseMap<DeclBaseName, bool> &map) {
+  std::vector<DependName> out;
+  for (const auto &p: map)
+    out.push_back(DependName{p.getFirst(), p.getSecond()});
+  
+  std::sort(out.begin(), out.end());
+  return out;
+}
+
+std::vector<MemberTableEntryTy> DependsArcs::sort(const llvm::DenseMap<ReferencedNameTracker::MemberPair, bool> &members) {
+  std::vector<MemberTableEntryTy> out{members.begin(), members.end()};
+  llvm::array_pod_sort(out.begin(), out.end(),
+                       [](const MemberTableEntryTy *lhs,
+                          const MemberTableEntryTy *rhs) -> int {
+                         if (auto cmp = lhs->first.first->getName().compare(rhs->first.first->getName()))
+                           return cmp;
+                         
+                         if (auto cmp = lhs->first.second.compare(rhs->first.second))
+                           return cmp;
+                         
+                         // We can have two entries with the same member name if one of them
+                         // was the special 'init' name and the other is the plain 'init' token.
+                         if (lhs->second != rhs->second)
+                           return lhs->second ? -1 : 1;
+                         
+                         // Break type name ties by mangled name.
+                         auto lhsMangledName = mangleTypeAsContext(lhs->first.first);
+                         auto rhsMangledName = mangleTypeAsContext(rhs->first.first);
+                         return lhsMangledName.compare(rhsMangledName);
+                       });
+  return out;
+}
+
+std::vector<MemberTableEntryTy> DependsArcs::filter(const std::vector<MemberTableEntryTy> &in) {
+  std::vector<MemberTableEntryTy> out;
+  std::copy_if(in.begin(), in.end(), std::back_inserter(out),
+               [] (const MemberTableEntryTy &mte) -> bool {
+                 assert(mte.first.first != nullptr);
+                 return isVisible(mte.first.first);
+               });
+  return out;
+}
+
+std::unordered_set<const NominalTypeDecl*> DependsArcs::findCascadingHolders(const std::vector<MemberTableEntryTy> &in) {
+  std::unordered_set<const NominalTypeDecl*> out;
+  for (const auto &entry: in)
+    if (entry.second)
+      out.insert(entry.first.first);
+  return out;
+}
+
+std::vector<MemberTableEntryTy> DependsArcs::spreadCascades(const std::vector<MemberTableEntryTy> &members,
+                                               const std::unordered_set<const NominalTypeDecl*> &cascades) {
+  std::vector<MemberTableEntryTy> out;
+  std::transform(members.begin(), members.end(), std::back_inserter(out),
+                 [&cascades] (MemberTableEntryTy entry) -> MemberTableEntryTy {
+                   entry.second = cascades.count(entry.first.first) != 0 ? true : false;
+                   return entry;
+                 });
+  return out;
+}
+
+StringVec DependsArcs::reversePathSortedFilenames(const ArrayRef<std::string> in) {
+  StringVec out{in.begin(), in.end()};
+  std::sort(out.begin(), out.end(),  [](const std::string &a,
+                                        const std::string &b) -> bool {
+    return std::lexicographical_compare(a.rbegin(), a.rend(),
+                                        b.rbegin(), b.rend());
+  });
+  return out;
+}
 
 #if 0
 namespace SQ
