@@ -13,6 +13,7 @@ from __future__ import print_function
 import argparse
 import json
 import os
+import platform
 import re
 import sys
 import traceback
@@ -131,8 +132,8 @@ def update_single_repository(args):
             # If we were asked to reset to the specified branch, do the hard
             # reset and return.
             if checkout_target and reset_to_remote and not cross_repo:
-                shell.run(['git', 'reset', '--hard',
-                           "origin/%s" % checkout_target], echo=True)
+                full_target = full_target_name('origin', checkout_target)
+                shell.run(['git', 'reset', '--hard', full_target], echo=True)
                 return
 
             # Query whether we have a "detached HEAD", which will mean that
@@ -371,6 +372,37 @@ def validate_config(config):
                        'aliases?!')
 
 
+def full_target_name(repository, target):
+    tag = shell.capture(["git", "tag", "-l", target], echo=True).strip()
+    if tag == target:
+        return tag
+
+    branch = shell.capture(["git", "branch", "--list", target],
+                           echo=True).strip().replace("* ", "")
+    if branch == target:
+        name = "%s/%s" % (repository, target)
+        return name
+
+    raise RuntimeError('Cannot determine if %s is a branch or a tag' % target)
+
+
+def skip_list_for_platform(config):
+    # If there is a platforms key only include the repo if the
+    # plaform is in the list
+    skip_list = []
+    platform_name = platform.system()
+
+    for repo_name, repo_info in config['repos'].items():
+        if 'platforms' in repo_info:
+            if platform_name not in repo_info['platforms']:
+                print("Skipping", repo_name, "on", platform_name)
+                skip_list.append(repo_name)
+            else:
+                print("Including", repo_name, "on", platform_name)
+
+    return skip_list
+
+
 def main():
     freeze_support()
     parser = argparse.ArgumentParser(
@@ -494,7 +526,8 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         if scheme is None:
             scheme = config['default-branch-scheme']
 
-        skip_repo_list = args.skip_repository_list
+        skip_repo_list = skip_list_for_platform(config)
+        skip_repo_list.extend(args.skip_repository_list)
         clone_results = obtain_all_additional_swift_sources(args, config,
                                                             clone_with_ssh,
                                                             scheme,

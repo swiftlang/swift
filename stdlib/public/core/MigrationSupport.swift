@@ -133,7 +133,7 @@ public typealias StringLiteralConvertible = ExpressibleByStringLiteral
 public typealias ArrayLiteralConvertible = ExpressibleByArrayLiteral
 @available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByDictionaryLiteral")
 public typealias DictionaryLiteralConvertible = ExpressibleByDictionaryLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, message: "it will be replaced or redesigned in Swift 4.0.  Instead of conforming to 'StringInterpolationConvertible', consider adding an 'init(_:String)'")
+@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByStringInterpolation")
 public typealias StringInterpolationConvertible = ExpressibleByStringInterpolation
 @available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByColorLiteral")
 public typealias _ColorLiteralConvertible = _ExpressibleByColorLiteral

@@ -58,7 +58,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckSwitchStmt.cpp
   TypeCheckType.cpp
   TypeChecker.cpp
-  LINK_LIBS
+  LINK_LIBRARIES
     swiftParse
     swiftAST
     swiftSerialization

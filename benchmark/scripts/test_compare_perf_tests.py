@@ -681,7 +681,7 @@ class TestReportFormatter(OldAndNewLog):
     def setUp(self):
         super(TestReportFormatter, self).setUp()
         self.tc = TestComparator(self.old_results, self.new_results, 0.05)
-        self.rf = ReportFormatter(self.tc, '', '', changes_only=False)
+        self.rf = ReportFormatter(self.tc, changes_only=False)
         self.markdown = self.rf.markdown()
         self.git = self.rf.git()
         self.html = self.rf.html()
@@ -840,7 +840,7 @@ class TestReportFormatter(OldAndNewLog):
 
     def test_report_only_changes(self):
         """Leave out tests without significant change."""
-        rf = ReportFormatter(self.tc, '', '', changes_only=True)
+        rf = ReportFormatter(self.tc, changes_only=True)
         markdown, git, html = rf.markdown(), rf.git(), rf.html()
         self.assertNotIn('No Changes', markdown)
         self.assertNotIn('AngryPhonebook', markdown)
@@ -908,18 +908,6 @@ class Test_parse_args(unittest.TestCase):
         self.assertFalse(parse_args(self.required).changes_only)
         self.assertTrue(parse_args(self.required +
                                    ['--changes-only']).changes_only)
-
-    def test_branch_arguments(self):
-        # default value
-        args = parse_args(self.required)
-        self.assertEquals(args.new_branch, 'NEW_MIN')
-        self.assertEquals(args.old_branch, 'OLD_MIN')
-        # user specified
-        args = parse_args(
-            self.required + ['--old-branch', 'master',
-                             '--new-branch', 'amazing-optimization'])
-        self.assertEquals(args.old_branch, 'master')
-        self.assertEquals(args.new_branch, 'amazing-optimization')
 
 
 class Test_compare_perf_tests_main(OldAndNewLog, FileSystemIntegration):

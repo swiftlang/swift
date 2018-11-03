@@ -1219,8 +1219,11 @@ public:
   StringRef copyAndStripUnderscores(StringRef text);
 
   ParserStatus parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
-                                   SmallVectorImpl<Expr*> &Exprs,
-                                   Token EntireTok);
+                                   Token EntireTok,
+                                   VarDecl *InterpolationVar,
+                                   SmallVectorImpl<ASTNode> &Stmts,
+                                   unsigned &LiteralCapacity,
+                                   unsigned &InterpolationCount);
 
   /// Parse an argument label `identifier ':'`, if it exists.
   ///

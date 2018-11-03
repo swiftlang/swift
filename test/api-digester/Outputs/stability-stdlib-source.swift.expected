@@ -1,9 +1,11 @@
 
 /* Generic Signature Changes */
+Protocol StringProtocol has generic signature change from <Self : BidirectionalCollection, Self : Comparable, Self : ExpressibleByStringLiteral, Self : Hashable, Self : LosslessStringConvertible, Self : TextOutputStream, Self : TextOutputStreamable, Self.Element == Character, Self.SubSequence : StringProtocol, Self.UTF16View : BidirectionalCollection, Self.UTF8View : Collection, Self.UnicodeScalarView : BidirectionalCollection, Self.UTF16View.Element == UInt16, Self.UTF8View.Element == UInt8, Self.UnicodeScalarView.Element == Unicode.Scalar> to <Self : BidirectionalCollection, Self : Comparable, Self : ExpressibleByStringInterpolation, Self : Hashable, Self : LosslessStringConvertible, Self : TextOutputStream, Self : TextOutputStreamable, Self.Element == Character, Self.StringInterpolation == DefaultStringInterpolation, Self.SubSequence : StringProtocol, Self.UTF16View : BidirectionalCollection, Self.UTF8View : Collection, Self.UnicodeScalarView : BidirectionalCollection, Self.UTF16View.Element == UInt16, Self.UTF8View.Element == UInt8, Self.UnicodeScalarView.Element == Unicode.Scalar>
 
 /* RawRepresentable Changes */
 
 /* Removed Decls */
+Constructor String.init(stringInterpolationSegment:) has been removed
 Func Collection.prefix(through:) has been removed
 Func Collection.prefix(upTo:) has been removed
 Func Collection.suffix(from:) has been removed
@@ -13,6 +15,7 @@ Func Sequence.map(_:) has been removed
 Func _SequenceWrapper.filter(_:) has been removed
 Func _SequenceWrapper.forEach(_:) has been removed
 Func _SequenceWrapper.map(_:) has been removed
+TypeAlias ExpressibleByStringInterpolation has been removed (deprecated)
 Var AnyBidirectionalCollection.first has been removed
 Var AnyBidirectionalCollection.last has been removed
 Var AnyCollection.first has been removed
@@ -32,7 +35,9 @@ Var Set.first has been removed
 /* Renamed Decls */
 
 /* Type Changes */
+Constructor String.init(stringInterpolation:) has parameter 0 type change from [String] to DefaultStringInterpolation
 
 /* Decl Attribute changes */
 
 /* Protocol Requirement Changes */
+Protocol StringProtocol has added inherited protocol ExpressibleByStringInterpolation
