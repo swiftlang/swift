@@ -910,6 +910,18 @@ extension _StringGuts {
     _invariantCheck()
   }
 
+  @inlinable internal
+  init(_initialCapacity capacity: Int) {
+    if capacity <= _SmallUTF8String.capacity {
+      self.init()
+    } else {
+      let storage = _SwiftStringStorage<UInt8>.create(
+        capacity: capacity,
+        count: 0)
+      self.init(_large: storage)
+    }
+  }
+
   @usableFromInline // @testable
   mutating func reserveCapacity(_ capacity: Int) {
     if _fastPath(_isUniqueNative()) {
@@ -940,6 +952,7 @@ extension _StringGuts {
     _invariantCheck()
   }
 
+  @usableFromInline
   internal
   mutating func append(_ other: _UnmanagedASCIIString) {
     guard other.count > 0 else { return  }
@@ -982,11 +995,24 @@ extension _StringGuts {
     self.append(other._wholeString._guts, range: other._encodedOffsetRange)
   }
 
-  @usableFromInline // @testable
+  @inlinable // @testable
   internal
   mutating func append(_ other: _StringGuts) {
+    // We inline only the _isEmptySingleton check because it can often be
+    // proven or disproven at compile time. A full length check is often
+    // inconclusive.
+    if _isEmptySingleton {
+      self = other
+      return
+    }
+    _appendSlow(other)
+  }
+
+  @usableFromInline
+  internal
+  mutating func _appendSlow(_ other: _StringGuts) {
     // FIXME(TODO: JIRA): shouldn't _isEmptySingleton be sufficient?
-    if _isEmptySingleton || self.count == 0 && !_object.isNative {
+    if self.count == 0 && !_object.isNative {
       // We must be careful not to discard any capacity that
       // may have been reserved for the append -- this is why
       // we check for the empty string singleton rather than

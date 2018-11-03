@@ -1,5 +1,8 @@
 
 /* Generic Signature Changes */
+Constructor _ExpressibleByStringInterpolation.init(stringInterpolation:) has generic signature change from <τ_0_0 where τ_0_0 : _ExpressibleByStringInterpolation> to <τ_0_0 where τ_0_0 : ExpressibleByStringInterpolation>
+Protocol StringProtocol has generic signature change from <τ_0_0 : BidirectionalCollection, τ_0_0 : Comparable, τ_0_0 : ExpressibleByStringLiteral, τ_0_0 : Hashable, τ_0_0 : LosslessStringConvertible, τ_0_0 : TextOutputStream, τ_0_0 : TextOutputStreamable, τ_0_0.Element == Character, τ_0_0.SubSequence : StringProtocol, τ_0_0.UTF16View : BidirectionalCollection, τ_0_0.UTF8View : Collection, τ_0_0.UnicodeScalarView : BidirectionalCollection, τ_0_0.UTF16View.Element == UInt16, τ_0_0.UTF8View.Element == UInt8, τ_0_0.UnicodeScalarView.Element == Unicode.Scalar> to <τ_0_0 : BidirectionalCollection, τ_0_0 : Comparable, τ_0_0 : ExpressibleByStringInterpolation, τ_0_0 : Hashable, τ_0_0 : LosslessStringConvertible, τ_0_0 : TextOutputStream, τ_0_0 : TextOutputStreamable, τ_0_0.Element == Character, τ_0_0.StringInterpolation == DefaultStringInterpolation, τ_0_0.SubSequence : StringProtocol, τ_0_0.UTF16View : BidirectionalCollection, τ_0_0.UTF8View : Collection, τ_0_0.UnicodeScalarView : BidirectionalCollection, τ_0_0.UTF16View.Element == UInt16, τ_0_0.UTF8View.Element == UInt8, τ_0_0.UnicodeScalarView.Element == Unicode.Scalar>
+Protocol _ExpressibleByStringInterpolation has generic signature change from to <τ_0_0 : ExpressibleByStringLiteral, τ_0_0.StringInterpolation : StringInterpolationProtocol, τ_0_0.StringLiteralType == τ_0_0.StringInterpolation.StringLiteralType>
 
 /* RawRepresentable Changes */
 
@@ -7,9 +10,11 @@
 Constructor AnyHashable.init(_box:) has been removed
 Constructor AnyHashable.init(_usingDefaultRepresentationOf:) has been removed
 Constructor ManagedBufferPointer.init(_:_:_:) has been removed
+Constructor String.init(stringInterpolationSegment:) has been removed
 Constructor Zip2Sequence.init(_sequence1:_sequence2:) has been removed
 Constructor _BridgeStorage.init(native:bits:) has been removed
 Constructor _BridgeableMetatype.init(value:) has been removed
+Constructor _ExpressibleByStringInterpolation.init(stringInterpolationSegment:) has been removed
 Func AnyHashable._downCastConditional(into:) has been removed
 Func Collection.prefix(through:) has been removed
 Func Collection.prefix(upTo:) has been removed
@@ -32,6 +37,8 @@ Func _getEnumCaseName(_:) has been removed
 Func _opaqueSummary(_:) has been removed
 Func _stdlib_NSDictionary_allKeys(_:) has been removed
 Func _stdlib_NSSet_allObjects(_:) has been removed
+Func _toStringReadOnlyPrintable(_:) has been removed
+Func _toStringReadOnlyStreamable(_:) has been removed
 Protocol _HeapBufferHeader_ has been removed
 Struct _ConcreteHashableBox has been removed
 Struct _HeapBufferHeader has been removed
@@ -73,13 +80,16 @@ Var _RandomAccessCollectionBox._first has been removed
 Var _RandomAccessCollectionBox._last has been removed
 Var __SwiftDeferredNSArray._heapBufferBridged has been removed
 Var __SwiftDeferredNSArray._heapBufferBridgedPtr has been removed
-Var Hasher._core has declared type change from _BufferingHasher<_SipHash13Core> to _BufferingHasher<Hasher._Core>
 
 /* Moved Decls */
 
 /* Renamed Decls */
+Protocol _ExpressibleByStringInterpolation has been renamed to Protocol ExpressibleByStringInterpolation
 
 /* Type Changes */
+Constructor String.init(stringInterpolation:) has parameter 0 type change from Array<String> to DefaultStringInterpolation
+Constructor _ExpressibleByStringInterpolation.init(stringInterpolation:) has parameter 0 type change from Array<τ_0_0> to τ_0_0.StringInterpolation
+Var Hasher._core has declared type change from _BufferingHasher<_SipHash13Core> to _BufferingHasher<Hasher._Core>
 Struct _BridgeableMetatype is now without @_fixed_layout
 Func __ContiguousArrayStorageBase._getNonVerbatimBridgingBuffer() is added to a non-resilient type
 Var _CocoaDictionary.Index._offset is added to a non-resilient type
@@ -90,3 +100,9 @@ Var _CocoaSet.Index._storage in a non-resilient type changes position from 1 to 
 /* Decl Attribute changes */
 
 /* Protocol Requirement Changes */
+Protocol ExpressibleByStringInterpolation has added inherited protocol ExpressibleByExtendedGraphemeClusterLiteral
+Protocol ExpressibleByStringInterpolation has added inherited protocol ExpressibleByStringLiteral
+Protocol ExpressibleByStringInterpolation has added inherited protocol ExpressibleByUnicodeScalarLiteral
+Protocol StringProtocol has added inherited protocol ExpressibleByStringInterpolation
+Struct String has removed conformance to _ExpressibleByStringInterpolation
+Func TextOutputStream._writeASCII(_:) has been added as a protocol requirement

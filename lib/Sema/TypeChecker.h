@@ -1080,6 +1080,8 @@ public:
 
   bool typeCheckClosureBody(ClosureExpr *closure);
 
+  bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
+
   void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
   void processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
@@ -1390,15 +1392,6 @@ public:
 
   bool typeCheckCompletionSequence(Expr *&expr, DeclContext *DC);
 
-  /// \brief Type check the given expression assuming that its children
-  /// have already been fully type-checked.
-  ///
-  /// \param expr The expression to type-check, which will be modified in
-  /// place.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  bool typeCheckExpressionShallow(Expr *&expr, DeclContext *dc);
-
   /// Check the key-path expression.
   ///
   /// Returns the type of the last component of the key-path.
@@ -1691,7 +1684,7 @@ public:
                     ProtocolDecl *protocol,
                     ProtocolConformanceRef conformance,
                     DeclName name,
-                    MutableArrayRef<Expr *> arguments,
+                    ArrayRef<Expr *> arguments,
                     Diag<> brokenProtocolDiag);
 
   /// \brief Determine whether the given type contains the given protocol.

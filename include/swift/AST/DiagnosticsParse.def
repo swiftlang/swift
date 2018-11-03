@@ -1221,6 +1221,16 @@ ERROR(expected_type_after_as,none,
 ERROR(string_interpolation_extra,none,
       "extra tokens after interpolated string expression", ())
 
+// Interpolations with parameter labels or multiple values
+WARNING(string_interpolation_list_changing,none,
+      "interpolating multiple values will not form a tuple in Swift 5", ())
+NOTE(string_interpolation_list_insert_parens,none,
+      "insert parentheses to keep current behavior", ())
+WARNING(string_interpolation_label_changing,none,
+      "labeled interpolations will not be ignored in Swift 5", ())
+NOTE(string_interpolation_remove_label,none,
+      "remove %0 label to keep current behavior", (Identifier))
+
 // Keypath expressions.
 ERROR(expr_keypath_expected_lparen,PointsToFirstBadToken,
       "expected '(' following '#keyPath'", ())
