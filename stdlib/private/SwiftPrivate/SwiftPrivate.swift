@@ -45,7 +45,7 @@ public func gather<C : Collection, IndicesSequence : Sequence>(
   _ collection: C, _ indices: IndicesSequence
 ) -> [C.Element]
   where IndicesSequence.Element == C.Index {
-    return Array(indices.map { collection[$0] })
+  return Array(indices.map { collection[$0] })
 }
 
 public func scatter<T>(_ a: [T], _ idx: [Int]) -> [T] {
