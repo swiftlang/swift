@@ -5639,12 +5639,20 @@ Expr *ExprRewriter::coerceCallArguments(
       continue;
     }
 
-    Expr *convertedArg = nullptr;
+    auto isAutoClosureArg = [](Expr *arg) -> bool {
+      if (auto *DRE = dyn_cast<DeclRefExpr>(arg)) {
+        if (auto *PD = dyn_cast<ParamDecl>(DRE->getDecl()))
+          return PD->isAutoClosure();
+      }
+      return false;
+    };
 
+    Expr *convertedArg = nullptr;
     // Since it was allowed to pass function types to @autoclosure
     // parameters in Swift versions < 5, it has to be handled as
     // a regular function coversion by `coerceToType`.
-    if (param.isAutoClosure() && !argType->is<FunctionType>()) {
+    if (param.isAutoClosure() && (!argType->is<FunctionType>() ||
+                                  !isAutoClosureArg(arg))) {
       // If parameter is an autoclosure, we need to make sure that:
       //   - argument type is coerced to parameter result type
       //   - impilict autoclosure is created to wrap argument expression
