@@ -62,7 +62,6 @@ public func withArrayOfCStrings<R>(
   let argsCounts = Array(args.map { $0.utf8.count + 1 })
   let argsOffsets = [ 0 ] + scan(argsCounts, 0, +)
   let argsBufferSize = argsOffsets.last!
-  
   var argsBuffer: [UInt8] = []
   argsBuffer.reserveCapacity(argsBufferSize)
   for arg in args {
