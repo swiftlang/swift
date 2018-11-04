@@ -6,7 +6,7 @@
 // REQUIRES: CPU=arm64 || CPU=x86_64
 
 // FIXME: https://bugs.swift.org/browse/SR-9008
-// XFAIL: linux
+// XFAIL: *
 
 //CHECK-LABEL: @$s17unused_containers16empty_array_testyyF
 //CHECK: bb0:
