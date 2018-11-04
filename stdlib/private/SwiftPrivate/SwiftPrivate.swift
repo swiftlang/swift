@@ -68,7 +68,6 @@ public func withArrayOfCStrings<R>(
     argsBuffer.append(contentsOf: arg.utf8)
     argsBuffer.append(0)
   }
-  
   return argsBuffer.withUnsafeMutableBufferPointer {
     (argsBuffer) in
     let ptr = UnsafeMutableRawPointer(argsBuffer.baseAddress!).bindMemory(
