@@ -971,7 +971,10 @@ void IRGenModule::emitReflectionMetadataVersion() {
                                           llvm::GlobalValue::LinkOnceODRLinkage,
                                           Init,
                                           "__swift_reflection_version");
-  Version->setVisibility(llvm::GlobalValue::HiddenVisibility);
+  ApplyIRLinkage({llvm::GlobalValue::LinkOnceODRLinkage,
+                  llvm::GlobalValue::HiddenVisibility,
+                  llvm::GlobalValue::DefaultStorageClass})
+      .to(Version);
   addUsedGlobal(Version);
 }
 
