@@ -279,6 +279,30 @@ namespace {
     const CPVec<ValueDecl> classMembers() const { return _classMembers; }
   };
 }
+//////////////////////////
+
+namespace {
+  class ProviderNames {
+    const ProviderDecls &pds;
+    
+  public:
+    ProviderNames(const ProviderDecls &pds) : pds(pds) {}
+    
+
+    template <typename DeclT>
+    StringVec names(const CPVec<DeclT>& (ProviderDecls::*declFunc)() const, Identifier (DeclT::*idFunc)() const) {
+      StringVec out;
+      for (const auto *const D: (pds.*declFunc)())
+        out.push_back(DeclBaseName((D->*idFunc)()).userFacingName());
+      return out;
+    }
+
+    //using topOperators =
+    void snort() {
+      names<OperatorDecl>(&ProviderDecls::topOperators, &OperatorDecl::getName);
+    }
+  };
+}
 
 
 ////////////////////////////
