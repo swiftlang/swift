@@ -42,8 +42,10 @@ func array_of_strings_test() {
 
 //CHECK-LABEL: string_interpolation
 //CHECK: bb0:
-//CHECK-NEXT: tuple
-//CHECK-NEXT: return
+
+// <rdar://problem/45788348>
+//xCHECK-NEXT: tuple
+//xCHECK-NEXT: return
 func string_interpolation() {
   // Int
   let x : Int = 2
@@ -69,8 +71,10 @@ func string_interpolation() {
 
 //CHECK-LABEL: string_interpolation2
 //CHECK: bb0:
-//CHECK-NEXT: tuple
-//CHECK-NEXT: return
+
+// <rdar://problem/45788348>
+//xCHECK-NEXT: tuple
+//xCHECK-NEXT: return
 func string_interpolation2() {
   "\(false) \(true)"
 }
