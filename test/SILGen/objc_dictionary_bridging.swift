@@ -53,12 +53,12 @@ import gizmo
   @objc var property: Dictionary<Foo, Foo> = [:]
 
   // Property getter
-  // CHECK-LABEL: sil hidden [thunk] @$s24objc_dictionary_bridging3FooC8propertySDyA3CSH10FoundationyHCg_GvgTo : $@convention(objc_method) (Foo) -> @autoreleased NSDictionary
+  // CHECK-LABEL: sil hidden [thunk] @$s24objc_dictionary_bridging3FooC8propertySDyA2CGvgTo : $@convention(objc_method) (Foo) -> @autoreleased NSDictionary
   //                                 @$s24objc_dictionary_bridging3FooC8propertySDyA2CSo8NSObjectCSH10Foundationg_Gvpfi
   // CHECK: bb0([[SELF:%[0-9]+]] : @unowned $Foo):
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
-  // CHECK:   [[GETTER:%[0-9]+]] = function_ref @$s24objc_dictionary_bridging3FooC8propertySDyA3CSH10FoundationyHCg_Gvg : $@convention(method) (@guaranteed Foo) -> @owned Dictionary<Foo, Foo>
+  // CHECK:   [[GETTER:%[0-9]+]] = function_ref @$s24objc_dictionary_bridging3FooC8propertySDyA2CGvg : $@convention(method) (@guaranteed Foo) -> @owned Dictionary<Foo, Foo>
   // CHECK:   [[DICT:%[0-9]+]] = apply [[GETTER]]([[BORROWED_SELF_COPY]]) : $@convention(method) (@guaranteed Foo) -> @owned Dictionary<Foo, Foo>
   // CHECK:   end_borrow [[BORROWED_SELF_COPY]]
   // CHECK:   destroy_value [[SELF_COPY]]
@@ -71,7 +71,7 @@ import gizmo
   // CHECK: } // end sil function
 
   // Property setter
-  // CHECK-LABEL: sil hidden [thunk] @$s24objc_dictionary_bridging3FooC8propertySDyA3CSH10FoundationyHCg_GvsTo : $@convention(objc_method) (NSDictionary, Foo) -> ()
+  // CHECK-LABEL: sil hidden [thunk] @$s24objc_dictionary_bridging3FooC8propertySDyA2CGvsTo : $@convention(objc_method) (NSDictionary, Foo) -> ()
   // CHECK: bb0([[NSDICT:%[0-9]+]] : @unowned $NSDictionary, [[SELF:%[0-9]+]] : @unowned $Foo):
   // CHECK:   [[NSDICT_COPY:%.*]] = copy_value [[NSDICT]]
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
@@ -81,7 +81,7 @@ import gizmo
   // CHECK:   [[DICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[OPT_NSDICT]], [[DICT_META]])
 
   // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
-  // CHECK:   [[SETTER:%[0-9]+]] = function_ref @$s24objc_dictionary_bridging3FooC8propertySDyA3CSH10FoundationyHCg_Gvs : $@convention(method) (@owned Dictionary<Foo, Foo>, @guaranteed Foo) -> ()
+  // CHECK:   [[SETTER:%[0-9]+]] = function_ref @$s24objc_dictionary_bridging3FooC8propertySDyA2CGvs : $@convention(method) (@owned Dictionary<Foo, Foo>, @guaranteed Foo) -> ()
   // CHECK:   [[RESULT:%[0-9]+]] = apply [[SETTER]]([[DICT]], [[BORROWED_SELF_COPY]]) : $@convention(method) (@owned Dictionary<Foo, Foo>, @guaranteed Foo) -> ()
   // CHECK:   end_borrow [[BORROWED_SELF_COPY]]
   // CHECK:   destroy_value [[SELF_COPY]]
