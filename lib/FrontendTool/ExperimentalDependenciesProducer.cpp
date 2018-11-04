@@ -256,11 +256,11 @@ namespace {
     _classMembers(findClassMembers(SF))
     { }
     // Tops:
-    const CPVec<FuncDecl>& operatorFunctions() const { return innerDeclCollector.memberOperatorDecls; }
     const CPVec<NominalTypeDecl>& topNominals() const { return filteredTopNominals; }
     const CPVec<PrecedenceGroupDecl>& precedenceGroups() const { return tops.precedenceGroups; }
     const CPVec<OperatorDecl>& topOperators() const {return tops.operators; }
     const CPVec<ValueDecl>& topValues() const {return filteredTopValues; }
+    const CPVec<FuncDecl>& operatorFunctions() const { return innerDeclCollector.memberOperatorDecls; }
     
     // Nominals:
     const CPVec<NominalTypeDecl>& extendedNominalsThatCanChangeExernallyObservableShape() const {
@@ -285,22 +285,36 @@ namespace {
   class ProviderNames {
     const ProviderDecls &pds;
     
+  private:
+    template <typename DeclT>
+    static DeclBaseName getName(const DeclT *const D) { return DeclBaseName(D->getName()); }
+    
+    static DeclBaseName getBaseName(const ValueDecl *const D) { return D->getBaseName(); }
+    
   public:
     ProviderNames(const ProviderDecls &pds) : pds(pds) {}
     
 
-    template <typename DeclT>
-    StringVec names(const CPVec<DeclT>& (ProviderDecls::*declFunc)() const, Identifier (DeclT::*idFunc)() const) {
+    template <
+    typename DeclT,
+    const CPVec<DeclT>& (ProviderDecls::*declFunc)() const,
+    DeclBaseName (*baseNameFn)(const DeclT*)
+    >
+    StringVec names() const {
       StringVec out;
       for (const auto *const D: (pds.*declFunc)())
-        out.push_back(DeclBaseName((D->*idFunc)()).userFacingName());
+        out.push_back((*baseNameFn)(D).userFacingName());
       return out;
     }
 
-    //using topOperators =
-    void snort() {
-      names<OperatorDecl>(&ProviderDecls::topOperators, &OperatorDecl::getName);
+    void topsSomehow() {
+      names<NominalTypeDecl, &ProviderDecls::topNominals, getName>(); // TypeDecl
+      names<OperatorDecl, &ProviderDecls::topOperators, getName>();
+      names<PrecedenceGroupDecl, &ProviderDecls::precedenceGroups, getName>();
+      names<ValueDecl, &ProviderDecls::topValues, getBaseName>();// rets DeclBaseName
+      names<FuncDecl, &ProviderDecls::operatorFunctions, getName>();
     }
+
   };
 }
 
