@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 // RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) %s -enable-sil-ownership | %FileCheck %s
+// REQUIRES: objc_interop
 
 import ObjectiveC
 
