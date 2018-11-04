@@ -24,7 +24,7 @@ public func asHex<T : FixedWidthInteger>(_ x: T) -> String {
 public func asHex<S : Sequence>(_ x: S) -> String
   where
   S.Element : FixedWidthInteger {
-    return "[ \(x.lazy.map { asHex($0) }.joined(separator: ", ")) ]"
+  return "[ \(x.lazy.map { asHex($0) }.joined(separator: ", ")) ]"
 }
 
 /// Compute the prefix sum of `seq`.
