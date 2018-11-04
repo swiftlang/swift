@@ -43,7 +43,7 @@ public func scan<
 
 public func gather<C : Collection, IndicesSequence : Sequence>(
   _ collection: C, _ indices: IndicesSequence
-  ) -> [C.Element]
+) -> [C.Element]
   where IndicesSequence.Element == C.Index {
     return Array(indices.map { collection[$0] })
 }
