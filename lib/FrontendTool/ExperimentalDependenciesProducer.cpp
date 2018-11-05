@@ -12,6 +12,7 @@
 
 #include <stdio.h>
 
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Decl.h"
@@ -38,44 +39,8 @@
 using namespace swift;
 using namespace experimental_dependencies;
 
-namespace {
-enum class ReferendeDependenciesKind { StatusQuo };
-/// Emits the reference dependencies from the frontend so that the driver
-/// can compute a dependency graph for the whole module, and use it to decide
-/// which files need to be recompiled when doing incremental compilation.
-template <ReferendeDependenciesKind> class ReferenceDependenciesEmitter {
-protected:
-  SourceFile *const SF;
-  const DependencyTracker &depTracker;
-  llvm::raw_ostream &out;
 
-public:
-  ReferenceDependenciesEmitter(SourceFile *const SF,
-                               const DependencyTracker &depTracker,
-                               llvm::raw_ostream &out)
-      : SF(SF), depTracker(depTracker), out(out) {}
-  void emit();
-};
-} // end namespace
 
-template <>
-void ReferenceDependenciesEmitter<ReferendeDependenciesKind::StatusQuo>::emit();
-
-bool swift::experimental_dependencies::emitReferenceDependencies(
-    DiagnosticEngine &diags, SourceFile *SF,
-    const DependencyTracker &depTracker, StringRef outputPath) {
-
-  // Before writing to the dependencies file path, preserve any previous file
-  // that may have been there. No error handling -- this is just a nicety, it
-  // doesn't matter if it fails.
-  llvm::sys::fs::rename(outputPath, outputPath + "~");
-  return withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
-    ReferenceDependenciesEmitter<ReferendeDependenciesKind::StatusQuo>(
-        SF, depTracker, out)
-        .emit();
-    return false;
-  });
-}
 
 
 
@@ -86,10 +51,8 @@ template <typename T> using CPVec = std::vector<const T*>;
 template <typename T1 = std::string, typename T2 = std::string> using PairVec = std::vector<std::pair<T1, T2>>;
 template <typename T1, typename T2> using CPPairVec = std::vector<std::pair<const T1*, const T2*>>;
 
-static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
-  Mangle::ASTMangler Mangler;
-  return Mangler.mangleTypeAsContextUSR(type);
-}
+
+
 
 namespace {
   /// Takes all the Decls in a SourceFile, and collects them into buckets by groups of DeclKinds.
@@ -125,77 +88,76 @@ namespace {
       }
     }
   };
+}
     
-    template <typename DeclT>
-    bool isVisible(const DeclT *const D) {
-        return D  &&  D->getFormalAccess() > AccessLevel::FilePrivate;
+
+
+
+
+namespace {
+  class CommonDeclHelpers {
+  private:
+    static bool protoIsVisible(ProtocolType *proto) {
+      return memberIsVisible(proto->getDecl());
     }
-    
-    bool memberIsVisible(const Decl *member) {
-        if (auto *VD = dyn_cast<ValueDecl>(member))
-            return isVisible(VD);
-        
-        switch (member->getKind()) {
-            case DeclKind::Import:
-            case DeclKind::PatternBinding:
-            case DeclKind::EnumCase:
-            case DeclKind::TopLevelCode:
-            case DeclKind::IfConfig:
-            case DeclKind::PoundDiagnostic:
-                return false;
-                
-            case DeclKind::Extension:
-            case DeclKind::InfixOperator:
-            case DeclKind::PrefixOperator:
-            case DeclKind::PostfixOperator:
-                return true;
-                
-            default:
-                llvm_unreachable("everything else is a ValueDecl");
-        }
+    static bool conformedProtocolIsVisible(TypeLoc inheritedType) {
+      auto type = inheritedType.getType();
+      if (!type)
+        return false;
+      if (!type->isExistentialType()) {
+        // Be conservative. We don't know how to deal with other extended types.
+        return true;
+      }
+      auto layout = type->getExistentialLayout();
+      assert(!layout.explicitSuperclass && "Should not have a subclass existential "
+             "in the inheritance clause of an extension");
+      return std::any_of(layout.getProtocols().begin(), layout.getProtocols().end(),protoIsVisible);
     }
 
-    bool protoIsVisible(ProtocolType *proto) {
-        return memberIsVisible(proto->getDecl());
-    }
-    
-    bool conformedProtocolIsVisible(TypeLoc inheritedType) {
-        auto type = inheritedType.getType();
-        if (!type)
-            return false;
-        if (!type->isExistentialType()) {
-            // Be conservative. We don't know how to deal with other extended types.
-            return true;
-        }
-        auto layout = type->getExistentialLayout();
-        assert(!layout.explicitSuperclass && "Should not have a subclass existential "
-               "in the inheritance clause of an extension");
-        return std::any_of(layout.getProtocols().begin(), layout.getProtocols().end(),protoIsVisible);
-    }
-    
-    bool extendsVisibleNominal(const ExtensionDecl *const ED) {
-        return isVisible(ED->getExtendedNominal());
-    }
-    bool introducesConformanceToVisibleProtocol(const ExtensionDecl *const ED) {
-        return std::any_of(ED->getInherited().begin(), ED->getInherited().end(),
-                           conformedProtocolIsVisible);
-    }
-    bool hasVisibleMember(const ExtensionDecl *const ED) {
-        return std::any_of(ED->getMembers().begin(), ED->getMembers().end(), memberIsVisible);
-    }
-
+  protected:
     template <typename DeclT>
-    bool hasVisibleName(const DeclT *const D) {
-        return D->hasName() && isVisible(D);
+    static bool isVisible(const DeclT *const D) {
+      return D  &&  D->getFormalAccess() > AccessLevel::FilePrivate;
     }
+    static bool memberIsVisible(const Decl *member) {
+      if (auto *VD = dyn_cast<ValueDecl>(member))
+        return isVisible(VD);
+      
+      switch (member->getKind()) {
+        case DeclKind::Import:
+        case DeclKind::PatternBinding:
+        case DeclKind::EnumCase:
+        case DeclKind::TopLevelCode:
+        case DeclKind::IfConfig:
+        case DeclKind::PoundDiagnostic:
+          return false;
+          
+        case DeclKind::Extension:
+        case DeclKind::InfixOperator:
+        case DeclKind::PrefixOperator:
+        case DeclKind::PostfixOperator:
+          return true;
+          
+        default:
+          llvm_unreachable("everything else is a ValueDecl");
+      }
+    }
+    static bool introducesConformanceToVisibleProtocol(const ExtensionDecl *const ED) {
+      return std::any_of(ED->getInherited().begin(), ED->getInherited().end(),
+                         conformedProtocolIsVisible);
+    }
+  };
+}
+
+
     
  
-  
+   /////////////////////////
     
   
         
-    
-  struct InnerDeclCollector {
+namespace {
+  struct InnerDeclCollector: CommonDeclHelpers {
     // Records every nominal declaration, and whether or not the declaration
     /// changes the externally-observable shape of the type.
     llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
@@ -214,10 +176,43 @@ namespace {
     /// adding memberOperatorDecls and extendedNominals to the receiver.
     void findNominalsAndOperators(const DeclRange members);
   };
-    
+}
+
+
+InnerDeclCollector::InnerDeclCollector(const CPVec<ExtensionDecl> &filteredExtensions, const CPVec<NominalTypeDecl> &filteredTopNominals) {
+  for (auto *ED: filteredExtensions) {
+    if (!introducesConformanceToVisibleProtocol(ED))
+      extensionsWithJustMembers.push_back(ED);
+    extendedNominals[ED->getExtendedNominal()] |= introducesConformanceToVisibleProtocol(ED);
+    findNominalsAndOperators(ED->getMembers());
+  }
+  for (auto *NTD: filteredTopNominals) {
+    extendedNominals[NTD] |= true;
+    findNominalsAndOperators(NTD->getMembers());
+  }
+}
+
+/// Recursively computes the transitive closure over members
+/// adding memberOperatorDecls and extendedNominals to the receiver.
+void InnerDeclCollector::findNominalsAndOperators(const DeclRange members) {
+  CPVec<Decl> visibleValues;
+  std::copy_if(members.begin(), members.end(), std::back_inserter(visibleValues),
+               [](const Decl *const D) -> bool { return isVisible(dyn_cast<ValueDecl>(D)); } );
+  for (auto *D: visibleValues) {
+    if (dyn_cast<ValueDecl>(D)->getFullName().isOperator())
+      memberOperatorDecls.push_back(cast<FuncDecl>(D));
+    else if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
+      extendedNominals[nominal] |= true;
+      findNominalsAndOperators(nominal->getMembers());
+    }
+  }
+}
+
+  /////////////////////////
   
-    
-  class ProviderDecls {
+namespace  {
+
+  class ProviderDecls: CommonDeclHelpers {
   private:
     SourceFileDeclDemux tops;
     CPVec<ExtensionDecl> filteredExtensions;
@@ -232,8 +227,13 @@ namespace {
     
     static CPVec<NominalTypeDecl> filterMap(llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals);
 
+    // helpers
     template <typename DeclT>
     static CPVec<DeclT> filter(const CPVec<DeclT> &in);
+    
+    static bool hasVisibleMember(const ExtensionDecl *const ED) {
+      return std::any_of(ED->getMembers().begin(), ED->getMembers().end(), memberIsVisible);
+    }
 
     static CPVec<ExtensionDecl>  filterExtensions(const CPVec<ExtensionDecl> &in);
     static CPVec<NominalTypeDecl> getKeysOf(const llvm::MapVector<const NominalTypeDecl *, bool>& extendedNominals);
@@ -241,6 +241,14 @@ namespace {
     constructHoldersAndMembers(const CPVec<ExtensionDecl> &in );
     
     static CPVec<ValueDecl> findClassMembers(const SourceFile* SF);
+    
+    template <typename DeclT>
+    static bool hasVisibleName(const DeclT *const D) {
+      return D->hasName() && isVisible(D);
+    }
+    static bool extendsVisibleNominal(const ExtensionDecl *const ED) {
+      return isVisible(ED->getExtendedNominal());
+    }
 
     
   public:
@@ -271,18 +279,83 @@ namespace {
     const CPVec<NominalTypeDecl>& extendedNominalsThatCouldAddMembers() const {
       return allExtendedNominals;
     }
-    const std::vector<std::pair<const NominalTypeDecl*, const ValueDecl*>>& holdersAndMembers() const {
+    const std::vector<std::pair<const NominalTypeDecl*, const ValueDecl*>>& c() const {
       return _holdersAndMembers;
     }
     
     // Dynamic lookup:
-    const CPVec<ValueDecl> classMembers() const { return _classMembers; }
+    const CPVec<ValueDecl>& classMembers() const { return _classMembers; }
   };
 }
-//////////////////////////
 
+
+CPVec<NominalTypeDecl> ProviderDecls::filterMap(llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals) {
+  CPVec<NominalTypeDecl> out;
+  for (const auto entry: extendedNominals)
+    if (entry.second)
+      out.push_back(entry.first);
+  return out;
+}
+
+template <typename DeclT>
+CPVec<DeclT> ProviderDecls::filter(const CPVec<DeclT> &in) {
+  CPVec<DeclT> out;
+  std::copy_if(in.begin(), in.end(), std::back_inserter(out), hasVisibleName<DeclT>);
+  return out;
+}
+
+CPVec<ExtensionDecl>  ProviderDecls::filterExtensions(const CPVec<ExtensionDecl> &in)  {
+  CPVec<ExtensionDecl> out;
+  std::copy_if(in.begin(), in.end(), std::back_inserter(out),
+               [](const ExtensionDecl *const ED) -> bool {
+                 return extendsVisibleNominal(ED)  &&  (hasVisibleMember(ED) || introducesConformanceToVisibleProtocol(ED));
+               });
+  return out;
+}
+
+CPVec<NominalTypeDecl> ProviderDecls::getKeysOf(const llvm::MapVector<const NominalTypeDecl *, bool>& extendedNominals) {
+  CPVec<NominalTypeDecl> out;
+  for (auto &p: extendedNominals)
+    out.push_back(p.first);
+  return out;
+}
+
+std::vector<std::pair<const NominalTypeDecl*, const ValueDecl*>>
+ProviderDecls::constructHoldersAndMembers(const CPVec<ExtensionDecl> &in ) {
+  std::vector<std::pair<const NominalTypeDecl*, const ValueDecl*>> out;
+  for (const auto *const ED: in) {
+    for (const auto *const member: ED->getMembers()) {
+      const auto *const VD = dyn_cast<ValueDecl>(member);
+      if (hasVisibleName(VD))
+        out.push_back(std::make_pair(ED->getExtendedNominal(), VD));
+    }
+  }
+  return out;
+}
+
+CPVec<ValueDecl> ProviderDecls::findClassMembers(const SourceFile* SF) {
+  struct Collector: public VisibleDeclConsumer {
+    CPVec<ValueDecl> members;
+    void foundDecl(ValueDecl *VD, DeclVisibilityKind) override {
+      members.push_back(VD);
+    }
+  } collector;
+  SF->lookupClassMembers({}, collector);
+  return collector.members;
+}
+
+class CommonNameHelpers {
+protected:
+  static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
+    Mangle::ASTMangler Mangler;
+    return Mangler.mangleTypeAsContextUSR(type);
+  }
+};
+
+
+///////////////////////
 namespace {
-  class ProviderNames {
+  class ProviderNames: CommonNameHelpers {
     const ProviderDecls &pds;
     
   private:
@@ -314,6 +387,16 @@ namespace {
       names<ValueDecl, &ProviderDecls::topValues, getBaseName>();// rets DeclBaseName
       names<FuncDecl, &ProviderDecls::operatorFunctions, getName>();
     }
+    void nominalsSomehow() {
+      names<NominalTypeDecl, &ProviderDecls::extendedNominalsThatCanChangeExernallyObservableShape,getName>();
+    }
+    void membersSomehow() {
+//      xxx<NominalTypeDecl,&ProviderDecls::extendedNominalsThatCouldAddMembers,getMangledTypeAsContext, "">();
+//      yyy<<std::pair<const NominalTypeDecl*, const ValueDecl*>, &ProviderDecls::<std::pair<const NominalTypeDecl*, const ValueDecl*>, getMangledTypeAsContext, names>;
+    }
+    void dynamicLookupsSomehow() {
+      names<ValueDecl, &ProviderDecls::classMembers, getName>();
+    }
 
   };
 }
@@ -321,9 +404,10 @@ namespace {
 
 ////////////////////////////
 
+
+using MemberTableEntryTy = std::pair<ReferencedNameTracker::MemberPair, bool>;
+
 namespace {
-  using MemberTableEntryTy = std::pair<ReferencedNameTracker::MemberPair, bool>;
-  
   struct DependName {
     DeclBaseName name;
     bool cascades;
@@ -334,9 +418,10 @@ namespace {
     }
     bool operator< (const DependName &other) const {return compare(other) == -1; }
   };
-  
-  
-  class DependsArcs {
+}
+
+namespace {
+  class DependsArcs: CommonNameHelpers, CommonDeclHelpers {
   private:
     const ReferencedNameTracker *const tracker;
     std::vector<DependName> sortedTops;
@@ -378,98 +463,6 @@ namespace {
 
 ////////////////////////
 
-InnerDeclCollector::InnerDeclCollector(const CPVec<ExtensionDecl> &filteredExtensions, const CPVec<NominalTypeDecl> &filteredTopNominals) {
-  for (auto *ED: filteredExtensions) {
-    if (!introducesConformanceToVisibleProtocol(ED))
-      extensionsWithJustMembers.push_back(ED);
-    extendedNominals[ED->getExtendedNominal()] |= introducesConformanceToVisibleProtocol(ED);
-    findNominalsAndOperators(ED->getMembers());
-  }
-  for (auto *NTD: filteredTopNominals) {
-    extendedNominals[NTD] |= true;
-    findNominalsAndOperators(NTD->getMembers());
-  }
-}
-
-/// Recursively computes the transitive closure over members
-/// adding memberOperatorDecls and extendedNominals to the receiver.
-void InnerDeclCollector::findNominalsAndOperators(const DeclRange members) {
-  CPVec<Decl> visibleValues;
-  std::copy_if(members.begin(), members.end(), std::back_inserter(visibleValues),
-               [](const Decl *const D) -> bool { return isVisible(dyn_cast<ValueDecl>(D)); } );
-  for (auto *D: visibleValues) {
-    if (dyn_cast<ValueDecl>(D)->getFullName().isOperator())
-      memberOperatorDecls.push_back(cast<FuncDecl>(D));
-    else if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
-      extendedNominals[nominal] |= true;
-      findNominalsAndOperators(nominal->getMembers());
-    }
-  }
-}
-
-/////////////////////////
-
-CPVec<NominalTypeDecl> ProviderDecls::filterMap(llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals) {
-  CPVec<NominalTypeDecl> out;
-  for (const auto entry: extendedNominals)
-    if (entry.second)
-      out.push_back(entry.first);
-  return out;
-}
-
-template <typename DeclT>
-CPVec<DeclT> ProviderDecls::filter(const CPVec<DeclT> &in) {
-  CPVec<DeclT> out;
-  std::copy_if(in.begin(), in.end(), std::back_inserter(out), hasVisibleName<DeclT>);
-  return out;
-}
-
-CPVec<ExtensionDecl>  ProviderDecls::filterExtensions(const CPVec<ExtensionDecl> &in)  {
-  CPVec<ExtensionDecl> out;
-  std::copy_if(in.begin(), in.end(), std::back_inserter(out),
-               [](const ExtensionDecl *const ED) -> bool {
-                 return extendsVisibleNominal(ED)  &&  (hasVisibleMember(ED) || introducesConformanceToVisibleProtocol(ED));
-               });
-  return out;
-}
-
-
-
-CPVec<NominalTypeDecl> ProviderDecls::getKeysOf(const llvm::MapVector<const NominalTypeDecl *, bool>& extendedNominals) {
-  CPVec<NominalTypeDecl> out;
-  for (auto &p: extendedNominals)
-    out.push_back(p.first);
-  return out;
-}
-
-std::vector<std::pair<const NominalTypeDecl*, const ValueDecl*>>
-ProviderDecls::constructHoldersAndMembers(const CPVec<ExtensionDecl> &in ) {
-  std::vector<std::pair<const NominalTypeDecl*, const ValueDecl*>> out;
-  for (const auto *const ED: in) {
-    for (const auto *const member: ED->getMembers()) {
-      const auto *const VD = dyn_cast<ValueDecl>(member);
-      if (hasVisibleName(VD))
-        out.push_back(std::make_pair(ED->getExtendedNominal(), VD));
-    }
-  }
-  return out;
-}
-
-CPVec<ValueDecl> ProviderDecls::findClassMembers(const SourceFile* SF) {
-  struct Collector: public VisibleDeclConsumer {
-    CPVec<ValueDecl> members;
-    void foundDecl(ValueDecl *VD, DeclVisibilityKind) override {
-      members.push_back(VD);
-    }
-  } collector;
-  SF->lookupClassMembers({}, collector);
-  return collector.members;
-}
-
-
-///////////////////////
-
-
 std::vector<DependName> DependsArcs::linearizeAndSort(const llvm::DenseMap<DeclBaseName, bool> &map) {
   std::vector<DependName> out;
   for (const auto &p: map)
@@ -478,6 +471,9 @@ std::vector<DependName> DependsArcs::linearizeAndSort(const llvm::DenseMap<DeclB
   std::sort(out.begin(), out.end());
   return out;
 }
+
+
+
 
 std::vector<MemberTableEntryTy> DependsArcs::sort(const llvm::DenseMap<ReferencedNameTracker::MemberPair, bool> &members) {
   std::vector<MemberTableEntryTy> out{members.begin(), members.end()};
@@ -670,3 +666,101 @@ namespace SQ
 // move filter etc into wherever
 // do depends decls
 // do output
+
+
+////////////////////////
+
+
+namespace {
+  class FileRenamerAndWriter {
+    DiagnosticEngine &diags;
+    std::string outputPath;
+    
+  public:
+    FileRenamerAndWriter(DiagnosticEngine &diags, StringRef outputPath) :diags(diags), outputPath(outputPath.str())
+     {}
+    
+    /// Returns true on error
+    bool operator() (ArrayRef<std::string> strings) {
+      // Before writing to the dependencies file path, preserve any previous file
+      // that may have been there. No error handling -- this is just a nicety, it
+      // doesn't matter if it fails.
+      llvm::sys::fs::rename(outputPath, outputPath + "~");
+      return withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
+        for (auto s: strings) out << s; } );
+    }
+    
+  };
+}
+
+
+//////////////////////////
+
+template <typename InT, typename OutT>
+OutT operator>>(InT in, OutT (*fn)(InT)) { return (*fn)(in); }
+
+template <typename InT, typename OutT>
+OutT operator>>(InT in, std::function<OutT(InT)> &fn) { return fn(in); }
+
+template <typename InInT, typename InT, typename OutT>
+std::function<OutT(InInT)>
+operator>> (std::function<InT(InInT)> lhs, std::function<OutT(InT)> rhs) {
+  return [&](InInT in) -> OutT { rhs(lhs(in)); };
+}
+
+
+//template <typename InInT, typename InT, typename OutT>
+//std::function<OutT(InInT)>
+//operator>> ( (InInT) -> InT  lhs, std::function<OutT(InT)> rhs) {
+//  return [&](InInT in) -> OutT { rhs(lhs(in)); };
+//}
+
+
+template <typename T>
+using Sum = llvm::SmallVector<T, 32>;
+
+template <typename InT, typename OutT>
+Sum<OutT> operator+ (std::function<OutT(InT)> fn1, std::function<OutT(InT)> fn2) {
+  return [&](InT in) -> Sum<OutT> { return Sum<OutT> {fn1(in), fn2(in)}; };
+}
+
+template <typename InT, typename OutT, size_t N>
+std::function< Sum<OutT>(InT) > operator+ (std::function<Sum<OutT>(InT)> lhs, std::function<OutT(InT)> fn2) {
+  return [&](InT in) -> Sum<OutT> {
+    auto out = lhs(in);
+    out.push_back(fn2(in));
+    return out;
+  };
+}
+
+
+
+
+/// Entry point to this whole file:
+
+bool swift::experimental_dependencies::emitReferenceDependencies(
+                                                                 DiagnosticEngine &diags, SourceFile *const SF,
+                                                                 const DependencyTracker &depTracker, StringRef outputPath) {
+  
+//  auto x = SourceFileDeclDemux(SF) >> InnerDeclCollector() ;
+//
+//  auto provides = SF >> SourceFileDeclDemux >> InnerDeclCollector >> (TopLevelProvidesSection + NominalSection + MemberSection + DynamicLookupSection);
+  
+//  auto depends = DependsFeeder(SF, depTracker) >> (TopLevelDependsSection + NominalDependsSection + MembersDependsSection + dynamicLookupDependsSection + externalDependsSection);
+//
+//  (provedes + depends + interfaceHash) >> SectionEncoder >> FileRenamerAndWriter(outputPath);
+//
+//  // Before writing to the dependencies file path, preserve any previous file
+//  // that may have been there. No error handling -- this is just a nicety, it
+//  // doesn't matter if it fails.
+//  llvm::sys::fs::rename(outputPath, outputPath + "~");
+//  return withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
+//    ReferenceDependenciesEmitter<ReferendeDependenciesKind::StatusQuo>(
+//                                                                       SF, depTracker, out)
+//    .emit();
+//    return false;
+//  });
+  
+  return ([]()->std::vector<std::string> {return StringVec{std::string()};})
+  >> FileRenamerAndWriter(diags, outputPath);
+}
