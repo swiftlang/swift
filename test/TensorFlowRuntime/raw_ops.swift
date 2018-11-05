@@ -1,5 +1,5 @@
 // RUN: %target-run-simple-swift
-// RUN: %target-run-disable-deabstraction-swift
+// RUN: %target-run-dynamic-compilation-swift
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 // REQUIRES: tensorflow_swift_bindings

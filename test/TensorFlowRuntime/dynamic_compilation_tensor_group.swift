@@ -1,4 +1,4 @@
-// RUN: %target-run-disable-deabstraction-swift
+// RUN: %target-run-dynamic-compilation-swift
 // REQUIRES: executable_test
 
 import TensorFlow

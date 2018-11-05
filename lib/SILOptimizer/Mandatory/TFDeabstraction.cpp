@@ -55,18 +55,6 @@ static llvm::cl::opt<bool> TFPromoteGlobalVariables(
         "If enabled, promote global variables into SSA with a best "
         "effort to minimize sends/recvs. This is a performance optimization."));
 
-// TODO(marcrasi): This is a very temporary option allowing us to
-// incrementally add IRGen support for non-deabstracted functions. As soon as
-// IRGen fully supports non-deabstracted functions, remove this flag and make
-// TFDeabstraction always be off for non-graph-only functions in dynamic
-// compilation mode.
-static llvm::cl::opt<bool>
-TFDisableDeabstraction(
-    "tf-disable-deabstraction", llvm::cl::init(false),
-    llvm::cl::desc(
-        "Disables deabstraction for everything except graph-only functions. "
-        "-tf-dynamic-compilation must also be enabled when this is on."));
-
 template<typename...T, typename...U>
 static InFlightDiagnostic
 diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
@@ -235,16 +223,6 @@ void TFDeabstraction::inlineCalls() {
                           const SILFunction &callee) -> bool {
     // If this is a call of an explicitly noinline function, don't inline it!
     if (callee.getInlineStrategy() == NoInline)
-      return false;
-
-    // In dynamic compliation mode, do not inline functions from the same
-    // module. (We still inline functions from other modules, because there is a
-    // risk that the other module was not compiled in dynamic compilation mode
-    // and therefore its functions are not deabstracted or lowered. For
-    // example, we do not compile the standard library in dynamic compilation
-    // mode.)
-    if (llvm::TFDynamicCompilation && !isAcceleratorOnly(fn) &&
-        !callee.isAvailableExternally())
       return false;
 
     // Check for array internals which we could be inlined, but prefer to
@@ -473,15 +451,6 @@ static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
       auto argumentType = argumentValue->getType();
       assert(argumentType.isAddress());
       if (!argumentType.isLoadable(origInst->getModule())) {
-        // When we're in dynamic compilation mode, it is okay to keep the
-        // generic out parameter because dynamic compilation knows how to deal
-        // with generic out parameters.
-        if (llvm::TFDynamicCompilation && !isAcceleratorOnly(*fn)) {
-          opBuilder.addArgument(argumentValue,
-                                argument.getArgumentNameWithSuffix());
-          continue;
-        }
-
         auto astType = argumentType.getASTType();
         if (astType->hasArchetype()) {
           diagnose(ctx, getUserSourceLocation(origInst).getSourceLoc(),
@@ -2031,10 +2000,6 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
       continue;
     }
 
-    // Do not perform the following graph_op optimization/promotion unless
-    // we are in graph mode.
-    if (llvm::TFDynamicCompilation && !isAcceleratorOnly(fn)) continue;
-
     // Take a look at the various well known function calls that we can promote
     // to tensor operations.  We can promote them if we are able to constant
     // fold all of the operands to these calls.  If so, we rewrite them in terms
@@ -2164,14 +2129,8 @@ unwrapAggregateInstructions(SILValue value,
 /// Recursively unpacks aggregates of TensorFlow values to `inputList`, using
 /// the already-lowered values when possible to avoid code bloat.  Returns true
 /// to represent error if it detects a non-TensorFlow leaf field.
-///
-/// If `acceptTensorGroupConformingLeaves` is true, then we accept types that
-/// conform to TensorGroup as allowed leaf fields that get unpacked to
-/// `inputList`. Otherwise, we only accept types as leaf fields when they are
-/// one of our well-known TensorFlow types.
 static bool unpackTensorAggregates(
     const ASTContext &ctx, SILLocation loc, SILBuilder &B, SILValue rootAggregate,
-    bool acceptTensorGroupConformingLeaves,
     llvm::DenseMap<std::pair<SILValue, unsigned>, SILValue> &loweredTupleElts,
     llvm::DenseMap<std::pair<SILValue, VarDecl*>, SILValue>
         &loweredStructFields,
@@ -2196,23 +2155,10 @@ static bool unpackTensorAggregates(
     return B.createStructExtract(loc, structValue, field);
   };
 
-  auto tfModule = ctx.getLoadedModule(ctx.Id_TensorFlow);
-  assert(tfModule && "could not find TensorFlow module");
-  auto inputTensorGroupProto =
-      ctx.getProtocol(KnownProtocolKind::TensorArrayProtocol);
-  assert(inputTensorGroupProto &&
-         "could not find TensorArrayProtocol protocol");
-
   std::function<bool(SILValue)> recurse;
   recurse = [&](SILValue aggregate) -> bool {
     auto aggregateTy = aggregate->getType();
     if (isTensorFlowValue(aggregateTy)) {
-      inputList.push_back(aggregate);
-      return false;
-    }
-    if (acceptTensorGroupConformingLeaves &&
-        tfModule->lookupConformance(aggregateTy.getASTType(),
-                                    inputTensorGroupProto)) {
       inputList.push_back(aggregate);
       return false;
     }
@@ -2381,13 +2327,7 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
             return;
           }
 
-          // In dynamic compilation mode, we can handle inputs that conform to
-          // TensorGroup even if we cannot completely unpack them.
-          bool acceptTensorGroupConformingLeaves =
-              llvm::TFDynamicCompilation && !isAcceleratorOnly(fn);
-
           if (unpackTensorAggregates(context, origInst->getLoc(), B, element,
-                                     acceptTensorGroupConformingLeaves,
                                      loweredTupleElts, loweredStructFields,
                                      unwrapCache, inputList)) {
             diagnoseInvalid(argumentLoc,
@@ -2403,7 +2343,6 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
 
       // Otherwise, this must be a single input.
       if (unpackTensorAggregates(context, origInst->getLoc(), B, argumentValue,
-                                 /*acceptTensorGroupConformingLeaves=*/false,
                                  loweredTupleElts, loweredStructFields,
                                  unwrapCache, inputList)) {
         // FIXME: Since TFDeabstraction happens after mandatory inlining,
@@ -2443,30 +2382,20 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
     };
 
     // Ok, we have an attribute argument, we should have been able to fold it
-    // through our constexpr evaluation logic -- unless we're doing dynamic
-    // compilation.
+    // through our constexpr evaluation logic.
     auto it = constants.find(argumentValue);
     if (it == constants.end() || !it->second.isConstant()) {
-      if (llvm::TFDynamicCompilation && !isAcceleratorOnly(fn)
-          && !argument.mustBeLoweredToConstant()) {
-        // Since we're doing dynamic compilation, we can simply pass this
-        // unknown attribute as a named argument to the graph_op, and IRGen will
-        // deal with it.
-        opBuilder.addArgument(argumentValue, argument.getArgumentNameWithSuffix());
-        continue;
-      } else {
-        // TODO: improve the diagnostic to talk about the parameter label in
-        // the user code, not the internal op attribute.  The bookkeeping for
-        // this isn't obvious though.
-        diagnoseInvalidAttr("requires a constant argument");
+      // TODO: improve the diagnostic to talk about the parameter label in
+      // the user code, not the internal op attribute.  The bookkeeping for
+      // this isn't obvious though.
+      diagnoseInvalidAttr("requires a constant argument");
 
-        // If we have more specific information about what went wrong, emit
-        // notes.
-        if (it != constants.end() &&
-            it->second.getKind() == SymbolicValue::Unknown)
-          it->second.emitUnknownDiagnosticNotes(origInstLoc);
-        return;
-      }
+      // If we have more specific information about what went wrong, emit
+      // notes.
+      if (it != constants.end() &&
+          it->second.getKind() == SymbolicValue::Unknown)
+        it->second.emitUnknownDiagnosticNotes(origInstLoc);
+      return;
     }
 
     // Get the constant, ignoring struct wrappers.
@@ -2834,9 +2763,6 @@ void TFDeabstractionPass::run() {
   SILModule *module = getModule();
   auto &ctx = module->getASTContext();
 
-  assert((llvm::TFDynamicCompilation || !TFDisableDeabstraction) &&
-         "If deabstraction is disabled, dynamic compilation must be enabled.");
-
   // If the TensorFlow module hasn't been imported by the program, don't do
   // anything.  This avoids impacting compile time for non-TensorFlow using
   // Swift programs by doing extraneous analysis.
@@ -2864,26 +2790,14 @@ void TFDeabstractionPass::run() {
   // iff they look like they could be the top level of a deabstraction
   // context.
   for (auto &fn : *module) {
-    if (TFDisableDeabstraction && !isAcceleratorOnly(fn))
-      continue;
-
-    // There's no point in deabstracting things defined in other modules,
-    // because we won't lower them.
-    if (fn.isAvailableExternally())
+    // In dynamic compilation mode, only deabstract accelerator-only functions.
+    if (llvm::TFDynamicCompilation && !isAcceleratorOnly(fn))
       continue;
 
     // If this function is a building block of larger tensor programs (e.g.
     // the ops defined in the TensorFlow module), then don't transform it in
     // isolation.
-    // However, in dynamic compilation mode, deabstract everything in this
-    // module because dynamic compilation mode executes functions individually
-    // rather than inlining them into large tensor programs.
-    //
-    // TODO(marcrasi): IRGen should be able to handle non-deabstracted code.
-    // Once it can handle non-deabstracted code, turn deabstraction off entirely
-    // in dynamic compilation mode.
-    if (!tfc.shouldBePartitioned(&fn, /*forceTFFunctions*/false) &&
-        !llvm::TFDynamicCompilation)
+    if (!tfc.shouldBePartitioned(&fn, /*forceTFFunctions*/false))
       continue;
 
     // If something crashes, make sure the pretty stack trace says what we
@@ -2926,7 +2840,8 @@ void TFDeabstractionPass::run() {
   // of the functions would be dead after the first round, but some stragglers
   // remain as in the example above.
   for (auto &fn : *module) {
-    if (TFDisableDeabstraction && !isAcceleratorOnly(fn))
+    // In dynamic compilation mode, only deabstract accelerator-only functions.
+    if (llvm::TFDynamicCompilation && !isAcceleratorOnly(fn))
       continue;
 
     // Skip if it is already partitioned, or if it was ignored only because it
