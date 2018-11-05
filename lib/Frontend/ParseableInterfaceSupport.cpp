@@ -266,6 +266,9 @@ static bool buildSwiftModuleFromSwiftInterface(
     for (auto const &Dep : DepNames) {
       auto DepStatus = FS.status(Dep);
       if (!DepStatus) {
+        Diags.diagnose(SourceLoc(),
+                       diag::missing_dependency_of_parseable_module_interface,
+                       Dep, InPath, DepStatus.getError().message());
         SubError = true;
         return;
       }
