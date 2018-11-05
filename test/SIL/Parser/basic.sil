@@ -1684,7 +1684,14 @@ sil [dynamically_replacable] @test_dynamically_replaceable : $@convention(thin) 
 bb0:
   %0 = tuple ()
   return %0 : $()
-} 
+}
+
+// CHECK-LABEL: sil [dynamic_replacement_for "test_dynamically_replaceable"] @test_dynamic_replacement_for
+sil [dynamic_replacement_for "test_dynamically_replaceable"] @test_dynamic_replacement_for : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
 
 struct EmptyStruct {}
 

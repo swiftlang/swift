@@ -10,9 +10,9 @@ bb0:
   return %0 : $()
 }
 
-// CHECK-DAG-LABEL: sil [serialized] [canonical] @test_dynamic_replacement_for
+// CHECK-DAG-LABEL: sil [serialized] [dynamic_replacement_for "test_dynamically_replaceable"] [canonical] @test_dynamic_replacement_for
 // CHECK: prev_dynamic_function_ref @test_dynamic_replacement_for
-sil [serialized] @test_dynamic_replacement_for : $@convention(thin) () -> () {
+sil [serialized] [dynamic_replacement_for "test_dynamically_replaceable"] @test_dynamic_replacement_for : $@convention(thin) () -> () {
 bb0:
   %0 = prev_dynamic_function_ref @test_dynamic_replacement_for : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()

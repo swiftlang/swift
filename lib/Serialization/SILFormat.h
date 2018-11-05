@@ -292,6 +292,7 @@ namespace sil_block {
                      BCFixed<1>,  // must be weakly referenced
                      BCFixed<1>,  // is dynamically replacable
                      TypeIDField, // SILFunctionType
+                     DeclIDField,  // SILFunction name or 0 (replaced function)
                      GenericEnvironmentIDField,
                      DeclIDField, // ClangNode owner
                      BCArray<IdentifierIDField> // Semantics Attribute

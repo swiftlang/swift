@@ -128,6 +128,11 @@ SILFunction::~SILFunction() {
   // an allocator that may recycle freed memory.
   dropAllReferences();
 
+  if (ReplacedFunction) {
+    ReplacedFunction->decrementRefCount();
+    ReplacedFunction = nullptr;
+  }
+
   auto &M = getModule();
   for (auto &BB : *this) {
     for (auto I = BB.begin(), E = BB.end(); I != E;) {
@@ -489,6 +494,9 @@ SILFunction::isPossiblyUsedExternally() const {
   if (linkage == SILLinkage::Hidden && hasCReferences())
     return true;
 
+  if (ReplacedFunction)
+    return true;
+
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
 }
 
@@ -515,6 +523,24 @@ SubstitutionMap SILFunction::getForwardingSubstitutionMap() {
 
 bool SILFunction::shouldVerifyOwnership() const {
   return !hasSemanticsAttr("verify.ownership.sil.never");
+}
+
+static Identifier getIdentifierForObjCSelector(ObjCSelector selector, ASTContext &Ctxt) {
+  SmallVector<char, 64> buffer;
+  auto str = selector.getString(buffer);
+  return Ctxt.getIdentifier(str);
+}
+
+void SILFunction::setObjCReplacement(AbstractFunctionDecl *replacedFunc) {
+  assert(ReplacedFunction == nullptr && ObjCReplacementFor.empty());
+  assert(replacedFunc != nullptr);
+  ObjCReplacementFor = getIdentifierForObjCSelector(
+      replacedFunc->getObjCSelector(), getASTContext());
+}
+
+void SILFunction::setObjCReplacement(Identifier replacedFunc) {
+  assert(ReplacedFunction == nullptr && ObjCReplacementFor.empty());
+  ObjCReplacementFor = replacedFunc;
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing

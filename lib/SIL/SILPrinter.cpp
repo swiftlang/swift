@@ -2319,6 +2319,18 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   else if (getEffectsKind() == EffectsKind::ReleaseNone)
     OS << "[releasenone] ";
 
+  if (auto *replacedFun = getDynamicallyReplacedFunction()) {
+    OS << "[dynamic_replacement_for \"";
+    OS << replacedFun->getName();
+    OS << "\"] ";
+  }
+
+  if (hasObjCReplacement()) {
+    OS << "[objc_replacement_for \"";
+    OS << getObjCReplacement().str();
+    OS << "\"] ";
+  }
+
   for (auto &Attr : getSemanticsAttrs())
     OS << "[_semantics \"" << Attr << "\"] ";
 

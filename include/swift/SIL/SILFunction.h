@@ -149,6 +149,12 @@ private:
   /// disabled.
   SILProfiler *Profiler = nullptr;
 
+  /// The function this function is meant to replace. Null if this is not a
+  /// @_dynamicReplacement(for:) function.
+  SILFunction *ReplacedFunction = nullptr;
+
+  Identifier ObjCReplacementFor;
+
   /// The function's bare attribute. Bare means that the function is SIL-only
   /// and does not require debug info.
   unsigned Bare : 1;
@@ -312,6 +318,38 @@ public:
   }
 
   SILProfiler *getProfiler() const { return Profiler; }
+
+  SILFunction *getDynamicallyReplacedFunction() const {
+    return ReplacedFunction;
+  }
+  void setDynamicallyReplacedFunction(SILFunction *f) {
+    assert(ReplacedFunction == nullptr && "already set");
+    assert(!hasObjCReplacement());
+
+    if (f == nullptr)
+      return;
+    ReplacedFunction = f;
+    ReplacedFunction->incrementRefCount();
+  }
+
+  /// This function should only be called when SILFunctions are bulk deleted.
+  void dropDynamicallyReplacedFunction() {
+    if (!ReplacedFunction)
+      return;
+    ReplacedFunction->decrementRefCount();
+    ReplacedFunction = nullptr;
+  }
+
+  bool hasObjCReplacement() const {
+    return !ObjCReplacementFor.empty();
+  }
+
+  Identifier getObjCReplacement() const {
+    return ObjCReplacementFor;
+  }
+
+  void setObjCReplacement(AbstractFunctionDecl *replacedDecl);
+  void setObjCReplacement(Identifier replacedDecl);
 
   void setProfiler(SILProfiler *InheritedProfiler) {
     assert(!Profiler && "Function already has a profiler");
