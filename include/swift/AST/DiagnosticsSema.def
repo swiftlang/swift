@@ -2825,8 +2825,6 @@ ERROR(builtin_unicode_scalar_literal_broken_proto,none,
 ERROR(unicode_scalar_literal_broken_proto,none,
       "protocol 'ExpressibleByUnicodeScalarLiteral' is broken", ())
 
-ERROR(builtin_utf16_extended_grapheme_cluster_literal_broken_proto,none,
-      "protocol '_ExpressibleByBuiltinUTF16ExtendedGraphemeClusterLiteral' is broken", ())
 ERROR(builtin_extended_grapheme_cluster_literal_broken_proto,none,
       "protocol '_ExpressibleByBuiltinExtendedGraphemeClusterLiteral' is broken", ())
 ERROR(extended_grapheme_cluster_literal_broken_proto,none,

@@ -72,7 +72,7 @@ extension Substring : _ObjectiveCBridgeable {
     result: inout Substring?
   ) {
     let s = String(x)
-    result = Substring(_base: s, s.startIndex ..< s.endIndex)
+    result = s[...]
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
@@ -91,7 +91,7 @@ extension Substring : _ObjectiveCBridgeable {
     // string; map it to an empty substring.
     if _slowPath(source == nil) { return Substring() }
     let s = String(source!)
-    return Substring(_base: s, s.startIndex ..< s.endIndex)
+    return s[...]
   }
 }
 

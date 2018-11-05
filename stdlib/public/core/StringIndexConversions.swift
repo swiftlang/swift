@@ -53,10 +53,10 @@ extension String.Index {
     _ sourcePosition: String.Index,
     within target: String
   ) {
-    guard target.unicodeScalars._isOnGraphemeClusterBoundary(sourcePosition)
-    else { return nil }
-
-    self = target._index(atEncodedOffset: sourcePosition.encodedOffset)
+    guard target._guts.isOnGraphemeClusterBoundary(sourcePosition) else {
+      return nil
+    }
+    self = sourcePosition
   }
 
   /// Returns the position in the given UTF-8 view that corresponds exactly to
@@ -79,10 +79,10 @@ extension String.Index {
   ///   If this index does not have an exact corresponding position in `utf8`,
   ///   this method returns `nil`. For example, an attempt to convert the
   ///   position of a UTF-16 trailing surrogate returns `nil`.
-  @inlinable // trivial-implementation
+  @inlinable // FIXME(sil-serialize-all)
   public func samePosition(
     in utf8: String.UTF8View
-  ) -> String.UTF8View.Index? {
+    ) -> String.UTF8View.Index? {
     return String.UTF8View.Index(self, within: utf8)
   }
 
@@ -108,7 +108,7 @@ extension String.Index {
   ///   index. If this index does not have an exact corresponding position in
   ///   `utf16`, this method returns `nil`. For example, an attempt to convert
   ///   the position of a UTF-8 continuation byte returns `nil`.
-  @inlinable // trivial-implementation
+  @inlinable // FIXME(sil-serialize-all)
   public func samePosition(
     in utf16: String.UTF16View
   ) -> String.UTF16View.Index? {

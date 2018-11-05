@@ -161,7 +161,6 @@ IDENTIFIER_(builtinUnicodeScalarLiteral)
 IDENTIFIER(unicodeScalarLiteral)
 
 IDENTIFIER(stringLiteral)
-IDENTIFIER_(builtinUTF16StringLiteral)
 IDENTIFIER_(builtinStringLiteral)
 IDENTIFIER(StringLiteralType)
 IDENTIFIER(stringInterpolation)

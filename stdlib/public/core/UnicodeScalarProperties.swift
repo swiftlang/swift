@@ -19,6 +19,7 @@ extension Unicode.Scalar {
 
   /// A value that provides access to properties of a Unicode scalar that are
   /// defined by the Unicode standard.
+
   public struct Properties {
     @usableFromInline
     internal var _scalar: Unicode.Scalar
@@ -690,31 +691,10 @@ extension Unicode.Scalar.Properties {
   /// all current case mappings. In the event more space is needed, it will be
   /// allocated on the heap.
   internal func _applyMapping(_ u_strTo: _U_StrToX) -> String {
-    var scratchBuffer = _Normalization._SegmentOutputBuffer(allZeros: ())
-    let count = scratchBuffer.withUnsafeMutableBufferPointer { bufPtr -> Int in
-      return _scalar.withUTF16CodeUnits { utf16 in
-        var err = __swift_stdlib_U_ZERO_ERROR
-        let correctSize = u_strTo(
-          bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
-          Int32(bufPtr.count),
-          utf16.baseAddress._unsafelyUnwrappedUnchecked,
-          Int32(utf16.count),
-          "",
-          &err)
-        guard err.isSuccess ||
-              err == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR else {
-          fatalError("Unexpected error case-converting Unicode scalar.")
-        }
-        return Int(correctSize)
-      }
-    }
-
-    if _fastPath(count <= scratchBuffer.count) {
-      scratchBuffer.count = count
-      return String._fromWellFormedUTF16CodeUnits(scratchBuffer)
-    }
+    // TODO(String performance): Stack buffer first and then detect real count
+    let count = 64
     var array = Array<UInt16>(repeating: 0, count: count)
-    array.withUnsafeMutableBufferPointer { bufPtr in
+    let len: Int = array.withUnsafeMutableBufferPointer { bufPtr in
       return _scalar.withUTF16CodeUnits { utf16 in
         var err = __swift_stdlib_U_ZERO_ERROR
         let correctSize = u_strTo(
@@ -727,10 +707,14 @@ extension Unicode.Scalar.Properties {
         guard err.isSuccess else {
           fatalError("Unexpected error case-converting Unicode scalar.")
         }
-        _sanityCheck(count == correctSize, "inconsistent ICU behavior")
+        // TODO: _sanityCheck(count == correctSize, "inconsistent ICU behavior")
+        return Int(correctSize)
       }
     }
-    return String._fromWellFormedUTF16CodeUnits(array[..<count])
+    // TODO: replace `len` with `count`
+    return array[..<len].withUnsafeBufferPointer {
+      return String._uncheckedFromUTF16($0)
+    }
   }
 
   /// The lowercase mapping of the scalar.

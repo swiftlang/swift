@@ -29,36 +29,7 @@ struct SillyString : _ExpressibleByBuiltinStringLiteral, ExpressibleByStringLite
   init(stringLiteral value: SillyString) { }
 }
 
-struct SillyUTF16String : _ExpressibleByBuiltinUTF16StringLiteral, ExpressibleByStringLiteral {
-  init(_builtinUnicodeScalarLiteral value: Builtin.Int32) { }
-
-  init(unicodeScalarLiteral value: SillyString) { }
-
-  init(
-    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
-    utf8CodeUnitCount: Builtin.Word,
-    isASCII: Builtin.Int1
-  ) { 
-  }
-
-  init(extendedGraphemeClusterLiteral value: SillyString) { }
-
-  init(
-    _builtinStringLiteral start: Builtin.RawPointer,
-    utf8CodeUnitCount: Builtin.Word,
-    isASCII: Builtin.Int1
-  ) { }
-
-  init(
-    _builtinUTF16StringLiteral start: Builtin.RawPointer,
-    utf16CodeUnitCount: Builtin.Word
-  ) { 
-  }
-
-  init(stringLiteral value: SillyUTF16String) { }
-}
-
-struct SillyConstUTF16String : ExpressibleByStringLiteral {
+struct SillyConstString : ExpressibleByStringLiteral {
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32) { }
 
   init(unicodeScalarLiteral value: SillyString) { }
@@ -72,7 +43,7 @@ struct SillyConstUTF16String : ExpressibleByStringLiteral {
 
   init(extendedGraphemeClusterLiteral value: SillyString) { }
 
-  init(stringLiteral value: SillyUTF16String) { }
+  init(stringLiteral value: SillyString) { }
 }
 
 func literals() {
@@ -84,7 +55,7 @@ func literals() {
 // CHECK-LABEL: sil hidden @$s11expressions8literalsyyF
 // CHECK: integer_literal $Builtin.IntLiteral, 1
 // CHECK: float_literal $Builtin.FPIEEE{{64|80}}, {{0x3FF4000000000000|0x3FFFA000000000000000}}
-// CHECK: string_literal utf16 "foö"
+// CHECK: string_literal utf8 "foö"
 // CHECK: string_literal utf8 "foo"
 
 func bar(_ x: Int) {}
@@ -518,7 +489,7 @@ func magic_identifier_expansion(_ a: Int = #column) {
 func print_string() {
   // CHECK-LABEL: print_string
   var str = "\u{08}\u{09}\thello\r\n\0wörld\u{1e}\u{7f}"
-  // CHECK: string_literal utf16 "\u{08}\t\thello\r\n\0wörld\u{1E}\u{7F}"
+  // CHECK: string_literal utf8 "\u{08}\t\thello\r\n\0wörld\u{1E}\u{7F}"
 }
 
 
