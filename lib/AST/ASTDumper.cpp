@@ -768,9 +768,8 @@ namespace {
         OS << " final";
       if (VD->isObjC())
         OS << " @objc";
-      if (VD->isDynamic()) {
+      if (VD->isDynamic())
         OS << " dynamic";
-      }
       if (auto *attr =
               VD->getAttrs().getAttribute<DynamicReplacementAttr>()) {
         OS << " @_dynamicReplacement(for: \"";
