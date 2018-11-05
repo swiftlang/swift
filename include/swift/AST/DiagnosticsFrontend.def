@@ -267,6 +267,9 @@ ERROR(error_extracting_version_from_parseable_interface,none,
       "error extracting version from parseable module interface", ())
 ERROR(error_extracting_flags_from_parseable_interface,none,
       "error extracting flags from parseable module interface", ())
+ERROR(missing_dependency_of_parseable_module_interface,none,
+      "missing dependency '%0' of parseable module interface '%1': %2",
+      (StringRef, StringRef, StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
