@@ -449,7 +449,7 @@ extension MutableCollection where Self : RandomAccessCollection {
     var amount = count
     var currentIndex = startIndex
     while amount > 1 {
-      let random = Int.random(in: 0 ..< amount)
+      let random = Int.random(in: 0 ..< amount, using: &generator)
       amount -= 1
       swapAt(
         currentIndex,

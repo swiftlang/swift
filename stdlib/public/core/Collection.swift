@@ -929,7 +929,7 @@ extension Collection {
     using generator: inout T
   ) -> Element? {
     guard !isEmpty else { return nil }
-    let random = Int.random(in: 0 ..< count)
+    let random = Int.random(in: 0 ..< count, using: &generator)
     let idx = index(
       startIndex,
       offsetBy: random
