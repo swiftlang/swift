@@ -191,6 +191,8 @@ KNOWN_SETTINGS=(
     install-lldb                ""               "whether to install LLDB"
     install-llbuild             ""               "whether to install llbuild"
     install-swiftpm             ""               "whether to install swiftpm"
+    install-swiftsyntax         ""               "whether to install swiftsyntax"
+    skip-install-swiftsyntax-module ""           "set to skip installing swiftsyntax modules"
     install-xctest              ""               "whether to install xctest"
     install-foundation          ""               "whether to install foundation"
     install-libdispatch         ""               "whether to install libdispatch"
@@ -3381,7 +3383,22 @@ for host in "${ALL_HOSTS[@]}"; do
                 continue
                 ;;
             swiftsyntax)
-                # SwiftSyntax is not installed as part of the toolchain
+                if [[ -z "${INSTALL_SWIFTSYNTAX}" ]] ; then
+                    continue
+                fi
+                if [[ -z "${INSTALL_DESTDIR}" ]] ; then
+                    echo "--install-destdir is required to install products."
+                    exit 1
+                fi
+                echo "--- Installing ${product} ---"
+                DYLIB_DIR="${host_install_destdir}${host_install_prefix}/lib/swift/${SWIFT_HOST_VARIANT}"
+                MODULE_DIR="${DYLIB_DIR}/${SWIFT_HOST_VARIANT_ARCH}"
+                if [[ -z "${SKIP_INSTALL_SWIFTSYNTAX_MODULE}" ]] ; then
+                    call "${swiftsyntax_build_command[@]}" --dylib-dir="${DYLIB_DIR}" --swiftmodule-dir "${MODULE_DIR}" --install
+                else
+                    call "${swiftsyntax_build_command[@]}" --dylib-dir="${DYLIB_DIR}" --install
+                fi
+
                 continue
                 ;;
             xctest)
