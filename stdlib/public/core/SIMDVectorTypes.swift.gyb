@@ -1,0 +1,113 @@
+%{
+from SwiftIntTypes import all_integer_types
+word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
+storageElementCounts = [2,4,8]
+vectorElementCounts = storageElementCounts + [3]
+}%
+
+%for n in vectorElementCounts:
+% storageN = 4 if n == 3 else n
+@_fixed_layout
+public struct Vector${n}<Scalar> : SIMDVector where Scalar: SIMDVectorizable {
+  public var _storage: Scalar._Vector${storageN}
+  public typealias Mask = SIMDMask<Vector${n}<Scalar._MaskElement>>
+  @_transparent public var elementCount: Int { return ${n} }
+  @_transparent public init() { _storage = Scalar._Vector${storageN}() }
+  public subscript(index: Int) -> Scalar {
+    @inlinable get {
+      _precondition(indices.contains(index))
+      return _storage[index]
+    }
+    @inlinable set {
+      _precondition(indices.contains(index))
+      _storage[index] = newValue
+    }
+  }
+}
+
+%end
+
+%for self_type in all_integer_types(word_bits):
+% Self = self_type.stdlib_name
+% BuiltinName = self_type.builtin_name
+% Mask = Self if self_type.is_signed else self_type.get_opposite_signedness().stdlib_name
+extension ${Self} : SIMDVectorizable {
+
+  public typealias _MaskElement = ${Mask}
+
+% for n in storageElementCounts:
+  @_fixed_layout public struct _Vector${n} : SIMDVectorStorage {
+
+    public var _value: Builtin.Vec${n}x${BuiltinName}
+
+    @_transparent
+    public var elementCount: Int {
+      return ${n}
+    }
+
+    @_transparent
+    public init() {
+      _value = Builtin.zeroInitializer()
+    }
+
+    public subscript(index: Int) -> ${Self} {
+      @_transparent
+      get {
+        return ${Self}(Builtin.extractelement_Vec${n}x${BuiltinName}_Int32(
+          _value, Int32(truncatingIfNeeded: index)._value
+        ))
+      }
+      @_transparent
+      set {
+        _value = Builtin.insertelement_Vec${n}x${BuiltinName}_${BuiltinName}_Int32(
+          _value, newValue._value, Int32(truncatingIfNeeded: index)._value
+        )
+      }
+    }
+  }
+
+% end
+}
+
+%end
+
+%for (Self, bits) in [('Float',32), ('Double',64)]:
+extension ${Self} : SIMDVectorizable {
+
+  public typealias _MaskElement = Int${bits}
+
+% for n in storageElementCounts:
+  @_fixed_layout public struct _Vector${n} : SIMDVectorStorage {
+
+    public var _value: Builtin.Vec${n}xFPIEEE${bits}
+
+    @_transparent
+    public var elementCount: Int {
+      return ${n}
+    }
+
+    @_transparent
+    public init() {
+      _value = Builtin.zeroInitializer()
+    }
+
+    public subscript(index: Int) -> ${Self} {
+      @_transparent
+      get {
+        return ${Self}(Builtin.extractelement_Vec${n}xFPIEEE${bits}_Int32(
+          _value, Int32(truncatingIfNeeded: index)._value
+        ))
+      }
+      @_transparent
+      set {
+        _value = Builtin.insertelement_Vec${n}xFPIEEE${bits}_FPIEEE${bits}_Int32(
+          _value, newValue._value, Int32(truncatingIfNeeded: index)._value
+        )
+      }
+    }
+  }
+
+% end
+}
+
+%end
