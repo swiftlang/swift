@@ -41,6 +41,9 @@ public let DataBenchmarks = [
     BenchmarkInfo(name: "DataAppendDataLargeToLarge", runFunction: run_AppendDataLargeToLarge, tags: [.validation, .api, .Data]),
 ]
 
+let small = sampleData(.small)
+let medium = sampleData(.medium)
+
 enum SampleKind {
     case small
     case medium
@@ -138,7 +141,6 @@ func sampleData(_ type: SampleKind) -> Data {
     case .string: return sampleString()
     case .immutableBacking: return sampleBridgedNSData()
     }
-    
 }
 
 func benchmark_AccessBytes(_ N: Int, _ data: Data) {
@@ -228,7 +230,7 @@ func benchmark_AppendData(_ N: Int, _ lhs: Data, _ rhs: Data) {
 
 @inline(never)
 public func run_Subscript(_ N: Int) {
-    let data = sampleData(.medium)
+    let data = medium
     let index = 521
     for _ in 1...10000*N {
         // Ensure that the compiler does not optimize away this call
@@ -238,7 +240,7 @@ public func run_Subscript(_ N: Int) {
 
 @inline(never)
 public func run_Count(_ N: Int) {
-    let data = sampleData(.medium)
+    let data = medium
     for _ in 1...10000*N {
         // Ensure that the compiler does not optimize away this call
         blackHole(data.count)
@@ -247,7 +249,7 @@ public func run_Count(_ N: Int) {
 
 @inline(never)
 public func run_SetCount(_ N: Int) {
-    let data = sampleData(.medium)
+    let data = medium
     let count = data.count + 100
     var otherData = data
     let orig = data.count
@@ -259,65 +261,65 @@ public func run_SetCount(_ N: Int) {
 
 @inline(never)
 public func run_AccessBytes(_ N: Int) {
-    let data = sampleData(.medium)
+    let data = medium
     benchmark_AccessBytes(N, data)
 }
 
 @inline(never)
 public func run_MutateBytes(_ N: Int) {
-    let data = sampleData(.medium)
+    let data = medium
     benchmark_MutateBytes(N, data)
 }
 
 @inline(never)
 public func run_CopyBytes(_ N: Int) {
-    let data = sampleData(.medium)
+    let data = medium
     benchmark_CopyBytes(N, data)
 }
 
 @inline(never)
 public func run_AppendBytes(_ N: Int) {
-    let data = sampleData(.medium)
+    let data = medium
     benchmark_AppendBytes(N, 809, data)
 }
 
 @inline(never)
 public func run_AppendArray(_ N: Int) {
-    let data = sampleData(.medium)
+    let data = medium
     benchmark_AppendArray(N, 809, data)
 }
 
 @inline(never)
 public func run_Reset(_ N: Int) {
-    let data = sampleData(.medium)
+    let data = medium
     benchmark_Reset(N, 431..<809, data)
 }
 
 @inline(never)
 public func run_ReplaceSmall(_ N: Int) {
-    let data = sampleData(.medium)
-    let replacement = sampleData(.small)
+    let data = medium
+    let replacement = small
     benchmark_Replace(N, 431..<809, data, replacement)
 }
 
 @inline(never)
 public func run_ReplaceMedium(_ N: Int) {
-    let data = sampleData(.medium)
-    let replacement = sampleData(.medium)
+    let data = medium
+    let replacement = medium
     benchmark_Replace(N, 431..<809, data, replacement)
 }
 
 @inline(never)
 public func run_ReplaceLarge(_ N: Int) {
-    let data = sampleData(.medium)
+    let data = medium
     let replacement = sampleData(.large)
     benchmark_Replace(N, 431..<809, data, replacement)
 }
 
 @inline(never)
 public func run_ReplaceSmallBuffer(_ N: Int) {
-    let data = sampleData(.medium)
-    let replacement = sampleData(.small)
+    let data = medium
+    let replacement = small
     let sz = replacement.count
     replacement.withUnsafeBytes { (ptr: UnsafePointer<UInt8>) in
         benchmark_ReplaceBuffer(N, 431..<809, data, UnsafeBufferPointer(start: ptr, count: sz))
@@ -326,8 +328,8 @@ public func run_ReplaceSmallBuffer(_ N: Int) {
 
 @inline(never)
 public func run_ReplaceMediumBuffer(_ N: Int) {
-    let data = sampleData(.medium)
-    let replacement = sampleData(.medium)
+    let data = medium
+    let replacement = medium
     let sz = replacement.count
     replacement.withUnsafeBytes { (ptr: UnsafePointer<UInt8>) in
         benchmark_ReplaceBuffer(N, 431..<809, data, UnsafeBufferPointer(start: ptr, count: sz))
@@ -336,7 +338,7 @@ public func run_ReplaceMediumBuffer(_ N: Int) {
 
 @inline(never)
 public func run_ReplaceLargeBuffer(_ N: Int) {
-    let data = sampleData(.medium)
+    let data = medium
     let replacement = sampleData(.large)
     let sz = replacement.count
     replacement.withUnsafeBytes { (ptr: UnsafePointer<UInt8>) in
@@ -346,62 +348,62 @@ public func run_ReplaceLargeBuffer(_ N: Int) {
 
 @inline(never)
 public func run_AppendSequence(_ N: Int) {
-    let data = sampleData(.medium)
+    let data = medium
     benchmark_AppendSequence(N, 809, data)
 }
 
 @inline(never)
 public func run_AppendDataSmallToSmall(_ N: Int) {
-    let data = sampleData(.small)
-    let other = sampleData(.small)
+    let data = small
+    let other = small
     benchmark_AppendData(N, data, other)
 }
 
 @inline(never)
 public func run_AppendDataSmallToMedium(_ N: Int) {
-    let data = sampleData(.medium)
-    let other = sampleData(.small)
+    let data = medium
+    let other = small
     benchmark_AppendData(N, data, other)
 }
 
 @inline(never)
 public func run_AppendDataSmallToLarge(_ N: Int) {
     let data = sampleData(.large)
-    let other = sampleData(.small)
+    let other = small
     benchmark_AppendData(N, data, other)
 }
 
 @inline(never)
 public func run_AppendDataMediumToSmall(_ N: Int) {
-    let data = sampleData(.small)
-    let other = sampleData(.medium)
+    let data = small
+    let other = medium
     benchmark_AppendData(N, data, other)
 }
 
 @inline(never)
 public func run_AppendDataMediumToMedium(_ N: Int) {
-    let data = sampleData(.medium)
-    let other = sampleData(.medium)
+    let data = medium
+    let other = medium
     benchmark_AppendData(N, data, other)
 }
 
 @inline(never)
 public func run_AppendDataMediumToLarge(_ N: Int) {
     let data = sampleData(.large)
-    let other = sampleData(.medium)
+    let other = medium
     benchmark_AppendData(N, data, other)
 }
 
 @inline(never)
 public func run_AppendDataLargeToSmall(_ N: Int) {
-    let data = sampleData(.small)
+    let data = small
     let other = sampleData(.large)
     benchmark_AppendData(N, data, other)
 }
 
 @inline(never)
 public func run_AppendDataLargeToMedium(_ N: Int) {
-    let data = sampleData(.medium)
+    let data = medium
     let other = sampleData(.large)
     benchmark_AppendData(N, data, other)
 }
