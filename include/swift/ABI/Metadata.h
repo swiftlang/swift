@@ -4230,6 +4230,76 @@ TargetTypeContextDescriptor<Runtime>::getSingletonMetadataInitialization() const
   }
 }
 
+/// An entry in the chain of dynamic replacement functions.
+struct DynamicReplacementChainEntry {
+  void *implementationFunction;
+  DynamicReplacementChainEntry *next;
+};
+
+/// A record describing the root of dynamic replacements for a function.
+struct DynamicReplacementKey {
+  RelativeDirectPointer<DynamicReplacementChainEntry, false> root;
+  uint32_t flags;
+};
+
+/// A record describing a dynamic function replacement.
+class DynamicReplacementDescriptor {
+  RelativeIndirectablePointer<DynamicReplacementKey, false> replacedFunctionKey;
+  RelativeDirectPointer<void, false> replacementFunction;
+  RelativeDirectPointer<DynamicReplacementChainEntry, false> chainEntry;
+  uint32_t flags;
+
+public:
+  /// Enable this replacement by changing the function's replacement chain's
+  /// root entry.
+  /// This replacement must be done while holding a global lock that guards this
+  /// function's chain. Currently this is done by holding the
+  /// \p DynamicReplacementLock.
+  void enableReplacement() const;
+
+  /// Disable this replacement by changing the function's replacement chain's
+  /// root entry.
+  /// This replacement must be done while holding a global lock that guards this
+  /// function's chain. Currently this is done by holding the
+  /// \p DynamicReplacementLock.
+  void disableReplacement() const;
+
+  uint32_t getFlags() const { return flags; }
+};
+
+/// A collection of dynamic replacement records.
+class DynamicReplacementScope
+    : private swift::ABI::TrailingObjects<DynamicReplacementScope,
+                                          DynamicReplacementDescriptor> {
+
+  uint32_t flags;
+  uint32_t numReplacements;
+
+  using TrailingObjects =
+      swift::ABI::TrailingObjects<DynamicReplacementScope,
+                                  DynamicReplacementDescriptor>;
+  friend TrailingObjects;
+
+  ArrayRef<DynamicReplacementDescriptor> getReplacementDescriptors() const {
+    return {this->template getTrailingObjects<DynamicReplacementDescriptor>(),
+            numReplacements};
+  }
+
+public:
+  void enable() const {
+    for (auto &descriptor : getReplacementDescriptors()) {
+      descriptor.enableReplacement();
+    }
+  }
+
+  void disable() const {
+    for (auto &descriptor : getReplacementDescriptors()) {
+      descriptor.disableReplacement();
+    }
+  }
+  uint32_t getFlags() { return flags; }
+};
+
 } // end namespace swift
 
 #pragma clang diagnostic pop

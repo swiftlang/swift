@@ -1241,6 +1241,11 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
   if (f->getLoweredFunctionType()->isCoroutine()) {
     CurFn->addFnAttr(llvm::Attribute::NoInline);
   }
+  // Emit the thunk that calls the previous implementation if this is a dynamic
+  // replacement.
+  if (f->getDynamicallyReplacedFunction()) {
+    IGM.emitDynamicReplacementOriginalFunctionThunk(f);
+  }
 }
 
 IRGenSILFunction::~IRGenSILFunction() {
@@ -1622,6 +1627,9 @@ void IRGenSILFunction::emitSILFunction() {
   
   assert(!CurSILFn->empty() && "function has no basic blocks?!");
 
+  if (CurSILFn->getDynamicallyReplacedFunction())
+    IGM.IRGen.addDynamicReplacement(CurSILFn);
+
   // Configure the dominance resolver.
   // TODO: consider re-using a dom analysis from the PassManager
   // TODO: consider using a cheaper analysis at -O0
@@ -1838,7 +1846,9 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto fn = i->getReferencedFunction();
 
-  llvm::Constant *fnPtr = IGM.getAddrOfSILFunction(fn, NotForDefinition);
+  llvm::Constant *fnPtr = IGM.getAddrOfSILFunction(
+      fn, NotForDefinition, false /*isDynamicallyReplaceableImplementation*/,
+      isa<PreviousDynamicFunctionRefInst>(i));
 
   auto sig = IGM.getSignature(fn->getLoweredFunctionType());
 

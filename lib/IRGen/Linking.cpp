@@ -290,6 +290,13 @@ std::string LinkEntity::mangleAsString() const {
     return Result;
   }
 
+  case Kind::DynamicallyReplaceableFunctionKey: {
+    std::string Result(getSILFunction()->getName());
+    Result.append("Tx");
+    return Result;
+  }
+
+
   case Kind::DynamicallyReplaceableFunctionVariableAST: {
     assert(isa<AbstractFunctionDecl>(getDecl()));
     std::string Result;
@@ -300,6 +307,19 @@ std::string LinkEntity::mangleAsString() const {
       Result = mangler.mangleEntity(getDecl(), /*isCurried=*/false);
     }
     Result.append("TX");
+    return Result;
+  }
+
+  case Kind::DynamicallyReplaceableFunctionKeyAST: {
+    assert(isa<AbstractFunctionDecl>(getDecl()));
+    std::string Result;
+    if (auto *Constructor = dyn_cast<ConstructorDecl>(getDecl())) {
+      Result = mangler.mangleConstructorEntity(Constructor, true,
+                                               /*isCurried=*/false);
+    } else  {
+      Result = mangler.mangleEntity(getDecl(), /*isCurried=*/false);
+    }
+    Result.append("Tx");
     return Result;
   }
 
@@ -528,11 +548,14 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
     return SILLinkage::Private;
 
+  case Kind::DynamicallyReplaceableFunctionKey:
   case Kind::SILFunction:
     return getSILFunction()->getEffectiveSymbolLinkage();
 
   case Kind::DynamicallyReplaceableFunctionImpl:
+  case Kind::DynamicallyReplaceableFunctionKeyAST:
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
+
 
   case Kind::DynamicallyReplaceableFunctionVariable:
     return getSILFunction()->getEffectiveSymbolLinkage();
@@ -668,6 +691,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::TypeMetadataPattern:
   case Kind::DefaultAssociatedConformanceAccessor:
     return false;
+  case Kind::DynamicallyReplaceableFunctionKey:
   case Kind::DynamicallyReplaceableFunctionVariable:
     return true;
 
@@ -696,6 +720,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::CoroutineContinuationPrototype:
   case Kind::DynamicallyReplaceableFunctionVariableAST:
   case Kind::DynamicallyReplaceableFunctionImpl:
+  case Kind::DynamicallyReplaceableFunctionKeyAST:
     llvm_unreachable("Relative reference to unsupported link entity");
   }
   llvm_unreachable("bad link entity kind");
@@ -776,7 +801,8 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::MethodDescriptorInitializer:
   case Kind::MethodDescriptorAllocator:
     return IGM.MethodDescriptorStructTy;
-    
+  case Kind::DynamicallyReplaceableFunctionKey:
+    return IGM.DynamicReplacementKeyTy;
   case Kind::DynamicallyReplaceableFunctionVariable:
     return IGM.DynamicReplacementLinkEntryTy;
   default:
@@ -820,6 +846,7 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
   case Kind::DynamicallyReplaceableFunctionVariable:
+  case Kind::DynamicallyReplaceableFunctionKey:
     return IGM.getPointerAlignment();
   case Kind::SILFunction:
     return Alignment(1);
@@ -834,7 +861,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
     if (getSILGlobalVariable()->getDecl())
       return getSILGlobalVariable()->getDecl()->isWeakImported(module);
     return false;
-
+  case Kind::DynamicallyReplaceableFunctionKey:
   case Kind::DynamicallyReplaceableFunctionVariable:
   case Kind::SILFunction: {
     // For imported functions check the Clang declaration.
@@ -886,6 +913,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::ProtocolDescriptor:
   case Kind::ProtocolRequirementsBaseDescriptor:
   case Kind::AssociatedTypeDescriptor:
+  case Kind::DynamicallyReplaceableFunctionKeyAST:
   case Kind::DynamicallyReplaceableFunctionVariableAST:
   case Kind::DynamicallyReplaceableFunctionImpl:
     return getDecl()->isWeakImported(module);
@@ -961,6 +989,7 @@ const SourceFile *LinkEntity::getSourceFileForEmission() const {
   case Kind::AssociatedConformanceDescriptor:
   case Kind::DefaultAssociatedConformanceAccessor:
   case Kind::DynamicallyReplaceableFunctionVariableAST:
+  case Kind::DynamicallyReplaceableFunctionKeyAST:
   case Kind::DynamicallyReplaceableFunctionImpl:
     sf = getSourceFileForDeclContext(getDecl()->getDeclContext());
     if (!sf)
@@ -969,6 +998,7 @@ const SourceFile *LinkEntity::getSourceFileForEmission() const {
   
   case Kind::SILFunction:
   case Kind::DynamicallyReplaceableFunctionVariable:
+  case Kind::DynamicallyReplaceableFunctionKey:
     sf = getSourceFileForDeclContext(getSILFunction()->getDeclContext());
     if (!sf)
       return nullptr;

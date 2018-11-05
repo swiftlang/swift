@@ -836,6 +836,10 @@ void Remangler::mangleDynamicallyReplaceableFunctionImpl(Node *node) {
   Out << "TI";
 }
 
+void Remangler::mangleDynamicallyReplaceableFunctionKey(Node *node) {
+  Out << "Tx";
+}
+
 void Remangler::mangleDynamicallyReplaceableFunctionVar(Node *node) {
   Out << "TX";
 }

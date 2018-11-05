@@ -1255,6 +1255,7 @@ void Remangler::mangleGlobal(Node *node) {
       case Node::Kind::VTableAttribute:
       case Node::Kind::DirectMethodReferenceAttribute:
       case Node::Kind::MergedFunction:
+      case Node::Kind::DynamicallyReplaceableFunctionKey:
       case Node::Kind::DynamicallyReplaceableFunctionImpl:
       case Node::Kind::DynamicallyReplaceableFunctionVar:
         mangleInReverseOrder = true;
@@ -1591,6 +1592,10 @@ void Remangler::mangleMergedFunction(Node *node) {
 
 void Remangler::mangleDynamicallyReplaceableFunctionImpl(Node *node) {
   Buffer << "TI";
+}
+
+void Remangler::mangleDynamicallyReplaceableFunctionKey(Node *node) {
+  Buffer << "Tx";
 }
 
 void Remangler::mangleDynamicallyReplaceableFunctionVar(Node *node) {

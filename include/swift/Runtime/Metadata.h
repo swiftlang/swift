@@ -788,6 +788,12 @@ const TypeContextDescriptor *swift_getTypeContextDescriptor(const Metadata *type
 SWIFT_RUNTIME_EXPORT
 const HeapObject *swift_getKeyPath(const void *pattern, const void *arguments);
 
+SWIFT_RUNTIME_EXPORT
+void swift_enableDynamicReplacementScope(const DynamicReplacementScope *scope);
+
+SWIFT_RUNTIME_EXPORT
+void swift_disableDynamicReplacementScope(const DynamicReplacementScope *scope);
+
 } // end namespace swift
 
 #endif // SWIFT_RUNTIME_METADATA_H
