@@ -2309,11 +2309,17 @@ public:
     return TypeRef.getTypeDescriptor(getTypeKind());
   }
 
+  /// Whether this is a retroactive conformance.
+  bool isRetroactive() const {
+    return Flags.isRetroactive();
+  }
+
   /// Retrieve the context of a retroactive conformance.
-  const TargetContextDescriptor<Runtime> *getRetroactiveContext() const {
+  ConstTargetPointer<Runtime, TargetContextDescriptor<Runtime>>
+  getRetroactiveContext() const {
     if (!Flags.isRetroactive()) return nullptr;
 
-    return this->template getTrailingObjects<RelativeContextPointer<Runtime>>();
+    return *this->template getTrailingObjects<RelativeContextPointer<Runtime>>();
   }
 
   /// Whether this conformance is non-unique because it has been synthesized
