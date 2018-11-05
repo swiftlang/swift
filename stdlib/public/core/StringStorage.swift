@@ -350,7 +350,7 @@ extension _StringStorage {
       _sanityCheck(_allASCII(self.codeUnits))
     }
     if let crumbs = _breadcrumbsAddress.pointee {
-      crumbs._invariantCheck()
+      crumbs._invariantCheck(for: self.asString)
     }
   }
   #endif // INTERNAL_CHECKS_ENABLED
@@ -369,6 +369,9 @@ extension _StringStorage {
       count: newCount, isASCII: newIsASCII)
 #endif
     self.terminator.pointee = 0
+
+    // TODO(String performance): Consider updating breadcrumbs when feasible
+    self._breadcrumbsAddress.pointee = nil
     _invariantCheck()
   }
 
@@ -552,7 +555,7 @@ extension _SharedStringStorage {
   #else
   internal func _invariantCheck() {
     if let crumbs = _breadcrumbs {
-      crumbs._invariantCheck()
+      crumbs._invariantCheck(for: self.asString)
     }
     _countAndFlags._invariantCheck()
   }

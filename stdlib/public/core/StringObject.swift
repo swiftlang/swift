@@ -1272,7 +1272,6 @@ extension _StringObject {
     } else {
       _sanityCheck(isLarge)
       _sanityCheck(largeCount == count)
-      _countAndFlags._invariantCheck()
       if providesFastUTF8 && largeFastIsNative {
         _sanityCheck(!isSmall)
         _sanityCheck(!largeIsCocoa)
@@ -1284,7 +1283,6 @@ extension _StringObject {
           _sanityCheck(hasNativeStorage)
           _sanityCheck(hasObjCBridgeableObject)
           _sanityCheck(nativeStorage.count == self.count)
-          nativeStorage._invariantCheck()
         }
       }
       if largeIsCocoa {
