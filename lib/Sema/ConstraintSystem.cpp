@@ -1618,10 +1618,6 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     openedFullType = refType;
     return true;
   }
-  // SWIFT_ENABLE_TENSORFLOW
-  case DeclTypeCheckingSemantics::GradientOf:
-  case DeclTypeCheckingSemantics::ValueAndGradientOf:
-    return false;
   }
 
   llvm_unreachable("Unhandled DeclTypeCheckingSemantics in switch.");

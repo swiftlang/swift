@@ -971,6 +971,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
            Attr = 0, NumSubs = 0, NumConformances = 0, IsNonThrowingApply = 0;
   // SWIFT_ENABLE_TENSORFLOW
   unsigned NumArguments = 0;
+  unsigned GradResultIndex = 0;
   ValueID ValID, ValID2, ValID3;
   TypeID TyID, TyID2, TyID3;
   TypeID ConcreteTyID;
@@ -1076,6 +1077,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILInstGraphOperationLayout::readRecord(scratch, ValID, NumArguments,
                                             ListOfValues);
     RawOpCode = (unsigned)SILInstructionKind::GraphOperationInst;
+    break;
+  case SIL_INST_GRADIENT:
+    SILInstGradientLayout::readRecord(scratch, Attr, TyID, TyCategory, ValID,
+                                      GradResultIndex, ListOfValues);
+    RawOpCode = (unsigned)SILInstructionKind::GradientInst;
     break;
   case SIL_INST_NO_OPERAND:
     SILInstNoOperandLayout::readRecord(scratch, RawOpCode);
@@ -1464,6 +1470,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW
+  case SILInstructionKind::GradientInst: {
+    auto ASTTy = MF->getType(TyID);
+    auto SILTy = getSILType(ASTTy, SILValueCategory::Object);
+    auto Val = getLocalValue(ValID, SILTy);
+    auto GradOpts = (SILGradientOptions)Attr;
+    llvm::SmallBitVector paramIndices(ListOfValues.size());
+    for (auto i : indices(ListOfValues))
+      paramIndices[i] = ListOfValues[i];
+    SILReverseAutoDiffIndices indices(GradResultIndex, paramIndices);
+    SILReverseAutoDiffConfig config(indices, GradOpts);
+    ResultVal = Builder.createGradient(Loc, Val, config);
+    break;
+  }
   case SILInstructionKind::GraphOperationInst: {
     // TODO(SR-8848): Deserialize attributes.
     auto EndOfArgValues = 3 * NumArguments;
@@ -1534,11 +1553,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         getLocalValue(ValID,
                       getSILType(Ty, (SILValueCategory)TyCategory)), OnStack);
     break;
-  }
-
-  // SWIFT_ENABLE_TENSORFLOW
-  case SILInstructionKind::GradientInst: {
-    llvm_unreachable("not supported");
   }
 
   case SILInstructionKind::DeallocPartialRefInst: {

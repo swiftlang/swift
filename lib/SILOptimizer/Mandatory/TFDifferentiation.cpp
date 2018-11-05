@@ -4461,6 +4461,10 @@ void Differentiation::run() {
       astCtx.Diags.diagnose(f.getLocation().getSourceLoc(),
                             diag::autodiff_incomplete_differentiable_attr);
     }
+    // Not look for `gradient` instructions in transparent functions because
+    // they are to be inlined.
+    if (f.isTransparent())
+      continue;
     for (SILBasicBlock &bb : f) {
       for (SILInstruction &i : bb) {
         // If `i` is a `gradient` instruction, i.e. the SIL-level differential

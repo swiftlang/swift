@@ -919,11 +919,6 @@ TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
       return DeclTypeCheckingSemantics::WithoutActuallyEscaping;
     if (semantics->Value.equals("typechecker._openExistential(_:do:)"))
       return DeclTypeCheckingSemantics::OpenExistential;
-    // SWIFT_ENABLE_TENSORFLOW
-    if (semantics->Value.equals("typechecker.gradient(of:)"))
-      return DeclTypeCheckingSemantics::GradientOf;
-    if (semantics->Value.equals("typechecker.valueAndGradient(of:)"))
-      return DeclTypeCheckingSemantics::ValueAndGradientOf;
   }
   return DeclTypeCheckingSemantics::Normal;
 }

@@ -174,6 +174,7 @@ namespace sil_block {
     // SWIFT_ENABLE_TENSORFLOW
     SIL_REVERSE_DIFFERENTIABLE_ATTR,
     SIL_INST_GRAPH_OPERATION,
+    SIL_INST_GRADIENT,
 
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
@@ -408,12 +409,22 @@ namespace sil_block {
 
   // SWIFT_ENABLE_TENSORFLOW
   using SILInstGraphOperationLayout = BCRecordLayout<
-      SIL_INST_GRAPH_OPERATION,
-      ValueIDField,          // the (mangled) graph_op name
-      BCVBR<8>,              // number of arguments
-      BCArray<ValueIDField>  // 3 entries per argument (value, type, and type
-                             // category)
-      // followed by 2 entries per result type (type, and type category)
+    SIL_INST_GRAPH_OPERATION,
+    ValueIDField,          // the (mangled) graph_op name
+    BCVBR<8>,              // number of arguments
+    BCArray<ValueIDField>  // 3 entries per argument (value, type, and type
+                           // category)
+    // followed by 2 entries per result type (type, and type category)
+  >;
+  
+  using SILInstGradientLayout = BCRecordLayout<
+    SIL_INST_GRADIENT,
+    BCFixed<3>,         // options
+    TypeIDField,
+    SILTypeCategoryField,
+    ValueIDField,
+    BCFixed<32>,        // result index
+    BCArray<BCFixed<1>> // parameter indices
   >;
 
   // SIL instructions with one type. (alloc_stack)

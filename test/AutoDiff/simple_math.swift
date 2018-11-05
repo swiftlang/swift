@@ -74,4 +74,15 @@ SimpleMathTests.test("CaptureGlobal") {
   expectEqual(30, #gradient(foo)(0))
 }
 
+// FIXME: Forced inlining through @_transparent doesn't work on differential
+// operators yet.
+//
+// SimpleMathTests.test("FunctionalDifferentialOperators") {
+//   let x: Float = 3
+//   let dydx = gradient(at: x) { x in
+//     x * x
+//   }
+//   expectEqual(6, dydx)
+// }
+
 runAllTests()

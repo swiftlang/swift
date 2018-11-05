@@ -952,11 +952,7 @@ public:
   void visitBuiltinInst(BuiltinInst *i);
 
   // SWIFT_ENABLE_TENSORFLOW
-  void visitGradientInst(GradientInst *i) {
-    llvm_unreachable("gradient is not valid in canonical SIL");
-  }
-
-  // SWIFT_ENABLE_TENSORFLOW
+  void visitGradientInst(GradientInst *i);
   void visitGraphOperationInst(GraphOperationInst *i);
 
   void visitFunctionRefInst(FunctionRefInst *i);
@@ -1968,6 +1964,23 @@ static Type getOptionalType(const ASTContext &ctx, Type element) {
 /// Returns the type Array<`element`>.
 static Type getArrayType(const ASTContext &ctx, Type element) {
   return BoundGenericType::get(ctx.getArrayDecl(), Type(), {element});
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+/// Gradient is not valid in canonical SIL yet. For now, we print a runtime
+/// error.
+void IRGenSILFunction::visitGradientInst(GradientInst *i) {
+  const std::string errMessage =
+      "Compiler bug: gradient should have been canonicalized.";
+  abortOnGraphOp(*this, errMessage.c_str());
+  for (auto result : i->getResults()) {
+    ExplosionSchema schema = getTypeInfo(result->getType()).getSchema();
+    Explosion e;
+    for (auto &elt : schema)
+      e.add(llvm::UndefValue::get(elt.getScalarType()));
+    setLoweredExplosion(result, e);
+  }
+  return;
 }
 
 // The code structure resembles

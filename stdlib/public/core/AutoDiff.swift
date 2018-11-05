@@ -94,116 +94,18 @@ public extension Differentiable where TangentVector == CotangentVector {
 // Differential Operators
 //===----------------------------------------------------------------------===//
 
-@_transparent @usableFromInline
-func _gradientBodyUnreachable() {
-  // This implementation is never used, since calls to `Swift.gradient(of:)` are
-  // resolved as a special case by the type checker.
-  Builtin.staticReport(_trueAfterDiagnostics(), true._value,
-    ("internal consistency error: 'gradient(of:)' operation failed to resolve"
-      as StaticString).utf8Start._rawValue)
-  Builtin.unreachable()
+@_transparent @_effects(readnone)
+public func gradient<T : Differentiable, R : FloatingPoint>(
+  of f: /*@autodiff*/ @escaping (T) -> R
+) -> (T) -> T {
+  return #gradient(f)
 }
 
-@_transparent @usableFromInline
-func _valueAndGradientBodyUnreachable() {
-  // This implementation is never used, since calls to
-  // `Swift.valueAndGradient(of:)` are resolved as a special case by the type
-  // checker.
-  Builtin.staticReport(_trueAfterDiagnostics(), true._value,
-    ("""
-     internal consistency error: 'valueAndGradient(of:)' operation failed to \
-     resolve
-     """ as StaticString).utf8Start._rawValue)
-  Builtin.unreachable()
-}
-
-@inlinable // FIXME(sil-serialize-all)
-@_transparent @_semantics("typechecker.gradient(of:)")
-public func gradient<T, R>(of function: (T) -> R) -> (T) -> T.CotangentVector
-  where T : Differentiable, R : Differentiable {
-  _gradientBodyUnreachable()
-}
-
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
-@_semantics("typechecker.gradient(of:)")
-public func gradient<T, U, R>(
-  of function: (T, U) -> R
-) -> (T, U) -> (T.CotangentVector, U.CotangentVector)
-  where T : Differentiable, U : Differentiable,
-        R : Differentiable {
-  _gradientBodyUnreachable()
-}
-
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
-@_semantics("typechecker.gradient(of:)")
-public func gradient<T, U, V, R>(
-  of function: (T, U, V) -> R
-) -> (T, U, V) -> (T.CotangentVector, U.CotangentVector, V.CotangentVector)
-  where T : Differentiable, U : Differentiable,
-        V : Differentiable, R : Differentiable {
-  _gradientBodyUnreachable()
-}
-
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
-@_semantics("typechecker.gradient(of:)")
-public func gradient<T, U, V, W, R>(
-  of function: (T, U, V, W) -> R
-) -> (T, U, V, W) -> (T.CotangentVector, U.CotangentVector, V.CotangentVector,
-                      W.CotangentVector)
-  where T : Differentiable, U : Differentiable,
-        V : Differentiable, W : Differentiable,
-        R : Differentiable {
-  _gradientBodyUnreachable()
-}
-
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
-@_semantics("typechecker.valueAndGradient(of:)")
-public func valueAndGradient<T, R>(
-  of function: (T) -> R
-) -> (T) -> (value: R, gradient: T.CotangentVector)
-  where T : Differentiable, R : Differentiable {
-  _valueAndGradientBodyUnreachable()
-}
-
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
-@_semantics("typechecker.valueAndGradient(of:)")
-public func valueAndGradient<T, U, R>(
-  of function: (T, U) -> R
-) -> (T, U) -> (value: R, gradient: (T.CotangentVector, U.CotangentVector))
-  where T : Differentiable, U : Differentiable,
-        R : Differentiable {
-  _valueAndGradientBodyUnreachable()
-}
-
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
-@_semantics("typechecker.valueAndGradient(of:)")
-public func valueAndGradient<T, U, V, R>(
-  of function: (T, U, V) -> R
-) -> (T, U, V) -> (value: R, gradient: (T.CotangentVector, U.CotangentVector,
-                                        V.CotangentVector))
-  where T : Differentiable, U : Differentiable,
-        V : Differentiable, R : Differentiable {
-  _valueAndGradientBodyUnreachable()
-}
-
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
-@_semantics("typechecker.valueAndGradient(of:)")
-public func valueAndGradient<T, U, V, W, R>(
-  of function: (T, U, V, W) -> R
-) -> (T, U, V, W)
-  -> (value: R, gradient: (T.CotangentVector, U.CotangentVector,
-                           V.CotangentVector, W.CotangentVector))
-  where T : Differentiable, U : Differentiable,
-        V : Differentiable, W : Differentiable,
-        R : Differentiable {
-  _valueAndGradientBodyUnreachable()
+@_transparent @_effects(readnone)
+public func gradient<T : Differentiable, R : FloatingPoint>(
+  at x: T, in f: /*@autodiff*/ @escaping (T) -> R
+) -> T {
+  return #gradient(f)(x)
 }
 
 //===----------------------------------------------------------------------===//
