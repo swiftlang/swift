@@ -137,15 +137,16 @@ class ClassWithArrs {
     }
 
     func writeArr() {
-		for i in 0..<self.N {
-			A[i] = i
-			B[i] = i
-		}
+        for i in 0..<self.N {
+    			A[i] = i
+    			B[i] = i
+    		}
     }
 }
 
+let workload = ClassWithArrs(N: 100)
+
 public func run_DistinctClassFieldAccesses(_ N: Int) {
-    let workload = ClassWithArrs(N: 100)
     for _ in 1...N {
         workload.writeArr()
         workload.readArr()

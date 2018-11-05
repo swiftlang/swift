@@ -22,6 +22,7 @@ import TestsUtils
 let sequenceCount = 4096
 let suffixCount = 1024
 let sumCount = suffixCount * (2 * sequenceCount - suffixCount - 1) / 2
+let array: [Int] = Array(0..<sequenceCount)
 %{
 # Name and initializer Expression pairs for Sequences to test.
 
@@ -34,7 +35,7 @@ Sequences = [
   ('AnySeqCntRange', 'AnySequence(0..<sequenceCount)'),
   ('AnySeqCRangeIter', 'AnySequence((0..<sequenceCount).makeIterator())'),
   ('AnyCollection', 'AnyCollection(0..<sequenceCount)'),
-  ('Array', 'Array(0..<sequenceCount)'),
+  ('Array', 'array'),
 ]
 def lazy ((Name, Expr)) : return (Name + 'Lazy', '(' + Expr + ').lazy')
 
@@ -47,8 +48,8 @@ public let Suffix = [
     name: "Suffix${Name}",
     runFunction: run_Suffix${Name},
     tags: [.validation, .api${
-      ', .Array, .unstable' if Name == 'Array' or Name == 'ArrayLazy' else
-        ', .unstable' if 'CountableRange' in Name else ''}]),
+    ', .Array],\n    setUpFunction: { blackHole(array) })' if 'Array' in Name else
+    '])' },
 % end
 ]
 
