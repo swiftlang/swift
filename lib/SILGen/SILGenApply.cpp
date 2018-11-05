@@ -207,7 +207,7 @@ static ManagedValue borrowedCastToOriginalSelfType(SILGenFunction &SGF,
   }
 
   // Otherwise, we have a non-metatype. Use a borrow+unchecked_ref_cast.
-  return SGF.B.createUncheckedRefCast(loc, self.borrow(SGF, loc),
+  return SGF.B.createUncheckedRefCast(loc, self.formalAccessBorrow(SGF, loc),
                                       originalSelfType);
 }
 
@@ -226,7 +226,7 @@ static ManagedValue convertOwnershipConventionGivenParamInfo(
   if (isForCoroutine && value.getOwnershipKind() == ValueOwnershipKind::Owned) {
     if (param.isDirectGuaranteed() || (!SGF.silConv.useLoweredAddresses() &&
                                        param.isIndirectInGuaranteed())) {
-      return value.borrow(SGF, loc);
+      return value.formalAccessBorrow(SGF, loc);
     }
   }
 
@@ -592,7 +592,7 @@ public:
       auto methodTy = SGF.SGM.Types.getConstantOverrideType(*constant);
 
       // Otherwise, do the dynamic dispatch inline.
-      Scope S(SGF, Loc);
+      ArgumentScope S(SGF, Loc);
 
       SILValue methodVal;
       if (!constant->isForeign) {
@@ -603,12 +603,13 @@ public:
             Loc, borrowedSelf->getValue(), *constant,
             SILType::getPrimitiveObjectType(methodTy));
       }
+      S.pop();
       return ManagedValue::forUnmanaged(methodVal);
     }
     case Kind::SuperMethod: {
       assert(!constant->isCurried);
 
-      Scope S(SGF, Loc);
+      ArgumentScope S(SGF, Loc);
       ManagedValue castValue = borrowedCastToOriginalSelfType(
         SGF, Loc, *borrowedSelf);
 
@@ -616,13 +617,16 @@ public:
       auto constantInfo =
           SGF.SGM.Types.getConstantOverrideInfo(*constant, base);
 
+      ManagedValue fn;
       if (!constant->isForeign) {
-        return SGF.B.createSuperMethod(Loc, castValue, *constant,
-                                       constantInfo.getSILType());
+        fn = SGF.B.createSuperMethod(Loc, castValue, *constant,
+                                     constantInfo.getSILType());
       } else {
-        return SGF.B.createObjCSuperMethod(Loc, castValue, *constant,
-                                           constantInfo.getSILType());
+        fn = SGF.B.createObjCSuperMethod(Loc, castValue, *constant,
+                                         constantInfo.getSILType());
       }
+      S.pop();
+      return fn;
     }
     case Kind::WitnessMethod: {
       auto constantInfo = SGF.getConstantInfo(*constant);
@@ -632,10 +636,10 @@ public:
       auto lookupType = selfType.subst(Substitutions)->getCanonicalType();
       auto conformance = *Substitutions.lookupConformance(selfType, proto);
 
+      ArgumentScope S(SGF, Loc);
+
       SILValue fn;
-
       if (!constant->isForeign) {
-
         fn = SGF.B.createWitnessMethod(
           Loc, lookupType, conformance, *constant,
           constantInfo.getSILType());
@@ -643,17 +647,18 @@ public:
         fn = SGF.B.createObjCMethod(Loc, borrowedSelf->getValue(),
                                     *constant, constantInfo.getSILType());
       }
-
+      S.pop();
       return ManagedValue::forUnmanaged(fn);
     }
     case Kind::DynamicMethod: {
       auto closureType = getDynamicMethodLoweredType(
           SGF.SGM.M, *constant, getSubstFormalType());
 
-      Scope S(SGF, Loc);
+      ArgumentScope S(SGF, Loc);
       SILValue fn = SGF.B.createObjCMethod(
           Loc, borrowedSelf->getValue(), *constant,
           closureType);
+      S.pop();
       return ManagedValue::forUnmanaged(fn);
     }
     }
@@ -1483,6 +1488,8 @@ public:
     if (!fd || !fd->isObjC())
       return false;
 
+    FormalEvaluationScope writebackScope(SGF);
+
     // Local function that actually emits the dynamic member reference.
     auto emitDynamicMemberRef = [&] {
       // We found it. Emit the base.
@@ -1617,7 +1624,8 @@ static void emitRawApply(SILGenFunction &SGF,
   bool isUnowned = substFnType->isCalleeUnowned();
   SILValue fnValue =
       isUnowned ? fn.getValue()
-                : isConsumed ? fn.forward(SGF) : fn.borrow(SGF, loc).getValue();
+                : isConsumed ? fn.forward(SGF)
+                             : fn.formalAccessBorrow(SGF, loc).getValue();
 
   SmallVector<SILValue, 4> argValues;
 
@@ -3002,6 +3010,14 @@ private:
 
       // Otherwise, just use the default logic.
       value = SGF.emitRValueAsSingleValue(expr, contexts.FinalContext);
+
+      // We want any borrows done by the ownership-convention adjustment to
+      // happen outside of the formal-evaluation scope we pushed for the
+      // expression evaluation, but any copies to be done inside of it.
+      // Copies are only done if the parameter is consumed.
+      if (!param.isConsumed())
+        S.pop();
+
       Args.push_back(convertOwnershipConvention(value));
       return;
     }
@@ -4451,7 +4467,7 @@ CallEmission::applyPartiallyAppliedSuperMethod(SGFContext C) {
   auto functionTy = constantInfo.getSILType();
   ManagedValue superMethod;
   {
-    Scope S(SGF, loc);
+    ArgumentScope S(SGF, loc);
     ManagedValue castValue =
         borrowedCastToOriginalSelfType(SGF, loc, upcastedSelf);
     if (!constant.isForeign) {
@@ -4461,6 +4477,7 @@ CallEmission::applyPartiallyAppliedSuperMethod(SGFContext C) {
       superMethod = SGF.B.createObjCSuperMethod(loc, castValue, constant,
                                                 functionTy);
     }
+    S.pop();
   }
   auto calleeConvention = ParameterConvention::Direct_Guaranteed;
   auto closureTy = SILGenBuilder::getPartialApplyResultType(
@@ -5719,7 +5736,7 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorObjectBaseArg() {
 
   // We need to produce the value at +1 if it's going to be consumed.
   if (selfParam.isConsumed() && !base.hasCleanup()) {
-    base = base.formalAccessCopyUnmanaged(SGF, loc);
+    base = base.copyUnmanaged(SGF, loc);
   }
 
   // If the parameter is indirect, we need to drop the value into
