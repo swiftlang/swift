@@ -897,6 +897,7 @@ void Serializer::writeBlockInfoBlock() {
   // SWIFT_ENABLE_TENSORFLOW
   BLOCK_RECORD(sil_block, SIL_REVERSE_DIFFERENTIABLE_ATTR);
   BLOCK_RECORD(sil_block, SIL_INST_GRAPH_OPERATION);
+  BLOCK_RECORD(sil_block, SIL_INST_GRADIENT);
 
   // These layouts can exist in both decl blocks and sil blocks.
 #define BLOCK_RECORD_WITH_NAMESPACE(K, X) emitRecordID(Out, X, #X, nameBuffer)

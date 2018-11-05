@@ -933,6 +933,25 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW
+  case SILInstructionKind::GradientInst: {
+    const GradientInst *GI = cast<GradientInst>(&SI);
+    auto operandType = GI->getOriginal()->getType();
+    auto operandTypeRef = S.addTypeRef(operandType.getASTType());
+    auto operandRef = addValueRef(GI->getOriginal());
+    SmallVector<bool, 4> paramIndicesBitVec;
+    auto indices = GI->getIndices();
+    for (unsigned i : range(indices.parameters.size()))
+      paramIndicesBitVec.push_back(indices.parameters[i]);
+    SILInstGradientLayout::emitRecord(Out, ScratchRecord,
+                                      SILAbbrCodes[SILInstGradientLayout::Code],
+                                      GI->getOptions().toRaw(),
+                                      operandTypeRef,
+                                      unsigned(operandType.getCategory()),
+                                      operandRef,
+                                      indices.source,
+                                      paramIndicesBitVec);
+    break;
+  }
   case SILInstructionKind::GraphOperationInst: {
     // TODO(SR-8848): Serialize attributes.
     const GraphOperationInst *GI = cast<GraphOperationInst>(&SI);
@@ -2095,9 +2114,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::MarkUninitializedBehaviorInst:
     llvm_unreachable("todo");
-  // SWIFT_ENABLE_TENSORFLOW
-  case SILInstructionKind::GradientInst:
-    llvm_unreachable("not supported");
   }
   // Non-void values get registered in the value table.
   for (auto result : SI.getResults()) {
@@ -2428,6 +2444,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // SWIFT_ENABLE_TENSORFLOW
   registerSILAbbr<SILReverseDifferentiableAttrLayout>();
   registerSILAbbr<SILInstGraphOperationLayout>();
+  registerSILAbbr<SILInstGradientLayout>();
 
   // Register the abbreviation codes so these layouts can exist in both
   // decl blocks and sil blocks.
