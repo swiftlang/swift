@@ -520,6 +520,8 @@ struct StructLoweringState {
   SmallVector<TermInst *, 8> returnInsts;
   // All (large type) return instructions that are modified
   SmallVector<ReturnInst *, 8> modReturnInsts;
+  // All (large type) yield instructions that are modified
+  SmallVector<YieldInst *, 8> modYieldInsts;
   // All destroy_value instrs should be replaced with _addr version
   SmallVector<SILInstruction *, 16> destroyValueInstsToMod;
   // All debug instructions.
@@ -945,6 +947,8 @@ void LargeValueVisitor::visitReturnInst(ReturnInst *instr) {
 void LargeValueVisitor::visitYieldInst(YieldInst *instr) {
   if (!modYieldType(pass.F, pass.Mod, pass.Mapper)) {
     visitInstr(instr);
+  } else {
+    pass.modYieldInsts.push_back(instr);
   } // else: function signature return instructions remain as-is
 }
 
@@ -1075,6 +1079,9 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddr(
       }
       break;
     }
+    case SILInstructionKind::YieldInst:
+      // The rewrite is enough.
+      break;
     case SILInstructionKind::RetainValueInst: {
       auto *insToInsert = cast<RetainValueInst>(userIns);
       pass.retainInstsToMod.push_back(insToInsert);
@@ -1127,6 +1134,12 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddr(
   optimizableLoad->getParent()->erase(optimizableLoad);
 }
 
+static bool isYieldUseRewriteable(StructLoweringState &pass,
+                                  YieldInst *inst, Operand *operand) {
+  assert(inst == operand->getUser());
+  return pass.isLargeLoadableType(operand->get()->getType());
+}
+
 /// Does the value's uses contain instructions that *must* be rewrites?
 static bool hasMandatoryRewriteUse(StructLoweringState &pass,
                                    SILValue value) {
@@ -1149,6 +1162,10 @@ static bool hasMandatoryRewriteUse(StructLoweringState &pass,
       }
       return true;
     }
+    case SILInstructionKind::YieldInst:
+      if (isYieldUseRewriteable(pass, cast<YieldInst>(userIns), user))
+        return true;
+      break;
     default:
       break;
     }
@@ -1198,6 +1215,11 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddrForModifiable(
         pass.applies.push_back(userIns);
       }
       usesToMod.push_back(use);
+      break;
+    }
+    case SILInstructionKind::YieldInst: {
+      if (isYieldUseRewriteable(pass, cast<YieldInst>(userIns), use))
+        usesToMod.push_back(use);
       break;
     }
     case SILInstructionKind::RetainValueInst: {
@@ -1698,6 +1720,10 @@ static bool allUsesAreReplaceable(StructLoweringState &pass,
       }
       break;
     }
+    case SILInstructionKind::YieldInst:
+      if (!isYieldUseRewriteable(pass, cast<YieldInst>(userIns), user))
+        return false;
+      break;
     case SILInstructionKind::StructExtractInst:
     case SILInstructionKind::SwitchEnumInst:
       break;
@@ -2174,6 +2200,11 @@ static void rewriteFunction(StructLoweringState &pass,
     auto newRetTuple = retBuilder.createTuple(regLoc, emptyTy, {});
     retBuilder.createReturn(newRetTuple->getLoc(), newRetTuple);
     instr->eraseFromParent();
+  }
+
+  while (!pass.modYieldInsts.empty()) {
+    YieldInst *inst = pass.modYieldInsts.pop_back_val();
+    allocateAndSetAll(pass, allocator, inst, inst->getAllOperands());
   }
 }
 
