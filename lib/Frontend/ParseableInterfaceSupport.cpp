@@ -223,9 +223,8 @@ static bool buildSwiftModuleFromSwiftInterface(
                << InPath << " to " << OutPath << "\n");
     CompilerInstance SubInstance;
 
-    // FIXME: Temporary: this should forward to the outer Diags somehow.
-    PrintingDiagnosticConsumer PDC;
-    SubInstance.addDiagnosticConsumer(&PDC);
+    ForwardingDiagnosticConsumer FDC(Diags);
+    SubInstance.addDiagnosticConsumer(&FDC);
 
     SubInstance.createDependencyTracker(/*TrackSystemDeps=*/false);
     if (SubInstance.setup(SubInvocation)) {
