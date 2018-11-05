@@ -1,16 +1,25 @@
-//===----------------------------------------------------------------------===//
+//===--- StringCharacterView.swift - String's Collection of Characters ----===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+//  String is-not-a Sequence or Collection, but it exposes a
+//  collection of characters.
+//
+//===----------------------------------------------------------------------===//
 
-// String is a bidirectional collection of `Character`s, aka graphemes
+// FIXME(ABI)#70 : The character string view should have a custom iterator type
+// to allow performance optimizations of linear traversals.
+
+import SwiftShims
+
 extension String: BidirectionalCollection {
   /// A type that represents the number of steps between two `String.Index`
   /// values, where one value is reachable from the other.
@@ -21,22 +30,30 @@ extension String: BidirectionalCollection {
 
   public typealias SubSequence = Substring
 
+  public typealias Element = Character
+
   /// The position of the first character in a nonempty string.
   ///
   /// In an empty string, `startIndex` is equal to `endIndex`.
-  @inlinable // FIXME(sil-serialize-all)
-  public var startIndex: Index { return Index(encodedOffset: 0) }
+  @inlinable
+  public var startIndex: Index {
+    @inline(__always) get { return _guts.startIndex }
+  }
 
   /// A string's "past the end" position---that is, the position one greater
   /// than the last valid subscript argument.
   ///
   /// In an empty string, `endIndex` is equal to `startIndex`.
-  @inlinable // FIXME(sil-serialize-all)
-  public var endIndex: Index { return Index(encodedOffset: _guts.count) }
+  @inlinable
+  public var endIndex: Index {
+    @inline(__always) get { return _guts.endIndex }
+  }
 
   /// The number of characters in a string.
   public var count: Int {
-    return distance(from: startIndex, to: endIndex)
+    @inline(__always) get {
+      return distance(from: startIndex, to: endIndex)
+    }
   }
 
   /// Returns the position immediately after the given index.
@@ -45,10 +62,16 @@ extension String: BidirectionalCollection {
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
   public func index(after i: Index) -> Index {
-    return _visitGuts(_guts, args: i,
-      ascii: { ascii, i in ascii.characterIndex(after: i) },
-      utf16: { utf16, i in utf16.characterIndex(after: i) },
-      opaque: { opaque, i in opaque.characterIndex(after: i) })
+    _precondition(i < endIndex, "String index is out of bounds")
+
+    // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
+    let stride = _characterStride(startingAt: i)
+    let nextOffset = i.encodedOffset &+ stride
+    let nextStride = _characterStride(
+      startingAt: Index(encodedOffset: nextOffset))
+
+    return Index(
+      encodedOffset: nextOffset, characterStride: nextStride)
   }
 
   /// Returns the position immediately before the given index.
@@ -57,12 +80,13 @@ extension String: BidirectionalCollection {
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
   public func index(before i: Index) -> Index {
-    return _visitGuts(_guts, args: i,
-      ascii: { ascii, i in ascii.characterIndex(before: i) },
-      utf16: { utf16, i in utf16.characterIndex(before: i) },
-      opaque: { opaque, i in opaque.characterIndex(before: i) })
-  }
+    _precondition(i > startIndex, "String index is out of bounds")
 
+    // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
+    let stride = _characterStride(endingAt: i)
+    let priorOffset = i.encodedOffset &- stride
+    return Index(encodedOffset: priorOffset, characterStride: stride)
+  }
   /// Returns an index that is the specified distance from the given index.
   ///
   /// The following example obtains an index advanced four positions from a
@@ -73,27 +97,22 @@ extension String: BidirectionalCollection {
   ///     print(s[i])
   ///     // Prints "t"
   ///
-  /// The value passed as `distance` must not offset `i` beyond the bounds of
-  /// the collection.
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
+  /// collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
-  ///   - distance: The distance to offset `i`.
-  /// - Returns: An index offset by `distance` from the index `i`. If
-  ///   `distance` is positive, this is the same value as the result of
-  ///   `distance` calls to `index(after:)`. If `distance` is negative, this
-  ///   is the same value as the result of `abs(distance)` calls to
-  ///   `index(before:)`.
+  ///   - n: The distance to offset `i`.
+  /// - Returns: An index offset by `n` from the index `i`. If `n` is positive,
+  ///   this is the same value as the result of `n` calls to `index(after:)`.
+  ///   If `n` is negative, this is the same value as the result of `-n` calls
+  ///   to `index(before:)`.
   ///
-  /// - Complexity: O(*k*), where *k* is the absolute value of `distance`.
-  public func index(_ i: Index, offsetBy distance: IndexDistance) -> Index {
-    return _visitGuts(_guts, args: (i, distance),
-      ascii: { ascii, args in let (i, n) = args
-        return ascii.characterIndex(i, offsetBy: n) },
-      utf16: { utf16, args in let (i, n) = args
-        return utf16.characterIndex(i, offsetBy: n) },
-      opaque: { opaque, args in let (i, n) = args
-        return opaque.characterIndex(i, offsetBy: n) })
+  /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
+  @inlinable @inline(__always)
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
+    return _index(i, offsetBy: n)
   }
 
   /// Returns an index that is the specified distance from the given index,
@@ -118,31 +137,27 @@ extension String: BidirectionalCollection {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// The value passed as `distance` must not offset `i` beyond the bounds of the
+  /// The value passed as `n` must not offset `i` beyond the bounds of the
   /// collection, unless the index passed as `limit` prevents offsetting
   /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
-  ///   - distance: The distance to offset `i`.
-  ///   - limit: A valid index of the collection to use as a limit. If `distance > 0`,
-  ///     a limit that is less than `i` has no effect. Likewise, if `distance < 0`, a
+  ///   - n: The distance to offset `i`.
+  ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
+  ///     a limit that is less than `i` has no effect. Likewise, if `n < 0`, a
   ///     limit that is greater than `i` has no effect.
-  /// - Returns: An index offset by `distance` from the index `i`, unless that index
+  /// - Returns: An index offset by `n` from the index `i`, unless that index
   ///   would be beyond `limit` in the direction of movement. In that case,
   ///   the method returns `nil`.
   ///
-  /// - Complexity: O(*k*), where *k* is the absolute value of `distance`.
+  /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
+  @inlinable @inline(__always)
   public func index(
-    _ i: Index, offsetBy distance: IndexDistance, limitedBy limit: Index
+    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
-    return _visitGuts(_guts, args: (i, distance, limit),
-      ascii: { ascii, args in let (i, n, limit) = args
-        return ascii.characterIndex(i, offsetBy: n, limitedBy: limit) },
-      utf16: { utf16, args in let (i, n, limit) = args
-        return utf16.characterIndex(i, offsetBy: n, limitedBy: limit) },
-      opaque: { opaque, args in let (i, n, limit) = args
-        return opaque.characterIndex(i, offsetBy: n, limitedBy: limit) })
+    // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
+    return _index(i, offsetBy: n, limitedBy: limit)
   }
 
   /// Returns the distance between two indices.
@@ -153,15 +168,11 @@ extension String: BidirectionalCollection {
   ///     `start`, the result is zero.
   /// - Returns: The distance between `start` and `end`.
   ///
-  /// - Complexity: O(*k*), where *k* is the resulting distance.
+  /// - Complexity: O(*n*), where *n* is the resulting distance.
+  @inlinable @inline(__always)
   public func distance(from start: Index, to end: Index) -> IndexDistance {
-    return _visitGuts(_guts, args: (start, end),
-      ascii: { ascii, args in let (start, end) = args
-        return ascii.characterDistance(from: start, to: end) },
-      utf16: { utf16, args in let (start, end) = args
-        return utf16.characterDistance(from: start, to: end) },
-      opaque: { opaque, args in let (start, end) = args
-        return opaque.characterDistance(from: start, to: end) })
+    // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
+    return _distance(from: start, to: end)
   }
 
   /// Accesses the character at the given position.
@@ -179,10 +190,78 @@ extension String: BidirectionalCollection {
   ///
   /// - Parameter i: A valid index of the string. `i` must be less than the
   ///   string's end index.
+  @inlinable
   public subscript(i: Index) -> Character {
-    return _visitGuts(_guts, args: i,
-      ascii: { ascii, i in return ascii.character(at: i) },
-      utf16: { utf16, i in return utf16.character(at: i) },
-      opaque: { opaque, i in return opaque.character(at: i) })
+    @inline(__always) get {
+      _boundsCheck(i)
+
+      let i = _guts.scalarAlign(i)
+      let distance = _characterStride(startingAt: i)
+
+      if _fastPath(_guts.isFastUTF8) {
+        let start = i.encodedOffset
+        let end = start + distance
+        return _guts.withFastUTF8(range: start..<end) { utf8 in
+          return Character(unchecked: String._uncheckedFromUTF8(utf8))
+        }
+      }
+
+      return _foreignSubscript(position: i, distance: distance)
+    }
+  }
+
+  @inlinable @inline(__always)
+  internal func _characterStride(startingAt i: Index) -> Int {
+    // Fast check if it's already been measured, otherwise check resiliently
+    if let d = i.characterStride { return d }
+
+    if i == endIndex { return 0 }
+
+    return _guts._opaqueCharacterStride(startingAt: i.encodedOffset)
+  }
+
+  @inlinable @inline(__always)
+  internal func _characterStride(endingAt i: Index) -> Int {
+    if i == startIndex { return 0 }
+
+    return _guts._opaqueCharacterStride(endingAt: i.encodedOffset)
   }
 }
+
+// Foreign string support
+extension String {
+  @usableFromInline @inline(never)
+  @_effects(releasenone)
+  internal func _foreignSubscript(position: Index, distance: Int) -> Character {
+#if _runtime(_ObjC)
+    _sanityCheck(_guts.isForeign)
+
+    // Both a fast-path for single-code-unit graphemes and validation:
+    //   ICU treats isolated surrogates as isolated graphemes
+    if distance == 1 {
+      return Character(
+        String(_guts.foreignErrorCorrectedScalar(startingAt: position).0))
+    }
+
+    let start = position.encodedOffset
+    let end = start + distance
+    let count = end - start
+
+    // TODO(String performance): Stack buffer if small enough
+
+    var cus = Array<UInt16>(repeating: 0, count: count)
+    cus.withUnsafeMutableBufferPointer {
+      _cocoaStringCopyCharacters(
+        from: _guts._object.cocoaObject,
+        range: start..<end,
+        into: $0.baseAddress._unsafelyUnwrappedUnchecked)
+    }
+    return cus.withUnsafeBufferPointer {
+      return Character(String._uncheckedFromUTF16($0))
+    }
+#else
+    fatalError("No foreign strings on Linux in this version of Swift")
+#endif
+  }
+}
+

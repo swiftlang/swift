@@ -68,7 +68,7 @@ let continuingScalars: [UnicodeScalar] = [
   "\u{200D}",
 ]
 
-let testCharacters = [
+var testCharacters = [
   // U+000D CARRIAGE RETURN (CR)
   // U+000A LINE FEED (LF)
   "\u{000d}\u{000a}",
@@ -82,7 +82,20 @@ let testCharacters = [
   "\u{0061}\u{0300}\u{0300}", // UTF-8: 5 bytes
   "\u{0061}\u{0300}\u{0300}\u{0300}", // UTF-8: 7 bytes
   "\u{0061}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 9 bytes
+]
 
+// Only run it on ObjC platforms. Supported Linux versions do not have a
+// recent enough ICU
+#if _runtime(_ObjC)
+testCharacters += [
+  "\u{0061}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 11 bytes
+  "\u{0061}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 13 bytes
+  "\u{0061}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 15 bytes
+  "\u{0061}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 17 bytes
+]
+#endif
+
+testCharacters += [
   // U+00A9 COPYRIGHT SIGN
   // U+0300 COMBINING GRAVE ACCENT
   "\u{00a9}", // UTF-8: 2 bytes
@@ -91,6 +104,19 @@ let testCharacters = [
   "\u{00a9}\u{0300}\u{0300}\u{0300}", // UTF-8: 8 bytes
   "\u{00a9}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 10 bytes
 ]
+
+// Only run it on ObjC platforms. Supported Linux versions do not have a
+// recent enough ICU
+#if _runtime(_ObjC)
+testCharacters += [
+  "\u{00a9}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 12 bytes
+  "\u{00a9}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 14 bytes
+  "\u{00a9}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 16 bytes
+
+  "👩🏽‍💼", // UTF-8: 15 bytes
+  "👩‍👩‍👦‍👦", // UTF-8: 25 bytes
+]
+#endif
 
 func randomGraphemeCluster(_ minSize: Int, _ maxSize: Int) -> String {
   let n = Int.random(in: (minSize + 1) ..< maxSize)
@@ -139,12 +165,10 @@ CharacterTests.test("sizeof") {
   // <rdar://problem/16754935> MemoryLayout<Character>.size is 9, should be 8
 
   let size1 = MemoryLayout<Character>.size
-  expectTrue(size1 == 8 || size1 == 9)
+  expectTrue(size1 == MemoryLayout<String>.size)
 
   let a: Character = "a"
   let size2 = MemoryLayout.size(ofValue: a)
-  expectTrue(size2 == 8 || size2 == 9)
-
   expectEqual(size1, size2)
 }
 
@@ -237,13 +261,13 @@ func isSmallRepresentation(_ s: String) -> Bool {
 func checkUnicodeScalars(_ s: String) {
   let c = s.first!
   expectEqualSequence(s.unicodeScalars, c.unicodeScalars)
-  
+
   expectEqualSequence(
     s.unicodeScalars, c.unicodeScalars.indices.map { c.unicodeScalars[$0] })
-  
+
   expectEqualSequence(
     s.unicodeScalars.reversed(), c.unicodeScalars.reversed())
-  
+
   expectEqualSequence(
     s.unicodeScalars.reversed(), c.unicodeScalars.indices.reversed().map {
       c.unicodeScalars[$0]
@@ -251,9 +275,7 @@ func checkUnicodeScalars(_ s: String) {
 }
 
 func checkRepresentation(_ s: String) {
-  let utf16 = Array(s.utf16)
-  let expectSmall
-    = utf16.count < 4 || utf16.count == 4 && utf16[3] < 0x8000
+  let expectSmall = s.utf8.count <= _SmallString.capacity
   let isSmall = isSmallRepresentation(s)
 
   let expectedSize = expectSmall ? "small" : "large"

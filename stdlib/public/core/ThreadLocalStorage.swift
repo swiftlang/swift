@@ -71,14 +71,40 @@ internal struct _ThreadLocalStorage {
   }
 
   internal static func getUBreakIterator(
-    start: UnsafePointer<UTF16.CodeUnit>,
-    count: Int32
+    _ bufPtr: UnsafeBufferPointer<UTF16.CodeUnit>
   ) -> OpaquePointer {
     let tlsPtr = getPointer()
     let brkIter = tlsPtr[0].uBreakIterator
+    let utext = tlsPtr[0].uText
 
     var err = __swift_stdlib_U_ZERO_ERROR
-    __swift_stdlib_ubrk_setText(brkIter, start, count, &err)
+
+    let start = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
+    _ = __swift_stdlib_utext_openUChars(
+      utext, start, Int64(bufPtr.count), &err)
+    _precondition(err.isSuccess, "Unexpected utext_openUChars failure")
+
+    __swift_stdlib_ubrk_setUText(brkIter, utext, &err)
+    _precondition(err.isSuccess, "Unexpected ubrk_setUText failure")
+
+    return brkIter
+  }
+
+  internal static func getUBreakIterator(
+    _ bufPtr: UnsafeBufferPointer<UTF8.CodeUnit>
+  ) -> OpaquePointer {
+    let tlsPtr = getPointer()
+    let brkIter = tlsPtr[0].uBreakIterator
+    let utext = tlsPtr[0].uText
+
+    var err = __swift_stdlib_U_ZERO_ERROR
+
+    let start = bufPtr.baseAddress._unsafelyUnwrappedUnchecked._asCChar
+    _ = __swift_stdlib_utext_openUTF8(
+      utext, start, Int64(bufPtr.count), &err)
+    _precondition(err.isSuccess, "Unexpected utext_openUChars failure")
+
+    __swift_stdlib_ubrk_setUText(brkIter, utext, &err)
     _precondition(err.isSuccess, "Unexpected ubrk_setUText failure")
 
     return brkIter
