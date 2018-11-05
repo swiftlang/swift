@@ -61,8 +61,12 @@ public extension Tensor where Scalar : Numeric {
 //===----------------------------------------------------------------------===//
 
 extension Tensor : AdditiveArithmetic where Scalar : Numeric {
+  @inlinable
   public static var zero: Tensor {
-    return Tensor(zeros: [])
+    @inline(__always)
+    get {
+      return Tensor(zeros: [])
+    }
   }
 
   /// Adds two tensors and produces their sum.
