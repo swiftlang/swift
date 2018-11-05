@@ -436,3 +436,99 @@ entry:
   %ret = tuple ()
   return %ret : $()
 }
+
+sil [transparent] @stack_overlap : $@convention(thin) @yield_once () -> (@yields @inout Builtin.Int32) {
+entry:
+  %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
+  %temp = alloc_stack $Builtin.Int32
+  %1000 = integer_literal $Builtin.Int32, 1000
+  store %1000 to [trivial] %temp : $*Builtin.Int32
+  %2000 = integer_literal $Builtin.Int32, 2000
+  apply %marker(%2000) : $@convention(thin) (Builtin.Int32) -> ()
+  yield %temp : $*Builtin.Int32, resume resume, unwind unwind
+
+resume:
+  %3000 = integer_literal $Builtin.Int32, 3000
+  apply %marker(%3000) : $@convention(thin) (Builtin.Int32) -> ()
+  dealloc_stack %temp : $*Builtin.Int32
+  %4000 = integer_literal $Builtin.Int32, 4000
+  apply %marker(%4000) : $@convention(thin) (Builtin.Int32) -> ()
+  %ret = tuple ()
+  return %ret : $()
+
+unwind:
+  dealloc_stack %temp : $*Builtin.Int32
+  unwind
+}
+
+// CHECK-LABEL: sil @test_stack_overlap_dealloc
+// CHECK:       bb0:
+// CHECK-NEXT:    [[A16:%.*]] = alloc_stack $Builtin.Int16
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[MARKER:%.*]] = function_ref @marker
+// CHECK-NEXT:    [[A32:%.*]] = alloc_stack $Builtin.Int32
+// CHECK-NEXT:    [[I1000:%.*]] = integer_literal $Builtin.Int32, 1000
+// CHECK-NEXT:    store [[I1000]] to [trivial] [[A32]]
+// CHECK-NEXT:    [[I2000:%.*]] = integer_literal $Builtin.Int32, 2000
+// CHECK-NEXT:    apply [[MARKER]]([[I2000]])
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    [[I3000:%.*]] = integer_literal $Builtin.Int32, 3000
+// CHECK-NEXT:    apply [[MARKER]]([[I3000]])
+// CHECK-NEXT:    dealloc_stack [[A32]] : $*Builtin.Int32
+//   Note that this has been delayed to follow stack discipline.
+// CHECK-NEXT:    dealloc_stack [[A16]] : $*Builtin.Int16
+// CHECK-NEXT:    [[I4000:%.*]] = integer_literal $Builtin.Int32, 4000
+// CHECK-NEXT:    apply [[MARKER]]([[I4000]])
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    br [[END:bb[0-9]+]]
+// CHECK:       [[END]]:
+// CHECK-NEXT:    [[RET:%.*]] = tuple ()
+// CHECK-NEXT:    return [[RET]] : $()
+// CHECK-LABEL: // end sil function 'test_stack_overlap_dealloc'
+sil @test_stack_overlap_dealloc : $() -> () {
+bb0:
+  %stack = alloc_stack $Builtin.Int16
+  %0 = function_ref @stack_overlap : $@convention(thin) @yield_once () -> (@yields @inout Builtin.Int32)
+  (%value, %token) = begin_apply %0() : $@convention(thin) @yield_once () -> (@yields @inout Builtin.Int32)
+  dealloc_stack %stack : $*Builtin.Int16
+  end_apply %token
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil @test_stack_overlap_alloc
+// CHECK:       bb0:
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[MARKER:%.*]] = function_ref @marker
+// CHECK-NEXT:    [[A32:%.*]] = alloc_stack $Builtin.Int32
+// CHECK-NEXT:    [[I1000:%.*]] = integer_literal $Builtin.Int32, 1000
+// CHECK-NEXT:    store [[I1000]] to [trivial] [[A32]]
+// CHECK-NEXT:    [[I2000:%.*]] = integer_literal $Builtin.Int32, 2000
+// CHECK-NEXT:    apply [[MARKER]]([[I2000]])
+// CHECK-NEXT:    [[A16:%.*]] = alloc_stack $Builtin.Int16
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    [[I3000:%.*]] = integer_literal $Builtin.Int32, 3000
+// CHECK-NEXT:    apply [[MARKER]]([[I3000]])
+// CHECK-NEXT:    [[I4000:%.*]] = integer_literal $Builtin.Int32, 4000
+// CHECK-NEXT:    apply [[MARKER]]([[I4000]])
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    br [[END:bb[0-9]+]]
+// CHECK:       [[END]]:
+// CHECK-NEXT:    dealloc_stack [[A16]] : $*Builtin.Int16
+//   Note that this has been delayed to follow stack discipline.
+// CHECK-NEXT:    dealloc_stack [[A32]] : $*Builtin.Int32
+// CHECK-NEXT:    [[RET:%.*]] = tuple ()
+// CHECK-NEXT:    return [[RET]] : $()
+// CHECK-LABEL: // end sil function 'test_stack_overlap_alloc'
+sil @test_stack_overlap_alloc : $() -> () {
+bb0:
+  %0 = function_ref @stack_overlap : $@convention(thin) @yield_once () -> (@yields @inout Builtin.Int32)
+  (%value, %token) = begin_apply %0() : $@convention(thin) @yield_once () -> (@yields @inout Builtin.Int32)
+  %stack = alloc_stack $Builtin.Int16
+  end_apply %token
+  dealloc_stack %stack : $*Builtin.Int16
+  %ret = tuple ()
+  return %ret : $()
+}
