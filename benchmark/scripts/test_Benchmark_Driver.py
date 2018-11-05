@@ -509,10 +509,14 @@ class TestBenchmarkDoctor(unittest.TestCase):
              'Measuring B1, 5 x i1 (2048 samples), 5 x i2 (2048 samples)'],
             self.logs['debug'])
 
-    def test_benchmark_name_matches_capital_words_conventions(self):
+    def test_benchmark_name_matches_naming_conventions(self):
         driver = BenchmarkDriverMock(tests=[
             'BenchmarkName', 'CapitalWordsConvention', 'ABBRName',
-            'wrongCase', 'Wrong_convention'])
+            'TooManyCamelCaseHumps',
+            'Existential.Array.method.1x.Val4',
+            'Flatten.Array.Array.Str.for-in.reserved',
+            'Flatten.Array.String?.as!.NSArray',
+            'wrongCase', 'Wrong_convention', 'Illegal._$%[]<>{}@^()'])
         with captured_output() as (out, _):
             doctor = BenchmarkDoctor(self.args, driver)
             doctor.check()
@@ -522,12 +526,22 @@ class TestBenchmarkDoctor(unittest.TestCase):
         self.assertNotIn('BenchmarkName', output)
         self.assertNotIn('CapitalWordsConvention', output)
         self.assertNotIn('ABBRName', output)
+        self.assertNotIn('Existential.Array.method.1x.Val4', output)
+        self.assertNotIn('Flatten.Array.Array.Str.for-in.reserved', output)
+        self.assertNotIn('Flatten.Array.String?.as!.NSArray', output)
+        err_msg = " name doesn't conform to benchmark naming convention."
         self.assert_contains(
-            ["'wrongCase' name doesn't conform to UpperCamelCase convention.",
-             "'Wrong_convention' name doesn't conform to UpperCamelCase "
-             "convention."], self.logs['error'])
+            ["'wrongCase'" + err_msg, "'Wrong_convention'" + err_msg,
+             "'Illegal._$%[]<>{}@^()'" + err_msg], self.logs['error'])
         self.assert_contains(
-            ['See http://bit.ly/UpperCamelCase'], self.logs['info'])
+            ["'TooManyCamelCaseHumps' name is composed of 5 words."],
+            self.logs['warning'])
+        self.assert_contains(
+            ['See http://bit.ly/BenchmarkNaming'], self.logs['info'])
+        self.assert_contains(
+            ["Split 'TooManyCamelCaseHumps' name into dot-separated groups "
+             "and variants. See http://bit.ly/BenchmarkNaming"],
+            self.logs['info'])
 
     def test_benchmark_name_is_at_most_40_chars_long(self):
         driver = BenchmarkDriverMock(tests=[
