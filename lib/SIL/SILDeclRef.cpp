@@ -941,6 +941,11 @@ bool SILDeclRef::isDynamicallyReplaceable() const {
   if (isStoredPropertyInitializer())
     return false;
 
+  if (kind == SILDeclRef::Kind::Destroyer ||
+      kind == SILDeclRef::Kind::Initializer) {
+    return false;
+  }
+
   if (!hasDecl())
     return false;
 

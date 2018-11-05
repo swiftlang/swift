@@ -1408,6 +1408,15 @@ ERROR(attr_nskeyedarchiverencodenongenericsubclassesonly_removed, none,
       "@NSKeyedArchiverEncodeNonGenericSubclassesOnly is no longer necessary",
       ())
 
+ERROR(attr_dynamic_replacement_expected_rparen,none,
+      "expected ')' after function name for @_dynamicReplacement", ())
+ERROR(attr_dynamic_replacement_expected_function,none,
+      "expected a function name in @_dynamicReplacement(for:)", ())
+ERROR(attr_dynamic_replacement_expected_for,none,
+      "expected 'for' in '_dynamicReplacement' attribute", ())
+ERROR(attr_dynamic_replacement_expected_colon,none,
+      "expected ':' after @_dynamicReplacement(for", ())
+
 // opened
 ERROR(opened_attribute_expected_lparen,none,
       "expected '(' after 'opened' attribute", ())

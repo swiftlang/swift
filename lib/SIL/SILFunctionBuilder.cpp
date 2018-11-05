@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILFunctionBuilder.h"
-
+#include "swift/AST/Decl.h"
 using namespace swift;
 
 SILFunction *SILFunctionBuilder::getOrCreateFunction(
@@ -35,8 +35,11 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   return fn;
 }
 
-static void addFunctionAttributes(SILFunction *F, DeclAttributes &Attrs,
-                                  SILModule &M) {
+void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
+                                               DeclAttributes &Attrs,
+                                               SILModule &M,
+                                               SILDeclRef constant) {
+
   for (auto *A : Attrs.getAttributes<SemanticsAttr>())
     F->addSemanticsAttr(cast<SemanticsAttr>(A)->Value);
 
@@ -58,6 +61,38 @@ static void addFunctionAttributes(SILFunction *F, DeclAttributes &Attrs,
   // @_silgen_name and @_cdecl functions may be called from C code somewhere.
   if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>())
     F->setHasCReferences(true);
+
+  // Propagate @_dynamicReplacement(for:).
+  if (constant.isNull())
+    return;
+  auto *decl = constant.getDecl();
+
+  // Only emit replacements for the objc entry point of objc methods.
+  if (decl->isObjC() &&
+      F->getLoweredFunctionType()->getExtInfo().getRepresentation() !=
+          SILFunctionTypeRepresentation::ObjCMethod)
+    return;
+
+  auto *replacedFuncAttr = Attrs.getAttribute<DynamicReplacementAttr>();
+  if (!replacedFuncAttr)
+    return;
+
+  auto *replacedDecl = replacedFuncAttr->getReplacedFunction();
+  assert(replacedDecl);
+
+  if (decl->isObjC()) {
+    F->setObjCReplacement(replacedDecl);
+    return;
+  }
+
+  if (constant.isInitializerOrDestroyer())
+    return;
+
+  SILDeclRef declRef(replacedDecl, constant.kind, false);
+  auto *replacedFunc =
+      getOrCreateFunction(replacedDecl, declRef, NotForDefinition);
+  assert(replacedFunc->getLoweredFunctionType() == F->getLoweredFunctionType());
+  F->setDynamicallyReplacedFunction(replacedFunc);
 }
 
 SILFunction *
@@ -127,7 +162,7 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
       // Add attributes for e.g. computed properties.
       addFunctionAttributes(F, storage->getAttrs(), mod);
     }
-    addFunctionAttributes(F, decl->getAttrs(), mod);
+    addFunctionAttributes(F, decl->getAttrs(), mod, constant);
   }
 
   return F;

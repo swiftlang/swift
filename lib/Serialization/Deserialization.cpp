@@ -2541,6 +2541,30 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
         break;
       }
 
+      case decls_block::DynamicReplacement_DECL_ATTR: {
+        bool isImplicit;
+        uint64_t numArgs;
+        ArrayRef<uint64_t> rawPieceIDs;
+        DeclID replacedFunID;
+        serialization::decls_block::DynamicReplacementDeclAttrLayout::
+            readRecord(scratch, isImplicit, replacedFunID, numArgs, rawPieceIDs);
+
+        auto replacedFunDecl = getDeclChecked(replacedFunID);
+        if (!replacedFunDecl)
+          return replacedFunDecl.takeError();
+        auto baseName = getDeclBaseName(rawPieceIDs[0]);
+        SmallVector<Identifier, 4> pieces;
+        for (auto pieceID : rawPieceIDs.slice(1))
+          pieces.push_back(getIdentifier(pieceID));
+
+        assert(numArgs != 0);
+        assert(!isImplicit && "Need to update for implicit");
+        Attr = DynamicReplacementAttr::create(
+            ctx, DeclName(ctx, baseName, ArrayRef<Identifier>(pieces)),
+            cast<AbstractFunctionDecl>(*replacedFunDecl));
+        break;
+      }
+
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
       case decls_block::CLASS##_DECL_ATTR: { \
         bool isImplicit; \

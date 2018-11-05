@@ -546,6 +546,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_DynamicReplacement: {
+    Printer.printAttrName("@_dynamicReplacement(for: \"");
+    auto *attr = cast<DynamicReplacementAttr>(this);
+    Printer << attr->getReplacedFunctionName() << "\")";
+    break;
+  }
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
@@ -612,6 +619,8 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_ObjC:
   case DAK_ObjCRuntimeName:
     return "objc";
+  case DAK_DynamicReplacement:
+    return "_dynamicReplacement";
   case DAK_RestatedObjCConformance:
     return "_restatedObjCConformance";
   case DAK_Inline: {
@@ -774,6 +783,50 @@ ObjCAttr *ObjCAttr::clone(ASTContext &context) const {
   auto attr = new (context) ObjCAttr(getName(), isNameImplicit());
   attr->setSwift3Inferred(isSwift3Inferred());
   return attr;
+}
+
+DynamicReplacementAttr::DynamicReplacementAttr(SourceLoc atLoc,
+                                               SourceRange baseRange,
+                                               DeclName name,
+                                               SourceRange parenRange)
+    : DeclAttribute(DAK_DynamicReplacement, atLoc, baseRange,
+                    /*Implicit=*/false),
+      ReplacedFunctionName(name), ReplacedFunction(nullptr) {
+  Bits.DynamicReplacementAttr.HasTrailingLocationInfo = true;
+  getTrailingLocations()[0] = parenRange.Start;
+  getTrailingLocations()[1] = parenRange.End;
+}
+
+DynamicReplacementAttr *
+DynamicReplacementAttr::create(ASTContext &Ctx, SourceLoc AtLoc,
+                               SourceLoc DynReplLoc, SourceLoc LParenLoc,
+                               DeclName ReplacedFunction, SourceLoc RParenLoc) {
+  void *mem = Ctx.Allocate(totalSizeToAlloc<SourceLoc>(2),
+                           alignof(DynamicReplacementAttr));
+  return new (mem) DynamicReplacementAttr(
+      AtLoc, SourceRange(DynReplLoc, RParenLoc), ReplacedFunction,
+      SourceRange(LParenLoc, RParenLoc));
+}
+
+DynamicReplacementAttr *DynamicReplacementAttr::create(ASTContext &Ctx,
+                                                       DeclName name) {
+  return new (Ctx) DynamicReplacementAttr(name);
+}
+
+DynamicReplacementAttr *
+DynamicReplacementAttr::create(ASTContext &Ctx, DeclName name,
+                               AbstractFunctionDecl *f) {
+  auto res = new (Ctx) DynamicReplacementAttr(name);
+  res->setReplacedFunction(f);
+  return res;
+}
+
+SourceLoc DynamicReplacementAttr::getLParenLoc() const {
+  return getTrailingLocations()[0];
+}
+
+SourceLoc DynamicReplacementAttr::getRParenLoc() const {
+  return getTrailingLocations()[1];
 }
 
 AvailableAttr *

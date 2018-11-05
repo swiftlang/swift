@@ -2342,6 +2342,21 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     writeGenericRequirements(SA->getRequirements(), DeclTypeAbbrCodes);
     return;
   }
+
+  case DAK_DynamicReplacement: {
+    auto abbrCode = DeclTypeAbbrCodes[DynamicReplacementDeclAttrLayout::Code];
+    auto theAttr = cast<DynamicReplacementAttr>(DA);
+    auto replacedFun = theAttr->getReplacedFunctionName();
+    SmallVector<IdentifierID, 4> pieces;
+    pieces.push_back(addDeclBaseNameRef(replacedFun.getBaseName()));
+    for (auto argName : replacedFun.getArgumentNames())
+      pieces.push_back(addDeclBaseNameRef(argName));
+    assert(theAttr->getReplacedFunction());
+    DynamicReplacementDeclAttrLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, false, /*implicit flag*/
+        addDeclRef(theAttr->getReplacedFunction()), pieces.size(), pieces);
+    return;
+  }
   }
 }
 

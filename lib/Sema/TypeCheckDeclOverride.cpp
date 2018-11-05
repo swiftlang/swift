@@ -1210,6 +1210,7 @@ namespace  {
     UNINTERESTING_ATTR(SwiftNativeObjCRuntimeBase)
     UNINTERESTING_ATTR(ShowInInterface)
     UNINTERESTING_ATTR(Specialize)
+    UNINTERESTING_ATTR(DynamicReplacement)
 
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(Prefix)

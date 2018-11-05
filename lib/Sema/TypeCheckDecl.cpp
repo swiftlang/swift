@@ -2737,6 +2737,8 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
+    TC.addImplicitDynamicAttribute(SD);
+
     TC.validateDecl(SD);
 
     if (!SD->isInvalid()) {
@@ -2762,6 +2764,9 @@ public:
     }
 
     triggerAccessorSynthesis(TC, SD);
+    if (SD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+      TC.checkDynamicReplacementAttribute(SD);
+    }
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
@@ -3201,8 +3206,16 @@ public:
   }
 
   void visitVarDecl(VarDecl *VD) {
+    TC.addImplicitDynamicAttribute(VD);
+
     // Delay type-checking on VarDecls until we see the corresponding
     // PatternBindingDecl.
+
+    // Except if there is a dynamic replacement attribute.
+    if (VD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+      TC.validateDecl(VD);
+      TC.checkDynamicReplacementAttribute(VD);
+    }
   }
 
   /// Determine whether the given declaration requires a definition.
@@ -3246,6 +3259,8 @@ public:
   }
 
   void visitFuncDecl(FuncDecl *FD) {
+    TC.addImplicitDynamicAttribute(FD);
+
     TC.validateDecl(FD);
 
     if (!FD->isInvalid()) {
@@ -3274,6 +3289,10 @@ public:
     } else {
       // Record the body.
       TC.definedFunctions.push_back(FD);
+    }
+
+    if (FD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+      TC.checkDynamicReplacementAttribute(FD);
     }
   }
 
@@ -3358,6 +3377,7 @@ public:
   }
 
   void visitConstructorDecl(ConstructorDecl *CD) {
+    TC.addImplicitDynamicAttribute(CD);
     TC.validateDecl(CD);
 
     if (!CD->isInvalid()) {
@@ -3470,6 +3490,10 @@ public:
       TC.diagnose(CD->getLoc(), diag::missing_initializer_def);
     } else {
       TC.definedFunctions.push_back(CD);
+    }
+
+    if (CD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+      TC.checkDynamicReplacementAttribute(CD);
     }
   }
 

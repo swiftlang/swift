@@ -1247,7 +1247,8 @@ public:
   DeclName parseUnqualifiedDeclName(bool afterDot, DeclNameLoc &loc,
                                     const Diagnostic &diag,
                                     bool allowOperators=false,
-                                    bool allowZeroArgCompoundNames=false);
+                                    bool allowZeroArgCompoundNames=false,
+                                    bool allowDeinitAndSubscript=false);
 
   Expr *parseExprIdentifier();
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,

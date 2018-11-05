@@ -95,6 +95,9 @@ class SILFunctionBuilder {
                  EffectsKind EK = EffectsKind::Unspecified,
                  SILFunction *InsertBefore = nullptr,
                  const SILDebugScope *DebugScope = nullptr);
+
+  void addFunctionAttributes(SILFunction *F, DeclAttributes &Attrs,
+                             SILModule &M, SILDeclRef constant = SILDeclRef());
 };
 } // namespace swift
 
