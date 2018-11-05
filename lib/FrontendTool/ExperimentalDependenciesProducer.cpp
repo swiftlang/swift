@@ -51,8 +51,46 @@ template <typename T> using CPVec = std::vector<const T*>;
 template <typename T1 = std::string, typename T2 = std::string> using PairVec = std::vector<std::pair<T1, T2>>;
 template <typename T1, typename T2> using CPPairVec = std::vector<std::pair<const T1*, const T2*>>;
 
+//TODO: elim virtuals with templating>
 
-
+namespace {
+  template <typename ElementT>
+  class Source {
+  public:
+    typedef ElementT Element;
+    virtual Optional<Element> next() = 0;
+    virtual ~Source() = default;
+  };
+  
+  template <typename FeederT>
+  class Sink {
+    FeederT &feeder;
+  public:
+    Sink(FeederT &feeder) : feeder(feeder) {}
+    void run() {
+      for (;;) {
+        auto in = feeder.next();
+        if (!in)
+          return;
+        process(in);
+      }
+    }
+    virtual void process(typename FeederT::Element &in) = 0;
+  };
+  
+  template <typename ElementT, typename FeederT>
+  class Transducer: public Source<ElementT> {
+    FeederT &feeder;
+  public:
+    Transducer(FeederT &feeder) : feeder(feeder) {}
+    Optional<ElementT> next() override {
+      auto in = feeder.next();
+      if (!in) return None;
+      return process(in);
+    }
+    virtual Optional<ElementT> process(typename FeederT::Element &in) = 0;
+  };
+}
 
 namespace {
   /// Takes all the Decls in a SourceFile, and collects them into buckets by groups of DeclKinds.
@@ -87,6 +125,20 @@ namespace {
         || take<ValueDecl, DeclKind::TypeAlias, DeclKind::Var, DeclKind::Func, DeclKind::Accessor>(D, values);
       }
     }
+  };
+  
+  template <typename ContainerT>
+  class ContainerSource: public Source<typename ContainerT::value_type> {
+    typename ContainerT::const_iterator _next, end;
+  public:
+    typedef typename ContainerT::value_type Element;
+    ContainerSource(ContainerT container) :
+    _next(container.cbegin()),
+    end(container.cend()) {}
+    Optional<Element> next() override {
+      return _next == end ? Optional<Element>(None) : Optional<Element>(*_next++);
+    }
+    ContainerSource() = default;
   };
 }
     
@@ -761,6 +813,10 @@ bool swift::experimental_dependencies::emitReferenceDependencies(
 //    return false;
 //  });
   
-  return ([]()->std::vector<std::string> {return StringVec{std::string()};})
-  >> FileRenamerAndWriter(diags, outputPath);
+//  return ([]()->std::vector<std::string> {return StringVec{std::string()};})
+//  >> FileRenamerAndWriter(diags, outputPath);
+  
+  SourceFileDeclDemux demux{SF};
+  
+  ContainerSource<decltype(demux.precedenceGroups)>(demux.precedenceGroups);
 }
