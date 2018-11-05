@@ -1799,9 +1799,8 @@ void ASTMangler::appendTypeList(Type listTy) {
 
 void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
                                        ParameterTypeFlags flags) {
-  if (flags.isAutoClosure())
-    appendFunctionType(elementType->castTo<FunctionType>(),
-                       /*isAutoClosure*/ true);
+  if (auto *fnType = elementType->getAs<FunctionType>())
+    appendFunctionType(fnType, flags.isAutoClosure());
   else
     appendType(elementType);
 
