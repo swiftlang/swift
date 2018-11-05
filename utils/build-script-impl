@@ -3181,6 +3181,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 )
 
                 [[ -z "${DISTCC}" ]] || EXTRA_DISTCC_OPTIONS=("DISTCC_HOSTS=localhost,lzo,cpp")
+                export CTEST_OUTPUT_ON_FAILURE=1
                 with_pushd "$(build_directory ${host} foundation)" \
                     call env "${EXTRA_DISTCC_OPTIONS[@]}" "${CMAKE}" "${cmake_options[@]}" "${EXTRA_CMAKE_OPTIONS[@]}" "${FOUNDATION_SOURCE_DIR}"
 
