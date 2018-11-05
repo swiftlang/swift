@@ -2294,6 +2294,7 @@ public:
     if (strategy.getKind() != AccessStrategy::Storage)
       return None;
 
+    FormalEvaluationScope scope(SGF);
     if (isa<StructDecl>(Base))
       return emitStructDecl(SGF);
     assert(isa<ClassDecl>(Base) && "Expected class");
@@ -2778,6 +2779,8 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
       opened = subs.getReplacementTypes()[0]->castTo<ArchetypeType>();
     }
     assert(opened->isOpenedExistential());
+
+    FormalEvaluationScope scope(subSGF);
     
     baseType = opened->getCanonicalType();
     auto openedOpaqueValue = subSGF.emitOpenExistential(loc, paramSubstValue,
@@ -2962,7 +2965,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
     indexPtrArg = entry->createFunctionArgument(indexArgTy);
   }
   
-  Scope scope(subSGF, loc);
+  ArgumentScope scope(subSGF, loc);
   
   auto baseSubstValue = emitKeyPathRValueBase(subSGF, property,
                                                loc, baseArg,
@@ -5163,7 +5166,7 @@ RValue RValueEmitter::emitForceValue(ForceValueExpr *loc, Expr *E,
 void SILGenFunction::emitOpenExistentialExprImpl(
        OpenExistentialExpr *E,
        llvm::function_ref<void(Expr *)> emitSubExpr) {
-  Optional<FormalEvaluationScope> writebackScope;
+  assert(isInFormalEvaluationScope());
 
   // Emit the existential value.
   if (E->getExistentialValue()->getType()->is<LValueType>()) {
@@ -5198,6 +5201,7 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
     return RValue(SGF, E, *result);
   }
 
+  FormalEvaluationScope writebackScope(SGF);
   return SGF.emitOpenExistentialExpr<RValue>(E,
                                              [&](Expr *subExpr) -> RValue {
                                                return visit(subExpr, C);
