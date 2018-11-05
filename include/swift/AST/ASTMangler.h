@@ -24,6 +24,7 @@ class NamedDecl;
 namespace swift {
 
 class AbstractClosureExpr;
+class ConformanceAccessPath;
 
 namespace Mangle {
 
@@ -299,7 +300,11 @@ protected:
   void appendEntity(const ValueDecl *decl);
 
   void appendProtocolConformance(const ProtocolConformance *conformance);
-
+  void appendProtocolConformanceRef(
+                                const NormalProtocolConformance *conformance);
+  void appendConcreteProtocolConformance(
+                                        const ProtocolConformance *conformance);
+  void appendDependentProtocolConformance(const ConformanceAccessPath &path);
   void appendOpParamForLayoutConstraint(LayoutConstraint Layout);
   
   void appendSymbolicReference(SymbolicReferent referent);

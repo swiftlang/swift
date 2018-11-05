@@ -301,7 +301,7 @@ _T0So13GenericOptionas8HashableSCsACP9hashValueSivgTW ---> {T:} protocol witness
 _T0So11CrappyColorVs16RawRepresentableSCMA ---> reflection metadata associated type descriptor __C.CrappyColor : Swift.RawRepresentable in __C_Synthesized
 $S28protocol_conformance_records15NativeValueTypeVAA8RuncibleAAMc ---> protocol conformance descriptor for protocol_conformance_records.NativeValueType : protocol_conformance_records.Runcible in protocol_conformance_records
 $SSC9SomeErrorLeVD ---> __C_Synthesized.related decl 'e' for SomeError
-$S20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PAAg_AiJ1QAAg1_GF ---> mangling_retroactive.test0(mangling_retroactive.Z<RetroactiveB.X, Swift.Int, RetroactiveB.Y>) -> ()
+$s20mangling_retroactive5test1yyAA2Z2V5InnerVy12RetroactiveB1XV_AG1YVAI0F1A1PAAyHCg_AkL1QAAyHCg0_GF ---> mangling_retroactive.test1(mangling_retroactive.Z2<RetroactiveB.X>.Inner<RetroactiveB.Y>) -> ()
 _T0LiteralAByxGxd_tcfC ---> _T0LiteralAByxGxd_tcfC
 _T0XZ ---> _T0XZ
 _TTSf0os___TFVs17_LegacyStringCore15_invariantCheckfT_T_ ---> function signature specialization <Arg[0] = Guaranteed To Owned and Exploded> of Swift._LegacyStringCore._invariantCheck() -> ()
@@ -316,7 +316,6 @@ _$S3BBBBf0602365061_ ---> _$S3BBBBf0602365061_
 _$S3BBBBi0602365061_ ---> _$S3BBBBi0602365061_
 _$S3BBBBv0602365061_ ---> _$S3BBBBv0602365061_
 _T0lxxxmmmTk ---> _T0lxxxmmmTk
-$S11TestSupport20MockPackageContainerC12dependenciesSDySSSaySS9container_0D5Graph0dE10ConstraintV11RequirementOySS_SSAF0dE10IdentifierAAg_G11requirementtGGvg ---> TestSupport.MockPackageContainer.dependencies.getter : [Swift.String : [(container: Swift.String, requirement: PackageGraph.PackageContainerConstraint<Swift.String>.Requirement)]]
 $S3nix8MystructV1xACyxGx_tcfc7MyaliasL_ayx__GD ---> Myalias #1 in nix.Mystruct<A>.init(x: A) -> nix.Mystruct<A>
 $S3nix7MyclassCfd7MyaliasL_ayx__GD ---> Myalias #1 in nix.Myclass<A>.deinit
 $S3nix8MystructVyS2icig7MyaliasL_ayx__GD ---> Myalias #1 in nix.Mystruct<A>.subscript.getter : (Swift.Int) -> Swift.Int
