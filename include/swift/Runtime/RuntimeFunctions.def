@@ -1298,7 +1298,7 @@ FUNCTION(TF_NewStatus, TF_NewStatus, C_CC,
          ATTRS(NoUnwind))
 
 FUNCTION(TF_DeleteStatus, TF_DeleteStatus, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind))
 
@@ -1308,47 +1308,47 @@ FUNCTION(TFE_NewOp, TFE_NewOp, C_CC,
          ATTRS(NoUnwind))
 
 FUNCTION(TFE_DeleteOp, TFE_DeleteOp, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind))
 
 FUNCTION(TFE_OpAddInput, TFE_OpAddInput, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 FUNCTION(TFE_OpSetDevice, TFE_OpSetDevice, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 FUNCTION(TFE_OpSetAttrType, TFE_OpSetAttrType, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, Int32Ty),
          ATTRS(NoUnwind))
 
 FUNCTION(TFE_OpSetAttrFunctionName, TFE_OpSetAttrFunctionName, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, SizeTy),
          ATTRS(NoUnwind))
 
 FUNCTION(TFE_OpSetAttrInt, TFE_OpSetAttrInt, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, Int64Ty),
          ATTRS(NoUnwind))
 
 FUNCTION(TFE_OpSetAttrFloat, TFE_OpSetAttrFloat, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, FloatTy),
          ATTRS(NoUnwind))
 
 FUNCTION(TFE_OpSetAttrBool, TFE_OpSetAttrBool, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, Int1Ty),
          ATTRS(NoUnwind))
 
 FUNCTION(TFE_OpSetAttrString, TFE_OpSetAttrString, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, SizeTy),
          ATTRS(NoUnwind))
 
@@ -1362,32 +1362,32 @@ FUNCTION(TFE_OpSetAttrString, TFE_OpSetAttrString, C_CC,
 //                           const int64_t* values,
 //                           int num_values);
 FUNCTION(TFE_OpSetAttrIntList, TFE_OpSetAttrIntList, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int32Ty),
          ATTRS(NoUnwind))
 
 // Similar situation with the final int param as described above on
 // TFE_OpSetAttrIntList.
 FUNCTION(TFE_OpSetAttrTypeList, TFE_OpSetAttrTypeList, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int32Ty),
          ATTRS(NoUnwind))
 
 // Similar situation with the final int param as described above on
 // TFE_OpSetAttrIntList.
 FUNCTION(TFE_OpSetAttrShapeList, TFE_OpSetAttrShapeList, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrPtrTy, Int8PtrTy, Int32Ty,
 	      Int8PtrTy),
          ATTRS(NoUnwind))
 
 FUNCTION(TFE_OpSetAttrTensor, TFE_OpSetAttrTensor, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 FUNCTION(TF_DeleteTensor, TF_DeleteTensor, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind))
 
@@ -1403,7 +1403,7 @@ FUNCTION(TFC_CreateFloatTensor, swift_tfc_CreateFloatTensor, C_CC,
          ATTRS(NoUnwind))
 
 FUNCTION(TFE_Execute, swift_tfc_TFE_Execute, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrPtrTy, Int32PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
@@ -1433,7 +1433,7 @@ FUNCTION(TFC_AllocateCHandleBuffer,
 
 FUNCTION(TFC_DeallocateCHandleBuffer,
          _swift_tfc_DeallocateCHandleBuffer, SwiftCC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind))
 
@@ -1454,43 +1454,43 @@ FUNCTION(TFC_CreateTensorHandleFromC, _swift_tfc_CreateTensorHandleFromC, C_CC,
          ATTRS(NoUnwind))
 
 FUNCTION(TFC_OpSetAttrBoolArray, _swift_tfc_OpSetAttrBoolArray, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 FUNCTION(TFC_OpSetAttrInt32Array, _swift_tfc_OpSetAttrInt32Array, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 FUNCTION(TFC_OpSetAttrInt64Array, _swift_tfc_OpSetAttrInt64Array, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 FUNCTION(TFC_OpSetAttrDoubleArray, _swift_tfc_OpSetAttrDoubleArray, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 FUNCTION(TFC_OpSetAttrFloatArray, _swift_tfc_OpSetAttrFloatArray, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 FUNCTION(TFC_OpSetAttrTypeArray, _swift_tfc_OpSetAttrTypeArray, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 FUNCTION(TFC_OpSetAttrTensorShapeArray, _swift_tfc_OpSetAttrTensorShapeArray,
-         C_CC, RETURNS(),
+         C_CC, RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 FUNCTION(TFC_OpSetAttrOptionalTensorShapeArray,
 	 _swift_tfc_OpSetAttrOptionalTensorShapeArray,
-         C_CC, RETURNS(),
+         C_CC, RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
@@ -1498,12 +1498,12 @@ FUNCTION(TFC_OpSetAttrOptionalTensorShapeArray,
 // In LLVM IR, the String gets exploded to (BridgeObjectPtrTy, Int64Ty), so
 // IRGen passes those two values in place of the Swift String.
 FUNCTION(TFC_OpSetAttrString, _swift_tfc_OpSetAttrString, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, BridgeObjectPtrTy, Int64Ty),
          ATTRS(NoUnwind))
 
 FUNCTION(TFC_CheckOk, _swift_tfc_CheckOk, C_CC,
-         RETURNS(),
+         RETURNS(VoidTy),
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind))
 
