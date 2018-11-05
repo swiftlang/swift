@@ -12,13 +12,14 @@
 
 import SwiftShims
 
+/// Effectively an untyped NSString that doesn't require foundation.
+@usableFromInline
+internal typealias _CocoaString = AnyObject
+
 #if _runtime(_ObjC)
 // Swift's String bridges NSString via this protocol and these
 // variables, allowing the core stdlib to remain decoupled from
 // Foundation.
-
-/// Effectively an untyped NSString that doesn't require foundation.
-public typealias _CocoaString = AnyObject
 
 @usableFromInline // @testable
 @_effects(releasenone)
