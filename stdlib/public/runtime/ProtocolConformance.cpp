@@ -185,9 +185,13 @@ namespace {
     /// Either a Metadata* or a NominalTypeDescriptor*.
     const void *Type;
     const ProtocolDescriptor *Proto;
+    /// Module in which we expect to find the conformance, or nullptr if
+    /// we don't know/care.
+    const char *Module;
 
-    ConformanceCacheKey(const void *type, const ProtocolDescriptor *proto)
-        : Type(type), Proto(proto) {
+    ConformanceCacheKey(const void *type, const ProtocolDescriptor *proto,
+                        const char *module)
+        : Type(type), Proto(proto), Module(module) {
       assert(type);
     }
   };
@@ -196,6 +200,9 @@ namespace {
   private:
     const void *Type; 
     const ProtocolDescriptor *Proto;
+    /// Module in which we expect to find the conformance, or nullptr if
+    /// we don't know/care.
+    const char *Module;
     std::atomic<const WitnessTable *> Table;
     std::atomic<size_t> FailureGeneration;
 
@@ -203,18 +210,25 @@ namespace {
     ConformanceCacheEntry(ConformanceCacheKey key,
                           const WitnessTable *table,
                           size_t failureGeneration)
-      : Type(key.Type), Proto(key.Proto), Table(table),
+      : Type(key.Type), Proto(key.Proto), Module(key.Module), Table(table),
         FailureGeneration(failureGeneration) {
     }
 
     int compareWithKey(const ConformanceCacheKey &key) const {
       if (key.Type != Type) {
         return (uintptr_t(key.Type) < uintptr_t(Type) ? -1 : 1);
-      } else if (key.Proto != Proto) {
-        return (uintptr_t(key.Proto) < uintptr_t(Proto) ? -1 : 1);
-      } else {
-        return 0;
       }
+      if (key.Proto != Proto) {
+        return (uintptr_t(key.Proto) < uintptr_t(Proto) ? -1 : 1);
+      }
+      if (key.Module != Module) {
+        if (!key.Module) return -1;
+        if (!Module) return 1;
+        if (int result = strcmp(key.Module, Module))
+          return result;
+      }
+
+      return 0;
     }
 
     template <class... Args>
@@ -234,7 +248,10 @@ namespace {
       assert(!isSuccessful());
       FailureGeneration.store(failureGeneration, std::memory_order_relaxed);
     }
-    
+
+    /// Get the module in which we expected to find this conformance.
+    const char *getModule() const { return Module; }
+
     /// Get the cached witness table, if successful.
     const WitnessTable *getWitnessTable() const {
       assert(isSuccessful());
@@ -249,6 +266,10 @@ namespace {
   };
 } // end anonymous namespace
 
+static constexpr size_t roundUpToAlignment(size_t offset, size_t alignment) {
+  return ((offset + alignment - 1) & ~(alignment - 1));
+}
+
 // Conformance Cache.
 struct ConformanceState {
   ConcurrentMap<ConformanceCacheEntry> Cache;
@@ -258,10 +279,43 @@ struct ConformanceState {
     initializeProtocolConformanceLookup();
   }
 
+  std::pair<ConformanceCacheEntry *, bool>
+  cacheResult(const void *type, const ProtocolDescriptor *proto,
+              const char *module, const WitnessTable *witness,
+              size_t failureGeneration) {
+    // When there is no module, directly check/update the cache.
+    ConformanceCacheKey key(type, proto, module);
+    if (!module)
+      return Cache.getOrInsert(key, witness, failureGeneration);
+
+    // Look for an existing entry. If we have one, return it.
+    if (auto known = findCached(type, proto, module))
+      return { known, false };
+
+    // Clone the module string into the conformance allocator, so it refers
+    // to permanent storage if it does get inserted.
+    size_t moduleLen = strlen(module);
+    size_t moduleAllocSize = roundUpToAlignment(moduleLen + 1, sizeof(void*));
+    char *newModule =
+      (char *)Cache.getAllocator().Allocate(moduleAllocSize, alignof(char));
+    strcpy(newModule, module);
+    key.Module = newModule;
+
+    // Update the cache.
+    auto result = Cache.getOrInsert(key, witness, failureGeneration);
+
+    // If we didn't manage to perform the insertion, free the memory we just
+    // allocated for the module: nobody else can reference it.
+    if (result.first->getModule() != newModule) {
+      Cache.getAllocator().Deallocate(newModule, moduleAllocSize);
+    }
+
+    return result;
+  }
+
   void cacheSuccess(const void *type, const ProtocolDescriptor *proto,
-                    const WitnessTable *witness) {
-    auto result = Cache.getOrInsert(ConformanceCacheKey(type, proto),
-                                    witness, 0);
+                    const char *module, const WitnessTable *witness) {
+    auto result = cacheResult(type, proto, module, witness, 0);
 
     // If the entry was already present, we may need to update it.
     if (!result.second) {
@@ -270,10 +324,9 @@ struct ConformanceState {
   }
 
   void cacheFailure(const void *type, const ProtocolDescriptor *proto,
+                    const char *module,
                     size_t failureGeneration) {
-    auto result = Cache.getOrInsert(ConformanceCacheKey(type, proto),
-                                    (const WitnessTable *) nullptr,
-                                    failureGeneration);
+    auto result = cacheResult(type, proto, module, nullptr, failureGeneration);
 
     // If the entry was already present, we may need to update it.
     if (!result.second) {
@@ -282,8 +335,9 @@ struct ConformanceState {
   }
 
   ConformanceCacheEntry *findCached(const void *type,
-                                    const ProtocolDescriptor *proto) {
-    return Cache.find(ConformanceCacheKey(type, proto));
+                                    const ProtocolDescriptor *proto,
+                                    const char *module) {
+    return Cache.find(ConformanceCacheKey(type, proto, module));
   }
 
 #ifndef NDEBUG
@@ -381,7 +435,8 @@ static const void *getConformanceCacheTypeKey(const Metadata *type) {
 static
 ConformanceCacheResult
 searchInConformanceCache(const Metadata *type,
-                         const ProtocolDescriptor *protocol) {
+                         const ProtocolDescriptor *protocol,
+                         const char *module) {
   auto &C = Conformances.get();
   auto origType = type;
   ConformanceCacheEntry *failureEntry = nullptr;
@@ -389,7 +444,7 @@ searchInConformanceCache(const Metadata *type,
 recur:
   {
     // Try the specific type first.
-    if (auto *Value = C.findCached(type, protocol)) {
+    if (auto *Value = C.findCached(type, protocol, module)) {
       if (Value->isSuccessful()) {
         // Found a conformance on the type or some superclass. Return it.
         return ConformanceCacheResult::cachedSuccess(Value->getWitnessTable());
@@ -432,7 +487,7 @@ recur:
     auto typeKey = getConformanceCacheTypeKey(type);
 
     // Hash and lookup the type-protocol pair in the cache.
-    if (auto *Value = C.findCached(typeKey, protocol)) {
+    if (auto *Value = C.findCached(typeKey, protocol, module)) {
       if (Value->isSuccessful())
         return ConformanceCacheResult::cachedSuccess(Value->getWitnessTable());
 
@@ -494,14 +549,15 @@ bool isRelatedType(const Metadata *type, const void *candidate,
   return false;
 }
 
-static const WitnessTable *
-swift_conformsToProtocolImpl(const Metadata * const type,
-                             const ProtocolDescriptor *protocol) {
+const WitnessTable *
+swift::_conformsToSwiftProtocol(const Metadata * const type,
+                                const ProtocolDescriptor *protocol,
+                                const char *module) {
   auto &C = Conformances.get();
 
   // See if we have a cached conformance. The ConcurrentMap data structure
   // allows us to insert and search the map concurrently without locking.
-  auto FoundConformance = searchInConformanceCache(type, protocol);
+  auto FoundConformance = searchInConformanceCache(type, protocol, module);
   // If the result (positive or negative) is authoritative, return it.
   if (FoundConformance.isAuthoritative)
     return FoundConformance.witnessTable;
@@ -520,18 +576,92 @@ swift_conformsToProtocolImpl(const Metadata * const type,
   // If there are no unscanned sections outstanding
   // then we can cache failure and give up now.
   if (startIndex == endIndex) {
-    C.cacheFailure(type, protocol, snapshot.count());
+    C.cacheFailure(type, protocol, module, snapshot.count());
     return nullptr;
   }
 
+  /// Describes the result of matching a particular protocol conformance
+  /// descriptor's module against
+  enum class ModuleMatch {
+    /// The descriptor does not match due to conflicting modules, i.e.,
+    /// a specific module was requested but the conformance is a retroactive
+    /// conformance from a different module.
+    None,
+    /// The protocol conformance descriptor exactly matches the module we
+    /// asked for.
+    Exact,
+    /// The protocol conformance is retroactive, but we asked for anything,
+    /// so it should be considered a retroactive candidate.
+    Retroactive,
+    /// The protocol conformance is not retroactive, but we were asked for
+    /// a specific conformance.
+    NonRetroactive,
+  };
+
+  /// Match a given descriptor against the requested module.
+  auto matchModule = [module](const ProtocolConformanceDescriptor &descriptor) {
+    bool isRetroactive = descriptor.isRetroactive();
+
+    // If no module is specified, we can find any conformance.
+    if (!module) {
+      return isRetroactive ? ModuleMatch::Retroactive : ModuleMatch::Exact;
+    }
+
+    // If the conformance is retroactive, check whether we have the same
+    // module name.
+    if (isRetroactive) {
+      auto moduleContext =
+        cast<ModuleContextDescriptor>(descriptor.getRetroactiveContext());
+      return strcmp(moduleContext->Name, module) == 0
+               ? ModuleMatch::Exact
+               : ModuleMatch::None;
+    }
+
+    // We were asked for a conformance in a specific module, but we found
+    // a conformance that is not retroactive.
+    return ModuleMatch::NonRetroactive;
+  };
+
+  // Keep track of candidate conformances discovered that did not exactly
+  // match, but can be used.
+  using Candidate =
+    std::pair<const ProtocolConformanceDescriptor *, const Metadata *>;
+  std::vector<Candidate> candidates;
+
   /// Local function to retrieve the witness table and record the result.
+  bool foundExactMatch = false;
   auto recordWitnessTable = [&](const ProtocolConformanceDescriptor &descriptor,
                                 const Metadata *type) {
     auto witnessTable = descriptor.getWitnessTable(type);
-    if (witnessTable)
-      C.cacheSuccess(type, protocol, witnessTable);
-    else
-      C.cacheFailure(type, protocol, snapshot.count());
+    if (witnessTable) {
+      C.cacheSuccess(type, protocol, module, witnessTable);
+
+      foundExactMatch = true;
+    } else {
+      C.cacheFailure(type, protocol, module, snapshot.count());
+    }
+  };
+
+  /// Local function to record a result.
+  auto recordResult = [&](const ProtocolConformanceDescriptor &descriptor,
+                          const Metadata *type) {
+    switch (auto match = matchModule(descriptor)) {
+    case ModuleMatch::Exact:
+      // Record the match below.
+      break;
+
+    case ModuleMatch::None:
+      return;
+
+    case ModuleMatch::NonRetroactive:
+    case ModuleMatch::Retroactive:
+      // Record the candidate and move on.
+      candidates.push_back({&descriptor, type});
+      return;
+    }
+
+    // Record the match.
+    recordWitnessTable(descriptor, type);
   };
 
   // Really scan conformance records.
@@ -553,7 +683,7 @@ swift_conformsToProtocolImpl(const Metadata * const type,
           continue;
 
         // Record the witness table.
-        recordWitnessTable(descriptor, metadata);
+        recordResult(descriptor, metadata);
 
       // TODO: "Nondependent witness table" probably deserves its own flag.
       // An accessor function might still be necessary even if the witness table
@@ -572,21 +702,94 @@ swift_conformsToProtocolImpl(const Metadata * const type,
         if (!isRelatedType(type, R, /*candidateIsMetadata=*/false))
           continue;
 
-        recordWitnessTable(descriptor, type);
+        recordResult(descriptor, type);
       }
     }
   }
   
   // Conformance scan is complete.
+
+  // If we didn't find an exact match, but we did find some candidates that
+  // nearly matched, use them.
+  if (!foundExactMatch && !candidates.empty()) {
+    unsigned bestIdx = 0;
+
+    // If there's one candidate, record it.
+    if (candidates.size() > 1) {
+      unsigned numCandidates = candidates.size();
+
+      // If there is a non-retroactive conformance, use it.
+      bool foundNonRetroactive = false;
+      for (unsigned idx = 0; idx != numCandidates; ++idx) {
+        if (!candidates[idx].first->isRetroactive()) {
+          bestIdx = idx;
+          foundNonRetroactive = true;
+          break;
+        }
+      }
+
+      // If we have only retroactive conformances, complain about the
+      // conflict.
+      // FIXME: Only do this once per type descriptor/protocol combination.
+      if (!foundNonRetroactive) {
+        // Form the list of modules in which we found retroactive conformances.
+        std::string moduleNamesStr;
+        const char *firstModuleName = nullptr;
+        for (unsigned idx = 0; idx != numCandidates; ++idx) {
+          const auto &candidate = candidates[idx];
+          assert(candidate.first->isRetroactive());
+
+          auto retroactiveContext =
+            candidate.first->getRetroactiveContext();
+          auto retroactiveModule =
+            cast<ModuleContextDescriptor>(retroactiveContext);
+
+          if (firstModuleName) {
+            if (idx == numCandidates - 1)
+              moduleNamesStr += " and ";
+            else
+              moduleNamesStr += ", ";
+          } else {
+            firstModuleName = retroactiveModule->Name;
+          }
+
+          moduleNamesStr += '\'';
+          moduleNamesStr += retroactiveModule->Name.get();
+          moduleNamesStr += '\'';
+        }
+
+        auto typeName = swift_getTypeName(type, true);
+
+        // FIXME: Report to debugger
+        swift::warning(0,
+                       "***Swift runtime warning: multiple conformances for "
+                       "'%s: %s' found in modules %s. "
+                       "Arbitrarily selecting conformance from module '%s'\n",
+                       StringRef(typeName.data, typeName.length).str().c_str(),
+                       protocol->Name.get(),
+                       moduleNamesStr.c_str(),
+                       firstModuleName);
+      }
+    }
+
+    recordWitnessTable(*candidates[bestIdx].first, candidates[bestIdx].second);
+  }
+
   // Search the cache once more, and this time update the cache if necessary.
 
-  FoundConformance = searchInConformanceCache(type, protocol);
+  FoundConformance = searchInConformanceCache(type, protocol, module);
   if (FoundConformance.isAuthoritative) {
     return FoundConformance.witnessTable;
   } else {
-    C.cacheFailure(type, protocol, snapshot.count());
+    C.cacheFailure(type, protocol, module, snapshot.count());
     return nullptr;
   }
+}
+
+static const WitnessTable *
+swift_conformsToProtocolImpl(const Metadata * const type,
+                             const ProtocolDescriptor *protocol) {
+  return _conformsToSwiftProtocol(type, protocol, /*module=*/nullptr);
 }
 
 const TypeContextDescriptor *
