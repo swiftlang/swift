@@ -583,12 +583,13 @@ static bool isNonNative_unTagged_bridgeObject(void *object) {
   return (uintptr_t(object) & objectPointerIsObjCBit) != 0
       && (uintptr_t(object) & heap_object_abi::BridgeObjectTagBitsMask) == 0;
 }
-#endif
 
 /// Return true iff the given BridgeObject is a tagged value.
 static bool isBridgeObjectTaggedPointer(void *object) {
-	return (uintptr_t(object) & heap_object_abi::BridgeObjectTagBitsMask) != 0;
+  return (uintptr_t(object) & heap_object_abi::BridgeObjectTagBitsMask) != 0;
 }
+
+#endif
 
 // Mask out the spare bits in a bridgeObject, returning the object it
 // encodes.
