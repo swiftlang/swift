@@ -2754,9 +2754,6 @@ protected:
     FollowingTrailingObjects...>;
   friend TrailingObjects;
 
-  template<typename T>
-  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
-  
   const Self *asSelf() const {
     return static_cast<const Self *>(this);
   }
@@ -2808,15 +2805,15 @@ public:
   }
 
 protected:
-  size_t numTrailingObjects(OverloadToken<GenericContextHeaderType>) const {
+  size_t numTrailingObjects(typename TrailingObjects::template OverloadToken<GenericContextHeaderType>) const {
     return asSelf()->isGeneric() ? 1 : 0;
   }
   
-  size_t numTrailingObjects(OverloadToken<GenericParamDescriptor>) const {
+  size_t numTrailingObjects(typename TrailingObjects::template OverloadToken<GenericParamDescriptor>) const {
     return asSelf()->isGeneric() ? getGenericContextHeader().NumParams : 0;
   }
 
-  size_t numTrailingObjects(OverloadToken<GenericRequirementDescriptor>) const {
+  size_t numTrailingObjects(typename TrailingObjects::template OverloadToken<GenericRequirementDescriptor>) const {
     return asSelf()->isGeneric() ? getGenericContextHeader().NumRequirements : 0;
   }
 };
