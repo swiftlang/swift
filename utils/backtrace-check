@@ -36,8 +36,8 @@ formatting.""")
     args = parser.parse_args()
 
     TARGET_RE = re.compile(
-        "(?P<index>\d+) +(?P<object>\S+) +(?P<address>0x[0-9a-fA-F]{16}) "
-        "(?P<routine>[^+]+) [+] (?P<offset>\d+)")
+        r"(?P<index>\d+) +(?P<object>\S+) +(?P<address>0x[0-9a-fA-F]{16}) "
+        r"(?P<routine>[^+]+) [+] (?P<offset>\d+)")
 
     lines = sys.stdin.readlines()
 

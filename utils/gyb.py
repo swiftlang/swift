@@ -99,7 +99,7 @@ tokenize_re = re.compile(
   )
 ''', re.VERBOSE | re.MULTILINE)
 
-gyb_block_close = re.compile('\}%[ \t]*\n?')
+gyb_block_close = re.compile(r'\}%[ \t]*\n?')
 
 
 def token_pos_to_index(token_pos, start, line_starts):

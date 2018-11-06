@@ -25,7 +25,7 @@ parser.add_argument('-o', type=argparse.FileType('w'),
 args = parser.parse_args()
 
 seen_variables = set([])
-ssa_re = re.compile('[%](\d+)')
+ssa_re = re.compile(r'[%](\d+)')
 for line in args.input.readlines():
     line = line[:line.find('//')].rstrip() + "\n"
     have_match = False

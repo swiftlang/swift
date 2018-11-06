@@ -199,7 +199,7 @@ AUXPATSTR = (r"(?P<module>[^-]+)-(?P<input>[^-]+)-(?P<triple>[^-]+)" +
 AUXPAT = re.compile(AUXPATSTR)
 
 TIMERPATSTR = (r"time\.swift-(?P<jobkind>\w+)\." + AUXPATSTR +
-               "\.(?P<timerkind>\w+)$")
+               r"\.(?P<timerkind>\w+)$")
 TIMERPAT = re.compile(TIMERPATSTR)
 
 FILEPATSTR = (r"^stats-(?P<start>\d+)-swift-(?P<kind>\w+)-" +
