@@ -34,6 +34,68 @@ public struct Vector${n}<Scalar> : SIMDVector where Scalar: SIMDVectorizable {
       _storage[index] = newValue
     }
   }
+
+  @_transparent
+  public init(${', '.join(['_ v' + str(i) + ': Scalar' for i in range(n)])}) {
+    self.init()
+% for i in range(n):
+    self[${i}] = v${i}
+% end
+  }
+
+% if n <= 4:
+  @_transparent
+  init(${', '.join([c + ': Scalar' for c in 'xyzw'[:n]])}) {
+    self.init(${', '.join('xyzw'[:n])})
+  }
+
+%  for i in range(n):
+  @_transparent
+  var ${'xyzw'[i]}: Scalar {
+    @_transparent get { return self[${i}]}
+    @_transparent set { self[${i}] = newValue }
+  }
+
+%  end
+% end
+% if n >= 4:
+  @_transparent
+  init(lowHalf: Vector${n/2}<Scalar>, highHalf: Vector${n/2}<Scalar>) {
+    self.init()
+    self.lowHalf = lowHalf
+    self.highHalf = highHalf
+  }
+
+%  for (half,indx) in [('low','i'), ('high',str(n/2)+'+i'), ('even','2*i'), ('odd','2*i+1')]:
+  var ${half}Half: Vector${n/2}<Scalar> {
+    @inlinable get {
+      var result = Vector${n/2}<Scalar>()
+      for i in result.indices { result[i] = self[${indx}] }
+      return result
+    }
+    @inlinable set {
+      for i in newValue.indices { self[${indx}] = newValue[i] }
+    }
+  }
+
+%  end
+% end
+}
+
+public extension Vector${n} where Scalar : FixedWidthInteger {
+  @inlinable
+  init<Other>(truncatingIfNeeded other: Vector${n}<Other>)
+  where Other : FixedWidthInteger {
+    self.init()
+    for i in indices { self[i] = Scalar(truncatingIfNeeded: other[i]) }
+  }
+
+  @inlinable
+  init<Other>(clamping other: Vector${n}<Other>)
+  where Other : FixedWidthInteger {
+    self.init()
+    for i in indices { self[i] = Scalar(clamping: other[i]) }
+  }
 }
 
 %end

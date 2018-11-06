@@ -238,19 +238,37 @@ public extension SIMDVector {
 }
 
 public extension SIMDMaskVector {
+  
   @_transparent static prefix func .!(rhs: Self) -> Self { return false .== rhs }
+  
   @_transparent static func .&(lhs: Scalar, rhs: Self) -> Self { return Self(repeating: lhs) .& rhs }
   @_transparent static func .^(lhs: Scalar, rhs: Self) -> Self { return Self(repeating: lhs) .^ rhs }
   @_transparent static func .|(lhs: Scalar, rhs: Self) -> Self { return Self(repeating: lhs) .| rhs }
+  
   @_transparent static func .&(lhs: Self, rhs: Scalar) -> Self { return lhs .& Self(repeating: rhs) }
   @_transparent static func .^(lhs: Self, rhs: Scalar) -> Self { return lhs .^ Self(repeating: rhs) }
   @_transparent static func .|(lhs: Self, rhs: Scalar) -> Self { return lhs .| Self(repeating: rhs) }
+  
   @_transparent static func .&(lhs: inout Self, rhs: Self) { lhs = lhs .& rhs }
   @_transparent static func .^(lhs: inout Self, rhs: Self) { lhs = lhs .^ rhs }
   @_transparent static func .|(lhs: inout Self, rhs: Self) { lhs = lhs .| rhs }
+  
   @_transparent static func .&(lhs: inout Self, rhs: Scalar) { lhs = lhs .& rhs }
   @_transparent static func .^(lhs: inout Self, rhs: Scalar) { lhs = lhs .^ rhs }
   @_transparent static func .|(lhs: inout Self, rhs: Scalar) { lhs = lhs .| rhs }
+  
+  @inlinable
+  static func random<T: RandomNumberGenerator>(using generator: inout T) -> Self {
+    var result = Self()
+    for i in result.indices { result[i] = Bool.random(using: &generator) }
+    return result
+  }
+  
+  @inlinable
+  static func random() -> Self {
+    var g = SystemRandomNumberGenerator()
+    return Self.random(using: &g)
+  }
 }
 
 public extension SIMDVector where Scalar : Comparable {
@@ -312,6 +330,42 @@ public extension SIMDVector where Scalar : FixedWidthInteger {
   @_transparent static func &*=(lhs: inout Self, rhs: Scalar) { lhs = lhs &* rhs }
   @_transparent static func /=(lhs: inout Self, rhs: Scalar) { lhs = lhs / rhs }
   @_transparent static func %=(lhs: inout Self, rhs: Scalar) { lhs = lhs % rhs }
+  
+  @inlinable
+  static func random<T: RandomNumberGenerator>(
+    in range: Range<Scalar>,
+    using generator: inout T
+  ) -> Self {
+    var result = Self()
+    for i in result.indices {
+      result[i] = Scalar.random(in: range, using: &generator)
+    }
+    return result
+  }
+  
+  @inlinable
+  static func random(in range: Range<Scalar>) -> Self {
+    var g = SystemRandomNumberGenerator()
+    return Self.random(in: range, using: &g)
+  }
+  
+  @inlinable
+  static func random<T: RandomNumberGenerator>(
+    in range: ClosedRange<Scalar>,
+    using generator: inout T
+  ) -> Self {
+    var result = Self()
+    for i in result.indices {
+      result[i] = Scalar.random(in: range, using: &generator)
+    }
+    return result
+  }
+  
+  @inlinable
+  static func random(in range: ClosedRange<Scalar>) -> Self {
+    var g = SystemRandomNumberGenerator()
+    return Self.random(in: range, using: &g)
+  }
 }
 
 public protocol SIMDVectorizable {
@@ -325,20 +379,37 @@ public protocol SIMDVectorizable {
 }
 
 @_fixed_layout
-public struct SIMDMask<Storage> : SIMDMaskVector where Storage : SIMDVector, Storage.Scalar : FixedWidthInteger & SignedInteger {
+public struct SIMDMask<Storage> : SIMDMaskVector
+  where Storage : SIMDVector,
+        Storage.Scalar : FixedWidthInteger & SignedInteger {
+  
   public var _storage : Storage
+  
   public typealias Mask = SIMDMask<Storage>
+  
   public typealias Scalar = Bool
-  @_transparent public var elementCount: Int { return _storage.elementCount }
-  @_transparent public init() { _storage = Storage() }
+  
+  @_transparent
+  public var elementCount: Int {
+    return _storage.elementCount
+  }
+  
+  @_transparent
+  public init() {
+    _storage = Storage()
+  }
+  
   public subscript(index: Int) -> Bool {
-    @inlinable get {
+    @_transparent
+    get {
       _precondition(indices.contains(index))
       return _storage[index] < 0
     }
-    @inlinable set {
+    @_transparent
+    set {
       _precondition(indices.contains(index))
       _storage[index] = newValue ? -1 : 0
     }
   }
+  
 }
