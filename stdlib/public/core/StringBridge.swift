@@ -12,60 +12,44 @@
 
 import SwiftShims
 
+/// Effectively an untyped NSString that doesn't require foundation.
+@usableFromInline
+internal typealias _CocoaString = AnyObject
+
 #if _runtime(_ObjC)
 // Swift's String bridges NSString via this protocol and these
 // variables, allowing the core stdlib to remain decoupled from
 // Foundation.
 
-/// Effectively an untyped NSString that doesn't require foundation.
-public typealias _CocoaString = AnyObject
-
-@inlinable // FIXME(sil-serialize-all)
-public // @testable
-func _stdlib_binary_CFStringCreateCopy(
+@usableFromInline // @testable
+@_effects(releasenone)
+internal func _stdlib_binary_CFStringCreateCopy(
   _ source: _CocoaString
 ) -> _CocoaString {
   let result = _swift_stdlib_CFStringCreateCopy(nil, source) as AnyObject
   return result
 }
 
-@inlinable // FIXME(sil-serialize-all)
+@usableFromInline // @testable
 @_effects(readonly)
-public // @testable
-func _stdlib_binary_CFStringGetLength(
+internal func _stdlib_binary_CFStringGetLength(
   _ source: _CocoaString
 ) -> Int {
   return _swift_stdlib_CFStringGetLength(source)
 }
 
-@inlinable // FIXME(sil-serialize-all)
-public // @testable
-func _stdlib_binary_CFStringGetCharactersPtr(
+@usableFromInline // @testable
+@_effects(readonly)
+internal func _stdlib_binary_CFStringGetCharactersPtr(
   _ source: _CocoaString
 ) -> UnsafeMutablePointer<UTF16.CodeUnit>? {
   return UnsafeMutablePointer(
     mutating: _swift_stdlib_CFStringGetCharactersPtr(source))
 }
 
-/// Loading Foundation initializes these function variables
-/// with useful values
-
-/// Copies the entire contents of a _CocoaString into contiguous
-/// storage of sufficient capacity.
-@usableFromInline // FIXME(sil-serialize-all)
-@inline(never) // Hide the CF dependency
-internal func _cocoaStringReadAll(
-  _ source: _CocoaString, _ destination: UnsafeMutablePointer<UTF16.CodeUnit>
-) {
-  _swift_stdlib_CFStringGetCharacters(
-    source, _swift_shims_CFRange(
-      location: 0, length: _swift_stdlib_CFStringGetLength(source)), destination)
-}
-
 /// Copies a slice of a _CocoaString into contiguous storage of
 /// sufficient capacity.
-@usableFromInline // FIXME(sil-serialize-all)
-@inline(never) // Hide the CF dependency
+@_effects(releasenone)
 internal func _cocoaStringCopyCharacters(
   from source: _CocoaString,
   range: Range<Int>,
@@ -77,34 +61,11 @@ internal func _cocoaStringCopyCharacters(
     destination)
 }
 
-@usableFromInline // FIXME(sil-serialize-all)
-@inline(never) // Hide the CF dependency
-internal func _cocoaStringSlice(
-  _ target: _CocoaString, _ bounds: Range<Int>
-) -> _CocoaString {
-  let cfSelf: _swift_shims_CFStringRef = target
-
-  _sanityCheck(
-    _swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
-    "Known contiguously stored strings should already be converted to Swift")
-
-  let cfResult = _swift_stdlib_CFStringCreateWithSubstring(
-    nil, cfSelf, _swift_shims_CFRange(
-      location: bounds.lowerBound, length: bounds.count)) as AnyObject
-
-  return cfResult
-}
-
-@usableFromInline // FIXME(sil-serialize-all)
-@inline(never) // Hide the CF dependency
+@_effects(readonly)
 internal func _cocoaStringSubscript(
   _ target: _CocoaString, _ position: Int
 ) -> UTF16.CodeUnit {
   let cfSelf: _swift_shims_CFStringRef = target
-
-  _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
-    "Known contiguously stored strings should already be converted to Swift")
-
   return _swift_stdlib_CFStringGetCharacterAtIndex(cfSelf, position)
 }
 
@@ -112,108 +73,140 @@ internal func _cocoaStringSubscript(
 // Conversion from NSString to Swift's native representation
 //
 
-@inlinable // FIXME(sil-serialize-all)
-internal var kCFStringEncodingASCII : _swift_shims_CFStringEncoding {
+private var kCFStringEncodingASCII : _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x0600 }
 }
-@inlinable // FIXME(sil-serialize-all)
-internal var kCFStringEncodingUTF8 : _swift_shims_CFStringEncoding {
+private var kCFStringEncodingUTF8 : _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x8000100 }
 }
 
-@usableFromInline // @opaque
-internal func _bridgeASCIICocoaString(
+#if !(arch(i386) || arch(arm))
+// Resiliently write a tagged cocoa string's contents into a buffer
+@_effects(releasenone) // @opaque
+internal func _bridgeTagged(
   _ cocoa: _CocoaString,
-  intoUTF8 bufPtr: UnsafeMutableRawBufferPointer
+  intoUTF8 bufPtr: UnsafeMutableBufferPointer<UInt8>
 ) -> Int? {
-  let ptr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked.assumingMemoryBound(
-    to: UInt8.self)
+  _sanityCheck(_isObjCTaggedPointer(cocoa))
+  let ptr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
   let length = _stdlib_binary_CFStringGetLength(cocoa)
+  _sanityCheck(length <= _SmallString.capacity)
   var count = 0
   let numCharWritten = _swift_stdlib_CFStringGetBytes(
     cocoa, _swift_shims_CFRange(location: 0, length: length),
     kCFStringEncodingUTF8, 0, 0, ptr, bufPtr.count, &count)
   return length == numCharWritten ? count : nil
 }
+#endif
 
-@usableFromInline
-internal func _bridgeToCocoa(_ small: _SmallUTF8String) -> _CocoaString {
-  return small.withUTF8CodeUnits { bufPtr in
-      return _swift_stdlib_CFStringCreateWithBytes(
-          nil, bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
-          bufPtr.count,
-          small.isASCII ? kCFStringEncodingASCII : kCFStringEncodingUTF8, 0)
-      as AnyObject
-  }
+@_effects(releasenone) // @opaque
+internal func _cocoaUTF8Pointer(_ str: _CocoaString) -> UnsafePointer<UInt8>? {
+  // TODO(String bridging): Is there a better interface here? This requires nul
+  // termination and may assume ASCII.
+  guard let ptr = _swift_stdlib_CFStringGetCStringPtr(
+    str, kCFStringEncodingUTF8
+  ) else { return nil }
+
+  return ptr._asUInt8
 }
 
-internal func _getCocoaStringPointer(
+private enum CocoaStringPointer {
+  case ascii(UnsafePointer<UInt8>)
+  case utf8(UnsafePointer<UInt8>)
+  case utf16(UnsafePointer<UInt16>)
+  case none
+}
+
+@_effects(readonly)
+private func _getCocoaStringPointer(
   _ cfImmutableValue: _CocoaString
-) -> (UnsafeRawPointer?, isUTF16: Bool)  {
-  // Look first for null-terminated ASCII
-  // Note: the code in clownfish appears to guarantee
-  // nul-termination, but I'm waiting for an answer from Chris Kane
-  // about whether we can count on it for all time or not.
-  let nulTerminatedASCII = _swift_stdlib_CFStringGetCStringPtr(
-    cfImmutableValue, kCFStringEncodingASCII)
-
-  // start will hold the base pointer of contiguous storage, if it
-  // is found.
-  var start: UnsafeRawPointer?
-  let isUTF16 = (nulTerminatedASCII == nil)
-  if isUTF16 {
-    let utf16Buf = _swift_stdlib_CFStringGetCharactersPtr(cfImmutableValue)
-    start = UnsafeRawPointer(utf16Buf)
-  } else {
-    start = UnsafeRawPointer(nulTerminatedASCII)
+) -> CocoaStringPointer {
+  if let utf8Ptr = _cocoaUTF8Pointer(cfImmutableValue) {
+    // NOTE: CFStringGetCStringPointer means ASCII
+    return .ascii(utf8Ptr)
   }
-  return (start, isUTF16: isUTF16)
+  if let utf16Ptr = _swift_stdlib_CFStringGetCharactersPtr(cfImmutableValue) {
+    return .utf16(utf16Ptr)
+  }
+  return .none
 }
 
 @usableFromInline
-@inline(never) // Hide the CF dependency
-internal
-func _makeCocoaStringGuts(_ cocoaString: _CocoaString) -> _StringGuts {
-  if let ascii = cocoaString as? _ASCIIStringStorage {
-    return _StringGuts(_large: ascii)
-  } else if let utf16 = cocoaString as? _UTF16StringStorage {
-    return _StringGuts(_large: utf16)
-  } else if let wrapped = cocoaString as? __NSContiguousString {
-    return wrapped._guts
-  } else if _isObjCTaggedPointer(cocoaString) {
-    guard let small = _SmallUTF8String(_cocoaString: cocoaString) else {
-      fatalError("Internal invariant violated: large tagged NSStrings")
-    }
-    return _StringGuts(small)
+@_effects(releasenone) // @opaque
+internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
+  if let abstract = cocoaString as? _AbstractStringStorage {
+    return abstract.asString._guts
   }
+#if !(arch(i386) || arch(arm))
+  if _isObjCTaggedPointer(cocoaString) {
+    return _StringGuts(_SmallString(taggedCocoa: cocoaString))
+  }
+#endif
+
   // "copy" it into a value to be sure nobody will modify behind
   // our backs.  In practice, when value is already immutable, this
   // just does a retain.
+  //
+  // TODO: Only in certain circumstances should we emit this call:
+  //   1) If it's immutable, just retain it.
+  //   2) If it's mutable with no associated information, then a copy must
+  //      happen; might as well eagerly bridge it in.
+  //   3) If it's mutable with associated information, must make the call
+  //
   let immutableCopy
     = _stdlib_binary_CFStringCreateCopy(cocoaString) as AnyObject
 
+#if !(arch(i386) || arch(arm))
   if _isObjCTaggedPointer(immutableCopy) {
-    guard let small = _SmallUTF8String(_cocoaString: cocoaString) else {
-      fatalError("Internal invariant violated: large tagged NSStrings")
-    }
-    return _StringGuts(small)
+    return _StringGuts(_SmallString(taggedCocoa: immutableCopy))
   }
+#endif
 
-  let (start, isUTF16) = _getCocoaStringPointer(immutableCopy)
+  let (fastUTF8, isASCII): (Bool, Bool)
+  switch _getCocoaStringPointer(immutableCopy) {
+    case .ascii(_): (fastUTF8, isASCII) = (true, true)
+    case .utf8(_): (fastUTF8, isASCII) = (true, false)
+    default:  (fastUTF8, isASCII) = (false, false)
+  }
+  let length = _stdlib_binary_CFStringGetLength(immutableCopy)
 
-  let length = _StringGuts.getCocoaLength(
-    _unsafeBitPattern: Builtin.reinterpretCast(immutableCopy))
   return _StringGuts(
-    _largeNonTaggedCocoaObject: immutableCopy,
-    count: length,
-    isSingleByte: !isUTF16,
-    start: start)
+    cocoa: immutableCopy,
+    providesFastUTF8: fastUTF8,
+    isASCII: isASCII,
+    length: length)
 }
 
 extension String {
   public // SPI(Foundation)
   init(_cocoaString: AnyObject) {
-    self._guts = _makeCocoaStringGuts(_cocoaString)
+    self._guts = _bridgeCocoaString(_cocoaString)
+  }
+}
+
+extension String {
+  @_effects(releasenone)
+  public // SPI(Foundation)
+  func _bridgeToObjectiveCImpl() -> AnyObject {
+    if _guts.isSmall {
+      return _guts.asSmall.withUTF8 { bufPtr in
+        // TODO(String bridging): worth isASCII check for different encoding?
+        return _swift_stdlib_CFStringCreateWithBytes(
+            nil, bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+            bufPtr.count,
+            kCFStringEncodingUTF8, 0)
+        as AnyObject
+      }
+    }
+    if _guts._object.isImmortal {
+      return _SharedStringStorage(
+        immortal: _guts._object.fastUTF8.baseAddress!,
+        countAndFlags: _guts._object._countAndFlags)
+    }
+
+    _sanityCheck(_guts._object.hasObjCBridgeableObject,
+      "Unknown non-bridgeable object case")
+    return _guts._object.objCBridgeableObject
   }
 }
 
@@ -223,10 +216,6 @@ extension String {
 // The @_swift_native_objc_runtime_base attribute
 // This allows us to subclass an Objective-C class and use the fast Swift
 // memory allocator.
-//
-// NOTE: older runtimes called this _SwiftNativeNSString. The two must
-// coexist, so it was renamed. The old name must not be used in the new
-// runtime.
 @_fixed_layout // FIXME(sil-serialize-all)
 @objc @_swift_native_objc_runtime_base(__SwiftNativeNSStringBase)
 public class __SwiftNativeNSString {
@@ -252,166 +241,18 @@ public protocol _NSStringCore : _NSCopying /* _NSFastEnumeration */ {
   @objc(characterAtIndex:)
   func character(at index: Int) -> UInt16
 
-  // We also override the following methods for efficiency.
+ // We also override the following methods for efficiency.
 
   @objc(getCharacters:range:)
   func getCharacters(
-    _ buffer: UnsafeMutablePointer<UInt16>,
-    range aRange: _SwiftNSRange)
+   _ buffer: UnsafeMutablePointer<UInt16>,
+   range aRange: _SwiftNSRange)
 
   @objc(_fastCharacterContents)
   func _fastCharacterContents() -> UnsafePointer<UInt16>?
-}
 
-/// An `NSString` built around a slice of contiguous Swift `String` storage.
-///
-/// NOTE: older runtimes called this _NSContiguousString. The two must
-/// coexist, so it was renamed. The old name must not be used in the new
-/// runtime.
-@_fixed_layout // FIXME(sil-serialize-all)
-public final class __NSContiguousString : __SwiftNativeNSString, _NSStringCore {
-  public let _guts: _StringGuts
-
-  @inlinable // FIXME(sil-serialize-all)
-  public init(_ _guts: _StringGuts) {
-    _sanityCheck(!_guts._isOpaque,
-      "__NSContiguousString requires contiguous storage")
-    self._guts = _guts
-    super.init()
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public init(_unmanaged guts: _StringGuts) {
-    _sanityCheck(!guts._isOpaque,
-      "__NSContiguousString requires contiguous storage")
-    if guts.isASCII {
-      self._guts = _StringGuts(_large: guts._unmanagedASCIIView)
-    } else {
-      self._guts = _StringGuts(_large: guts._unmanagedUTF16View)
-    }
-    super.init()
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public init(_unmanaged guts: _StringGuts, range: Range<Int>) {
-    _sanityCheck(!guts._isOpaque,
-      "__NSContiguousString requires contiguous storage")
-    if guts.isASCII {
-      self._guts = _StringGuts(_large: guts._unmanagedASCIIView[range])
-    } else {
-      self._guts = _StringGuts(_large: guts._unmanagedUTF16View[range])
-    }
-    super.init()
-  }
-
-  @usableFromInline // FIXME(sil-serialize-all)
-  @objc
-  init(coder aDecoder: AnyObject) {
-    _sanityCheckFailure("init(coder:) not implemented for __NSContiguousString")
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  deinit {}
-
-  @inlinable
-  @objc(length)
-  public var length: Int {
-    return _guts.count
-  }
-
-  @inlinable
-  @objc(characterAtIndex:)
-  public func character(at index: Int) -> UInt16 {
-    defer { _fixLifetime(self) }
-    return _guts.codeUnit(atCheckedOffset: index)
-  }
-
-  @inlinable
-  @objc(getCharacters:range:)
-  public func getCharacters(
-    _ buffer: UnsafeMutablePointer<UInt16>,
-    range aRange: _SwiftNSRange) {
-    _precondition(aRange.location >= 0 && aRange.length >= 0)
-    let range: Range<Int> = aRange.location ..< aRange.location + aRange.length
-    _precondition(range.upperBound <= Int(_guts.count))
-
-    if _guts.isASCII {
-      _guts._unmanagedASCIIView[range]._copy(
-        into: UnsafeMutableBufferPointer(start: buffer, count: range.count))
-    } else {
-      _guts._unmanagedUTF16View[range]._copy(
-        into: UnsafeMutableBufferPointer(start: buffer, count: range.count))
-    }
-    _fixLifetime(self)
-  }
-
-  @inlinable
-  @objc(_fastCharacterContents)
-  public func _fastCharacterContents() -> UnsafePointer<UInt16>? {
-    guard !_guts.isASCII else { return nil }
-    return _guts._unmanagedUTF16View.start
-  }
-
-  @objc(copyWithZone:)
-  public func copy(with zone: _SwiftNSZone?) -> AnyObject {
-    // Since this string is immutable we can just return ourselves.
-    return self
-  }
-
-  /// The caller of this function guarantees that the closure 'body' does not
-  /// escape the object referenced by the opaque pointer passed to it or
-  /// anything transitively reachable form this object. Doing so
-  /// will result in undefined behavior.
-  @inlinable // FIXME(sil-serialize-all)
-  @_semantics("self_no_escaping_closure")
-  func _unsafeWithNotEscapedSelfPointer<Result>(
-    _ body: (OpaquePointer) throws -> Result
-  ) rethrows -> Result {
-    let selfAsPointer = unsafeBitCast(self, to: OpaquePointer.self)
-    defer {
-      _fixLifetime(self)
-    }
-    return try body(selfAsPointer)
-  }
-
-  /// The caller of this function guarantees that the closure 'body' does not
-  /// escape either object referenced by the opaque pointer pair passed to it or
-  /// transitively reachable objects. Doing so will result in undefined
-  /// behavior.
-  @inlinable // FIXME(sil-serialize-all)
-  @_semantics("pair_no_escaping_closure")
-  func _unsafeWithNotEscapedSelfPointerPair<Result>(
-    _ rhs: __NSContiguousString,
-    _ body: (OpaquePointer, OpaquePointer) throws -> Result
-  ) rethrows -> Result {
-    let selfAsPointer = unsafeBitCast(self, to: OpaquePointer.self)
-    let rhsAsPointer = unsafeBitCast(rhs, to: OpaquePointer.self)
-    defer {
-      _fixLifetime(self)
-      _fixLifetime(rhs)
-    }
-    return try body(selfAsPointer, rhsAsPointer)
-  }
-}
-
-extension String {
-  /// Same as `_bridgeToObjectiveC()`, but located inside the core standard
-  /// library.
-  @inlinable // FIXME(sil-serialize-all)
-  public func _stdlib_binary_bridgeToObjectiveCImpl() -> AnyObject {
-    if _guts._isSmall {
-      return _bridgeToCocoa(_guts._smallUTF8String)
-    }
-    if let cocoa = _guts._underlyingCocoaString {
-      return cocoa
-    }
-    return __NSContiguousString(_guts)
-  }
-
-  @inline(never) // Hide the CF dependency
-  public func _bridgeToObjectiveCImpl() -> AnyObject {
-    return _stdlib_binary_bridgeToObjectiveCImpl()
-  }
+  @objc(_fastCStringContents)
+  func _fastCStringContents() -> UnsafePointer<CChar>?
 }
 
 // Called by the SwiftObject implementation to get the description of a value
@@ -420,7 +261,6 @@ extension String {
 public func _getDescription<T>(_ x: T) -> AnyObject {
   return String(reflecting: x)._bridgeToObjectiveCImpl()
 }
-
 
 #else // !_runtime(_ObjC)
 
@@ -434,3 +274,53 @@ public class __SwiftNativeNSString {
 public protocol _NSStringCore: class {}
 
 #endif
+
+// Special-case Index <-> Offset converters for bridging and use in accelerating
+// the UTF16View in general.
+extension StringProtocol {
+  @_specialize(where Self == String)
+  @_specialize(where Self == Substring)
+  public // SPI(Foundation)
+  func _toUTF16Offset(_ idx: Index) -> Int {
+    return self.utf16.distance(from: self.utf16.startIndex, to: idx)
+  }
+
+  @_specialize(where Self == String)
+  @_specialize(where Self == Substring)
+  public // SPI(Foundation)
+  func _toUTF16Index(_ offset: Int) -> Index {
+    return self.utf16.index(self.utf16.startIndex, offsetBy: offset)
+  }
+
+  @_specialize(where Self == String)
+  @_specialize(where Self == Substring)
+  public // SPI(Foundation)
+  func _toUTF16Offsets(_ indices: Range<Index>) -> Range<Int> {
+    let lowerbound = _toUTF16Offset(indices.lowerBound)
+    let length = self.utf16.distance(
+      from: indices.lowerBound, to: indices.upperBound)
+    return Range(
+      uncheckedBounds: (lower: lowerbound, upper: lowerbound + length))
+  }
+
+  @_specialize(where Self == String)
+  @_specialize(where Self == Substring)
+  public // SPI(Foundation)
+  func _toUTF16Indices(_ range: Range<Int>) -> Range<Index> {
+    let lowerbound = _toUTF16Index(range.lowerBound)
+    let upperbound = _toUTF16Index(range.lowerBound + range.count)
+    return Range(uncheckedBounds: (lower: lowerbound, upper: upperbound))
+  }
+}
+
+extension String {
+  public // @testable / @benchmarkable
+  func _copyUTF16CodeUnits(
+    into buffer: UnsafeMutableBufferPointer<UInt16>,
+    range: Range<Int>
+  ) {
+    _sanityCheck(buffer.count >= range.count)
+    let indexRange = self._toUTF16Indices(range)
+    self._nativeCopyUTF16CodeUnits(into: buffer, range: indexRange)
+  }
+}

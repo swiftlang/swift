@@ -677,6 +677,27 @@ static bool isStdlibType(const TypeDecl *decl) {
   return dc->isModuleScopeContext() && dc->getParentModule()->isStdlibModule();
 }
 
+/// Whether to mangle the given type as generic.
+static bool shouldMangleAsGeneric(Type type) {
+  if (!type)
+    return false;
+
+  TypeBase *typePtr = type.getPointer();
+  if (auto typeAlias = dyn_cast<NameAliasType>(typePtr))
+    return !typeAlias->getSubstitutionMap().empty();
+
+  if (auto bound = dyn_cast<BoundGenericType>(typePtr))
+    return true;
+
+  if (auto nominal = dyn_cast<NominalType>(typePtr))
+    return shouldMangleAsGeneric(nominal->getParent());
+
+  if (auto unbound = dyn_cast<UnboundGenericType>(typePtr))
+    return shouldMangleAsGeneric(unbound->getParent());
+
+  return false;
+}
+
 /// Mangle a type into the buffer.
 ///
 void ASTMangler::appendType(Type type) {
@@ -845,11 +866,12 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::BoundGenericClass:
     case TypeKind::BoundGenericEnum:
     case TypeKind::BoundGenericStruct: {
-      // We can't use getAnyNominal here because this can be TypeAliasDecl only
-      // in case of UnboundGenericType. Such mangling happens in, for instance,
-      // SourceKit 'cursorinfo' request.
-      auto *Decl = type->getAnyGeneric();
-      if (type->isSpecialized()) {
+      GenericTypeDecl *Decl;
+      if (auto typeAlias = dyn_cast<NameAliasType>(type.getPointer()))
+        Decl = typeAlias->getDecl();
+      else
+        Decl = type->getAnyGeneric();
+      if (shouldMangleAsGeneric(type)) {
         // Try to mangle the entire name as a substitution.
         if (tryMangleSubstitution(tybase))
           return;
@@ -869,7 +891,7 @@ void ASTMangler::appendType(Type type) {
         addSubstitution(type.getPointer());
         return;
       }
-      appendAnyGenericType(Decl);
+      appendAnyGenericType(type->getAnyGeneric());
       return;
     }
 
@@ -1112,40 +1134,83 @@ void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
   }
 }
 
+/// Determine whether the given protocol conformance is itself retroactive,
+/// meaning that there might be multiple conflicting conformances of the
+/// same type to the same protocol.
+static bool isRetroactiveConformance(
+                               const NormalProtocolConformance *conformance) {
+  /// Non-retroactive conformances are... never retroactive.
+  if (!conformance->isRetroactive())
+    return false;
+
+  /// Synthesized non-unique conformances all get collapsed together at run
+  /// time.
+  if (conformance->isSynthesizedNonUnique())
+    return false;
+
+  /// Objective-C protocol conformances don't have identity.
+  if (conformance->getProtocol()->isObjC())
+    return false;
+
+  return true;
+}
+
+/// Determine whether the given protocol conformance contains a retroactive
+/// protocol conformance anywhere in it.
+static bool containsRetroactiveConformance(
+                                      const ProtocolConformance *conformance,
+                                      ModuleDecl *module) {
+  // If the root conformance is retroactive, it's retroactive.
+  if (isRetroactiveConformance(conformance->getRootNormalConformance()))
+    return true;
+
+  // If any of the substitutions used to form this conformance are retroactive,
+  // it's retroactive.
+  auto subMap = conformance->getSubstitutions(module);
+  for (auto conformance : subMap.getConformances()) {
+    if (conformance.isConcrete() &&
+        containsRetroactiveConformance(conformance.getConcrete(), module))
+      return true;
+  }
+
+  return false;
+}
+
 void ASTMangler::appendRetroactiveConformances(Type type) {
-  auto nominal = type->getAnyNominal();
-  if (!nominal) return;
+  // Dig out the substitution map to use.
+  SubstitutionMap subMap;
+  ModuleDecl *module;
+  if (auto typeAlias = dyn_cast<NameAliasType>(type.getPointer())) {
+    module = Mod ? Mod : typeAlias->getDecl()->getModuleContext();
+    subMap = typeAlias->getSubstitutionMap();
+  } else {
+    if (type->hasUnboundGenericType())
+      return;
 
-  auto genericSig = nominal->getGenericSignatureOfContext();
-  if (!genericSig) return;
+    auto nominal = type->getAnyNominal();
+    if (!nominal) return;
 
-  auto module = Mod ? Mod : nominal->getModuleContext();
-  auto subMap = type->getContextSubstitutionMap(module, nominal);
+    module = Mod ? Mod : nominal->getModuleContext();
+    subMap = type->getContextSubstitutionMap(module, nominal);
+  }
+
   if (subMap.empty()) return;
 
   unsigned numProtocolRequirements = 0;
-  for (const auto &req: genericSig->getRequirements()) {
-    if (req.getKind() != RequirementKind::Conformance)
-      continue;
-
+  for (auto conformance : subMap.getConformances()) {
     SWIFT_DEFER {
       ++numProtocolRequirements;
     };
 
-    // Fast path: we're in the module of the protocol.
-    auto proto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
-    if (proto->getModuleContext() == module)
+    // Ignore abstract conformances.
+    if (!conformance.isConcrete())
       continue;
 
-    auto conformance =
-      subMap.lookupConformance(req.getFirstType()->getCanonicalType(), proto);
-    if (!conformance || !conformance->isConcrete()) continue;
-
-    auto normal = conformance->getConcrete()->getRootNormalConformance();
-    if (!normal->isRetroactive() || normal->isSynthesizedNonUnique())
+    // Skip non-retroactive conformances.
+    if (!containsRetroactiveConformance(conformance.getConcrete(), module))
       continue;
 
-    appendProtocolConformance(normal);
+    appendConcreteProtocolConformance(conformance.getConcrete());
     appendOperator("g", Index(numProtocolRequirements));
   }
 }
@@ -2238,6 +2303,138 @@ ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance) {
   if (GenericSignature *Sig = conformance->getGenericSignature()) {
     appendGenericSignature(Sig, contextSig);
   }
+}
+
+void ASTMangler::appendProtocolConformanceRef(
+                                const NormalProtocolConformance *conformance) {
+  // FIXME: Symbolic reference to the protocol conformance descriptor.
+  appendProtocolName(conformance->getProtocol());
+
+  // For retroactive conformances, add a reference to the module in which the
+  // conformance resides. For @objc protocols, there is no point: conformances
+  // are global anyway.
+  if (conformance->isRetroactive() && !conformance->isSynthesizedNonUnique() &&
+      !conformance->getProtocol()->isObjC())
+    appendModule(conformance->getDeclContext()->getParentModule());
+}
+
+/// Retrieve the index of the conformance requirement indicated by the
+/// conformance access path entry within the given set of requirements.
+static unsigned conformanceRequirementIndex(
+                                      const ConformanceAccessPath::Entry &entry,
+                                      ArrayRef<Requirement> requirements) {
+  unsigned result = 0;
+  for (const auto &req : requirements) {
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+
+    if (req.getFirstType()->isEqual(entry.first) &&
+        req.getSecondType()->castTo<ProtocolType>()->getDecl() == entry.second)
+      return result;
+
+    ++result;
+  }
+
+  llvm_unreachable("Conformance access path step is missing from requirements");
+}
+
+void ASTMangler::appendDependentProtocolConformance(
+                                            const ConformanceAccessPath &path) {
+  ProtocolDecl *currentProtocol = nullptr;
+  for (const auto &entry : path) {
+    // After each step, update the current protocol to refer to where we
+    // are.
+    SWIFT_DEFER {
+      currentProtocol = entry.second;
+    };
+
+    // The first entry is the "root". Find this requirement in the generic
+    // signature.
+    if (!currentProtocol) {
+      appendType(entry.first);
+      appendProtocolName(entry.second);
+      auto index =
+        conformanceRequirementIndex(entry,
+                                    CurGenericSignature->getRequirements());
+      appendOperator("HD", index + 1);
+      continue;
+    }
+
+    // Conformances are relative to the current protocol's requirement
+    // signature.
+    auto index =
+      conformanceRequirementIndex(entry,
+                                  currentProtocol->getRequirementSignature());
+
+    // Inherited conformance.
+    bool isInheritedConformance =
+      entry.first->isEqual(currentProtocol->getProtocolSelfType());
+    if (isInheritedConformance) {
+      appendProtocolName(entry.second);
+      appendOperator("HI", index + 1);
+      continue;
+    }
+
+    // Associated conformance.
+    // FIXME: Symbolic reference.
+    appendType(entry.first);
+    appendProtocolName(entry.second);
+
+    // For non-resilient protocols, encode the index.
+    bool isResilient =
+      currentProtocol->isResilient(Mod, ResilienceExpansion::Maximal);
+    appendOperator("HA", isResilient ? 0 : index + 1);
+  }
+}
+
+void ASTMangler::appendConcreteProtocolConformance(
+                                      const ProtocolConformance *conformance) {
+  auto module = conformance->getDeclContext()->getParentModule();
+
+  // Conforming type.
+  Type conformingType = conformance->getType();
+  if (conformingType->hasArchetype())
+    conformingType = conformingType->mapTypeOutOfContext();
+  appendType(conformingType->getCanonicalType());
+
+  // Protocol conformance reference.
+  appendProtocolConformanceRef(conformance->getRootNormalConformance());
+
+  // Conditional conformance requirements.
+  bool firstRequirement = true;
+  for (const auto &conditionalReq : conformance->getConditionalRequirements()) {
+    switch (conditionalReq.getKind()) {
+    case RequirementKind::Layout:
+    case RequirementKind::SameType:
+    case RequirementKind::Superclass:
+      continue;
+
+    case RequirementKind::Conformance: {
+      auto type = conditionalReq.getFirstType();
+      if (type->hasArchetype())
+        type = type->mapTypeOutOfContext();
+      CanType canType = type->getCanonicalType(CurGenericSignature);
+      auto proto =
+        conditionalReq.getSecondType()->castTo<ProtocolType>()->getDecl();
+      if (canType->isTypeParameter()) {
+        assert(CurGenericSignature &&
+               "Need a generic signature to resolve conformance");
+        auto conformanceAccessPath =
+          CurGenericSignature->getConformanceAccessPath(type, proto);
+        appendDependentProtocolConformance(conformanceAccessPath);
+      } else {
+        auto conditionalConf = module->lookupConformance(canType, proto);
+        appendConcreteProtocolConformance(conditionalConf->getConcrete());
+      }
+      appendListSeparator(firstRequirement);
+      break;
+    }
+    }
+  }
+  if (firstRequirement)
+    appendOperator("y");
+
+  appendOperator("HC");
 }
 
 void ASTMangler::appendOpParamForLayoutConstraint(LayoutConstraint layout) {

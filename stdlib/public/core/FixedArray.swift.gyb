@@ -16,7 +16,7 @@
 
 %{
   # The sizes to generate code for.
-  sizes = [2, 8, 16]
+  sizes = [2, 4, 8, 16]
 }%
 
 % for N in sizes:

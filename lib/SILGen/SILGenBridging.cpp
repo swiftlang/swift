@@ -131,6 +131,8 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   AbstractionPattern origSelfType(witness->getInterfaceType());
   origSelfType = origSelfType.getFunctionParamType(0);
 
+  ArgumentScope scope(SGF, loc);
+
   swiftValue = SGF.emitSubstToOrigValue(loc, swiftValue,
                                         origSelfType,
                                         swiftValueType,
@@ -158,6 +160,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
                         swiftValue.borrow(SGF, loc).getValue());
 
   auto bridgedMV = SGF.emitManagedRValueWithCleanup(bridgedValue);
+  bridgedMV = scope.popPreservingValue(bridgedMV);
 
   // The Objective-C value doesn't necessarily match the desired type.
   bridgedMV = emitUnabstractedCast(SGF, loc, bridgedMV,
@@ -702,6 +705,8 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
   // some work by opening it.
   if (nativeType->isExistentialType()) {
     auto openedType = ArchetypeType::getOpened(nativeType);
+
+    FormalEvaluationScope scope(SGF);
 
     auto openedExistential = SGF.emitOpenExistential(
         loc, v, openedType, SGF.getLoweredType(openedType),

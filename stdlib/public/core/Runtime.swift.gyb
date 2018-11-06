@@ -103,80 +103,7 @@ func _stdlib_atomicInitializeARCRef(
 }
 
 % for bits in [ 32, 64 ]:
-
-@_transparent
-public // @testable
-func _stdlib_atomicCompareExchangeStrongUInt${bits}(
-  object target: UnsafeMutablePointer<UInt${bits}>,
-  expected: UnsafeMutablePointer<UInt${bits}>,
-  desired: UInt${bits}) -> Bool {
-
-  let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Int${bits}(
-    target._rawValue, expected.pointee._value, desired._value)
-  expected.pointee._value = oldValue
-  return Bool(won)
-}
-
-@_transparent
-public // @testable
-func _stdlib_atomicCompareExchangeStrongInt${bits}(
-  object target: UnsafeMutablePointer<Int${bits}>,
-  expected: UnsafeMutablePointer<Int${bits}>,
-  desired: Int${bits}) -> Bool {
-
-  let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Int${bits}(
-    target._rawValue, expected.pointee._value, desired._value)
-  expected.pointee._value = oldValue
-  return Bool(won)
-}
-
-@_transparent
-public // @testable
-func _swift_stdlib_atomicStoreUInt${bits}(
-  object target: UnsafeMutablePointer<UInt${bits}>,
-  desired: UInt${bits}) {
-
-  Builtin.atomicstore_seqcst_Int${bits}(target._rawValue, desired._value)
-}
-
-@inlinable // FIXME(sil-serialize-all)
-internal func _swift_stdlib_atomicStoreInt${bits}(
-  object target: UnsafeMutablePointer<Int${bits}>,
-  desired: Int${bits}) {
-
-  Builtin.atomicstore_seqcst_Int${bits}(target._rawValue, desired._value)
-}
-
-@inlinable // FIXME(sil-serialize-all)
-public // @testable
-func _swift_stdlib_atomicLoadUInt${bits}(
-  object target: UnsafeMutablePointer<UInt${bits}>) -> UInt${bits} {
-
-  let value = Builtin.atomicload_seqcst_Int${bits}(target._rawValue)
-  return UInt${bits}(value)
-}
-
-@inlinable // FIXME(sil-serialize-all)
-internal func _swift_stdlib_atomicLoadInt${bits}(
-  object target: UnsafeMutablePointer<Int${bits}>) -> Int${bits} {
-
-  let value = Builtin.atomicload_seqcst_Int${bits}(target._rawValue)
-  return Int${bits}(value)
-}
-
 %   for operation in ['Add', 'And', 'Or', 'Xor']:
-// Warning: no overflow checking.
-@_transparent
-public // @testable
-func _swift_stdlib_atomicFetch${operation}UInt${bits}(
-  object target: UnsafeMutablePointer<UInt${bits}>,
-  operand: UInt${bits}) -> UInt${bits} {
-
-  let value = Builtin.atomicrmw_${operation.lower()}_seqcst_Int${bits}(
-    target._rawValue, operand._value)
-
-  return UInt${bits}(value)
-}
 
 // Warning: no overflow checking.
 @inlinable // FIXME(sil-serialize-all)
@@ -189,8 +116,8 @@ internal func _swift_stdlib_atomicFetch${operation}Int${bits}(
 
   return Int${bits}(value)
 }
-%   end
 
+%   end
 % end
 
 @inlinable // FIXME(sil-serialize-all)

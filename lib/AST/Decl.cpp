@@ -1559,6 +1559,8 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
 
 static AccessStrategy
 getOpaqueReadAccessStrategy(const AbstractStorageDecl *storage, bool dispatch) {
+  if (storage->requiresOpaqueReadCoroutine())
+    return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
   return AccessStrategy::getAccessor(AccessorKind::Get, dispatch);
 }
 
@@ -4292,7 +4294,8 @@ AbstractStorageDecl::setSynthesizedReadCoroutine(AccessorDecl *accessor) {
 
 void
 AbstractStorageDecl::setSynthesizedSetter(AccessorDecl *accessor) {
-  assert(getGetter() && "declaration doesn't already have getter!");
+  assert((getGetter() || getReadCoroutine()) &&
+         "declaration doesn't already have getter!");
   assert(supportsMutation() && "adding setter to immutable storage");
   assert(isAccessor(accessor, AccessorKind::Set, this));
 
@@ -4301,7 +4304,8 @@ AbstractStorageDecl::setSynthesizedSetter(AccessorDecl *accessor) {
 
 void
 AbstractStorageDecl::setSynthesizedModifyCoroutine(AccessorDecl *accessor) {
-  assert(getGetter() && "declaration doesn't already have getter!");
+  assert((getGetter() || getReadCoroutine()) &&
+         "declaration doesn't already have getter!");
   assert(getSetter() && "declaration doesn't already have setter!");
   assert(supportsMutation() && "adding modify to immutable storage");
   assert(!getModifyCoroutine() && "already has a modify accessor");

@@ -363,7 +363,19 @@ bool NormalProtocolConformance::isRetroactive() const {
   // If the conformance occurs in the same module as the conforming type
   // definition, this is not a retroactive conformance.
   if (auto nominal = getType()->getAnyNominal()) {
-    if (module == nominal->getParentModule())
+    auto nominalModule = nominal->getParentModule();
+
+    // Consider the overlay module to be the "home" of a nominal type
+    // defined in a Clang module.
+    if (auto nominalClangModule =
+          dyn_cast<ClangModuleUnit>(nominal->getModuleScopeContext())) {
+      if (auto clangLoader = nominal->getASTContext().getClangModuleLoader()) {
+        if (auto overlayModule = nominalClangModule->getAdapterModule())
+          nominalModule = overlayModule;
+      }
+    }
+
+    if (module == nominalModule)
       return false;
   }
 

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -typo-correction-limit 20
+// RUN: %target-typecheck-verify-swift -typo-correction-limit 22
 // RUN: not %target-swift-frontend -typecheck -disable-typo-correction %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
 // RUN: not %target-swift-frontend -typecheck -typo-correction-limit 0 %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
 // RUN: not %target-swift-frontend -typecheck -DIMPORT_FAIL %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
@@ -176,4 +176,18 @@ func boo() { // expected-note {{did you mean 'boo'?}}
       booo() // expected-error {{use of unresolved identifier 'booo'}}
     }
   }
+}
+
+// Don't show underscored names as typo corrections unless the typed name also
+// begins with an underscore.
+func test_underscored_no_match() {
+  let _ham = 0
+  _ = ham
+  // expected-error@-1 {{use of unresolved identifier 'ham'}}
+}
+
+func test_underscored_match() {
+  let _eggs = 4 // expected-note {{'_eggs' declared here}}
+  _ = _fggs + 1
+  // expected-error@-1 {{use of unresolved identifier '_fggs'; did you mean '_eggs'?}}
 }

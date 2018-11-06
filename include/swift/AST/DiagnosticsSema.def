@@ -966,6 +966,10 @@ ERROR(extra_address_of,none,
 ERROR(extra_address_of_unsafepointer,none,
       "'&' is not allowed passing array value as %0 argument",
       (Type))
+ERROR(cannot_pass_inout_arg_to_subscript,none,
+      "cannot pass an inout argument to a subscript; use "
+      "'withUnsafeMutablePointer' to explicitly convert argument "
+      "to a pointer", ())
 
 ERROR(missing_init_on_metatype_initialization,none,
       "initializing from a metatype value must reference 'init' explicitly",
@@ -2825,8 +2829,6 @@ ERROR(builtin_unicode_scalar_literal_broken_proto,none,
 ERROR(unicode_scalar_literal_broken_proto,none,
       "protocol 'ExpressibleByUnicodeScalarLiteral' is broken", ())
 
-ERROR(builtin_utf16_extended_grapheme_cluster_literal_broken_proto,none,
-      "protocol '_ExpressibleByBuiltinUTF16ExtendedGraphemeClusterLiteral' is broken", ())
 ERROR(builtin_extended_grapheme_cluster_literal_broken_proto,none,
       "protocol '_ExpressibleByBuiltinExtendedGraphemeClusterLiteral' is broken", ())
 ERROR(extended_grapheme_cluster_literal_broken_proto,none,

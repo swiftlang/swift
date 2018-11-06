@@ -24,6 +24,8 @@
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/IR/GlobalValue.h"
+#include "llvm/IR/GlobalObject.h"
+#include "llvm/IR/Module.h"
 
 namespace llvm {
 class Triple;
@@ -917,6 +919,9 @@ public:
   bool isObjCClassRef() const {
     return getKind() == Kind::ObjCClassRef;
   }
+  bool isSILFunction() const {
+    return getKind() == Kind::SILFunction;
+  }
 
   /// Determine whether this entity will be weak-imported.
   bool isWeakImported(ModuleDecl *module) const;
@@ -935,14 +940,43 @@ public:
 #undef LINKENTITY_SET_FIELD
 };
 
+struct IRLinkage {
+  llvm::GlobalValue::LinkageTypes Linkage;
+  llvm::GlobalValue::VisibilityTypes Visibility;
+  llvm::GlobalValue::DLLStorageClassTypes DLLStorage;
+};
+
+class ApplyIRLinkage {
+  IRLinkage IRL;
+public:
+  ApplyIRLinkage(IRLinkage IRL) : IRL(IRL) {}
+  void to(llvm::GlobalValue *GV) const {
+    GV->setLinkage(IRL.Linkage);
+    GV->setVisibility(IRL.Visibility);
+    GV->setDLLStorageClass(IRL.DLLStorage);
+
+    if (IRL.Linkage == llvm::GlobalValue::LinkOnceODRLinkage ||
+        IRL.Linkage == llvm::GlobalValue::WeakODRLinkage) {
+      llvm::Module *M = GV->getParent();
+      const llvm::Triple Triple(M->getTargetTriple());
+
+      // TODO: BFD and gold do not handle COMDATs properly
+      if (Triple.isOSBinFormatELF())
+        return;
+
+      if (Triple.supportsCOMDAT())
+        if (llvm::GlobalObject *GO = dyn_cast<llvm::GlobalObject>(GV))
+          GO->setComdat(M->getOrInsertComdat(GV->getName()));
+    }
+  }
+};
+
 /// Encapsulated information about the linkage of an entity.
 class LinkInfo {
   LinkInfo() = default;
 
   llvm::SmallString<32> Name;
-  llvm::GlobalValue::LinkageTypes Linkage;
-  llvm::GlobalValue::VisibilityTypes Visibility;
-  llvm::GlobalValue::DLLStorageClassTypes DLLStorageClass;
+  IRLinkage IRL;
   ForDefinition_t ForDefinition;
 
 public:
@@ -962,25 +996,19 @@ public:
     return Name.str();
   }
   llvm::GlobalValue::LinkageTypes getLinkage() const {
-    return Linkage;
+    return IRL.Linkage;
   }
   llvm::GlobalValue::VisibilityTypes getVisibility() const {
-    return Visibility;
+    return IRL.Visibility;
   }
   llvm::GlobalValue::DLLStorageClassTypes getDLLStorage() const {
-    return DLLStorageClass;
+    return IRL.DLLStorage;
   }
 
-  bool isForDefinition() const {
-    return ForDefinition;
-  }
-  bool isUsed() const {
-    return ForDefinition && isUsed(Linkage, Visibility, DLLStorageClass);
-  }
+  bool isForDefinition() const { return ForDefinition; }
+  bool isUsed() const { return ForDefinition && isUsed(IRL); }
 
-  static bool isUsed(llvm::GlobalValue::LinkageTypes Linkage,
-                     llvm::GlobalValue::VisibilityTypes Visibility,
-                     llvm::GlobalValue::DLLStorageClassTypes DLLStorage);
+  static bool isUsed(IRLinkage IRL);
 };
 
 StringRef encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,

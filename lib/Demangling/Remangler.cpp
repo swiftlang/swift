@@ -282,6 +282,7 @@ class Remangler {
   void mangleGenericArgs(Node *node, char &Separator);
   void mangleAnyConstructor(Node *node, char kindOp);
   void mangleAbstractStorage(Node *node, StringRef accessorCode);
+  void mangleAnyProtocolConformance(Node *node);
 
 #define NODE(ID)                                                        \
   void mangle##ID(Node *node);
@@ -1606,9 +1607,9 @@ void Remangler::mangleProtocol(Node *node) {
 }
 
 void Remangler::mangleRetroactiveConformance(Node *node) {
-  mangleProtocolConformance(node->getChild(1));
+  mangleAnyProtocolConformance(node->getChild(0));
   Buffer << 'g';
-  mangleIndex(node->getChild(0)->getIndex());
+  mangleIndex(node->getIndex());
 }
 
 void Remangler::mangleProtocolConformance(Node *node) {
@@ -1625,6 +1626,72 @@ void Remangler::mangleProtocolConformance(Node *node) {
   mangleChildNode(node, 2);
   if (GenSig)
     mangle(GenSig);
+}
+
+void Remangler::mangleProtocolConformanceRef(Node *node) {
+  manglePureProtocol(node->getChild(0));
+  if (node->getNumChildren() > 1)
+    mangleChildNode(node, 1);
+}
+
+void Remangler::mangleConcreteProtocolConformance(Node *node) {
+  mangleType(node->getChild(0));
+  mangleProtocolConformanceRef(node->getChild(1));
+  if (node->getNumChildren() > 2)
+    mangleAnyProtocolConformanceList(node->getChild(2));
+  else
+    Buffer << "y";
+  Buffer << "HC";
+}
+
+void Remangler::mangleDependentProtocolConformanceRoot(Node *node) {
+  mangleType(node->getChild(0));
+  manglePureProtocol(node->getChild(1));
+  Buffer << "HD";
+  mangleIndex(node->hasIndex() ? node->getIndex() + 1 : 0);
+}
+
+void Remangler::mangleDependentProtocolConformanceInherited(Node *node) {
+  mangleAnyProtocolConformance(node->getChild(0));
+  manglePureProtocol(node->getChild(1));
+  Buffer << "HI";
+  mangleIndex(node->hasIndex() ? node->getIndex() + 1 : 0);
+}
+
+void Remangler::mangleDependentAssociatedConformance(Node *node) {
+  mangleType(node->getChild(0));
+  manglePureProtocol(node->getChild(1));
+}
+
+void Remangler::mangleDependentProtocolConformanceAssociated(Node *node) {
+  mangleAnyProtocolConformance(node->getChild(0));
+  mangleDependentAssociatedConformance(node->getChild(1));
+  Buffer << "HA";
+  mangleIndex(node->hasIndex() ? node->getIndex() + 1 : 0);
+}
+
+void Remangler::mangleAnyProtocolConformance(Node *node) {
+  switch (node->getKind()) {
+  case Node::Kind::ConcreteProtocolConformance:
+    return mangleConcreteProtocolConformance(node);
+  case Node::Kind::DependentProtocolConformanceRoot:
+    return mangleDependentProtocolConformanceRoot(node);
+  case Node::Kind::DependentProtocolConformanceInherited:
+    return mangleDependentProtocolConformanceInherited(node);
+  case Node::Kind::DependentProtocolConformanceAssociated:
+    return mangleDependentProtocolConformanceAssociated(node);
+  default:
+    break;
+  }
+}
+
+void Remangler::mangleAnyProtocolConformanceList(Node *node) {
+  bool firstElem = true;
+  for (NodePointer child : *node) {
+    mangleAnyProtocolConformance(child);
+    mangleListSeparator(firstElem);
+  }
+  mangleEndOfList(firstElem);
 }
 
 void Remangler::mangleProtocolDescriptor(Node *node) {

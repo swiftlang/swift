@@ -732,16 +732,10 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   auto AILeftOperandsNum = AILeft->getNumOperands();
   auto AIRightOperandsNum = AIRight->getNumOperands();
 
-  // makeUTF16 should have following parameters:
-  // (start: RawPointer, utf16CodeUnitCount: Word)
   // makeUTF8 should have following parameters:
   // (start: RawPointer, utf8CodeUnitCount: Word, isASCII: Int1)
-  if (!((FRILeftFun->hasSemanticsAttr("string.makeUTF16") &&
-         AILeftOperandsNum == 4) ||
-        (FRILeftFun->hasSemanticsAttr("string.makeUTF8") &&
+  if (!((FRILeftFun->hasSemanticsAttr("string.makeUTF8") &&
          AILeftOperandsNum == 5) ||
-        (FRIRightFun->hasSemanticsAttr("string.makeUTF16") &&
-         AIRightOperandsNum == 4) ||
         (FRIRightFun->hasSemanticsAttr("string.makeUTF8") &&
          AIRightOperandsNum == 5)))
     return false;

@@ -172,6 +172,13 @@ static inline bool isReadAccessResultOwned(SGFAccessKind kind) {
   return uint8_t(kind) >= uint8_t(SGFAccessKind::OwnedAddressRead);
 }
 
+/// Given a read access kind, does it require an address result?
+static inline bool isReadAccessResultAddress(SGFAccessKind kind) {
+  assert(isReadAccess(kind));
+  return kind == SGFAccessKind::BorrowedAddressRead ||
+         kind == SGFAccessKind::OwnedAddressRead;
+}
+
 /// Return an address-preferring version of the given access kind.
 static inline SGFAccessKind getAddressAccessKind(SGFAccessKind kind) {
   switch (kind) {

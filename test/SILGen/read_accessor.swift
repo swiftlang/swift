@@ -117,4 +117,47 @@ struct TupleReader {
   func useReadable() {
     var v = readable
   }
+
+  var computed: String {
+    return compute()
+  }
+
+// CHECK-LABEL: sil hidden @$s13read_accessor11TupleReaderV0A8ComputedSSvr
+// CHECK:         [[GETTER:%.*]] = function_ref @$s13read_accessor11TupleReaderV8computedSSvg
+// CHECK-NEXT:    [[VALUE:%.]] = apply [[GETTER]](%0)
+// CHECK-NEXT:    [[BORROW:%.*]] = begin_borrow [[VALUE]] : $String
+// CHECK-NEXT:    yield [[BORROW]] : $String, resume bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    end_borrow [[BORROW]] : $String
+// CHECK-NEXT:    destroy_value [[VALUE]] : $String
+  var readComputed : String {
+    _read {
+      yield computed
+    }
+  }
 }
+
+struct TestKeyPath {
+  var readable: String {
+    _read {
+      yield ""
+    }
+  }
+
+  func useKeyPath() -> String {
+    return self[keyPath: \.readable]
+  }
+}
+//   Key-path getter for TestKeyPath.readable
+// CHECK-LABEL: sil shared [thunk] @$s13read_accessor11TestKeyPathV8readableSSvpACTK
+// CHECK:       bb0(%0 : @trivial $*String, %1 : @trivial $*TestKeyPath):
+// CHECK-NEXT:    [[SELF:%.*]] = load [trivial] %1
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[READ:%.*]] = function_ref @$s13read_accessor11TestKeyPathV8readableSSvr
+// CHECK-NEXT:    ([[VALUE:%.*]], [[TOKEN:%.*]]) = begin_apply [[READ]]([[SELF]])
+// CHECK-NEXT:    [[COPY:%.*]] = copy_value [[VALUE]]
+// CHECK-NEXT:    end_apply [[TOKEN]]
+// CHECK-NEXT:    store [[COPY]] to [init] %0 : $*String
+// CHECK-NEXT:    [[RET:%.*]] = tuple ()
+// CHECK-NEXT:    return [[RET]] : $()
+// CHECK-LABEL: } // end sil function '$s13read_accessor11TestKeyPathV8readableSSvpACTK'

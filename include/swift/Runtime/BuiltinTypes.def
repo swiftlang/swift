@@ -55,9 +55,7 @@ BUILTIN_POINTER_TYPE(Bb, "Builtin.BridgeObject")
 BUILTIN_POINTER_TYPE(Bp, "Builtin.RawPointer")
 BUILTIN_TYPE(BB, "Builtin.UnsafeValueBuffer")
 
-#if SWIFT_OBJC_INTEROP
 BUILTIN_POINTER_TYPE(BO, "Builtin.UnknownObject")
-#endif
 
 // Int8 vector types
 BUILTIN_VECTOR_TYPE(Bi8_, Int8, 2)

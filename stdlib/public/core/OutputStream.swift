@@ -80,7 +80,6 @@ extension TextOutputStream {
   public mutating func _lock() {}
   public mutating func _unlock() {}
 
-  @inlinable
   public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
     write(String._fromASCII(buffer))
   }
@@ -522,15 +521,8 @@ internal struct _Stdout : TextOutputStream {
   internal mutating func write(_ string: String) {
     if string.isEmpty { return }
 
-    if _fastPath(string._guts.isASCII) {
-      defer { _fixLifetime(string) }
-      let ascii = string._guts._unmanagedASCIIView
-      _swift_stdlib_fwrite_stdout(ascii.start, ascii.count, 1)
-      return
-    }
-
-    for c in string.utf8 {
-      _swift_stdlib_putchar_unlocked(Int32(c))
+    _ = string._withUTF8 { utf8 in
+      _swift_stdlib_fwrite_stdout(utf8.baseAddress!, 1, utf8.count)
     }
   }
 }
@@ -544,7 +536,7 @@ extension String : TextOutputStream {
   }
 
   public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
-    self._guts.append(_UnmanagedString(buffer))
+    self._guts.append(_StringGuts(buffer, isASCII: true))
   }
 }
 

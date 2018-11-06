@@ -22,6 +22,7 @@ let sequenceCount = 4096
 let dropCount = 1024
 let suffixCount = sequenceCount - dropCount
 let sumCount = suffixCount * (2 * sequenceCount - suffixCount - 1) / 2
+let array: [Int] = Array(0..<sequenceCount)
 
 public let DropWhile = [
   BenchmarkInfo(
@@ -51,7 +52,8 @@ public let DropWhile = [
   BenchmarkInfo(
     name: "DropWhileArray",
     runFunction: run_DropWhileArray,
-    tags: [.validation, .api, .Array, .unstable]),
+    tags: [.validation, .api, .Array],
+    setUpFunction: { blackHole(array) }),
   BenchmarkInfo(
     name: "DropWhileCountableRangeLazy",
     runFunction: run_DropWhileCountableRangeLazy,
@@ -79,7 +81,8 @@ public let DropWhile = [
   BenchmarkInfo(
     name: "DropWhileArrayLazy",
     runFunction: run_DropWhileArrayLazy,
-    tags: [.validation, .api]),
+    tags: [.validation, .api, .Array],
+    setUpFunction: { blackHole(array) }),
 ]
 
 @inline(never)
@@ -150,7 +153,7 @@ public func run_DropWhileAnyCollection(_ N: Int) {
 }
 @inline(never)
 public func run_DropWhileArray(_ N: Int) {
-  let s = Array(0..<sequenceCount)
+  let s = array
   for _ in 1...20*N {
     var result = 0
     for element in s.drop(while: {$0 < dropCount} ) {
@@ -227,7 +230,7 @@ public func run_DropWhileAnyCollectionLazy(_ N: Int) {
 }
 @inline(never)
 public func run_DropWhileArrayLazy(_ N: Int) {
-  let s = (Array(0..<sequenceCount)).lazy
+  let s = (array).lazy
   for _ in 1...20*N {
     var result = 0
     for element in s.drop(while: {$0 < dropCount} ) {

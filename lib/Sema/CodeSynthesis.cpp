@@ -300,7 +300,8 @@ static AccessorDecl *createSetterPrototype(TypeChecker &TC,
 
   // Always add the setter to the context immediately after the getter.
   if (!getter) getter = storage->getGetter();
-  assert(getter && "always synthesize setter prototype after getter");
+  if (!getter) getter = storage->getReadCoroutine();
+  assert(getter && "always synthesize setter prototype after get/read");
   addMemberToContextIfNeeded(setter, storage->getDeclContext(), getter);
 
   return setter;

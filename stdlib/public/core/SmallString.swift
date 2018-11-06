@@ -10,885 +10,334 @@
 //
 //===----------------------------------------------------------------------===//
 
-@usableFromInline // FIXME(sil-serialize-all)
-internal
-typealias _SmallUTF16StringBuffer = _FixedArray16<UInt16>
-
-//
-// NOTE: Small string is not available on 32-bit platforms (not enough bits!),
-// but we don't want to #if-def all use sites (at least for now). So, provide a
-// minimal unavailable interface.
-//
-#if arch(i386) || arch(arm)
-// Helper method for declaring something as not supported in 32-bit. Use inside
-// a function body inside a #if block so that callers don't have to be
-// conditional.
-@_transparent @inlinable
-func unsupportedOn32bit() -> Never { _conditionallyUnreachable() }
-
-// Trivial type declaration for type checking. Never present at runtime.
-@_fixed_layout public struct _SmallUTF8String {}
-
-#else
-//
-// The low byte of the first word (low) stores the first code unit. Up to 15
-// such code units are encodable, with the second-highest byte of the second
-// word (high) being the final code unit. The high byte of the final word
-// stores the count.
-//
-// The low and high values are automatically stored in little-endian byte order
-// by the _RawBitPattern struct, which reverses the byte order as needed to
-// convert between the little-endian storage format and the host byte order.
-// The memory layout of the _RawBitPattern struct will therefore be identical
-// on both big- and little-endian machines. The values of 'high' and 'low'
-// will also appear to be identical. Routines which build, manipulate and
-// convert small strings should therefore always assume little-endian byte
-// order.
-//
-// Storage layout:
-//
-//   |0 1 2 3 4 5 6 7 8 9 a b c d e f| ← offset
-//   |      low      |     high      | ← properties
-//   |            string           | | ← encoded layout
-//    ↑                             ↑
-//    first (low) byte          count
-//
-// Examples:
-//                                                  ! o l l e H         6
-//   |H e l l o ! ░ ░ ░ ░ ░ ░ ░ ░ ░|6| → low=0x0000216f6c6c6548 high=0x0600000000000000
-//
-//                                              W   , o l l e H        13     ! d l r o
-//   |H e l l o ,   W o r l d ! ░ ░|d| → low=0x57202c6f6c6c6548 high=0x0d000021646c726f
-//
-@_fixed_layout
-@usableFromInline
-internal struct _SmallUTF8String {
-  @_fixed_layout
+@_fixed_layout @usableFromInline
+internal struct _SmallString {
   @usableFromInline
-  internal struct _RawBitPattern: Equatable {
-    // high and low are stored in little-endian byte order
-    @usableFromInline
-    internal var _storage: (low: UInt, high: UInt)
+  internal typealias RawBitPattern = (UInt64, UInt64)
 
-    @inlinable
-    var low: UInt {
-      @inline(__always) get { return _storage.low.littleEndian }
-      @inline(__always) set { _storage.low = newValue.littleEndian }
-    }
-
-    @inlinable
-    var high: UInt {
-      @inline(__always) get { return _storage.high.littleEndian }
-      @inline(__always) set { _storage.high = newValue.littleEndian }
-    }
-
-    @inlinable
-    @inline(__always)
-    init(low l: UInt, high h: UInt) {
-      // host byte order to little-endian byte order
-      _storage.low = l.littleEndian
-      _storage.high = h.littleEndian
-    }
-
-    @inlinable
-    @inline(__always)
-    static func == (lhs: _RawBitPattern, rhs: _RawBitPattern) -> Bool {
-      return lhs._storage == rhs._storage
-    }
-  }
-
+  // Small strings are values; store them raw
   @usableFromInline
-  var _storage: _RawBitPattern
-  @inlinable
-  @inline(__always)
-  init() {
-    self._storage = _RawBitPattern(low: 0, high: 0)
-  }
-}
-#endif // 64-bit
-
-//
-// Small string creation interface
-//
-extension _SmallUTF8String {
-  @inlinable
-  static internal var capacity: Int { return 15 }
-
-#if _runtime(_ObjC)
-  @usableFromInline
-  internal init?(_cocoaString cocoa: _CocoaString) {
-#if arch(i386) || arch(arm)
-    return nil // Never form small strings on 32-bit
-#else
-    self.init()
-    let len = self._withAllUnsafeMutableBytes { bufPtr -> Int? in
-      guard let len = _bridgeASCIICocoaString(cocoa, intoUTF8: bufPtr),
-            len <= _SmallUTF8String.capacity
-      else {
-        return nil
-      }
-      return len
-    }
-    guard let count = len else { return nil }
-    _sanityCheck(self.count == 0, "overwrote count early?")
-
-    self.count = count
-    _invariantCheck()
-#endif
-  }
-#endif // _runtime(_ObjC)
+  internal var _storage: RawBitPattern
 
   @inlinable
-  internal init?<C: RandomAccessCollection>(_ codeUnits: C) where C.Element == UInt16 {
-#if arch(i386) || arch(arm)
-    return nil // Never form small strings on 32-bit
-#else
-    guard codeUnits.count <= _SmallUTF8String.capacity else { return nil }
-    // TODO(TODO: JIRA): Just implement this directly
-
-    self.init()
-    var bufferIdx = 0
-    for encodedScalar in Unicode._ParsingIterator(
-      codeUnits: codeUnits.makeIterator(),
-      parser: Unicode.UTF16.ForwardParser()
-    ) {
-      guard let transcoded = Unicode.UTF8.transcode(
-        encodedScalar, from: Unicode.UTF16.self
-      ) else {
-        // FIXME: can this fail with unpaired surrogates?
-        _sanityCheckFailure("UTF-16 should be transcodable to UTF-8")
-        return nil
-      }
-      _sanityCheck(transcoded.count <= 4, "how?")
-      guard bufferIdx + transcoded.count <= _SmallUTF8String.capacity else {
-        return nil
-      }
-      for i in transcoded.indices {
-        self._uncheckedSetCodeUnit(at: bufferIdx, to: transcoded[i])
-        bufferIdx += 1
-      }
-    }
-    _sanityCheck(self.count == 0, "overwrote count early?")
-    self.count = bufferIdx
-
-    // FIXME: support transcoding
-    if !self.isASCII { return nil }
-
-    _invariantCheck()
-#endif
-  }
-
-  @inline(__always)
-  @inlinable
-  @_effects(readonly)
-  public // @testable
-  init?(_ codeUnits: UnsafeBufferPointer<UInt8>) {
-#if arch(i386) || arch(arm)
-    return nil // Never form small strings on 32-bit
-#else
-    let count = codeUnits.count
-    guard count <= _SmallUTF8String.capacity else { return nil }
-
-    let addr = codeUnits.baseAddress._unsafelyUnwrappedUnchecked
-    var high: UInt
-    let lowCount: Int
-    if count > 8 {
-      lowCount = 8
-      high = _bytesToUInt(addr + 8, count &- 8)
-    } else {
-      lowCount = count
-      high = 0
-    }
-    high |= (UInt(count) &<< (8*15))
-    let low = _bytesToUInt(addr, lowCount)
-    _storage = _RawBitPattern(low: low, high: high)
-
-    // FIXME: support transcoding
-    if !self.isASCII { return nil }
-
-    _invariantCheck()
-#endif
-  }
-
-  @inlinable
-  public // @testable
-  init?(_ scalar: Unicode.Scalar) {
-#if arch(i386) || arch(arm)
-    return nil // Never form small strings on 32-bit
-#else
-    // FIXME: support transcoding
-    guard scalar.value <= 0x7F else { return nil }
-    self.init()
-    self.count = 1
-    self[0] = UInt8(truncatingIfNeeded: scalar.value)
-#endif
-  }
-}
-
-@inline(__always)
-@inlinable
-func _bytesToUInt(_ input: UnsafePointer<UInt8>, _ c: Int) -> UInt {
-  var r: UInt = 0
-  var shift: Int = 0
-  for idx in 0..<c {
-    r = r | (UInt(input[idx]) &<< shift)
-    shift = shift &+ 8
-  }
-  return r
-}
-
-//
-// Small string read interface
-//
-extension _SmallUTF8String {
-  @inlinable
-  @inline(__always)
-  func withUTF8CodeUnits<Result>(
-    _ body: (UnsafeBufferPointer<UInt8>) throws -> Result
-  ) rethrows -> Result {
-#if arch(i386) || arch(arm)
-    unsupportedOn32bit()
-#else
-    return try _withAllUnsafeBytes { bufPtr in
-      let ptr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
-        .assumingMemoryBound(to: UInt8.self)
-      return try body(UnsafeBufferPointer(start: ptr, count: self.count))
-    }
-#endif
-  }
-
-  @inlinable
-  @inline(__always)
-  public // @testable
-  func withTranscodedUTF16CodeUnits<Result>(
-    _ body: (UnsafeBufferPointer<UInt16>) throws -> Result
-  ) rethrows -> Result {
-#if arch(i386) || arch(arm)
-    unsupportedOn32bit()
-#else
-    var (transcoded, transcodedCount) = self.transcoded
-    return try Swift.withUnsafeBytes(of: &transcoded.storage) {
-      bufPtr -> Result in
-      let ptr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
-        .assumingMemoryBound(to: UInt16.self)
-      return try body(UnsafeBufferPointer(start: ptr, count: transcodedCount))
-    }
-#endif
-  }
-
-  @inlinable
-  @inline(__always)
-  func withUnmanagedUTF16<Result>(
-    _ body: (_UnmanagedString<UInt16>) throws -> Result
-  ) rethrows -> Result {
-#if arch(i386) || arch(arm)
-    unsupportedOn32bit()
-#else
-    return try withTranscodedUTF16CodeUnits {
-      return try body(_UnmanagedString($0))
-    }
-#endif
-  }
-
-  @inlinable
-  @inline(__always)
-  func withUnmanagedASCII<Result>(
-    _ body: (_UnmanagedString<UInt8>) throws -> Result
-  ) rethrows -> Result {
-#if arch(i386) || arch(arm)
-    unsupportedOn32bit()
-#else
-    _sanityCheck(self.isASCII)
-    return try withUTF8CodeUnits {
-      return try body(_UnmanagedString($0))
-    }
-#endif
-  }
-}
-extension _SmallUTF8String {
-  @inlinable
-  public // @testable
-  // FIXME:  internal(set)
-  var count: Int {
-    @inline(__always) get {
-#if arch(i386) || arch(arm)
-    unsupportedOn32bit()
-#else
-      return Int(bitPattern: UInt(self._uncheckedCodeUnit(at: 15)))
-#endif
-    }
-    @inline(__always) set {
-#if arch(i386) || arch(arm)
-    unsupportedOn32bit()
-#else
-      _sanityCheck(newValue <= _SmallUTF8String.capacity, "out of bounds")
-      self._uncheckedSetCodeUnit(
-        at: 15, to: UInt8(truncatingIfNeeded: UInt(bitPattern: newValue)))
-#endif
-    }
-  }
-
-  @inlinable
-  public // @testable
-  var capacity: Int { @inline(__always) get { return 15 } }
-
-  @inlinable
-  public // @testable
-  var unusedCapacity: Int { @inline(__always) get { return capacity - count } }
-
-  @inlinable
-  public // @testable
-  var isASCII: Bool {
-    @inline(__always) get {
-#if arch(i386) || arch(arm)
-      unsupportedOn32bit()
-#else
-      // TODO (TODO: JIRA): Consider using our last bit for this
-      _sanityCheck(_uncheckedCodeUnit(at: 15) & 0xF0 == 0)
-
-      let topBitMask: UInt = 0x8080_8080_8080_8080
-      return (_storage.low | _storage.high) & topBitMask == 0
-#endif
-    }
-  }
-
-  @inlinable
-  func _invariantCheck() {
-#if arch(i386) || arch(arm)
-    unsupportedOn32bit()
-#else
-    #if INTERNAL_CHECKS_ENABLED
-    _sanityCheck(count <= _SmallUTF8String.capacity)
-    _sanityCheck(self.isASCII, "UTF-8 currently unsupported")
-    #endif // INTERNAL_CHECKS_ENABLED
-#endif
-  }
-
-  internal
-  func _dump() {
-#if arch(i386) || arch(arm)
-    unsupportedOn32bit()
-#else
-    #if INTERNAL_CHECKS_ENABLED
-    print("""
-      smallUTF8: count: \(self.count), codeUnits: \(
-        self.map { String($0, radix: 16) }.dropLast()
-      )
-      """)
-    #endif // INTERNAL_CHECKS_ENABLED
-#endif
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal func _copy<TargetCodeUnit>(
-    into target: UnsafeMutableBufferPointer<TargetCodeUnit>
-  ) where TargetCodeUnit : FixedWidthInteger & UnsignedInteger {
-#if arch(i386) || arch(arm)
-    unsupportedOn32bit()
-#else
-    _sanityCheck(target.count >= self.count)
-    guard count > 0 else { return }
-
-    if _fastPath(TargetCodeUnit.bitWidth == 8) {
-      _sanityCheck(TargetCodeUnit.self == UInt8.self)
-      let target = _castBufPtr(target, to: UInt8.self)
-
-      // TODO: Inspect generated code. Consider checking count for alignment so
-      // we can just copy our UInts directly when possible.
-      var ptr = target.baseAddress._unsafelyUnwrappedUnchecked
-      for cu in self {
-        ptr[0] = cu
-        ptr += 1
-      }
-      return
-    }
-
-    _sanityCheck(TargetCodeUnit.self == UInt16.self)
-    self.transcode(_uncheckedInto: _castBufPtr(target, to: UInt16.self))
-#endif
-  }
-}
-extension _SmallUTF8String: RandomAccessCollection {
-  public // @testable
-  typealias Index = Int
-  public // @testable
-  typealias Element = UInt8
-  public // @testable
-  typealias SubSequence = _SmallUTF8String
-
-  @inlinable
-  public // @testable
-  var startIndex: Int { @inline(__always) get { return 0 } }
-
-  @inlinable
-  public // @testable
-  var endIndex: Int { @inline(__always) get { return count } }
-
-  @inlinable
-  public // @testable
-  subscript(_ idx: Int) -> UInt8 {
-    @inline(__always) get {
-#if arch(i386) || arch(arm)
-      unsupportedOn32bit()
-#else
-      _sanityCheck(idx >= 0 && idx <= count)
-      return _uncheckedCodeUnit(at: idx)
-#endif
-    }
-    @inline(__always) set {
-#if arch(i386) || arch(arm)
-      unsupportedOn32bit()
-#else
-      _sanityCheck(idx >= 0 && idx <= count)
-      _uncheckedSetCodeUnit(at: idx, to: newValue)
-#endif
-    }
-  }
-
-  @inlinable
-  public // @testable
-  subscript(_ bounds: Range<Index>) -> SubSequence {
-    @inline(__always) get {
-#if arch(i386) || arch(arm)
-    unsupportedOn32bit()
-#else
-      _sanityCheck(bounds.lowerBound >= 0 && bounds.upperBound <= count)
-      return self._uncheckedClamp(
-        lowerBound: bounds.lowerBound, upperBound: bounds.upperBound)
-#endif
-    }
-  }
-}
-
-extension _SmallUTF8String {
-  @inlinable
-  public // @testable
-  func _repeated(_ n: Int) -> _SmallUTF8String? {
-#if arch(i386) || arch(arm)
-      unsupportedOn32bit()
-#else
-    _sanityCheck(n > 1)
-    let finalCount = self.count * n
-    guard finalCount <= 15 else { return nil }
-    var ret = self
-    for _ in 0..<(n &- 1) {
-      ret = ret._appending(self)._unsafelyUnwrappedUnchecked
-    }
-    return ret
-#endif
-  }
-
-  @inlinable
-  public // @testable
-  func _appending<C: RandomAccessCollection>(_ other: C) -> _SmallUTF8String?
-  where C.Element == UInt8 {
-#if arch(i386) || arch(arm)
-      unsupportedOn32bit()
-#else
-    guard other.count <= self.unusedCapacity else { return nil }
-
-    // TODO: as _copyContents
-    var result = self
-    result._withMutableExcessCapacityBytes { rawBufPtr in
-      var i = 0
-      for cu in other {
-        rawBufPtr[i] = cu
-        i += 1
-      }
-    }
-    result.count = self.count &+ other.count
-    return result
-#endif
-  }
-
-  @inlinable
-  func _appending<C: RandomAccessCollection>(_ other: C) -> _SmallUTF8String?
-  where C.Element == UInt16 {
-#if arch(i386) || arch(arm)
-      unsupportedOn32bit()
-#else
-    guard other.count <= self.unusedCapacity else { return nil }
-
-    // TODO: as _copyContents
-    var result = self
-    let success = result._withMutableExcessCapacityBytes { rawBufPtr -> Bool in
-      var i = 0
-      for cu in other {
-        guard cu <= 0x7F else {
-          // TODO: transcode and communicate count back
-          return false
-        }
-        rawBufPtr[i] = UInt8(truncatingIfNeeded: cu)
-        i += 1
-      }
-      return true
-    }
-    guard success else { return nil }
-
-    result.count = self.count &+ other.count
-    return result
-#endif
-  }
-
-  // NOTE: This exists to facilitate _fromCodeUnits, which is awful for this use
-  // case. Please don't call this from anywhere else.
-  @inlinable
-  init?<S: Sequence, Encoding: Unicode.Encoding>(
-    _fromCodeUnits codeUnits: S,
-    utf16Length: Int,
-    isASCII: Bool,
-    _: Encoding.Type = Encoding.self
-  ) where S.Element == Encoding.CodeUnit {
-#if arch(i386) || arch(arm)
-    return nil // Never form small strings on 32-bit
-#else
-    guard utf16Length <= 15 else { return nil }
-
-    // TODO: transcode
-    guard isASCII else { return nil }
-
-    self.init()
-    var bufferIdx = 0
-    for encodedScalar in Unicode._ParsingIterator(
-      codeUnits: codeUnits.makeIterator(),
-      parser: Encoding.ForwardParser()
-    ) {
-      guard let transcoded = Unicode.UTF8.transcode(
-        encodedScalar, from: Encoding.self
-      ) else {
-        fatalError("Somehow un-transcodable?")
-      }
-      _sanityCheck(transcoded.count <= 4, "how?")
-      guard bufferIdx + transcoded.count <= 15 else { return nil }
-      for i in transcoded.indices {
-        self._uncheckedSetCodeUnit(at: bufferIdx, to: transcoded[i])
-        bufferIdx += 1
-      }
-    }
-    _sanityCheck(self.count == 0, "overwrote count early?")
-    self.count = bufferIdx
-
-    // FIXME: support transcoding
-    if !self.isASCII { return nil }
-
-    _invariantCheck()
-#endif
-  }
-}
-
-extension _SmallUTF8String {
-#if arch(i386) || arch(arm)
-  @_fixed_layout @usableFromInline struct UnicodeScalarIterator {
-    @inlinable @inline(__always)
-    func next() -> Unicode.Scalar? { unsupportedOn32bit() }
-  }
-  @inlinable @inline(__always)
-  func makeUnicodeScalarIterator() -> UnicodeScalarIterator {
-    unsupportedOn32bit()
-  }
-#else
-  // FIXME (TODO: JIRA): Just make a real decoding iterator
-  @_fixed_layout
-  @usableFromInline // FIXME(sil-serialize-all)
-  struct UnicodeScalarIterator {
-    @usableFromInline // FIXME(sil-serialize-all)
-    var buffer: _SmallUTF16StringBuffer
-    @usableFromInline // FIXME(sil-serialize-all)
-    var count: Int
-    @usableFromInline // FIXME(sil-serialize-all)
-    var _offset: Int
-
-    @inlinable // FIXME(sil-serialize-all)
-    init(_ base: _SmallUTF8String) {
-      (self.buffer, self.count) = base.transcoded
-      self._offset = 0
-    }
-
-    @inlinable // FIXME(sil-serialize-all)
-    mutating func next() -> Unicode.Scalar? {
-      if _slowPath(_offset == count) { return nil }
-      let u0 = buffer[_offset]
-      if _fastPath(UTF16._isScalar(u0)) {
-        _offset += 1
-        return Unicode.Scalar(u0)
-      }
-      if UTF16.isLeadSurrogate(u0) && _offset + 1 < count {
-        let u1 = buffer[_offset + 1]
-        if UTF16.isTrailSurrogate(u1) {
-          _offset += 2
-          return UTF16._decodeSurrogates(u0, u1)
-        }
-      }
-      _offset += 1
-      return Unicode.Scalar._replacementCharacter
-    }
-  }
-
-  @inlinable
-  func makeUnicodeScalarIterator() -> UnicodeScalarIterator {
-    return UnicodeScalarIterator(self)
-  }
-#endif // 64-bit
-}
-
-#if arch(i386) || arch(arm)
-#else
-extension _SmallUTF8String {
-  @inlinable
-  @inline(__always)
-  init(_rawBits: (low: UInt, high: UInt)) {
-    self.init()
-    self._storage.low = _rawBits.low
-    self._storage.high = _rawBits.high
-    _invariantCheck()
-  }
-
-  @inlinable
-  @inline(__always)
-  init(low: UInt, high: UInt, count: Int) {
-    self.init()
-    self._storage.low = low
-    self._storage.high = high
-    self.count = count
-    _invariantCheck()
-  }
-
-  @inlinable
-  internal var _rawBits: _RawBitPattern {
+  internal var rawBits: RawBitPattern {
     @inline(__always) get { return _storage }
   }
 
   @inlinable
-  internal var lowUnpackedBits: UInt {
-    @inline(__always) get { return _storage.low }
-  }
-  @inlinable
-  internal var highUnpackedBits: UInt {
-    @inline(__always) get { return _storage.high & 0x00FF_FFFF_FFFF_FFFF }
+  internal var leadingRawBits: UInt64 {
+    @inline(__always) get { return _storage.0 }
+    @inline(__always) set { _storage.0 = newValue }
   }
 
   @inlinable
-  internal var unpackedBits: (low: UInt, high: UInt, count: Int) {
-    @inline(__always)
-    get { return (lowUnpackedBits, highUnpackedBits, count) }
-  }
-}
-extension _SmallUTF8String {
-  // Operate with a pointer to the entire struct, including unused capacity
-  // and inline count. You should almost never call this directly.
-  @inlinable
-  @inline(__always)
-  mutating func _withAllUnsafeMutableBytes<Result>(
-    _ body: (UnsafeMutableRawBufferPointer) throws -> Result
-  ) rethrows -> Result {
-    var copy = self
-    defer { self = copy }
-    return try Swift.withUnsafeMutableBytes(of: &copy._storage) { try body($0) }
-  }
-  @inlinable
-  @inline(__always)
-  func _withAllUnsafeBytes<Result>(
-    _ body: (UnsafeRawBufferPointer) throws -> Result
-  ) rethrows -> Result {
-    var copy = self
-    return try Swift.withUnsafeBytes(of: &copy._storage) { try body($0) }
-  }
-  @inlinable
-  @inline(__always)
-  mutating func _withMutableExcessCapacityBytes<Result>(
-    _ body: (UnsafeMutableRawBufferPointer) throws -> Result
-  ) rethrows -> Result {
-    let unusedCapacity = self.unusedCapacity
-    let count = self.count
-    return try self._withAllUnsafeMutableBytes { allBufPtr in
-      let ptr = allBufPtr.baseAddress._unsafelyUnwrappedUnchecked + count
-      return try body(
-        UnsafeMutableRawBufferPointer(start: ptr, count: unusedCapacity))
-    }
+  internal var trailingRawBits: UInt64 {
+    @inline(__always) get { return _storage.1 }
+    @inline(__always) set { _storage.1 = newValue }
   }
 
-}
-extension _SmallUTF8String {
-  @inlinable
-  @inline(__always)
-  func _uncheckedCodeUnit(at i: Int) -> UInt8 {
-    _sanityCheck(i >= 0 && i <= 15)
-    if i < 8 {
-      return _storage.low._uncheckedGetByte(at: i)
-    } else {
-      return _storage.high._uncheckedGetByte(at: i &- 8)
-    }
+  @inlinable @inline(__always)
+  internal init(rawUnchecked bits: RawBitPattern) {
+    self._storage = bits
   }
-  @inlinable
-  @inline(__always)
-  mutating func _uncheckedSetCodeUnit(at i: Int, to: UInt8) {
-    // TODO(TODO: JIRA): in-register operation instead
-    self._withAllUnsafeMutableBytes { $0[i] = to }
+
+  @inlinable @inline(__always)
+  internal init(raw bits: RawBitPattern) {
+    self.init(rawUnchecked: bits)
+    _invariantCheck()
+  }
+
+  @inlinable @inline(__always)
+  internal init(_ object: _StringObject) {
+    _sanityCheck(object.isSmall)
+    self.init(raw: object.rawBits)
+  }
+
+  @inlinable @inline(__always)
+  internal init() {
+    self.init(raw: _StringObject(empty:()).rawBits)
   }
 }
 
-extension _SmallUTF8String {
+// TODO
+extension _SmallString {
   @inlinable
-  @inline(__always)
-  internal func _uncheckedClamp(upperBound: Int) -> _SmallUTF8String {
-    _sanityCheck(upperBound <= self.count)
-    guard upperBound >= 8 else {
-      var low = self.lowUnpackedBits
-      let shift = upperBound &* 8
-      let mask: UInt = (1 &<< shift) &- 1
-      low &= mask
-      return _SmallUTF8String(low: low, high: 0, count: upperBound)
-    }
-    let shift = (upperBound &- 8) &* 8
-    _sanityCheck(shift % 8 == 0)
-
-    var high = self.highUnpackedBits
-    high &= (1 &<< shift) &- 1
-    return _SmallUTF8String(
-      low: self.lowUnpackedBits, high: high, count: upperBound)
-  }
-
-  @inlinable
-  @inline(__always)
-  internal func _uncheckedClamp(lowerBound: Int) -> _SmallUTF8String {
-    _sanityCheck(lowerBound < self.count)
-    let low: UInt
-    let high: UInt
-    if lowerBound < 8 {
-      let shift: UInt = UInt(bitPattern: lowerBound) &* 8
-      let newLowHigh: UInt = self.highUnpackedBits & ((1 &<< shift) &- 1)
-      low = (self.lowUnpackedBits &>> shift) | (newLowHigh &<< (64 &- shift))
-      high = self.highUnpackedBits &>> shift
-    } else {
-      high = 0
-      low = self.highUnpackedBits &>> ((lowerBound &- 8) &* 8)
-    }
-
-    return _SmallUTF8String(
-      low: low, high: high, count: self.count &- lowerBound)
-  }
-
-  @inlinable
-  @inline(__always)
-  internal func _uncheckedClamp(
-    lowerBound: Int, upperBound: Int
-  ) -> _SmallUTF8String {
-    // TODO: More efficient to skip the intermediary shifts and just mask up
-    // front.
-    _sanityCheck(upperBound >= lowerBound)
-    if lowerBound == upperBound { return _SmallUTF8String() }
-    let dropTop = self._uncheckedClamp(upperBound: upperBound)
-    return dropTop._uncheckedClamp(lowerBound: lowerBound)
-  }
-}
-
-extension _SmallUTF8String {//}: _StringVariant {
-  @usableFromInline
-  internal typealias TranscodedBuffer = _SmallUTF16StringBuffer
-
-  @inlinable
-  @discardableResult
-  func transcode(
-    _uncheckedInto buffer: UnsafeMutableBufferPointer<UInt16>
-  ) -> Int {
-      if _fastPath(isASCII) {
-        _sanityCheck(buffer.count >= self.count)
-        var bufferIdx = 0
-        for cu in self {
-            buffer[bufferIdx] = UInt16(cu)
-            bufferIdx += 1
-        }
-        return bufferIdx
-    }
-
-    let length = _transcodeNonASCII(_uncheckedInto: buffer)
-    _sanityCheck(length <= buffer.count) // TODO: assert ahead-of-time
-
-    return length
-  }
-
-  @inlinable
-  @inline(__always)
-  func transcode(into buffer: UnsafeMutablePointer<TranscodedBuffer>) -> Int {
-    let ptr = UnsafeMutableRawPointer(buffer).assumingMemoryBound(
-      to: UInt16.self)
-
-    return transcode(
-      _uncheckedInto: UnsafeMutableBufferPointer(start: ptr, count: count))
-  }
-
-  @inlinable
-  var transcoded: (TranscodedBuffer, count: Int) {
+  internal static var capacity: Int {
     @inline(__always) get {
-      // TODO: in-register zero-extension for ascii
-      var buffer = TranscodedBuffer(allZeros:())
-      let count = transcode(into: &buffer)
-      return (buffer, count: count)
+#if arch(i386) || arch(arm)
+      return 10
+#else
+      return 15
+#endif
     }
   }
+
+  @inlinable
+  internal var discriminator: _StringObject.Discriminator {
+    @inline(__always) get {
+      let value = _storage.1 &>> _StringObject.Nibbles.discriminatorShift
+      return _StringObject.Discriminator(UInt8(truncatingIfNeeded: value))
+    }
+    @inline(__always) set {
+      _storage.1 &= _StringObject.Nibbles.largeAddressMask
+      _storage.1 |= (
+        UInt64(truncatingIfNeeded: newValue._value)
+          &<< _StringObject.Nibbles.discriminatorShift)
+    }
+  }
+
+  @inlinable
+  internal var capacity: Int {
+    @inline(__always) get {
+      return _SmallString.capacity
+    }
+  }
+
+  @inlinable
+  internal var count: Int {
+    @inline(__always) get {
+      return discriminator.smallCount
+    }
+  }
+
+  @inlinable
+  internal var unusedCapacity: Int {
+    @inline(__always) get { return capacity &- count }
+  }
+
+  @inlinable
+  internal var isASCII: Bool {
+    @inline(__always) get {
+      return discriminator.smallIsASCII
+    }
+  }
+
+  // Give raw, nul-terminated code units. This is only for limited internal
+  // usage: it always clears the discriminator and count (in case it's full)
+  @inlinable
+  internal var zeroTerminatedRawCodeUnits: RawBitPattern {
+    @inline(__always) get {
+      return (
+        self._storage.0,
+        self._storage.1 & _StringObject.Nibbles.largeAddressMask)
+    }
+  }
+
+  @inlinable
+  internal func computeIsASCII() -> Bool {
+    // TODO(String micro-performance): Evaluate other expressions, e.g. | first
+    let asciiMask: UInt64 = 0x8080_8080_8080_8080
+    let raw = zeroTerminatedRawCodeUnits
+    return (raw.0 & asciiMask == 0) && (raw.1 & asciiMask == 0)
+  }
+}
+
+// Internal invariants
+extension _SmallString {
+  #if !INTERNAL_CHECKS_ENABLED
+  @inlinable @inline(__always) internal func _invariantCheck() {}
+  #else
+  @usableFromInline @inline(never) @_effects(releasenone)
+  internal func _invariantCheck() {
+    _sanityCheck(count <= _SmallString.capacity)
+    _sanityCheck(isASCII == computeIsASCII())
+  }
+  #endif // INTERNAL_CHECKS_ENABLED
+
+  internal func _dump() {
+    #if INTERNAL_CHECKS_ENABLED
+    print("""
+      smallUTF8: count: \(self.count), codeUnits: \(
+        self.map { String($0, radix: 16) }.joined()
+      )
+      """)
+    #endif // INTERNAL_CHECKS_ENABLED
+  }
+}
+
+// Provide a RAC interface
+extension _SmallString: RandomAccessCollection, MutableCollection {
+  @usableFromInline
+  internal typealias Index = Int
 
   @usableFromInline
-  @inline(never) // @outlined
-  func _transcodeNonASCII(
-    _uncheckedInto buffer: UnsafeMutableBufferPointer<UInt16>
-  ) -> Int {
-    _sanityCheck(!isASCII)
+  internal typealias Element = UInt8
 
-    // TODO(TODO: JIRA): Just implement this directly
+  @usableFromInline
+  internal typealias SubSequence = _SmallString
 
-    var bufferIdx = 0
-    for encodedScalar in Unicode._ParsingIterator(
-      codeUnits: self.makeIterator(),
-      parser: Unicode.UTF8.ForwardParser()
-    ) {
-      guard let transcoded = Unicode.UTF16.transcode(
-        encodedScalar, from: Unicode.UTF8.self
-      ) else {
-        fatalError("Somehow un-transcodable?")
-      }
-      switch transcoded.count {
-      case 1:
-        buffer[bufferIdx] = transcoded.first!
-        bufferIdx += 1
-      case 2:
-        buffer[bufferIdx] = transcoded.first!
-        buffer[bufferIdx+1] = transcoded.dropFirst().first!
-        bufferIdx += 2
-      case _: fatalError("Somehow, not transcoded or more than 2?")
+  @inlinable
+  internal var startIndex: Int { @inline(__always) get { return 0 } }
+
+  @inlinable
+  internal var endIndex: Int { @inline(__always) get { return count } }
+
+  @inlinable
+  internal subscript(_ idx: Int) -> UInt8 {
+    @inline(__always) get {
+      _sanityCheck(idx >= 0 && idx <= 15)
+      if idx < 8 {
+        return leadingRawBits._uncheckedGetByte(at: idx)
+      } else {
+        return trailingRawBits._uncheckedGetByte(at: idx &- 8)
       }
     }
+    @inline(__always) set {
+      _sanityCheck(idx >= 0 && idx <= 15)
+      if idx < 8 {
+        leadingRawBits._uncheckedSetByte(at: idx, to: newValue)
+      } else {
+        trailingRawBits._uncheckedSetByte(at: idx &- 8, to: newValue)
+      }
+    }
+  }
 
-    _sanityCheck(bufferIdx <= buffer.count) // TODO: assert earlier
-    return bufferIdx
+  @usableFromInline // testable
+  internal subscript(_ bounds: Range<Index>) -> SubSequence {
+    @inline(__always) get {
+      // TODO(String performance): In-vector-register operation
+      return self.withUTF8 { utf8 in
+        let rebased = UnsafeBufferPointer(rebasing: utf8[bounds])
+        return _SmallString(rebased)._unsafelyUnwrappedUnchecked
+      }
+    }
   }
 }
 
-@inlinable
-@inline(__always)
-internal
-func _castBufPtr<A, B>(
-  _ bufPtr: UnsafeMutableBufferPointer<A>, to: B.Type = B.self
-) -> UnsafeMutableBufferPointer<B> {
-  let numBytes = bufPtr.count &* MemoryLayout<A>.stride
-  _sanityCheck(numBytes % MemoryLayout<B>.stride == 0)
+extension _SmallString {
+  @inlinable @inline(__always)
+  internal func withUTF8<Result>(
+    _ f: (UnsafeBufferPointer<UInt8>) throws -> Result
+  ) rethrows -> Result {
+    var raw = self.zeroTerminatedRawCodeUnits
+    return try Swift.withUnsafeBytes(of: &raw) { rawBufPtr in
+      let ptr = rawBufPtr.baseAddress._unsafelyUnwrappedUnchecked
+        .assumingMemoryBound(to: UInt8.self)
+      return try f(UnsafeBufferPointer(start: ptr, count: self.count))
+    }
+  }
 
-  let ptr = UnsafeMutableRawPointer(
-    bufPtr.baseAddress._unsafelyUnwrappedUnchecked
-  ).assumingMemoryBound(to: B.self)
-  let count = numBytes / MemoryLayout<B>.stride
-  return UnsafeMutableBufferPointer(start: ptr, count: count)
+  // Overwrite stored code units, including uninitialized. `f` should return the
+  // new count.
+  @inlinable @inline(__always)
+  internal mutating func withMutableCapacity(
+    _ f: (UnsafeMutableBufferPointer<UInt8>) throws -> Int
+  ) rethrows {
+    let len = try withUnsafeMutableBytes(of: &self._storage) {
+      (rawBufPtr: UnsafeMutableRawBufferPointer) -> Int in
+      let ptr = rawBufPtr.baseAddress._unsafelyUnwrappedUnchecked
+        .assumingMemoryBound(to: UInt8.self)
+      return try f(UnsafeMutableBufferPointer(
+        start: ptr, count: _SmallString.capacity))
+    }
+
+    _sanityCheck(len <= _SmallString.capacity)
+    discriminator = .small(withCount: len, isASCII: self.computeIsASCII())
+  }
 }
 
-#endif // 64-bit
+// Creation
+extension _SmallString {
+  // Direct from UTF-8
+  @inlinable @inline(__always)
+  internal init?(_ input: UnsafeBufferPointer<UInt8>) {
+    let count = input.count
+    guard count <= _SmallString.capacity else { return nil }
 
-extension UInt {
+    // TODO(SIMD): The below can be replaced with just be a masked unaligned
+    // vector load
+    let ptr = input.baseAddress._unsafelyUnwrappedUnchecked
+    let leading = _bytesToUInt64(ptr, Swift.min(input.count, 8))
+    let trailing = count > 8 ? _bytesToUInt64(ptr + 8, count &- 8) : 0
+
+    let isASCII = (leading | trailing) & 0x8080_8080_8080_8080 == 0
+    let discriminator = _StringObject.Discriminator.small(
+      withCount: count,
+      isASCII: isASCII)
+    self.init(raw: (leading, trailing | discriminator.rawBits))
+  }
+
+  @usableFromInline // @testable
+  internal init?(_ base: _SmallString, appending other: _SmallString) {
+    let totalCount = base.count + other.count
+    guard totalCount <= _SmallString.capacity else { return nil }
+
+    // TODO(SIMD): The below can be replaced with just be a couple vector ops
+
+    var result = base
+    var writeIdx = base.count
+    for readIdx in 0..<other.count {
+      result[writeIdx] = other[readIdx]
+      writeIdx &+= 1
+    }
+    _sanityCheck(writeIdx == totalCount)
+
+    let isASCII = base.isASCII && other.isASCII
+    let discriminator = _StringObject.Discriminator.small(
+      withCount: totalCount,
+      isASCII: isASCII)
+
+    let (leading, trailing) = result.zeroTerminatedRawCodeUnits
+    self.init(raw: (leading, trailing | discriminator.rawBits))
+  }
+}
+
+#if _runtime(_ObjC) && !(arch(i386) || arch(arm))
+// Cocoa interop
+extension _SmallString {
+  // Resiliently create from a tagged cocoa string
+  //
+  @_effects(readonly) // @opaque
+  @usableFromInline // testable
+  internal init(taggedCocoa cocoa: AnyObject) {
+    self.init()
+    self.withMutableCapacity {
+      let len = _bridgeTagged(cocoa, intoUTF8: $0)
+      _sanityCheck(len != nil && len! < _SmallString.capacity,
+        "Internal invariant violated: large tagged NSStrings")
+      return len._unsafelyUnwrappedUnchecked
+    }
+    self._invariantCheck()
+  }
+}
+#endif
+
+extension UInt64 {
   // Fetches the `i`th byte, from least-significant to most-significant
-  @inlinable
-  @inline(__always)
-  func _uncheckedGetByte(at i: Int) -> UInt8 {
-    _sanityCheck(i >= 0 && i < MemoryLayout<UInt>.stride)
-    let shift = UInt(bitPattern: i) &* 8
+  //
+  // TODO: endianess awareness day
+  @inlinable @inline(__always)
+  internal func _uncheckedGetByte(at i: Int) -> UInt8 {
+    _sanityCheck(i >= 0 && i < MemoryLayout<UInt64>.stride)
+    let shift = UInt64(truncatingIfNeeded: i) &* 8
     return UInt8(truncatingIfNeeded: (self &>> shift))
   }
+
+  // Sets the `i`th byte, from least-significant to most-significant
+  //
+  // TODO: endianess awareness day
+  @inlinable @inline(__always)
+  internal mutating func _uncheckedSetByte(at i: Int, to value: UInt8) {
+    _sanityCheck(i >= 0 && i < MemoryLayout<UInt64>.stride)
+    let shift = UInt64(truncatingIfNeeded: i) &* 8
+    let valueMask: UInt64 = 0xFF &<< shift
+    self = (self & ~valueMask) | (UInt64(truncatingIfNeeded: value) &<< shift)
+  }
 }
 
+@inlinable @inline(__always)
+internal func _bytesToUInt64(
+  _ input: UnsafePointer<UInt8>,
+  _ c: Int
+) -> UInt64 {
+  // FIXME: This should be unified with _loadPartialUnalignedUInt64LE.
+  // Unfortunately that causes regressions in literal concatenation tests. (Some
+  // owned to guaranteed specializations don't get inlined.)
+  var r: UInt64 = 0
+  var shift: Int = 0
+  for idx in 0..<c {
+    r = r | (UInt64(input[idx]) &<< shift)
+    shift = shift &+ 8
+  }
+  return r
+}
