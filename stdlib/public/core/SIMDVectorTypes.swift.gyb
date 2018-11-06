@@ -45,13 +45,13 @@ public struct Vector${n}<Scalar> : SIMDVector where Scalar: SIMDVectorizable {
 
 % if n <= 4:
   @_transparent
-  init(${', '.join([c + ': Scalar' for c in 'xyzw'[:n]])}) {
+  public init(${', '.join([c + ': Scalar' for c in 'xyzw'[:n]])}) {
     self.init(${', '.join('xyzw'[:n])})
   }
 
 %  for i in range(n):
   @_transparent
-  var ${'xyzw'[i]}: Scalar {
+  public var ${'xyzw'[i]}: Scalar {
     @_transparent get { return self[${i}]}
     @_transparent set { self[${i}] = newValue }
   }
@@ -60,14 +60,14 @@ public struct Vector${n}<Scalar> : SIMDVector where Scalar: SIMDVectorizable {
 % end
 % if n >= 4:
   @_transparent
-  init(lowHalf: Vector${n/2}<Scalar>, highHalf: Vector${n/2}<Scalar>) {
+  public init(lowHalf: Vector${n/2}<Scalar>, highHalf: Vector${n/2}<Scalar>) {
     self.init()
     self.lowHalf = lowHalf
     self.highHalf = highHalf
   }
 
 %  for (half,indx) in [('low','i'), ('high',str(n/2)+'+i'), ('even','2*i'), ('odd','2*i+1')]:
-  var ${half}Half: Vector${n/2}<Scalar> {
+  public var ${half}Half: Vector${n/2}<Scalar> {
     @inlinable get {
       var result = Vector${n/2}<Scalar>()
       for i in result.indices { result[i] = self[${indx}] }
