@@ -45,6 +45,9 @@ Func _swift_stdlib_atomicStoreInt32(object:desired:) has been removed
 Func _swift_stdlib_atomicStoreInt64(object:desired:) has been removed
 Func _swift_stdlib_atomicStoreUInt32(object:desired:) has been removed
 Func _swift_stdlib_atomicStoreUInt64(object:desired:) has been removed
+Protocol _HasherCore has been removed
+Struct _BufferingHasher has been removed
+Struct _HasherTailBuffer has been removed
 
 /* Moved Decls */
 
@@ -53,6 +56,10 @@ Func MutableCollection._partition(within:by:) has been renamed to Func MutableCo
 
 /* Type Changes */
 Func MutableCollection._partition(within:by:) has parameter 0 type change from Range<τ_0_0.Index> to (τ_0_0.Element) throws -> Bool
+Var Hasher._core has declared type change from _BufferingHasher<Hasher._Core> to Hasher._Core
+Var Hasher._Core._buffer is added to a non-resilient type
+Var Hasher._Core._state in a non-resilient type changes position from 0 to 1
+Struct Hasher._Core has removed conformance to _HasherCore
 
 /* Decl Attribute changes */
 
