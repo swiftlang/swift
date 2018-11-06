@@ -77,11 +77,10 @@ namespace {
     virtual Output process(const Input* in) = 0;
   };
   
-  template <typename Source, typename Sink>
-  Sink operator>> (Source &&source, Sink &&sink) {
-    sink.setSource(source);
-    return sink;
-  }
+template<typename First, typename... Stages>
+  class Pipe {
+    
+  };
   
   template <typename Output>
   class VectorSource: public Source<Output> {
@@ -828,8 +827,9 @@ bool swift::experimental_dependencies::emitReferenceDependencies(
 //  return ([]()->std::vector<std::string> {return StringVec{std::string()};})
 //  >> FileRenamerAndWriter(diags, outputPath);
   
+  
   SourceFileDeclDemux demux{SF};
   
-  VectorSource<const PrecedenceGroupDecl*> xxx(demux.precedenceGroups);
-  xxx << GetName<PrecedenceGroupDecl>();
+  Pipeline< VectorSource<const PrecedenceGroupDecl*>(demux), GetName<PrecedenceGroupDecl> >();
+
 }
