@@ -200,7 +200,7 @@ public func zip<T : TensorGroup, U : TensorGroup>(
 ) -> Dataset<TensorPair<T, U>> {
   let handle: VariantHandle = #tfop(
      "ZipDataset", TensorPair(dataset1._handle, dataset2._handle),
-     output_types$dtype: TensorPair<T, U>._outputTypeList,
+     output_types$dtype: TensorPair<T, U>._typeList,
      output_shapes: TensorPair<T, U>._unknownShapeList)
   return Dataset(_handle: handle)
 }

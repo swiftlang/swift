@@ -85,8 +85,8 @@ DatasetAPITests.testAllBackends("DoubleValueDatasetIteration") {
   let datasetRight = Dataset(elements: scalars2)
   var i: Int32 = 0
   for pair in zip(datasetLeft, datasetRight) {
-    expectEqual(scalars1[i].array, pair.a.array)
-    expectEqual(scalars2[i].array, pair.b.array)
+    expectEqual(scalars1[i].array, pair.first.array)
+    expectEqual(scalars2[i].array, pair.second.array)
     i += 1
   }
 }
