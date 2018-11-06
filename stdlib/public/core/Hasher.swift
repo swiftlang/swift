@@ -425,7 +425,7 @@ public struct Hasher {
     var state = _State(seed: seed)
 #if arch(i386) || arch(arm)
     _sanityCheck(UInt.bitWidth < UInt64.bitWidth)
-    let tbc = _HasherTailBuffer(
+    let tbc = _TailBuffer(
       tail: UInt64(truncatingIfNeeded: value),
       byteCount: UInt.bitWidth &>> 3)
 #else
