@@ -227,6 +227,59 @@ public extension SIMDVector where Scalar : FixedWidthInteger {
   }
 }
 
+//  Implementations of floating-point operations. These should eventually all
+//  be replaced with @_semantics to lower directly to vector IR nodes.
+public extension SIMDVector where Scalar : FloatingPoint {
+  @_transparent
+  static func +(lhs: Self, rhs: Self) -> Self {
+    var result = Self()
+    for i in result.indices { result[i] = lhs[i] + rhs[i] }
+    return result
+  }
+  
+  @_transparent
+  static func -(lhs: Self, rhs: Self) -> Self {
+    var result = Self()
+    for i in result.indices { result[i] = lhs[i] - rhs[i] }
+    return result
+  }
+  
+  @_transparent
+  static func *(lhs: Self, rhs: Self) -> Self {
+    var result = Self()
+    for i in result.indices { result[i] = lhs[i] * rhs[i] }
+    return result
+  }
+  
+  @_transparent
+  static func /(lhs: Self, rhs: Self) -> Self {
+    var result = Self()
+    for i in result.indices { result[i] = lhs[i] / rhs[i] }
+    return result
+  }
+  
+  @_transparent
+  func addingProduct(_ lhs: Self, _ rhs: Self) -> Self {
+    var result = Self()
+    for i in result.indices { result[i] = self[i].addingProduct(lhs[i], rhs[i]) }
+    return result
+  }
+  
+  @_transparent
+  func squareRoot( ) -> Self {
+    var result = Self()
+    for i in result.indices { result[i] = self[i].squareRoot() }
+    return result
+  }
+  
+  @_transparent
+  func rounded(_ rule: FloatingPointRoundingRule) -> Self {
+    var result = Self()
+    for i in result.indices { result[i] = self[i].rounded(rule) }
+    return result
+  }
+}
+
 //  These operations should never need @_semantics; they should be trivial
 //  wrappers around the core operations defined above.
 public extension SIMDVector {
@@ -331,6 +384,93 @@ public extension SIMDVector where Scalar : FixedWidthInteger {
   @_transparent static func /=(lhs: inout Self, rhs: Scalar) { lhs = lhs / rhs }
   @_transparent static func %=(lhs: inout Self, rhs: Scalar) { lhs = lhs % rhs }
   
+  @inlinable
+  static func random<T: RandomNumberGenerator>(
+    in range: Range<Scalar>,
+    using generator: inout T
+  ) -> Self {
+    var result = Self()
+    for i in result.indices {
+      result[i] = Scalar.random(in: range, using: &generator)
+    }
+    return result
+  }
+  
+  @inlinable
+  static func random(in range: Range<Scalar>) -> Self {
+    var g = SystemRandomNumberGenerator()
+    return Self.random(in: range, using: &g)
+  }
+  
+  @inlinable
+  static func random<T: RandomNumberGenerator>(
+    in range: ClosedRange<Scalar>,
+    using generator: inout T
+  ) -> Self {
+    var result = Self()
+    for i in result.indices {
+      result[i] = Scalar.random(in: range, using: &generator)
+    }
+    return result
+  }
+  
+  @inlinable
+  static func random(in range: ClosedRange<Scalar>) -> Self {
+    var g = SystemRandomNumberGenerator()
+    return Self.random(in: range, using: &g)
+  }
+}
+
+public extension SIMDVector where Scalar : FloatingPoint {
+  @_transparent static var zero: Self { return Self() }
+  
+  @_transparent static func +(lhs: Scalar, rhs: Self) -> Self { return Self(repeating: lhs) + rhs }
+  @_transparent static func -(lhs: Scalar, rhs: Self) -> Self { return Self(repeating: lhs) - rhs }
+  @_transparent static func *(lhs: Scalar, rhs: Self) -> Self { return Self(repeating: lhs) * rhs }
+  @_transparent static func /(lhs: Scalar, rhs: Self) -> Self { return Self(repeating: lhs) / rhs }
+  
+  @_transparent static func +(lhs: Self, rhs: Scalar) -> Self { return lhs + Self(repeating: rhs) }
+  @_transparent static func -(lhs: Self, rhs: Scalar) -> Self { return lhs - Self(repeating: rhs) }
+  @_transparent static func *(lhs: Self, rhs: Scalar) -> Self { return lhs * Self(repeating: rhs) }
+  @_transparent static func /(lhs: Self, rhs: Scalar) -> Self { return lhs / Self(repeating: rhs) }
+  
+  @_transparent static func +=(lhs: inout Self, rhs: Self) { lhs = lhs + rhs }
+  @_transparent static func -=(lhs: inout Self, rhs: Self) { lhs = lhs - rhs }
+  @_transparent static func *=(lhs: inout Self, rhs: Self) { lhs = lhs * rhs }
+  @_transparent static func /=(lhs: inout Self, rhs: Self) { lhs = lhs / rhs }
+  
+  @_transparent static func +=(lhs: inout Self, rhs: Scalar) { lhs = lhs + rhs }
+  @_transparent static func -=(lhs: inout Self, rhs: Scalar) { lhs = lhs - rhs }
+  @_transparent static func *=(lhs: inout Self, rhs: Scalar) { lhs = lhs * rhs }
+  @_transparent static func /=(lhs: inout Self, rhs: Scalar) { lhs = lhs / rhs }
+  
+  @_transparent func addingProduct(_ lhs: Scalar, _ rhs: Self) -> Self {
+    return self.addingProduct(Self(repeating: lhs), rhs)
+  }
+  @_transparent func addingProduct(_ lhs: Self, _ rhs: Scalar) -> Self {
+    return self.addingProduct(lhs, Self(repeating: rhs))
+  }
+  @_transparent mutating func addProduct(_ lhs: Self, _ rhs: Self) {
+    self = self.addingProduct(lhs, rhs)
+  }
+  @_transparent mutating func addProduct(_ lhs: Scalar, _ rhs: Self) {
+    self = self.addingProduct(lhs, rhs)
+  }
+  @_transparent mutating func addProduct(_ lhs: Self, _ rhs: Scalar) {
+    self = self.addingProduct(lhs, rhs)
+  }
+  
+  @_transparent mutating func formSquareRoot( ) {
+    self = self.squareRoot()
+  }
+  
+  @_transparent mutating func round(_ rule: FloatingPointRoundingRule) {
+    self = self.rounded(rule)
+  }
+}
+
+public extension SIMDVector
+where Scalar : BinaryFloatingPoint, Scalar.RawSignificand : FixedWidthInteger {
   @inlinable
   static func random<T: RandomNumberGenerator>(
     in range: Range<Scalar>,
