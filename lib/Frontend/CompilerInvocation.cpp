@@ -212,8 +212,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableOperatorDesignatedTypes |=
       Args.hasArg(OPT_enable_operator_designated_types);
 
-  Opts.SolverEnableOperatorDesignatedTypes |=
-      Args.hasArg(OPT_solver_enable_operator_designated_types);
+  Opts.SolverEnableOperatorDesignatedTypes |= true;
 
   if (auto A = Args.getLastArg(OPT_enable_deserialization_recovery,
                                OPT_disable_deserialization_recovery)) {
@@ -342,8 +341,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.SolverShrinkUnsolvedThreshold = threshold;
   }
 
-  if (Args.getLastArg(OPT_solver_disable_shrink))
-    Opts.SolverDisableShrink = true;
+  Opts.SolverDisableShrink = true;
 
   if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
     unsigned threshold;
@@ -417,8 +415,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.UseDarwinPreStableABIBit = true;
 #endif
 
-  Opts.DisableConstraintSolverPerformanceHacks |=
-      Args.hasArg(OPT_disable_constraint_solver_performance_hacks);
+  Opts.DisableConstraintSolverPerformanceHacks |= true;
 
   // Must be processed after any other language options that could affect
   // platform conditions.
