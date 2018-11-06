@@ -13,7 +13,7 @@ add_swift_host_library(swiftIDE STATIC
   IDETypeChecking.cpp
   APIDigesterData.cpp
   SourceEntityWalker.cpp
-  LINK_LIBRARIES
+  LINK_LIBS
     swiftFrontend
     swiftClangImporter
     swiftParse
