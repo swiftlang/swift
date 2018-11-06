@@ -963,8 +963,10 @@ static llvm::Constant *findSwiftAsObjCThunk(IRGenModule &IGM, SILDeclRef ref) {
   SILFunction *SILFn = IGM.getSILModule().lookUpFunction(ref);
   assert(SILFn && "no IR function for swift-as-objc thunk");
   auto fn = IGM.getAddrOfSILFunction(SILFn, NotForDefinition);
-  fn->setVisibility(llvm::GlobalValue::DefaultVisibility);
-  fn->setLinkage(llvm::GlobalValue::InternalLinkage);
+  ApplyIRLinkage({llvm::GlobalValue::InternalLinkage,
+                  llvm::GlobalValue::DefaultVisibility,
+                  llvm::GlobalValue::DefaultStorageClass})
+      .to(fn);
   fn->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
 
   return llvm::ConstantExpr::getBitCast(fn, IGM.Int8PtrTy);

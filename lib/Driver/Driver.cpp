@@ -947,7 +947,7 @@ Driver::buildCompilation(const ToolChain &TC,
 
   // Construct the graph of Actions.
   SmallVector<const Action *, 8> TopLevelActions;
-  buildActions(TopLevelActions, TC, OI, OFM ? OFM.getPointer() : nullptr,
+  buildActions(TopLevelActions, TC, OI,
                rebuildEverything ? nullptr : &outOfDateMap, *C);
 
   if (Diags.hadAnyError())
@@ -1662,7 +1662,6 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
 
 void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
                           const ToolChain &TC, const OutputInfo &OI,
-                          const OutputFileMap *OFM,
                           const InputInfoMap *OutOfDateMap,
                           Compilation &C) const {
   const DerivedArgList &Args = C.getArgs();
@@ -1783,7 +1782,6 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_ModuleTrace:
       case file_types::TY_OptRecord:
       case file_types::TY_SwiftParseableInterfaceFile:
-      case file_types::TY_SwiftParseableInterfaceDeps:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
@@ -2473,8 +2471,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
                     Output.get());
 
   if (OI.ShouldGenerateModule && isa<CompileJobAction>(JA))
-    chooseSwiftModuleOutputPath(C, OFM, OutputMap, workingDirectory,
-                                Output.get());
+    chooseSwiftModuleOutputPath(C, OutputMap, workingDirectory, Output.get());
 
   if (OI.ShouldGenerateModule &&
       (isa<CompileJobAction>(JA) || isa<MergeModuleJobAction>(JA)))
@@ -2660,7 +2657,6 @@ void Driver::computeMainOutput(
 }
 
 void Driver::chooseSwiftModuleOutputPath(Compilation &C,
-                                         const OutputFileMap *OFM,
                                          const TypeToPathMap *OutputMap,
                                          StringRef workingDirectory,
                                          CommandOutput *Output) const {

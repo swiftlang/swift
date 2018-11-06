@@ -14,6 +14,7 @@
 #define SWIFT_SERIALIZATION_VALIDATION_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Serialization/SerializationOptions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -144,9 +145,12 @@ public:
 /// \param[out] extendedInfo If present, will be populated with additional
 /// compilation options serialized into the AST at build time that may be
 /// necessary to load it properly.
-ValidationInfo
-validateSerializedAST(StringRef data,
-                      ExtendedValidationInfo *extendedInfo = nullptr);
+/// \param[out] dependencies If present, will be populated with list of
+/// input files the module depends on, if present in INPUT_BLOCK.
+ValidationInfo validateSerializedAST(
+    StringRef data, ExtendedValidationInfo *extendedInfo = nullptr,
+    SmallVectorImpl<SerializationOptions::FileDependency> *dependencies =
+        nullptr);
 
 /// Emit diagnostics explaining a failure to load a serialized AST.
 ///

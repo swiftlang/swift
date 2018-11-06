@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 456; // Last change: encode depth in generic param XREFs
+const uint16_t SWIFTMODULE_VERSION_MINOR = 458; // Last change: enrich FILE_DEPENDENCY records.
 
 using DeclIDField = BCFixed<31>;
 
@@ -630,7 +630,8 @@ namespace input_block {
     IMPORTED_HEADER,
     IMPORTED_HEADER_CONTENTS,
     MODULE_FLAGS, // [unused]
-    SEARCH_PATH
+    SEARCH_PATH,
+    FILE_DEPENDENCY
   };
 
   using ImportedModuleLayout = BCRecordLayout<
@@ -667,6 +668,13 @@ namespace input_block {
     BCFixed<1>, // framework?
     BCFixed<1>, // system?
     BCBlob      // path
+  >;
+
+  using FileDependencyLayout = BCRecordLayout<
+    FILE_DEPENDENCY,
+    FileSizeField,    // file size (for validation)
+    FileModTimeField, // file mtime (for validation)
+    BCBlob            // path
   >;
 }
 

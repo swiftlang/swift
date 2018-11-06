@@ -86,15 +86,23 @@ struct is_apply_expr
               std::is_same<Ty, ConstructorRefCallExpr>::value> {};
 
 template <typename Ty>
+struct is_subscript_expr
+    : public std::integral_constant<
+          bool, std::is_same<Ty, SubscriptExpr>::value ||
+                    std::is_same<Ty, DynamicSubscriptExpr>::value> {};
+
+template <typename Ty>
 struct is_autoclosure_expr
     : public std::integral_constant<bool,
                                     std::is_same<Ty, AutoClosureExpr>::value> {
 };
 
 template <typename Ty>
-struct is_apply_or_autoclosure_expr
-    : public std::integral_constant<
-          bool, is_apply_expr<Ty>::value || is_autoclosure_expr<Ty>::value> {};
+struct is_apply_subscript_or_autoclosure_expr
+    : public std::integral_constant<bool, is_apply_expr<Ty>::value ||
+                                              is_subscript_expr<Ty>::value ||
+                                              is_autoclosure_expr<Ty>::value> {
+};
 
 template <typename Verifier, typename Kind>
 std::pair<bool, Expr *> dispatchVisitPreExprHelper(
@@ -106,6 +114,22 @@ std::pair<bool, Expr *> dispatchVisitPreExprHelper(
     // Record any inout_to_pointer or array_to_pointer that we see in
     // the proper position.
     V.maybeRecordValidPointerConversion(node, node->getArg());
+    return {true, node};
+  }
+  V.cleanup(node);
+  return {false, node};
+}
+
+template <typename Verifier, typename Kind>
+std::pair<bool, Expr *> dispatchVisitPreExprHelper(
+    Verifier &V,
+    typename std::enable_if<
+        is_subscript_expr<typename std::remove_pointer<Kind>::type>::value,
+        Kind>::type node) {
+  if (V.shouldVerify(node)) {
+    // Record any inout_to_pointer or array_to_pointer that we see in
+    // the proper position.
+    V.maybeRecordValidPointerConversion(node, node->getIndex());
     return {true, node};
   }
   V.cleanup(node);
@@ -131,7 +155,7 @@ std::pair<bool, Expr *> dispatchVisitPreExprHelper(
 template <typename Verifier, typename Kind>
 std::pair<bool, Expr *> dispatchVisitPreExprHelper(
     Verifier &V, typename std::enable_if<
-                     !is_apply_or_autoclosure_expr<
+                     !is_apply_subscript_or_autoclosure_expr<
                          typename std::remove_pointer<Kind>::type>::value,
                      Kind>::type node) {
   if (V.shouldVerify(node)) {
