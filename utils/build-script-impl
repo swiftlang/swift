@@ -2993,13 +2993,14 @@ for host in "${ALL_HOSTS[@]}"; do
                     # This assumes that there are no spaces in any on these paths.
                     FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
                     DOTEST_EXTRA="-I${FOUNDATION_BUILD_DIR}"
-                    DOTEST_EXTRA="-F${FOUNDATION_BUILD_DIR}/CoreFoundation-prefix/System/Library/Frameworks"
+                    DOTEST_EXTRA="-Xcc -F${FOUNDATION_BUILD_DIR}/CoreFoundation-prefix/System/Library/Frameworks"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -I${FOUNDATION_BUILD_DIR}/swift"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -I${LIBDISPATCH_SOURCE_DIR}"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -L${FOUNDATION_BUILD_DIR}"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -L${LIBDISPATCH_BUILD_DIR}"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -L${LIBDISPATCH_BUILD_DIR}/src"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${LIBDISPATCH_BUILD_DIR}/src"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${LIBDISPATCH_BUILD_DIR}"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}"
                 fi
                 call mkdir -p "${results_dir}"
