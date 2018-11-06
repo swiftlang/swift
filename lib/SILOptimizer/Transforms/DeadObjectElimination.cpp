@@ -191,20 +191,29 @@ removeInstructions(ArrayRef<SILInstruction*> UsersToRemove) {
 //                             Use Graph Analysis
 //===----------------------------------------------------------------------===//
 
-static bool mutatesOnlyExpectedSelf(ApplyInst *Apply, SILInstruction *ExpectedSelf) {
-  if (!Apply->hasSemantics("interpolation.selfEffectsOnly"))
+static bool isCallToInterpolationEliminatableMethod(ApplyInst *Apply,
+                                                    SILInstruction *AllocInst) {
+  if (!Apply->hasSemantics("interpolation.append"))
     return false;
-  assert(Apply->hasSelfArgument() && "interpolation.selfEffectsOnly on non-method");
 
-  SILInstruction *ActualSelf = Apply->getSelfArgument()->getDefiningInstruction();
-  return ActualSelf == ExpectedSelf;
+  // An interpolation.append call can be eliminated if we're trying to
+  // eliminate its self parameter. If we're trying to eliminate a different
+  // parameter, it cannot.
+
+  assert(Apply->hasSelfArgument() &&
+         "interpolation.append is only valid on methods");
+
+  auto *SelfInst = Apply->getSelfArgument()->getDefiningInstruction();
+  return SelfInst == AllocInst;
 }
 
 // FIXME: This is blatantly awful and needs to be better.
 static bool isStringObjectReleaseLoad(LoadInst *Load) {
   // Are we dereferencing a pointer stored in _StringGuts._object?
-  if (auto *StructLookup = dyn_cast<StructElementAddrInst>(Load->getOperand()->getDefiningInstruction())) {
-    if (StructLookup->getField()->getName().is("_object") && StructLookup->getStructDecl()->getName().is("_StringObject")) {
+  auto *SourceInst = Load->getOperand()->getDefiningInstruction();
+  if (auto *StructLookup = dyn_cast<StructElementAddrInst>(SourceInst)) {
+    if (StructLookup->getField()->getName().is("_object") &&
+        StructLookup->getStructDecl()->getName().is("_StringObject")) {
 
       // Are the only uses strong_release?
       for (auto Use : Load->getUses()) {
@@ -254,7 +263,7 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
 
   // We can remove applies of certain interpolation-related methods.
   if (auto *Apply = dyn_cast<ApplyInst>(Inst))
-    if (mutatesOnlyExpectedSelf(Apply, AllocInst))
+    if (isCallToInterpolationEliminatableMethod(Apply, AllocInst))
       return true;
 
   // FIXME: Necessary for string interpolation, but is it correct?
