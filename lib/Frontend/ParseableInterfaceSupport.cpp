@@ -123,6 +123,10 @@ ParseableInterfaceModuleLoader::configureSubInvocationAndOutputPaths(
   SubInvocation.setTargetTriple(LangOpts.Target);
   SubInvocation.setClangModuleCachePath(CacheDir);
 
+  // Inhibit warnings from the SubInvocation since we are assuming the user
+  // is not in a position to fix them.
+  SubInvocation.getDiagnosticOptions().SuppressWarnings = true;
+
   // Calculate an output filename that includes a hash of relevant key data, and
   // wire up the SubInvocation's InputsAndOutputs to contain both input and
   // output filenames.
