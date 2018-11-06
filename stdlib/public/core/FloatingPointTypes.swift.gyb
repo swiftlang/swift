@@ -1833,6 +1833,25 @@ extension ${Self} : Strideable {
   }
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+//===----------------------------------------------------------------------===//
+// VectorNumeric Conformance
+//===----------------------------------------------------------------------===//
+
+extension ${Self} : VectorNumeric {
+  public typealias Shape = ()
+  public typealias Scalar = ${Self}
+
+  public init(repeating repeatedValue: ${Self}, shape: ()) {
+    self = repeatedValue
+  }
+}
+
+extension ${Self} : Differentiable {
+  public typealias TangentVector = ${Self}
+  public typealias CotangentVector = ${Self}
+}
+
 //===----------------------------------------------------------------------===//
 // AnyHashable
 //===----------------------------------------------------------------------===//

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -tf-xla-cfg-canonicalize -tf-ensure-single-loop-exit -assume-parsing-unqualified-ownership-sil %s -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt -tf-dump-intermediates -tf-xla-cfg-canonicalize -tf-ensure-single-loop-exit -assume-parsing-unqualified-ownership-sil %s -o /dev/null | %FileCheck %s
 
 import Builtin
 import Swift
@@ -294,17 +294,17 @@ bb3 (%9 : $Builtin.Int32):
 // }
 // The CFG is shown below:
 //
-//  [0]-----+
+// [0]-------+
 //  |         \
 // [1]       [2]
-//  |          |
-//  |   +--- [4]
-//  |   |    /   \
-//  |   | [6]    [5]
-//  |   +/ \      |
-// [3]----[8]     |
-//  |             |
-//  +-->[9]<------+
+//  |         |
+//  |   +--->[4]
+//  |  [7]   /  \
+//  |   |  [6]  [5]
+//  V   +-+ \    |
+// [3]<-----[8]  |
+//  |            |
+//  +-->[9]<-----+
 //
 // This is an example where the nodes that lead to the common post dominator of all exit nodes
 // is also reachable from nodes outside of the loop. The key issue is that bb9 is the common
@@ -349,6 +349,103 @@ bb2:
 bb3(%6 : $Builtin.Int32, %7 : $Builtin.Int32):
   %8 = builtin "ssub_with_overflow_Int32"(%6 : $Builtin.Int32, %7 : $Builtin.Int32) : $Builtin.Int32
   br bb9(%8 : $Builtin.Int32)
+
+bb4(%9 : $Builtin.Int32, %10 : $Builtin.Int32):
+  %11 = builtin "sadd_with_overflow_Int32"(%10 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32
+  %12 = builtin "sadd_with_overflow_Int32"(%9 : $Builtin.Int32, %10 : $Builtin.Int32) : $Builtin.Int32
+  %13 = builtin "cmp_slt_Int32"(%11 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %13, bb5, bb6
+
+bb5:
+  br bb9(%12 : $Builtin.Int32)
+
+bb6:
+  %14 = builtin "sadd_with_overflow_Int32"(%11 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32
+  %15 = builtin "sadd_with_overflow_Int32"(%12 : $Builtin.Int32, %14 : $Builtin.Int32) : $Builtin.Int32
+  %16 = builtin "cmp_slt_Int32"(%14 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %16, bb8, bb7
+
+bb7:
+  br bb4(%15 : $Builtin.Int32, %14 : $Builtin.Int32)
+
+bb8:
+  br bb3(%15 : $Builtin.Int32, %14 : $Builtin.Int32)
+
+bb9(%18 : $Builtin.Int32):
+  return %18 : $Builtin.Int32
+}
+
+// The following example is similar to loopThatRequiresNodeCloning, where the
+// nodes that lead to the common post dominator of all exit nodes is also
+// reachable from nodes outside of the loop. The only difference in this example
+// is that some of these nodes also belong to a loop. Therefore, it is required
+// for us to update the LoopInfo in addition to cloning. The loop in question
+// consists of the single node bb3. The CFG is shown below:
+//
+//     [0]-------+
+//      |         \
+//     [1]       [2]
+//      |         |
+//      |   +--->[4]
+//      |  [7]   /  \
+//      |   |  [6]  [5]
+//      V   +--+ \   |
+// +-->[3]<-----[8]  |
+// | /  |            |
+// +    +-->[9]<-----+
+//
+// CHECK-LABEL:--- XLA CFG Loops Before Canonicalize: $loopThatRequiresNodeAndLoopCloning
+//----The following loop will be cloned in the second loop.
+// CHECK:Loop at depth 1 containing: {{bb[0-9]+}}<header><latch><exiting>
+// CHECK:Loop at depth 1 containing: {{bb[0-9]+}}<header><exiting>,{{bb[0-9]+}}<exiting>,{{bb[0-9]+}}<latch>
+
+// CHECK-LABEL:--- XLA CFG Loops After Canonicalize: $loopThatRequiresNodeAndLoopCloning
+// CHECK:Loop at depth 1 containing: [[L1HDR:bb[0-9]+]]<header><exiting>,[[L1LATCH:bb[0-9]+]]<latch>
+// CHECK:Loop at depth 1 containing: [[L2HDR:bb[0-9]+]]<header><exiting>,{{.*}},[[L2LATCH:bb[0-9]+]]<latch>
+//----Following is the clone of the first loop.
+// CHECK:    Loop at depth 2 containing: [[L3HDR:bb[0-9]+]]<header><exiting>,[[L3LATCH:bb[0-9]+]]<latch>
+
+// CHECK-LABEL:--- XLA CFG Canonicalize: $loopThatRequiresNodeAndLoopCloning
+// CHECK:[sequence
+// CHECK:  {condition Header: {{bb[0-9]+}}
+// CHECK:    [sequence
+// CHECK:      <while Preheader: {{bb[0-9]+}}, Header: [[L1HDR]], exit: {{bb[0-9]+}}
+// CHECK:        block [[L1LATCH]]>
+// CHECK:      block {{bb[0-9]+}}]
+// CHECK:    [sequence
+// CHECK:      <while Preheader: {{bb[0-9]+}}, Header: [[L2HDR]], exit: {{bb[0-9]+}}
+// CHECK:        [sequence
+// CHECK:          {condition Header: {{bb[0-9]+}}
+// CHECK:            block {{bb[0-9]+}}
+// CHECK:            {condition Header: {{bb[0-9]+}}
+// CHECK:              [sequence
+// CHECK:                <while Preheader: {{bb[0-9]+}}, Header: [[L3HDR]], exit: {{bb[0-9]+}}
+// CHECK:                  block [[L3LATCH]]>
+// CHECK:                block {{bb[0-9]+}}]
+// CHECK:              block {{bb[0-9]+}}}}
+// CHECK:          block [[L2LATCH]]]>
+// CHECK:      block {{bb[0-9]+}}]}
+// CHECK:  block {{bb[0-9]+}}]
+
+sil @$loopThatRequiresNodeAndLoopCloning : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
+  %2 = integer_literal $Builtin.Int32, 1
+  %3 = integer_literal $Builtin.Int32, 100
+  %4 = builtin "sadd_with_overflow_Int32"(%0 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32
+  %5 = builtin "cmp_slt_Int32"(%4 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1
+	cond_br %5, bb1, bb2
+
+bb1:
+  // First arg is sum, the second arg is loop counter.
+  br bb3(%4 : $Builtin.Int32, %0 : $Builtin.Int32)
+
+bb2:
+  br bb4(%4 : $Builtin.Int32, %0 : $Builtin.Int32)
+
+bb3(%6 : $Builtin.Int32, %7 : $Builtin.Int32):
+  %8 = builtin "ssub_with_overflow_Int32"(%6 : $Builtin.Int32, %7 : $Builtin.Int32) : $Builtin.Int32
+	%100 = builtin "cmp_slt_Int32"(%8 : $Builtin.Int32, %7 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %100, bb3(%7: $Builtin.Int32, %8: $Builtin.Int32), bb9(%8 : $Builtin.Int32)
 
 bb4(%9 : $Builtin.Int32, %10 : $Builtin.Int32):
   %11 = builtin "sadd_with_overflow_Int32"(%10 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32

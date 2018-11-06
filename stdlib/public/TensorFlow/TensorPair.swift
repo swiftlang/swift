@@ -16,45 +16,41 @@
 
 /// A 2-tuple-like struct that conforms to TensorGroup so that you can use
 /// 2-tuples in APIs that require TensorGroups.
-public struct TensorPair<A : TensorGroup, B : TensorGroup> {
-  public var a: A
-  public var b: B
+public struct TensorPair<T : TensorGroup, U : TensorGroup> {
+  public var first: T
+  public var second: U
 
-  public init(_ a: A, _ b: B) {
-    self.a = a
-    self.b = b
+  public init(_ first: T, _ second: U) {
+    self.first = first
+    self.second = second
   }
 }
 
 extension TensorPair : TensorGroup {
   @inlinable
-  public static var _outputTypeList: [TensorDataType] {
-    return A._outputTypeList + B._outputTypeList
+  public static var _typeList: [TensorDataType] {
+    return T._typeList + U._typeList
   }
 
   @inlinable
   public static var _unknownShapeList: [TensorShape?] {
-    return A._unknownShapeList + B._unknownShapeList
-  }
-
-  public var _inputTensorHandleCount: Int32 {
-    return a._inputTensorHandleCount + b._inputTensorHandleCount
+    return T._unknownShapeList + U._unknownShapeList
   }
 
   public func _unpackTensorHandles(
       into address: UnsafeMutablePointer<CTensorHandle>?) {
-    a._unpackTensorHandles(into: address)
-    let bAddress = address.map {
-      $0.advanced(by: Int(A._outputTensorHandleCount))
+    first._unpackTensorHandles(into: address)
+    let secondAddress = address.map {
+      $0.advanced(by: Int(T._tensorHandleCount))
     }
-    b._unpackTensorHandles(into: bAddress)
+    second._unpackTensorHandles(into: secondAddress)
   }
 
   public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
-    self.a = A(_owning: tensorHandles)
-    let bTensorHandles = tensorHandles.map {
-      $0.advanced(by: Int(A._outputTensorHandleCount))
+    self.first = T(_owning: tensorHandles)
+    let secondTensorHandles = tensorHandles.map {
+      $0.advanced(by: Int(T._tensorHandleCount))
     }
-    self.b = B(_owning: bTensorHandles)
+    self.second = U(_owning: secondTensorHandles)
   }
 }

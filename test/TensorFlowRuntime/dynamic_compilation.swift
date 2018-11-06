@@ -1,11 +1,6 @@
-// RUN: %target-run-simple-swift
 // TODO: Revert to %target-run-simple-swift once we fold dynamic compilation into -Onone.
-// RUN: %target-run-dynamic-compilation-swift
+// RUN: %target-run-disable-deabstraction-swift
 // REQUIRES: executable_test
-// REQUIRES: swift_test_mode_optimize
-
-// This file contains testing over a dataset as a global variable. This requires
-// sends/recvs support for variant handles.
 
 import CTensorFlow
 import TensorFlow
@@ -13,13 +8,6 @@ import TensorFlowUnittest
 import StdlibUnittest
 
 var DynamicCompilationTests = TestSuite("DynamicCompilation")
-
-DynamicCompilationTests.testCPUOrGPU("Const") {
-  _RuntimeConfig.printsDebugLog = true
-  let x: TensorHandle<Float> = #tfop("Const", dtype$dtype: Float.tensorFlowDataType, value$tensor: Float(1.0))
-  _hostOp(x)
-  expectNearlyEqualWithScalarTensor(1.0, Tensor<Float>(handle: x))
-}
 
 DynamicCompilationTests.testCPUOrGPU("ScalarNonConst") {
   _RuntimeConfig.printsDebugLog = true

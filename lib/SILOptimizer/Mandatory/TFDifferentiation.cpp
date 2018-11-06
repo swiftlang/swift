@@ -2240,7 +2240,8 @@ public:
       return;
     SILClonerWithScopes::postProcess(orig, cloned);
     auto &indices = getDifferentiationTask()->getIndices();
-    if (!(activityInfo.getActivity(orig, indices) & ActivityFlags::Active))
+    if (!activityInfo.getActivity(orig, indices)
+            .contains(ActivityFlags::Active))
       return;
     switch (classifyPrimalValue(orig)) {
     case PrimalValueKind::Conversion:
@@ -2952,9 +2953,15 @@ namespace {
 /// `AdjointRematCloner` is used to clone non-checkpointed computation
 /// that is to be rematerialized from the original function to the adjoint
 /// function. It's called by `AdjointEmitter` during adjoint code generation.
+/// During cloning, this cloner will record instructions that introduce data
+/// flow scopes, such as `alloc_stack` and `begin_access`. `AdjointEmitter` will
+/// emit the corresponding end-scope instructions.
 class AdjointRematCloner final
     : public SILClonerWithScopes<AdjointRematCloner> {
   friend class AdjointEmitter;
+      
+  SmallVector<std::pair<SILInstruction *, SILInstruction *>, 8>
+      scopeMarkingInstructions;
 
 private:
   SILFunction &getOriginal() { return getBuilder().getFunction(); }
@@ -2979,6 +2986,21 @@ public:
       if (auto *ti = dyn_cast<TermInst>(&bb->back()))
         getBuilder().setInsertionPoint(ti);
     getBuilder().setInsertionPoint(bb);
+  }
+      
+  void postProcess(SILInstruction *orig, SILInstruction *cloned) {
+    // If the instruction is a scope-marking instruction, record it so that the
+    // adjoint emitter can emit their end-scope counterparts.
+    switch (orig->getKind()) {
+    // FIXME: Handle other cases such as `begin_apply`.
+    case swift::SILInstructionKind::BeginAccessInst:
+    case swift::SILInstructionKind::AllocStackInst:
+      scopeMarkingInstructions.push_back({orig, cloned});
+      break;
+    default:
+      break;
+    }
+    SILClonerWithScopes::postProcess(orig, cloned);
   }
 };
 
@@ -3217,6 +3239,23 @@ public:
         // Differentiate instruction.
         visit(&inst);
       }
+    }
+    
+    for (auto &pair : rematCloner.scopeMarkingInstructions) {
+      auto *original = pair.first;
+      auto *cloned = pair.second;
+      // The end-scope counterpart should be emitted to the adjoint block
+      // corresponding to the original begin-scope instruction.
+      auto *endBB = getAdjointBlock(original->getParent());
+      getBuilder().setInsertionPoint(endBB);
+      if (auto *bai = dyn_cast<BeginAccessInst>(original))
+        getBuilder().createEndAccess(bai->getLoc(),
+                                     cast<BeginAccessInst>(cloned),
+                                     /*aborted*/ false);
+      else if (auto *asi = dyn_cast<AllocStackInst>(original))
+        getBuilder().createDeallocStack(asi->getLoc(),
+                                        cast<AllocStackInst>(cloned));
+      // FIXME: Handle other cases.
     }
 
     // If errors occurred, back out.
@@ -4422,6 +4461,10 @@ void Differentiation::run() {
       astCtx.Diags.diagnose(f.getLocation().getSourceLoc(),
                             diag::autodiff_incomplete_differentiable_attr);
     }
+    // Not look for `gradient` instructions in transparent functions because
+    // they are to be inlined.
+    if (f.isTransparent())
+      continue;
     for (SILBasicBlock &bb : f) {
       for (SILInstruction &i : bb) {
         // If `i` is a `gradient` instruction, i.e. the SIL-level differential

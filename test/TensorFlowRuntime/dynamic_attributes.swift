@@ -1,6 +1,5 @@
-// RUN: %target-run-dynamic-compilation-swift
+// RUN: %target-run-disable-deabstraction-swift
 // REQUIRES: executable_test
-// REQUIRES: swift_test_mode_optimize
 // REQUIRES: tensorflow
 
 import TensorFlow
@@ -213,7 +212,7 @@ DynamicAttributeTests.test("NormalAttribute Float") {
 DynamicAttributeTests.test("NormalAttribute String") {
   let result: Tensor<Float> = #tfop("Conv2D", convImage, convFilter,
                                     T$dtype: Float.tensorFlowDataType,
-                                    strides: [1, 1, 1, 1],
+                                    strides: [1, 1, 1, 1] as [Int32],
                                     padding: loadVALIDString())
   expectEqual(convExpectedResult, result.array)
 }

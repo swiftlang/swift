@@ -952,11 +952,7 @@ public:
   void visitBuiltinInst(BuiltinInst *i);
 
   // SWIFT_ENABLE_TENSORFLOW
-  void visitGradientInst(GradientInst *i) {
-    llvm_unreachable("gradient is not valid in canonical SIL");
-  }
-
-  // SWIFT_ENABLE_TENSORFLOW
+  void visitGradientInst(GradientInst *i);
   void visitGraphOperationInst(GraphOperationInst *i);
 
   void visitFunctionRefInst(FunctionRefInst *i);
@@ -1970,6 +1966,23 @@ static Type getArrayType(const ASTContext &ctx, Type element) {
   return BoundGenericType::get(ctx.getArrayDecl(), Type(), {element});
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+/// Gradient is not valid in canonical SIL yet. For now, we print a runtime
+/// error.
+void IRGenSILFunction::visitGradientInst(GradientInst *i) {
+  const std::string errMessage =
+      "Compiler bug: gradient should have been canonicalized.";
+  abortOnGraphOp(*this, errMessage.c_str());
+  for (auto result : i->getResults()) {
+    ExplosionSchema schema = getTypeInfo(result->getType()).getSchema();
+    Explosion e;
+    for (auto &elt : schema)
+      e.add(llvm::UndefValue::get(elt.getScalarType()));
+    setLoweredExplosion(result, e);
+  }
+  return;
+}
+
 // The code structure resembles
 // TFGraphFunctionLowering::visitGraphOperationInst().
 void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
@@ -1980,25 +1993,17 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   auto tfModule = astCtx.getLoadedModule(astCtx.Id_TensorFlow);
   assert(tfModule && "could not find TensorFlow module");
   auto inputTensorGroupProto =
-      astCtx.getProtocol(KnownProtocolKind::InputTensorGroup);
+      astCtx.getProtocol(KnownProtocolKind::TensorArrayProtocol);
   auto outputTensorGroupProto =
-      astCtx.getProtocol(KnownProtocolKind::OutputTensorGroup);
-  assert(inputTensorGroupProto && "could not find InputTensorGroup protocol");
-  assert(outputTensorGroupProto && "could not find OutputTensorGroup protocol");
+      astCtx.getProtocol(KnownProtocolKind::TensorGroup);
+  assert(inputTensorGroupProto &&
+         "could not find TensorArrayProtocol protocol");
+  assert(outputTensorGroupProto && "could not find TensorGroup protocol");
 
-  if (!llvm::TFDynamicCompilation) {
-    // If we are not in dynamic compilation mode, then deabstraction may not
-    // have transformed the graph_ops into a form that we can lower, so do not
-    // try to lower the graph_ops.
-    // TODO(marcrasi): Once we make deabstraction unnecessary for IRGen, we
-    // should be able to lower everything no matter what the mode is, so remove
-    // this check.
-    const std::string errMessage = "!!! Compiler bug -- graph_op " +
-                              opInfo.getOperationName().str() +
-                              " cannot be lowered to LLVM IR !!!\n";
-    abortOnGraphOp(*this, errMessage.c_str());
-
-    // Finally, we set up our explosion results full of undef values.
+  // Makes this op cause a runtime error, and sets an (undef) lowered explosion
+  // for this op so that IRGen can proceed.
+  auto lowerOpToError = [&](const char *errorMessage) {
+    abortOnGraphOp(*this, errorMessage);
     for (auto result : i->getResults()) {
       ExplosionSchema schema = getTypeInfo(result->getType()).getSchema();
       Explosion e;
@@ -2006,6 +2011,20 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
         e.add(llvm::UndefValue::get(elt.getScalarType()));
       setLoweredExplosion(result, e);
     }
+  };
+
+  // These ops configure the `deviceInfo`. They do not do anything
+  // at runtime, so lower them to a no-op.
+  // This must be above the GraphFunctionDeviceInfo::getForFunction() call,
+  // because GraphFunctionDeviceInfo::getForFunction() crashes when called in
+  // the `enableTPU` function, because the enableInfeed operand isn't an integer
+  // literal instruction.
+  if (GraphFunctionDeviceInfo::isConfigOp(opInfo)) {
+    assert(i->getNumResults() == 1 && "config op should have one Void result");
+
+    // A Void result is lowered as an empty Explosion.
+    Explosion e;
+    setLoweredExplosion(i->getResults()[0], e);
     return;
   }
 
@@ -2014,11 +2033,6 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     deviceInfo = Optional<GraphFunctionDeviceInfo>(
         GraphFunctionDeviceInfo::getForFunction(*CurSILFn,
                                                 /*removeConfigInst*/false));
-
-  // These ops configure the `deviceInfo`. They do not do anything
-  // at runtime, so do not lower them.
-  if (GraphFunctionDeviceInfo::isConfigOp(opInfo))
-    return;
 
   LLVM_DEBUG(llvm::dbgs() << "IRGen for graph_op: "
                           << opInfo.getOperationName() << "\n");
@@ -2054,7 +2068,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   // returns an Int32 value for the number of inputs that it has added. There
   // are a few different cases that can be unpacked:
   // - if `opInput` is a TensorFlow value, then we just add its handle;
-  // - if `opInput` is an archetype conforming to InputTensorGroup, then we
+  // - if `opInput` is an archetype conforming to TensorArrayProtocol, then we
   //   ask the conformance for the handles and add those;
   // This function crashes if it receives an unhandled case. Earlier
   // typechecking should ensure that inputs match the cases that this function
@@ -2065,7 +2079,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
     // If this is a known TensorFlow value, add it directly.
     // TODO: We could also handle concrete structs of known TensorFlow values
-    // here, to avoid falling through to the slower InputTensorGroup case.
+    // here, to avoid falling through to the slower TensorArrayProtocol case.
     if (tf::isTensorFlowValue(opInput->getType())) {
       auto *tensorHandleValue = getLoweredSingletonExplosion(opInput);
       auto *opAddInputFromTensorHandleFn =
@@ -2078,13 +2092,13 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       return llvm::ConstantInt::get(IGM.Int32Ty, 1);
     }
 
-    // Otherwise, this must conform to InputTensorGroup so we can add it using
-    // TFC_OpAddInputFromTensorGroup.
+    // Otherwise, this must conform to TensorArrayProtocol so we can add it
+    // using TFC_OpAddInputFromTensorGroup.
 
     auto canType = opInput->getType().getASTType()->getCanonicalType();
     auto conformance =
         tfModule->lookupConformance(canType, inputTensorGroupProto);
-    assert(conformance && "input type does not conform to InputTensorGroup");
+    assert(conformance && "input type does not conform to TensorArrayProtocol");
     auto *typeMetadata = emitTypeMetadataRef(canType);
     auto *wtable = emitWitnessTableRef(*this, canType, *conformance);
 
@@ -2161,6 +2175,9 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       // See the comment on the declaration of the enum case
       // `GraphOperationInfo::ArgumentLowering::TensorAttribute` for more
       // information on why this cannot be dynamic.
+      // TODO(SR-9166): Emit a nice diagnostic earlier in the compiler, so that
+      // we don't get an assertion failure when we write a
+      // #tfop(..., value$tensor: ...).
       assert(0 && "TensorAttributes cannot be dynamic");
     case GraphOperationInfo::ArgumentLowering::Input: {
       assert(argumentName.empty() && "inputs cannot have names");
@@ -2219,7 +2236,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
           silValue->getType().getASTType()->getCanonicalType();
       auto conformance = tfModule->lookupConformance(outParameterCanType,
                                                      outputTensorGroupProto);
-      assert(conformance && "out type does not conform to OutputTensorGroup");
+      assert(conformance && "out type does not conform to TensorGroup");
       outParameterTypeMetadata = emitTypeMetadataRef(outParameterCanType);
       outParameterTensorGroupWitnessTable =
           emitWitnessTableRef(*this, outParameterCanType, *conformance);
@@ -2361,11 +2378,15 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
       if (astType->isEqual(getArrayType(
           astCtx, astCtx.getStringDecl()->getDeclaredInterfaceType()))) {
-        assert(0 && "TODO: dynamic string list attributes");
+        // TODO: dynamic string list attributes
+        lowerOpToError("dynamic string list attributes not supported");
+        return;
       }
 
-      if (astType->is<AnyFunctionType>()) {
-        assert(0 && "TODO: dynamic function attributes");
+      if (astType->is<SILFunctionType>()) {
+        // TODO: dynamic function attributes
+        lowerOpToError("dynamic function attributes not supported");
+        return;
       }
 
       assert(0 && "unknown NormalAttribute type");
@@ -2424,7 +2445,9 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       LLVM_DEBUG(llvm::dbgs() << "  Adding dynamic ShapeAttribute of type "
                  << astType << "\n");
 
-      assert(0 && "TODO: implement dynamic ShapeAttribute");
+      // TODO: dynamic shape attributes
+      lowerOpToError("dynamic shape attributes not supported");
+      return;
     }
   }
 
@@ -2795,8 +2818,6 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   // compute the flag by iterating over all the results and checking if they are
   // known TensorFlow values that do not need to go through the TensorGroup
   // machinery.
-  // TODO: We can add more types of known TensorFlow values to reduce the amount
-  // of work that happens at runtime.
   bool hasOpaqueTensorGroupResults = false;
   if (outParameterAddress.isValid()) {
     LLVM_DEBUG(llvm::dbgs() << " Has indirect result of type "
@@ -2808,9 +2829,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     for (auto silResult : i->getResults()) {
       LLVM_DEBUG(llvm::dbgs() << "  Direct result of type "
                  << silResult->getType() << ".\n");
-      if (silResult->getType().getASTType() == astCtx.TheEmptyTupleType)
-        continue;
-      if (tf::isTensorFlowValue(silResult->getType()))
+      if (tf::isTensorFlowValueOrAggregate(silResult->getType().getASTType()))
         continue;
       hasOpaqueTensorGroupResults = true;
       break;
@@ -2846,23 +2865,16 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     // add up their counts.
     expectedReturnValueCount = llvm::ConstantInt::get(IGM.Int32Ty, 0);
     for (auto silResult : i->getResults()) {
-      // If the result is Void, it corresponds to 0 outputs.
-      if (silResult->getType().getASTType() == astCtx.TheEmptyTupleType) {
+      // If the result is a known TensorFlow type or aggregate of known
+      // TensorFlow types, then we can count it directly.
+      SmallVector<Type, 4> flattenedTensorFlowTypes;
+      if (tf::flattenTensorFlowValueAggregate(
+              silResult->getType().getASTType(), flattenedTensorFlowTypes)) {
         directResultTypeMetadatas.push_back(nullptr);
         directResultTensorGroupWitnessTables.push_back(nullptr);
-        auto *cTensorHandleCount = llvm::ConstantInt::get(IGM.Int32Ty, 0);
+        auto *cTensorHandleCount = llvm::ConstantInt::get(
+            IGM.Int32Ty, flattenedTensorFlowTypes.size());
         directResultCTensorHandleCounts.push_back(cTensorHandleCount);
-        continue;
-      }
-
-      // If the result is a known TensorFlow type, it corresponds to just 1
-      // output.
-      if (tf::isTensorFlowValue(silResult->getType())) {
-        directResultTypeMetadatas.push_back(nullptr);
-        directResultTensorGroupWitnessTables.push_back(nullptr);
-        auto *cTensorHandleCount = llvm::ConstantInt::get(IGM.Int32Ty, 1);
-        directResultCTensorHandleCounts.push_back(cTensorHandleCount);
-        // Note that `CreateAdd` constant-folds ConstantInts.
         expectedReturnValueCount = Builder.CreateAdd(expectedReturnValueCount,
                                                      cTensorHandleCount);
         continue;
@@ -2872,13 +2884,13 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       // TensorGroup for the number of outputs that it needs.
 
       assert(hasOpaqueTensorGroupResults &&
-             "found an unexpected opaque OutputTensorGroup result");
+             "found an unexpected opaque TensorGroup result");
 
       // Emit the type metadata and witness table.
       auto canType = silResult->getType().getASTType()->getCanonicalType();
       auto conformance = tfModule->lookupConformance(canType,
                                                      outputTensorGroupProto);
-      assert(conformance && "out type does not conform to OutputTensorGroup");
+      assert(conformance && "out type does not conform to TensorGroup");
       auto *typeMetadata = emitTypeMetadataRef(canType);
       directResultTypeMetadatas.push_back(typeMetadata);
       auto *witnessTable =
@@ -2982,39 +2994,40 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       auto tfOutputAddr = Builder.CreateInBoundsGEP(returnValuesAddress,
                                                     tfOutputIdx);
 
-      // If the result is Void, it corresponds to 0 outputs.
-      if (silResult->getType().getASTType() == astCtx.TheEmptyTupleType) {
+      // If the result is a known TensorFlow type or aggregate of known
+      // TensorFlow types, get them directly.
+      SmallVector<Type, 4> flattenedTensorFlowTypes;
+      if (tf::flattenTensorFlowValueAggregate(
+              silResult->getType().getASTType(), flattenedTensorFlowTypes)) {
         Explosion e;
+        for (auto tensorFlowType : flattenedTensorFlowTypes) {
+          auto cTensorHandle = Builder.CreateLoad(tfOutputAddr,
+                                                  IGM.getPointerAlignment());
+
+          // Wrap `cTensorHandle` into a _AnyTensorHandle object, and get an
+          // untyped pointer to the _AnyTensorHandle.
+          auto *createHandleFn = IGM.getTFC_CreateTensorHandleFromCFn();
+          llvm::Value *tensorHandle = Builder.CreateCall(createHandleFn,
+                                                         {cTensorHandle});
+
+          // Cast to a pointer of the expected result type (for example,
+          // TensorHandle<Float>).
+          auto silType = SILType::getPrimitiveObjectType(
+              tensorFlowType->getCanonicalType());
+          tensorHandle = Builder.CreateBitCast(tensorHandle,
+                                               IGM.getStorageType(silType));
+
+          // Set the result.
+          e.add(tensorHandle);
+
+          // We consumed one output.
+          // Note that `CreateAdd` constant-folds ConstantInts.
+          tfOutputIdx = Builder.CreateAdd(
+              tfOutputIdx, llvm::ConstantInt::get(IGM.Int32Ty, 1));
+          tfOutputAddr = Builder.CreateInBoundsGEP(returnValuesAddress,
+                                                      tfOutputIdx);
+        }
         setLoweredExplosion(silResult, e);
-        continue;
-      }
-
-      // If the result is a known TensorFlow type, get it directly.
-      if (tf::isTensorFlowValue(silResult->getType())) {
-        auto cTensorHandle = Builder.CreateLoad(tfOutputAddr,
-                                                IGM.getPointerAlignment());
-
-        // Wrap `cTensorHandle` into a _AnyTensorHandle object, and get an untyped
-        // pointer to the _AnyTensorHandle.
-        auto *createHandleFn = IGM.getTFC_CreateTensorHandleFromCFn();
-        llvm::Value *tensorHandle = Builder.CreateCall(createHandleFn,
-                                                       {cTensorHandle});
-
-        // Cast to a pointer of the expected result type (for example,
-        // TensorHandle<Float>).
-        tensorHandle = Builder.CreateBitCast(
-            tensorHandle, IGM.getStorageType(silResult->getType()));
-
-        // Set the result.
-        Explosion e;
-        e.add(tensorHandle);
-        setLoweredExplosion(silResult, e);
-
-        // We consumed one output.
-        // Note that `CreateAdd` constant-folds ConstantInts.
-        tfOutputIdx = Builder.CreateAdd(
-            tfOutputIdx, llvm::ConstantInt::get(IGM.Int32Ty, 1));
-
         continue;
       }
 

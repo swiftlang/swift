@@ -75,16 +75,6 @@ enum class DeclTypeCheckingSemantics {
   /// The _openExistential(_:do:) declaration, which extracts the value inside
   /// an existential and passes it as a value of its own dynamic type.
   OpenExistential,
-
-  /// SWIFT_ENABLE_TENSORFLOW
-  /// The gradient(of:) declaration, which performs a reverse-mode automatic
-  /// differentiation and returns a function that computes the gradient.
-  GradientOf,
-
-  /// The valueAndGradient(of:) declaration, which performs a reverse-mode
-  /// automatic differentiation and returns a function that computes both the
-  /// original result value and the gradient.
-  ValueAndGradientOf,
 };
 
 /// The result of name lookup.

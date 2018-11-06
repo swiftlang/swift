@@ -420,11 +420,13 @@ public:
                                    "times during SESE cloning.");
   }
 
-  /// Clone the body of `loop` starting from `startBlock` and nest the cloned
-  /// fragment into the parent loop. If `startBlock` is the same as the header
-  /// of `loop`, we clone the entire loop including the back edge.  Otherwise,
-  /// we clone one iteration of the loop body without the back edge.
-  SILLoop *cloneLoop(SILLoopInfo *LI, SILLoop *loop, SILBasicBlock *startBlock) {
+  /// Utility to unroll one iteration of the loop or to clone the entire loop.
+  ///   - If `startBlock` is the same as the header of `loop`, we clone the
+  ///     entire loop including the back edge.
+  ///   - Otherwise, we unroll one iteration of the loop body starting from
+  ///     `startBlock' to the latch.
+  /// The unrolled or cloned version is nested into the parent loop.
+  SILLoop *cloneOrUnrollLoop(SILLoopInfo *LI, SILLoop *loop, SILBasicBlock *startBlock) {
     llvm::DenseMap<SILLoop*, SILLoop*> loopClones;
     // This is for convenience as top-level loops have nullptr for parent loop.
     loopClones[nullptr] = nullptr;
@@ -514,24 +516,48 @@ public:
 
 // A helper class to transform a loop to have a single exit from the header.
 class SingleExitLoopTransformer {
-public:
-  SingleExitLoopTransformer(GraphFunctionDeviceInfo *deviceInfo,
-                            SILLoopInfo *LI, DominanceInfo *DI, SILLoop *loop,
-                            PostDominanceInfo *PDI)
-      : deviceInfo(deviceInfo), DI(DI), PDI(PDI), LI(LI), loop(loop),
-        header(loop->getHeader()), preheader(loop->getLoopPreheader()),
-        latch(loop->getLoopLatch()), currentFn(header->getParent()),
-        oldHeaderNumArgs(header->getNumArguments()), hasUndefsAtPreheader(false) {
-    assert(preheader && "Canonicalization should have given us one preheader");
-    assert(latch && "Canonicalization should have given us one latch block");
-    initialize();
+  public:
+    // Convert the given loop into a SESE form. Returns false if the loop was
+    // already in SESE form. Otherwise, returns true.
+    static bool doIt(GraphFunctionDeviceInfo *deviceInfo, SILLoopInfo *LI,
+                     DominanceInfo *DI, SILLoop *loop, PostDominanceInfo *PDI) {
+      SingleExitLoopTransformer transformer(deviceInfo, LI, DI, loop, PDI);
+      bool loopChanged = transformer.transform();
+      if (loopChanged) {
+        // Recalculate dominator information as it is stale now.
+        DI->recalculate(*transformer.currentFn);
+        PDI->recalculate(*transformer.currentFn);
+      }
+
+#ifndef NDEBUG
+      {
+        // Verify that the loop is OK after all the transformations.
+        llvm::DenseSet<const SILLoop *> nestedLoops;
+        loop->verifyLoopNest(&nestedLoops);
+      }
+#endif
+      return loopChanged;
+    }
+
+  private:
+    SingleExitLoopTransformer(GraphFunctionDeviceInfo *deviceInfo,
+                              SILLoopInfo *LI, DominanceInfo *DI, SILLoop *loop,
+                              PostDominanceInfo *PDI)
+        : deviceInfo(deviceInfo), DI(DI), PDI(PDI), LI(LI), loop(loop),
+          header(loop->getHeader()), preheader(loop->getLoopPreheader()),
+          latch(loop->getLoopLatch()), currentFn(header->getParent()),
+          oldHeaderNumArgs(header->getNumArguments()),
+          hasUndefsAtPreheader(false) {
+      assert(preheader &&
+             "Canonicalization should have given us one preheader");
+      assert(latch && "Canonicalization should have given us one latch block");
+      initialize();
   }
 
   /// Transforms the loop to ensure it has a single exit from the header.
   /// Returns true if the CFG was changed.
   bool transform();
 
-private:
   // Helper functions
 
   void initialize();
@@ -711,6 +737,24 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
                    << SILPrintContext(llvm::dbgs()).getID(nearestCommonPD)
                    << "\n");
 
+  // Compute the set of preheaders of loops that are unrelated to our loop w.r.t
+  // nesting. This will be used when needing to identify cases where a loop
+  // from outside is moved into the current loop. e.g.,
+  //   while ... {
+  //     if ... {
+  //       for(...) {...} // This should be nested into the while loop.
+  //       break;
+  //     }
+  //   }
+  // The unrelated loops are those that are not contained within each other.
+  SmallPtrSet<SILBasicBlock *, 32> unrelatedPreheaders;
+  for (auto *otherLoop : *LI) {
+    if (!otherLoop->contains(loop) && !loop->contains(otherLoop)) {
+      unrelatedPreheaders.insert(otherLoop->getLoopPreheader());
+    }
+  }
+
+
   // Collect all the blocks from each exiting block up to nearest common PD.
   SmallPtrSet<SILBasicBlock *, 32> blocksToBeMoved;
   for (SILBasicBlock *exitBlock : exitBlockList) {
@@ -735,6 +779,19 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
           continue;
         }
 
+        // Check if `succ` is a preheader of another loop.
+        SILLoop *succBlockLoop = nullptr;
+        if (unrelatedPreheaders.count(succ) > 0) {
+          // We are about a move a loop from outside. Perform canonicalization
+          // of that loop first.
+          SILBasicBlock *unrelatedHeader = succ->getSingleSuccessorBlock();
+          assert(unrelatedHeader &&
+                 "There should be a single successor for a preheader.");
+          succBlockLoop = LI->getLoopFor(unrelatedHeader);
+          SingleExitLoopTransformer::doIt(deviceInfo, LI, DI, succBlockLoop,
+                                          PDI);
+        }
+
         if (DI->properlyDominates(header, succ)) {
           worklist.insert(succ);
           continue;
@@ -752,6 +809,24 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
 
         // Clone the block and rewire the edge.
         SILBasicBlock *clonedSucc = cloner.initAndCloneBlock(succ);
+        // If `succ` is a preheader of an unrelated loop, we will have to clone
+        // the entire loop now so that we can also incrementally update LoopInfo.
+        if (succBlockLoop) {
+          SILLoop *clonedLoop = cloner.cloneOrUnrollLoop(
+              LI, succBlockLoop, succBlockLoop->getHeader());
+          changeBranchTarget(clonedSucc->getTerminator(), 0,
+                             clonedLoop->getHeader(), /*preserveArgs*/ true);
+          // Note that all the nodes of `clonedLoop` should be moved into the
+          // current loop.  We do that here itself as an optimization and also
+          // because the dominator and post-dominator information for the new
+          // blocks in `clonedLoop` are stale and cannot be relied upon.
+          for (SILBasicBlock *bb : clonedLoop->getBlocks()) {
+            blocksToBeMoved.insert(bb);
+          }
+          // Add the header to worklist for processing the exit edge.
+          // (Other successor edges are already processed above.)
+          worklist.insert(clonedLoop->getHeader());
+        }
         changeBranchTarget(current->getTerminator(), edgeIdx, clonedSucc,
                            /*preserveArgs*/ true);
         worklist.insert(clonedSucc);
@@ -771,24 +846,45 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
 
     // Update loop info if this belongs to a parent loop.
     SILLoop *outsideBlockLoop = LI->getLoopFor(outsideBlock);
-    if (outsideBlockLoop != nullptr) {
-      // FIXME: We don't deal with cases where the nodes being moved in
-      // belong to another loop yet. e.g.,
+    if (outsideBlockLoop == nullptr) {
+      // outsideBlock is not part of any other loop. Simply add it to our loop.
+      loop->addBasicBlockToLoop(outsideBlock, LI->getBase());
+    } else {
+      // We deal with the case where the nodes being moved in
+      // belong to another loop. e.g.,
       // while ... {
       //   if ... {
       //     for(...) {...}
       //     break;
       //   }
       // }
-      // Check that `loop` is nested within `reachableLoop`.
-      assert(outsideBlockLoop->contains(loop) &&
-             "Nodes being moved belong to a non-nested loop.");
-      // Move the node into our loop.
-      outsideBlockLoop->removeBlockFromLoop(outsideBlock);
-      LI->changeLoopFor(outsideBlock, nullptr);
+      if (outsideBlockLoop->contains(loop)) {
+        // If our `loop` is nested within `outsideBlockLoop`.  Move the node
+        // from `outsideBlockLoop` into our `loop`.
+        outsideBlockLoop->removeBlockFromLoop(outsideBlock);
+        LI->changeLoopFor(outsideBlock, nullptr);
+        loop->addBasicBlockToLoop(outsideBlock, LI->getBase());
+      } else {
+        // We should only nest `outsideBlockLoop` into our `loop` when we
+        // process the very first node of the `outsideBlockLoop`. Check that we
+        // have not already nested the `outsideBlockLoop` into our `loop`.
+        if (!loop->contains(outsideBlockLoop)) {
+          // Not yet nested, adjust the LoopInfo w.r.t nesting.
+          if (outsideBlockLoop->getParentLoop() == nullptr) {
+            // Remove from top-level loops as we are nesting it in `loop`.
+            LI->removeLoop(llvm::find(*LI, outsideBlockLoop));
+          }
+          loop->addChildLoop(outsideBlockLoop);
+        }
+        // Add the block to this loop and all its parents.
+        auto *L = loop;
+        while (L) {
+          L->addBlockEntry(outsideBlock);
+          L = L->getParentLoop();
+        }
+      }
       // top-level loop is already correct.
     }
-    loop->addBasicBlockToLoop(outsideBlock, LI->getBase());
   }
   if (cloner.hasCloned()) {
     // TODO(https://bugs.swift.org/browse/SR-8336): the transformations here are
@@ -1283,13 +1379,8 @@ void SESERegionBuilder::ensureSingleExitFromLoops() {
       }
       continue;
     }
-    SingleExitLoopTransformer transformer(&deviceInfo, &LI, &DI, loop, &PDI);
-    bool loopChanged = transformer.transform();
-    if (loopChanged) {
-      // Recalculate dominator information as it is stale now.
-      DI.recalculate(*F);
-      PDI.recalculate(*F);
-    }
+    bool loopChanged =
+      SingleExitLoopTransformer::doIt(&deviceInfo, &LI, &DI, loop, &PDI);
     changed |= loopChanged;
   }
   if (changed) {
@@ -1414,7 +1505,7 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
   }
 
   // Clone everything starting from the old header.
-  cloner.cloneLoop(LI, loop, header);
+  cloner.cloneOrUnrollLoop(LI, loop, header);
 
   // Get the clone for old header.
   SILBasicBlock *clonedOldHeader = cloner.remapBasicBlock(header);
@@ -1494,9 +1585,8 @@ void SESERegionBuilder::processLoop(SILLoop *loop) {
   SmallVector<SILBasicBlock *, 8> exitingBlocks;
   loop->getExitingBlocks(exitingBlocks);
 
-  if (exitingBlocks.size() != 1) {
-    llvm_unreachable("SESE FIXME: Loops with multiple exits not handled yet!");
-  }
+  assert(exitingBlocks.size() == 1 &&
+         "Canonicalization should have given us one loop exit!");
 
   // Loop canonicalization also gives us the property that exits out of the
   // loop have critical edges split, and that any exit block jumps to a block
@@ -1528,11 +1618,8 @@ void SESERegionBuilder::processLoop(SILLoop *loop) {
     return;
   }
 
-  llvm_unreachable("SESE FIXME: Imperfect loop exits not handled yet!");
-  // splitCriticalEdge
-
-  // FIXME: Need to handle "break" edges that exit the loop, preventing the
-  // body from being an SESE region.
+  llvm_unreachable("Canonicalization should have made loop header to be the "
+                   "only loop exit!");
 }
 
 /// Transform the function into a properly nested series of

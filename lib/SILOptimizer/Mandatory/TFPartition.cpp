@@ -3840,7 +3840,9 @@ void TFFunctionPartition::insertTensorComputationStartEndTerminate(
     // closed over.  If it is a TensorHandle<T>, load the CTensorHandle out of
     // it.  If it is a scalar, then we need to box the scalar in a
     // CTensorHandle.
-    if (isTensorHandle(tensorValue->getType().getASTType())) {
+    if ((TFSendRecvOpaqueHandle &&
+         isTensorFlowValue(tensorValue->getType().getASTType())) ||
+        isTensorHandle(tensorValue->getType().getASTType())) {
       // Upcast to _AnyTensorHandle.
       tensorValue = B.createUpcast(loc, tensorValue, anyTensorHandleSILTy);
       auto fieldAddress =

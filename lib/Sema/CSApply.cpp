@@ -7343,30 +7343,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         return replacement;
       }
 
-      // SWIFT_ENABLE_TENSORFLOW
-      case DeclTypeCheckingSemantics::GradientOf: {
-        auto *tup = cast<TupleExpr>(apply->getArg());
-        auto arg = tup->getElement(0);
-        auto replacement =
-          GradientExpr::create(tc.Context, apply->getFn()->getLoc(),
-                               apply->getArg()->getStartLoc(), arg, {},
-                               /*resultIndex*/ 0, apply->getArg()->getEndLoc());
-        cs.setType(replacement, simplifyType(openedType));
-        return replacement;
-      }
-
-      case DeclTypeCheckingSemantics::ValueAndGradientOf: {
-        auto *tup = cast<TupleExpr>(apply->getArg());
-        auto arg = tup->getElement(0);
-        auto replacement =
-          ValueAndGradientExpr::create(tc.Context, apply->getFn()->getLoc(),
-                                       apply->getArg()->getStartLoc(), arg, {},
-                                       /*resultIndex*/ 0,
-                                       apply->getArg()->getEndLoc());
-        cs.setType(replacement, simplifyType(openedType));
-        return replacement;
-      }
-      
       case DeclTypeCheckingSemantics::Normal:
         return nullptr;
       }
