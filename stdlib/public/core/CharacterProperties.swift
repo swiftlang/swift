@@ -22,15 +22,15 @@ extension Character {
     ) == self.unicodeScalars.endIndex
   }
 
-  /// Whether this Character is ASCII.
+  /// A Boolean value indicating whether this is an ASCII character.
   @inlinable
   public var isASCII: Bool {
     return asciiValue != nil
   }
 
-  /// Returns the ASCII encoding value of this Character, if ASCII.
+  /// The ASCII encoding value of this character, if it is an ASCII character.
   ///
-  /// Note: "\r\n" (CR-LF) is normalized to "\n" (LF), which will return 0x0A
+  /// The "\r\n" (CR-LF) is normalized to "\n" (LF), which will return 0x0A
   @inlinable
   public var asciiValue: UInt8? {
     if _slowPath(self == "\r\n") { return 0x000A /* LINE FEED (LF) */ }
@@ -38,30 +38,31 @@ extension Character {
     return UInt8(_firstScalar.value)
   }
 
-  /// Whether this Character represents whitespace, including newlines.
+  /// A Boolean value indicating whether this character represents whitespace,
+  /// including newlines.
   ///
-  /// Examples:
-  ///   * "\t" (U+0009 CHARACTER TABULATION)
-  ///   * " " (U+0020 SPACE)
-  ///   * U+2029 PARAGRAPH SEPARATOR
-  ///   * U+3000 IDEOGRAPHIC SPACE
+  /// For example, the following characters all represent whitespace:
   ///
+  /// - "\t" (U+0009 CHARACTER TABULATION)
+  /// - " " (U+0020 SPACE)
+  /// - U+2029 PARAGRAPH SEPARATOR
+  /// - U+3000 IDEOGRAPHIC SPACE
   public var isWhitespace: Bool {
     return _firstScalar.properties.isWhitespace
   }
 
-  /// Whether this Character represents a newline.
+  /// A Boolean value indicating whether this character represents a newline.
   ///
-  /// Examples:
-  ///   * "\n" (U+000A): LINE FEED (LF)
-  ///   * U+000B: LINE TABULATION (VT)
-  ///   * U+000C: FORM FEED (FF)
-  ///   * "\r" (U+000D): CARRIAGE RETURN (CR)
-  ///   * "\r\n" (U+000A U+000D): CR-LF
-  ///   * U+0085: NEXT LINE (NEL)
-  ///   * U+2028: LINE SEPARATOR
-  ///   * U+2029: PARAGRAPH SEPARATOR
+  /// For example, the following characters all represent newlines:
   ///
+  /// - "\n" (U+000A): LINE FEED (LF)
+  /// - U+000B: LINE TABULATION (VT)
+  /// - U+000C: FORM FEED (FF)
+  /// - "\r" (U+000D): CARRIAGE RETURN (CR)
+  /// - "\r\n" (U+000A U+000D): CR-LF
+  /// - U+0085: NEXT LINE (NEL)
+  /// - U+2028: LINE SEPARATOR
+  /// - U+2029: PARAGRAPH SEPARATOR
   @inlinable
   public var isNewline: Bool {
     switch _firstScalar.value {
@@ -73,21 +74,20 @@ extension Character {
     }
   }
 
-  /// Whether this Character represents a number.
+  /// A Boolean value indicating whether this character represents a number.
   ///
-  /// Examples:
-  ///   * "7" (U+0037 DIGIT SEVEN)
-  ///   * "⅚" (U+215A VULGAR FRACTION FIVE SIXTHS)
-  ///   * "㊈" (U+3288 CIRCLED IDEOGRAPH NINE)
-  ///   * "𝟠" (U+1D7E0 MATHEMATICAL DOUBLE-STRUCK DIGIT EIGHT)
-  ///   * "๒" (U+0E52 THAI DIGIT TWO)
+  /// For example, the following characters all represent numbers:
   ///
+  /// - "7" (U+0037 DIGIT SEVEN)
+  /// - "⅚" (U+215A VULGAR FRACTION FIVE SIXTHS)
+  /// - "㊈" (U+3288 CIRCLED IDEOGRAPH NINE)
+  /// - "𝟠" (U+1D7E0 MATHEMATICAL DOUBLE-STRUCK DIGIT EIGHT)
+  /// - "๒" (U+0E52 THAI DIGIT TWO)
   public var isNumber: Bool {
     return _firstScalar.properties.numericType != nil
   }
 
-  /// Whether this Character represents a whole number. See
-  /// `Character.wholeNumberValue`
+  /// A Boolean value indicating whether this character represents a whole number.
   @inlinable
   public var isWholeNumber: Bool {
     return wholeNumberValue != nil
@@ -96,7 +96,9 @@ extension Character {
   /// If this Character is a whole number, return the value it represents, else
   /// nil.
   ///
-  /// Examples:
+  /// A Boolean value indicating whether this character represents a newline.
+  ///
+  /// For example, the following characters all represent newlines:
   ///   * "1" (U+0031 DIGIT ONE) => 1
   ///   * "५" (U+096B DEVANAGARI DIGIT FIVE) => 5
   ///   * "๙" (U+0E59 THAI DIGIT NINE) => 9
@@ -236,25 +238,38 @@ extension Character {
     return !_isUppercased || !_isLowercased
   }
 
-  /// Whether this Character represents a symbol
+  /// A Boolean value indicating whether this character represents a symbol.
   ///
-  /// Examples:
-  ///   * "®" (U+00AE REGISTERED SIGN)
-  ///   * "⌹" (U+2339 APL FUNCTIONAL SYMBOL QUAD DIVIDE)
-  ///   * "⡆" (U+2846 BRAILLE PATTERN DOTS-237)
+  /// This property is `true` only for characters composed of scalars in the
+  /// "Math_Symbol", "Currency_Symbol", "Modifier_Symbol", or "Other_Symbol"
+  /// categories in the
+  /// [Unicode Standard](https://unicode.org/reports/tr44/#General_Category_Values).
   ///
+  /// For example, the following characters all represent symbols:
+  ///
+  /// - "®" (U+00AE REGISTERED SIGN)
+  /// - "⌹" (U+2339 APL FUNCTIONAL SYMBOL QUAD DIVIDE)
+  /// - "⡆" (U+2846 BRAILLE PATTERN DOTS-237)
   public var isSymbol: Bool {
     return _firstScalar.properties.generalCategory._isSymbol
   }
 
-  /// Whether this Character represents a symbol used mathematical formulas
+  /// A Boolean value indicating whether this character represents a symbol
+  /// that naturally appearx in mathematical contexts.
   ///
-  /// Examples:
-  ///   * "+" (U+002B PLUS SIGN)
-  ///   * "∫" (U+222B INTEGRAL)
-  ///   * "ϰ" (U+03F0 GREEK KAPPA SYMBOL)
+  /// For example, the following characters all represent math symbols:
   ///
-  /// Note: This is not a strict subset of isSymbol. This includes characters
+  /// - "+" (U+002B PLUS SIGN)
+  /// - "∫" (U+222B INTEGRAL)
+  /// - "ϰ" (U+03F0 GREEK KAPPA SYMBOL)
+  ///
+  /// This property corresponds to the "Math" property in the
+  /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  ///
+  /// - Note: A character might
+  ///
+  ///
+  /// is not a strict subset of `isSymbol`. This includes characters
   /// used both as letters and commonly in mathematical formulas. For example,
   /// "ϰ" (U+03F0 GREEK KAPPA SYMBOL) is considered a both mathematical symbol
   /// and a letter.
@@ -263,7 +278,8 @@ extension Character {
     return _firstScalar.properties.isMath
   }
 
-  /// Whether this Character represents a currency symbol
+  /// A Boolean value indicating whether this Character represents a currency
+  /// symbol.
   ///
   /// Examples:
   ///   * "$" (U+0024 DOLLAR SIGN)
@@ -274,7 +290,7 @@ extension Character {
     return _firstScalar.properties.generalCategory == .currencySymbol
   }
 
-  /// Whether this Character represents punctuation
+  /// A Boolean value indicating whether this character represents punctuation.
   ///
   /// Examples:
   ///   * "!" (U+0021 EXCLAMATION MARK)
