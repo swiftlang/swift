@@ -52,27 +52,28 @@ sil_property #ExternalGeneric.rw <T: Comparable> (
   stored_property #ExternalGeneric.rw : $T)
 
 // CHECK: @"$s19property_descriptor15ExternalGenericV10computedROxvpMV" =
-// -- 0x0108_0000 - computed, readonly, has arguments
-// CHECK-SAME:  <{ <i32 0x0208_0000>,
-// CHECK-SAME:     @id_computed, 
-// CHECK-SAME:     [[GET_COMPUTEDRO:@keypath_get[.0-9]*]],
-// CHECK-SAME:     [[GET_ARG_LAYOUT_COMPUTEDRO:@keypath_get_arg_layout[.0-9]*]],
-// CHECK-SAME:     @swift_keyPathGenericWitnessTable,
-// CHECK-SAME:     [[ARG_INIT_COMPUTEDRO:@keypath_arg_init[.0-9]*]] }>
+// -- 0x0108_0000 - computed, readonly, has arguments, identified by indirect
+// CHECK-SAME:  <{ <i32 0x0208_0002>,
+// CHECK-SAME:     @got.id_computed
+// CHECK-SAME:     [[GET_COMPUTEDRO:@keypath_get[.0-9]*]]
+// CHECK-SAME:     [[GET_ARG_LAYOUT_COMPUTEDRO:@keypath_get_arg_layout[.0-9]*]]
+// -- default witness table
+// CHECK-SAME:     i32 0
+// CHECK-SAME:     [[ARG_INIT_COMPUTEDRO:@keypath_arg_init[.0-9]*]]
 sil_property #ExternalGeneric.computedRO <T: Comparable> (
   gettable_property $T,
     id @id_computed : $@convention(thin) () -> (),
     getter @get_computed_generic : $@convention(thin) <T: Comparable> (@in_guaranteed ExternalGeneric<T>) -> @out T)
 
 // CHECK: @"$s19property_descriptor15ExternalGenericV10computedRWxvpMV" =
-// -- 0x01c8_0000 - computed, settable, mutating, has arguments
-// CHECK-SAME:  <{ <i32 0x02c8_0000>, 
-// CHECK-SAME:     @id_computed,
-// CHECK-SAME:     [[GET_COMPUTEDRW:@keypath_get[.0-9]*]],
-// CHECK-SAME:     [[SET_COMPUTEDRW:@keypath_set[.0-9]*]],
-// CHECK-SAME:     [[GET_ARG_LAYOUT_COMPUTEDRW:@keypath_get_arg_layout[.0-9]*]],
-// CHECK-SAME:     @swift_keyPathGenericWitnessTable,
-// CHECK-SAME:     [[ARG_INIT_COMPUTEDRW:@keypath_arg_init[.0-9]*]] }>
+// -- 0x01c8_0000 - computed, settable, mutating, has arguments, indirect id
+// CHECK-SAME:  <{ <i32 0x02c8_0002>, 
+// CHECK-SAME:     @got.id_computed
+// CHECK-SAME:     [[GET_COMPUTEDRW:@keypath_get[.0-9]*]]
+// CHECK-SAME:     [[SET_COMPUTEDRW:@keypath_set[.0-9]*]]
+// CHECK-SAME:     [[GET_ARG_LAYOUT_COMPUTEDRW:@keypath_get_arg_layout[.0-9]*]]
+// CHECK-SAME:     i32 0
+// CHECK-SAME:     [[ARG_INIT_COMPUTEDRW:@keypath_arg_init[.0-9]*]]
 sil_property #ExternalGeneric.computedRW <T: Comparable> (
   settable_property $T,
     id @id_computed : $@convention(thin) () -> (),
@@ -80,14 +81,14 @@ sil_property #ExternalGeneric.computedRW <T: Comparable> (
     setter @set_computed_generic : $@convention(thin) <T: Comparable> (@in_guaranteed T, @inout ExternalGeneric<T>) -> ())
 
 // CHECK: @"$s19property_descriptor15ExternalGenericVyxqd__cSHRd__luipMV" =
-// -- 0x01c8_0000 - computed, settable, mutating, has arguments
-// CHECK-SAME:  <{ <i32 0x02c8_0000>, 
-// CHECK-SAME:     @id_computed,
-// CHECK-SAME:     [[GET_SUBSCRIPT:@keypath_get[.0-9]*]],
-// CHECK-SAME:     [[SET_SUBSCRIPT:@keypath_set[.0-9]*]],
-// CHECK-SAME:     [[GET_ARG_LAYOUT_SUBSCRIPT:@keypath_get_arg_layout[.0-9]*]],
-// CHECK-SAME:     @swift_keyPathGenericWitnessTable,
-// CHECK-SAME:     [[ARG_INIT_SUBSCRIPT:@keypath_arg_init[.0-9]*]] }>
+// -- 0x01c8_0000 - computed, settable, mutating, has arguments, indirect id
+// CHECK-SAME:  <{ <i32 0x02c8_0002>, 
+// CHECK-SAME:     @got.id_computed
+// CHECK-SAME:     [[GET_SUBSCRIPT:@keypath_get[.0-9]*]]
+// CHECK-SAME:     [[SET_SUBSCRIPT:@keypath_set[.0-9]*]]
+// CHECK-SAME:     [[GET_ARG_LAYOUT_SUBSCRIPT:@keypath_get_arg_layout[.0-9]*]]
+// CHECK-SAME:     i32 0
+// CHECK-SAME:     [[ARG_INIT_SUBSCRIPT:@keypath_arg_init[.0-9]*]]
 sil_property #ExternalGeneric.subscript <T: Comparable><U: Hashable> (
   settable_property $T,
     id @id_computed : $@convention(thin) () -> (),

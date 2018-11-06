@@ -2036,6 +2036,20 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
   return gotEquivalent;
 }
 
+llvm::Constant *IRGenModule::getOrCreateGOTEquivalent(llvm::Constant *global,
+                                                      LinkEntity entity) {
+  auto &gotEntry = GlobalGOTEquivalents[entity];
+  if (gotEntry) {
+    return gotEntry;
+  }
+
+  // Use the global as the initializer for an anonymous constant. LLVM can treat
+  // this as equivalent to the global's GOT entry.
+  auto gotEquivalent = createGOTEquivalent(*this, global, entity);
+  gotEntry = gotEquivalent;
+  return gotEquivalent;
+}
+
 static llvm::Constant *getElementBitCast(llvm::Constant *ptr,
                                          llvm::Type *newEltType) {
   auto ptrType = cast<llvm::PointerType>(ptr->getType());
@@ -2203,6 +2217,19 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
 ConstantReference
 IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
                               ConstantReference::Directness forceIndirectness) {
+  // Handle SILFunctions specially, because unlike other entities they aren't
+  // variables and aren't kept in the GlobalVars table.
+  if (entity.isSILFunction()) {
+    auto fn = getAddrOfSILFunction(entity.getSILFunction(), NotForDefinition);
+    if (entity.getSILFunction()->isDefinition()
+        && !isAvailableExternally(entity.getSILFunction()->getLinkage())) {
+      return {fn, ConstantReference::Direct};
+    }
+    
+    auto gotEquivalent = getOrCreateGOTEquivalent(fn, entity);
+    return {gotEquivalent, ConstantReference::Indirect};
+  }
+  
   // ObjC class references can always be directly referenced, even in
   // the weird cases where we don't see a definition.
   if (entity.isObjCClassRef()) {
@@ -2211,7 +2238,7 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
     return { cast<llvm::Constant>(value.getAddress()),
              ConstantReference::Direct };
   }
-
+  
   // Ensure the variable is at least forward-declared.
   if (entity.isForeignTypeMetadataCandidate()) {
     auto foreignCandidate
@@ -2251,17 +2278,8 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
   
   /// Returns an indirect reference.
   auto indirect = [&]() -> ConstantReference {
-    auto &gotEntry = GlobalGOTEquivalents[entity];
-    if (gotEntry) {
-      return {gotEntry, ConstantReference::Indirect};
-    }
-
-    // Look up the global variable.
-    auto global = cast<llvm::GlobalValue>(entry);
-    // Use it as the initializer for an anonymous constant. LLVM can treat this as
-    // equivalent to the global's GOT entry.
-    auto gotEquivalent = createGOTEquivalent(*this, global, entity);
-    gotEntry = gotEquivalent;
+    auto gotEquivalent = getOrCreateGOTEquivalent(
+      cast<llvm::GlobalValue>(entry), entity);
     return {gotEquivalent, ConstantReference::Indirect};
   };
   

@@ -519,6 +519,11 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   llvm_unreachable("bad link entity kind");
 }
 
+static bool isAvailableExternally(IRGenModule &IGM, SILFunction *F) {
+  // TODO
+  return true;
+}
+
 static bool isAvailableExternally(IRGenModule &IGM, const DeclContext *dc) {
   dc = dc->getModuleScopeContext();
   if (isa<ClangModuleUnit>(dc) ||
@@ -619,16 +624,24 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::DefaultAssociatedConformanceAccessor:
     return false;
 
+  case Kind::SILFunction:
+    return ::isAvailableExternally(IGM, getSILFunction());
+
+  case Kind::FieldOffset: {
+    return ::isAvailableExternally(IGM,
+                                   cast<VarDecl>(getDecl())
+                                     ->getDeclContext()
+                                     ->getInnermostTypeContext());
+  }
+  
   case Kind::ObjCMetadataUpdateFunction:
   case Kind::ValueWitness:
   case Kind::TypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
-  case Kind::FieldOffset:
   case Kind::ProtocolWitnessTableLazyAccessFunction:
   case Kind::ProtocolWitnessTableLazyCacheVariable:
   case Kind::AssociatedTypeWitnessTableAccessFunction:
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
-  case Kind::SILFunction:
   case Kind::SILGlobalVariable:
   case Kind::ReflectionBuiltinDescriptor:
   case Kind::ReflectionFieldDescriptor:

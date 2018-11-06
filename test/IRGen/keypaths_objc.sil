@@ -17,15 +17,15 @@ sil_vtable C {}
 
 sil @x_get : $@convention(thin) (@in_guaranteed C) -> @out NSString
 
-// CHECK: [[KEYPATH_A:@keypath.*]] = private global
+// CHECK: [[KEYPATH_A:@keypath(\..*)?]] = private global
 // --             computed, get-only, indirect identifier
 // CHECK-SAME: <i32 0x0200_0002>,
 // CHECK-SAME: i8** @"\01L_selector(x)"
 
-// CHECK: [[KEYPATH_B:@keypath.*]] = private global
+// CHECK: [[KEYPATH_B:@keypath(\..*)?]] = private global
 // --             class mutable stored property with indirect offset
 // CHECK-SAME: <i32 0x03fffffd>,
-// CHECK-SAME: @"$s13keypaths_objc1CC6storedSivpWvd"
+// CHECK-SAME: @"got.$s13keypaths_objc1CC6storedSivpWvd"
 
 // CHECK-LABEL: define swiftcc void @objc_only_property()
 sil @objc_only_property : $@convention(thin) () -> () {
