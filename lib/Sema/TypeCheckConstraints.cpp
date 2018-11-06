@@ -2092,12 +2092,6 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
         cs.cacheExprTypes(closure);
         return closure;
       }
-
-      bool isInDefaultArgContext() const {
-        if (auto *init = dyn_cast<Initializer>(DC))
-          return init->getInitializerKind() == InitializerKind::DefaultArgument;
-        return false;
-      }
     };
 
     auto *fnType = paramType->castTo<FunctionType>();
