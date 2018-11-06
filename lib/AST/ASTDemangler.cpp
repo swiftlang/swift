@@ -79,6 +79,12 @@ Type ASTBuilder::createNominalType(NominalTypeDecl *decl, Type parent) {
   if (decl->getGenericParams())
     return Type();
 
+  if (!parent && decl->hasClangNode()) {
+    if (auto *parentNominal = decl->getDeclContext()->getSelfNominalTypeDecl())
+      if (!parentNominal->isGenericContext())
+        parent = parentNominal->getDeclaredType();
+  }
+
   // Validate the parent type.
   if (!validateNominalParent(decl, parent))
     return Type();
