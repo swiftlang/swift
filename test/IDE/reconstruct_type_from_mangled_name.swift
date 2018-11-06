@@ -1,5 +1,4 @@
 // RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | %FileCheck %s -implicit-check-not="FAILURE"
-// XFAIL: *
 
 struct Mystruct1 {
 // CHECK: decl: struct Mystruct1
