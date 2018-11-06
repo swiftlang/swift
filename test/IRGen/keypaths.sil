@@ -33,7 +33,14 @@ struct G<T> {
   subscript<U: Hashable>(x: U) -> T { get set }
 }
 
+class C1: C { }
+class C2: C1 {
+  var reabstracted: () -> ()
+}
+
 sil_vtable C {}
+sil_vtable C1 {}
+sil_vtable C2 {}
 
 // CHECK: %TSi = type <{ [[WORD:i.*]] }>
 
@@ -195,6 +202,10 @@ sil_vtable C {}
 // CHECK-SAME: void (%swift.function*, %T8keypaths1SV*)* @m_get,
 // CHECK-SAME: void (%swift.function*, %T8keypaths1SV*)* @m_set }>
 
+// -- %m2: reabstracted
+// Note: the contents here aren't interesting. The test triggered infinite
+// looping in the compiler at one point.
+// CHECK: [[KP_M:@keypath.*]] = private global <{ {{.*}} }> <{
 
 // -- %i: Gen<A>.x
 // CHECK: [[KP_I:@keypath.*]] = private global <{ {{.*}} }> <{
@@ -261,6 +272,7 @@ entry:
   %k = keypath $KeyPath<S, Int>, (root $S; gettable_property $Int, id @k_id : $@convention(thin) () -> (), getter @k_get : $@convention(thin) (@in_guaranteed S) -> @out Int)
   %l = keypath $KeyPath<C, Int>, (root $C; settable_property $Int, id #C.w!getter.1, getter @l_get : $@convention(thin) (@in_guaranteed C) -> @out Int, setter @l_set : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ())
   %m = keypath $KeyPath<S, () -> ()>, (root $S; settable_property $() -> (), id ##S.reabstracted, getter @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed () -> @out (), setter @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed () -> @out (), @inout S) -> ())
+  %m2 = keypath $KeyPath<C2, () -> ()>, (root $C2; settable_property $() -> (), id ##C2.reabstracted, getter @m2_get : $@convention(thin) (@in_guaranteed C2) -> @out @callee_guaranteed () -> @out (), setter @m2_set : $@convention(thin) (@in_guaranteed @callee_guaranteed () -> @out (), @inout C2) -> ())
 
   return undef : $()
 }
@@ -273,6 +285,9 @@ sil @l_set : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ()
 
 sil @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed () -> @out ()
 sil @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed () -> @out (), @inout S) -> ()
+
+sil @m2_get : $@convention(thin) (@in_guaranteed C2) -> @out @callee_guaranteed () -> @out ()
+sil @m2_set : $@convention(thin) (@in_guaranteed @callee_guaranteed () -> @out (), @inout C2) -> ()
 
 struct Gen<T, U> {
   var x: T
