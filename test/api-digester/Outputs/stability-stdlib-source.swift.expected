@@ -5,17 +5,100 @@ Protocol StringProtocol has generic signature change from <Self : BidirectionalC
 /* RawRepresentable Changes */
 
 /* Removed Decls */
+Constructor ClosedRange.init(_:) has been removed (deprecated)
+Constructor Range.init(_:) has been removed (deprecated)
 Constructor String.init(stringInterpolationSegment:) has been removed
+Func Collection.distance(from:to:) has been removed (deprecated)
+Func Collection.flatMap(_:) has been removed (deprecated)
+Func Collection.formIndex(_:offsetBy:) has been removed (deprecated)
+Func Collection.formIndex(_:offsetBy:limitedBy:) has been removed (deprecated)
+Func Collection.index(_:offsetBy:) has been removed (deprecated)
+Func Collection.index(_:offsetBy:limitedBy:) has been removed (deprecated)
 Func Collection.prefix(through:) has been removed
 Func Collection.prefix(upTo:) has been removed
 Func Collection.suffix(from:) has been removed
+Func LazyCollectionProtocol.flatMap(_:) has been removed (deprecated)
 Func Sequence.filter(_:) has been removed
 Func Sequence.forEach(_:) has been removed
 Func Sequence.map(_:) has been removed
+Func String.withMutableCharacters(_:) has been removed (deprecated)
+Func Substring.withMutableCharacters(_:) has been removed (deprecated)
+Func UnsafeMutablePointer.deallocate(capacity:) has been removed (deprecated)
+Func UnsafeMutablePointer.deinitialize() has been removed (deprecated)
+Func UnsafeMutablePointer.initialize(from:) has been removed (deprecated)
+Func UnsafeMutablePointer.initialize(to:count:) has been removed (deprecated)
+Func UnsafeMutableRawBufferPointer.allocate(count:) has been removed (deprecated)
+Func UnsafeMutableRawBufferPointer.copyBytes(from:) has been removed (deprecated)
+Func UnsafeMutableRawPointer.allocate(bytes:alignedTo:) has been removed (deprecated)
+Func UnsafeMutableRawPointer.copyBytes(from:count:) has been removed (deprecated)
+Func UnsafeMutableRawPointer.deallocate(bytes:alignedTo:) has been removed (deprecated)
+Func UnsafeMutableRawPointer.initializeMemory(as:at:count:to:) has been removed (deprecated)
+Func UnsafeMutableRawPointer.initializeMemory(as:from:) has been removed (deprecated)
 Func _SequenceWrapper.filter(_:) has been removed
 Func _SequenceWrapper.forEach(_:) has been removed
 Func _SequenceWrapper.map(_:) has been removed
+TypeAlias ArrayLiteralConvertible has been removed (deprecated)
+TypeAlias BidirectionalIndexable has been removed (deprecated)
+TypeAlias BidirectionalSlice has been removed (deprecated)
+TypeAlias BooleanLiteralConvertible has been removed (deprecated)
+TypeAlias ClosedRangeIndex has been removed (deprecated)
+TypeAlias CustomPlaygroundQuickLookable has been removed (deprecated)
+TypeAlias DefaultBidirectionalIndices has been removed (deprecated)
+TypeAlias DefaultRandomAccessIndices has been removed (deprecated)
+TypeAlias DictionaryLiteralConvertible has been removed (deprecated)
+TypeAlias EmptyIterator has been removed (deprecated)
 TypeAlias ExpressibleByStringInterpolation has been removed (deprecated)
+TypeAlias ExtendedGraphemeClusterLiteralConvertible has been removed (deprecated)
+TypeAlias FlattenBidirectionalCollection has been removed (deprecated)
+TypeAlias FlattenBidirectionalCollectionIndex has been removed (deprecated)
+TypeAlias FlattenCollectionIndex has been removed (deprecated)
+TypeAlias FloatLiteralConvertible has been removed (deprecated)
+TypeAlias Indexable has been removed (deprecated)
+TypeAlias IndexableBase has been removed (deprecated)
+TypeAlias IntegerLiteralConvertible has been removed (deprecated)
+TypeAlias IteratorOverOne has been removed (deprecated)
+TypeAlias JoinedIterator has been removed (deprecated)
+TypeAlias LazyBidirectionalCollection has been removed (deprecated)
+TypeAlias LazyDropWhileBidirectionalCollection has been removed (deprecated)
+TypeAlias LazyDropWhileIndex has been removed (deprecated)
+TypeAlias LazyDropWhileIterator has been removed (deprecated)
+TypeAlias LazyFilterBidirectionalCollection has been removed (deprecated)
+TypeAlias LazyFilterIndex has been removed (deprecated)
+TypeAlias LazyFilterIterator has been removed (deprecated)
+TypeAlias LazyMapBidirectionalCollection has been removed (deprecated)
+TypeAlias LazyMapIterator has been removed (deprecated)
+TypeAlias LazyMapRandomAccessCollection has been removed (deprecated)
+TypeAlias LazyPrefixWhileBidirectionalCollection has been removed (deprecated)
+TypeAlias LazyPrefixWhileIndex has been removed (deprecated)
+TypeAlias LazyPrefixWhileIterator has been removed (deprecated)
+TypeAlias LazyRandomAccessCollection has been removed (deprecated)
+TypeAlias MutableBidirectionalSlice has been removed (deprecated)
+TypeAlias MutableIndexable has been removed (deprecated)
+TypeAlias MutableRandomAccessSlice has been removed (deprecated)
+TypeAlias MutableRangeReplaceableBidirectionalSlice has been removed (deprecated)
+TypeAlias MutableRangeReplaceableRandomAccessSlice has been removed (deprecated)
+TypeAlias MutableRangeReplaceableSlice has been removed (deprecated)
+TypeAlias MutableSlice has been removed (deprecated)
+TypeAlias NilLiteralConvertible has been removed (deprecated)
+TypeAlias RandomAccessIndexable has been removed (deprecated)
+TypeAlias RandomAccessSlice has been removed (deprecated)
+TypeAlias RangeReplaceableBidirectionalSlice has been removed (deprecated)
+TypeAlias RangeReplaceableIndexable has been removed (deprecated)
+TypeAlias RangeReplaceableRandomAccessSlice has been removed (deprecated)
+TypeAlias RangeReplaceableSlice has been removed (deprecated)
+TypeAlias ReversedIndex has been removed (deprecated)
+TypeAlias ReversedRandomAccessCollection has been removed (deprecated)
+TypeAlias String.CharacterView has been removed (deprecated)
+TypeAlias StringInterpolationConvertible has been removed (deprecated)
+TypeAlias StringLiteralConvertible has been removed (deprecated)
+TypeAlias Substring.CharacterView has been removed (deprecated)
+TypeAlias UnicodeScalarLiteralConvertible has been removed (deprecated)
+TypeAlias UnsafeBufferPointerIterator has been removed (deprecated)
+TypeAlias UnsafeMutableRawBufferPointerIterator has been removed (deprecated)
+TypeAlias UnsafeRawBufferPointerIterator has been removed (deprecated)
+TypeAlias Zip2Iterator has been removed (deprecated)
+TypeAlias Zip2Sequence.Stream1 has been removed (deprecated)
+TypeAlias Zip2Sequence.Stream2 has been removed (deprecated)
 Var AnyBidirectionalCollection.first has been removed
 Var AnyBidirectionalCollection.last has been removed
 Var AnyCollection.first has been removed
@@ -29,6 +112,8 @@ Var LazyCollection.last has been removed
 Var LazyMapCollection.first has been removed
 Var LazyMapCollection.last has been removed
 Var Set.first has been removed
+Var String.characters has been removed (deprecated)
+Var Substring.characters has been removed (deprecated)
 
 /* Moved Decls */
 
