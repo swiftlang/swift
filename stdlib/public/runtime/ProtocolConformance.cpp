@@ -203,14 +203,15 @@ namespace {
     /// Module in which we expect to find the conformance, or nullptr if
     /// we don't know/care.
     const char *Module;
-    std::atomic<const WitnessTable *> Table;
+    std::atomic<const ProtocolConformanceDescriptor *> Description;
     std::atomic<size_t> FailureGeneration;
 
   public:
     ConformanceCacheEntry(ConformanceCacheKey key,
-                          const WitnessTable *table,
+                          const ProtocolConformanceDescriptor *description,
                           size_t failureGeneration)
-      : Type(key.Type), Proto(key.Proto), Module(key.Module), Table(table),
+      : Type(key.Type), Proto(key.Proto), Module(key.Module),
+        Description(description),
         FailureGeneration(failureGeneration) {
     }
 
@@ -237,11 +238,11 @@ namespace {
     }
 
     bool isSuccessful() const {
-      return Table.load(std::memory_order_relaxed) != nullptr;
+      return Description.load(std::memory_order_relaxed) != nullptr;
     }
 
-    void makeSuccessful(const WitnessTable *table) {
-      Table.store(table, std::memory_order_release);
+    void makeSuccessful(const ProtocolConformanceDescriptor *description) {
+      Description.store(description, std::memory_order_release);
     }
 
     void updateFailureGeneration(size_t failureGeneration) {
@@ -252,10 +253,10 @@ namespace {
     /// Get the module in which we expected to find this conformance.
     const char *getModule() const { return Module; }
 
-    /// Get the cached witness table, if successful.
-    const WitnessTable *getWitnessTable() const {
+    /// Get the cached conformance descriptor, if successful.
+    const ProtocolConformanceDescriptor *getDescription() const {
       assert(isSuccessful());
-      return Table.load(std::memory_order_acquire);
+      return Description.load(std::memory_order_acquire);
     }
     
     /// Get the generation in which this lookup failed.
@@ -281,12 +282,13 @@ struct ConformanceState {
 
   std::pair<ConformanceCacheEntry *, bool>
   cacheResult(const void *type, const ProtocolDescriptor *proto,
-              const char *module, const WitnessTable *witness,
+              const char *module,
+              const ProtocolConformanceDescriptor *description,
               size_t failureGeneration) {
     // When there is no module, directly check/update the cache.
     ConformanceCacheKey key(type, proto, module);
     if (!module)
-      return Cache.getOrInsert(key, witness, failureGeneration);
+      return Cache.getOrInsert(key, description, failureGeneration);
 
     // Look for an existing entry. If we have one, return it.
     if (auto known = findCached(type, proto, module))
@@ -302,7 +304,7 @@ struct ConformanceState {
     key.Module = newModule;
 
     // Update the cache.
-    auto result = Cache.getOrInsert(key, witness, failureGeneration);
+    auto result = Cache.getOrInsert(key, description, failureGeneration);
 
     // If we didn't manage to perform the insertion, free the memory we just
     // allocated for the module: nobody else can reference it.
@@ -314,12 +316,13 @@ struct ConformanceState {
   }
 
   void cacheSuccess(const void *type, const ProtocolDescriptor *proto,
-                    const char *module, const WitnessTable *witness) {
-    auto result = cacheResult(type, proto, module, witness, 0);
+                    const char *module,
+                    const ProtocolConformanceDescriptor *description) {
+    auto result = cacheResult(type, proto, module, description, 0);
 
     // If the entry was already present, we may need to update it.
     if (!result.second) {
-      result.first->makeSuccessful(witness);
+      result.first->makeSuccessful(description);
     }
   }
 
@@ -394,21 +397,22 @@ swift::swift_registerProtocolConformances(const ProtocolConformanceRecord *begin
 
 
 struct ConformanceCacheResult {
-  // true if witnessTable is an authoritative result as-is.
+  // true if description is an authoritative result as-is.
   // false if more searching is required (for example, because a cached
   // failure was returned in failureEntry but it is out-of-date.
   bool isAuthoritative;
 
-  // The matching witness table, or null if no cached conformance was found.
-  const WitnessTable *witnessTable;
+  // The matching conformance descriptor, or null if no cached conformance
+  // was found.
+  const ProtocolConformanceDescriptor *description;
 
   // If the search fails, this may be the negative cache entry for the
   // queried type itself. This entry may be null or out-of-date.
   ConformanceCacheEntry *failureEntry;
 
   static ConformanceCacheResult
-  cachedSuccess(const WitnessTable *table) {
-    return ConformanceCacheResult { true, table, nullptr };
+  cachedSuccess(const ProtocolConformanceDescriptor *description) {
+    return ConformanceCacheResult { true, description, nullptr };
   }
 
   static ConformanceCacheResult
@@ -431,7 +435,7 @@ static const void *getConformanceCacheTypeKey(const Metadata *type) {
   return type;
 }
 
-/// Search for a witness table in the ConformanceCache.
+/// Search for a conformance descriptor in the ConformanceCache.
 static
 ConformanceCacheResult
 searchInConformanceCache(const Metadata *type,
@@ -447,7 +451,7 @@ recur:
     if (auto *Value = C.findCached(type, protocol, module)) {
       if (Value->isSuccessful()) {
         // Found a conformance on the type or some superclass. Return it.
-        return ConformanceCacheResult::cachedSuccess(Value->getWitnessTable());
+        return ConformanceCacheResult::cachedSuccess(Value->getDescription());
       }
 
       // Found a negative cache entry.
@@ -489,7 +493,7 @@ recur:
     // Hash and lookup the type-protocol pair in the cache.
     if (auto *Value = C.findCached(typeKey, protocol, module)) {
       if (Value->isSuccessful())
-        return ConformanceCacheResult::cachedSuccess(Value->getWitnessTable());
+        return ConformanceCacheResult::cachedSuccess(Value->getDescription());
 
       // We don't try to cache negative responses for generic
       // patterns.
@@ -549,7 +553,7 @@ bool isRelatedType(const Metadata *type, const void *candidate,
   return false;
 }
 
-const WitnessTable *
+const ProtocolConformanceDescriptor *
 swift::_conformsToSwiftProtocol(const Metadata * const type,
                                 const ProtocolDescriptor *protocol,
                                 const char *module) {
@@ -560,7 +564,7 @@ swift::_conformsToSwiftProtocol(const Metadata * const type,
   auto FoundConformance = searchInConformanceCache(type, protocol, module);
   // If the result (positive or negative) is authoritative, return it.
   if (FoundConformance.isAuthoritative)
-    return FoundConformance.witnessTable;
+    return FoundConformance.description;
 
   auto failureEntry = FoundConformance.failureEntry;
 
@@ -628,21 +632,8 @@ swift::_conformsToSwiftProtocol(const Metadata * const type,
     std::pair<const ProtocolConformanceDescriptor *, const Metadata *>;
   std::vector<Candidate> candidates;
 
-  /// Local function to retrieve the witness table and record the result.
-  bool foundExactMatch = false;
-  auto recordWitnessTable = [&](const ProtocolConformanceDescriptor &descriptor,
-                                const Metadata *type) {
-    auto witnessTable = descriptor.getWitnessTable(type);
-    if (witnessTable) {
-      C.cacheSuccess(type, protocol, module, witnessTable);
-
-      foundExactMatch = true;
-    } else {
-      C.cacheFailure(type, protocol, module, snapshot.count());
-    }
-  };
-
   /// Local function to record a result.
+  bool foundExactMatch = false;
   auto recordResult = [&](const ProtocolConformanceDescriptor &descriptor,
                           const Metadata *type) {
     switch (auto match = matchModule(descriptor)) {
@@ -661,7 +652,8 @@ swift::_conformsToSwiftProtocol(const Metadata * const type,
     }
 
     // Record the match.
-    recordWitnessTable(descriptor, type);
+    C.cacheSuccess(type, protocol, module, &descriptor);
+    foundExactMatch = true;
   };
 
   // Really scan conformance records.
@@ -682,12 +674,8 @@ swift::_conformsToSwiftProtocol(const Metadata * const type,
         if (!isRelatedType(type, metadata, /*candidateIsMetadata=*/true))
           continue;
 
-        // Record the witness table.
+        // Record the conformance descriptor.
         recordResult(descriptor, metadata);
-
-      // TODO: "Nondependent witness table" probably deserves its own flag.
-      // An accessor function might still be necessary even if the witness table
-      // can be shared.
       } else if (descriptor.getTypeKind()
                    == TypeReferenceKind::DirectNominalTypeDescriptor ||
                  descriptor.getTypeKind()
@@ -772,14 +760,15 @@ swift::_conformsToSwiftProtocol(const Metadata * const type,
       }
     }
 
-    recordWitnessTable(*candidates[bestIdx].first, candidates[bestIdx].second);
+    C.cacheSuccess(candidates[bestIdx].second, protocol, module,
+                   candidates[bestIdx].first);
   }
 
   // Search the cache once more, and this time update the cache if necessary.
 
   FoundConformance = searchInConformanceCache(type, protocol, module);
   if (FoundConformance.isAuthoritative) {
-    return FoundConformance.witnessTable;
+    return FoundConformance.description;
   } else {
     C.cacheFailure(type, protocol, module, snapshot.count());
     return nullptr;
@@ -789,7 +778,12 @@ swift::_conformsToSwiftProtocol(const Metadata * const type,
 static const WitnessTable *
 swift_conformsToProtocolImpl(const Metadata * const type,
                              const ProtocolDescriptor *protocol) {
-  return _conformsToSwiftProtocol(type, protocol, /*module=*/nullptr);
+  auto description =
+    _conformsToSwiftProtocol(type, protocol, /*module=*/nullptr);
+  if (!description)
+    return nullptr;
+
+  return description->getWitnessTable(type);
 }
 
 const TypeContextDescriptor *

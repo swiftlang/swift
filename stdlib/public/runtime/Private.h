@@ -452,8 +452,9 @@ public:
                            ProtocolDescriptorRef protocol,
                            const WitnessTable **conformance);
 
-  /// Determine whether the given type conforms to the given Swift protocol.
-  const WitnessTable *
+  /// Determine whether the given type conforms to the given Swift protocol,
+  /// returning the appropriate protocol conformance descriptor when it does.
+  const ProtocolConformanceDescriptor *
   _conformsToSwiftProtocol(const Metadata * const type,
                            const ProtocolDescriptor *protocol,
                            const char *module);
