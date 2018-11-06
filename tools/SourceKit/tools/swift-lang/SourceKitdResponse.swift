@@ -12,6 +12,7 @@
 // This file provides convenient APIs to interpret a SourceKitd response.
 //===----------------------------------------------------------------------===//
 
+import Foundation
 import sourcekitd
 
 public class SourceKitdResponse: CustomStringConvertible {
@@ -58,6 +59,15 @@ public class SourceKitdResponse: CustomStringConvertible {
     public func getDictionary(_ key: SourceKitdUID) -> Dictionary {
       let value = sourcekitd_variant_dictionary_get_value(dict, key.uid)
       return Dictionary(dict: value, context: context)
+    }
+
+    public func getData(_ key: SourceKitdUID) -> Data {
+      let value = sourcekitd_variant_dictionary_get_value(dict, key.uid)
+      let size = sourcekitd_variant_data_get_size(value)
+      guard let ptr = sourcekitd_variant_data_get_ptr(value), size > 0 else {
+        return Data()
+      }
+      return Data(bytes: ptr, count: size)
     }
 
     public func getOptional(_ key: SourceKitdUID) -> Variant? {
@@ -186,6 +196,14 @@ public class SourceKitdResponse: CustomStringConvertible {
 
     public func getDictionary() -> Dictionary {
       return Dictionary(dict: val, context: context)
+    }
+
+    public func getData() -> Data {
+      let size = sourcekitd_variant_data_get_size(val)
+      guard let ptr = sourcekitd_variant_data_get_ptr(val), size > 0 else {
+        return Data()
+      }
+      return Data(bytes: ptr, count: size)
     }
 
     public var description: String {
