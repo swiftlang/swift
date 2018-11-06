@@ -35,7 +35,8 @@ public protocol SIMDVector : SIMDVectorStorage, Hashable, CustomStringConvertibl
   associatedtype Mask : SIMDMaskVector
 }
 
-public protocol SIMDMaskVector : SIMDVector where Scalar == Bool, Mask == Self { }
+public protocol SIMDMaskVector : SIMDVector where Scalar == Bool, Mask == Self {
+}
 
 public extension SIMDVector {
   /// The valid indices for subscripting the vector.
@@ -106,6 +107,20 @@ public extension SIMDMaskVector {
   static func .&(lhs: Self, rhs: Self) -> Self {
     var result = Self()
     for i in result.indices { result[i] = lhs[i] && rhs[i] }
+    return result
+  }
+  
+  @_transparent
+  static func .^(lhs: Self, rhs: Self) -> Self {
+    var result = Self()
+    for i in result.indices { result[i] = lhs[i] != rhs[i] }
+    return result
+  }
+  
+  @_transparent
+  static func .|(lhs: Self, rhs: Self) -> Self {
+    var result = Self()
+    for i in result.indices { result[i] = lhs[i] || rhs[i] }
     return result
   }
 }
@@ -224,9 +239,36 @@ public extension SIMDVector {
 
 public extension SIMDMaskVector {
   @_transparent static prefix func .!(rhs: Self) -> Self { return false .== rhs }
+  @_transparent static func .&(lhs: Scalar, rhs: Self) -> Self { return Self(repeating: lhs) .& rhs }
+  @_transparent static func .^(lhs: Scalar, rhs: Self) -> Self { return Self(repeating: lhs) .^ rhs }
+  @_transparent static func .|(lhs: Scalar, rhs: Self) -> Self { return Self(repeating: lhs) .| rhs }
+  @_transparent static func .&(lhs: Self, rhs: Scalar) -> Self { return lhs .& Self(repeating: rhs) }
+  @_transparent static func .^(lhs: Self, rhs: Scalar) -> Self { return lhs .^ Self(repeating: rhs) }
+  @_transparent static func .|(lhs: Self, rhs: Scalar) -> Self { return lhs .| Self(repeating: rhs) }
+  @_transparent static func .&(lhs: inout Self, rhs: Self) { lhs = lhs .& rhs }
+  @_transparent static func .^(lhs: inout Self, rhs: Self) { lhs = lhs .^ rhs }
+  @_transparent static func .|(lhs: inout Self, rhs: Self) { lhs = lhs .| rhs }
+  @_transparent static func .&(lhs: inout Self, rhs: Scalar) { lhs = lhs .& rhs }
+  @_transparent static func .^(lhs: inout Self, rhs: Scalar) { lhs = lhs .^ rhs }
+  @_transparent static func .|(lhs: inout Self, rhs: Scalar) { lhs = lhs .| rhs }
+}
+
+public extension SIMDVector where Scalar : Comparable {
+  @_transparent static func .>=(lhs: Self, rhs: Self) -> Mask { return rhs .<= lhs }
+  @_transparent static func .>(lhs: Self, rhs: Self) -> Mask { return rhs .< lhs }
+  @_transparent static func .<(lhs: Scalar, rhs: Self) -> Mask { return Self(repeating: lhs) .< rhs }
+  @_transparent static func .<=(lhs: Scalar, rhs: Self) -> Mask { return Self(repeating: lhs) .<= rhs }
+  @_transparent static func .>=(lhs: Scalar, rhs: Self) -> Mask { return Self(repeating: lhs) .>= rhs }
+  @_transparent static func .>(lhs: Scalar, rhs: Self) -> Mask { return Self(repeating: lhs) .> rhs }
+  @_transparent static func .<(lhs: Self, rhs: Scalar) -> Mask { return lhs .< Self(repeating: rhs) }
+  @_transparent static func .<=(lhs: Self, rhs: Scalar) -> Mask { return lhs .<= Self(repeating: rhs) }
+  @_transparent static func .>=(lhs: Self, rhs: Scalar) -> Mask { return lhs .>= Self(repeating: rhs) }
+  @_transparent static func .>(lhs: Self, rhs: Scalar) -> Mask { return lhs .> Self(repeating: rhs) }
 }
 
 public extension SIMDVector where Scalar : FixedWidthInteger {
+  @_transparent static var zero: Self { return Self() }
+  
   @_transparent static func &(lhs: Scalar, rhs: Self) -> Self { return Self(repeating: lhs) & rhs }
   @_transparent static func ^(lhs: Scalar, rhs: Self) -> Self { return Self(repeating: lhs) ^ rhs }
   @_transparent static func |(lhs: Scalar, rhs: Self) -> Self { return Self(repeating: lhs) | rhs }
@@ -249,27 +291,27 @@ public extension SIMDVector where Scalar : FixedWidthInteger {
   @_transparent static func /(lhs: Self, rhs: Scalar) -> Self { return lhs / Self(repeating: rhs) }
   @_transparent static func %(lhs: Self, rhs: Scalar) -> Self { return lhs % Self(repeating: rhs) }
   
-  @_transparent static func &=(lhs: inout Self, rhs: Self) { return lhs = lhs & rhs }
-  @_transparent static func ^=(lhs: inout Self, rhs: Self) { return lhs = lhs ^ rhs }
-  @_transparent static func |=(lhs: inout Self, rhs: Self) { return lhs = lhs | rhs }
-  @_transparent static func &<<=(lhs: inout Self, rhs: Self) { return lhs = lhs &<< rhs }
-  @_transparent static func &>>=(lhs: inout Self, rhs: Self) { return lhs = lhs &>> rhs }
-  @_transparent static func &+=(lhs: inout Self, rhs: Self) { return lhs = lhs &+ rhs }
-  @_transparent static func &-=(lhs: inout Self, rhs: Self) { return lhs = lhs &- rhs }
-  @_transparent static func &*=(lhs: inout Self, rhs: Self) { return lhs = lhs &* rhs }
-  @_transparent static func /=(lhs: inout Self, rhs: Self) { return lhs = lhs / rhs }
-  @_transparent static func %=(lhs: inout Self, rhs: Self) { return lhs = lhs % rhs }
+  @_transparent static func &=(lhs: inout Self, rhs: Self) { lhs = lhs & rhs }
+  @_transparent static func ^=(lhs: inout Self, rhs: Self) { lhs = lhs ^ rhs }
+  @_transparent static func |=(lhs: inout Self, rhs: Self) { lhs = lhs | rhs }
+  @_transparent static func &<<=(lhs: inout Self, rhs: Self) { lhs = lhs &<< rhs }
+  @_transparent static func &>>=(lhs: inout Self, rhs: Self) { lhs = lhs &>> rhs }
+  @_transparent static func &+=(lhs: inout Self, rhs: Self) { lhs = lhs &+ rhs }
+  @_transparent static func &-=(lhs: inout Self, rhs: Self) { lhs = lhs &- rhs }
+  @_transparent static func &*=(lhs: inout Self, rhs: Self) { lhs = lhs &* rhs }
+  @_transparent static func /=(lhs: inout Self, rhs: Self) { lhs = lhs / rhs }
+  @_transparent static func %=(lhs: inout Self, rhs: Self) { lhs = lhs % rhs }
   
-  @_transparent static func &=(lhs: inout Self, rhs: Scalar) { return lhs = lhs & rhs }
-  @_transparent static func ^=(lhs: inout Self, rhs: Scalar) { return lhs = lhs ^ rhs }
-  @_transparent static func |=(lhs: inout Self, rhs: Scalar) { return lhs = lhs | rhs }
-  @_transparent static func &<<=(lhs: inout Self, rhs: Scalar) { return lhs = lhs &<< rhs }
-  @_transparent static func &>>=(lhs: inout Self, rhs: Scalar) { return lhs = lhs &>> rhs }
-  @_transparent static func &+=(lhs: inout Self, rhs: Scalar) { return lhs = lhs &+ rhs }
-  @_transparent static func &-=(lhs: inout Self, rhs: Scalar) { return lhs = lhs &- rhs }
-  @_transparent static func &*=(lhs: inout Self, rhs: Scalar) { return lhs = lhs &* rhs }
-  @_transparent static func /=(lhs: inout Self, rhs: Scalar) { return lhs = lhs / rhs }
-  @_transparent static func %=(lhs: inout Self, rhs: Scalar) { return lhs = lhs % rhs }
+  @_transparent static func &=(lhs: inout Self, rhs: Scalar) { lhs = lhs & rhs }
+  @_transparent static func ^=(lhs: inout Self, rhs: Scalar) { lhs = lhs ^ rhs }
+  @_transparent static func |=(lhs: inout Self, rhs: Scalar) { lhs = lhs | rhs }
+  @_transparent static func &<<=(lhs: inout Self, rhs: Scalar) { lhs = lhs &<< rhs }
+  @_transparent static func &>>=(lhs: inout Self, rhs: Scalar) { lhs = lhs &>> rhs }
+  @_transparent static func &+=(lhs: inout Self, rhs: Scalar) { lhs = lhs &+ rhs }
+  @_transparent static func &-=(lhs: inout Self, rhs: Scalar) { lhs = lhs &- rhs }
+  @_transparent static func &*=(lhs: inout Self, rhs: Scalar) { lhs = lhs &* rhs }
+  @_transparent static func /=(lhs: inout Self, rhs: Scalar) { lhs = lhs / rhs }
+  @_transparent static func %=(lhs: inout Self, rhs: Scalar) { lhs = lhs % rhs }
 }
 
 public protocol SIMDVectorizable {
@@ -277,6 +319,9 @@ public protocol SIMDVectorizable {
   associatedtype _Vector2 : SIMDVectorStorage where _Vector2.Scalar == Self
   associatedtype _Vector4 : SIMDVectorStorage where _Vector4.Scalar == Self
   associatedtype _Vector8 : SIMDVectorStorage where _Vector8.Scalar == Self
+  associatedtype _Vector16 : SIMDVectorStorage where _Vector16.Scalar == Self
+  associatedtype _Vector32 : SIMDVectorStorage where _Vector32.Scalar == Self
+  associatedtype _Vector64 : SIMDVectorStorage where _Vector64.Scalar == Self
 }
 
 @_fixed_layout

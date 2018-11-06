@@ -1,7 +1,7 @@
 %{
 from SwiftIntTypes import all_integer_types
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
-storageElementCounts = [2,4,8]
+storageElementCounts = [2,4,8,16,32,64]
 vectorElementCounts = storageElementCounts + [3]
 }%
 
@@ -9,10 +9,21 @@ vectorElementCounts = storageElementCounts + [3]
 % storageN = 4 if n == 3 else n
 @_fixed_layout
 public struct Vector${n}<Scalar> : SIMDVector where Scalar: SIMDVectorizable {
+
   public var _storage: Scalar._Vector${storageN}
+
   public typealias Mask = SIMDMask<Vector${n}<Scalar._MaskElement>>
-  @_transparent public var elementCount: Int { return ${n} }
-  @_transparent public init() { _storage = Scalar._Vector${storageN}() }
+
+  @_transparent
+  public var elementCount: Int {
+    return ${n}
+  }
+
+  @_transparent
+  public init() {
+    _storage = Scalar._Vector${storageN}()
+  }
+
   public subscript(index: Int) -> Scalar {
     @inlinable get {
       _precondition(indices.contains(index))
