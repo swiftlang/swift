@@ -1,5 +1,5 @@
 // TODO: Revert to %target-run-simple-swift once we fold dynamic compilation into -Onone.
-// RUN: %target-run-disable-deabstraction-swift
+// RUN: %target-run-dynamic-compilation-swift
 // REQUIRES: executable_test
 
 import CTensorFlow
