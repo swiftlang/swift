@@ -96,6 +96,34 @@ public extension Vector${n} where Scalar : FixedWidthInteger {
     self.init()
     for i in indices { self[i] = Scalar(clamping: other[i]) }
   }
+
+  @inlinable
+  init<Other>(
+    _ other: Vector${n}<Other>,
+    rounding rule: FloatingPointRoundingRule = .towardZero
+  )
+  where Other : BinaryFloatingPoint {
+    self.init()
+    // TODO: this should clamp
+    for i in indices { self[i] = Scalar(other[i].rounded(rule)) }
+  }
+}
+
+
+public extension Vector${n} where Scalar : BinaryFloatingPoint {
+  @inlinable
+  init<Other>(_ other: Vector${n}<Other>)
+  where Other : FixedWidthInteger {
+    self.init()
+    for i in indices { self[i] = Scalar(other[i]) }
+  }
+
+  @inlinable
+  init<Other>(_ other: Vector${n}<Other>)
+  where Other : BinaryFloatingPoint {
+    self.init()
+    for i in indices { self[i] = Scalar(other[i]) }
+  }
 }
 
 %end

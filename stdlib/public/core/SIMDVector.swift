@@ -78,6 +78,13 @@ public extension SIMDVector {
     for i in result.indices { result[i] = lhs[i] == rhs[i] }
     return result
   }
+  
+  /// Replaces elements of this vector with `other` in the lanes where
+  /// `mask` is `true`.
+  @_transparent
+  mutating func replace(with other: Self, where mask: Mask) {
+    for i in indices { self[i] = mask[i] ? other[i] : self[i] }
+  }
 }
 
 //  Implementations of comparison operations. These should eventually all
@@ -288,6 +295,23 @@ public extension SIMDVector {
   @_transparent static func .!=(lhs: Scalar, rhs: Self) -> Mask { return Self(repeating: lhs) .!= rhs }
   @_transparent static func .==(lhs: Self, rhs: Scalar) -> Mask { return lhs .== Self(repeating: rhs) }
   @_transparent static func .!=(lhs: Self, rhs: Scalar) -> Mask { return lhs .!= Self(repeating: rhs) }
+  
+  @_transparent
+  mutating func replace(with other: Scalar, where mask: Mask) {
+    replace(with: Self(repeating: other), where: mask)
+  }
+  
+  @_transparent
+  func replacing(with other: Self, where mask: Mask) -> Self {
+    var result = self
+    result.replace(with: other, where: mask)
+    return result
+  }
+  
+  @_transparent
+  func replacing(with other: Scalar, where mask: Mask) -> Self {
+    return replacing(with: Self(repeating: other), where: mask)
+  }
 }
 
 public extension SIMDMaskVector {
