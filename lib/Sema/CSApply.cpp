@@ -2094,55 +2094,24 @@ namespace {
       Diag<> brokenBuiltinProtocolDiag;
 
       if (isStringLiteral) {
-        // If the string contains only ASCII, force a UTF8 representation
-        bool forceASCII = stringLiteral != nullptr;
-        if (forceASCII) {
-          for (auto c: stringLiteral->getValue()) {
-            if (c & (1 << 7)) {
-              forceASCII = false;
-              break;
-            }
-          }
-        }
-        
         literalType = tc.Context.Id_StringLiteralType;
 
         literalFuncName = DeclName(tc.Context, DeclBaseName::createConstructor(),
                                    { tc.Context.Id_stringLiteral });
 
-        // If the string contains non-ASCII and the type can handle
-        // UTF-16 string literals, prefer them.
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
-            KnownProtocolKind::ExpressibleByBuiltinUTF16StringLiteral);
+            KnownProtocolKind::ExpressibleByBuiltinStringLiteral);
+        builtinLiteralFuncName
+          = DeclName(tc.Context, DeclBaseName::createConstructor(),
+                     { tc.Context.Id_builtinStringLiteral,
+                       tc.Context.getIdentifier("utf8CodeUnitCount"),
+                       tc.Context.getIdentifier("isASCII") });
+        if (stringLiteral)
+          stringLiteral->setEncoding(StringLiteralExpr::UTF8);
+        else
+          magicLiteral->setStringEncoding(StringLiteralExpr::UTF8);
 
-        if (!forceASCII && (tc.conformsToProtocol(
-                                      type, builtinProtocol, cs.DC,
-                                      ConformanceCheckFlags::InExpression))) {
-          builtinLiteralFuncName =
-              DeclName(tc.Context, DeclBaseName::createConstructor(),
-                       {tc.Context.Id_builtinUTF16StringLiteral,
-                        tc.Context.getIdentifier("utf16CodeUnitCount")});
-
-          if (stringLiteral)
-            stringLiteral->setEncoding(StringLiteralExpr::UTF16);
-          else
-            magicLiteral->setStringEncoding(StringLiteralExpr::UTF16);
-        } else {
-          // Otherwise, fall back to UTF-8.
-          builtinProtocol = tc.getProtocol(
-              expr->getLoc(),
-              KnownProtocolKind::ExpressibleByBuiltinStringLiteral);
-          builtinLiteralFuncName 
-            = DeclName(tc.Context, DeclBaseName::createConstructor(),
-                       { tc.Context.Id_builtinStringLiteral,
-                         tc.Context.getIdentifier("utf8CodeUnitCount"),
-                         tc.Context.getIdentifier("isASCII") });
-          if (stringLiteral)
-            stringLiteral->setEncoding(StringLiteralExpr::UTF8);
-          else
-            magicLiteral->setStringEncoding(StringLiteralExpr::UTF8);
-        }
         brokenProtocolDiag = diag::string_literal_broken_proto;
         brokenBuiltinProtocolDiag = diag::builtin_string_literal_broken_proto;
       } else if (isGraphemeClusterLiteral) {
@@ -2163,26 +2132,6 @@ namespace {
             diag::extended_grapheme_cluster_literal_broken_proto;
         brokenBuiltinProtocolDiag =
             diag::builtin_extended_grapheme_cluster_literal_broken_proto;
-
-        auto *builtinUTF16ExtendedGraphemeClusterProtocol = tc.getProtocol(
-            expr->getLoc(),
-            KnownProtocolKind::ExpressibleByBuiltinUTF16ExtendedGraphemeClusterLiteral);
-        if (tc.conformsToProtocol(type,
-                                  builtinUTF16ExtendedGraphemeClusterProtocol,
-                                  cs.DC, ConformanceCheckFlags::InExpression)) {
-          builtinLiteralFuncName
-            = DeclName(tc.Context, DeclBaseName::createConstructor(),
-                       { tc.Context.Id_builtinExtendedGraphemeClusterLiteral,
-                         tc.Context.getIdentifier("utf16CodeUnitCount") });
-
-          builtinProtocol = builtinUTF16ExtendedGraphemeClusterProtocol;
-          brokenBuiltinProtocolDiag =
-            diag::builtin_utf16_extended_grapheme_cluster_literal_broken_proto;
-          if (stringLiteral)
-            stringLiteral->setEncoding(StringLiteralExpr::UTF16);
-          else
-            magicLiteral->setStringEncoding(StringLiteralExpr::UTF16);
-        }
       } else {
         // Otherwise, we should have just one Unicode scalar.
         literalType = tc.Context.Id_UnicodeScalarLiteralType;
@@ -2227,91 +2176,104 @@ namespace {
       auto type = simplifyType(openedType);
       cs.setType(expr, type);
 
-      // Find the string interpolation protocol we need.
-      auto &tc = cs.getTypeChecker();
-      auto interpolationProto
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::ExpressibleByStringInterpolation);
-      assert(interpolationProto && "Missing string interpolation protocol?");
-
-      DeclName name(tc.Context, DeclBaseName::createConstructor(),
-                    { tc.Context.Id_stringInterpolation });
-      auto member
-        = findNamedWitnessImpl(
-            tc, dc, type,
-            interpolationProto, name,
-            diag::interpolation_broken_proto);
-
-      DeclName segmentName(tc.Context, DeclBaseName::createConstructor(),
-                           { tc.Context.Id_stringInterpolationSegment });
-      auto segmentMember
-        = findNamedWitnessImpl(
-            tc, dc, type, interpolationProto, segmentName,
-            diag::interpolation_broken_proto);
-      if (!member ||
-          !segmentMember ||
-          !isa<ConstructorDecl>(member.getDecl()) ||
-          !isa<ConstructorDecl>(segmentMember.getDecl()))
-        return nullptr;
-
-      // Build a reference to the init(stringInterpolation:) initializer.
-      // FIXME: This location info is bogus.
-      auto *typeRef = TypeExpr::createImplicitHack(expr->getStartLoc(), type,
-                                                   tc.Context);
-
-      Expr *memberRef =
-        new (tc.Context) MemberRefExpr(typeRef,
-                                       expr->getStartLoc(),
-                                       member.getDecl(),
-                                       DeclNameLoc(expr->getStartLoc()),
-                                       /*Implicit=*/true);
-      cs.cacheSubExprTypes(memberRef);
-      cs.setSubExprTypes(memberRef);
-      bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
-      cs.cacheExprTypes(memberRef);
-      assert(!failed && "Could not reference string interpolation witness");
-      (void)failed;
-
-      // Create a tuple containing all of the segments.
-      SmallVector<Expr *, 4> segments;
-      SmallVector<Identifier, 4> names;
-      ConstraintLocatorBuilder locatorBuilder(cs.getConstraintLocator(expr));
-      auto getType = [&](const Expr *E) -> Type {
-        return cs.getType(E);
-      };
-
-      for (auto segment : expr->getSegments()) {
-        ApplyExpr *apply =
-          CallExpr::createImplicit(
-            tc.Context, typeRef,
-            { segment },
-            { tc.Context.Id_stringInterpolationSegment }, getType);
-        cs.cacheSubExprTypes(apply);
-
-        Expr *convertedSegment = apply;
-        cs.setSubExprTypes(convertedSegment);
-        if (tc.typeCheckExpressionShallow(convertedSegment, cs.DC))
-          continue;
-        cs.cacheExprTypes(convertedSegment);
-
-        segments.push_back(convertedSegment);
-
-        if (names.empty()) {
-          names.push_back(tc.Context.Id_stringInterpolation);
-        } else {
-          names.push_back(Identifier());
-        }
+      if (expr->getSemanticExpr() != nullptr) {
+        return expr;
       }
 
-      // If all of the segments had errors, bail out.
-      if (segments.empty())
-        return nullptr;
+      auto &tc = cs.getTypeChecker();
+      auto loc = expr->getStartLoc();
 
-      // Call the init(stringInterpolation:) initializer with the arguments.
-      ApplyExpr *apply = CallExpr::createImplicit(tc.Context, memberRef,
-                                                  segments, names, getType);
-      cs.cacheExprTypes(apply);
-      expr->setSemanticExpr(finishApply(apply, openedType, locatorBuilder));
+      auto buildProtocolInitCall =
+        [&](KnownProtocolKind protocolKind, Type type, 
+            ArrayRef<Identifier> argLabels, ArrayRef<Expr *> args) -> Expr * {
+
+        auto proto = tc.getProtocol(loc, protocolKind);
+        assert(proto && "Missing string interpolation protocol?");
+
+        auto conformance =
+          tc.conformsToProtocol(type, proto, cs.DC,
+                              ConformanceCheckFlags::InExpression);
+        assert(conformance && "string interpolation type conforms to protocol");
+
+        DeclName constrName(tc.Context, DeclBaseName::createConstructor(), argLabels);
+        
+        Expr *base = TypeExpr::createImplicitHack(loc, type,
+                                                  tc.Context);
+        Expr *semanticExpr = tc.callWitness(base, dc, proto, *conformance,
+                                            constrName, args,
+                                            diag::interpolation_broken_proto);
+        if (semanticExpr)
+          cs.cacheExprTypes(semanticExpr);
+
+        return semanticExpr;
+      };
+
+      auto associatedTypeArray = 
+        tc.getProtocol(expr->getLoc(),
+             KnownProtocolKind::ExpressibleByStringInterpolation)
+          ->lookupDirect(tc.Context.Id_StringInterpolation);
+      if (associatedTypeArray.empty()) {
+        tc.diagnose(expr->getStartLoc(), diag::interpolation_broken_proto);
+        return nullptr;
+      }
+      auto associatedTypeDecl =
+        cast<AssociatedTypeDecl>(associatedTypeArray.front());
+      auto interpolationType =
+        simplifyType(DependentMemberType::get(openedType, associatedTypeDecl));
+
+      // interpolationInitCall = """
+      //   StringInterpolationProtocol.init(
+      //     literalCapacity: \(expr->getLiteralCapacity()), 
+      //     interpolationCount: \(expr->getInterpolationCount()))
+      //   """
+
+      // Make the integer literals for the parameters.
+      Expr *literalCapacity =
+        IntegerLiteralExpr::createFromUnsigned(tc.Context,
+                                               expr->getLiteralCapacity());
+      cs.setType(literalCapacity, tc.getIntType(cs.DC));
+      literalCapacity =
+        handleIntegerLiteralExpr((LiteralExpr*)literalCapacity);
+
+      Expr *interpolationCount =
+        IntegerLiteralExpr::createFromUnsigned(tc.Context,
+                                               expr->getInterpolationCount());
+      cs.setType(interpolationCount, tc.getIntType(cs.DC));
+      interpolationCount =
+        handleIntegerLiteralExpr((LiteralExpr*)interpolationCount);
+
+      // Make the call itself.
+      auto interpolationInitCall =
+        buildProtocolInitCall(
+          KnownProtocolKind::StringInterpolationProtocol, interpolationType,
+          { tc.Context.Id_literalCapacity, tc.Context.Id_interpolationCount },
+          { literalCapacity, interpolationCount });
+
+      // appendingExpr = """
+      //   _tap var \(expr->getBody()->getElement(0)) = 
+      //         \(interpolationInitCall) {
+      //     \(expr->getBody())
+      //   }
+      //   """
+
+      auto appendingExpr = expr->getAppendingExpr();
+      appendingExpr->setSubExpr(interpolationInitCall);
+
+      // initStringInterpolationExpr = """
+      //   ExpressibleByStringInterpolation.init(
+      //     stringInterpolation: \(appendingExpr))
+      //   """
+
+      auto initStringInterpolationExpr =
+        buildProtocolInitCall(
+          KnownProtocolKind::ExpressibleByStringInterpolation, type, 
+          { tc.Context.Id_stringInterpolation },
+          { appendingExpr });
+
+      // Set that as the semantic expr.
+      expr->setSemanticExpr(initStringInterpolationExpr);
+
+      // And we're done!
       return expr;
     }
     
@@ -4565,6 +4527,18 @@ namespace {
 
     Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) {
       llvm_unreachable("found KeyPathDotExpr in CSApply");
+    }
+
+    Expr *visitTapExpr(TapExpr *E) {
+      auto type = simplifyType(cs.getType(E));
+
+      E->getVar()->setType(type);
+      E->getVar()->setInterfaceType(type->mapTypeOutOfContext());
+
+      cs.setType(E, type);
+      E->setType(type);
+
+      return E;
     }
 
     /// Interface for ExprWalker
@@ -7570,12 +7544,17 @@ namespace {
   class ExprWalker : public ASTWalker {
     ExprRewriter &Rewriter;
     SmallVector<ClosureExpr *, 4> ClosuresToTypeCheck;
+    SmallVector<std::pair<TapExpr *, DeclContext *>, 4> TapsToTypeCheck;
 
   public:
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
 
     const SmallVectorImpl<ClosureExpr *> &getClosuresToTypeCheck() const {
       return ClosuresToTypeCheck;
+    }
+
+    const SmallVectorImpl<std::pair<TapExpr *, DeclContext *>> &getTapsToTypeCheck() const {
+      return TapsToTypeCheck;
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
@@ -7639,6 +7618,12 @@ namespace {
         tc.ClosuresWithUncomputedCaptures.push_back(closure);
 
         return { false, closure };
+      }
+
+      if (auto tap = dyn_cast_or_null<TapExpr>(expr)) {
+        // We remember the DeclContext because the code to handle
+        // single-expression-body closures above changes it.
+        TapsToTypeCheck.push_back(std::make_pair(tap, Rewriter.dc));
       }
 
       Rewriter.walkToExprPre(expr);
@@ -7751,12 +7736,19 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
     bool hadError = false;
     for (auto *closure : walker.getClosuresToTypeCheck())
       hadError |= tc.typeCheckClosureBody(closure);
-    
-    // If any of the closures failed to type check, bail.
+
+    // Tap expressions too; they should or should not be
+    // type-checked under the same conditions as closure bodies.
+    for (auto tuple : walker.getTapsToTypeCheck()) {
+      auto tap = std::get<0>(tuple);
+      auto tapDC = std::get<1>(tuple);
+      hadError |= tc.typeCheckTapBody(tap, tapDC);
+    }
+
+    // If any of them failed to type check, bail.
     if (hadError)
       return nullptr;
   }
-  
   
   // If we're supposed to convert the expression to some particular type,
   // do so now.
@@ -7774,17 +7766,6 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
   if (result)
     rewriter.finalize(result);
 
-  return result;
-}
-
-Expr *ConstraintSystem::applySolutionShallow(const Solution &solution,
-                                             Expr *expr,
-                                             bool suppressDiagnostics) {
-  ExprRewriter rewriter(*this, solution, suppressDiagnostics);
-  rewriter.walkToExprPre(expr);
-  Expr *result = rewriter.walkToExprPost(expr);
-  if (result)
-    rewriter.finalize(result);
   return result;
 }
 
@@ -7840,7 +7821,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                ProtocolDecl *protocol,
                                ProtocolConformanceRef conformance,
                                DeclName name,
-                               MutableArrayRef<Expr *> arguments,
+                               ArrayRef<Expr *> arguments,
                                Diag<> brokenProtocolDiag) {
   // Construct an empty constraint system and solution.
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());

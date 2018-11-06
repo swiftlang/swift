@@ -116,3 +116,19 @@ func r31977679_1(_ properties: [String: String]) -> Any? {
 func r31977679_2(_ properties: [String: String]) -> Any? {
   return properties["foo"] // Ok
 }
+
+// rdar://problem/45819956 - inout-to-pointer in a subscript arg could use a better diagnostic
+func rdar_45819956() {
+  struct S {
+    subscript(takesPtr ptr: UnsafeMutablePointer<Int>) -> Int {
+      get { return 0 }
+    }
+  }
+
+  let s = S()
+  var i = 0
+
+  // TODO: It should be possible to suggest `withUnsafe[Mutable]Pointer` as a fix-it
+  _ = s[takesPtr: &i]
+  // expected-error@-1 {{cannot pass an inout argument to a subscript; use 'withUnsafeMutablePointer' to explicitly convert argument to a pointer}}
+}

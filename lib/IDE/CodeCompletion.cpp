@@ -5259,8 +5259,10 @@ namespace  {
       if (E == ChildExpr || arePositionsSame(E, ChildExpr))
         return { false, nullptr };
 
-      if (Predicate(E, Parent))
+      if (E != ChildExpr && Predicate(E, Parent)) {
         Ancestors.push_back(E);
+        return { true, E };
+      }
       return { true, E };
     }
 
@@ -5626,7 +5628,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (isa<BindOptionalExpr>(ParsedExpr) || isa<ForceValueExpr>(ParsedExpr))
       Lookup.setIsUnwrappedOptional(true);
 
-    ::CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext, ParsedExpr);
+    ::CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext,
+                                                     ParsedExpr);
     llvm::SmallVector<Type, 2> PossibleTypes;
     if (TypeAnalyzer.Analyze(PossibleTypes)) {
       Lookup.setExpectedTypes(PossibleTypes);
@@ -5671,7 +5674,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::ForEachSequence:
   case CompletionKind::PostfixExprBeginning: {
     ::CodeCompletionTypeContextAnalyzer Analyzer(CurDeclContext,
-                                               CodeCompleteTokenExpr);
+                                                 CodeCompleteTokenExpr);
     llvm::SmallVector<Type, 1> Types;
     if (Analyzer.Analyze(Types)) {
       Lookup.setExpectedTypes(Types);
@@ -5699,7 +5702,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.setHaveLParen(true);
 
     ::CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext,
-                                                   CodeCompleteTokenExpr);
+                                                     CodeCompleteTokenExpr);
     SmallVector<Type, 2> PossibleTypes;
     SmallVector<StringRef, 2> PossibleNames;
     if (TypeAnalyzer.Analyze(PossibleTypes, PossibleNames)) {

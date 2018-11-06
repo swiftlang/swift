@@ -31,7 +31,11 @@
         "swift-xcode-playground-support": {
             "remote": { "id": "apple/swift-xcode-playground-support" } },
         "ninja": {
-            "remote": { "id": "ninja-build/ninja" } }
+            "remote": { "id": "ninja-build/ninja" } },
+        "icu": {
+            "remote": { "id": "unicode-org/icu" },
+            "platforms": [ "Linux" ]
+        }
     },
     "default-branch-scheme": "master",
     "branch-schemes": {
@@ -52,7 +56,8 @@
                 "swift-corelibs-libdispatch": "master",
                 "swift-integration-tests": "master",
                 "swift-xcode-playground-support": "master",
-                "ninja": "release"
+                "ninja": "release",
+                "icu": "release-61-1"
             }
         },
         "next" : {
@@ -74,7 +79,8 @@
                 "swift-corelibs-libdispatch": "master",
                 "swift-integration-tests": "master",
                 "swift-xcode-playground-support": "master",
-                "ninja": "release"
+                "ninja": "release",
+                "icu": "release-61-1"
             }
         },
         "swift-3.0-branch" : {
@@ -185,16 +191,17 @@
                 "compiler-rt": "swift-5.0-branch",
                 "swift": "swift-5.0-branch",
                 "lldb": "swift-5.0-branch",
-                "cmark": "master",
-                "llbuild": "master",
-                "swiftpm": "master",
-                "swift-syntax": "master",
-                "swift-corelibs-xctest": "master",
-                "swift-corelibs-foundation": "master",
-                "swift-corelibs-libdispatch": "master",
-                "swift-integration-tests": "master",
-                "swift-xcode-playground-support": "master",
-                "ninja": "release"
+                "cmark": "swift-5.0-branch",
+                "llbuild": "swift-5.0-branch",
+                "swiftpm": "swift-5.0-branch",
+                "swift-syntax": "swift-5.0-branch",
+                "swift-corelibs-xctest": "swift-5.0-branch",
+                "swift-corelibs-foundation": "swift-5.0-branch",
+                "swift-corelibs-libdispatch": "swift-5.0-branch",
+                "swift-integration-tests": "swift-5.0-branch",
+                "swift-xcode-playground-support": "swift-5.0-branch",
+                "ninja": "release",
+                "icu": "release-61-1"
             }
         }
     }

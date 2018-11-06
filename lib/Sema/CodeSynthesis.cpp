@@ -300,7 +300,8 @@ static AccessorDecl *createSetterPrototype(TypeChecker &TC,
 
   // Always add the setter to the context immediately after the getter.
   if (!getter) getter = storage->getGetter();
-  assert(getter && "always synthesize setter prototype after getter");
+  if (!getter) getter = storage->getReadCoroutine();
+  assert(getter && "always synthesize setter prototype after get/read");
   addMemberToContextIfNeeded(setter, storage->getDeclContext(), getter);
 
   return setter;
@@ -1204,6 +1205,16 @@ namespace {
           CLE.Var->setDeclContext(NewDC);
           CLE.Init->setDeclContext(NewDC);
         }
+      }
+      
+      // Unlike a closure, a TapExpr is not a DeclContext, so we need to
+      // recontextualize its variable and then anything else in its body.
+      // FIXME: Might be better to change walkToDeclPre() and walkToStmtPre()
+      // below, but I don't know what other effects that might have.
+      if (auto TE = dyn_cast<TapExpr>(E)) {
+        TE->getVar()->setDeclContext(NewDC);
+        for (auto node : TE->getBody()->getElements())
+          node.walk(RecontextualizeClosures(NewDC));
       }
 
       return { true, E };

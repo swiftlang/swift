@@ -28,7 +28,6 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Parse/SyntaxParsingCache.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
@@ -79,6 +78,7 @@ namespace swift {
   class ValueDecl;
   class VarDecl;
   class VisibleDeclConsumer;
+  class SyntaxParsingCache;
   
 namespace syntax {
   class SourceFileSyntax;

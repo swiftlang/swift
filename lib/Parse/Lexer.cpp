@@ -267,9 +267,7 @@ Token Lexer::getTokenAt(SourceLoc Loc) {
           HashbangMode::Allowed, CommentRetentionMode::None,
           TriviaRetentionMode::WithoutTrivia);
   L.restoreState(State(Loc));
-  Token Result;
-  L.lex(Result);
-  return Result;
+  return L.peekNextToken();
 }
 
 void Lexer::formToken(tok Kind, const char *TokStart) {

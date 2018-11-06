@@ -26,10 +26,10 @@ func createErrorDomain(str: String) -> ErrorDomain {
 // CHECK-RAW: [[BRIDGE_FN:%[0-9]+]] = function_ref @{{.*}}_bridgeToObjectiveC
 // CHECK-RAW: [[BORROWED_COPIED_STR:%.*]] = begin_borrow [[COPIED_STR]]
 // CHECK-RAW: [[BRIDGED:%[0-9]+]] = apply [[BRIDGE_FN]]([[BORROWED_COPIED_STR]])
+// CHECK-RAW: end_borrow [[BORROWED_COPIED_STR]]
 // CHECK-RAW: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB_BOX]]
 // CHECK-RAW: [[RAWVALUE_ADDR:%[0-9]+]] = struct_element_addr [[WRITE]]
 // CHECK-RAW: assign [[BRIDGED]] to [[RAWVALUE_ADDR]]
-// CHECK-RAW: end_borrow [[BORROWED_COPIED_STR]]
 // CHECK-RAW: end_borrow [[BORROWED_STR]]
 
 func getRawValue(ed: ErrorDomain) -> String {

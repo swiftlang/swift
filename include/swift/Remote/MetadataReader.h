@@ -498,18 +498,39 @@ public:
 #if SWIFT_OBJC_INTEROP
         // Check whether we have an Objective-C protocol.
         if (ProtocolAddress.isObjC()) {
-          auto MangledNameStr =
+          auto Name =
             readObjCProtocolName(ProtocolAddress.getObjCProtocol());
+          StringRef NameStr(Name);
 
-          StringRef MangledName =
-            Demangle::dropSwiftManglingPrefix(MangledNameStr);
+          // If this is a Swift-defined protocol, demangle it.
+          if (NameStr.startswith("_TtP")) {
+            Demangle::Context DCtx;
+            auto Demangled = DCtx.demangleSymbolAsNode(NameStr);
+            if (!Demangled)
+              return BuiltType();
 
-          Demangle::Context DCtx;
-          auto Demangled = DCtx.demangleTypeAsNode(MangledName);
-          if (!Demangled)
-            return BuiltType();
+            // FIXME: This appears in _swift_buildDemanglingForMetadata().
+            while (Demangled->getKind() == Node::Kind::Global ||
+                   Demangled->getKind() == Node::Kind::TypeMangling ||
+                   Demangled->getKind() == Node::Kind::Type ||
+                   Demangled->getKind() == Node::Kind::ProtocolList ||
+                   Demangled->getKind() == Node::Kind::TypeList ||
+                   Demangled->getKind() == Node::Kind::Type) {
+              if (Demangled->getNumChildren() != 1)
+                return BuiltType();
+              Demangled = Demangled->getFirstChild();
+            }
 
-          auto Protocol = Builder.createProtocolDecl(Demangled);
+            auto Protocol = Builder.createProtocolDecl(Demangled);
+            if (!Protocol)
+              return BuiltType();
+
+            Protocols.push_back(Protocol);
+            continue;
+          }
+
+          // Otherwise, this is an imported protocol.
+          auto Protocol = Builder.createObjCProtocolDecl(NameStr);
           if (!Protocol)
             return BuiltType();
 
@@ -518,6 +539,7 @@ public:
         }
 #endif
 
+        // Swift-native protocol.
         Demangle::Demangler Dem;
         auto Demangled = readDemanglingForContextDescriptor(
             ProtocolAddress.getSwiftProtocol(), Dem);

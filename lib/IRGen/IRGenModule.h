@@ -929,6 +929,9 @@ private:
                               StringRef funcName,
                               CopyAddrHelperGenerator generator);
 
+  llvm::Constant *getOrCreateGOTEquivalent(llvm::Constant *global,
+                                           LinkEntity entity);
+                                           
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
@@ -1045,12 +1048,6 @@ public:
   /// without knowledge of their contents. This includes imported structs
   /// and fixed-size multi-payload enums.
   llvm::SetVector<const NominalTypeDecl *> OpaqueTypes;
-  /// Imported classes referenced by types in this module when emitting
-  /// reflection metadata.
-  llvm::SetVector<const ClassDecl *> ImportedClasses;
-  /// Imported protocols referenced by types in this module when emitting
-  /// reflection metadata.
-  llvm::SetVector<const ProtocolDecl *> ImportedProtocols;
   /// Imported structs referenced by types in this module when emitting
   /// reflection metadata.
   llvm::SetVector<const StructDecl *> ImportedStructs;

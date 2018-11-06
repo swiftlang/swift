@@ -125,6 +125,15 @@ func deallocBytes(
   pointer.deallocate()
 }
 
+@_transparent
+func _swift_stdlib_atomicStoreUInt64(
+  object target: UnsafeMutablePointer<UInt64>,
+  desired: UInt64
+) {
+  Builtin.atomicstore_seqcst_Int64(target._rawValue, desired._value)
+}
+
+
 func _swift_stdlib_atomicStoreInt(
   object target: UnsafeMutablePointer<Int>,
   desired: Int) {

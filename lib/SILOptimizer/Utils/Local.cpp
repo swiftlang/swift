@@ -732,16 +732,10 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   auto AILeftOperandsNum = AILeft->getNumOperands();
   auto AIRightOperandsNum = AIRight->getNumOperands();
 
-  // makeUTF16 should have following parameters:
-  // (start: RawPointer, utf16CodeUnitCount: Word)
   // makeUTF8 should have following parameters:
   // (start: RawPointer, utf8CodeUnitCount: Word, isASCII: Int1)
-  if (!((FRILeftFun->hasSemanticsAttr("string.makeUTF16") &&
-         AILeftOperandsNum == 4) ||
-        (FRILeftFun->hasSemanticsAttr("string.makeUTF8") &&
+  if (!((FRILeftFun->hasSemanticsAttr("string.makeUTF8") &&
          AILeftOperandsNum == 5) ||
-        (FRIRightFun->hasSemanticsAttr("string.makeUTF16") &&
-         AIRightOperandsNum == 4) ||
         (FRIRightFun->hasSemanticsAttr("string.makeUTF8") &&
          AIRightOperandsNum == 5)))
     return false;
@@ -1411,53 +1405,94 @@ bool swift::isSimpleType(SILType SILTy, SILModule& Module) {
   return true;
 }
 
-/// Check if the value of V is computed by means of a simple initialization.
-/// Store the actual SILValue into Val and the reversed list of instructions
-/// initializing it in Insns.
-///
-/// The check is performed by recursively walking the computation of the SIL
-/// value being analyzed.
-bool
-swift::analyzeStaticInitializer(SILValue V,
-                                SmallVectorImpl<SILInstruction *> &Insts) {
-  // Save every instruction we see.
-  // TODO: MultiValueInstruction?
-  if (auto *I = dyn_cast<SingleValueInstruction>(V))
-    Insts.push_back(I);
+// Encapsulate the state used for recursive analysis of a static
+// initializer. Discover all the instruction in a use-def graph and return them
+// in topological order.
+//
+// TODO: We should have a DFS utility for this sort of thing so it isn't
+// recursive.
+class StaticInitializerAnalysis {
+  SmallVectorImpl<SILInstruction *> &postOrderInstructions;
+  llvm::SmallDenseSet<SILValue, 8> visited;
+  int recursionLevel = 0;
 
-  if (auto *SI = dyn_cast<StructInst>(V)) {
-    // If it is not a struct which is a simple type, bail.
-    if (!isSimpleType(SI->getType(), SI->getModule()))
-      return false;
-    return llvm::all_of(SI->getAllOperands(), [&](Operand &Op) -> bool {
-      return analyzeStaticInitializer(Op.get(), Insts);
-    });
+public:
+  StaticInitializerAnalysis(
+      SmallVectorImpl<SILInstruction *> &postOrderInstructions)
+      : postOrderInstructions(postOrderInstructions) {}
+
+  // Perform a recursive DFS on on the use-def graph rooted at `V`. Insert
+  // values in the `visited` set in preorder. Insert values in
+  // `postOrderInstructions` in postorder so that the instructions are
+  // topologically def-use ordered (in execution order).
+  bool analyze(SILValue RootValue) {
+    return recursivelyAnalyzeOperand(RootValue);
   }
 
-  if (auto *TI = dyn_cast<TupleInst>(V)) {
-    // If it is not a tuple which is a simple type, bail.
-    if (!isSimpleType(TI->getType(), TI->getModule()))
+protected:
+  bool recursivelyAnalyzeOperand(SILValue V) {
+    if (!visited.insert(V).second)
+      return true;
+
+    if (++recursionLevel > 50)
       return false;
-    return llvm::all_of(TI->getAllOperands(), [&](Operand &Op) -> bool {
-      return analyzeStaticInitializer(Op.get(), Insts);
-    });
+
+    // TODO: For multi-result instructions, we could simply insert all result
+    // values in the visited set here.
+    auto *I = dyn_cast<SingleValueInstruction>(V);
+    if (!I)
+      return false;
+
+    if (!recursivelyAnalyzeInstruction(I))
+      return false;
+
+    postOrderInstructions.push_back(I);
+    --recursionLevel;
+    return true;
   }
 
-  if (auto *bi = dyn_cast<BuiltinInst>(V)) {
-    switch (bi->getBuiltinInfo().ID) {
-    case BuiltinValueKind::FPTrunc:
-      if (auto *LI = dyn_cast<LiteralInst>(bi->getArguments()[0])) {
-        return analyzeStaticInitializer(LI, Insts);
-      }
-      return false;
-    default:
-      return false;
+  bool recursivelyAnalyzeInstruction(SILInstruction *I) {
+    if (auto *SI = dyn_cast<StructInst>(I)) {
+      // If it is not a struct which is a simple type, bail.
+      if (!isSimpleType(SI->getType(), SI->getModule()))
+        return false;
+
+      return llvm::all_of(SI->getAllOperands(), [&](Operand &Op) -> bool {
+        return recursivelyAnalyzeOperand(Op.get());
+      });
     }
-  }
+    if (auto *TI = dyn_cast<TupleInst>(I)) {
+      // If it is not a tuple which is a simple type, bail.
+      if (!isSimpleType(TI->getType(), TI->getModule()))
+        return false;
 
-  return isa<IntegerLiteralInst>(V)
-    || isa<FloatLiteralInst>(V)
-    || isa<StringLiteralInst>(V);
+      return llvm::all_of(TI->getAllOperands(), [&](Operand &Op) -> bool {
+        return recursivelyAnalyzeOperand(Op.get());
+      });
+    }
+    if (auto *bi = dyn_cast<BuiltinInst>(I)) {
+      switch (bi->getBuiltinInfo().ID) {
+      case BuiltinValueKind::FPTrunc:
+        if (auto *LI = dyn_cast<LiteralInst>(bi->getArguments()[0])) {
+          return recursivelyAnalyzeOperand(LI);
+        }
+        return false;
+      default:
+        return false;
+      }
+    }
+    return isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I)
+           || isa<StringLiteralInst>(I);
+  }
+};
+
+/// Check if the value of V is computed by means of a simple initialization.
+/// Populate `forwardInstructions` with references to all the instructions
+/// that participate in the use-def graph required to compute `V`. The
+/// instructions will be in def-use topological order.
+bool swift::analyzeStaticInitializer(
+    SILValue V, SmallVectorImpl<SILInstruction *> &forwardInstructions) {
+  return StaticInitializerAnalysis(forwardInstructions).analyze(V);
 }
 
 /// Replace load sequence which may contain

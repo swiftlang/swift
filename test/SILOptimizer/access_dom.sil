@@ -180,7 +180,7 @@ bb2:
 //
 // CHECK-LABEL: sil @testIrreducibleGraph : $@convention(thin) () -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
-// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN]] : $*X
 // CHECK-NEXT: end_access [[BEGIN]] : $*X
 // CHECK-NEXT: br bb1
@@ -371,6 +371,172 @@ bb0:
   end_access %7 : $*X
   %keyRef = function_ref @stdlibKeyPathEntry : $@convention(thin) () -> ()
   apply %keyRef() : $@convention(thin) () -> ()
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// public func testLoopDominatingAccessAdderSimple() {
+// Checks creation of new scope in loop preheader
+//
+// CHECK-LABEL: sil @testLoopDominatingAccessAdderSimple : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK: bb1:
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK: bb3:
+// CHECK: [[BEGIN2:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN2]] : $*X
+// CHECK-NEXT: end_access [[BEGIN2]] : $*X
+// CHECK: cond_br {{.*}}, bb2, bb4
+// CHECK-LABEL: } // end sil function 'testLoopDominatingAccessAdderSimple'
+sil @testLoopDominatingAccessAdderSimple : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  br bb1
+  
+bb1:
+  br bb2
+
+bb2:
+  br bb3
+  
+bb3:
+  %4 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*X
+  %5 = load %4 : $*X
+  end_access %4 : $*X
+  %cond = integer_literal $Builtin.Int1, 1
+  cond_br %cond, bb2, bb4
+
+bb4:
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// public func testLoopDominatingAccessAdderBailSimple() {
+// Checks bailing on the creation of new scope in loop preheader if the access has a nested conflict
+//
+// CHECK-LABEL: sil @testLoopDominatingAccessAdderBailSimple : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK: bb1:
+// CHECK-NEXT: br bb2
+// CHECK: bb3:
+// CHECK: [[BEGIN2:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN2]] : $*X
+// CHECK-NEXT: end_access [[BEGIN2]] : $*X
+// CHECK: cond_br {{.*}}, bb2, bb4
+// CHECK-LABEL: } // end sil function 'testLoopDominatingAccessAdderBailSimple'
+sil @testLoopDominatingAccessAdderBailSimple : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  br bb1
+  
+bb1:
+  br bb2
+
+bb2:
+  br bb3
+  
+bb3:
+  %4 = begin_access [read] [dynamic] %0 : $*X
+  %5 = load %4 : $*X
+  end_access %4 : $*X
+  %cond = integer_literal $Builtin.Int1, 1
+  cond_br %cond, bb2, bb4
+
+bb4:
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// public func testLoopDominatingAccessAdderMulti() {
+// Checks creation of a single new scope in loop preheader if we have multi-access in loop
+//
+// CHECK-LABEL: sil @testLoopDominatingAccessAdderMulti : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK: bb1:
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK: bb3:
+// CHECK: [[BEGIN2:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN2]] : $*X
+// CHECK-NEXT: end_access [[BEGIN2]] : $*X
+// CHECK: [[BEGIN3:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN3]] : $*X
+// CHECK-NEXT: end_access [[BEGIN3]] : $*X
+// CHECK: cond_br {{.*}}, bb2, bb4
+// CHECK-LABEL: } // end sil function 'testLoopDominatingAccessAdderMulti'
+sil @testLoopDominatingAccessAdderMulti : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  br bb1
+  
+bb1:
+  br bb2
+
+bb2:
+  br bb3
+  
+bb3:
+  %4 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*X
+  %5 = load %4 : $*X
+  end_access %4 : $*X
+  %6 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*X
+  %7 = load %6 : $*X
+  end_access %6 : $*X
+  %cond = integer_literal $Builtin.Int1, 1
+  cond_br %cond, bb2, bb4
+
+bb4:
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// public func testLoopDominatingAccessAdderMultiChangeKind() {
+// Checks creation of a single new scope in loop preheader with [modify]
+// if one of the accesses changes the kind we first encounter
+//
+// CHECK-LABEL: sil @testLoopDominatingAccessAdderMultiChangeKind : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK: bb1:
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK: bb3:
+// CHECK: [[BEGIN2:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN2]] : $*X
+// CHECK-NEXT: end_access [[BEGIN2]] : $*X
+// CHECK: [[BEGIN3:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN3]] : $*X
+// CHECK-NEXT: end_access [[BEGIN3]] : $*X
+// CHECK: [[BEGIN4:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN4]] : $*X
+// CHECK-NEXT: end_access [[BEGIN4]] : $*X
+// CHECK: cond_br {{.*}}, bb2, bb4
+// CHECK-LABEL: } // end sil function 'testLoopDominatingAccessAdderMultiChangeKind'
+sil @testLoopDominatingAccessAdderMultiChangeKind : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  br bb1
+  
+bb1:
+  br bb2
+
+bb2:
+  br bb3
+  
+bb3:
+  %4 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*X
+  %5 = load %4 : $*X
+  end_access %4 : $*X
+  %6 = begin_access [modify] [dynamic] [no_nested_conflict] %0 : $*X
+  %7 = load %6 : $*X
+  end_access %6 : $*X
+  %8 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*X
+  %9 = load %8 : $*X
+  end_access %8 : $*X
+  %cond = integer_literal $Builtin.Int1, 1
+  cond_br %cond, bb2, bb4
+
+bb4:
   %10 = tuple ()
   return %10 : $()
 }

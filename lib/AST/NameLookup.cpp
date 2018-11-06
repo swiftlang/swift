@@ -1256,12 +1256,6 @@ public:
   /// \brief Add the given members to the lookup table.
   void addMembers(DeclRange members);
 
-  /// \brief The given extension has been extended with new members; add them
-  /// if appropriate.
-  void addExtensionMembers(NominalTypeDecl *nominal,
-                           ExtensionDecl *ext,
-                           DeclRange members);
-
   /// Iterator into the lookup table.
   typedef LookupTable::iterator iterator;
 
@@ -1270,6 +1264,30 @@ public:
 
   iterator find(DeclName name) {
     return Lookup.find(name);
+  }
+
+  void dump(llvm::raw_ostream &os) const {
+    os << "LastExtensionIncluded:\n";
+    if (LastExtensionIncluded)
+      LastExtensionIncluded->printContext(os, 2);
+    else
+      os << "  nullptr\n";
+
+    os << "Lookup:\n  ";
+    for (auto &pair : Lookup) {
+      pair.getFirst().print(os) << ":\n  ";
+      for (auto &decl : pair.getSecond()) {
+        os << "- ";
+        decl->dumpRef(os);
+        os << "\n  ";
+      }
+    }
+    os << "\n";
+  }
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger") {
+    dump(llvm::errs());
   }
 
   // \brief Mark all Decls in this table as not-resident in a table, drop
@@ -1373,26 +1391,6 @@ void MemberLookupTable::addMembers(DeclRange members) {
   }
 }
 
-void MemberLookupTable::addExtensionMembers(NominalTypeDecl *nominal,
-                                            ExtensionDecl *ext,
-                                            DeclRange members) {
-  // We have not processed any extensions yet, so there's nothing to do.
-  if (!LastExtensionIncluded)
-    return;
-
-  // If this extension shows up in the list of extensions not yet included
-  // in the lookup table, there's nothing to do.
-  for (auto notIncluded = LastExtensionIncluded->NextExtension.getPointer();
-       notIncluded;
-       notIncluded = notIncluded->NextExtension.getPointer()) {
-    if (notIncluded == ext)
-      return;
-  }
-
-  // Add the new members to the lookup table.
-  addMembers(members);
-}
-
 void MemberLookupTable::updateLookupTable(NominalTypeDecl *nominal) {
   // If the last extension we included is the same as the last known extension,
   // we're already up-to-date.
@@ -1416,6 +1414,11 @@ void NominalTypeDecl::addedMember(Decl *member) {
   }
 }
 
+void NominalTypeDecl::addedExtension(ExtensionDecl * ext) {
+  if (hasLazyMembers())
+    setLookupTablePopulated(false);
+}
+
 void ExtensionDecl::addedMember(Decl *member) {
   if (NextExtension.getInt()) {
     auto nominal = getExtendedNominal();
@@ -1423,7 +1426,7 @@ void ExtensionDecl::addedMember(Decl *member) {
       return;
 
     if (nominal->LookupTable.getPointer() &&
-        nominal->LookupTable.getInt()) {
+        nominal->isLookupTablePopulated()) {
       // Make sure we have the complete list of extensions.
       // FIXME: This is completely unnecessary. We want to determine whether
       // our own extension has already been included in the lookup table.
@@ -1557,6 +1560,14 @@ populateLookupTableEntryFromExtensions(ASTContext &ctx,
   return false;
 }
 
+bool NominalTypeDecl::isLookupTablePopulated() const {
+  return LookupTable.getInt();
+}
+
+void NominalTypeDecl::setLookupTablePopulated(bool value) {
+  LookupTable.setInt(value);
+}
+
 void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
   // If we haven't allocated the lookup table yet, do so now.
   if (!LookupTable.getPointer()) {
@@ -1569,24 +1580,28 @@ void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
     // from those members already in the IDC member list_ such as implicits or
     // globals-as-members, then update table entries from the extensions that
     // have the same names as any such initial-population members.
-    if (!LookupTable.getInt()) {
-      LookupTable.setInt(true);
+    if (!isLookupTablePopulated()) {
+      setLookupTablePopulated(true);
       LookupTable.getPointer()->addMembers(getCurrentMembersWithoutLoading());
-      for (auto *m : getCurrentMembersWithoutLoading()) {
-        if (auto v = dyn_cast<ValueDecl>(m)) {
-          populateLookupTableEntryFromExtensions(getASTContext(),
-                                                 *LookupTable.getPointer(),
-                                                 this, v->getBaseName(),
-                                                 ignoreNewExtensions);
-        }
+
+      llvm::SetVector<DeclName> baseNamesPresent;
+      for (auto entry : *LookupTable.getPointer()) {
+        baseNamesPresent.insert(entry.getFirst().getBaseName());
+      }
+      
+      for (auto baseName : baseNamesPresent) {
+        populateLookupTableEntryFromExtensions(getASTContext(),
+                                               *LookupTable.getPointer(),
+                                               this, baseName,
+                                               ignoreNewExtensions);
       }
     }
 
   } else {
     // No lazy members: if the table needs population, populate the table
     // en-masse; and in either case update the extensions.
-    if (!LookupTable.getInt()) {
-      LookupTable.setInt(true);
+    if (!isLookupTablePopulated()) {
+      setLookupTablePopulated(true);
       LookupTable.getPointer()->addMembers(getMembers());
     }
     if (!ignoreNewExtensions) {
@@ -1652,8 +1667,9 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
       name.getBaseName() == DeclBaseName::createConstructor())
     useNamedLazyMemberLoading = false;
 
-  LLVM_DEBUG(llvm::dbgs() << getNameStr() << ".lookupDirect(" << name << ")"
-        << ", lookupTable.getInt()=" << LookupTable.getInt()
+  LLVM_DEBUG(llvm::dbgs() << getNameStr() << ".lookupDirect("
+             << name << ", " << ignoreNewExtensions << ")"
+        << ", isLookupTablePopulated()=" << isLookupTablePopulated()
         << ", hasLazyMembers()=" << hasLazyMembers()
         << ", useNamedLazyMemberLoading=" << useNamedLazyMemberLoading
         << "\n");
@@ -1670,7 +1686,7 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
       // that is either currently out of date or soon to be out of date.
       // This can happen two ways:
       //
-      //   - We've not yet indexed the members we have (LookupTable.getInt()
+      //   - We've not yet indexed the members we have (isLookupTablePopulated()
       //     is zero).
       //
       //   - We've still got more lazy members left to load; this can happen
@@ -1679,9 +1695,9 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
       // In either of these cases, we want to reset the table to empty and
       // mark it as needing reconstruction.
       if (LookupTable.getPointer() &&
-          (hasLazyMembers() || !LookupTable.getInt())) {
+          (hasLazyMembers() || !isLookupTablePopulated())) {
         LookupTable.getPointer()->clear();
-        LookupTable.setInt(false);
+        setLookupTablePopulated(false);
       }
 
       (void)getMembers();

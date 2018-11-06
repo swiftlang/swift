@@ -101,6 +101,8 @@ namespace pointer_types {
 
     /// The basic value-witness table for ObjC object pointers.
     using BO = ObjCRetainableBox;
+#else
+    using BO = UnknownObjectRetainableBox;
 #endif
 
   }

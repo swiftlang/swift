@@ -446,9 +446,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
     HANDLE_SEMANTIC_EXPR(E);
 
-    for (auto &Segment : E->getSegments()) {
-      if (Expr *Seg = doIt(Segment))
-        Segment = Seg;
+    if (auto oldAppendingExpr = E->getAppendingExpr()) {
+      if (auto appendingExpr = doIt(oldAppendingExpr))
+        E->setAppendingExpr(dyn_cast<TapExpr>(appendingExpr));
       else
         return nullptr;
     }
@@ -1049,6 +1049,28 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) { return E; }
+
+  Expr *visitTapExpr(TapExpr *E) {
+    if (auto oldSubExpr = E->getSubExpr()) {
+      if (auto subExpr = doIt(oldSubExpr)) {
+        E->setSubExpr(subExpr);
+      }
+      else {
+        return nullptr;
+      }
+    }
+
+    if (auto oldBody = E->getBody()) {
+      if (auto body = doIt(oldBody)) {
+        E->setBody(dyn_cast<BraceStmt>(body));
+      }
+      else {
+        return nullptr;
+      }
+    }
+
+    return E;
+  }
 
   //===--------------------------------------------------------------------===//
   //                           Everything Else

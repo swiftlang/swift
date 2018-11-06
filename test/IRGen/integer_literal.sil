@@ -1,4 +1,7 @@
 // RUN: %swift -target armv7-apple-ios10 -module-name integer_literal %s -gnone -emit-ir | %FileCheck %s
+
+// REQUIRES: CODEGENERATOR=ARM
+
 // We use a 32-bit target because it makes the literals smaller.
 
 sil_stage canonical

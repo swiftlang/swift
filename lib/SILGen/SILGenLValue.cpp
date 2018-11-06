@@ -322,16 +322,16 @@ LogicalPathComponent::projectForRead(SILGenFunction &SGF, SILLocation loc,
   assert(isReadAccess(accessKind));
 
   const TypeLowering &RValueTL = SGF.getTypeLowering(getTypeOfRValue());
-  TemporaryInitializationPtr tempInit;
-  RValue rvalue;
 
   // If the access doesn't require us to make an owned address, don't
   // force a materialization.
-  if (accessKind != SGFAccessKind::OwnedAddressRead &&
-      accessKind != SGFAccessKind::BorrowedAddressRead) {
+  if (!isReadAccessResultAddress(accessKind)) {
     auto rvalue = std::move(*this).get(SGF, loc, base, SGFContext());
     return std::move(rvalue).getAsSingleValue(SGF, loc);
   }
+
+  TemporaryInitializationPtr tempInit;
+  RValue rvalue;
 
   // If the RValue type has an openedExistential, then the RValue must be
   // materialized before allocating a temporary for the RValue type. In that
@@ -1652,7 +1652,10 @@ namespace {
       // Use the yield value directly if it's the right type.
       if (!getOrigFormalType().isTuple()) {
         assert(yields.size() == 1);
-        return yields[0];
+        auto value = yields[0];
+        if (value.getType().isAddress() ||
+            !isReadAccessResultAddress(getAccessKind()))
+          return value;
       }
 
       // Otherwise, we need to make a temporary.
@@ -1997,11 +2000,17 @@ namespace {
     RValue get(SILGenFunction &SGF, SILLocation loc,
                ManagedValue base, SGFContext c) && override {
       assert(base && "ownership component must not be root of lvalue path");
+
       auto &TL = SGF.getTypeLowering(getTypeOfRValue());
 
-      // Load the original value.
-      ManagedValue result = SGF.emitLoad(loc, base.getValue(), TL,
-                                         SGFContext(), IsNotTake);
+      ManagedValue result;
+      if (base.getType().isObject()) {
+        result = SGF.emitConversionToSemanticRValue(loc, base, TL);
+      } else {
+        result = SGF.emitLoad(loc, base.getValue(), TL, SGFContext(),
+                              IsNotTake);
+      }
+
       return RValue(SGF, loc, getSubstFormalType(), result);
     }
 
@@ -2698,7 +2707,7 @@ LValue SILGenLValue::visitOpaqueValueExpr(OpaqueValueExpr *e,
 
   RegularLocation loc(e);
   LValue lv;
-  lv.add<ValueComponent>(entry.Value.borrow(SGF, loc), None,
+  lv.add<ValueComponent>(entry.Value.formalAccessBorrow(SGF, loc), None,
                          getValueTypeData(SGF, accessKind, e));
   return lv;
 }
@@ -3784,13 +3793,19 @@ ManagedValue SILGenFunction::emitBorrowedLValue(SILLocation loc,
   assert(src.getAccessKind() == SGFAccessKind::IgnoredRead ||
          src.getAccessKind() == SGFAccessKind::BorrowedAddressRead ||
          src.getAccessKind() == SGFAccessKind::BorrowedObjectRead);
+  bool isIgnored = src.getAccessKind() == SGFAccessKind::IgnoredRead;
 
   ManagedValue base;
   PathComponent &&component =
     drillToLastComponent(*this, loc, std::move(src), base, tsanKind);
 
-  base = drillIntoComponent(*this, loc, std::move(component), base, tsanKind);
-  return ManagedValue::forBorrowedRValue(base.getValue());
+  auto value =
+    drillIntoComponent(*this, loc, std::move(component), base, tsanKind);
+
+  // If project() returned an owned value, and the caller cares, borrow it.
+  if (value.hasCleanup() && !isIgnored)
+    value = value.formalAccessBorrow(*this, loc);
+  return value;
 }
 
 LValue

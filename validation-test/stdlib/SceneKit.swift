@@ -132,7 +132,9 @@ if #available(iOS 8.0, *) {
     expectEqual(1, element.bytesPerIndex)
   }
 
-  SceneKitTests.test("SCNGeometrySource.init(vertices:)") {
+  SceneKitTests.test("SCNGeometrySource.init(vertices:)")
+    .skip(.always("rdar://problem/43534146"))
+    .code {
     let source = SCNGeometrySource(vertices: [SCNVector3(1, 2, 3),
                                               SCNVector3(4, 5, 6)])
 
@@ -146,7 +148,9 @@ if #available(iOS 8.0, *) {
     expectEqual(positions[4], 5)
   }
 
-  SceneKitTests.test("SCNGeometrySource.init(normals:)") {
+  SceneKitTests.test("SCNGeometrySource.init(normals:)")
+    .skip(.always("rdar://problem/43534146"))
+    .code {
     let source = SCNGeometrySource(normals: [SCNVector3(1, 2, 3),
                                              SCNVector3(4, 5, 6)])
 
@@ -160,7 +164,9 @@ if #available(iOS 8.0, *) {
     expectEqual(normals[4], 5)
   }
 
-  SceneKitTests.test("SCNGeometrySource.init(textureCoordinates:)") {
+  SceneKitTests.test("SCNGeometrySource.init(textureCoordinates:)")
+    .skip(.always("rdar://problem/43534146"))
+    .code {
     let source = SCNGeometrySource(textureCoordinates: [CGPoint(x: 1, y: 2),
                                                         CGPoint(x: 4, y: 5)])
 

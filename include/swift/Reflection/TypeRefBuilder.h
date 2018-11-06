@@ -160,7 +160,7 @@ class TypeRefBuilder {
 public:
   using BuiltType = const TypeRef *;
   using BuiltNominalTypeDecl = Optional<std::string>;
-  using BuiltProtocolDecl = Optional<std::string>;
+  using BuiltProtocolDecl = Optional<std::pair<std::string, bool /*isObjC*/>>;
 
   TypeRefBuilder();
 
@@ -214,9 +214,14 @@ public:
     return Demangle::mangleNode(node);
   }
 
-  Optional<std::string>
+  BuiltProtocolDecl
   createProtocolDecl(const Demangle::NodePointer &node) {
-    return Demangle::mangleNode(node);
+    return std::make_pair(Demangle::mangleNode(node), false);
+  }
+
+  BuiltProtocolDecl
+  createObjCProtocolDecl(std::string &&name) {
+    return std::make_pair(name, true);
   }
 
   Optional<std::string> createNominalTypeDecl(std::string &&mangledName) {
@@ -265,9 +270,15 @@ public:
   createProtocolCompositionType(ArrayRef<BuiltProtocolDecl> protocols,
                                 BuiltType superclass,
                                 bool isClassBound) {
-    std::vector<const NominalTypeRef *> protocolRefs;
+    std::vector<const TypeRef *> protocolRefs;
     for (const auto &protocol : protocols) {
-      protocolRefs.push_back(createNominalType(protocol));
+      if (!protocol)
+        continue;
+
+      if (protocol->second)
+        protocolRefs.push_back(createObjCProtocolType(protocol->first));
+      else
+        protocolRefs.push_back(createNominalType(protocol->first));
     }
 
     return ProtocolCompositionTypeRef::create(*this, protocolRefs, superclass,
@@ -292,8 +303,12 @@ public:
   const DependentMemberTypeRef *
   createDependentMemberType(const std::string &member,
                             const TypeRef *base,
-                            Optional<std::string> protocol) {
-    return DependentMemberTypeRef::create(*this, member, base, *protocol);
+                            BuiltProtocolDecl protocol) {
+    // Objective-C protocols don't have dependent types.
+    if (protocol->second)
+      return nullptr;
+    return DependentMemberTypeRef::create(*this, member, base,
+                                          protocol->first);
   }
 
 #define REF_STORAGE(Name, ...) \
@@ -306,13 +321,18 @@ public:
     return SILBoxTypeRef::create(*this, base);
   }
 
-  const ObjCClassTypeRef *
-  createObjCClassType(const std::string &mangledName) {
-    return ObjCClassTypeRef::create(*this, mangledName);
-  }
-
   const ObjCClassTypeRef *getUnnamedObjCClassType() {
     return createObjCClassType("");
+  }
+
+  const ObjCClassTypeRef *
+  createObjCClassType(const std::string &name) {
+    return ObjCClassTypeRef::create(*this, name);
+  }
+
+  const ObjCProtocolTypeRef *
+  createObjCProtocolType(const std::string &name) {
+    return ObjCProtocolTypeRef::create(*this, name);
   }
 
   const ForeignClassTypeRef *

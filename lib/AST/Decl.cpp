@@ -1559,6 +1559,8 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
 
 static AccessStrategy
 getOpaqueReadAccessStrategy(const AbstractStorageDecl *storage, bool dispatch) {
+  if (storage->requiresOpaqueReadCoroutine())
+    return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
   return AccessStrategy::getAccessor(AccessorKind::Get, dispatch);
 }
 
@@ -1699,13 +1701,8 @@ bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
   if (isDynamic())
     return false;
 
-  // We only need the modify coroutine in type contexts.
-  // TODO: resilient global variables?
-  auto *dc = getDeclContext();
-  if (!dc->isTypeContext())
-    return false;
-
   // Requirements of ObjC protocols don't support the modify coroutine.
+  auto *dc = getDeclContext();
   if (auto protoDecl = dyn_cast<ProtocolDecl>(dc))
     if (protoDecl->isObjC())
       return false;
@@ -3000,6 +2997,8 @@ void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
   // Add to the end of the list.
   LastExtension->NextExtension.setPointer(extension);
   LastExtension = extension;
+
+  addedExtension(extension);
 }
 
 auto NominalTypeDecl::getStoredProperties(bool skipInaccessible) const
@@ -4295,7 +4294,8 @@ AbstractStorageDecl::setSynthesizedReadCoroutine(AccessorDecl *accessor) {
 
 void
 AbstractStorageDecl::setSynthesizedSetter(AccessorDecl *accessor) {
-  assert(getGetter() && "declaration doesn't already have getter!");
+  assert((getGetter() || getReadCoroutine()) &&
+         "declaration doesn't already have getter!");
   assert(supportsMutation() && "adding setter to immutable storage");
   assert(isAccessor(accessor, AccessorKind::Set, this));
 
@@ -4304,7 +4304,8 @@ AbstractStorageDecl::setSynthesizedSetter(AccessorDecl *accessor) {
 
 void
 AbstractStorageDecl::setSynthesizedModifyCoroutine(AccessorDecl *accessor) {
-  assert(getGetter() && "declaration doesn't already have getter!");
+  assert((getGetter() || getReadCoroutine()) &&
+         "declaration doesn't already have getter!");
   assert(getSetter() && "declaration doesn't already have setter!");
   assert(supportsMutation() && "adding modify to immutable storage");
   assert(!getModifyCoroutine() && "already has a modify accessor");

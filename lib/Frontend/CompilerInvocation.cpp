@@ -159,9 +159,9 @@ static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
 /// Save a copy of any flags marked as ParseableInterfaceOption, if running
 /// in a mode that is going to emit a .swiftinterface file.
 static void SaveParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
+                                       FrontendOptions &FOpts,
                                        ArgList &Args, DiagnosticEngine &Diags) {
-  if (!Args.hasArg(options::OPT_emit_interface_path) &&
-      !Args.hasArg(options::OPT_emit_parseable_module_interface_path))
+  if (!FOpts.InputsAndOutputs.hasParseableInterfaceOutputPath())
     return;
   ArgStringList RenderedArgs;
   for (auto A : Args) {
@@ -1188,12 +1188,13 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  SaveParseableInterfaceArgs(ParseableInterfaceOpts, ParsedArgs, Diags);
-
   if (ParseFrontendArgs(FrontendOpts, ParsedArgs, Diags,
                         ConfigurationFileBuffers)) {
     return true;
   }
+
+  SaveParseableInterfaceArgs(ParseableInterfaceOpts, FrontendOpts,
+                             ParsedArgs, Diags);
 
   if (ParseLangArgs(LangOpts, ParsedArgs, Diags, FrontendOpts)) {
     return true;
