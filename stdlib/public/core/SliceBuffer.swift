@@ -344,6 +344,7 @@ internal struct _SliceBuffer<Element>
     }
   }
 
+  @usableFromInline
   internal typealias Indices = Range<Int>
 
   //===--- misc -----------------------------------------------------------===//
