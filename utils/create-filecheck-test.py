@@ -26,17 +26,17 @@ args = parser.parse_args()
 
 seen_variables = set([])
 ssa_re = re.compile('[%](\d+)')
-for l in args.input.readlines():
-    l = l[:l.find('//')].rstrip() + "\n"
+for line in args.input.readlines():
+    line = line[:line.find('//')].rstrip() + "\n"
     have_match = False
-    for match in ssa_re.finditer(l):
+    for match in ssa_re.finditer(line):
         have_match = True
         var = match.groups()[0]
         if var not in seen_variables:
-            l = l.replace('%' + var, '[[VAR_%s:%%[0-9]+]]' % var)
+            line = line.replace('%' + var, '[[VAR_%s:%%[0-9]+]]' % var)
             seen_variables.add(var)
         else:
-            l = l.replace('%' + var, '[[VAR_%s]]' % var)
+            line = line.replace('%' + var, '[[VAR_%s]]' % var)
     if have_match:
-        l = '// CHECK: ' + l
-    args.o.write(l)
+        line = '// CHECK: ' + line
+    args.o.write(line)

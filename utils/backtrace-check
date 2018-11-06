@@ -43,12 +43,12 @@ formatting.""")
 
     found_stack_trace_start = False
     found_stack_trace_entry = False
-    for l in lines:
-        l = l.rstrip("\n")
+    for line in lines:
+        line = line.rstrip("\n")
 
         # First see if we found the start of our stack trace start. If so, set
         # the found stack trace flag and continue.
-        if l == "Current stack trace:":
+        if line == "Current stack trace:":
             assert(not found_stack_trace_start)
             found_stack_trace_start = True
             continue
@@ -59,7 +59,7 @@ formatting.""")
             continue
 
         # Ok, we are in the middle of matching a stack trace entry.
-        m = TARGET_RE.match(l)
+        m = TARGET_RE.match(line)
         # If we fail to match, we have exited the stack trace entry region
         if m is None:
             break
