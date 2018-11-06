@@ -266,7 +266,7 @@ def find_profiles_in(profiledir, select_stat=[]):
                 if profiletype not in profiles:
                     profiles[profiletype] = dict()
                 profiles[profiletype][counter] = fullpath
-            except:
+            except Exception:
                 pass
     return profiles
 
