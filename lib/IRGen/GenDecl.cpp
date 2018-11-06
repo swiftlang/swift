@@ -2092,6 +2092,8 @@ static void emitDynamicallyReplaceableThunk(IRGenModule &IGM,
       llvm::BasicBlock::Create(IGM.getLLVMContext(), "entry", dispatchFn);
   IRBuilder B(IGM.getLLVMContext(), false);
   B.SetInsertPoint(entryBB);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(B, dispatchFn);
   llvm::Constant *indices[] = {llvm::ConstantInt::get(IGM.Int32Ty, 0),
                                llvm::ConstantInt::get(IGM.Int32Ty, 0)};
   auto *fnPtr = B.CreateLoad(
