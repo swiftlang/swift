@@ -54,42 +54,73 @@ template <typename T1, typename T2> using CPPairVec = std::vector<std::pair<cons
 //TODO: elim virtuals with templating>
 
 namespace {
-  template <typename ElementT>
+  template <typename Output>
   class Source {
   public:
-    typedef ElementT Element;
-    virtual Optional<Element> next() = 0;
+    Source() = default;
+    virtual Optional<Output> next() = 0;
     virtual ~Source() = default;
   };
   
-  template <typename FeederT>
-  class Sink {
-    FeederT &feeder;
+  
+  template <typename Input, typename Output>
+  class Transducer: public Source<Output> {
+    Source<Input> source;
   public:
-    Sink(FeederT &feeder) : feeder(feeder) {}
-    void run() {
-      for (;;) {
-        auto in = feeder.next();
-        if (!in)
-          return;
-        process(in);
-      }
+    Transducer() = default;
+    void setSource(Source<Input> &&s) { source = std::move(s); }
+    Optional<Output> next() override {
+      auto in = source->next();
+      if (!in) return None;
+      return process(in.get());
     }
-    virtual void process(typename FeederT::Element &in) = 0;
+    virtual Output process(const Input* in) = 0;
   };
   
-  template <typename ElementT, typename FeederT>
-  class Transducer: public Source<ElementT> {
-    FeederT &feeder;
+  template <typename Source, typename Sink>
+  Sink operator>> (Source &&source, Sink &&sink) {
+    sink.setSource(source);
+    return sink;
+  }
+  
+  template <typename Output>
+  class VectorSource: public Source<Output> {
+    using VectorT = std::vector<Output>;
+    typename VectorT::const_iterator _next, end;
+    
   public:
-    Transducer(FeederT &feeder) : feeder(feeder) {}
-    Optional<ElementT> next() override {
-      auto in = feeder.next();
-      if (!in) return None;
-      return process(in);
+    VectorSource(VectorT container) :  _next(container.cbegin()), end(container.cend()) {}
+    ~VectorSource() = default;
+    
+    Optional<Output> next() override {
+      return _next == end ? Optional<Output>(None) : Optional<Output>(*_next++);
     }
-    virtual Optional<ElementT> process(typename FeederT::Element &in) = 0;
   };
+  
+  template <typename Input, typename Output, Output (*fn)(const Input)>
+  class FunctionalTransducer: public Transducer<Input, Output> {
+  public:
+    FunctionalTransducer() = default;
+    Output process(const Input *in) override { return fn(*in); }
+    ~FunctionalTransducer() override = default;
+  };
+  
+//  template <typename FeederT>
+//  class Sink {
+//    FeederT &feeder;
+//  public:
+//    Sink(FeederT &feeder) : feeder(feeder) {}
+//    void run() {
+//      for (;;) {
+//        auto in = feeder.next();
+//        if (!in)
+//          return;
+//        process(in);
+//      }
+//    }
+//    virtual void process(typename FeederT::Element in) = 0;
+//  };
+
 }
 
 namespace {
@@ -126,22 +157,20 @@ namespace {
       }
     }
   };
-  
-  template <typename ContainerT>
-  class ContainerSource: public Source<typename ContainerT::value_type> {
-    typename ContainerT::const_iterator _next, end;
-  public:
-    typedef typename ContainerT::value_type Element;
-    ContainerSource(ContainerT container) :
-    _next(container.cbegin()),
-    end(container.cend()) {}
-    Optional<Element> next() override {
-      return _next == end ? Optional<Element>(None) : Optional<Element>(*_next++);
-    }
-    ContainerSource() = default;
-  };
+
+
 }
-    
+
+namespace {
+  template <typename DeclT>
+  static DeclBaseName getName(const DeclT* D) { return DeclBaseName(D->getName()); }
+  
+  template <typename DeclT>
+  using GetName = FunctionalTransducer<const DeclT*, DeclBaseName, getName>;
+
+}
+
+
 
 
 
@@ -748,24 +777,7 @@ namespace {
 
 //////////////////////////
 
-template <typename InT, typename OutT>
-OutT operator>>(InT in, OutT (*fn)(InT)) { return (*fn)(in); }
 
-template <typename InT, typename OutT>
-OutT operator>>(InT in, std::function<OutT(InT)> &fn) { return fn(in); }
-
-template <typename InInT, typename InT, typename OutT>
-std::function<OutT(InInT)>
-operator>> (std::function<InT(InInT)> lhs, std::function<OutT(InT)> rhs) {
-  return [&](InInT in) -> OutT { rhs(lhs(in)); };
-}
-
-
-//template <typename InInT, typename InT, typename OutT>
-//std::function<OutT(InInT)>
-//operator>> ( (InInT) -> InT  lhs, std::function<OutT(InT)> rhs) {
-//  return [&](InInT in) -> OutT { rhs(lhs(in)); };
-//}
 
 
 template <typename T>
@@ -818,5 +830,6 @@ bool swift::experimental_dependencies::emitReferenceDependencies(
   
   SourceFileDeclDemux demux{SF};
   
-  ContainerSource<decltype(demux.precedenceGroups)>(demux.precedenceGroups);
+  VectorSource<const PrecedenceGroupDecl*> xxx(demux.precedenceGroups);
+  xxx << GetName<PrecedenceGroupDecl>();
 }
