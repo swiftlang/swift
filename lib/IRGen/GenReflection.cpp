@@ -426,11 +426,11 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   }
 
   void layoutProtocol() {
-    auto protocolDecl = cast<ProtocolDecl>(NTD);
+    auto PD = cast<ProtocolDecl>(NTD);
     FieldDescriptorKind Kind;
-    if (protocolDecl->isObjC())
+    if (PD->isObjC())
       Kind = FieldDescriptorKind::ObjCProtocol;
-    else if (protocolDecl->requiresClass())
+    else if (PD->requiresClass())
       Kind = FieldDescriptorKind::ClassProtocol;
     else
       Kind = FieldDescriptorKind::Protocol;
@@ -446,8 +446,11 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     addNominalRef(NTD);
 
     auto *CD = dyn_cast<ClassDecl>(NTD);
+    auto *PD = dyn_cast<ProtocolDecl>(NTD);
     if (CD && CD->getSuperclass()) {
       addTypeRef(CD->getSuperclass()->getCanonicalType());
+    } else if (PD && PD->getDeclaredType()->getSuperclass()) {
+      addTypeRef(PD->getDeclaredType()->getSuperclass()->getCanonicalType());
     } else {
       B.addInt32(0);
     }
@@ -515,7 +518,13 @@ public:
     addTypeRef(type);
 
     B.addInt32(ti->getFixedSize().getValue());
-    B.addInt32(ti->getFixedAlignment().getValue());
+
+    auto alignment = ti->getFixedAlignment().getValue();
+    unsigned bitwiseTakable =
+      (ti->isBitwiseTakable(ResilienceExpansion::Minimal) == IsBitwiseTakable
+       ? 1 : 0);
+    B.addInt32(alignment | (bitwiseTakable << 16));
+
     B.addInt32(ti->getFixedStride().getValue());
     B.addInt32(ti->getFixedExtraInhabitantCount(IGM));
   }
