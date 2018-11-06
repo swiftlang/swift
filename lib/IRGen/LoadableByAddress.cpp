@@ -539,6 +539,18 @@ struct StructLoweringState {
   SILType getNewSILType(SILType type) {
     return Mapper.getNewSILType(F->getGenericEnvironment(), type, Mod);
   }
+
+  bool hasLargeLoadableYields() {
+    auto fnType = F->getLoweredFunctionType();
+    if (!fnType->isCoroutine()) return false;
+
+    auto env = F->getGenericEnvironment();
+    for (auto yield : fnType->getYields()) {
+      if (Mapper.shouldTransformParameter(env, yield, Mod))
+        return true;
+    }
+    return false;
+  }
 };
 } // end anonymous namespace
 
@@ -2296,8 +2308,10 @@ void LoadableByAddress::runOnFunction(SILFunction *F) {
 
   // If we modified the function arguments - add to list of functions to clone
   if (modifiableFunction(funcType) &&
-      (rewrittenReturn || !pass.largeLoadableArgs.empty() ||
-       !pass.funcSigArgs.empty())) {
+      (rewrittenReturn ||
+       !pass.largeLoadableArgs.empty() ||
+       !pass.funcSigArgs.empty() ||
+       pass.hasLargeLoadableYields())) {
     modFuncs.insert(F);
   }
   // If we modified any applies - add them to the global list for recreation
