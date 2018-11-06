@@ -194,7 +194,7 @@
                 "cmark": "swift-5.0-branch",
                 "llbuild": "swift-5.0-branch",
                 "swiftpm": "swift-5.0-branch",
-                "swift-syntax": "master",
+                "swift-syntax": "swift-5.0-branch",
                 "swift-corelibs-xctest": "swift-5.0-branch",
                 "swift-corelibs-foundation": "swift-5.0-branch",
                 "swift-corelibs-libdispatch": "swift-5.0-branch",
