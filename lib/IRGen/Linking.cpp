@@ -31,6 +31,18 @@ using namespace swift;
 using namespace irgen;
 using namespace Mangle;
 
+const IRLinkage IRLinkage::InternalLinkOnceODR = {
+  llvm::GlobalValue::LinkOnceODRLinkage,
+  llvm::GlobalValue::HiddenVisibility,
+  llvm::GlobalValue::DefaultStorageClass,
+};
+
+const IRLinkage IRLinkage::Internal = {
+  llvm::GlobalValue::InternalLinkage,
+  llvm::GlobalValue::DefaultVisibility,
+  llvm::GlobalValue::DefaultStorageClass,
+};
+
 bool swift::irgen::useDllStorage(const llvm::Triple &triple) {
   return triple.isOSBinFormatCOFF() && !triple.isOSCygMing();
 }
