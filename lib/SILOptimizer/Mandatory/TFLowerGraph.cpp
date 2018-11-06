@@ -232,6 +232,8 @@ struct TFGraphFunctionLowering
   const std::string &funcNodeBaseName;
   llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
       &graphFunctions;
+  // Map from FunctionSESERegion to corresponding graph function bodies.
+  llvm::DenseMap<FunctionSESERegion *, GraphFunctionBody> functionRegionBodies;
   TF_Graph *resultGraph;
   TF_Status *status;
 
@@ -587,6 +589,7 @@ public: // Lowering functionality.
   GLStatus lowerBasicBlock(SILBasicBlock *bb, bool skipTerminator = false);
   GLStatus lowerRegion(SESERegionTree *region);
   GLStatus lowerSequenceRegion(SequenceSESERegion *r);
+  GLStatus lowerFunctionRegion(FunctionSESERegion *r);
   GLStatus lowerWhileLoopRegion(WhileLoopSESERegion *r);
   GLStatus lowerConditionalRegion(ConditionalSESERegion *r);
 
@@ -1999,11 +2002,29 @@ GLStatus TFGraphFunctionLowering::lowerSequenceRegion(SequenceSESERegion *r) {
   for (auto &child : r->getNodes()) {
     // The outputs for a sequence corresponds to the outputs of the last region
     // in the sequence. Hence, clear outputs for the current function if any.
-    getCurrentGraphFunction().outputs.clear();
+    // Do not clear the outputs if the next region is a function as we the
+    // outputs would become the inputs for that function region.
+    if (child->getKind() != SESERegionTree::Function) {
+      getCurrentGraphFunction().outputs.clear();
+    }
     GLStatus S = lowerRegion(child.get());
     if (S != GLStatus::Success)
       return S;
   }
+  return GLStatus::Success;
+}
+
+GLStatus TFGraphFunctionLowering::lowerFunctionRegion(FunctionSESERegion *r) {
+  GLStatus S = GLStatus::Success;
+  auto &graphFn = getCurrentGraphFunction();
+  for (int i = 0, e = graphFn.outputs.size(); i != e; ++i) {
+    addValueMapping({graphFn.outputs[i].first, 0},
+                    graphFn.outputs[i].second);
+  }
+  graphFn.outputs.clear();
+  S = lowerRegion(r->getFunctionRegion());
+  if (S != GLStatus::Success)
+    return S;
   return GLStatus::Success;
 }
 
@@ -2508,7 +2529,7 @@ GLStatus TFGraphFunctionLowering::lowerRegion(SESERegionTree *region) {
   case SESERegionTree::Sequence:
     return lowerSequenceRegion(cast<SequenceSESERegion>(region));
   case SESERegionTree::Function:
-    return lowerRegion(cast<FunctionSESERegion>(region)->getFunctionRegion());
+    return lowerFunctionRegion(cast<FunctionSESERegion>(region));
   case SESERegionTree::WhileLoop:
     return lowerWhileLoopRegion(cast<WhileLoopSESERegion>(region));
   case SESERegionTree::Conditional:
