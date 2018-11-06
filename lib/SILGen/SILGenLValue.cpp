@@ -3776,108 +3776,6 @@ getFormalStorageAbstractionPattern(SILGenFunction &SGF, AbstractStorageDecl *fie
   return SGF.SGM.Types.getAbstractionPattern(sub);
 }
 
-static SILDeclRef getRValueAccessorDeclRef(SILGenFunction &SGF,
-                                           AbstractStorageDecl *storage,
-                                           AccessStrategy strategy) {
-  switch (strategy.getKind()) {
-  case AccessStrategy::BehaviorStorage:
-    llvm_unreachable("shouldn't load an rvalue via behavior storage!");
-
-  case AccessStrategy::Storage:
-    llvm_unreachable("should already have been filtered out!");
-
-  case AccessStrategy::MaterializeToTemporary:
-    llvm_unreachable("never used for read accesses");
-
-  case AccessStrategy::DirectToAccessor:
-  case AccessStrategy::DispatchToAccessor: {
-    auto accessor = strategy.getAccessor();
-    return SGF.SGM.getAccessorDeclRef(storage->getAccessor(accessor));
-  }
-  }
-  llvm_unreachable("should already have been filtered out!");
-}
-
-static RValue getTargetRValue(SILGenFunction &SGF, SILLocation loc,
-                              ManagedValue value,
-                              AbstractionPattern origFormalType,
-                              CanType substFormalType,
-                              SGFContext C) {
-  SILType loweredSubstType = SGF.getLoweredType(substFormalType);
-
-  bool hasAbstraction =
-    (loweredSubstType.getObjectType() != value.getType().getObjectType());
-
-  if (value.isLValue() ||
-      (value.getType().isAddress() && !loweredSubstType.isAddress())) {
-    auto isTake =
-      IsTake_t(!value.isLValue() && !value.isPlusZeroRValueOrTrivial());
-    value = SGF.emitLoad(loc,
-                         (isTake ? value.forward(SGF)
-                                 : value.getUnmanagedValue()),
-                         SGF.getTypeLowering(value.getType()),
-                         (hasAbstraction ? SGFContext() : C),
-                         isTake);
-  }
-
-  RValue result(SGF, loc, substFormalType, value);
-  if (hasAbstraction) {
-    result = SGF.emitOrigToSubstValue(loc, std::move(result), origFormalType,
-                                      substFormalType, C);
-  }
-  return result;
-}
-
-static RValue
-emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
-                       AbstractStorageDecl *storage,
-                       SubstitutionMap substitutions,
-                       ArgumentSource &&baseRV,
-                       PreparedArguments &&subscriptIndices,
-                       bool isSuper, AccessStrategy strategy,
-                       SILDeclRef accessor,
-                       AbstractionPattern origFormalType,
-                       CanType substFormalType,
-                       SGFContext C) {
-  assert(strategy.getKind() == AccessStrategy::DirectToAccessor ||
-         strategy.getKind() == AccessStrategy::DispatchToAccessor);
-  bool isDirectUse = (strategy.getKind() == AccessStrategy::DirectToAccessor);
-
-  // The easy path here is if we don't need to use an addressor.
-  if (strategy.getAccessor() == AccessorKind::Get) {
-    return SGF.emitGetAccessor(loc, accessor, substitutions,
-                               std::move(baseRV), isSuper, isDirectUse,
-                               std::move(subscriptIndices), C);
-  }
-
-  assert(strategy.getAccessor() == AccessorKind::Address);
-
-  auto &storageTL = SGF.getTypeLowering(origFormalType, substFormalType);
-  SILType storageType = storageTL.getLoweredType().getAddressType();
-
-  auto addressorResult =
-    SGF.emitAddressorAccessor(loc, accessor, substitutions,
-                              std::move(baseRV), isSuper, isDirectUse,
-                              std::move(subscriptIndices), storageType);
-
-  RValue result = getTargetRValue(SGF, loc, addressorResult.first,
-                                  origFormalType, substFormalType, C);
-
-  switch (cast<AccessorDecl>(accessor.getDecl())->getAddressorKind()) {
-  case AddressorKind::NotAddressor: llvm_unreachable("inconsistent");
-  case AddressorKind::Unsafe:
-    // Nothing to do.
-    break;
-  case AddressorKind::Owning:
-  case AddressorKind::NativeOwning:
-    // Emit the release immediately.
-    SGF.B.emitDestroyValueOperation(loc, addressorResult.second.forward(SGF));
-    break;
-  }
-
-  return result;
-}
-
 /// Produce a singular RValue for a load from the specified property.  This is
 /// designed to work with RValue ManagedValue bases that are either +0 or +1.
 RValue SILGenFunction::emitRValueForStorageLoad(
@@ -3892,21 +3790,25 @@ RValue SILGenFunction::emitRValueForStorageLoad(
 
   // If we should call an accessor of some kind, do so.
   if (strategy.getKind() != AccessStrategy::Storage) {
-    auto accessor = getRValueAccessorDeclRef(*this, storage, strategy);
-    ArgumentSource baseRV = prepareAccessorBaseArg(loc, base,
-                                                   baseFormalType,
-                                                   accessor);
+    auto accessKind = SGFAccessKind::OwnedObjectRead;
 
-    AbstractionPattern origFormalType =
-      getFormalStorageAbstractionPattern(*this, storage);
-    auto substFormalType = propTy->getCanonicalType();
+    LValue lv = [&] {
+      if (!base) return LValue();
 
-    return emitRValueWithAccessor(*this, loc, storage, substitutions,
-                                  std::move(baseRV),
-                                  std::move(subscriptIndices),
-                                  isSuper, strategy, accessor,
-                                  origFormalType, substFormalType, C);
+      auto baseAccess = getBaseAccessKind(SGM, storage, accessKind,
+                                          strategy, baseFormalType);
+      return LValue::forValue(baseAccess, base, baseFormalType);
+    }();
+
+    lv.addMemberComponent(*this, loc, storage, substitutions, LValueOptions(),
+                          isSuper, accessKind, strategy,
+                          propTy->getCanonicalType(),
+                          std::move(subscriptIndices),
+                          /*index for diagnostics*/ nullptr);
+
+    return emitLoadOfLValue(loc, std::move(lv), C, isBaseGuaranteed);
   }
+
   assert(isa<VarDecl>(storage) && "only properties should have storage");
   auto field = cast<VarDecl>(storage);
   assert(field->hasStorage() &&
