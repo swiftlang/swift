@@ -18,7 +18,8 @@ import TestsUtils
 public var ArraySetElement = BenchmarkInfo(
   name: "ArraySetElement",
   runFunction: run_ArraySetElement,
-  tags: [.runtime, .cpubench, .unstable]
+  tags: [.runtime, .cpubench, .unstable],
+  legacyFactor: 10
 )
 
 // This is an effort to defeat isUniquelyReferenced optimization. Ideally
@@ -29,9 +30,8 @@ func storeArrayElement(_ array: inout [Int], _ i: Int) {
 }
 
 public func run_ArraySetElement(_ N: Int) {
-  let scale = 10
   var array = [Int](repeating: 0, count: 10000)
-  for _ in 0..<N*scale {
+  for _ in 0..<N {
     for i in 0..<array.count {
       storeArrayElement(&array, i)
     }
