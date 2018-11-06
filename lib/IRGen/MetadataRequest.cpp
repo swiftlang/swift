@@ -317,7 +317,10 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
                                       llvm::GlobalValue::LinkOnceODRLinkage,
                                       nullptr,
                                       symbolName);
-  var->setVisibility(llvm::GlobalValue::HiddenVisibility);
+  ApplyIRLinkage({llvm::GlobalValue::LinkOnceODRLinkage,
+                  llvm::GlobalValue::HiddenVisibility,
+                  llvm::GlobalValue::DefaultStorageClass})
+      .to(var);
   var->setAlignment(2);
   setTrueConstGlobal(var);
   var->setSection(getReflectionTypeRefSectionName());
