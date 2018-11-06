@@ -1055,10 +1055,17 @@ namespace {
 
           if (isa<TupleExpr>(parent) || isa<ParenExpr>(parent)) {
             auto call = parents.find(parent);
-            if (call != parents.end() &&
-                (isa<ApplyExpr>(call->getSecond()) ||
-                 isa<UnresolvedMemberExpr>(call->getSecond())))
-              return finish(true, expr);
+            if (call != parents.end()) {
+              if (isa<ApplyExpr>(call->getSecond()) ||
+                  isa<UnresolvedMemberExpr>(call->getSecond()))
+                return finish(true, expr);
+
+              if (isa<SubscriptExpr>(call->getSecond())) {
+                TC.diagnose(expr->getStartLoc(),
+                            diag::cannot_pass_inout_arg_to_subscript);
+                return finish(false, nullptr);
+              }
+            }
           }
         }
 
