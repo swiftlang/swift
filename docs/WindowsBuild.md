@@ -127,6 +127,7 @@ cmake -G "Ninja"^
  -DLLVM_BUILD_EXTERNAL_COMPILER_RT=TRUE^
  -DLLVM_LIT_ARGS=-sv^
  -DLLVM_TARGETS_TO_BUILD=X86^
+ -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc^
  "%swift_source_dir%/llvm"
 popd
 cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"
