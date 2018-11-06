@@ -677,6 +677,27 @@ static bool isStdlibType(const TypeDecl *decl) {
   return dc->isModuleScopeContext() && dc->getParentModule()->isStdlibModule();
 }
 
+/// Whether to mangle the given type as generic.
+static bool shouldMangleAsGeneric(Type type) {
+  if (!type)
+    return false;
+
+  TypeBase *typePtr = type.getPointer();
+  if (auto typeAlias = dyn_cast<NameAliasType>(typePtr))
+    return !typeAlias->getSubstitutionMap().empty();
+
+  if (auto bound = dyn_cast<BoundGenericType>(typePtr))
+    return true;
+
+  if (auto nominal = dyn_cast<NominalType>(typePtr))
+    return shouldMangleAsGeneric(nominal->getParent());
+
+  if (auto unbound = dyn_cast<UnboundGenericType>(typePtr))
+    return shouldMangleAsGeneric(unbound->getParent());
+
+  return false;
+}
+
 /// Mangle a type into the buffer.
 ///
 void ASTMangler::appendType(Type type) {
@@ -845,11 +866,12 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::BoundGenericClass:
     case TypeKind::BoundGenericEnum:
     case TypeKind::BoundGenericStruct: {
-      // We can't use getAnyNominal here because this can be TypeAliasDecl only
-      // in case of UnboundGenericType. Such mangling happens in, for instance,
-      // SourceKit 'cursorinfo' request.
-      auto *Decl = type->getAnyGeneric();
-      if (type->isSpecialized()) {
+      GenericTypeDecl *Decl;
+      if (auto typeAlias = dyn_cast<NameAliasType>(type.getPointer()))
+        Decl = typeAlias->getDecl();
+      else
+        Decl = type->getAnyGeneric();
+      if (shouldMangleAsGeneric(type)) {
         // Try to mangle the entire name as a substitution.
         if (tryMangleSubstitution(tybase))
           return;
@@ -869,7 +891,7 @@ void ASTMangler::appendType(Type type) {
         addSubstitution(type.getPointer());
         return;
       }
-      appendAnyGenericType(Decl);
+      appendAnyGenericType(type->getAnyGeneric());
       return;
     }
 
@@ -1155,14 +1177,23 @@ static bool containsRetroactiveConformance(
 }
 
 void ASTMangler::appendRetroactiveConformances(Type type) {
-  auto nominal = type->getAnyNominal();
-  if (!nominal) return;
+  // Dig out the substitution map to use.
+  SubstitutionMap subMap;
+  ModuleDecl *module;
+  if (auto typeAlias = dyn_cast<NameAliasType>(type.getPointer())) {
+    module = Mod ? Mod : typeAlias->getDecl()->getModuleContext();
+    subMap = typeAlias->getSubstitutionMap();
+  } else {
+    if (type->hasUnboundGenericType())
+      return;
 
-  auto genericSig = nominal->getGenericSignatureOfContext();
-  if (!genericSig) return;
+    auto nominal = type->getAnyNominal();
+    if (!nominal) return;
 
-  auto module = Mod ? Mod : nominal->getModuleContext();
-  auto subMap = type->getContextSubstitutionMap(module, nominal);
+    module = Mod ? Mod : nominal->getModuleContext();
+    subMap = type->getContextSubstitutionMap(module, nominal);
+  }
+
   if (subMap.empty()) return;
 
   unsigned numProtocolRequirements = 0;
