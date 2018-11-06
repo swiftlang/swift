@@ -25,11 +25,11 @@ public struct Vector${n}<Scalar> : SIMDVector where Scalar: SIMDVectorizable {
   }
 
   public subscript(index: Int) -> Scalar {
-    @inlinable get {
+    @_transparent get {
       _precondition(indices.contains(index))
       return _storage[index]
     }
-    @inlinable set {
+    @_transparent set {
       _precondition(indices.contains(index))
       _storage[index] = newValue
     }

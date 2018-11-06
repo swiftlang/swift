@@ -7,6 +7,9 @@ infix operator .>= : ComparisonPrecedence
 infix operator .& : LogicalConjunctionPrecedence
 infix operator .^ : LogicalDisjunctionPrecedence
 infix operator .| : LogicalDisjunctionPrecedence
+infix operator .&= : AssignmentPrecedence
+infix operator .^= : AssignmentPrecedence
+infix operator .|= : AssignmentPrecedence
 prefix operator .!
 
 /// A SIMD vector type that may not have any computational operations.
@@ -25,8 +28,6 @@ public protocol SIMDVectorStorage {
   init()
   
   /// Element access to the vector.
-  ///
-  /// Precondition: `index` must be in `0 ..< elementCount`.
   subscript(index: Int) -> Scalar { get set }
 }
 
@@ -326,13 +327,13 @@ public extension SIMDMaskVector {
   @_transparent static func .^(lhs: Self, rhs: Scalar) -> Self { return lhs .^ Self(repeating: rhs) }
   @_transparent static func .|(lhs: Self, rhs: Scalar) -> Self { return lhs .| Self(repeating: rhs) }
   
-  @_transparent static func .&(lhs: inout Self, rhs: Self) { lhs = lhs .& rhs }
-  @_transparent static func .^(lhs: inout Self, rhs: Self) { lhs = lhs .^ rhs }
-  @_transparent static func .|(lhs: inout Self, rhs: Self) { lhs = lhs .| rhs }
+  @_transparent static func .&=(lhs: inout Self, rhs: Self) { lhs = lhs .& rhs }
+  @_transparent static func .^=(lhs: inout Self, rhs: Self) { lhs = lhs .^ rhs }
+  @_transparent static func .|=(lhs: inout Self, rhs: Self) { lhs = lhs .| rhs }
   
-  @_transparent static func .&(lhs: inout Self, rhs: Scalar) { lhs = lhs .& rhs }
-  @_transparent static func .^(lhs: inout Self, rhs: Scalar) { lhs = lhs .^ rhs }
-  @_transparent static func .|(lhs: inout Self, rhs: Scalar) { lhs = lhs .| rhs }
+  @_transparent static func .&=(lhs: inout Self, rhs: Scalar) { lhs = lhs .& rhs }
+  @_transparent static func .^=(lhs: inout Self, rhs: Scalar) { lhs = lhs .^ rhs }
+  @_transparent static func .|=(lhs: inout Self, rhs: Scalar) { lhs = lhs .| rhs }
   
   @inlinable
   static func random<T: RandomNumberGenerator>(using generator: inout T) -> Self {
