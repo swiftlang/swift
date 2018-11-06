@@ -102,8 +102,9 @@ ATTRIBUTE_NODES = [
     # named-attribute-string-arg -> 'name': string-literal
     Node('NamedAttributeStringArgument', kind='Syntax',
          description='''
-         The argument for the `@_dynamic_replacement` or `@_private` attribute \
-         of the form `for: "function()"` or `sourceFile: "Src.swift"`
+         The argument for the `@_dynamic_replacement` or `@_private` \
+         attribute of the form `for: "function()"` or `sourceFile: \
+         "Src.swift"`
          ''',
          children=[
              Child('NameTok', kind='Token',
@@ -111,24 +112,24 @@ ATTRIBUTE_NODES = [
              Child('Colon', kind='ColonToken',
                    description='The colon separating the label and the value'),
              Child('StringOrDeclname', kind='Syntax', node_choices=[
-                  Child('String', kind='StringLiteralToken'),
-                  Child('Declname', kind='DeclName'),
+                Child('String', kind='StringLiteralToken'),
+                Child('Declname', kind='DeclName'),
              ]),
          ]),
     Node('DeclName', kind='Syntax', children=[
-               Child('DeclBaseName', kind='Syntax', description='''
-                     The base name of the protocol\'s requirement.
-                     ''',
-                     node_choices=[
-                         Child('Identifier', kind='IdentifierToken'),
-                         Child('Operator', kind='PrefixOperatorToken'),
-                     ]),
-               Child('DeclNameArguments', kind='DeclNameArguments',
-                     is_optional=True, description='''
-                     The argument labels of the protocol\'s requirement if it \
-                     is a function requirement.
-                     '''),
-         ]),
+       Child('DeclBaseName', kind='Syntax', description='''
+             The base name of the protocol\'s requirement.
+             ''',
+             node_choices=[
+                 Child('Identifier', kind='IdentifierToken'),
+                 Child('Operator', kind='PrefixOperatorToken'),
+             ]),
+       Child('DeclNameArguments', kind='DeclNameArguments',
+             is_optional=True, description='''
+             The argument labels of the protocol\'s requirement if it \
+             is a function requirement.
+             '''),
+       ]),
     # The argument of '@_implements(...)'
     # implements-attr-arguments -> simple-type-identifier ',' 
     #                              (identifier | operator) decl-name-arguments
