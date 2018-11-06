@@ -31,7 +31,10 @@ public protocol SIMDVectorStorage {
   subscript(index: Int) -> Scalar { get set }
 }
 
-public protocol SIMDVector : SIMDVectorStorage, Hashable, CustomStringConvertible {
+public protocol SIMDVector : SIMDVectorStorage,
+                             Hashable,
+                             CustomStringConvertible,
+                             ExpressibleByArrayLiteral {
   /// The mask type resulting from pointwise comparisons of this vector type.
   associatedtype Mask : SIMDMaskVector
 }
@@ -85,6 +88,23 @@ public extension SIMDVector {
   @_transparent
   mutating func replace(with other: Self, where mask: Mask) {
     for i in indices { self[i] = mask[i] ? other[i] : self[i] }
+  }
+  
+  @inlinable
+  init(arrayLiteral elements: Scalar...) {
+    self.init(elements)
+  }
+  
+  @inlinable
+  init<S: Sequence>(_ elements: S) where S.Element == Scalar {
+    self.init()
+    var index = 0
+    for element in elements {
+      if index == elementCount { _preconditionFailure("Too many elements in sequence.") }
+      self[index] = element
+      index += 1
+    }
+    if index < elementCount { _preconditionFailure("Not enough elements in sequence.") }
   }
 }
 
