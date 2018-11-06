@@ -117,4 +117,22 @@ struct TupleReader {
   func useReadable() {
     var v = readable
   }
+
+  var computed: String {
+    return compute()
+  }
+
+// CHECK-LABEL: sil hidden @$s13read_accessor11TupleReaderV0A8ComputedSSvr
+// CHECK:         [[GETTER:%.*]] = function_ref @$s13read_accessor11TupleReaderV8computedSSvg
+// CHECK-NEXT:    [[VALUE:%.]] = apply [[GETTER]](%0)
+// CHECK-NEXT:    [[BORROW:%.*]] = begin_borrow [[VALUE]] : $String
+// CHECK-NEXT:    yield [[BORROW]] : $String, resume bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    end_borrow [[BORROW]] : $String
+// CHECK-NEXT:    destroy_value [[VALUE]] : $String
+  var readComputed : String {
+    _read {
+      yield computed
+    }
+  }
 }
