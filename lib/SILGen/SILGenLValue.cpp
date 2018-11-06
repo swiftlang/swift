@@ -3766,6 +3766,154 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
   return std::move(component.asLogical()).get(*this, loc, addr, C);
 }
 
+static AbstractionPattern
+getFormalStorageAbstractionPattern(SILGenFunction &SGF, AbstractStorageDecl *field) {
+  if (auto var = dyn_cast<VarDecl>(field)) {
+    auto origType = SGF.SGM.Types.getAbstractionPattern(var);
+    return origType.getReferenceStorageReferentType();
+  }
+  auto sub = cast<SubscriptDecl>(field);
+  return SGF.SGM.Types.getAbstractionPattern(sub);
+}
+
+/// Produce a singular RValue for a load from the specified property.  This is
+/// designed to work with RValue ManagedValue bases that are either +0 or +1.
+RValue SILGenFunction::emitRValueForStorageLoad(
+    SILLocation loc, ManagedValue base, CanType baseFormalType,
+    bool isSuper, AbstractStorageDecl *storage,
+    PreparedArguments &&subscriptIndices,
+    SubstitutionMap substitutions,
+    AccessSemantics semantics, Type propTy, SGFContext C,
+    bool isBaseGuaranteed) {
+  AccessStrategy strategy =
+    storage->getAccessStrategy(semantics, AccessKind::Read, FunctionDC);
+
+  // If we should call an accessor of some kind, do so.
+  if (strategy.getKind() != AccessStrategy::Storage) {
+    auto accessKind = SGFAccessKind::OwnedObjectRead;
+
+    LValue lv = [&] {
+      if (!base) return LValue();
+
+      auto baseAccess = getBaseAccessKind(SGM, storage, accessKind,
+                                          strategy, baseFormalType);
+      return LValue::forValue(baseAccess, base, baseFormalType);
+    }();
+
+    lv.addMemberComponent(*this, loc, storage, substitutions, LValueOptions(),
+                          isSuper, accessKind, strategy,
+                          propTy->getCanonicalType(),
+                          std::move(subscriptIndices),
+                          /*index for diagnostics*/ nullptr);
+
+    return emitLoadOfLValue(loc, std::move(lv), C, isBaseGuaranteed);
+  }
+
+  assert(isa<VarDecl>(storage) && "only properties should have storage");
+  auto field = cast<VarDecl>(storage);
+  assert(field->hasStorage() &&
+         "Cannot directly access value without storage");
+
+  // For static variables, emit a reference to the global variable backing
+  // them.
+  // FIXME: This has to be dynamically looked up for classes, and
+  // dynamically instantiated for generics.
+  if (field->isStatic()) {
+    auto baseMeta = base.getType().castTo<MetatypeType>().getInstanceType();
+    (void)baseMeta;
+    assert(!baseMeta->is<BoundGenericType>() &&
+           "generic static stored properties not implemented");
+    if (field->getDeclContext()->getSelfClassDecl() &&
+        field->hasStorage())
+      // FIXME: don't need to check hasStorage, already done above
+      assert(field->isFinal() && "non-final class stored properties not implemented");
+
+    return emitRValueForDecl(loc, field, propTy, semantics, C);
+  }
+
+
+  // rvalue MemberRefExprs are produced in two cases: when accessing a 'let'
+  // decl member, and when the base is a (non-lvalue) struct.
+  assert(baseFormalType->getAnyNominal() &&
+         base.getType().getASTType()->getAnyNominal() &&
+         "The base of an rvalue MemberRefExpr should be an rvalue value");
+
+  // If the accessed field is stored, emit a StructExtract on the base.
+
+  auto substFormalType = propTy->getCanonicalType();
+  auto &lowering = getTypeLowering(substFormalType);
+
+  // Check for an abstraction difference.
+  AbstractionPattern origFormalType =
+    getFormalStorageAbstractionPattern(*this, field);
+  bool hasAbstractionChange = false;
+  auto &abstractedTL = getTypeLowering(origFormalType, substFormalType);
+  if (!origFormalType.isExactType(substFormalType)) {
+    hasAbstractionChange =
+        (abstractedTL.getLoweredType() != lowering.getLoweredType());
+  }
+
+  // If the base is a reference type, just handle this as loading the lvalue.
+  ManagedValue result;
+  if (baseFormalType->hasReferenceSemantics()) {
+    LValue LV = emitPropertyLValue(loc, base, baseFormalType, field,
+                                   LValueOptions(),
+                                   SGFAccessKind::OwnedObjectRead,
+                                   AccessSemantics::DirectToStorage);
+    auto loaded = emitLoadOfLValue(loc, std::move(LV), C, isBaseGuaranteed);
+    // If we don't have to reabstract, the load is sufficient.
+    if (!hasAbstractionChange)
+      return loaded;
+
+    // Otherwise, bring the component up to +1 so we can reabstract it.
+    result = std::move(loaded).getAsSingleValue(*this, loc)
+                              .copyUnmanaged(*this, loc);
+  } else if (!base.getType().isAddress()) {
+    // For non-address-only structs, we emit a struct_extract sequence.
+    result = B.createStructExtract(loc, base, field);
+
+    if (result.getType().is<ReferenceStorageType>()) {
+      // For weak and unowned types, convert the reference to the right
+      // pointer, producing a +1.
+      result = emitConversionToSemanticRValue(loc, result, lowering);
+
+    } else if (hasAbstractionChange ||
+               (!C.isImmediatePlusZeroOk() &&
+                !(C.isGuaranteedPlusZeroOk() && isBaseGuaranteed))) {
+      // If we have an abstraction change or if we have to produce a result at
+      // +1, then copy the value. If we know that our base will stay alive for
+      // the entire usage of this value, we can borrow the value at +0 for a
+      // guaranteed consumer. Otherwise, since we do not have enough information
+      // to know if the base's lifetime last's as long as our use of the access,
+      // we can only emit at +0 for immediate clients.
+      result = result.copyUnmanaged(*this, loc);
+    }
+  } else {
+    // Create a tiny unenforced access scope around a load from local memory. No
+    // cleanup is necessary since we directly emit the load here. This will
+    // probably go away with opaque values.
+    UnenforcedAccess access;
+    SILValue accessAddress =
+      access.beginAccess(*this, loc, base.getValue(), SILAccessKind::Read);
+
+    // For address-only sequences, the base is in memory.  Emit a
+    // struct_element_addr to get to the field, and then load the element as an
+    // rvalue.
+    SILValue ElementPtr = B.createStructElementAddr(loc, accessAddress, field);
+
+    result = emitLoad(loc, ElementPtr, abstractedTL,
+                      hasAbstractionChange ? SGFContext() : C, IsNotTake);
+    access.endAccess(*this);
+  }
+
+  // If we're accessing this member with an abstraction change, perform that
+  // now.
+  if (hasAbstractionChange)
+    result =
+        emitOrigToSubstValue(loc, result, origFormalType, substFormalType, C);
+  return RValue(*this, loc, substFormalType, result);
+}
+
 ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
                                                  LValue &&src,
                                                  TSanKind tsanKind) {
