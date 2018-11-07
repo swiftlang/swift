@@ -1841,7 +1841,7 @@ void ConstraintSystem::partitionDisjunction(
     PartitionBeginning.push_back(0);
   };
 
-  if (!getASTContext().isSwiftVersionAtLeast(5) ||
+  if (/*!getASTContext().isSwiftVersionAtLeast(5) ||*/
       !TC.getLangOpts().SolverEnableOperatorDesignatedTypes ||
       !isOperatorBindOverload(Choices[0])) {
     originalOrdering();
@@ -1950,7 +1950,7 @@ Constraint *ConstraintSystem::selectDisjunction() {
   if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
     return disjunction;
 
-  if (getASTContext().isSwiftVersionAtLeast(5))
+  if (true/*getASTContext().isSwiftVersionAtLeast(5)*/)
     if (auto *disjunction = selectApplyDisjunction())
       return disjunction;
 
