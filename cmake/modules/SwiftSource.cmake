@@ -245,6 +245,10 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-enable-sil-ownership")
   endif()
 
+  if(NOT SWIFT_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING AND SWIFTFILE_IS_STDLIB)
+    list(APPEND swift_flags "-Xfrontend" "-enforce-exclusivity=unchecked")
+  endif()
+
   if(SWIFT_EMIT_SORTED_SIL_OUTPUT)
     list(APPEND swift_flags "-Xfrontend" "-emit-sorted-sil")
   endif()
