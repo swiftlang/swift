@@ -3,7 +3,7 @@
 // REQUIRES: objc_interop
 
 // CHECK: @test_dynamically_replaceableTX = global %swift.dyn_repl_link_entry { i8* bitcast (void ()* @test_dynamically_replaceableTI to i8*), %swift.dyn_repl_link_entry* null }
-// CHECK: @test_dynamically_replaceableTx = constant %swift.dyn_repl_key { i32 trunc ([[INTPTR:i[0-9]+]] sub ([[INTPTR]] ptrtoint (%swift.dyn_repl_link_entry* @test_dynamically_replaceableTX to [[INTPTR]]), [[INTPTR]] ptrtoint (%swift.dyn_repl_key* @test_dynamically_replaceableTx to [[INTPTR]])) to i32), i32 0 }, section "__TEXT,__const"
+// CHECK: @test_dynamically_replaceableTx = constant %swift.dyn_repl_key { i32{{.*}}%swift.dyn_repl_link_entry* @test_dynamically_replaceableTX{{.*}}, i32 0 }, section "__TEXT,__const"
 // CHECK: @test_replacementTX = global %swift.dyn_repl_link_entry zeroinitializer
 
 // CHECK: @"\01l_unnamed_dynamic_replacements" = private constant { i32, i32, [1 x { i32, i32, i32, i32 }] }
