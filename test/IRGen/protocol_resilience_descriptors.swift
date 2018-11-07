@@ -82,7 +82,7 @@ where Element: ProtocolWithRequirements, Element.T == Y {
 
 // CHECK-USAGE: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @"$s31protocol_resilience_descriptors17assocTypeMetadatay1TQzmxm010resilient_A024ProtocolWithRequirementsRzlF"(%swift.type*, %swift.type* [[PWD:%.*]], i8** [[WTABLE:%.*]])
 public func assocTypeMetadata<PWR: ProtocolWithRequirements>(_: PWR.Type) -> PWR.T.Type {
-  // CHECK-USAGE: call %swift.metadata_response @swift_getAssociatedTypeWitness([[INT]] 0, i8** %PWR.ProtocolWithRequirements, %swift.type* %PWR, %swift.protocol_requirement* @"$s18resilient_protocol24ProtocolWithRequirementsTL", %swift.protocol_requirement* @"$s1T18resilient_protocol24ProtocolWithRequirementsPTl")
+  // CHECK-USAGE: call swiftcc %swift.metadata_response @swift_getAssociatedTypeWitness([[INT]] 0, i8** %PWR.ProtocolWithRequirements, %swift.type* %PWR, %swift.protocol_requirement* @"$s18resilient_protocol24ProtocolWithRequirementsTL", %swift.protocol_requirement* @"$s1T18resilient_protocol24ProtocolWithRequirementsPTl")
   return PWR.T.self
 }
 
