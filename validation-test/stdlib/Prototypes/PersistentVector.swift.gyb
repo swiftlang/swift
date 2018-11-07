@@ -99,6 +99,7 @@ Memory layout:
 */
 
 import Swift
+import SwiftPrivate
 import SwiftShims
 
 // This prototype is only partially implemented, and it relies on specific hash
