@@ -4,7 +4,6 @@
 
 // FIXME: https://bugs.swift.org/browse/SR-7806
 // REQUIRES: CPU=arm64 || CPU=x86_64
-// REQUIRES: rdar45797168
 
 // FIXME: https://bugs.swift.org/browse/SR-9008
 
