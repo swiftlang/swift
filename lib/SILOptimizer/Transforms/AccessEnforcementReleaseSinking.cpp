@@ -74,11 +74,15 @@ static bool isBarrier(SILInstruction *inst) {
 
     // Whitelist the safe builtin categories. Builtins should generally be
     // treated conservatively, because introducing a new builtin does not
-    // require updating all passes to be aware of it. Avoid a default to ensure
-    // that all categories are covered.
+    // require updating all passes to be aware of it.
     switch (kind.getValue()) {
     case BuiltinValueKind::None:
       llvm_unreachable("Builtin must has a non-empty kind.");
+
+      // Unhandled categories don't generate a case. Instead, they result
+      // in a build error: enumeration values not handled in switch.
+#define BUILTIN(Id, Name, Attrs)
+
 #define BUILTIN_NO_BARRIER(Id)                                                 \
   case BuiltinValueKind::Id:                                                   \
     return false;
@@ -100,7 +104,59 @@ static bool isBarrier(SILInstruction *inst) {
 #define BUILTIN_RUNTIME_CALL(Id, Name, Attrs)                                  \
   case BuiltinValueKind::Id:                                                   \
     return true; // A runtime call could be anything.
-#define BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload) BUILTIN_NO_BARRIER(Id)
+
+    // Handle BUILTIN_MISC_OPERATIONs individually.
+    case BuiltinValueKind::Sizeof:
+    case BuiltinValueKind::Strideof:
+    case BuiltinValueKind::IsPOD:
+    case BuiltinValueKind::IsBitwiseTakable:
+    case BuiltinValueKind::IsSameMetatype:
+    case BuiltinValueKind::Alignof:
+    case BuiltinValueKind::OnFastPath:
+    case BuiltinValueKind::ExtractElement:
+    case BuiltinValueKind::InsertElement:
+    case BuiltinValueKind::StaticReport:
+    case BuiltinValueKind::AssertConf:
+    case BuiltinValueKind::StringObjectOr:
+    case BuiltinValueKind::UToSCheckedTrunc:
+    case BuiltinValueKind::SToUCheckedTrunc:
+    case BuiltinValueKind::SToSCheckedTrunc:
+    case BuiltinValueKind::UToUCheckedTrunc:
+    case BuiltinValueKind::SUCheckedConversion:
+    case BuiltinValueKind::USCheckedConversion:
+    case BuiltinValueKind::IntToFPWithOverflow:
+    case BuiltinValueKind::ZeroInitializer:
+    case BuiltinValueKind::Once:
+    case BuiltinValueKind::OnceWithContext:
+    case BuiltinValueKind::GetObjCTypeEncoding:
+    case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
+    case BuiltinValueKind::WillThrow:
+      return false;
+
+    // Handle some rare builtins that may be sensitive to object lifetime
+    // or deinit side effects conservatively.
+    case BuiltinValueKind::AllocRaw:
+    case BuiltinValueKind::DeallocRaw:
+    case BuiltinValueKind::Fence:
+    case BuiltinValueKind::AtomicLoad:
+    case BuiltinValueKind::AtomicStore:
+    case BuiltinValueKind::AtomicRMW:
+    case BuiltinValueKind::Unreachable:
+    case BuiltinValueKind::CmpXChg:
+    case BuiltinValueKind::CondUnreachable:
+    case BuiltinValueKind::DestroyArray:
+    case BuiltinValueKind::CopyArray:
+    case BuiltinValueKind::TakeArrayNoAlias:
+    case BuiltinValueKind::TakeArrayFrontToBack:
+    case BuiltinValueKind::TakeArrayBackToFront:
+    case BuiltinValueKind::AssignCopyArrayNoAlias:
+    case BuiltinValueKind::AssignCopyArrayFrontToBack:
+    case BuiltinValueKind::AssignCopyArrayBackToFront:
+    case BuiltinValueKind::AssignTakeArray:
+    case BuiltinValueKind::UnsafeGuaranteed:
+    case BuiltinValueKind::UnsafeGuaranteedEnd:
+      return true;
+
 #define BUILTIN_SANITIZER_OPERATION(Id, Name, Attrs) BUILTIN_NO_BARRIER(Id)
 #define BUILTIN_TYPE_CHECKER_OPERATION(Id, Name) BUILTIN_NO_BARRIER(Id)
 #define BUILTIN_TYPE_TRAIT_OPERATION(Id, Name) BUILTIN_NO_BARRIER(Id)
