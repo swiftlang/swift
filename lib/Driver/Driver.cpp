@@ -1411,11 +1411,15 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerOutputType = file_types::TY_Remapping;
       OI.LinkAction = LinkKind::None;
       break;
+
+    case options::OPT_dump_ast:
+      OI.CompilerOutputType = file_types::TY_ASTDump;
+      break;
+
     case options::OPT_parse:
     case options::OPT_resolve_imports:
     case options::OPT_typecheck:
     case options::OPT_dump_parse:
-    case options::OPT_dump_ast:
     case options::OPT_emit_syntax:
     case options::OPT_print_ast:
     case options::OPT_dump_type_refinement_contexts:
@@ -1764,6 +1768,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
           break;
         }
         LLVM_FALLTHROUGH;
+      case file_types::TY_ASTDump:
       case file_types::TY_Image:
       case file_types::TY_dSYM:
       case file_types::TY_Dependencies:

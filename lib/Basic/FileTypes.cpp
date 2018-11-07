@@ -70,6 +70,7 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_SIL:
   case file_types::TY_Dependencies:
   case file_types::TY_Assembly:
+  case file_types::TY_ASTDump:
   case file_types::TY_RawSIL:
   case file_types::TY_LLVM_IR:
   case file_types::TY_ObjCHeader:
@@ -117,6 +118,7 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_TBD:
   case file_types::TY_SIL:
   case file_types::TY_Dependencies:
+  case file_types::TY_ASTDump:
   case file_types::TY_RawSIL:
   case file_types::TY_ObjCHeader:
   case file_types::TY_AutolinkFile:
@@ -147,6 +149,7 @@ bool file_types::isAfterLLVM(ID Id) {
 bool file_types::isPartOfSwiftCompilation(ID Id) {
   switch (Id) {
   case file_types::TY_Swift:
+  case file_types::TY_ASTDump:
   case file_types::TY_SIL:
   case file_types::TY_RawSIL:
   case file_types::TY_SIB:

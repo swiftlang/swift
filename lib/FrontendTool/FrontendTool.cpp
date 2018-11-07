@@ -685,6 +685,19 @@ static SourceFile *getPrimaryOrMainSourceFile(CompilerInvocation &Invocation,
   return SF;
 }
 
+static void dumpAST(CompilerInvocation &Invocation, CompilerInstance &Instance) {
+  SourceFile *sourceFile = getPrimaryOrMainSourceFile(Invocation, Instance);
+  const StringRef OutputFilename =
+  Instance.getPrimarySpecificPathsForSourceFile(*sourceFile).OutputFilename;
+  // PSP.OutputFilename is "-" whenever the output should be written to stdout.
+  if (OutputFilename == "-") {
+    sourceFile->dump();
+  } else {
+    auto OS = getFileOutputStream(OutputFilename, Instance.getMainModule()->getASTContext());
+    sourceFile->dump(*OS);
+  }
+}
+
 /// We may have been told to dump the AST (either after parsing or
 /// type-checking, which is already differentiated in
 /// CompilerInstance::performSema()), so dump or print the main source file and
@@ -728,7 +741,7 @@ static Optional<bool> dumpASTIfNeeded(CompilerInvocation &Invocation,
 
   case FrontendOptions::ActionType::DumpParse:
   case FrontendOptions::ActionType::DumpAST:
-    getPrimaryOrMainSourceFile(Invocation, Instance)->dump();
+    dumpAST(Invocation, Instance);
     break;
 
   case FrontendOptions::ActionType::EmitImportedModules:
