@@ -1691,6 +1691,14 @@ ERROR(type_witness_not_accessible_type,none,
       "%0 %1 must be as accessible as its enclosing type because it "
       "matches a requirement in protocol %3",
       (DescriptiveDeclKind, DeclName, AccessLevel, DeclName))
+ERROR(witness_not_usable_from_inline,none,
+      "%0 %1 must be declared '@usableFromInline' because "
+      "because it matches a requirement in protocol %2",
+      (DescriptiveDeclKind, DeclName, DeclName))
+WARNING(witness_not_usable_from_inline_warn,none,
+        "%0 %1 should be declared '@usableFromInline' because "
+        "because it matches a requirement in protocol %2",
+        (DescriptiveDeclKind, DeclName, DeclName))
 ERROR(type_witness_objc_generic_parameter,none,
       "type %0 involving Objective-C type parameter%select{| %1}2 cannot be "
       "used for associated type %3 of protocol %4",
