@@ -160,8 +160,12 @@ public:
 
   Kind getKind() const { return TheKind; }
 
+  bool hasAccessor() const {
+    return TheKind == DirectToAccessor || TheKind == DispatchToAccessor;
+  }
+
   AccessorKind getAccessor() const {
-    assert(TheKind == DirectToAccessor || TheKind == DispatchToAccessor);
+    assert(hasAccessor());
     return FirstAccessor;
   }
 

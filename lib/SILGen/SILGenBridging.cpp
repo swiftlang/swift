@@ -601,8 +601,8 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   auto storage = emitTemporaryAllocation(loc, storageAddrTy);
   auto capture = B.createProjectBlockStorage(loc, storage);
   B.createStore(loc, fn, capture, StoreOwnershipQualifier::Init);
-  auto invokeFn = B.createFunctionRef(loc, thunk);
-  
+  auto invokeFn = B.createFunctionRefFor(loc, thunk);
+
   auto stackBlock = B.createInitBlockStorageHeader(loc, storage, invokeFn,
                               SILType::getPrimitiveObjectType(loweredBlockTy),
                                                    subs);
@@ -959,7 +959,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
   }
 
   // Create it in the current function.
-  auto thunkValue = B.createFunctionRef(loc, thunk);
+  auto thunkValue = B.createFunctionRefFor(loc, thunk);
   ManagedValue thunkedFn = B.createPartialApply(
       loc, thunkValue, SILType::getPrimitiveObjectType(substFnTy),
       interfaceSubs, block,
@@ -1433,7 +1433,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       // If @objc was inferred based on the Swift 3 @objc inference rules, emit
       // a call to Builtin.swift3ImplicitObjCEntrypoint() to enable runtime
       // logging of the uses of such entrypoints.
-      if (attr->isSwift3Inferred() && !decl->isDynamic()) {
+      if (attr->isSwift3Inferred() && !decl->isObjCDynamic()) {
         // Get the starting source location of the declaration so we can say
         // exactly where to stick '@objc'.
         SourceLoc objcInsertionLoc =

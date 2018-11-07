@@ -80,7 +80,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   // If the member is dynamic, reference its dynamic dispatch thunk so that
   // it will be redispatched, funneling the method call through the runtime
   // hook point.
-  if (derivedDecl->isDynamic()
+  if (derivedDecl->isObjCDynamic()
       && derived.kind != SILDeclRef::Kind::Allocator) {
     implFn = getDynamicThunk(derived, Types.getConstantInfo(derived).SILFnType);
     implLinkage = SILLinkage::Public;
@@ -135,7 +135,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   auto thunk = builder.createFunction(
       SILLinkage::Private, name, overrideInfo.SILFnType,
       cast<AbstractFunctionDecl>(derivedDecl)->getGenericEnvironment(), loc,
-      IsBare, IsNotTransparent, IsNotSerialized);
+      IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
   SILGenFunction(*this, *thunk, theClass)
@@ -684,7 +684,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
   auto *f = builder.createFunction(
       linkage, nameBuffer, witnessSILFnType, genericEnv,
       SILLocation(witnessRef.getDecl()), IsNotBare, IsTransparent, isSerialized,
-      ProfileCounter(), IsThunk, SubclassScope::NotApplicable, InlineStrategy);
+      IsNotDynamic, ProfileCounter(), IsThunk, SubclassScope::NotApplicable,
+      InlineStrategy);
 
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(witnessRef.getDecl()), f));

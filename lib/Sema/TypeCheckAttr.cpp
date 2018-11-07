@@ -117,6 +117,7 @@ public:
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
   IGNORED_ATTR(UsableFromInline)
   IGNORED_ATTR(WeakLinked)
+  IGNORED_ATTR(DynamicReplacement)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -359,6 +360,11 @@ void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
   // Members cannot be both dynamic and @nonobjc.
   if (D->getAttrs().hasAttribute<NonObjCAttr>())
     diagnoseAndRemoveAttr(attr, diag::dynamic_with_nonobjc);
+
+  // Members cannot be both dynamic and @_transparent.
+  if (D->getASTContext().LangOpts.isSwiftVersionAtLeast(5) &&
+      D->getAttrs().hasAttribute<TransparentAttr>())
+    diagnoseAndRemoveAttr(attr, diag::dynamic_with_transparent);
 }
 
 
@@ -818,6 +824,7 @@ public:
     IGNORED_ATTR(Transparent)
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(WeakLinked)
+    IGNORED_ATTR(DynamicReplacement)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
@@ -1904,6 +1911,214 @@ void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
   }
 }
 
+/// Lookup the replaced decl in the replacments scope.
+void lookupReplacedDecl(DeclName replacedDeclName,
+                        DynamicReplacementAttr *attr,
+                        AbstractFunctionDecl *replacement,
+                        SmallVectorImpl<ValueDecl *> &results) {
+  auto *declCtxt = replacement->getDeclContext();
+
+  // Look at the accessors' storage's context.
+  if (auto *accessor = dyn_cast<AccessorDecl>(replacement)) {
+    auto *storage = accessor->getStorage();
+    declCtxt = storage->getDeclContext();
+  }
+
+  if (isa<FileUnit>(declCtxt)) {
+    UnqualifiedLookup lookup(replacedDeclName,
+                             replacement->getModuleScopeContext(), nullptr,
+                             attr->getLocation());
+    if (lookup.isSuccess()) {
+      for (auto entry : lookup.Results)
+        results.push_back(entry.getValueDecl());
+    }
+    return;
+  }
+
+  assert(declCtxt->isTypeContext());
+  auto typeCtx = dyn_cast<NominalTypeDecl>(declCtxt->getAsDecl());
+  if (!typeCtx)
+    typeCtx = cast<ExtensionDecl>(declCtxt->getAsDecl())->getExtendedNominal();
+
+  replacement->getModuleScopeContext()->lookupQualified(
+      {typeCtx}, replacedDeclName, NL_QualifiedDefault, results);
+}
+
+static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
+                                      AccessorDecl *replacement,
+                                      DynamicReplacementAttr *attr,
+                                      TypeChecker &TC) {
+
+  // Retrieve the replaced abstract storage decl.
+  SmallVector<ValueDecl *, 4> results;
+  lookupReplacedDecl(replacedVarName, attr, replacement, results);
+
+  if (results.empty()) {
+    TC.diagnose(attr->getLocation(),
+                diag::dynamic_replacement_accessor_not_found, replacedVarName);
+    attr->setInvalid();
+    return nullptr;
+  }
+  assert(results.size() == 1 && "Should only have on var or fun");
+
+  assert(!isa<FuncDecl>(results[0]));
+  TC.validateDecl(results[0]);
+  auto *origStorage = cast<AbstractStorageDecl>(results[0]);
+  if (!origStorage->isDynamic()) {
+    TC.diagnose(attr->getLocation(),
+                diag::dynamic_replacement_accessor_not_dynamic,
+                replacedVarName);
+    attr->setInvalid();
+    return nullptr;
+  }
+
+  // Find the accessor in the replaced storage decl.
+  for (auto *origAccessor : origStorage->getAllAccessors()) {
+    TC.validateDecl(origAccessor);
+    if (origAccessor->getAccessorKind() != replacement->getAccessorKind())
+      continue;
+
+    if (!replacement->getInterfaceType()->getCanonicalType()->matches(
+            origAccessor->getInterfaceType()->getCanonicalType(),
+            TypeMatchFlags::AllowABICompatible)) {
+      TC.diagnose(attr->getLocation(),
+                  diag::dynamic_replacement_accessor_type_mismatch,
+                  replacedVarName);
+      attr->setInvalid();
+      return nullptr;
+    }
+    if (origAccessor->isImplicit() &&
+        !(origStorage->getReadImpl() == ReadImplKind::Stored &&
+          origStorage->getWriteImpl() == WriteImplKind::Stored)) {
+      TC.diagnose(attr->getLocation(),
+                  diag::dynamic_replacement_accessor_not_explicit,
+                  (unsigned)origAccessor->getAccessorKind(), replacedVarName);
+      attr->setInvalid();
+      return nullptr;
+    }
+    return origAccessor;
+  }
+  return nullptr;
+}
+
+static AbstractFunctionDecl *
+findReplacedFunction(DeclName replacedFunctionName,
+                     AbstractFunctionDecl *replacement,
+                     DynamicReplacementAttr *attr, TypeChecker &TC) {
+
+  SmallVector<ValueDecl *, 4> results;
+  lookupReplacedDecl(replacedFunctionName, attr, replacement, results);
+
+  for (auto *result : results) {
+    TC.validateDecl(result);
+    if (result->getInterfaceType()->getCanonicalType()->matches(
+            replacement->getInterfaceType()->getCanonicalType(),
+            TypeMatchFlags::AllowABICompatible)) {
+      if (!result->isDynamic()) {
+        TC.diagnose(attr->getLocation(),
+                    diag::dynamic_replacement_function_not_dynamic,
+                    replacedFunctionName);
+        attr->setInvalid();
+        return nullptr;
+      }
+      return cast<AbstractFunctionDecl>(result);
+    }
+  }
+  if (results.empty())
+    TC.diagnose(attr->getLocation(),
+                diag::dynamic_replacement_function_not_found,
+                attr->getReplacedFunctionName());
+  else {
+    TC.diagnose(attr->getLocation(),
+                diag::dynamic_replacement_function_of_type_not_found,
+                attr->getReplacedFunctionName(),
+                replacement->getInterfaceType()->getCanonicalType());
+
+    for (auto *result : results) {
+      TC.diagnose(SourceLoc(), diag::dynamic_replacement_found_function_of_type,
+                  attr->getReplacedFunctionName(),
+                  result->getInterfaceType()->getCanonicalType());
+    }
+  }
+  attr->setInvalid();
+  return nullptr;
+}
+
+void TypeChecker::checkDynamicReplacementAttribute(ValueDecl *D) {
+  assert(isa<AbstractFunctionDecl>(D) || isa<AbstractStorageDecl>(D));
+
+  auto *attr = D->getAttrs().getAttribute<DynamicReplacementAttr>();
+  assert(attr);
+
+  if (!D->getDeclContext()->isExtensionContext() &&
+      !D->getDeclContext()->isModuleScopeContext()) {
+    diagnose(attr->getLocation(), diag::dynamic_replacement_not_in_extension,
+                D->getBaseName());
+    attr->setInvalid();
+    return;
+  }
+
+  if (D->isDynamic() && !D->isObjC()) {
+    assert(false && "dynamic replacement must not be dynamic itself");
+    attr->setInvalid();
+    return;
+  }
+
+  // Don't process a declaration twice. This will happen to accessor decls after
+  // we have processed their var decls.
+  if (attr->getReplacedFunction())
+    return;
+
+  SmallVector<AbstractFunctionDecl *, 4> replacements;
+  SmallVector<AbstractFunctionDecl *, 4> origs;
+
+  // Collect the accessor replacement mapping if this is an abstract storage.
+  if (auto *var = dyn_cast<AbstractStorageDecl>(D)) {
+     for (auto *accessor : var->getAllAccessors()) {
+       validateDecl(accessor);
+       if (accessor->isImplicit())
+         continue;
+       auto *orig = findReplacedAccessor(attr->getReplacedFunctionName(),
+                                         accessor, attr, *this);
+       if (attr->isInvalid())
+         return;
+       if (!orig)
+         continue;
+       origs.push_back(orig);
+       replacements.push_back(accessor);
+     }
+  } else {
+    // Otherwise, find the matching function.
+    auto *fun = cast<AbstractFunctionDecl>(D);
+    if (auto *orig = findReplacedFunction(attr->getReplacedFunctionName(), fun,
+                                          attr, *this)) {
+      origs.push_back(orig);
+      replacements.push_back(fun);
+    } else
+      return;
+  }
+
+  // Annotate the replacement with the original func decl.
+  for (auto index : indices(replacements)) {
+    if (auto *attr = replacements[index]
+                         ->getAttrs()
+                         .getAttribute<DynamicReplacementAttr>()) {
+      attr->setReplacedFunction(origs[index]);
+      continue;
+    }
+    auto *newAttr = DynamicReplacementAttr::create(
+        D->getASTContext(), attr->getReplacedFunctionName(), origs[index]);
+    DeclAttributes &attrs = replacements[index]->getAttrs();
+    attrs.add(newAttr);
+  }
+
+  // Remove the attribute on the abstract storage (we have moved it to the
+  // accessor decl).
+  if (!isa<AbstractStorageDecl>(D))
+    return;
+  D->getAttrs().removeAttribute(attr);
+}
+
 void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   TypeLoc &ProtoTypeLoc = attr->getProtocolType();
   TypeResolutionOptions options = None;
@@ -2115,4 +2330,20 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
   }
 
   return None;
+}
+
+void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
+  if (!getLangOpts().EnableImplicitDynamic)
+    return;
+
+  // Add the attribute if the decl kind allows it and it is not an accessor
+  // decl. Accessor decls should always infer the var/subscript's attribute.
+  if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, D) ||
+      isa<AccessorDecl>(D))
+    return;
+
+  if (!D->getAttrs().hasAttribute<DynamicAttr>()) {
+    auto attr = new (D->getASTContext()) DynamicAttr(/*implicit=*/true);
+    D->getAttrs().add(attr);
+  }
 }

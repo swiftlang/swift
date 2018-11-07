@@ -111,8 +111,10 @@ SILModule::~SILModule() {
   // need to worry about sil_witness_tables since witness tables reference each
   // other via protocol conformances and sil_vtables don't reference each other
   // at all.
-  for (SILFunction &F : *this)
+  for (SILFunction &F : *this) {
     F.dropAllReferences();
+    F.dropDynamicallyReplacedFunction();
+  }
 }
 
 std::unique_ptr<SILModule>
@@ -436,6 +438,7 @@ void SILModule::eraseFunction(SILFunction *F) {
   // This opens dead-function-removal opportunities for called functions.
   // (References are not needed anymore.)
   F->dropAllReferences();
+  F->dropDynamicallyReplacedFunction();
 }
 
 void SILModule::invalidateFunctionInSILCache(SILFunction *F) {

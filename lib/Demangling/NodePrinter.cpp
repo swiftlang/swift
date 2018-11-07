@@ -493,6 +493,9 @@ private:
     case Node::Kind::DependentProtocolConformanceInherited:
     case Node::Kind::DependentProtocolConformanceRoot:
     case Node::Kind::ProtocolConformanceRef:
+    case Node::Kind::DynamicallyReplaceableFunctionKey:
+    case Node::Kind::DynamicallyReplaceableFunctionImpl:
+    case Node::Kind::DynamicallyReplaceableFunctionVar:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -1520,6 +1523,21 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::TypeSymbolicReference:
     Printer << "type symbolic reference 0x";
     Printer.writeHex(Node->getIndex());
+    return nullptr;
+  case Node::Kind::DynamicallyReplaceableFunctionKey:
+    if (!Options.ShortenThunk) {
+      Printer << "dynamically replaceable key for ";
+    }
+    return nullptr;
+  case Node::Kind::DynamicallyReplaceableFunctionImpl:
+    if (!Options.ShortenThunk) {
+      Printer << "dynamically replaceable thunk for ";
+    }
+    return nullptr;
+  case Node::Kind::DynamicallyReplaceableFunctionVar:
+    if (!Options.ShortenThunk) {
+      Printer << "dynamically replaceable variable for ";
+    }
     return nullptr;
   case Node::Kind::ProtocolSymbolicReference:
     Printer << "protocol symbolic reference 0x";

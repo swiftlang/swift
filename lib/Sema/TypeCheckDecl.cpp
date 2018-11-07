@@ -1117,7 +1117,7 @@ static void inferFinalAndDiagnoseIfNeeded(TypeChecker &TC, ValueDecl *D,
 /// constraints before doing so.
 ///
 /// \returns true if it can be made dynamic, false otherwise.
-static bool makeDynamic(ValueDecl *decl) {
+static bool makeObjCDynamic(ValueDecl *decl) {
   // Only  members of classes can be dynamic.
   auto classDecl = decl->getDeclContext()->getSelfClassDecl();
   if (!classDecl) {
@@ -1127,7 +1127,7 @@ static bool makeDynamic(ValueDecl *decl) {
     return false;
   }
 
-  // 'dynamic' is only supported through the Objective-C runtime.
+  // '@objc dynamic' is only supported through the Objective-C runtime.
   if (!decl->isObjC()) {
     decl->diagnose(diag::dynamic_requires_objc,
                    decl->getDescriptiveKind(), decl->getFullName())
@@ -1145,6 +1145,69 @@ static bool makeDynamic(ValueDecl *decl) {
   return true;
 }
 
+static llvm::Expected<bool> isStorageDynamic(Evaluator &evaluator,
+                                             AccessorDecl *accessor) {
+  auto isDynamicResult = evaluator(IsDynamicRequest{accessor->getStorage()});
+
+  if (!isDynamicResult)
+    return isDynamicResult;
+
+  return *isDynamicResult;
+}
+
+/// Runtime-replacable accessors are dynamic when their storage declaration
+/// is dynamic and they were explicitly defined or they are implicitly defined
+/// getter/setter because no accessor was defined.
+static llvm::Expected<bool>
+doesAccessorNeedDynamicAttribute(AccessorDecl *accessor, Evaluator &evaluator) {
+  auto kind = accessor->getAccessorKind();
+  auto storage = accessor->getStorage();
+  bool isObjC = storage->isObjC();
+
+  switch (kind) {
+  case AccessorKind::Get: {
+    auto readImpl = storage->getReadImpl();
+    if (!isObjC &&
+        (readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Address))
+      return false;
+    return isStorageDynamic(evaluator, accessor);
+  }
+  case AccessorKind::Set: {
+    auto writeImpl = storage->getWriteImpl();
+    if (!isObjC && (writeImpl == WriteImplKind::Modify ||
+                    writeImpl == WriteImplKind::MutableAddress ||
+                    writeImpl == WriteImplKind::StoredWithObservers))
+      return false;
+    return isStorageDynamic(evaluator, accessor);
+  }
+  case AccessorKind::Read:
+    if (!isObjC && storage->getReadImpl() == ReadImplKind::Read)
+      return isStorageDynamic(evaluator, accessor);
+    return false;
+  case AccessorKind::Modify: {
+    if (!isObjC && storage->getWriteImpl() == WriteImplKind::Modify)
+      return isStorageDynamic(evaluator, accessor);
+    return false;
+  }
+  case AccessorKind::MutableAddress: {
+    if (!isObjC && storage->getWriteImpl() == WriteImplKind::MutableAddress)
+      return isStorageDynamic(evaluator, accessor);
+    return false;
+  }
+  case AccessorKind::Address: {
+    if (!isObjC && storage->getReadImpl() == ReadImplKind::Address)
+      return isStorageDynamic(evaluator, accessor);
+    return false;
+  }
+  case AccessorKind::DidSet:
+  case AccessorKind::WillSet:
+    if (!isObjC &&
+        storage->getWriteImpl() == WriteImplKind::StoredWithObservers)
+      return isStorageDynamic(evaluator, accessor);
+    return false;
+  }
+}
+
 llvm::Expected<bool>
 IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // If we can't infer dynamic here, don't.
@@ -1153,12 +1216,20 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
   // If 'dynamic' was explicitly specified, check it.
   if (decl->getAttrs().hasAttribute<DynamicAttr>()) {
-    return makeDynamic(decl);
+    if (decl->getASTContext().LangOpts.isSwiftVersionAtLeast(5))
+      return true;
+    return makeObjCDynamic(decl);
   }
 
-  // Runtime-replacable accessors are dynamic when their storage declaration
-  // is dynamic. Other accessors are never dynamic.
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
+    // Swift 5: Runtime-replacable accessors are dynamic when their storage declaration
+    // is dynamic and they were explicitly defined or they are implicitly defined
+    // getter/setter because no accessor was defined.
+    if (decl->getASTContext().LangOpts.isSwiftVersionAtLeast(5))
+      return doesAccessorNeedDynamicAttribute(accessor, evaluator);
+
+    // Pre Swift 5: Runtime-replacable accessors are dynamic when their storage declaration
+    // is dynamic. Other accessors are never dynamic.
     switch (accessor->getAccessorKind()) {
     case AccessorKind::Get:
     case AccessorKind::Set: {
@@ -1169,7 +1240,7 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
         return isDynamicResult;
 
       if (*isDynamicResult)
-        return makeDynamic(decl);
+        return makeObjCDynamic(decl);
 
       return false;
     }
@@ -1186,7 +1257,7 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // FIXME: Use a semantic check for NSManaged rather than looking for the
   // attribute (which could be ill-formed).
   if (decl->getAttrs().hasAttribute<NSManagedAttr>()) {
-    return makeDynamic(decl);
+    return makeObjCDynamic(decl);
   }
 
   // The presence of 'final' blocks the inference of 'dynamic'.
@@ -1205,7 +1276,7 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // This is intended to enable overriding the declarations.
   auto dc = decl->getDeclContext();
   if (isa<ExtensionDecl>(dc) && dc->getSelfClassDecl()) {
-    return makeDynamic(decl);
+    return makeObjCDynamic(decl);
   }
 
   // If any of the declarations overridden by this declaration are dynamic
@@ -1216,11 +1287,13 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   auto overriddenDecls = evaluateOrDefault(evaluator,
     OverriddenDeclsRequest{decl}, {});
   for (auto overridden : overriddenDecls) {
-    if (overridden->isDynamic())
-      return makeDynamic(decl);
+    if (overridden->isDynamic() &&
+        (!decl->getASTContext().LangOpts.isSwiftVersionAtLeast(5) ||
+         overridden->isObjC()))
+      return makeObjCDynamic(decl);
 
     if (overridden->hasClangNode())
-      return makeDynamic(decl);
+      return makeObjCDynamic(decl);
   }
 
   return false;
@@ -2664,6 +2737,8 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
+    TC.addImplicitDynamicAttribute(SD);
+
     TC.validateDecl(SD);
 
     if (!SD->isInvalid()) {
@@ -2689,6 +2764,9 @@ public:
     }
 
     triggerAccessorSynthesis(TC, SD);
+    if (SD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+      TC.checkDynamicReplacementAttribute(SD);
+    }
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
@@ -3128,8 +3206,16 @@ public:
   }
 
   void visitVarDecl(VarDecl *VD) {
+    TC.addImplicitDynamicAttribute(VD);
+
     // Delay type-checking on VarDecls until we see the corresponding
     // PatternBindingDecl.
+
+    // Except if there is a dynamic replacement attribute.
+    if (VD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+      TC.validateDecl(VD);
+      TC.checkDynamicReplacementAttribute(VD);
+    }
   }
 
   /// Determine whether the given declaration requires a definition.
@@ -3173,6 +3259,8 @@ public:
   }
 
   void visitFuncDecl(FuncDecl *FD) {
+    TC.addImplicitDynamicAttribute(FD);
+
     TC.validateDecl(FD);
 
     if (!FD->isInvalid()) {
@@ -3201,6 +3289,10 @@ public:
     } else {
       // Record the body.
       TC.definedFunctions.push_back(FD);
+    }
+
+    if (FD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+      TC.checkDynamicReplacementAttribute(FD);
     }
   }
 
@@ -3285,6 +3377,7 @@ public:
   }
 
   void visitConstructorDecl(ConstructorDecl *CD) {
+    TC.addImplicitDynamicAttribute(CD);
     TC.validateDecl(CD);
 
     if (!CD->isInvalid()) {
@@ -3397,6 +3490,10 @@ public:
       TC.diagnose(CD->getLoc(), diag::missing_initializer_def);
     } else {
       TC.definedFunctions.push_back(CD);
+    }
+
+    if (CD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+      TC.checkDynamicReplacementAttribute(CD);
     }
   }
 

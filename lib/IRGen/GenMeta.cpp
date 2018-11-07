@@ -1511,7 +1511,7 @@ namespace {
       auto flags = getMethodDescriptorFlags<Flags>(func);
 
       // Remember if the declaration was dynamic.
-      if (func->isDynamic())
+      if (func->isObjCDynamic())
         flags = flags.withIsDynamic(true);
 
       // TODO: final? open?

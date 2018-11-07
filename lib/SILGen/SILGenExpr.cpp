@@ -2690,7 +2690,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   SILGenFunctionBuilder builder(SGM);
   auto thunk = builder.getOrCreateSharedFunction(
       loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
-      ProfileCounter(), IsThunk);
+      ProfileCounter(), IsThunk, IsNotDynamic);
   if (!thunk->empty())
     return thunk;
   
@@ -2830,7 +2830,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   SILGenFunctionBuilder builder(SGM);
   auto thunk = builder.getOrCreateSharedFunction(
       loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
-      ProfileCounter(), IsThunk);
+      ProfileCounter(), IsThunk, IsNotDynamic);
   if (!thunk->empty())
     return thunk;
   
@@ -2989,7 +2989,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     SILGenFunctionBuilder builder(SGM);
     equals = builder.getOrCreateSharedFunction(
         loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
-        ProfileCounter(), IsThunk);
+        ProfileCounter(), IsThunk, IsNotDynamic);
     if (!equals->empty()) {
       return;
     }
@@ -3154,9 +3154,9 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     auto name = Mangle::ASTMangler().mangleKeyPathHashHelper(indexTypes,
                                                              genericSig);
     SILGenFunctionBuilder builder(SGM);
-    hash = builder.getOrCreateSharedFunction(loc, name, signature, IsBare,
-                                             IsNotTransparent, IsNotSerialized,
-                                             ProfileCounter(), IsThunk);
+    hash = builder.getOrCreateSharedFunction(
+        loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
+        ProfileCounter(), IsThunk, IsNotDynamic);
     if (!hash->empty()) {
       return;
     }
