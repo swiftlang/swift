@@ -79,9 +79,10 @@ namespace {
     CPVec<OperatorDecl> operators;
     CPVec<PrecedenceGroupDecl> precedenceGroups;
     CPVec<NominalTypeDecl> topNominals;
-    CPVec<ValueDecl> values;
+    CPVec<ValueDecl> topValues;
     CPVec<NominalTypeDecl> allNominals;
     CPVec<FuncDecl> memberOperatorDecls;
+    CPVec<ValueDecl> valuesInExtensions;
     CPVec<ValueDecl> classMembers;
     
     SourceFileDeclDemux(const SourceFile *const SF) {
@@ -90,10 +91,11 @@ namespace {
         || take<OperatorDecl, DeclKind::InfixOperator, DeclKind::PrefixOperator, DeclKind::PostfixOperator>(D, operators)
         || take<PrecedenceGroupDecl, DeclKind::PrecedenceGroup> (D, precedenceGroups)
         || take<NominalTypeDecl, DeclKind::Enum, DeclKind::Struct, DeclKind::Class, DeclKind::Protocol>(D, topNominals)
-        || take<ValueDecl, DeclKind::TypeAlias, DeclKind::Var, DeclKind::Func, DeclKind::Accessor>(D, values);
+        || take<ValueDecl, DeclKind::TypeAlias, DeclKind::Var, DeclKind::Func, DeclKind::Accessor>(D, topValues);
       }
       findNominalsFromExtensions();
       findNominalsInTopNominals();
+      findValuesInExtensions();
       findClassMembers(SF);
     }
   private:
@@ -115,6 +117,14 @@ namespace {
           memberOperatorDecls.push_back(cast<FuncDecl>(D));
         else if (const auto *const NTD = dyn_cast<NominalTypeDecl>(D))
           findNominalsAndOperatorsIn(NTD);
+      }
+    }
+    void findValuesInExtensions() {
+      for (const auto* ED: extensions) {
+        for (const auto *member: ED->getMembers())
+          if (const auto *VD = dyn_cast<ValueDecl>(member))
+            if (VD->hasName())
+              valuesInExtensions.push_back(VD);
       }
     }
     void findClassMembers(const SourceFile *const SF) {
@@ -183,7 +193,9 @@ private:
     for (const auto* D: decls) {
       auto *context = D->getDeclContext();
       auto *containingDecl = context ? context->getAsDecl() : nullptr;
-      Node *containingNode = nodesByDecl.find(containingDecl).second;
+      auto iter = nodesByDecl.find(containingDecl);
+      assert(iter != nodesByDecl.end() && "missing container");
+      Node *containingNode = iter->second;
       addDeclNode(D, new DeclNode(D, containingNode, "", (*nameFn)(D), kind));
     }
   }
@@ -203,10 +215,14 @@ void GraphConstructor::constructProvidesNodes() {
   createNodes<FuncDecl>(demux.memberOperatorDecls, DeclNode::Kind::topLevel, getName);
   createNodes<OperatorDecl>(demux.operators, DeclNode::Kind::topLevel, getName);
   createNodes<NominalTypeDecl>(demux.topNominals, DeclNode::Kind::topLevel, getName);
-  createNodes<ValueDecl>(demux.values, DeclNode::Kind::topLevel, getBaseName);
+  createNodes<ValueDecl>(demux.topValues, DeclNode::Kind::topLevel, getBaseName);
   
-  createNodes<NominalTypeDecl>(demux.allNominals, DeclNode::Kind::nominal, mangleTypeAsContext);
+  createNodes<NominalTypeDecl>(demux.allNominals, DeclNode::Kind::nominalAndBlankMembers, mangleTypeAsContext);
   
+  createNodes<ValueDecl>(demux.valuesInExtensions, DeclNode::Kind::member, getBaseName);
+  
+  // could optimize by uniqueing by name, but then what of container?
+  createNodes<ValueDecl>(demux.classMembers, DeclNode::Kind::dynamicLookup, getBaseName);
 }
 void GraphConstructor::constructDependsArcs() {
 }
@@ -282,123 +298,123 @@ namespace {
   };
 }
 
-namespace {
-  class DependsArcs: CommonNameHelpers, CommonDeclHelpers {
-  private:
-    const ReferencedNameTracker *const tracker;
-    std::vector<DependName> sortedTops;
-    std::vector<MemberTableEntryTy> sortedMembers;
-    std::vector<MemberTableEntryTy> visibleSortedMembers;
-    std::unordered_set<const NominalTypeDecl*>cascadingHolders;
-    std::vector<MemberTableEntryTy> sortedMembersWithPropagatedCascades;
-    std::vector<DependName> sortedDynamicLookupNames;
-    StringVec externalNames;
-    
-    
-    static std::vector<DependName> linearizeAndSort(const llvm::DenseMap<DeclBaseName, bool> &map);
-    static std::vector<MemberTableEntryTy> sort(const llvm::DenseMap<ReferencedNameTracker::MemberPair, bool> &members);
-    static std::vector<MemberTableEntryTy> filter(const std::vector<MemberTableEntryTy> &in);
-    static std::unordered_set<const NominalTypeDecl*> findCascadingHolders(const std::vector<MemberTableEntryTy> &in);
-    static std::vector<MemberTableEntryTy> spreadCascades(const std::vector<MemberTableEntryTy> &members,
-                                                          const std::unordered_set<const NominalTypeDecl*> &cascades);
-    static StringVec reversePathSortedFilenames(const ArrayRef<std::string> in);
- 
-  public:
-    DependsArcs(const SourceFile *const SF, const DependencyTracker &depTracker) :
-    tracker(SF->getReferencedNameTracker()),
-    sortedTops(linearizeAndSort(tracker->getTopLevelNames())),
-    sortedMembers(sort(tracker->getUsedMembers())),
-    visibleSortedMembers(filter(sortedMembers)),
-    cascadingHolders(findCascadingHolders(sortedMembers)),
-    sortedMembersWithPropagatedCascades(spreadCascades(sortedMembers, cascadingHolders)),
-    sortedDynamicLookupNames(linearizeAndSort(tracker->getDynamicLookupNames())),
-    externalNames(reversePathSortedFilenames(depTracker.getDependencies()))
-    {
-    }
-    const std::vector<DependName> &tops() const { return sortedTops; }
-    const std::vector<MemberTableEntryTy> &membersWithPropagatedCascades() const { return sortedMembersWithPropagatedCascades; } // nominals
-    const std::vector<MemberTableEntryTy> &members() const { return visibleSortedMembers; } // members
-    const std::vector<DependName> &dynamicLookups() const { return sortedDynamicLookupNames; }
-    const StringVec &externals() const { return externalNames; }
-  };
-}
+//namespace {
+//  class DependsArcs: CommonNameHelpers, CommonDeclHelpers {
+//  private:
+//    const ReferencedNameTracker *const tracker;
+//    std::vector<DependName> sortedTops;
+//    std::vector<MemberTableEntryTy> sortedMembers;
+//    std::vector<MemberTableEntryTy> visibleSortedMembers;
+//    std::unordered_set<const NominalTypeDecl*>cascadingHolders;
+//    std::vector<MemberTableEntryTy> sortedMembersWithPropagatedCascades;
+//    std::vector<DependName> sortedDynamicLookupNames;
+//    StringVec externalNames;
+//
+//
+//    static std::vector<DependName> linearizeAndSort(const llvm::DenseMap<DeclBaseName, bool> &map);
+//    static std::vector<MemberTableEntryTy> sort(const llvm::DenseMap<ReferencedNameTracker::MemberPair, bool> &members);
+//    static std::vector<MemberTableEntryTy> filter(const std::vector<MemberTableEntryTy> &in);
+//    static std::unordered_set<const NominalTypeDecl*> findCascadingHolders(const std::vector<MemberTableEntryTy> &in);
+//    static std::vector<MemberTableEntryTy> spreadCascades(const std::vector<MemberTableEntryTy> &members,
+//                                                          const std::unordered_set<const NominalTypeDecl*> &cascades);
+//    static StringVec reversePathSortedFilenames(const ArrayRef<std::string> in);
+//
+//  public:
+//    DependsArcs(const SourceFile *const SF, const DependencyTracker &depTracker) :
+//    tracker(SF->getReferencedNameTracker()),
+//    sortedTops(linearizeAndSort(tracker->getTopLevelNames())),
+//    sortedMembers(sort(tracker->getUsedMembers())),
+//    visibleSortedMembers(filter(sortedMembers)),
+//    cascadingHolders(findCascadingHolders(sortedMembers)),
+//    sortedMembersWithPropagatedCascades(spreadCascades(sortedMembers, cascadingHolders)),
+//    sortedDynamicLookupNames(linearizeAndSort(tracker->getDynamicLookupNames())),
+//    externalNames(reversePathSortedFilenames(depTracker.getDependencies()))
+//    {
+//    }
+//    const std::vector<DependName> &tops() const { return sortedTops; }
+//    const std::vector<MemberTableEntryTy> &membersWithPropagatedCascades() const { return sortedMembersWithPropagatedCascades; } // nominals
+//    const std::vector<MemberTableEntryTy> &members() const { return visibleSortedMembers; } // members
+//    const std::vector<DependName> &dynamicLookups() const { return sortedDynamicLookupNames; }
+//    const StringVec &externals() const { return externalNames; }
+//  };
+//}
 
 ////////////////////////
 
-std::vector<DependName> DependsArcs::linearizeAndSort(const llvm::DenseMap<DeclBaseName, bool> &map) {
-  std::vector<DependName> out;
-  for (const auto &p: map)
-    out.push_back(DependName{p.getFirst(), p.getSecond()});
-  
-  std::sort(out.begin(), out.end());
-  return out;
-}
-
-
-
-
-std::vector<MemberTableEntryTy> DependsArcs::sort(const llvm::DenseMap<ReferencedNameTracker::MemberPair, bool> &members) {
-  std::vector<MemberTableEntryTy> out{members.begin(), members.end()};
-  llvm::array_pod_sort(out.begin(), out.end(),
-                       [](const MemberTableEntryTy *lhs,
-                          const MemberTableEntryTy *rhs) -> int {
-                         if (auto cmp = lhs->first.first->getName().compare(rhs->first.first->getName()))
-                           return cmp;
-                         
-                         if (auto cmp = lhs->first.second.compare(rhs->first.second))
-                           return cmp;
-                         
-                         // We can have two entries with the same member name if one of them
-                         // was the special 'init' name and the other is the plain 'init' token.
-                         if (lhs->second != rhs->second)
-                           return lhs->second ? -1 : 1;
-                         
-                         // Break type name ties by mangled name.
-                         auto lhsMangledName = mangleTypeAsContext(lhs->first.first);
-                         auto rhsMangledName = mangleTypeAsContext(rhs->first.first);
-                         return lhsMangledName.compare(rhsMangledName);
-                       });
-  return out;
-}
-
-std::vector<MemberTableEntryTy> DependsArcs::filter(const std::vector<MemberTableEntryTy> &in) {
-  std::vector<MemberTableEntryTy> out;
-  std::copy_if(in.begin(), in.end(), std::back_inserter(out),
-               [] (const MemberTableEntryTy &mte) -> bool {
-                 assert(mte.first.first != nullptr);
-                 return isVisible(mte.first.first);
-               });
-  return out;
-}
-
-std::unordered_set<const NominalTypeDecl*> DependsArcs::findCascadingHolders(const std::vector<MemberTableEntryTy> &in) {
-  std::unordered_set<const NominalTypeDecl*> out;
-  for (const auto &entry: in)
-    if (entry.second)
-      out.insert(entry.first.first);
-  return out;
-}
-
-std::vector<MemberTableEntryTy> DependsArcs::spreadCascades(const std::vector<MemberTableEntryTy> &members,
-                                               const std::unordered_set<const NominalTypeDecl*> &cascades) {
-  std::vector<MemberTableEntryTy> out;
-  std::transform(members.begin(), members.end(), std::back_inserter(out),
-                 [&cascades] (MemberTableEntryTy entry) -> MemberTableEntryTy {
-                   entry.second = cascades.count(entry.first.first) != 0 ? true : false;
-                   return entry;
-                 });
-  return out;
-}
-
-StringVec DependsArcs::reversePathSortedFilenames(const ArrayRef<std::string> in) {
-  StringVec out{in.begin(), in.end()};
-  std::sort(out.begin(), out.end(),  [](const std::string &a,
-                                        const std::string &b) -> bool {
-    return std::lexicographical_compare(a.rbegin(), a.rend(),
-                                        b.rbegin(), b.rend());
-  });
-  return out;
-}
+//std::vector<DependName> DependsArcs::linearizeAndSort(const llvm::DenseMap<DeclBaseName, bool> &map) {
+//  std::vector<DependName> out;
+//  for (const auto &p: map)
+//    out.push_back(DependName{p.getFirst(), p.getSecond()});
+//
+//  std::sort(out.begin(), out.end());
+//  return out;
+//}
+//
+//
+//
+//
+//std::vector<MemberTableEntryTy> DependsArcs::sort(const llvm::DenseMap<ReferencedNameTracker::MemberPair, bool> &members) {
+//  std::vector<MemberTableEntryTy> out{members.begin(), members.end()};
+//  llvm::array_pod_sort(out.begin(), out.end(),
+//                       [](const MemberTableEntryTy *lhs,
+//                          const MemberTableEntryTy *rhs) -> int {
+//                         if (auto cmp = lhs->first.first->getName().compare(rhs->first.first->getName()))
+//                           return cmp;
+//
+//                         if (auto cmp = lhs->first.second.compare(rhs->first.second))
+//                           return cmp;
+//
+//                         // We can have two entries with the same member name if one of them
+//                         // was the special 'init' name and the other is the plain 'init' token.
+//                         if (lhs->second != rhs->second)
+//                           return lhs->second ? -1 : 1;
+//
+//                         // Break type name ties by mangled name.
+//                         auto lhsMangledName = mangleTypeAsContext(lhs->first.first);
+//                         auto rhsMangledName = mangleTypeAsContext(rhs->first.first);
+//                         return lhsMangledName.compare(rhsMangledName);
+//                       });
+//  return out;
+//}
+//
+//std::vector<MemberTableEntryTy> DependsArcs::filter(const std::vector<MemberTableEntryTy> &in) {
+//  std::vector<MemberTableEntryTy> out;
+//  std::copy_if(in.begin(), in.end(), std::back_inserter(out),
+//               [] (const MemberTableEntryTy &mte) -> bool {
+//                 assert(mte.first.first != nullptr);
+//                 return isVisible(mte.first.first);
+//               });
+//  return out;
+//}
+//
+//std::unordered_set<const NominalTypeDecl*> DependsArcs::findCascadingHolders(const std::vector<MemberTableEntryTy> &in) {
+//  std::unordered_set<const NominalTypeDecl*> out;
+//  for (const auto &entry: in)
+//    if (entry.second)
+//      out.insert(entry.first.first);
+//  return out;
+//}
+//
+//std::vector<MemberTableEntryTy> DependsArcs::spreadCascades(const std::vector<MemberTableEntryTy> &members,
+//                                               const std::unordered_set<const NominalTypeDecl*> &cascades) {
+//  std::vector<MemberTableEntryTy> out;
+//  std::transform(members.begin(), members.end(), std::back_inserter(out),
+//                 [&cascades] (MemberTableEntryTy entry) -> MemberTableEntryTy {
+//                   entry.second = cascades.count(entry.first.first) != 0 ? true : false;
+//                   return entry;
+//                 });
+//  return out;
+//}
+//
+//StringVec DependsArcs::reversePathSortedFilenames(const ArrayRef<std::string> in) {
+//  StringVec out{in.begin(), in.end()};
+//  std::sort(out.begin(), out.end(),  [](const std::string &a,
+//                                        const std::string &b) -> bool {
+//    return std::lexicographical_compare(a.rbegin(), a.rend(),
+//                                        b.rbegin(), b.rend());
+//  });
+//  return out;
+//}
 
 
 
@@ -461,7 +477,9 @@ namespace {
       // doesn't matter if it fails.
       llvm::sys::fs::rename(outputPath, outputPath + "~");
       return withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
-        for (auto s: strings) out << s; } );
+        for (auto s: strings) out << s;
+        return false;
+      } );
     }
     
   };
@@ -486,10 +504,8 @@ bool swift::experimental_dependencies::emitReferenceDependencies(
   // that may have been there. No error handling -- this is just a nicety, it
   // doesn't matter if it fails.
   llvm::sys::fs::rename(outputPath, outputPath + "~");
-//  return withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
-//    out << NameEncoder() << ProvidesDeclExtractor(SF);
-//    out << DependSorter() << DependNameExtractor(SF, depTracer);
-//    out << InterfaceHash();
+  return withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out)  {
+    abort();
     return false;
   });
 

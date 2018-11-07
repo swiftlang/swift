@@ -55,7 +55,7 @@ bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
   
   class DeclNode: public Node {
   public:
-    enum class Kind { topLevel, nominal };
+    enum class Kind { topLevel, nominalAndBlankMembers, member, dynamicLookup };
     const Decl *D;
     Kind kind;
 
