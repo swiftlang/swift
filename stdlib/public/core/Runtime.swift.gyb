@@ -175,8 +175,7 @@ internal struct _Buffer32 {
 
   internal mutating func withBytes<Result>(
     _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
-  ) rethrows -> Result
-  {
+  ) rethrows -> Result {
     return try withUnsafeMutablePointer(to: &self) {
       try body(UnsafeMutableRawPointer($0).assumingMemoryBound(to: UInt8.self))
     }
@@ -192,8 +191,7 @@ internal struct _Buffer72 {
 
   internal mutating func withBytes<Result>(
     _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
-  ) rethrows -> Result
-  {
+  ) rethrows -> Result {
     return try withUnsafeMutablePointer(to: &self) {
       try body(UnsafeMutableRawPointer($0).assumingMemoryBound(to: UInt8.self))
     }

@@ -51,7 +51,7 @@ public func _autorelease(_ x: AnyObject) {
 ///
 /// This function is primarily useful to call various runtime functions
 /// written in C++.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 internal func _withUninitializedString<R>(
   _ body: (UnsafeMutablePointer<String>) -> R
 ) -> (R, String) {
@@ -67,13 +67,11 @@ internal func _withUninitializedString<R>(
 // with type names that we are nested in.
 // But we can place it behind #if _runtime(_Native) and remove it from ABI on
 // Apple platforms, deferring discussions mentioned above.
-@inlinable // FIXME(sil-serialize-all)
 @_silgen_name("swift_getTypeName")
 public func _getTypeName(_ type: Any.Type, qualified: Bool)
   -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the demangled qualified name of a metatype.
-@inlinable // FIXME(sil-serialize-all)
 public // @testable
 func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
   let (stringPtr, count) = _getTypeName(type, qualified: qualified)
