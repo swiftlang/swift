@@ -342,7 +342,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.SolverShrinkUnsolvedThreshold = threshold;
   }
 
-  //  if (Opts.isSwiftVersionAtLeast(5))
+  if (false && Opts.isSwiftVersionAtLeast(5))
     Opts.SolverDisableShrink = true;
 
   if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
@@ -417,7 +417,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.UseDarwinPreStableABIBit = true;
 #endif
 
-  //  if (Opts.isSwiftVersionAtLeast(5))
+  if (false && Opts.isSwiftVersionAtLeast(5))
     Opts.DisableConstraintSolverPerformanceHacks = true;
 
   // Must be processed after any other language options that could affect
