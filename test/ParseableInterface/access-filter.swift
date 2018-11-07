@@ -149,3 +149,139 @@ enum InternalEnum_BAD {
   // CHECK-NEXT: case y(Int)
   case y(Int)
 } // CHECK-NEXT: {{^[}]$}}
+
+// CHECK: public class PublicClass {{[{]$}}
+public class PublicClass {
+} // CHECK: {{^[}]$}}
+
+class InternalClass_BAD {
+}
+
+// CHECK: @usableFromInline
+// CHECK-NEXT: internal class UFIClass {{[{]$}}
+@usableFromInline class UFIClass {
+} // CHECK: {{^[}]$}}
+
+// CHECK: public struct GenericStruct<T>
+public struct GenericStruct<T> {}
+
+// CHECK: extension GenericStruct where T == main.PublicStruct {{[{]$}}
+extension GenericStruct where T == PublicStruct {
+  // CHECK-NEXT: public func constrainedToPublicStruct(){{$}}
+  public func constrainedToPublicStruct() {}
+} // CHECK-NEXT: {{^[}]$}}
+// CHECK: extension GenericStruct where T == main.UFIStruct {{[{]$}}
+extension GenericStruct where T == UFIStruct {
+  // CHECK-NEXT: @usableFromInline{{$}}
+  // CHECK-NEXT: internal func constrainedToUFIStruct(){{$}}
+  @usableFromInline internal func constrainedToUFIStruct() {}
+} // CHECK-NEXT: {{^[}]$}}
+extension GenericStruct where T == InternalStruct_BAD {
+  @usableFromInline internal func constrainedToInternalStruct_BAD() {}
+}
+
+// CHECK: extension GenericStruct where T == main.PublicStruct {{[{]$}}
+extension GenericStruct where PublicStruct == T {
+  // CHECK-NEXT: public func constrainedToPublicStruct2(){{$}}
+  public func constrainedToPublicStruct2() {}
+} // CHECK-NEXT: {{^[}]$}}
+// CHECK: extension GenericStruct where T == main.UFIStruct {{[{]$}}
+extension GenericStruct where UFIStruct == T {
+  // CHECK-NEXT: @usableFromInline{{$}}
+  // CHECK-NEXT: internal func constrainedToUFIStruct2(){{$}}
+  @usableFromInline internal func constrainedToUFIStruct2() {}
+} // CHECK-NEXT: {{^[}]$}}
+extension GenericStruct where InternalStruct_BAD == T {
+  @usableFromInline internal func constrainedToInternalStruct2_BAD() {}
+}
+
+// CHECK: extension GenericStruct where T : PublicProto {{[{]$}}
+extension GenericStruct where T: PublicProto {
+  // CHECK-NEXT: public func constrainedToPublicProto(){{$}}
+  public func constrainedToPublicProto() {}
+} // CHECK-NEXT: {{^[}]$}}
+// CHECK: extension GenericStruct where T : UFIProto {{[{]$}}
+extension GenericStruct where T: UFIProto {
+  // CHECK-NEXT: @usableFromInline{{$}}
+  // CHECK-NEXT: internal func constrainedToUFIProto(){{$}}
+  @usableFromInline internal func constrainedToUFIProto() {}
+} // CHECK-NEXT: {{^[}]$}}
+extension GenericStruct where T: InternalProto_BAD {
+  @usableFromInline internal func constrainedToInternalProto_BAD() {}
+}
+
+// CHECK: extension GenericStruct where T : main.PublicClass {{[{]$}}
+extension GenericStruct where T: PublicClass {
+  // CHECK-NEXT: public func constrainedToPublicClass(){{$}}
+  public func constrainedToPublicClass() {}
+} // CHECK-NEXT: {{^[}]$}}
+// CHECK: extension GenericStruct where T : main.UFIClass {{[{]$}}
+extension GenericStruct where T: UFIClass {
+  // CHECK-NEXT: @usableFromInline{{$}}
+  // CHECK-NEXT: internal func constrainedToUFIClass(){{$}}
+  @usableFromInline internal func constrainedToUFIClass() {}
+} // CHECK-NEXT: {{^[}]$}}
+extension GenericStruct where T: InternalClass_BAD {
+  @usableFromInline internal func constrainedToInternalClass_BAD() {}
+}
+
+// CHECK: extension GenericStruct where T : AnyObject {{[{]$}}
+extension GenericStruct where T: AnyObject {
+  // CHECK-NEXT: public func constrainedToAnyObject(){{$}}
+  public func constrainedToAnyObject() {}
+} // CHECK-NEXT: {{^[}]$}}
+
+public struct PublicAliasBase {}
+internal struct ReallyInternalAliasBase_BAD {}
+
+// CHECK: public typealias PublicAlias = PublicAliasBase
+public typealias PublicAlias = PublicAliasBase
+internal typealias InternalAlias_BAD = PublicAliasBase
+// CHECK: @usableFromInline
+// CHECK-NEXT: internal typealias UFIAlias = PublicAliasBase
+@usableFromInline internal typealias UFIAlias = PublicAliasBase
+
+internal typealias ReallyInternalAlias_BAD = ReallyInternalAliasBase_BAD
+
+// CHECK: extension GenericStruct where T == PublicAlias {{[{]$}}
+extension GenericStruct where T == PublicAlias {
+  // CHECK-NEXT: public func constrainedToPublicAlias(){{$}}
+  public func constrainedToPublicAlias() {}
+} // CHECK-NEXT: {{^[}]$}}
+// CHECK: extension GenericStruct where T == UFIAlias {{[{]$}}
+extension GenericStruct where T == UFIAlias {
+  // CHECK-NEXT: @usableFromInline{{$}}
+  // CHECK-NEXT: internal func constrainedToUFIAlias(){{$}}
+  @usableFromInline internal func constrainedToUFIAlias() {}
+} // CHECK-NEXT: {{^[}]$}}
+extension GenericStruct where T == InternalAlias_BAD {
+  // FIXME: We could print this one by desugaring; it is indeed public.
+  @usableFromInline internal func constrainedToInternalAlias() {}
+}
+extension GenericStruct where T == ReallyInternalAlias_BAD {
+  @usableFromInline internal func constrainedToPrivateAlias() {}
+}
+
+extension GenericStruct {
+  // For the next extension's test.
+  public func requirement() {}
+}
+extension GenericStruct: PublicProto where T: InternalProto_BAD {
+  @usableFromInline internal func conformance_BAD() {}
+}
+
+
+public struct MultiGenericStruct<First, Second> {}
+
+// CHECK: extension MultiGenericStruct where First == main.PublicStruct, Second == main.PublicStruct {{[{]$}}
+extension MultiGenericStruct where First == PublicStruct, Second == PublicStruct {
+  // CHECK-NEXT: public func publicPublic(){{$}}
+  public func publicPublic() {}
+} // CHECK-NEXT: {{^[}]$}}
+
+extension MultiGenericStruct where First == PublicStruct, Second == InternalStruct_BAD {
+  @usableFromInline internal func publicInternal_BAD() {}
+}
+extension MultiGenericStruct where First == InternalStruct_BAD, Second == PublicStruct {
+  @usableFromInline internal func internalPublic_BAD() {}
+}
