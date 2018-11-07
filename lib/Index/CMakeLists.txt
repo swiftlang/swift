@@ -3,5 +3,5 @@ add_swift_host_library(swiftIndex STATIC
   IndexDataConsumer.cpp
   IndexRecord.cpp
   IndexSymbol.cpp
-  LINK_LIBS
+  LINK_LIBRARIES
     swiftAST)
