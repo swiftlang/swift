@@ -170,17 +170,12 @@ internal func _swift_stdlib_atomicFetchAddInt(
 //===----------------------------------------------------------------------===//
 
 /// A 32 byte buffer.
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal struct _Buffer32 {
-  @inlinable // FIXME(sil-serialize-all)
   internal init() {}
 % for i in range(32):
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _x${i}: UInt8 = 0
 % end
 
-  @inlinable // FIXME(sil-serialize-all)
   internal mutating func withBytes<Result>(
     _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
   ) rethrows -> Result
@@ -192,17 +187,12 @@ internal struct _Buffer32 {
 }
 
 /// A 72 byte buffer.
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal struct _Buffer72 {
-  @inlinable // FIXME(sil-serialize-all)
   internal init() {}
 % for i in range(72):
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _x${i}: UInt8 = 0
 % end
 
-  @inlinable // FIXME(sil-serialize-all)
   internal mutating func withBytes<Result>(
     _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
   ) rethrows -> Result
@@ -243,7 +233,6 @@ internal func _float${bits}ToString(
 
 % end
 
-@usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_int64ToString")
 internal func _int64ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
@@ -251,7 +240,6 @@ internal func _int64ToStringImpl(
   _ radix: Int64, _ uppercase: Bool
 ) -> UInt
 
-@inlinable // FIXME(sil-serialize-all)
 internal func _int64ToString(
   _ value: Int64, radix: Int64 = 10, uppercase: Bool = false
 ) -> String {
@@ -274,14 +262,12 @@ internal func _int64ToString(
   }
 }
 
-@usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_uint64ToString")
 internal func _uint64ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt, _ value: UInt64, _ radix: Int64, _ uppercase: Bool
 ) -> UInt
 
-@inlinable // FIXME(sil-serialize-all)
 public // @testable
 func _uint64ToString(
     _ value: UInt64, radix: Int64 = 10, uppercase: Bool = false
