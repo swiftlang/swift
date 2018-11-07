@@ -411,6 +411,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///   `endIndex` property.
   ///
   /// - Complexity: O(1)
+  @_borrowed
   subscript(position: Index) -> Element { get }
 
   /// Accesses a contiguous subrange of the collection's elements.
