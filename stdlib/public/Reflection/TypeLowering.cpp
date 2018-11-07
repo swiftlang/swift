@@ -77,6 +77,7 @@ class PrintTypeInfo {
     printField("alignment", TI.getAlignment());
     printField("stride", TI.getStride());
     printField("num_extra_inhabitants", TI.getNumExtraInhabitants());
+    printField("bitwise_takable", TI.isBitwiseTakable());
   }
 
   void printFields(const RecordTypeInfo &TI) {
@@ -190,8 +191,12 @@ void TypeInfo::dump(std::ostream &OS, unsigned Indent) const {
 }
 
 BuiltinTypeInfo::BuiltinTypeInfo(const BuiltinTypeDescriptor *descriptor)
-    : TypeInfo(TypeInfoKind::Builtin, descriptor->Size, descriptor->Alignment,
-               descriptor->Stride, descriptor->NumExtraInhabitants),
+    : TypeInfo(TypeInfoKind::Builtin,
+               descriptor->Size,
+               descriptor->getAlignment(),
+               descriptor->Stride,
+               descriptor->NumExtraInhabitants,
+               descriptor->isBitwiseTakable()),
       Name(descriptor->getMangledTypeName(0)) {}
 
 /// Utility class for building values that contain witness tables.
@@ -263,6 +268,29 @@ class ExistentialTypeInfoBuilder {
         case FieldDescriptorKind::ClassProtocol:
           Representation = ExistentialTypeRepresentation::Class;
           WitnessTableCount++;
+
+          if (auto *Superclass = TC.getBuilder().lookupSuperclass(P)) {
+            auto *SuperclassTI = TC.getTypeInfo(Superclass);
+            if (SuperclassTI == nullptr) {
+              DEBUG_LOG(std::cerr << "No TypeInfo for superclass: ";
+                        Superclass->dump());
+              Invalid = true;
+              continue;
+            }
+
+            if (!isa<ReferenceTypeInfo>(SuperclassTI)) {
+              DEBUG_LOG(std::cerr << "Superclass not a reference type: ";
+                        SuperclassTI->dump());
+              Invalid = true;
+              continue;
+            }
+
+            if (cast<ReferenceTypeInfo>(SuperclassTI)->getReferenceCounting()
+                == ReferenceCounting::Native) {
+              Refcounting = ReferenceCounting::Native;
+            }
+          }
+
           continue;
         case FieldDescriptorKind::Protocol:
           WitnessTableCount++;
@@ -397,9 +425,12 @@ public:
 
       // Non-class existentials consist of a three-word buffer,
       // value metadata, and finally zero or more witness tables.
+      // The buffer is always bitwise takable, since non-bitwise
+      // takable payloads are stored out of line.
       builder.addField(TI->getSize() * 3,
                        TI->getAlignment(),
-                       /*numExtraInhabitants=*/0);
+                       /*numExtraInhabitants=*/0,
+                       /*bitwiseTakable=*/true);
       builder.addField("metadata", TC.getAnyMetatypeTypeRef());
       break;
     }
@@ -441,7 +472,8 @@ public:
 
 unsigned RecordTypeInfoBuilder::addField(unsigned fieldSize,
                                          unsigned fieldAlignment,
-                                         unsigned numExtraInhabitants) {
+                                         unsigned numExtraInhabitants,
+                                         bool bitwiseTakable) {
   assert(fieldAlignment > 0);
 
   // Align the current size appropriately
@@ -455,6 +487,9 @@ unsigned RecordTypeInfoBuilder::addField(unsigned fieldSize,
 
   // Update the aggregate alignment
   Alignment = std::max(Alignment, fieldAlignment);
+
+  // The aggregate is bitwise takable if all elements are.
+  BitwiseTakable &= bitwiseTakable;
 
   switch (Kind) {
   // The extra inhabitants of a struct or tuple are the same as the extra
@@ -500,7 +535,8 @@ void RecordTypeInfoBuilder::addField(const std::string &Name,
 
   unsigned offset = addField(TI->getSize(),
                              TI->getAlignment(),
-                             TI->getNumExtraInhabitants());
+                             TI->getNumExtraInhabitants(),
+                             TI->isBitwiseTakable());
   Fields.push_back({Name, offset, TR, *TI});
 }
 
@@ -515,7 +551,8 @@ const RecordTypeInfo *RecordTypeInfoBuilder::build() {
 
   return TC.makeTypeInfo<RecordTypeInfo>(
       Size, Alignment, Stride,
-      NumExtraInhabitants, Kind, Fields);
+      NumExtraInhabitants, BitwiseTakable,
+      Kind, Fields);
 }
 
 const ReferenceTypeInfo *
@@ -548,13 +585,28 @@ TypeConverter::getReferenceTypeInfo(ReferenceKind Kind,
   }
 
   unsigned numExtraInhabitants = BuiltinTI->NumExtraInhabitants;
-  if (Kind == ReferenceKind::Weak)
+  bool bitwiseTakable = true;
+
+  switch (Kind) {
+  case ReferenceKind::Strong:
+    break;
+  case ReferenceKind::Weak:
     numExtraInhabitants = 0;
+    bitwiseTakable = false;
+    break;
+  case ReferenceKind::Unowned:
+    if (Refcounting == ReferenceCounting::Unknown)
+      bitwiseTakable = false;
+    break;
+  case ReferenceKind::Unmanaged:
+    break;
+  }
 
   auto *TI = makeTypeInfo<ReferenceTypeInfo>(BuiltinTI->Size,
-                                             BuiltinTI->Alignment,
+                                             BuiltinTI->getAlignment(),
                                              BuiltinTI->Stride,
                                              numExtraInhabitants,
+                                             bitwiseTakable,
                                              Kind, Refcounting);
   ReferenceCache[key] = TI;
   return TI;
@@ -619,7 +671,12 @@ const TypeInfo *TypeConverter::getEmptyTypeInfo() {
   if (EmptyTI != nullptr)
     return EmptyTI;
 
-  EmptyTI = makeTypeInfo<TypeInfo>(TypeInfoKind::Builtin, 0, 1, 1, 0);
+  EmptyTI = makeTypeInfo<TypeInfo>(TypeInfoKind::Builtin,
+                                   /*Size=*/0,
+                                   /*Alignment=*/1,
+                                   /*Stride=*/1,
+                                   /*ExtraInhabitants=*/0,
+                                   /*BitwiseTakable=*/true);
   return EmptyTI;
 }
 
@@ -919,6 +976,7 @@ static unsigned getNumTagBytes(size_t size, unsigned emptyCases,
 class EnumTypeInfoBuilder {
   TypeConverter &TC;
   unsigned Size, Alignment, NumExtraInhabitants;
+  bool BitwiseTakable;
   RecordKind Kind;
   std::vector<FieldInfo> Cases;
   bool Invalid;
@@ -942,6 +1000,7 @@ class EnumTypeInfoBuilder {
 
     Size = std::max(Size, TI->getSize());
     Alignment = std::max(Alignment, TI->getAlignment());
+    BitwiseTakable &= TI->isBitwiseTakable();
 
     Cases.push_back({Name, /*offset=*/0, TR, *TI});
   }
@@ -949,7 +1008,7 @@ class EnumTypeInfoBuilder {
 public:
   EnumTypeInfoBuilder(TypeConverter &TC)
     : TC(TC), Size(0), Alignment(1), NumExtraInhabitants(0),
-      Kind(RecordKind::Invalid), Invalid(false) {}
+      BitwiseTakable(true), Kind(RecordKind::Invalid), Invalid(false) {}
 
   const TypeInfo *
   build(const TypeRef *TR,
@@ -1028,8 +1087,9 @@ public:
       auto *FixedDescriptor = TC.getBuilder().getBuiltinTypeInfo(TR);
       if (FixedDescriptor) {
         Size = FixedDescriptor->Size;
-        Alignment = FixedDescriptor->Alignment;
+        Alignment = FixedDescriptor->getAlignment();
         NumExtraInhabitants = FixedDescriptor->NumExtraInhabitants;
+        BitwiseTakable = FixedDescriptor->isBitwiseTakable();
       } else {
         // Dynamic multi-payload enums do not have extra inhabitants
         NumExtraInhabitants = 0;
@@ -1052,7 +1112,8 @@ public:
 
     return TC.makeTypeInfo<RecordTypeInfo>(
         Size, Alignment, Stride,
-        NumExtraInhabitants, Kind, Cases);
+        NumExtraInhabitants, BitwiseTakable,
+        Kind, Cases);
   }
 };
 
@@ -1263,10 +1324,12 @@ public:
       // Destructure the existential and replace the "object"
       // field with the right reference kind.
       } else if (SubKind == RecordKind::ClassExistential) {
+        bool BitwiseTakable = RecordTI->isBitwiseTakable();
         std::vector<FieldInfo> Fields;
         for (auto &Field : RecordTI->getFields()) {
           if (Field.Name == "object") {
             auto *FieldTI = rebuildStorageTypeInfo(&Field.TI, Kind);
+            BitwiseTakable &= FieldTI->isBitwiseTakable();
             Fields.push_back({Field.Name, Field.Offset, Field.TR, *FieldTI});
             continue;
           }
@@ -1278,6 +1341,7 @@ public:
             RecordTI->getAlignment(),
             RecordTI->getStride(),
             RecordTI->getNumExtraInhabitants(),
+            BitwiseTakable,
             SubKind, Fields);
       }
     }
@@ -1354,7 +1418,10 @@ const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
 
     // Start layout from the given instance start offset. This should
     // be the superclass instance size.
-    builder.addField(start, 1, /*numExtraInhabitants=*/0);
+    builder.addField(/*size=*/start,
+                     /*alignment=*/1,
+                     /*numExtraInhabitants=*/0,
+                     /*bitwiseTakable=*/true);
 
     for (auto Field : Fields)
       builder.addField(Field.Name, Field.TR);

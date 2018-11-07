@@ -541,13 +541,17 @@ private:
       return nullptr;
 
     // Initialize the builder.
-    Builder.addField(*OffsetToFirstCapture, sizeof(StoredPointer),
-                     /*numExtraInhabitants=*/0);
+    Builder.addField(*OffsetToFirstCapture,
+                     /*alignment=*/sizeof(StoredPointer),
+                     /*numExtraInhabitants=*/0,
+                     /*bitwiseTakable=*/true);
 
     // Skip the closure's necessary bindings struct, if it's present.
     auto SizeOfNecessaryBindings = Info.NumBindings * sizeof(StoredPointer);
-    Builder.addField(SizeOfNecessaryBindings, sizeof(StoredPointer),
-                     /*numExtraInhabitants=*/0);
+    Builder.addField(/*size=*/SizeOfNecessaryBindings,
+                     /*alignment=*/sizeof(StoredPointer),
+                     /*numExtraInhabitants=*/0,
+                     /*bitwiseTakable=*/true);
 
     // FIXME: should be unordered_set but I'm too lazy to write a hash
     // functor
