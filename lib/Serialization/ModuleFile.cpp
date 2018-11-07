@@ -251,7 +251,7 @@ static bool validateInputBlock(
     switch (kind) {
     case input_block::FILE_DEPENDENCY:
       dependencies.push_back(SerializationOptions::FileDependency{
-          scratch[0], llvm::sys::toTimePoint(scratch[1]), blobData});
+          scratch[0], scratch[1], blobData});
       break;
     default:
       // Unknown metadata record, possibly for use by a future version of the

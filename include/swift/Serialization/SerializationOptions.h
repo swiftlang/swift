@@ -37,7 +37,7 @@ namespace swift {
 
     struct FileDependency {
       uint64_t Size;
-      llvm::sys::TimePoint<> LastModTime;
+      uint64_t Hash;
       StringRef Path;
     };
     ArrayRef<FileDependency> Dependencies;
