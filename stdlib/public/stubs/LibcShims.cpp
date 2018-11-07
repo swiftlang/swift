@@ -23,6 +23,7 @@
 
 #include <stdio.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include <type_traits>
 
@@ -49,4 +50,33 @@ __swift_size_t swift::_swift_stdlib_fwrite_stdout(const void *ptr,
                                                   __swift_size_t size,
                                                   __swift_size_t nitems) {
     return fwrite(ptr, size, nitems, stdout);
+}
+
+SWIFT_RUNTIME_STDLIB_SPI
+__swift_ssize_t
+swift::_swift_stdlib_read(int fd, void *buf, __swift_size_t nbyte) {
+#if defined(_WIN32)
+  return _read(fd, buf, nbyte);
+#else
+  return read(fd, buf, nbyte);
+#endif
+}
+
+SWIFT_RUNTIME_STDLIB_SPI
+__swift_ssize_t
+swift::_swift_stdlib_write(int fd, const void *buf, __swift_size_t nbyte) {
+#if defined(_WIN32)
+  return _write(fd, buf, nbyte);
+#else
+  return write(fd, buf, nbyte);
+#endif
+}
+
+SWIFT_RUNTIME_STDLIB_SPI
+int swift::_swift_stdlib_close(int fd) {
+#if defined(_WIN32)
+  return _close(fd);
+#else
+  return close(fd);
+#endif
 }
