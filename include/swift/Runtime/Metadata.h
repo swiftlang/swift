@@ -385,7 +385,7 @@ swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
 /// \param assocType Associated type descriptor.
 ///
 /// \returns metadata for the associated type witness.
-SWIFT_RUNTIME_EXPORT
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse swift_getAssociatedTypeWitness(
                                           MetadataRequest request,
                                           WitnessTable *wtable,

@@ -167,8 +167,9 @@ using Metadata = TargetMetadata<InProcess>;
 /// The result of requesting type metadata.  Generally the return value of
 /// a function.
 ///
-/// For performance, functions returning this type should use SWIFT_CC so
-/// that the components are returned as separate values.
+/// For performance and ABI matching across Swift/C++, functions returning
+/// this type must use SWIFT_CC so that the components are returned as separate
+/// values.
 struct MetadataResponse {
   /// The requested metadata.
   const Metadata *Value;
