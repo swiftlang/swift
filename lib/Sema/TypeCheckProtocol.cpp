@@ -3625,60 +3625,14 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
 }
 
 #pragma mark Protocol conformance checking
-void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
-  assert(!Conformance->isComplete() && "Conformance is already complete");
 
-  FrontendStatsTracer statsTracer(TC.Context.Stats, "check-conformance",
-                                  Conformance);
-
-  llvm::SaveAndRestore<bool> restoreSuppressDiagnostics(SuppressDiagnostics);
-  SuppressDiagnostics = false;
-
-  // FIXME: Caller checks that this type conforms to all of the
-  // inherited protocols.
-
-  // Emit known diags for this conformance.
-  emitDelayedDiags();
-
-  // If delayed diags have already complained, return.
-  if (AlreadyComplained) {
-    Conformance->setInvalid();
-    return;
-  }
-
-  // Resolve all of the type witnesses.
-  resolveTypeWitnesses();
-
-  // Diagnose missing type witnesses for now.
-  diagnoseMissingWitnesses(Kind);
-
-  // Ensure the conforming type is used.
-  //
-  // FIXME: This feels like the wrong place for this, but if we don't put
-  // it here, extensions don't end up depending on the extended type.
-  recordConformanceDependency(DC, Adoptee->getAnyNominal(), Conformance, false);
-
-  // If we complain about any associated types, there is no point in continuing.
-  // FIXME: Not really true. We could check witnesses that don't involve the
-  // failed associated types.
-  if (AlreadyComplained) {
-    Conformance->setInvalid();
-    return;
-  }
-
-  // Diagnose missing value witnesses later.
-  SWIFT_DEFER { diagnoseMissingWitnesses(Kind); };
-
-  // Ensure the associated type conformances are used.
-  addUsedConformances(Conformance);
-
-  // Check non-type requirements.
+void ConformanceChecker::resolveValueWitnesses() {
   for (auto member : Proto->getMembers()) {
     auto requirement = dyn_cast<ValueDecl>(member);
     if (!requirement)
       continue;
 
-    // Associated type requirements handled above.
+    // Associated type requirements handled elsewhere.
     if (isa<TypeDecl>(requirement))
       continue;
 
@@ -3829,7 +3783,7 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
     // If this is an accessor for a storage decl, ignore it.
     if (isa<AccessorDecl>(requirement))
       continue;
-    
+
     // Try to resolve the witness via explicit definitions.
     switch (resolveWitnessViaLookup(requirement)) {
     case ResolveWitnessResult::Success:
@@ -3875,6 +3829,57 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
       break;
     }
   }
+}
+
+void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
+  assert(!Conformance->isComplete() && "Conformance is already complete");
+
+  FrontendStatsTracer statsTracer(TC.Context.Stats, "check-conformance",
+                                  Conformance);
+
+  llvm::SaveAndRestore<bool> restoreSuppressDiagnostics(SuppressDiagnostics);
+  SuppressDiagnostics = false;
+
+  // FIXME: Caller checks that this type conforms to all of the
+  // inherited protocols.
+
+  // Emit known diags for this conformance.
+  emitDelayedDiags();
+
+  // If delayed diags have already complained, return.
+  if (AlreadyComplained) {
+    Conformance->setInvalid();
+    return;
+  }
+
+  // Resolve all of the type witnesses.
+  resolveTypeWitnesses();
+
+  // Diagnose missing type witnesses for now.
+  diagnoseMissingWitnesses(Kind);
+
+  // Ensure the conforming type is used.
+  //
+  // FIXME: This feels like the wrong place for this, but if we don't put
+  // it here, extensions don't end up depending on the extended type.
+  recordConformanceDependency(DC, Adoptee->getAnyNominal(), Conformance, false);
+
+  // If we complain about any associated types, there is no point in continuing.
+  // FIXME: Not really true. We could check witnesses that don't involve the
+  // failed associated types.
+  if (AlreadyComplained) {
+    Conformance->setInvalid();
+    return;
+  }
+
+  // Diagnose missing value witnesses later.
+  SWIFT_DEFER { diagnoseMissingWitnesses(Kind); };
+
+  // Ensure the associated type conformances are used.
+  addUsedConformances(Conformance);
+
+  // Check non-type requirements.
+  resolveValueWitnesses();
 
   emitDelayedDiags();
 

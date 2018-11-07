@@ -675,6 +675,9 @@ public:
   /// Resolve all of the type witnesses.
   void resolveTypeWitnesses();
 
+  /// Resolve all of the non-type witnesses.
+  void resolveValueWitnesses();
+
   /// Resolve the witness for the given non-type requirement as
   /// directly as possible, only resolving other witnesses if
   /// needed, e.g., to determine type witnesses used within the
