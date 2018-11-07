@@ -151,16 +151,17 @@ extension UnsafeMutableAudioBufferListPointer
   }
 
   /// Access an indexed `AudioBuffer` (`mBuffers[i]`).
+  @_borrowed
   public subscript(index: Index) -> Element {
-    get {
+    _read {
       precondition(index >= 0 && index < self.count,
         "subscript index out of range")
-      return (_audioBuffersPointer + index).pointee
+      yield ((_audioBuffersPointer + index).pointee)
     }
-    nonmutating set(newValue) {
+    nonmutating _modify {
       precondition(index >= 0 && index < self.count,
         "subscript index out of range")
-      (_audioBuffersPointer + index).pointee = newValue
+      yield (&(_audioBuffersPointer + index).pointee)
     }
   }
 }
