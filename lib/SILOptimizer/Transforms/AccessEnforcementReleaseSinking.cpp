@@ -27,6 +27,7 @@
 
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
@@ -47,15 +48,67 @@ static bool isSinkable(SILInstruction &inst) {
 }
 
 // Returns a bool: If this is a "barrier" instruction for this opt
-static bool isBarrier(SILInstruction &inst) {
-  switch (inst.getKind()) {
-  default:
-    return FullApplySite::isa(&inst) != FullApplySite();
-  case SILInstructionKind::BeginAccessInst:
-  case SILInstructionKind::BeginUnpairedAccessInst:
-  case SILInstructionKind::IsUniqueInst:
+static bool isBarrier(SILInstruction *inst) {
+  // Calls hide many dangers, from checking reference counts, to beginning
+  // keypath access, to forcing memory to be live. Checking for these and other
+  // possible barries at ever call is certainly not worth it.
+  if (FullApplySite::isa(inst) != FullApplySite())
     return true;
+
+  // Don't extend lifetime past any sort of uniqueness check.
+  if (mayCheckRefCount(inst))
+    return true;
+
+  // Don't extend object lifetime past deallocation.
+  if (isa<DeallocationInst>(inst))
+    return true;
+
+  // Avoid introducing access conflicts.
+  if (isa<BeginAccessInst>(inst) || isa<BeginUnpairedAccessInst>(inst))
+    return true;
+
+  if (auto *BI = dyn_cast<BuiltinInst>(inst)) {
+    auto kind = BI->getBuiltinKind();
+    if (!kind)
+      return false; // LLVM intrinsics are not barriers.
+
+    // Whitelist the safe builtin categories. Builtins should generally be
+    // treated conservatively, because introducing a new builtin does not
+    // require updating all passes to be aware of it. Avoid a default to ensure
+    // that all categories are covered.
+    switch (kind.getValue()) {
+    case BuiltinValueKind::None:
+      llvm_unreachable("Builtin must has a non-empty kind.");
+#define BUILTIN_NO_BARRIER(Id)                                                 \
+  case BuiltinValueKind::Id:                                                   \
+    return false;
+#define BUILTIN_CAST_OPERATION(Id, Name, Attrs) BUILTIN_NO_BARRIER(Id)
+#define BUILTIN_CAST_OR_BITCAST_OPERATION(Id, Name, Attrs)                     \
+  BUILTIN_NO_BARRIER(Id)
+#define BUILTIN_BINARY_OPERATION(Id, Name, Attrs, Overload)                    \
+  BUILTIN_NO_BARRIER(Id)
+#define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(Id, Name, UncheckedID, Attrs,   \
+                                               Overload)                       \
+  BUILTIN_NO_BARRIER(Id)
+#define BUILTIN_UNARY_OPERATION(Id, Name, Attrs, Overload)                     \
+  BUILTIN_NO_BARRIER(Id)
+#define BUILTIN_BINARY_PREDICATE(Id, Name, Attrs, Overload)                    \
+  BUILTIN_NO_BARRIER(Id)
+#define BUILTIN_SIL_OPERATION(Id, Name, Overload)                              \
+  case BuiltinValueKind::Id:                                                   \
+    llvm_unreachable("SIL operation must be lowered to instructions.");
+#define BUILTIN_RUNTIME_CALL(Id, Name, Attrs)                                  \
+  case BuiltinValueKind::Id:                                                   \
+    return true; // A runtime call could be anything.
+#define BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload) BUILTIN_NO_BARRIER(Id)
+#define BUILTIN_SANITIZER_OPERATION(Id, Name, Attrs) BUILTIN_NO_BARRIER(Id)
+#define BUILTIN_TYPE_CHECKER_OPERATION(Id, Name) BUILTIN_NO_BARRIER(Id)
+#define BUILTIN_TYPE_TRAIT_OPERATION(Id, Name) BUILTIN_NO_BARRIER(Id)
+
+#include "swift/AST/Builtins.def"
+    }
   }
+  return false;
 }
 
 // Processes a block bottom-up, keeping a lookout for end_access instructions
@@ -70,7 +123,7 @@ static void processBlock(SILBasicBlock &block) {
       if (!bottomEndAccessInst) {
         bottomEndAccessInst = currEAI;
       }
-    } else if (isBarrier(currIns)) {
+    } else if (isBarrier(&currIns)) {
       LLVM_DEBUG(llvm::dbgs() << "Found a barrier " << currIns
                               << ", clearing last seen end_access\n");
       bottomEndAccessInst = nullptr;

@@ -2,11 +2,10 @@ add_swift_host_library(swiftDemangle
                   SHARED
                     SwiftDemangle.cpp
                     MangleHack.cpp
-                  LINK_LIBS
-                    swiftDemangling)
-target_compile_definitions(swiftDemangle
-                           PRIVATE
-                             LLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1)
+                  LINK_LIBRARIES
+                    swiftDemangling
+                  C_COMPILE_FLAGS
+                    -DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1)
 
 # Do not enforce checks for LLVM's ABI-breaking build settings.
 # The demangler uses some header-only code from LLVM's ADT classes,

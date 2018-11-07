@@ -215,3 +215,68 @@ bb0:
   %ret = tuple ()
   return %ret : $()
 }
+
+// testSinkAfterEscapingClosureCheck:
+// <rdar://problem/45846920> TestFoundation, TestProcess, closure
+// argument passed as @noescape to Objective-C has escaped
+class IntWrapper {
+  var value: Builtin.Int64
+
+  init(v: Builtin.Int64) {
+    value = v
+  }
+}
+
+sil @takesNoEscapeBlockClosure : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
+
+sil @closureThatModifiesCapture: $@convention(thin) ({ var Builtin.Int64 }) -> ()
+
+sil [reabstraction_thunk] @thunkForCalleeGuaranteed : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+sil [reabstraction_thunk] @withoutActuallyEscapingThunk : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+
+// The Copy release cannot be moved below the is_escaping_closure check.
+//
+// CHECK-LABEL: sil @testSinkAfterEscapingClosureCheck : $@convention(thin) (@guaranteed IntWrapper) -> () {
+// CHECK: bb0(%0 : $IntWrapper):
+// CHECK: [[BA:%.*]] = begin_access [read] [dynamic] %{{.*}} : $*Builtin.Int64
+// CHECK: [[COPY:%.*]] = copy_block %{{.*}} : $@convention(block) @noescape () -> ()
+// CHECK: [[F:%.*]] = function_ref @takesNoEscapeBlockClosure : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
+// CHECK: apply [[F]]([[COPY]]) : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
+// CHECK: strong_release [[COPY]] : $@convention(block) @noescape () -> ()
+// CHECK: is_escaping_closure
+// CHECK: cond_fail
+// CHECK: end_access [[BA]] : $*Builtin.Int64
+// CHECK-LABEL: } // end sil function 'testSinkAfterEscapingClosureCheck'
+sil @testSinkAfterEscapingClosureCheck : $@convention(thin) (@guaranteed IntWrapper) -> () {
+bb0(%0 : $IntWrapper):
+  %va = ref_element_addr %0 : $IntWrapper, #IntWrapper.value
+  %ba = begin_access [read] [dynamic] %va : $*Builtin.Int64
+  %value = load %ba : $*Builtin.Int64
+  %box = alloc_box ${ var Builtin.Int64 }
+  %boxaddr = project_box %box : ${ var Builtin.Int64 }, 0
+  store %value to %boxaddr : $*Builtin.Int64
+  %closureF = function_ref @closureThatModifiesCapture : $@convention(thin) ({ var Builtin.Int64 }) -> ()
+  %closure = partial_apply [callee_guaranteed] %closureF(%box) : $@convention(thin) ({ var Builtin.Int64 }) -> ()
+  %conv = convert_escape_to_noescape %closure : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %thunk = function_ref @withoutActuallyEscapingThunk : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  %pathunk = partial_apply [callee_guaranteed] %thunk(%conv) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  %md = mark_dependence %pathunk : $@callee_guaranteed () -> () on %conv : $@noescape @callee_guaranteed () -> ()
+  strong_retain %md : $@callee_guaranteed () -> ()
+  %allocblock = alloc_stack $@block_storage @callee_guaranteed () -> ()
+  %blockaddr = project_block_storage %allocblock : $*@block_storage @callee_guaranteed () -> ()
+  store %md to %blockaddr : $*@callee_guaranteed () -> ()
+  %blockF = function_ref @thunkForCalleeGuaranteed : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+  %initblock = init_block_storage_header %allocblock : $*@block_storage @callee_guaranteed () -> (), invoke %blockF : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> (), type $@convention(block) @noescape () -> ()
+  %copyblock = copy_block %initblock : $@convention(block) @noescape () -> ()
+  %f = function_ref @takesNoEscapeBlockClosure : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
+  %call = apply %f(%copyblock) : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
+  strong_release %copyblock : $@convention(block) @noescape () -> ()
+  %isescape = is_escaping_closure %md : $@callee_guaranteed () -> ()
+  cond_fail %isescape : $Builtin.Int1
+  end_access %ba : $*Builtin.Int64
+  destroy_addr %blockaddr : $*@callee_guaranteed() -> ()
+  dealloc_stack %allocblock : $*@block_storage @callee_guaranteed () -> ()
+  strong_release %box : ${ var Builtin.Int64 }
+  %ret = tuple ()
+  return %ret : $()
+}

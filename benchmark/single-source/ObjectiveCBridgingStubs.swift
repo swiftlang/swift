@@ -27,7 +27,19 @@ public let ObjectiveCBridgingStubs = [
   BenchmarkInfo(name: "ObjectiveCBridgeStubToNSDate2", runFunction: run_ObjectiveCBridgeStubToNSDate, tags: [.validation, .bridging]),
   BenchmarkInfo(name: "ObjectiveCBridgeStubToNSString", runFunction: run_ObjectiveCBridgeStubToNSString, tags: [.validation, .bridging]),
   BenchmarkInfo(name: "ObjectiveCBridgeStubURLAppendPath2", runFunction: run_ObjectiveCBridgeStubURLAppendPath, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringIsEqual", runFunction: run_ObjectiveCBridgeStringIsEqual, tags: [.validation, .String, .bridging], setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringIsEqual2", runFunction: run_ObjectiveCBridgeStringIsEqual2, tags: [.validation, .String, .bridging], setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringIsEqualAllSwift", runFunction: run_ObjectiveCBridgeStringIsEqualAllSwift, tags: [.validation, .String, .bridging], setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringCompare", runFunction: run_ObjectiveCBridgeStringCompare, tags: [.validation, .String, .bridging], setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringCompare2", runFunction: run_ObjectiveCBridgeStringCompare2, tags: [.validation, .String, .bridging], setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringGetASCIIContents", runFunction: run_ObjectiveCBridgeStringGetASCIIContents, tags: [.validation, .String, .bridging], setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringGetUTF8Contents", runFunction: run_ObjectiveCBridgeStringGetUTF8Contents, tags: [.validation, .String, .bridging], setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringRangeOfString", runFunction: run_ObjectiveCBridgeStringRangeOfString, tags: [.validation, .String, .bridging], setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringHash", runFunction: run_ObjectiveCBridgeStringHash, tags: [.validation, .String, .bridging], setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringUTF8String", runFunction: run_ObjectiveCBridgeStringUTF8String, tags: [.validation, .String, .bridging], setUpFunction: setup_StringBridgeBenchmark),
 ]
+
+var b:BridgeTester! = nil
 
 #if _runtime(_ObjC)
 @inline(never)
@@ -256,5 +268,129 @@ public func run_ObjectiveCBridgeStubDataAppend(N: Int) {
       testObjectiveCBridgeStubDataAppend()
     }
   }
+#endif
+}
+
+@inline(never)
+internal func getStringsToBridge() -> [String] {
+  let strings1 = ["hello", "the quick brown fox jumps over the lazy dog", "the quick brown fox jumps over the lazy dög"]
+  return strings1 + strings1.map { $0 + $0 } //mix of literals and non-literals
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringIsEqual(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testIsEqualToString()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringIsEqual2(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testIsEqualToString2()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringIsEqualAllSwift(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testIsEqualToStringAllSwift()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringCompare(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testCompare()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringCompare2(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testCompare2()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringGetASCIIContents(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testGetASCIIContents()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringGetUTF8Contents(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testGetUTF8Contents()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringRangeOfString(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testRangeOfString()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringHash(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testHash()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringUTF8String(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testUTF8String()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func setup_StringBridgeBenchmark() {
+#if _runtime(_ObjC)
+  b = BridgeTester()
+  b.setUpStringTests(getStringsToBridge())
 #endif
 }
