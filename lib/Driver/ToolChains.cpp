@@ -398,7 +398,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_PCH:
     return "-emit-pch";
   case file_types::TY_ASTDump:
-      return "-dump-ast";
+    return "-dump-ast";
   case file_types::TY_RawSIL:
     return "-emit-silgen";
   case file_types::TY_SIL:

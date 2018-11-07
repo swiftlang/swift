@@ -149,7 +149,6 @@ bool file_types::isAfterLLVM(ID Id) {
 bool file_types::isPartOfSwiftCompilation(ID Id) {
   switch (Id) {
   case file_types::TY_Swift:
-  case file_types::TY_ASTDump:
   case file_types::TY_SIL:
   case file_types::TY_RawSIL:
   case file_types::TY_SIB:
@@ -174,6 +173,7 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_ClangModuleFile:
   case file_types::TY_SwiftDeps:
   case file_types::TY_Nothing:
+  case file_types::TY_ASTDump:
   case file_types::TY_Remapping:
   case file_types::TY_IndexData:
   case file_types::TY_ModuleTrace:
