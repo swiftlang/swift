@@ -2,7 +2,8 @@
 // RUN: %target-swift-frontend -parse-as-library -Osize -emit-ir  %s | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
-// The 7-bit discriminator complicates codegen on 32-bit platforms.
+// FIXME(rdar://problem/45856408): The 7-bit discriminator complicates codegen
+// on 32-bit platforms.
 // UNSUPPORTED: PTRSIZE=32
 
 // This is an end-to-end test to ensure that the optimizer generates
