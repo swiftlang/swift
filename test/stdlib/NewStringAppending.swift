@@ -1,4 +1,4 @@
-// RUN: %target-run-stdlib-swift-swift3 | %FileCheck %s
+// RUN: %target-run-stdlib-swift | %FileCheck %s
 // REQUIRES: executable_test
 //
 // Parts of this test depend on memory allocator specifics.  The test
@@ -8,6 +8,8 @@
 //
 // Memory allocator specifics also vary across platforms.
 // REQUIRES: CPU=x86_64, OS=macosx
+
+// XFAIL: rdar45749460
 
 import Foundation
 import Swift

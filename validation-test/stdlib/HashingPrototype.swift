@@ -1,7 +1,9 @@
-// RUN: %target-run-simple-swift-swift3
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
+
+// XFAIL: rdar45749460
 
 /*
 

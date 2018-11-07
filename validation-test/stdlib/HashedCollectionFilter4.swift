@@ -1,5 +1,7 @@
-// RUN: %target-run-stdlib-swift-swift3
+// RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
+
+// XFAIL: rdar45749460
 
 import StdlibUnittest
 
