@@ -59,12 +59,14 @@
 // CHECK-32: Alignment: 4
 // CHECK-32: Stride: 16
 // CHECK-32: NumExtraInhabitants: 0
+// CHECK-32: BitwiseTakable: 1
 
 // CHECK-64: - __C.CGRect:
 // CHECK-64: Size: 32
 // CHECK-64: Alignment: 8
 // CHECK-64: Stride: 32
 // CHECK-64: NumExtraInhabitants: 0
+// CHECK-64: BitwiseTakable: 1
 
 // CHECK:      CAPTURE DESCRIPTORS:
 // CHECK-NEXT: ====================
