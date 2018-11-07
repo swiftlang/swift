@@ -3210,6 +3210,7 @@ AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
   // Find the best anchor among the anchors of the overridden decls.
   AssociatedTypeDecl *bestAnchor = nullptr;
   for (auto assocType : overridden) {
+    assert(this != assocType && "AssociatedTypeDecl cannot override itself");
     auto anchor = assocType->getAssociatedTypeAnchor();
     if (!bestAnchor || compare(anchor, bestAnchor) < 0)
       bestAnchor = anchor;
