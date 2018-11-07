@@ -3355,6 +3355,28 @@ CheckTypeWitnessResult swift::checkTypeWitness(TypeChecker &tc, DeclContext *dc,
   return CheckTypeWitnessResult();
 }
 
+ResolveWitnessResult
+ConformanceChecker::resolveWitnessTryingAllStrategies(ValueDecl *requirement) {
+  decltype(&ConformanceChecker::resolveWitnessViaLookup) strategies[] = {
+      &ConformanceChecker::resolveWitnessViaLookup,
+      &ConformanceChecker::resolveWitnessViaDerivation,
+      &ConformanceChecker::resolveWitnessViaDefault};
+
+  for (auto strategy : strategies) {
+    ResolveWitnessResult result = (this->*strategy)(requirement);
+    switch (result) {
+    case ResolveWitnessResult::Success:
+    case ResolveWitnessResult::ExplicitFailed:
+      return result;
+    case ResolveWitnessResult::Missing:
+      // Continue trying.
+      break;
+    }
+  }
+
+  return ResolveWitnessResult::Missing;
+}
+
 /// Attempt to resolve a type witness via member name lookup.
 ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
                        AssociatedTypeDecl *assocType) {
@@ -3784,8 +3806,8 @@ void ConformanceChecker::resolveValueWitnesses() {
     if (isa<AccessorDecl>(requirement))
       continue;
 
-    // Try to resolve the witness via explicit definitions.
-    switch (resolveWitnessViaLookup(requirement)) {
+    // Try to resolve the witness.
+    switch (resolveWitnessTryingAllStrategies(requirement)) {
     case ResolveWitnessResult::Success:
       finalizeWitness();
       continue;
@@ -3795,37 +3817,7 @@ void ConformanceChecker::resolveValueWitnesses() {
       continue;
 
     case ResolveWitnessResult::Missing:
-      // Continue trying below.
-      break;
-    }
-
-    // Try to resolve the witness via derivation.
-    switch (resolveWitnessViaDerivation(requirement)) {
-    case ResolveWitnessResult::Success:
-      finalizeWitness();
-      continue;
-
-    case ResolveWitnessResult::ExplicitFailed:
-      Conformance->setInvalid();
-      continue;
-
-    case ResolveWitnessResult::Missing:
-      // Continue trying below.
-      break;
-    }
-
-    // Try to resolve the witness via defaults.
-    switch (resolveWitnessViaDefault(requirement)) {
-    case ResolveWitnessResult::Success:
-      finalizeWitness();
-      continue;
-
-    case ResolveWitnessResult::ExplicitFailed:
-      Conformance->setInvalid();
-      continue;
-
-    case ResolveWitnessResult::Missing:
-      // Continue trying below.
+      // Let it get diagnosed later.
       break;
     }
   }

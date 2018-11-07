@@ -629,6 +629,11 @@ class ConformanceChecker : public WitnessChecker {
   /// Resolve a (non-type) witness via default definition or optional.
   ResolveWitnessResult resolveWitnessViaDefault(ValueDecl *requirement);
 
+  /// Resolve a (non-type) witness by trying each standard strategy until one
+  /// of them produces a result.
+  ResolveWitnessResult
+  resolveWitnessTryingAllStrategies(ValueDecl *requirement);
+
   /// Attempt to resolve a type witness via member name lookup.
   ResolveWitnessResult resolveTypeWitnessViaLookup(
                          AssociatedTypeDecl *assocType);
