@@ -1491,7 +1491,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         diagnose(ForLoc, diag::attr_dynamic_replacement_expected_colon);
         return false;
       }
-      auto ColonLoc = consumeToken(tok::colon);
+      consumeToken(tok::colon);
       {
         SyntaxParsingContext ContentContext(SyntaxContext,
                                             SyntaxKind::DeclName);
