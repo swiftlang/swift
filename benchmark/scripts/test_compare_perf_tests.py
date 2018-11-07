@@ -591,7 +591,7 @@ Totals,2"""
     def test_results_from_merge_verbose(self):
         """Parsing verbose log  merges all PerformanceTestSamples.
         ...this should technically be on TestPerformanceTestResult, but it's
-        easier to write here. ¯\_(ツ)_/¯"""
+        easier to write here. ¯\\_(ツ)_/¯"""
         concatenated_logs = """
     Sample 0,355883
     Sample 1,358817
