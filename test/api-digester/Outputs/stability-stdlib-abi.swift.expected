@@ -1,5 +1,17 @@
+
+/* Generic Signature Changes */
+Func MutableCollection._partition(within:by:) has generic signature change from <τ_0_0 where τ_0_0 : MutableCollection, τ_0_0 : RandomAccessCollection> to <τ_0_0 where τ_0_0 : BidirectionalCollection, τ_0_0 : MutableCollection>
+
+/* RawRepresentable Changes */
+
 /* Removed Decls */
 Class _stdlib_AtomicInt has been removed
+Func MutableCollection._heapSort(within:by:) has been removed
+Func MutableCollection._heapify(within:by:) has been removed
+Func MutableCollection._introSort(within:by:) has been removed
+Func MutableCollection._introSortImpl(within:by:depthLimit:) has been removed
+Func MutableCollection._siftDown(_:within:by:) has been removed
+Func MutableCollection._sort3(_:_:_:by:) has been removed
 Func _stdlib_atomicCompareExchangeStrongInt(object:expected:desired:) has been removed
 Func _stdlib_atomicCompareExchangeStrongInt32(object:expected:desired:) has been removed
 Func _stdlib_atomicCompareExchangeStrongInt64(object:expected:desired:) has been removed
@@ -33,3 +45,15 @@ Func _swift_stdlib_atomicStoreInt32(object:desired:) has been removed
 Func _swift_stdlib_atomicStoreInt64(object:desired:) has been removed
 Func _swift_stdlib_atomicStoreUInt32(object:desired:) has been removed
 Func _swift_stdlib_atomicStoreUInt64(object:desired:) has been removed
+
+/* Moved Decls */
+
+/* Renamed Decls */
+Func MutableCollection._partition(within:by:) has been renamed to Func MutableCollection._partitionImpl(by:)
+
+/* Type Changes */
+Func MutableCollection._partition(within:by:) has parameter 0 type change from Range<τ_0_0.Index> to (τ_0_0.Element) throws -> Bool
+
+/* Decl Attribute changes */
+
+/* Protocol Requirement Changes */
