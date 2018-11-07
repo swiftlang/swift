@@ -27,7 +27,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
 #include <unistd.h>
+#elif defined(_WIN32)
+#include <io.h>
+#include <fcntl.h>
+#endif
 
 typedef struct PipeMemoryReader {
   int to_child[2];
@@ -194,10 +199,17 @@ void PipeMemoryReader_sendDoneMessage(const PipeMemoryReader *Reader) {
 static
 PipeMemoryReader createPipeMemoryReader() {
   PipeMemoryReader Reader;
+#if defined(_WIN32)
+  if (pipe(Reader.to_child, 256, _O_BINARY))
+    errnoAndExit("Couldn't create pipes to child process");
+  if (pipe(Reader.from_child, 256, _O_BINARY))
+    errnoAndExit("Couldn't create pipes from child process");
+#else
   if (pipe(Reader.to_child))
     errnoAndExit("Couldn't create pipes to child process");
   if (pipe(Reader.from_child))
     errnoAndExit("Couldn't create pipes from child process");
+#endif
   return Reader;
 }
 
@@ -443,6 +455,8 @@ int reflectExistential(SwiftReflectionContextRef RC,
 int doDumpHeapInstance(const char *BinaryFilename) {
   PipeMemoryReader Pipe = createPipeMemoryReader();
 
+#if defined(_WIN32)
+#else
   pid_t pid = _fork();
   switch (pid) {
     case -1:
@@ -517,6 +531,7 @@ int doDumpHeapInstance(const char *BinaryFilename) {
       }
     }
   }
+#endif
   return EXIT_SUCCESS;
 }
 
