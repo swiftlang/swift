@@ -651,7 +651,7 @@ FUNCTION(InstantiateWitnessTable, swift_instantiateWitnessTable, C_CC,
 //                                            const Metadata *conformingType,
 //                                            ProtocolRequirement *reqBase,
 //                                            ProtocolRequirement *assocType);
-FUNCTION(GetAssociatedTypeWitness, swift_getAssociatedTypeWitness, C_CC,
+FUNCTION(GetAssociatedTypeWitness, swift_getAssociatedTypeWitness, SwiftCC,
          RETURNS(TypeMetadataResponseTy),
          ARGS(SizeTy,
               WitnessTablePtrTy,
