@@ -20,8 +20,8 @@ public func testFunctionRegion(_ count : Int32) -> Tensor<Int32> {
   do {
     if count > 0 {
       if count < 100 {
-				// expected-warning @+2 {{value implicitly copied to the host}}
-				// expected-warning @+1 {{value implicitly copied to the host}}
+        // expected-warning @+2 {{value implicitly copied to the host}}
+        // expected-warning @+1 {{value implicitly copied to the host}}
         result += 1
       } else {
         result += 2
@@ -29,18 +29,18 @@ public func testFunctionRegion(_ count : Int32) -> Tensor<Int32> {
       }
     } else {
       if count > -100 {
-				// expected-warning @+2 {{value implicitly copied to the host}}
-				// expected-warning @+1 {{value implicitly copied to the host}}
+        // expected-warning @+2 {{value implicitly copied to the host}}
+        // expected-warning @+1 {{value implicitly copied to the host}}
         result += 3
       } else {
         result += 4
         throw TestError.NegativeOutOfBound
       }
     } // expected-note {{value used here}}
-		// expected-note @+1 {{value used here}}
-	} catch { // expected-note {{value used here}}
-		// expected-warning @+2 {{value implicitly copied to the host}}
-		// expected-warning @+1 {{value implicitly copied to the host}}
+    // expected-note @+1 {{value used here}}
+  } catch { // expected-note {{value used here}}
+    // expected-warning @+2 {{value implicitly copied to the host}}
+    // expected-warning @+1 {{value implicitly copied to the host}}
     result += 5
   }
   return result
@@ -81,8 +81,8 @@ public func testFunctionRegionWithLoop(_ count : Int32) -> Tensor<Int32> {
   do {
     if count > 0 {
       if count < 100 {
-				// expected-warning @+2 {{value implicitly copied to the host}}
-				// expected-warning @+1 {{value implicitly copied to the host}}
+        // expected-warning @+2 {{value implicitly copied to the host}}
+        // expected-warning @+1 {{value implicitly copied to the host}}
         result += 1
       } else {
         result += 2
@@ -90,20 +90,20 @@ public func testFunctionRegionWithLoop(_ count : Int32) -> Tensor<Int32> {
       }
     } else {
       if count > -100 {
-				// expected-warning @+2 {{value implicitly copied to the host}}
-				// expected-warning @+1 {{value implicitly copied to the host}}
+        // expected-warning @+2 {{value implicitly copied to the host}}
+        // expected-warning @+1 {{value implicitly copied to the host}}
         result += 3
       } else {
         result += 4
         throw TestError.NegativeOutOfBound
       }
     } // expected-note {{value used here}}
-		// expected-note @+1 {{value used here}}
-	} catch { // expected-note {{value used here}}
+    // expected-note @+1 {{value used here}}
+  } catch { // expected-note {{value used here}}
     var i: Int32 = 0
     while i < 2 {
-			// expected-warning @+2 {{value implicitly copied to the host}}
-			// expected-warning @+1 {{value implicitly copied to the host}}
+      // expected-warning @+2 {{value implicitly copied to the host}}
+      // expected-warning @+1 {{value implicitly copied to the host}}
       result += 5
       i += 1
     }

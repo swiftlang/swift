@@ -96,8 +96,7 @@ namespace tf {
     }
   };
 
-  /// This region represents a sequence region that is shared between different
-  /// nodes.
+  /// Represents an SESERegion that is shared between different SESERegions.
   class FunctionSESERegion : public SESERegionTree {
     std::shared_ptr<SESERegionTree> functionRegionTree;
 

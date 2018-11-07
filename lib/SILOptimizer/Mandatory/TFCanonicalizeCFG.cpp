@@ -301,10 +301,9 @@ SESERegionBuilder::processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
                  "Function region should end with an unconditional branch");
           nextBB = branch->getDestBB();
         }
-        iter =
-            functionRegions
-                .try_emplace(currentBB, std::make_pair(subSESERegion, nextBB))
-                .first;
+        auto emplace_result = functionRegions.try_emplace(
+            currentBB, std::make_pair(subSESERegion, nextBB));
+        iter = emplace_result.first;
       }
       results.push_back(llvm::make_unique<FunctionSESERegion>(iter->second.first));
       currentBB = iter->second.second;

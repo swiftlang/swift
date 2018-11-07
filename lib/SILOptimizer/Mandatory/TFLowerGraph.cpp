@@ -232,8 +232,6 @@ struct TFGraphFunctionLowering
   const std::string &funcNodeBaseName;
   llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
       &graphFunctions;
-  // Map from FunctionSESERegion to corresponding graph function bodies.
-  llvm::DenseMap<FunctionSESERegion *, GraphFunctionBody> functionRegionBodies;
   TF_Graph *resultGraph;
   TF_Status *status;
 
@@ -2002,8 +2000,8 @@ GLStatus TFGraphFunctionLowering::lowerSequenceRegion(SequenceSESERegion *r) {
   for (auto &child : r->getNodes()) {
     // The outputs for a sequence corresponds to the outputs of the last region
     // in the sequence. Hence, clear outputs for the current function if any.
-    // Do not clear the outputs if the next region is a function as we the
-    // outputs would become the inputs for that function region.
+    // Do not clear the outputs if the next region is a function as the outputs
+    // are required to process that function region.
     if (child->getKind() != SESERegionTree::Function) {
       getCurrentGraphFunction().outputs.clear();
     }
