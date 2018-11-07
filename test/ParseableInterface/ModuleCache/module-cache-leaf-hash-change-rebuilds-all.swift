@@ -4,12 +4,13 @@
 // Setup builds a module TestModule that depends on OtherModule and LeafModule (built from other.swift and leaf.swift).
 // During setup, input and intermediate mtimes are all set to a constant 'old' time (long in the past).
 //
-// We then modify OtherModule.swiftinterface, and check only OtherModule-*.swiftmodule has a new mtime, LeafModule is unchanged.
+// We then modify LeafModule.swiftinterface's content (but not size), and check both cached modules have new mtimes.
 //
 //
 // Setup phase 1: Write input files.
 //
 // RUN: echo 'public func LeafFunc() -> Int { return 10; }' >%t/leaf.swift
+// RUN: echo 'public func LeafFunc2() -> Int { return 11; }' >>%t/leaf.swift
 //
 // RUN: echo 'import LeafModule' >%t/other.swift
 // RUN: echo 'public func OtherFunc() -> Int { return LeafFunc(); }' >>%t/other.swift
@@ -26,16 +27,15 @@
 // RUN: %S/Inputs/make-old.py %t/modulecache/OtherModule-*.swiftmodule
 //
 //
-// Actual test: make OtherModule.swiftinterface newer, check we only rebuild its cached module.
+// Actual test: Change a byte in LeafModule.swiftinterface, check both cached modules get rebuilt.
 //
 // RUN: %S/Inputs/check-is-old.py %t/OtherModule.swiftinterface %t/LeafModule.swiftinterface
 // RUN: %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
-// RUN: touch %t/OtherModule.swiftinterface
-// RUN: %S/Inputs/check-is-new.py %t/OtherModule.swiftinterface
+// RUN: sed -e 's/LeafFunc2/LoafFunc2/' -i.prev %t/LeafModule.swiftinterface
+// RUN: %S/Inputs/make-old.py %t/LeafModule.swiftinterface
 // RUN: rm %t/TestModule.swiftmodule
 // RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s
-// RUN: %S/Inputs/check-is-new.py %t/modulecache/OtherModule-*.swiftmodule
-// RUN: %S/Inputs/check-is-old.py %t/modulecache/LeafModule-*.swiftmodule
+// RUN: %S/Inputs/check-is-new.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
 
 import OtherModule
 

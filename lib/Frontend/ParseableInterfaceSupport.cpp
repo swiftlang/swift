@@ -27,6 +27,7 @@
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/Support/xxhash.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/CrashRecoveryContext.h"
@@ -73,6 +74,22 @@ extractSwiftInterfaceVersionAndArgs(DiagnosticEngine &Diags,
   return false;
 }
 
+static bool
+getHashOfFile(clang::vfs::FileSystem &FS,
+              StringRef Path, uint64_t &HashOut,
+              DiagnosticEngine &Diags) {
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> Buf =
+    FS.getBufferForFile(Path, /*FileSize=*/-1,
+                        /*RequiresNullTerminator=*/false);
+  if (!Buf) {
+    Diags.diagnose(SourceLoc(), diag::cannot_open_file, Path,
+                   Buf.getError().message());
+    return true;
+  }
+  HashOut = xxHash64(Buf.get()->getBuffer());
+  return false;
+}
+
 /// Construct a cache key for the .swiftmodule being generated. There is a
 /// balance to be struck here between things that go in the cache key and
 /// things that go in the "up to date" check of the cache entry. We want to
@@ -83,9 +100,9 @@ extractSwiftInterfaceVersionAndArgs(DiagnosticEngine &Diags,
 /// -- rather than making a new one and potentially filling up the cache
 /// with dead entries -- when other factors change, such as the contents of
 /// the .swiftinterface input or its dependencies.
-std::string getCacheHash(ASTContext &Ctx,
-                         CompilerInvocation &SubInvocation,
-                         StringRef InPath) {
+static std::string getCacheHash(ASTContext &Ctx,
+                                CompilerInvocation &SubInvocation,
+                                StringRef InPath) {
   // Start with the compiler version (which will be either tag names or revs).
   std::string vers = swift::version::getSwiftFullVersion(
       Ctx.LangOpts.EffectiveLanguageVersion);
@@ -154,7 +171,8 @@ ParseableInterfaceModuleLoader::configureSubInvocationAndOutputPaths(
 static bool
 swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
                       StringRef ModuleCachePath,
-                      StringRef OutPath) {
+                      StringRef OutPath,
+                      DiagnosticEngine &Diags) {
 
   if (!FS.exists(OutPath))
     return false;
@@ -177,10 +195,12 @@ swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
     return false;
 
   for (auto In : AllDeps) {
+    uint64_t Hash = 0;
     auto InStatus = FS.status(In.Path);
     if (!InStatus ||
         (InStatus.get().getSize() != In.Size) ||
-        (InStatus.get().getLastModificationTime() != In.LastModTime)) {
+        getHashOfFile(FS, In.Path, Hash, Diags) ||
+        (Hash != In.Hash)) {
       LLVM_DEBUG(llvm::dbgs() << "Dep " << In.Path
                  << " is directly out of date\n");
       return false;
@@ -190,7 +210,7 @@ swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
     auto Ty = file_types::lookupTypeForExtension(Ext);
     if (Ty == file_types::TY_SwiftModuleFile &&
         In.Path.startswith(ModuleCachePath) &&
-        !swiftModuleIsUpToDate(FS, ModuleCachePath, In.Path)) {
+        !swiftModuleIsUpToDate(FS, ModuleCachePath, In.Path, Diags)) {
       LLVM_DEBUG(llvm::dbgs() << "Dep " << In.Path
                  << " is indirectly out of date\n");
       return false;
@@ -276,9 +296,13 @@ static bool buildSwiftModuleFromSwiftInterface(
         SubError = true;
         return;
       }
+      uint64_t Hash = 0;
+      if (getHashOfFile(FS, Dep, Hash, Diags)) {
+        SubError = true;
+        return;
+      }
       Deps.push_back(SerializationOptions::FileDependency{
-          DepStatus.get().getSize(), DepStatus.get().getLastModificationTime(),
-          Dep});
+          DepStatus.get().getSize(), Hash, Dep});
     }
     serializationOpts.Dependencies = Deps;
     SILMod->setSerializeSILAction([&]() {
@@ -317,7 +341,7 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
   configureSubInvocationAndOutputPaths(SubInvocation, InPath, OutPath);
 
   // Evaluate if we need to run this sub-invocation, and if so run it.
-  if (!swiftModuleIsUpToDate(FS, CacheDir, OutPath)) {
+  if (!swiftModuleIsUpToDate(FS, CacheDir, OutPath, Diags)) {
     if (buildSwiftModuleFromSwiftInterface(FS, Diags, SubInvocation, InPath,
                                            OutPath))
       return std::make_error_code(std::errc::invalid_argument);
