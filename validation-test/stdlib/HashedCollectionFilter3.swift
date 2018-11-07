@@ -1,4 +1,4 @@
-// RUN: %target-run-stdlib-swift-swift3
+// RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
 
 import StdlibUnittest
