@@ -2050,7 +2050,7 @@ void TypeChecker::checkDynamicReplacementAttribute(ValueDecl *D) {
   auto *attr = D->getAttrs().getAttribute<DynamicReplacementAttr>();
   assert(attr);
 
-  if (!D->getDeclContext()->isExtensionContext() &&
+  if (!isa<ExtensionDecl>(D->getDeclContext()) &&
       !D->getDeclContext()->isModuleScopeContext()) {
     diagnose(attr->getLocation(), diag::dynamic_replacement_not_in_extension,
                 D->getBaseName());

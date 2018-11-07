@@ -883,7 +883,7 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   DeclContext *context = FD->getDeclContext();
 
   // Methods from extensions don't go into vtables (yet).
-  if (context->isExtensionContext())
+  if (isa<ExtensionDecl>(context))
     return SubclassScope::NotApplicable;
 
   // Various forms of thunks don't either.

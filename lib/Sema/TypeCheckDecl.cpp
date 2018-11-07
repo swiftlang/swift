@@ -972,7 +972,7 @@ static void validatePatternBindingEntry(TypeChecker &tc,
   // Validate 'static'/'class' on properties in nominal type decls.
   auto StaticSpelling = binding->getStaticSpelling();
   if (StaticSpelling != StaticSpellingKind::None &&
-      binding->getDeclContext()->isExtensionContext()) {
+      isa<ExtensionDecl>(binding->getDeclContext())) {
     if (auto *NTD = binding->getDeclContext()->getSelfNominalTypeDecl()) {
       if (!isa<ClassDecl>(NTD)) {
         if (StaticSpelling == StaticSpellingKind::KeywordClass) {
@@ -4186,7 +4186,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // Validate 'static'/'class' on functions in extensions.
     auto StaticSpelling = FD->getStaticSpelling();
     if (StaticSpelling != StaticSpellingKind::None &&
-        FD->getDeclContext()->isExtensionContext()) {
+        isa<ExtensionDecl>(FD->getDeclContext())) {
       if (auto *NTD = FD->getDeclContext()->getSelfNominalTypeDecl()) {
         if (!isa<ClassDecl>(NTD)) {
           if (StaticSpelling == StaticSpellingKind::KeywordClass) {
