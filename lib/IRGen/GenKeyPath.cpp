@@ -732,7 +732,7 @@ emitWitnessTableGeneratorForKeyPath(IRGenModule &IGM,
 static unsigned getClassFieldIndex(ClassDecl *classDecl, VarDecl *property) {
   SmallVector<ClassDecl *, 3> superclasses;
   for (auto *superDecl = classDecl; superDecl != nullptr;
-       superDecl = classDecl->getSuperclassDecl()) {
+       superDecl = superDecl->getSuperclassDecl()) {
     superclasses.push_back(superDecl);
   }
 
