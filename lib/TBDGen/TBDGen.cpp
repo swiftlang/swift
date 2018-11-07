@@ -164,6 +164,17 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
 
   addSymbol(SILDeclRef(AFD));
 
+  // Add the global function pointer for a dynamically replaceable function.
+  if (AFD->isDynamic() && ! AFD->isObjC()) {
+    addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(AFD));
+    addSymbol(LinkEntity::forDynamicallyReplaceableFunctionImpl(AFD));
+    addSymbol(LinkEntity::forDynamicallyReplaceableFunctionKey(AFD));
+  }
+  if (AFD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+    addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(AFD));
+    addSymbol(LinkEntity::forDynamicallyReplaceableFunctionImpl(AFD));
+  }
+
   if (AFD->getAttrs().hasAttribute<CDeclAttr>()) {
     // A @_cdecl("...") function has an extra symbol, with the name from the
     // attribute.

@@ -3167,7 +3167,7 @@ static ManagedValue createThunk(SILGenFunction &SGF,
   }
 
   // Create it in our current function.
-  auto thunkValue = SGF.B.createFunctionRef(loc, thunk);
+  auto thunkValue = SGF.B.createFunctionRefFor(loc, thunk);
   ManagedValue thunkedFn =
     SGF.B.createPartialApply(loc, thunkValue,
                              SILType::getPrimitiveObjectType(substFnType),
@@ -3275,7 +3275,7 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
   }
 
   // Create it in our current function.
-  auto thunkValue = B.createFunctionRef(loc, thunk);
+  auto thunkValue = B.createFunctionRefFor(loc, thunk);
   SILValue noEscapeValue =
       noEscapingFunctionValue.ensurePlusOne(*this, loc).forward(*this);
   SingleValueInstruction *thunkedFn = B.createPartialApply(
@@ -3552,7 +3552,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
   forwardFunctionArguments(*this, loc, fTy, substArgs, args);
 
   // Create the call.
-  auto implRef = B.createFunctionRef(loc, implFn);
+  auto implRef = B.createFunctionRefFor(loc, implFn);
   SILValue implResult = emitApplyWithRethrow(loc, implRef,
                                 SILType::getPrimitiveObjectType(fTy),
                                 subs, args);
@@ -3586,7 +3586,7 @@ static WitnessDispatchKind getWitnessDispatchKind(SILDeclRef witness) {
     return WitnessDispatchKind::Static;
 
   // If the witness is dynamic, go through dynamic dispatch.
-  if (decl->isDynamic()) {
+  if (decl->isObjCDynamic()) {
     // For initializers we still emit a static allocating thunk around
     // the dynamic initializing entry point.
     if (witness.kind == SILDeclRef::Kind::Allocator)
@@ -3958,7 +3958,7 @@ SILGenFunction::emitCanonicalFunctionThunk(SILLocation loc, ManagedValue fn,
   }
 
   // Create it in the current function.
-  auto thunkValue = B.createFunctionRef(loc, thunk);
+  auto thunkValue = B.createFunctionRefFor(loc, thunk);
   ManagedValue thunkedFn = B.createPartialApply(
       loc, thunkValue, SILType::getPrimitiveObjectType(substFnTy),
       interfaceSubs, {fn},

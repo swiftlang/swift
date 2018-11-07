@@ -67,7 +67,7 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var) {
     SILFunction *accessorFn = SGM.getFunction(
                             SILDeclRef(var, SILDeclRef::Kind::GlobalAccessor),
                                                   NotForDefinition);
-    SILValue accessor = B.createFunctionRef(loc, accessorFn);
+    SILValue accessor = B.createFunctionRefFor(loc, accessorFn);
     auto accessorTy = accessor->getType().castTo<SILFunctionType>();
     (void)accessorTy;
     assert(!accessorTy->isPolymorphic()
@@ -247,7 +247,7 @@ static void emitOnceCall(SILGenFunction &SGF, VarDecl *global,
                                                rawPointerSILTy);
 
   // Emit a reference to the function to execute.
-  SILValue onceFuncRef = SGF.B.createFunctionRef(global, onceFunc);
+  SILValue onceFuncRef = SGF.B.createFunctionRefFor(global, onceFunc);
 
   // Call Builtin.once.
   SILValue onceArgs[] = {onceTokenAddr, onceFuncRef};

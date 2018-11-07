@@ -378,6 +378,9 @@ SIMPLE_DECL_ATTR(_nonoverride, NonOverride,
   OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor | OnAssociatedType |
   UserInaccessible | NotSerialized,
   79)
+DECL_ATTR(_dynamicReplacement, DynamicReplacement,
+  OnAbstractFunction | OnVar | OnSubscript | UserInaccessible,
+  80)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

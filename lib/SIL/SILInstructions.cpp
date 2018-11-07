@@ -500,7 +500,7 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
 }
 
 bool swift::doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics) {
-  if (auto *FRI = dyn_cast<FunctionRefInst>(callee))
+  if (auto *FRI = dyn_cast<FunctionRefBaseInst>(callee))
     if (auto *F = FRI->getReferencedFunction())
       return F->hasSemanticsAttr(semantics);
   return false;
@@ -577,21 +577,40 @@ TryApplyInst *TryApplyInst::create(
                                      normalBB, errorBB, specializationInfo);
 }
 
-FunctionRefInst::FunctionRefInst(SILDebugLocation Loc, SILFunction *F)
-    : InstructionBase(Loc, F->getLoweredType()),
-      Function(F) {
+FunctionRefBaseInst::FunctionRefBaseInst(SILInstructionKind Kind,
+                                         SILDebugLocation DebugLoc,
+                                         SILFunction *F)
+    : LiteralInst(Kind, DebugLoc, F->getLoweredType()), f(F) {
   F->incrementRefCount();
 }
 
-FunctionRefInst::~FunctionRefInst() {
-  if (Function)
+void FunctionRefBaseInst::dropReferencedFunction() {
+  if (auto *Function = getReferencedFunction())
     Function->decrementRefCount();
+  f = nullptr;
 }
 
-void FunctionRefInst::dropReferencedFunction() {
-  if (Function)
-    Function->decrementRefCount();
-  Function = nullptr;
+FunctionRefBaseInst::~FunctionRefBaseInst() {
+  if (getReferencedFunction())
+    getReferencedFunction()->decrementRefCount();
+}
+
+FunctionRefInst::FunctionRefInst(SILDebugLocation Loc, SILFunction *F)
+    : FunctionRefBaseInst(SILInstructionKind::FunctionRefInst, Loc, F) {
+  assert(!F->isDynamicallyReplaceable());
+}
+
+DynamicFunctionRefInst::DynamicFunctionRefInst(SILDebugLocation Loc,
+                                               SILFunction *F)
+    : FunctionRefBaseInst(SILInstructionKind::DynamicFunctionRefInst, Loc, F) {
+  assert(F->isDynamicallyReplaceable());
+}
+
+PreviousDynamicFunctionRefInst::PreviousDynamicFunctionRefInst(
+    SILDebugLocation Loc, SILFunction *F)
+    : FunctionRefBaseInst(SILInstructionKind::PreviousDynamicFunctionRefInst,
+                          Loc, F) {
+  assert(!F->isDynamicallyReplaceable());
 }
 
 AllocGlobalInst::AllocGlobalInst(SILDebugLocation Loc,

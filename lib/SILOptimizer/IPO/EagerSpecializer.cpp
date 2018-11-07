@@ -755,6 +755,9 @@ void EagerSpecializerTransform::run() {
     if (F.isExternalDeclaration() || F.isAvailableExternally())
       continue;
 
+    if (F.isDynamicallyReplaceable())
+      continue;
+
     if (!F.getLoweredFunctionType()->getGenericSignature())
       continue;
 

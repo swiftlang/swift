@@ -2590,6 +2590,10 @@ public:
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;
 
+  bool isObjCDynamic() const {
+    return isObjC() && isDynamic();
+  }
+
   /// Set whether this type is 'dynamic' or not.
   void setIsDynamic(bool value);
 

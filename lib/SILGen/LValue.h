@@ -437,7 +437,8 @@ public:
                              bool isSuper,
                              SGFAccessKind accessKind,
                              AccessStrategy accessStrategy,
-                             CanType formalRValueType);
+                             CanType formalRValueType,
+                             bool isOnSelf = false);
 
   void addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
                                    SubscriptDecl *subscript,
@@ -448,7 +449,8 @@ public:
                                    AccessStrategy accessStrategy,
                                    CanType formalRValueType,
                                    PreparedArguments &&indices,
-                                   Expr *indexExprForDiagnostics);
+                                   Expr *indexExprForDiagnostics,
+                                   bool isOnSelfParameter = false);
 
   /// Add a subst-to-orig reabstraction component.  That is, given
   /// that this l-value trafficks in values following the substituted

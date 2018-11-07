@@ -229,6 +229,8 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'YieldStmt': 224,
     'YieldList': 225,
     'IdentifierList': 226,
+    'NamedAttributeStringArgument': 227,
+    'DeclName': 228,
 }
 
 

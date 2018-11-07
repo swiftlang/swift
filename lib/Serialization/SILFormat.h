@@ -290,7 +290,9 @@ namespace sil_block {
                      BCVBR<8>,    // number of specialize attributes
                      BCFixed<1>,  // has qualified ownership
                      BCFixed<1>,  // must be weakly referenced
+                     BCFixed<1>,  // is dynamically replacable
                      TypeIDField, // SILFunctionType
+                     DeclIDField,  // SILFunction name or 0 (replaced function)
                      GenericEnvironmentIDField,
                      DeclIDField, // ClangNode owner
                      BCArray<IdentifierIDField> // Semantics Attribute

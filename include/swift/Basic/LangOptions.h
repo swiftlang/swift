@@ -144,6 +144,10 @@ namespace swift {
     /// was not compiled with -enable-testing.
     bool EnableTestableAttrRequiresTestableModule = true;
 
+    /// If true, the 'dynamic' attribute is added to all applicable
+    /// declarations.
+    bool EnableImplicitDynamic = false;
+
     ///
     /// Flags for developers
     ///
