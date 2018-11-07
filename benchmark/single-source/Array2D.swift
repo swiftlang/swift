@@ -32,7 +32,7 @@ var inputArray: [[Int]]! = {
 func modifyArray(_ A: inout [[Int]], _ N: Int) {
   for _ in 0..<N {
     for i in 0 ..< 1024 {
-      for y in 0 ..< 1024 {
+      for y in 0 ..< 524 {
         A[i][y] = A[i][y] + 1
         A[i][y] = A[i][y] - 1
       }
