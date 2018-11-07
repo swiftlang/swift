@@ -28,7 +28,7 @@ supported host development operating systems.
 
 #### macOS
 
-To build for macOS, you need [Xcode 10 beta 5](https://developer.apple.com/xcode/downloads/).
+To build for macOS, you need [Xcode 10.0](https://developer.apple.com/xcode/downloads/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document for the current required version.
 
