@@ -18,9 +18,9 @@ def execute_cmd(cmd):
 
 # The regular expression we use to match compiler-crasher lines.
 regex = re.compile(
-    '.*Swift(.*) :: '
-    '(compiler_crashers|compiler_crashers_2|IDE/crashers|SIL/crashers)'
-    '/(.*\.swift|.*\.sil).*')
+    r'.*Swift(.*) :: '
+    r'(compiler_crashers|compiler_crashers_2|IDE/crashers|SIL/crashers)'
+    r'/(.*\.swift|.*\.sil).*')
 
 # Take the output of lit as standard input.
 for line in sys.stdin:
