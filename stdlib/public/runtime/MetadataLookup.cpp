@@ -946,8 +946,7 @@ public:
 #if SWIFT_OBJC_INTEROP
     // Look for a Swift-defined @objc protocol with the Swift 3 mangling that
     // is used for Objective-C entities.
-    std::string objcMangledName =
-      "_TtP" + mangledName.substr(0, mangledName.size()-1) + "_";
+    std::string objcMangledName = "_Tt" + mangleNodeOld(node) + "_";
     if (auto protocol = objc_getProtocol(objcMangledName.c_str()))
       return ProtocolDescriptorRef::forObjC(protocol);
 #endif
