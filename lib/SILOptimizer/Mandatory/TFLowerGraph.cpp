@@ -2013,17 +2013,13 @@ GLStatus TFGraphFunctionLowering::lowerSequenceRegion(SequenceSESERegion *r) {
 }
 
 GLStatus TFGraphFunctionLowering::lowerFunctionRegion(FunctionSESERegion *r) {
-  GLStatus S = GLStatus::Success;
   auto &graphFn = getCurrentGraphFunction();
   for (int i = 0, e = graphFn.outputs.size(); i != e; ++i) {
     addValueMapping({graphFn.outputs[i].first, 0},
                     graphFn.outputs[i].second);
   }
   graphFn.outputs.clear();
-  S = lowerRegion(r->getFunctionRegion());
-  if (S != GLStatus::Success)
-    return S;
-  return GLStatus::Success;
+  return lowerRegion(r->getFunctionRegion());
 }
 
 /// Given a conditional branch, produce the TF_Output for its branch condition.

@@ -161,7 +161,8 @@ namespace {
     /// of each loop, and points to the region produced for it.
     llvm::DenseMap<SILBasicBlock*, WhileLoopSESERegion*> loopPreheaders;
 
-    /// Function blocks.
+    /// Map that keeps track of the underlying SESERegionTree for the
+    /// FunctionSESERegion that starts at the given block.
     llvm::DenseMap<SILBasicBlock *,
                    std::pair<std::shared_ptr<SESERegionTree>, SILBasicBlock *>>
         functionRegions;
@@ -291,7 +292,6 @@ SESERegionBuilder::processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
         // separate function in the lowered graph.
         std::shared_ptr<SESERegionTree> subSESERegion(
             processAcyclicRegion(currentBB, subRegionEndBB).release());
-        // results.push_back(llvm::make_unique<FunctionSESERegion>(subSESERegion));
         SILBasicBlock *nextBB = nullptr;
         if (subRegionEndBB == endBB) {
           nextBB = endBB;
