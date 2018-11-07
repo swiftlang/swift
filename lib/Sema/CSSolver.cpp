@@ -1750,6 +1750,9 @@ void ConstraintSystem::sortDesignatedTypes(
 
   for (auto *protocol : argInfo.getLiteralProtocols()) {
     auto defaultType = TC.getDefaultType(protocol, DC);
+    // ExpressibleByNilLiteral does not have a default type.
+    if (!defaultType)
+      continue;
     auto *nominal = defaultType->getAnyNominal();
     for (size_t i = nextType + 1; i < nominalTypes.size(); ++i) {
       if (nominal == nominalTypes[i]) {
