@@ -576,10 +576,22 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   auto *tryExpr = dyn_cast<OptionalTryExpr>(unwrapped);
   if (!tryExpr)
     return diagnoseUnwrap(getConstraintSystem(), unwrapped, type);
-
-  emitDiagnostic(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try, type)
-      .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()}, "try!");
-  return true;
+  
+  bool isSwift5OrGreater = getTypeChecker().getLangOpts().isSwiftVersionAtLeast(5);
+  auto subExprType = getType(tryExpr->getSubExpr());
+  bool subExpressionIsOptional = (bool)subExprType->getOptionalObjectType();
+  
+  
+  if (isSwift5OrGreater && subExpressionIsOptional) {
+    // Using 'try!' won't change the type for a 'try?' with an optional sub-expr
+    // under Swift 5+, so just report that a missing unwrap can't be handled here.
+    return false;
+  }
+  else {
+    emitDiagnostic(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try, type)
+    .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()}, "try!");
+    return true;
+  }
 }
 
 bool RValueTreatedAsLValueFailure::diagnoseAsError() {
