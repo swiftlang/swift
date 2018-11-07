@@ -36,6 +36,8 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/YAMLParser.h"
 
+#include <unordered_map>
+
 using namespace swift;
 using namespace experimental_dependencies;
 
@@ -51,76 +53,9 @@ template <typename T> using CPVec = std::vector<const T*>;
 template <typename T1 = std::string, typename T2 = std::string> using PairVec = std::vector<std::pair<T1, T2>>;
 template <typename T1, typename T2> using CPPairVec = std::vector<std::pair<const T1*, const T2*>>;
 
-//TODO: elim virtuals with templating>
 
-namespace {
-  template <typename Output>
-  class Source {
-  public:
-    Source() = default;
-    virtual Optional<Output> next() = 0;
-    virtual ~Source() = default;
-  };
-  
-  
-  template <typename Input, typename Output>
-  class Transducer: public Source<Output> {
-    Source<Input> source;
-  public:
-    Transducer() = default;
-    void setSource(Source<Input> &&s) { source = std::move(s); }
-    Optional<Output> next() override {
-      auto in = source->next();
-      if (!in) return None;
-      return process(in.get());
-    }
-    virtual Output process(const Input* in) = 0;
-  };
-  
-template<typename First, typename... Stages>
-  class Pipe {
-    
-  };
-  
-  template <typename Output>
-  class VectorSource: public Source<Output> {
-    using VectorT = std::vector<Output>;
-    typename VectorT::const_iterator _next, end;
-    
-  public:
-    VectorSource(VectorT container) :  _next(container.cbegin()), end(container.cend()) {}
-    ~VectorSource() = default;
-    
-    Optional<Output> next() override {
-      return _next == end ? Optional<Output>(None) : Optional<Output>(*_next++);
-    }
-  };
-  
-  template <typename Input, typename Output, Output (*fn)(const Input)>
-  class FunctionalTransducer: public Transducer<Input, Output> {
-  public:
-    FunctionalTransducer() = default;
-    Output process(const Input *in) override { return fn(*in); }
-    ~FunctionalTransducer() override = default;
-  };
-  
-//  template <typename FeederT>
-//  class Sink {
-//    FeederT &feeder;
-//  public:
-//    Sink(FeederT &feeder) : feeder(feeder) {}
-//    void run() {
-//      for (;;) {
-//        auto in = feeder.next();
-//        if (!in)
-//          return;
-//        process(in);
-//      }
-//    }
-//    virtual void process(typename FeederT::Element in) = 0;
-//  };
 
-}
+
 
 namespace {
   /// Takes all the Decls in a SourceFile, and collects them into buckets by groups of DeclKinds.
@@ -143,343 +78,190 @@ namespace {
     CPVec<ExtensionDecl> extensions;
     CPVec<OperatorDecl> operators;
     CPVec<PrecedenceGroupDecl> precedenceGroups;
-    CPVec<NominalTypeDecl> nominals;
+    CPVec<NominalTypeDecl> topNominals;
     CPVec<ValueDecl> values;
+    CPVec<NominalTypeDecl> allNominals;
+    CPVec<FuncDecl> memberOperatorDecls;
+    CPVec<ValueDecl> classMembers;
     
     SourceFileDeclDemux(const SourceFile *const SF) {
       for (const Decl *const D: SF->Decls) {
         take<ExtensionDecl, DeclKind::Extension>(D, extensions)
         || take<OperatorDecl, DeclKind::InfixOperator, DeclKind::PrefixOperator, DeclKind::PostfixOperator>(D, operators)
         || take<PrecedenceGroupDecl, DeclKind::PrecedenceGroup> (D, precedenceGroups)
-        || take<NominalTypeDecl, DeclKind::Enum, DeclKind::Struct, DeclKind::Class, DeclKind::Protocol>(D, nominals)
+        || take<NominalTypeDecl, DeclKind::Enum, DeclKind::Struct, DeclKind::Class, DeclKind::Protocol>(D, topNominals)
         || take<ValueDecl, DeclKind::TypeAlias, DeclKind::Var, DeclKind::Func, DeclKind::Accessor>(D, values);
       }
+      findNominalsFromExtensions();
+      findNominalsInTopNominals();
+      findClassMembers(SF);
     }
-  };
-
-
-}
-
-namespace {
-  template <typename DeclT>
-  static DeclBaseName getName(const DeclT* D) { return DeclBaseName(D->getName()); }
-  
-  template <typename DeclT>
-  using GetName = FunctionalTransducer<const DeclT*, DeclBaseName, getName>;
-
-}
-
-
-
-
-
-
-namespace {
-  class CommonDeclHelpers {
   private:
-    static bool protoIsVisible(ProtocolType *proto) {
-      return memberIsVisible(proto->getDecl());
+    void findNominalsFromExtensions() {
+      for (auto *ED: extensions)
+        findNominalsAndOperatorsIn(ED->getExtendedNominal());
     }
-    static bool conformedProtocolIsVisible(TypeLoc inheritedType) {
-      auto type = inheritedType.getType();
-      if (!type)
-        return false;
-      if (!type->isExistentialType()) {
-        // Be conservative. We don't know how to deal with other extended types.
-        return true;
-      }
-      auto layout = type->getExistentialLayout();
-      assert(!layout.explicitSuperclass && "Should not have a subclass existential "
-             "in the inheritance clause of an extension");
-      return std::any_of(layout.getProtocols().begin(), layout.getProtocols().end(),protoIsVisible);
+    void findNominalsInTopNominals() {
+      for (const auto *const NTD: topNominals)
+        findNominalsAndOperatorsIn(NTD);
     }
-
-  protected:
-    template <typename DeclT>
-    static bool isVisible(const DeclT *const D) {
-      return D  &&  D->getFormalAccess() > AccessLevel::FilePrivate;
+    void findNominalsAndOperatorsIn(const NominalTypeDecl *const NTD) {
+      allNominals.push_back(NTD);
+      findNominalsAndOperatorsInMembers(NTD->getMembers());
     }
-    static bool memberIsVisible(const Decl *member) {
-      if (auto *VD = dyn_cast<ValueDecl>(member))
-        return isVisible(VD);
-      
-      switch (member->getKind()) {
-        case DeclKind::Import:
-        case DeclKind::PatternBinding:
-        case DeclKind::EnumCase:
-        case DeclKind::TopLevelCode:
-        case DeclKind::IfConfig:
-        case DeclKind::PoundDiagnostic:
-          return false;
-          
-        case DeclKind::Extension:
-        case DeclKind::InfixOperator:
-        case DeclKind::PrefixOperator:
-        case DeclKind::PostfixOperator:
-          return true;
-          
-        default:
-          llvm_unreachable("everything else is a ValueDecl");
+    void findNominalsAndOperatorsInMembers(const DeclRange members) {
+      for (const Decl *const D: members) {
+        if (dyn_cast<ValueDecl>(D)->getFullName().isOperator())
+          memberOperatorDecls.push_back(cast<FuncDecl>(D));
+        else if (const auto *const NTD = dyn_cast<NominalTypeDecl>(D))
+          findNominalsAndOperatorsIn(NTD);
       }
     }
-    static bool introducesConformanceToVisibleProtocol(const ExtensionDecl *const ED) {
-      return std::any_of(ED->getInherited().begin(), ED->getInherited().end(),
-                         conformedProtocolIsVisible);
+    void findClassMembers(const SourceFile *const SF) {
+      struct Collector: public VisibleDeclConsumer {
+        CPVec<ValueDecl> &classMembers;
+        Collector(CPVec<ValueDecl> &classMembers) : classMembers(classMembers) {}
+        void foundDecl(ValueDecl *VD, DeclVisibilityKind) override {
+          classMembers.push_back(VD);
+        }
+      } collector {classMembers};
+      SF->lookupClassMembers({}, collector);
     }
   };
+
 }
 
-
+class GraphConstructor {
+  SourceFile *SF;
+  const DependencyTracker &depTracker;
+  StringRef outputPath;
+  SourceFileNode *sourceFileNode;
+  
+  GraphConstructor(
+  SourceFile *SF,
+  const DependencyTracker &depTracker,
+                   StringRef outputPath) : SF(SF), depTracker(depTracker), outputPath(outputPath) {}
+  
+  Graph g;
+  void construct() {
+    //TODO storage mgmt
+    sourceFileNode = new SourceFileNode(outputPath, getInterfaceHash());
+    g.addNode(sourceFileNode);
     
+    constructProvidesNodes();
+    constructDependsArcs();
+  }
+  
+private:
+  std::unordered_map<const Decl*, Node*> nodesByDecl;
+  
+  std::string getInterfaceHash() const {
+    llvm::SmallString<32> interfaceHash;
+    SF->getInterfaceHash(interfaceHash);
+    return interfaceHash.str().str();
+  }
+  
+  void constructProvidesNodes();
+  void constructDependsArcs();
+  
+  
+  
+  /// name converters
+  template <typename DeclT>
+  static std::string getBaseName(DeclT const* D) { return D->getBaseName().userFacingName(); }
  
-   /////////////////////////
-    
+  template <typename DeclT>
+  static std::string getName(DeclT const* D) { return DeclBaseName(D->getName()).userFacingName(); }
   
-        
-namespace {
-  struct InnerDeclCollector: CommonDeclHelpers {
-    // Records every nominal declaration, and whether or not the declaration
-    /// changes the externally-observable shape of the type.
-    llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
-    
-    /// Records operator declarations so they can be included as top-level
-    /// declarations.
-    CPVec<FuncDecl> memberOperatorDecls;
-    
-    /// Records extension declarations which are not introducing a conformance
-    /// to a public protocol and add a public member.
-    CPVec<ExtensionDecl> extensionsWithJustMembers;
-    
-    InnerDeclCollector(const CPVec<ExtensionDecl> &filteredExtensions, const CPVec<NominalTypeDecl> &filteredTopNominals);
-    
-    /// Recursively computes the transitive closure over members
-    /// adding memberOperatorDecls and extendedNominals to the receiver.
-    void findNominalsAndOperators(const DeclRange members);
-  };
-}
-
-
-InnerDeclCollector::InnerDeclCollector(const CPVec<ExtensionDecl> &filteredExtensions, const CPVec<NominalTypeDecl> &filteredTopNominals) {
-  for (auto *ED: filteredExtensions) {
-    if (!introducesConformanceToVisibleProtocol(ED))
-      extensionsWithJustMembers.push_back(ED);
-    extendedNominals[ED->getExtendedNominal()] |= introducesConformanceToVisibleProtocol(ED);
-    findNominalsAndOperators(ED->getMembers());
-  }
-  for (auto *NTD: filteredTopNominals) {
-    extendedNominals[NTD] |= true;
-    findNominalsAndOperators(NTD->getMembers());
-  }
-}
-
-/// Recursively computes the transitive closure over members
-/// adding memberOperatorDecls and extendedNominals to the receiver.
-void InnerDeclCollector::findNominalsAndOperators(const DeclRange members) {
-  CPVec<Decl> visibleValues;
-  std::copy_if(members.begin(), members.end(), std::back_inserter(visibleValues),
-               [](const Decl *const D) -> bool { return isVisible(dyn_cast<ValueDecl>(D)); } );
-  for (auto *D: visibleValues) {
-    if (dyn_cast<ValueDecl>(D)->getFullName().isOperator())
-      memberOperatorDecls.push_back(cast<FuncDecl>(D));
-    else if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
-      extendedNominals[nominal] |= true;
-      findNominalsAndOperators(nominal->getMembers());
-    }
-  }
-}
-
-  /////////////////////////
-  
-namespace  {
-
-  class ProviderDecls: CommonDeclHelpers {
-  private:
-    SourceFileDeclDemux tops;
-    CPVec<ExtensionDecl> filteredExtensions;
-    CPVec<NominalTypeDecl> filteredTopNominals;
-    CPVec<ValueDecl> filteredTopValues;
-    InnerDeclCollector innerDeclCollector;
-    CPVec<NominalTypeDecl> _extendedNominalsThatCanChangeExernallyObservableShape;
-    CPVec<NominalTypeDecl> allExtendedNominals;
-    std::vector<std::pair<const NominalTypeDecl*, const ValueDecl*>> _holdersAndMembers;
-    CPVec<ValueDecl> _classMembers;
-    
-    
-    static CPVec<NominalTypeDecl> filterMap(llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals);
-
-    // helpers
-    template <typename DeclT>
-    static CPVec<DeclT> filter(const CPVec<DeclT> &in);
-    
-    static bool hasVisibleMember(const ExtensionDecl *const ED) {
-      return std::any_of(ED->getMembers().begin(), ED->getMembers().end(), memberIsVisible);
-    }
-
-    static CPVec<ExtensionDecl>  filterExtensions(const CPVec<ExtensionDecl> &in);
-    static CPVec<NominalTypeDecl> getKeysOf(const llvm::MapVector<const NominalTypeDecl *, bool>& extendedNominals);
-    static std::vector<std::pair<const NominalTypeDecl*, const ValueDecl*>>
-    constructHoldersAndMembers(const CPVec<ExtensionDecl> &in );
-    
-    static CPVec<ValueDecl> findClassMembers(const SourceFile* SF);
-    
-    template <typename DeclT>
-    static bool hasVisibleName(const DeclT *const D) {
-      return D->hasName() && isVisible(D);
-    }
-    static bool extendsVisibleNominal(const ExtensionDecl *const ED) {
-      return isVisible(ED->getExtendedNominal());
-    }
-
-    
-  public:
-    ProviderDecls(const SourceFile *SF) :
-    tops(SF),
-    filteredExtensions(filterExtensions(tops.extensions)),
-    filteredTopNominals(filter(tops.nominals)),
-    filteredTopValues(filter(tops.values)),
-    innerDeclCollector(filteredExtensions, filteredTopNominals),
-    _extendedNominalsThatCanChangeExernallyObservableShape(filterMap(innerDeclCollector.extendedNominals)),
-    allExtendedNominals(getKeysOf(innerDeclCollector.extendedNominals)),
-    _holdersAndMembers(constructHoldersAndMembers(innerDeclCollector.extensionsWithJustMembers)),
-    _classMembers(findClassMembers(SF))
-    { }
-    // Tops:
-    const CPVec<NominalTypeDecl>& topNominals() const { return filteredTopNominals; }
-    const CPVec<PrecedenceGroupDecl>& precedenceGroups() const { return tops.precedenceGroups; }
-    const CPVec<OperatorDecl>& topOperators() const {return tops.operators; }
-    const CPVec<ValueDecl>& topValues() const {return filteredTopValues; }
-    const CPVec<FuncDecl>& operatorFunctions() const { return innerDeclCollector.memberOperatorDecls; }
-    
-    // Nominals:
-    const CPVec<NominalTypeDecl>& extendedNominalsThatCanChangeExernallyObservableShape() const {
-      return _extendedNominalsThatCanChangeExernallyObservableShape;
-    }
-    
-    // Members:
-    const CPVec<NominalTypeDecl>& extendedNominalsThatCouldAddMembers() const {
-      return allExtendedNominals;
-    }
-    const std::vector<std::pair<const NominalTypeDecl*, const ValueDecl*>>& c() const {
-      return _holdersAndMembers;
-    }
-    
-    // Dynamic lookup:
-    const CPVec<ValueDecl>& classMembers() const { return _classMembers; }
-  };
-}
-
-
-CPVec<NominalTypeDecl> ProviderDecls::filterMap(llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals) {
-  CPVec<NominalTypeDecl> out;
-  for (const auto entry: extendedNominals)
-    if (entry.second)
-      out.push_back(entry.first);
-  return out;
-}
-
-template <typename DeclT>
-CPVec<DeclT> ProviderDecls::filter(const CPVec<DeclT> &in) {
-  CPVec<DeclT> out;
-  std::copy_if(in.begin(), in.end(), std::back_inserter(out), hasVisibleName<DeclT>);
-  return out;
-}
-
-CPVec<ExtensionDecl>  ProviderDecls::filterExtensions(const CPVec<ExtensionDecl> &in)  {
-  CPVec<ExtensionDecl> out;
-  std::copy_if(in.begin(), in.end(), std::back_inserter(out),
-               [](const ExtensionDecl *const ED) -> bool {
-                 return extendsVisibleNominal(ED)  &&  (hasVisibleMember(ED) || introducesConformanceToVisibleProtocol(ED));
-               });
-  return out;
-}
-
-CPVec<NominalTypeDecl> ProviderDecls::getKeysOf(const llvm::MapVector<const NominalTypeDecl *, bool>& extendedNominals) {
-  CPVec<NominalTypeDecl> out;
-  for (auto &p: extendedNominals)
-    out.push_back(p.first);
-  return out;
-}
-
-std::vector<std::pair<const NominalTypeDecl*, const ValueDecl*>>
-ProviderDecls::constructHoldersAndMembers(const CPVec<ExtensionDecl> &in ) {
-  std::vector<std::pair<const NominalTypeDecl*, const ValueDecl*>> out;
-  for (const auto *const ED: in) {
-    for (const auto *const member: ED->getMembers()) {
-      const auto *const VD = dyn_cast<ValueDecl>(member);
-      if (hasVisibleName(VD))
-        out.push_back(std::make_pair(ED->getExtendedNominal(), VD));
-    }
-  }
-  return out;
-}
-
-CPVec<ValueDecl> ProviderDecls::findClassMembers(const SourceFile* SF) {
-  struct Collector: public VisibleDeclConsumer {
-    CPVec<ValueDecl> members;
-    void foundDecl(ValueDecl *VD, DeclVisibilityKind) override {
-      members.push_back(VD);
-    }
-  } collector;
-  SF->lookupClassMembers({}, collector);
-  return collector.members;
-}
-
-class CommonNameHelpers {
-protected:
-  static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
+  static std::string mangleTypeAsContext(const NominalTypeDecl * NTD) {
     Mangle::ASTMangler Mangler;
-    return Mangler.mangleTypeAsContextUSR(type);
+    return Mangler.mangleTypeAsContextUSR(NTD);
+  }
+  
+  template <typename DeclT>
+  void createNodes(CPVec<DeclT> &decls, DeclNode::Kind kind, std::string(*nameFn)(const DeclT *)) {
+    for (const auto* D: decls) {
+      auto *context = D->getDeclContext();
+      auto *containingDecl = context ? context->getAsDecl() : nullptr;
+      Node *containingNode = nodesByDecl.find(containingDecl).second;
+      addDeclNode(D, new DeclNode(D, containingNode, "", (*nameFn)(D), kind));
+    }
+  }
+  
+  void addDeclNode(const Decl* D, DeclNode *node) {
+    bool inserted = nodesByDecl.insert(std::make_pair(D, node)).second;
+    assert(inserted && "dup node?");
+    g.addNode(node);
   }
 };
 
 
-///////////////////////
-namespace {
-  class ProviderNames: CommonNameHelpers {
-    const ProviderDecls &pds;
-    
-  private:
-    template <typename DeclT>
-    static DeclBaseName getName(const DeclT *const D) { return DeclBaseName(D->getName()); }
-    
-    static DeclBaseName getBaseName(const ValueDecl *const D) { return D->getBaseName(); }
-    
-  public:
-    ProviderNames(const ProviderDecls &pds) : pds(pds) {}
-    
-
-    template <
-    typename DeclT,
-    const CPVec<DeclT>& (ProviderDecls::*declFunc)() const,
-    DeclBaseName (*baseNameFn)(const DeclT*)
-    >
-    StringVec names() const {
-      StringVec out;
-      for (const auto *const D: (pds.*declFunc)())
-        out.push_back((*baseNameFn)(D).userFacingName());
-      return out;
-    }
-
-    void topsSomehow() {
-      names<NominalTypeDecl, &ProviderDecls::topNominals, getName>(); // TypeDecl
-      names<OperatorDecl, &ProviderDecls::topOperators, getName>();
-      names<PrecedenceGroupDecl, &ProviderDecls::precedenceGroups, getName>();
-      names<ValueDecl, &ProviderDecls::topValues, getBaseName>();// rets DeclBaseName
-      names<FuncDecl, &ProviderDecls::operatorFunctions, getName>();
-    }
-    void nominalsSomehow() {
-      names<NominalTypeDecl, &ProviderDecls::extendedNominalsThatCanChangeExernallyObservableShape,getName>();
-    }
-    void membersSomehow() {
-//      xxx<NominalTypeDecl,&ProviderDecls::extendedNominalsThatCouldAddMembers,getMangledTypeAsContext, "">();
-//      yyy<<std::pair<const NominalTypeDecl*, const ValueDecl*>, &ProviderDecls::<std::pair<const NominalTypeDecl*, const ValueDecl*>, getMangledTypeAsContext, names>;
-    }
-    void dynamicLookupsSomehow() {
-      names<ValueDecl, &ProviderDecls::classMembers, getName>();
-    }
-
-  };
+void GraphConstructor::constructProvidesNodes() {
+  SourceFileDeclDemux demux(SF);
+  
+  createNodes<PrecedenceGroupDecl>(demux.precedenceGroups, DeclNode::Kind::topLevel, getName);
+  createNodes<FuncDecl>(demux.memberOperatorDecls, DeclNode::Kind::topLevel, getName);
+  createNodes<OperatorDecl>(demux.operators, DeclNode::Kind::topLevel, getName);
+  createNodes<NominalTypeDecl>(demux.topNominals, DeclNode::Kind::topLevel, getName);
+  createNodes<ValueDecl>(demux.values, DeclNode::Kind::topLevel, getBaseName);
+  
+  createNodes<NominalTypeDecl>(demux.allNominals, DeclNode::Kind::nominal, mangleTypeAsContext);
+  
 }
+void GraphConstructor::constructDependsArcs() {
+}
+////////////
+
+
+
+
+// tags
+//class TopLevel{};
+//class Nominal{};
+//class Member{};
+//class DynamicLookup{};
+//class External{};
+//
+//class Provides{};
+//class Depends{};
+//class InterfaceHash{};
+//
+//template <typename Direction, typename Section>
+//static constexpr StringLiteral sectionHeader();
+//
+//template<> constexpr StringLiteral sectionHeader<Provides, TopLevel>() {
+//  return  reference_dependency_keys::providesTopLevel;
+//}
+//template<> constexpr StringLiteral sectionHeader<Provides, TopLevel>() {
+//  return  reference_dependency_keys::providesTopLevel;
+//}
+//template<> constexpr StringLiteral sectionHeader<Provides, TopLevel>() {
+//  return  reference_dependency_keys::providesTopLevel;
+//}
+//template<> constexpr StringLiteral sectionHeader<Provides, TopLevel>() {
+//  return  reference_dependency_keys::providesTopLevel;
+//}
+//template<> constexpr StringLiteral sectionHeader<Provides, TopLevel>() {
+//  return  reference_dependency_keys::providesTopLevel;
+//}
+//template<> constexpr StringLiteral sectionHeader<Provides, TopLevel>() {
+//  return  reference_dependency_keys::providesTopLevel;
+//}
+//template<> constexpr StringLiteral sectionHeader<Provides, TopLevel>() {
+//  return  reference_dependency_keys::providesTopLevel;
+//}
+//template<> constexpr StringLiteral sectionHeader<Provides, TopLevel>() {
+//  return  reference_dependency_keys::providesTopLevel;
+//}
+//template<> constexpr StringLiteral sectionHeader<Provides, TopLevel>() {
+//  return  reference_dependency_keys::providesTopLevel;
+//}
+
+
+
+//////////////
+  
+
 
 
 ////////////////////////////
@@ -618,129 +400,41 @@ StringVec DependsArcs::reversePathSortedFilenames(const ArrayRef<std::string> in
   return out;
 }
 
-#if 0
-namespace SQ
-  class YAMLEmitter {
-  private:
-    llvm::raw_ostream &out;
-    
-  public:
-    YAMLEmitter(llvm::raw_ostream &out) : out(out) {}
-    
-    void emitSectionStart(StringRef section) const {
-      out << reference_dependency_keys::providesMember << ":\n";
-    }
-    void emitName(StringRef name) const {
-      out << "- \"" << llvm::yaml::escape(name) << "\"\n";
-    }
-    void emitSingleValueSection(StringRef section, StringRef value) const {
-      out << section << ": \"" << llvm::yaml::escape(value) << "\"\n";
-    }
-    void emitDoubleNameLine(StringRef name1, StringRef name2) const {
-      out << "- [\"" << llvm::yaml::escape(name1) << "\", \""
-      << (name2.empty() ? std::string() : llvm::yaml::escape(name2))
-      << "\"]\n";
-    }
-    
-    template <typename NodeT>
-    void emitNodes(ArrayRef<NodeT> nodes) {
-      for (auto &n: nodes)
-        n.emit(this);
-    }
-  };
-  
-  class ProvideNode {
-    
-  };
-  class SingleDeclNode {
-    
-  };
-  
- 
-  
-//  template <DeclKind K>
-//  bool match(const DeclKind k) { return k == K; }
 
-  template <typename> // need a dummy template arg for this to work
-  bool match(const DeclKind k) { return false; }
+
+class YAMLEmitter {
+private:
+  llvm::raw_ostream &out;
   
-  template <typename, DeclKind F, DeclKind... Kinds>
-  bool match(const DeclKind k) {
-    return k == F || match<int, Kinds...>(k);
+public:
+  YAMLEmitter(llvm::raw_ostream &out) : out(out) {}
+  
+  void emitSectionStart(StringRef section) const {
+    out << reference_dependency_keys::providesMember << ":\n";
+  }
+  void emitName(StringRef name) const {
+    out << "- \"" << llvm::yaml::escape(name) << "\"\n";
+  }
+  void emitSingleValueSection(StringRef section, StringRef value) const {
+    out << section << ": \"" << llvm::yaml::escape(value) << "\"\n";
+  }
+  void emitDoubleNameLine(StringRef name1, StringRef name2) const {
+    out << "- [\"" << llvm::yaml::escape(name1) << "\", \""
+    << (name2.empty() ? std::string() : llvm::yaml::escape(name2))
+    << "\"]\n";
   }
   
-  template <typename DeclT, DeclKind ... Kinds>
-  void getSFDecls(const SourceFile *const SF, std::vector<const DeclT*> &dest) {
-    for (const Decl *const D: SF->Decls) {
-     if (match<int, Kinds ...>(D->getKind()))
-       dest.push_back(cast<DeclT>(D));
-    }
+  template <typename NodeT>
+  void emitNodes(ArrayRef<NodeT> nodes) {
+    for (auto &n: nodes)
+      n.emit(this);
   }
+};
   
+
+
   
-  
-  class SimpleNode {
- 
-  };
-  
-  class Node {
-    std::string name;
-  public:
-    const Decl *const D;
-    Node(std::string name, const Decl *const D) : name(name), D(D) {}
-  };
-  
-  template<typename DeclT, DeclKind ...Kinds>
-  class SimpleTopLevelProvide: Node {
-    static void
-    getDecls(const SourceFile *const SF, std::vector<const DeclT*> &dest) {
-      getSFDecls<DeclT, Kinds...>(SF, dest);
-    }
-    static Identifier identifier(const DeclT* D) {return D->getName(); }
-    static std::string name(const DeclT *D) {
-      return DeclBaseName(identifier(D)).userFacingName();
-    }
-    SimpleTopLevelProvide(const DeclT *D) : Node(name(D), D) {}
-  public:
-    static void getNodes(const SourceFile *SF, std::vector<const Node> &dest) {
-      CPVec<DeclT> decls;
-      getDecls(SF, decls);
-      for (const auto *D: decls)
-        dest.push_back(SimpleTopLevelProvide(D));
-    }
-    void emit(YAMLEmitter &emitter) {emitter.emitName(name);}
-  };
-  using TopLevelOperatorProvide = SimpleTopLevelProvide<OperatorDecl, DeclKind::InfixOperator, DeclKind::PrefixOperator, DeclKind::PostfixOperator>;
-  using TopLevelPrecedenceGroup = SimpleTopLevelProvide<PrecedenceGroupDecl, DeclKind::PrecedenceGroup>;
-  
-  class NodeConstructor {
- 
-  public:
-    std::vector<const Node> topLevelProvides;
-    
-//    std::vector<const NominalProvide> nominalProvides;
-//    std::vector<const MemberProvide> memberProvides;
-//    std::vector<const DynamicLookupProvide> dynamicLookupProvides;
-//    std::vector<const TopLevelDepend> topLevelDepends;
-//    std::vector<const NominalDepend> nominalDepends;
-//    std::vector<const MemberDepend> memberDepends;
-//    std::vector<const DynamicLookupDepend> dynamicLookupDepends;
-//    std::vector<const ExternalDepend> externalDepends;
-    
-    
-  public:
-    NodeConstructor(SourceFile *const SF,
-                                 const DependencyTracker &depTracker)
-    {
-      TopLevelOperatorProvide::getNodes(SF, topLevelProvides);
-      TopLevelPrecedenceGroup::getNodes(SF, topLevelProvides);
-    }
-  
-  };
-  
-  
-}
-#endif
+
 
 
 // move filter etc into wherever
@@ -779,23 +473,6 @@ namespace {
 
 
 
-template <typename T>
-using Sum = llvm::SmallVector<T, 32>;
-
-template <typename InT, typename OutT>
-Sum<OutT> operator+ (std::function<OutT(InT)> fn1, std::function<OutT(InT)> fn2) {
-  return [&](InT in) -> Sum<OutT> { return Sum<OutT> {fn1(in), fn2(in)}; };
-}
-
-template <typename InT, typename OutT, size_t N>
-std::function< Sum<OutT>(InT) > operator+ (std::function<Sum<OutT>(InT)> lhs, std::function<OutT(InT)> fn2) {
-  return [&](InT in) -> Sum<OutT> {
-    auto out = lhs(in);
-    out.push_back(fn2(in));
-    return out;
-  };
-}
-
 
 
 
@@ -805,31 +482,15 @@ bool swift::experimental_dependencies::emitReferenceDependencies(
                                                                  DiagnosticEngine &diags, SourceFile *const SF,
                                                                  const DependencyTracker &depTracker, StringRef outputPath) {
   
-//  auto x = SourceFileDeclDemux(SF) >> InnerDeclCollector() ;
-//
-//  auto provides = SF >> SourceFileDeclDemux >> InnerDeclCollector >> (TopLevelProvidesSection + NominalSection + MemberSection + DynamicLookupSection);
-  
-//  auto depends = DependsFeeder(SF, depTracker) >> (TopLevelDependsSection + NominalDependsSection + MembersDependsSection + dynamicLookupDependsSection + externalDependsSection);
-//
-//  (provedes + depends + interfaceHash) >> SectionEncoder >> FileRenamerAndWriter(outputPath);
-//
-//  // Before writing to the dependencies file path, preserve any previous file
-//  // that may have been there. No error handling -- this is just a nicety, it
-//  // doesn't matter if it fails.
-//  llvm::sys::fs::rename(outputPath, outputPath + "~");
+  // Before writing to the dependencies file path, preserve any previous file
+  // that may have been there. No error handling -- this is just a nicety, it
+  // doesn't matter if it fails.
+  llvm::sys::fs::rename(outputPath, outputPath + "~");
 //  return withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
-//    ReferenceDependenciesEmitter<ReferendeDependenciesKind::StatusQuo>(
-//                                                                       SF, depTracker, out)
-//    .emit();
-//    return false;
-//  });
-  
-//  return ([]()->std::vector<std::string> {return StringVec{std::string()};})
-//  >> FileRenamerAndWriter(diags, outputPath);
-  
-  
-  SourceFileDeclDemux demux{SF};
-  
-  Pipeline< VectorSource<const PrecedenceGroupDecl*>(demux), GetName<PrecedenceGroupDecl> >();
+//    out << NameEncoder() << ProvidesDeclExtractor(SF);
+//    out << DependSorter() << DependNameExtractor(SF, depTracer);
+//    out << InterfaceHash();
+    return false;
+  });
 
 }

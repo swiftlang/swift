@@ -16,6 +16,7 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/Support/MD5.h"
 #include <vector>
+#include "swift/AST/Decl.h"
 
 namespace swift {
 class DependencyTracker;
@@ -29,30 +30,50 @@ bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
                                const DependencyTracker &depTracker,
                                StringRef outputPath);
 
-class CompilationUnit {
-public:
-  StringRef getSourceFilename() const;
-  StringRef getSwiftDepsFilename() const;
-};
+  class Node {
+  public:
+    Node(Node* container,
+         std::vector<Node*> containees,
+         std::string fingerprint,
+         std::string nameForDependencies) :
+    container(container), containees(containees), fingerprint(fingerprint), nameForDependencies(nameForDependencies)
+    {}
+    
+    virtual ~Node() = default;
+    Node* container;
+    std::vector<Node*> containees;
+    std::string fingerprint;
+    std::string nameForDependencies;
+  };
+  
+  class SourceFileNode: public Node {
+  public:
+    std::string swiftDepsPath() const { return nameForDependencies; }
+    SourceFileNode(StringRef swiftDepsPath, StringRef interfaceHash) : Node(nullptr, {}, interfaceHash, swiftDepsPath) {}
+    virtual ~SourceFileNode() = default;
+  };
+  
+  class DeclNode: public Node {
+  public:
+    enum class Kind { topLevel, nominal };
+    const Decl *D;
+    Kind kind;
 
-class Node {
-public:
-  CompilationUnit &getContainer() const;
-  StringRef getNonuniqueID() const;
-  StringRef getFingerprint() const;
-};
-
-class Graph {
-  std::vector<const CompilationUnit> compilationUnits;
-  std::vector<Node> nodes;
-
-  llvm::ArrayRef<Node> getDependentsOf(const Node &);
-  const CompilationUnit &getContainerOf(const Node &);
-
-public:
-  std::pair<Graph, std::vector<CompilationUnit>>
-      compilationsRequiredAfterReadingNewNodes(llvm::ArrayRef<Node>);
-};
+    DeclNode(const Decl *D,
+             Node* container,
+             std::string fingerprint,
+             StringRef nameForDependencies,
+             Kind kind) :
+    Node(container, {}, fingerprint, nameForDependencies),
+    D(D), kind(kind) {}
+    ~DeclNode() = default;
+  };
+  
+  class Graph {
+    std::vector<Node*> allNodes;
+  public:
+    void addNode(Node* n) {allNodes.push_back(n); }
+  };
 
 } // end namespace experimental_dependencies
 } // end namespace swift
