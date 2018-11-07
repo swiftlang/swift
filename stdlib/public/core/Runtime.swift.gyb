@@ -102,63 +102,6 @@ func _stdlib_atomicInitializeARCRef(
   return wonRace
 }
 
-% for bits in [ 32, 64 ]:
-%   for operation in ['Add', 'And', 'Or', 'Xor']:
-
-// Warning: no overflow checking.
-@inlinable // FIXME(sil-serialize-all)
-internal func _swift_stdlib_atomicFetch${operation}Int${bits}(
-  object target: UnsafeMutablePointer<Int${bits}>,
-  operand: Int${bits}) -> Int${bits} {
-
-  let value = Builtin.atomicrmw_${operation.lower()}_seqcst_Int${bits}(
-    target._rawValue, operand._value)
-
-  return Int${bits}(value)
-}
-
-%   end
-% end
-
-@inlinable // FIXME(sil-serialize-all)
-internal func _stdlib_atomicCompareExchangeStrongInt(
-  object target: UnsafeMutablePointer<Int>,
-  expected: UnsafeMutablePointer<Int>,
-  desired: Int) -> Bool {
-#if arch(i386) || arch(arm)
-  let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Int32(
-    target._rawValue, expected.pointee._value, desired._value)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Int64(
-    target._rawValue, expected.pointee._value, desired._value)
-#endif
-  expected.pointee._value = oldValue
-  return Bool(won)
-}
-
-@inlinable // FIXME(sil-serialize-all)
-internal func _swift_stdlib_atomicStoreInt(
-  object target: UnsafeMutablePointer<Int>,
-  desired: Int) {
-#if arch(i386) || arch(arm)
-  Builtin.atomicstore_seqcst_Int32(target._rawValue, desired._value)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  Builtin.atomicstore_seqcst_Int64(target._rawValue, desired._value)
-#endif
-}
-
-@_transparent
-public func _swift_stdlib_atomicLoadInt(
-  object target: UnsafeMutablePointer<Int>) -> Int {
-#if arch(i386) || arch(arm)
-  let value = Builtin.atomicload_seqcst_Int32(target._rawValue)
-  return Int(value)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  let value = Builtin.atomicload_seqcst_Int64(target._rawValue)
-  return Int(value)
-#endif
-}
-
 @_transparent
 public // @testable
 func _stdlib_atomicLoadARCRef(
@@ -171,81 +114,56 @@ func _stdlib_atomicLoadARCRef(
   return nil
 }
 
-% for operation in ['Add', 'And', 'Or', 'Xor']:
+//===----------------------------------------------------------------------===//
+// These pieces are used in ThreadLocalStorage.swift in debug builds.
+// For tests, see similar functions from SwiftPrivate/AtomicInt.swift.gyb
+//===----------------------------------------------------------------------===//
+#if INTERNAL_CHECKS_ENABLED
+internal func _swift_stdlib_atomicLoadInt(
+  object target: UnsafeMutablePointer<Int>) -> Int {
+#if arch(i386) || arch(arm)
+  let value = Builtin.atomicload_seqcst_Int32(target._rawValue)
+  return Int(value)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+  let value = Builtin.atomicload_seqcst_Int64(target._rawValue)
+  return Int(value)
+#endif
+}
+
+% for bits in [ 32, 64 ]:
+
 // Warning: no overflow checking.
 @inlinable // FIXME(sil-serialize-all)
-public func _swift_stdlib_atomicFetch${operation}Int(
+internal func _swift_stdlib_atomicFetchAddInt${bits}(
+  object target: UnsafeMutablePointer<Int${bits}>,
+  operand: Int${bits}) -> Int${bits} {
+
+  let value = Builtin.atomicrmw_add_seqcst_Int${bits}(
+    target._rawValue, operand._value)
+
+  return Int${bits}(value)
+}
+
+% end
+
+// Warning: no overflow checking.
+internal func _swift_stdlib_atomicFetchAddInt(
   object target: UnsafeMutablePointer<Int>,
   operand: Int) -> Int {
   let rawTarget = UnsafeMutableRawPointer(target)
 #if arch(i386) || arch(arm)
-  let value = _swift_stdlib_atomicFetch${operation}Int32(
+  let value = _swift_stdlib_atomicFetchAddInt32(
     object: rawTarget.assumingMemoryBound(to: Int32.self),
     operand: Int32(operand))
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  let value = _swift_stdlib_atomicFetch${operation}Int64(
+  let value = _swift_stdlib_atomicFetchAddInt64(
     object: rawTarget.assumingMemoryBound(to: Int64.self),
     operand: Int64(operand))
 #endif
   return Int(value)
 }
-% end
-
-@_fixed_layout // FIXME(sil-serialize-all)
-public final class _stdlib_AtomicInt {
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal var _value: Int
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal var _valuePtr: UnsafeMutablePointer<Int> {
-    return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
-      to: Int.self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public init(_ value: Int = 0) {
-    _value = value
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  deinit {}
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func store(_ desired: Int) {
-    return _swift_stdlib_atomicStoreInt(object: _valuePtr, desired: desired)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func load() -> Int {
-    return _swift_stdlib_atomicLoadInt(object: _valuePtr)
-  }
-
-% for operation_name, operation in [ ('Add', '+'), ('And', '&'), ('Or', '|'), ('Xor', '^') ]:
-  @inlinable // FIXME(sil-serialize-all)
-  @discardableResult
-  public func fetchAnd${operation_name}(_ operand: Int) -> Int {
-    return _swift_stdlib_atomicFetch${operation_name}Int(
-      object: _valuePtr,
-      operand: operand)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func ${operation_name.lower()}AndFetch(_ operand: Int) -> Int {
-    return fetchAnd${operation_name}(operand) ${operation} operand
-  }
-% end
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func compareExchange(expected: inout Int, desired: Int) -> Bool {
-    var expectedVar = expected
-    let result = _stdlib_atomicCompareExchangeStrongInt(
-      object: _valuePtr,
-      expected: &expectedVar,
-      desired: desired)
-    expected = expectedVar
-    return result
-  }
-}
+#endif // INTERNAL_CHECKS_ENABLED
+//===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
 // Conversion of primitive types to `String`

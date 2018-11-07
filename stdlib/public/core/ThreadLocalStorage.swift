@@ -15,8 +15,33 @@ import SwiftShims
 // For testing purposes, a thread-safe counter to guarantee that destructors get
 // called by pthread.
 #if INTERNAL_CHECKS_ENABLED
+internal class _TLSAtomicInt {
+  internal var value: Int
+  internal init() { self.value = 0 }
+
+  internal var valuePtr: UnsafeMutablePointer<Int> {
+    return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
+      to: Int.self)
+  }
+
+  internal func increment() {
+    _ = _swift_stdlib_atomicFetchAddInt(
+      object: valuePtr,
+      operand: 1)
+  }
+
+  internal func load() -> Int {
+    return _swift_stdlib_atomicLoadInt(object: valuePtr)
+  }
+}
+
+internal let _destroyTLSCounter = _TLSAtomicInt()
+
 public // @testable
-let _destroyTLSCounter = _stdlib_AtomicInt()
+func _loadDestroyTLSCounter() -> Int {
+  return _destroyTLSCounter.load()
+}
+
 #endif
 
 // Thread local storage for all of the Swift standard library
@@ -124,7 +149,7 @@ internal func _destroyTLS(_ ptr: UnsafeMutableRawPointer?) {
 
 #if INTERNAL_CHECKS_ENABLED
   // Log the fact we've destroyed our storage
-  _destroyTLSCounter.fetchAndAdd(1)
+  _destroyTLSCounter.increment()
 #endif
 }
 
