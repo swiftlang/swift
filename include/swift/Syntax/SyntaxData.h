@@ -133,15 +133,16 @@ class SyntaxData final
   }
 
 public:
-  /// Get the node immediately before this current node. Return 0 if we cannot
-  /// find such node.
+  /// Get the node immediately before this current node that does contain a
+  /// non-missing token. Return nullptr if we cannot find such node.
   RC<SyntaxData> getPreviousNode() const;
 
-  /// Get the node immediately after this current node. Return 0 if we cannot
-  /// find such node.
+  /// Get the node immediately after this current node that does contain a
+  /// non-missing token. Return nullptr if we cannot find such node.
   RC<SyntaxData> getNextNode() const;
 
-  /// Get the first token node in this tree
+  /// Get the first non-missing token node in this tree. Return nullptr if this
+  /// node does not contain non-missing tokens.
   RC<SyntaxData> getFirstToken() const;
 
   ~SyntaxData() {
