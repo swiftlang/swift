@@ -3867,6 +3867,16 @@ ERROR(nonobjc_not_allowed,none,
 #undef OBJC_ATTR_SELECT
 
 //------------------------------------------------------------------------------
+// MARK: @_borrowed
+//------------------------------------------------------------------------------
+ERROR(borrowed_with_objc_dynamic,none,
+      "%0 cannot be '@_borrowed' if it is '@objc dynamic'",
+      (DescriptiveDeclKind))
+ERROR(borrowed_on_objc_protocol_requirement,none,
+      "%0 cannot be '@_borrowed' if it is an @objc protocol requirement",
+      (DescriptiveDeclKind))
+
+//------------------------------------------------------------------------------
 // MARK: dynamic
 //------------------------------------------------------------------------------
 
