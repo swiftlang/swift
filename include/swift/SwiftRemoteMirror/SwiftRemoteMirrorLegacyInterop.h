@@ -25,6 +25,7 @@
 #include "SwiftRemoteMirrorLegacyInteropTypes.h"
 #include "SwiftRemoteMirror.h"
 
+#include <string.h>
 #include <dlfcn.h>
 #include <mach-o/getsect.h>
 
@@ -678,14 +679,14 @@ swift_reflection_interop_addImageLegacy(
   }
     
   info.LocalStartAddress = (uintptr_t)Buf;
-  info.RemoteStartAddress = ImageStart;
+  info.RemoteStartAddress = (uintptr_t)ImageStart;
   
   Library->Functions.addReflectionInfoLegacy(Library->Context, info);
   
   // Find the data segment and add it to our list.
   unsigned long DataSize;
   const uint8_t *DataSegment = getsegmentdata(Header, "__DATA", &DataSize);
-  uintptr_t DataSegmentStart = DataSegment - (const uint8_t *)Buf + ImageStart;
+  uintptr_t DataSegmentStart = (uintptr_t)(DataSegment - (const uint8_t *)Buf + ImageStart);
   
   struct SwiftReflectionInteropContextLegacyImageRangeList *Node =
     (struct SwiftReflectionInteropContextLegacyImageRangeList *)malloc(sizeof(*Node));
@@ -697,12 +698,12 @@ swift_reflection_interop_addImageLegacy(
   // If the buffer needs to be freed, save buffer and free context to free it when the
   //  reflection context is destroyed.
   if (ContextRef->FreeBytes != NULL) {
-    struct SwiftReflectionInteropContextFreeList *Node =
-      (struct SwiftReflectionInteropContextFreeList *)malloc(sizeof(*Node));
-    Node->Next = ContextRef->FreeList;
-    Node->Pointer = Buf;
-    Node->Context = FreeContext;
-    ContextRef->FreeList = Node;
+    struct SwiftReflectionInteropContextFreeList *FreeListNode =
+      (struct SwiftReflectionInteropContextFreeList *)malloc(sizeof(*FreeListNode));
+    FreeListNode->Next = ContextRef->FreeList;
+    FreeListNode->Pointer = Buf;
+    FreeListNode->Context = FreeContext;
+    ContextRef->FreeList = FreeListNode;
   }
   
   return 1;
@@ -746,7 +747,7 @@ swift_reflection_interop_lookupMetadata(SwiftReflectionInteropContextRef Context
     swift_reflection_interop_libraryForAddress(ContextRef, Metadata);
   if (Library != NULL) {
     Result.Metadata = Metadata;
-    Result.Library = LIBRARY_INDEX;
+    Result.Library = (int)LIBRARY_INDEX;
   }
   return Result;
 }
@@ -772,7 +773,7 @@ swift_reflection_interop_typeRefForInstance(SwiftReflectionInteropContextRef Con
     swift_typeref_t Typeref = Library->Functions.typeRefForInstance(Library->Context,
                                                                     Object);
     Result.Typeref = Typeref;
-    Result.Library = LIBRARY_INDEX;
+    Result.Library = (int)LIBRARY_INDEX;
   }
   return Result;
 }
@@ -790,7 +791,7 @@ swift_reflection_interop_typeRefForMangledTypeName(
       continue;
     
     Result.Typeref = Typeref;
-    Result.Library = LIBRARY_INDEX;
+    Result.Library = (int)LIBRARY_INDEX;
     return Result;
   }
   
@@ -877,7 +878,7 @@ swift_reflection_interop_childOfInstance(SwiftReflectionInteropContextRef Contex
     Result.Offset = LibResult.Offset;
     Result.Kind = LibResult.Kind;
     Result.TR.Typeref = LibResult.TR;
-    Result.TR.Library = LIBRARY_INDEX;
+    Result.TR.Library = (int)LIBRARY_INDEX;
   } else {
     Result.Kind = SWIFT_UNKNOWN;
   }
