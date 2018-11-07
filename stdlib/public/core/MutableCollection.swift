@@ -85,6 +85,7 @@ where SubSequence: MutableCollection
   ///   `endIndex` property.
   ///
   /// - Complexity: O(1)
+  @_borrowed
   override subscript(position: Index) -> Element { get set }
 
   /// Accesses a contiguous subrange of the collection's elements.
