@@ -456,42 +456,74 @@ recur:
     return ConformanceCacheResult::cacheMiss();
 }
 
-/// Checks if a given candidate is a type itself, one of its
-/// superclasses or a related generic type.
-///
-/// This check is supposed to use the same logic that is used
-/// by searchInConformanceCache.
-///
-/// \param candidate Pointer to a Metadata or a NominalTypeDescriptor.
-///
-static
-bool isRelatedType(const Metadata *type, const void *candidate,
-                   bool candidateIsMetadata) {
+namespace {
+  /// Describes a protocol conformance "candidate" that can be checked
+  /// against the
+  class ConformanceCandidate {
+    const void *candidate;
+    bool candidateIsMetadata;
 
-  while (true) {
-    // Check whether the types match.
-    if (candidateIsMetadata && type == candidate)
-      return true;
+  public:
+    ConformanceCandidate() : candidate(0), candidateIsMetadata(false) { }
 
-    // Check whether the nominal type descriptors match.
-    if (!candidateIsMetadata) {
-      const auto *description = type->getTypeContextDescriptor();
-      auto candidateDescription =
-        static_cast<const TypeContextDescriptor *>(candidate);
-      if (description && equalContexts(description, candidateDescription))
+    ConformanceCandidate(const ProtocolConformanceDescriptor &conformance)
+      : ConformanceCandidate()
+    {
+      if (auto metadata = conformance.getCanonicalTypeMetadata()) {
+        candidate = metadata;
+        candidateIsMetadata = true;
+        return;
+      }
+
+      if (auto description = conformance.getTypeContextDescriptor()) {
+        candidate = description;
+        candidateIsMetadata = false;
+        return;
+      }
+    }
+
+    /// Retrieve the conforming type as metadata, or NULL if the candidate's
+    /// conforming type is described in another way (e.g., a nominal type
+    /// descriptor).
+    const Metadata *getConformingTypeAsMetadata() const {
+      return candidateIsMetadata ? static_cast<const Metadata *>(candidate)
+                                 : nullptr;
+    }
+
+    /// Whether the conforming type exactly matches the conformance candidate.
+    bool matches(const Metadata *conformingType) const {
+      // Check whether the types match.
+      if (candidateIsMetadata && conformingType == candidate)
         return true;
+
+      // Check whether the nominal type descriptors match.
+      if (!candidateIsMetadata) {
+        const auto *description = conformingType->getTypeContextDescriptor();
+        auto candidateDescription =
+          static_cast<const TypeContextDescriptor *>(candidate);
+        if (description && equalContexts(description, candidateDescription))
+          return true;
+      }
+
+      return false;
     }
 
-    // If there is a superclass, look there.
-    if (auto superclass = _swift_class_getSuperclass(type)) {
-      type = superclass;
-      continue;
+    /// Retrieve the type that matches the conformance candidate, which may
+    /// be a superclass of the given type. Returns null if this type does not
+    /// match this conformance.
+    const Metadata *getMatchingType(const Metadata *conformingType) const {
+      while (conformingType) {
+        // Check for a match.
+        if (matches(conformingType))
+          return conformingType;
+
+        // Look for a superclass.
+        conformingType = _swift_class_getSuperclass(conformingType);
+      }
+
+      return nullptr;
     }
-
-    break;
-  }
-
-  return false;
+  };
 }
 
 static const WitnessTable *
@@ -541,38 +573,18 @@ swift_conformsToProtocolImpl(const Metadata * const type,
     for (const auto &record : section) {
       auto &descriptor = *record.get();
 
-      // If the record applies to a specific type, cache it.
-      if (auto metadata = descriptor.getCanonicalTypeMetadata()) {
-        auto P = descriptor.getProtocol();
+      // We only care about conformances for this protocol.
+      if (descriptor.getProtocol() != protocol)
+        continue;
 
-        // Look for an exact match.
-        if (protocol != P)
-          continue;
+      // If there's a matching type, record the positive result.
+      ConformanceCandidate candidate(descriptor);
+      if (candidate.getMatchingType(type)) {
+        const Metadata *matchingType = candidate.getConformingTypeAsMetadata();
+        if (!matchingType)
+          matchingType = type;
 
-        if (!isRelatedType(type, metadata, /*candidateIsMetadata=*/true))
-          continue;
-
-        // Record the witness table.
-        recordWitnessTable(descriptor, metadata);
-
-      // TODO: "Nondependent witness table" probably deserves its own flag.
-      // An accessor function might still be necessary even if the witness table
-      // can be shared.
-      } else if (descriptor.getTypeKind()
-                   == TypeReferenceKind::DirectNominalTypeDescriptor ||
-                 descriptor.getTypeKind()
-                  == TypeReferenceKind::IndirectNominalTypeDescriptor) {
-        auto R = descriptor.getTypeContextDescriptor();
-        auto P = descriptor.getProtocol();
-
-        // Look for an exact match.
-        if (protocol != P)
-          continue;
-
-        if (!isRelatedType(type, R, /*candidateIsMetadata=*/false))
-          continue;
-
-        recordWitnessTable(descriptor, type);
+        recordWitnessTable(descriptor, matchingType);
       }
     }
   }
@@ -692,18 +704,13 @@ bool swift::_checkGenericRequirements(
 }
 
 const Metadata *swift::findConformingSuperclass(
-                                          const Metadata *type,
-                                          const ProtocolDescriptor *protocol) {
-  const Metadata *conformingType = type;
-  while (true) {
-    const Metadata *superclass = _swift_class_getSuperclass(conformingType);
-    if (!superclass)
-      break;
-    if (!swift_conformsToProtocol(superclass, protocol))
-      break;
-    conformingType = superclass;
-  }
+                            const Metadata *type,
+                            const ProtocolConformanceDescriptor *conformance) {
+  // Figure out which type we're looking for.
+  ConformanceCandidate candidate(*conformance);
 
+  const Metadata *conformingType = candidate.getMatchingType(type);
+  assert(conformingType);
   return conformingType;
 }
 
