@@ -261,8 +261,12 @@ bool SILPerformanceInliner::isProfitableToInline(
   int BaseBenefit = RemovedCallBenefit;
 
   // Osize heuristic.
+  //
+  // As a hack, don't apply this at all to coroutine inlining; avoiding
+  // coroutine allocation overheads is extremely valuable.  There might be
+  // more principled ways of getting this effect.
   bool isClassMethodAtOsize = false;
-  if (OptMode == OptimizationMode::ForSize) {
+  if (OptMode == OptimizationMode::ForSize && !isa<BeginApplyInst>(AI)) {
     // Don't inline into thunks.
     if (AI.getFunction()->isThunk())
       return false;
