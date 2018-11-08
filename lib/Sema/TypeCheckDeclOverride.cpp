@@ -1776,21 +1776,15 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       auto baseAccessor = baseASD->getAccessor(kind);
       if (!baseAccessor) continue;
 
-      switch (kind) {
-      case AccessorKind::Read:
-        if (baseASD->getReadCoroutine()->hasForcedStaticDispatch())
-          continue;
-        LLVM_FALLTHROUGH;
+      if (baseAccessor->hasForcedStaticDispatch())
+        continue;
 
+      switch (kind) {
       case AccessorKind::Get:
+      case AccessorKind::Read:
         break;
 
       case AccessorKind::Modify:
-        if (baseASD->getModifyCoroutine()->hasForcedStaticDispatch())
-          continue;
-
-        LLVM_FALLTHROUGH;
-
       case AccessorKind::Set:
         // For setter accessors, we need the base's setter to be
         // accessible from the overriding context, or it's not an override.
