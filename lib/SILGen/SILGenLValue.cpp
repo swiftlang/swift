@@ -1291,6 +1291,7 @@ namespace {
       bool isDirectAccessorUse = this->IsDirectAccessorUse;
       auto indices = std::move(this->Indices);
       auto baseFormalType = this->BaseFormalType;
+      bool isOnSelfParameter = this->IsOnSelfParameter;
 
       // Drop this component from the l-value.
       dest.dropLastComponent(*this);
@@ -1298,7 +1299,7 @@ namespace {
       return emitAssignWithSetter(SGF, loc, std::move(dest), baseFormalType,
                                   isSuper, setter, isDirectAccessorUse, subs,
                                   std::move(indices), std::move(value),
-                                  IsOnSelfParameter);
+                                  isOnSelfParameter);
     }
 
     static void emitAssignWithSetter(SILGenFunction &SGF, SILLocation loc,
