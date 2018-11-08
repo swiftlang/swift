@@ -81,7 +81,7 @@ internal struct _StringObject {
   @usableFromInline @_frozen
   internal enum Variant {
     case immortal(UInt)
-    case native(_AbstractStringStorage)
+    case native(AnyObject)
     case bridged(_CocoaString)
 
     @inlinable @inline(__always)
@@ -1029,7 +1029,6 @@ extension _StringObject {
     }
   }
 
-  @inlinable
   internal var nativeStorage: _StringStorage {
     @inline(__always) get {
 #if arch(i386) || arch(arm)
@@ -1187,7 +1186,7 @@ extension _StringObject {
 #endif
   }
 
-  @inlinable @inline(__always)
+  @inline(__always)
   internal init(_ storage: _StringStorage) {
 #if arch(i386) || arch(arm)
     self.init(
