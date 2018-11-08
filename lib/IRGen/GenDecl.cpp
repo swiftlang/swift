@@ -871,61 +871,6 @@ IRGenModule::getConstantReferenceForProtocolDescriptor(ProtocolDecl *proto) {
                                      LinkEntity::forProtocolDescriptor(proto));
 }
 
-llvm::Constant *IRGenModule::getAddrOfAssociatedTypeGenericParamRef(
-                                                   GenericSignature *sig,
-                                                   CanDependentMemberType dmt) {
-  llvm::SmallVector<AssociatedTypeDecl *, 4> assocTypePath;
-
-  // Get the base ordinal.
-  auto baseDMT = dmt;
-  CanType base;
-  do {
-    base = baseDMT.getBase();
-    assocTypePath.push_back(baseDMT->getAssocType());
-    baseDMT = dyn_cast<DependentMemberType>(base);
-  } while (baseDMT);
-  auto ordinal = sig->getGenericParamOrdinal(cast<GenericTypeParamType>(base));
-  
-  // Generate a symbol name for the descriptor. This is a private symbol, so
-  // isn't ABI, but is useful for ODR coalescing within the same binary.
-  IRGenMangler Mangler;
-  auto symbolName = Mangler
-    .mangleAssociatedTypeGenericParamRef(ordinal, dmt);
-  
-  // Use an existing definition if we have one.
-  if (auto existingVar = Module.getGlobalVariable(symbolName))
-    return existingVar;
-  
-  // Otherwise, build the reference path.
-  ConstantInitBuilder builder(*this);
-  auto B = builder.beginStruct();
-  B.addInt32(ordinal);
-
-  for (auto *assocType : reversed(assocTypePath)) {
-    auto proto = getConstantReferenceForProtocolDescriptor(
-                                                      assocType->getProtocol());
-    B.addRelativeAddress(proto);
-
-    // Add a reference to the associated type descriptor.
-    auto assocTypeDescriptor =
-      getAddrOfLLVMVariableOrGOTEquivalent(
-        LinkEntity::forAssociatedTypeDescriptor(assocType));
-    B.addRelativeAddress(assocTypeDescriptor);
-  }
-  
-  // Null terminator.
-  B.addInt32(0);
-  
-  auto var = B.finishAndCreateGlobal(symbolName, Alignment(4),
-                                     /*constant*/ true);
-  ApplyIRLinkage({llvm::GlobalValue::LinkOnceODRLinkage,
-                  llvm::GlobalValue::HiddenVisibility,
-                  llvm::GlobalValue::DefaultStorageClass})
-      .to(var);
-  setTrueConstGlobal(var);
-  return var;
-}
-
 void IRGenModule::addLazyConformances(DeclContext *dc) {
   for (const ProtocolConformance *conf :
          dc->getLocalConformances(ConformanceLookupKind::All,

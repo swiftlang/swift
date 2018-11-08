@@ -880,8 +880,6 @@ public:
                                            ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfKeyPathPattern(KeyPathPattern *pattern,
                                           SILLocation diagLoc);
-  llvm::Constant *getAddrOfAssociatedTypeGenericParamRef(GenericSignature *sig,
-                                                    CanDependentMemberType dmt);
   ConstantReference getConstantReferenceForProtocolDescriptor(ProtocolDecl *proto);
 
   ConstantIntegerLiteral getConstantIntegerLiteral(APInt value);
