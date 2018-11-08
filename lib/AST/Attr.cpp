@@ -553,7 +553,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   case DAK_DynamicReplacement: {
-    Printer.printAttrName("@_dynamicReplacement(for: \"");
+    Printer.printAttrName("@_dynamicReplacement");
+    Printer << "(for: \"";
     auto *attr = cast<DynamicReplacementAttr>(this);
     Printer << attr->getReplacedFunctionName() << "\")";
     break;
@@ -805,7 +806,7 @@ PrivateImportAttr *PrivateImportAttr::create(ASTContext &Ctxt, SourceLoc AtLoc,
                                              StringRef sourceFile,
                                              SourceLoc RParenLoc) {
   return new (Ctxt)
-      PrivateImportAttr(AtLoc, SourceRange(PrivateLoc, LParenLoc), sourceFile,
+      PrivateImportAttr(AtLoc, SourceRange(PrivateLoc, RParenLoc), sourceFile,
                         SourceRange(LParenLoc, RParenLoc));
 }
 

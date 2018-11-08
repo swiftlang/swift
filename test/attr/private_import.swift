@@ -5,4 +5,4 @@
 @_private(sourceFile: "Array.swift") import Swift // expected-error {{module 'Swift' was not compiled for private import}}
 @_private(sourceFile: "empty.swift") import empty // no-error
 
-@_private(sourceFile: "none") func foo() {} // expected-error {{@_private may only be used on 'import' declarations}} {{1-11=}}
+@_private(sourceFile: "none") func foo() {} // expected-error {{@_private may only be used on 'import' declarations}} {{1-31=}}
