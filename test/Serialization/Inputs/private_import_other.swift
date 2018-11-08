@@ -1,3 +1,3 @@
 private struct Base {
-  private func shouldNotBeVisible() {}
+  private func bar() {}
 }

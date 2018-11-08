@@ -2695,9 +2695,10 @@ void Serializer::writeDecl(const Decl *D) {
         auto getFilename = [](FileUnit *enclosingFile,
                               const ValueDecl *decl) -> StringRef {
           if (auto *SF = dyn_cast<SourceFile>(enclosingFile)) {
-            return SF->getFilename();
+            return llvm::sys::path::filename(SF->getFilename());
           } else if (auto *LF = dyn_cast<LoadedFile>(enclosingFile)) {
-            return LF->getFilenameForPrivateDecl(decl);
+            return llvm::sys::path::filename(
+                (LF->getFilenameForPrivateDecl(decl)));
           }
           return StringRef();
         };
@@ -2705,7 +2706,7 @@ void Serializer::writeDecl(const Decl *D) {
         if (M->arePrivateImportsEnabled()) {
           auto filename = getFilename(enclosingFile, value);
           if (!filename.empty()) {
-            auto filenameID = addFilename(llvm::sys::path::filename(filename));
+            auto filenameID = addFilename(filename);
             FilenameForPrivateLayout::emitRecord(
                 Out, ScratchRecord,
                 DeclTypeAbbrCodes[FilenameForPrivateLayout::Code], filenameID);

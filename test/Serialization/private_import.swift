@@ -32,11 +32,6 @@
     private func foo() {}
   }
 
-  extension Base {
-    // This should not cause a failure.
-    private func shouldNotBeVisible() {}
-  }
-
   public func unreleated() {}
 
 	// This should not conflict with Other from private_import_other_2.swift.
@@ -47,6 +42,8 @@
   @_private(sourceFile: "private_import.swift") import client
 
   Base().foo()
+  // This should not be ambigious.
+  Base().bar()
 
   unreleated()
 #endif
