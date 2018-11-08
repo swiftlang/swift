@@ -74,6 +74,14 @@ func string_interpolation2() {
   "\(false) \(true)"
 }
 
+//CHECK-LABEL: string_interpolation_non_small
+//CHECK: bb0:
+//CHECK-NEXT: tuple
+//CHECK-NEXT: return
+func string_interpolation_non_small() {
+  "The quick brown fox jumped over the lazy \("animal")."
+}
+
 //CHECK-LABEL: string_plus
 //CHECK: bb0:
 //CHECK-NEXT: tuple
