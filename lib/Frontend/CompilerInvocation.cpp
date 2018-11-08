@@ -771,6 +771,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.VerifyExclusivity
       = A->getOption().matches(OPT_enable_verify_exclusivity);
   }
+  // If runtime asserts are disabled in general, also disable runtime
+  // exclusivity checks unless explicitly requested.
+  if (Opts.RemoveRuntimeAsserts)
+    Opts.EnforceExclusivityDynamic = false;
+
   if (const Arg *A = Args.getLastArg(options::OPT_enforce_exclusivity_EQ)) {
     parseExclusivityEnforcementOptions(A, Opts, Diags);
   }
