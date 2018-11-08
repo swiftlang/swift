@@ -61,3 +61,17 @@ Var Hasher._core has declared type change from _BufferingHasher<Hasher._Core> to
 Var Hasher._Core._buffer is added to a non-resilient type
 Var Hasher._Core._state in a non-resilient type changes position from 0 to 1
 
+Class _AbstractStringStorage has been removed
+Constructor _StringGuts.init(_:) has been removed
+Constructor _StringObject.init(_:) has been removed
+Constructor _StringStorage.init() has been removed
+Var _StringObject.nativeStorage has been removed
+Var _StringStorage._countAndFlags has been removed
+Var _StringStorage._realCapacityAndFlags has been removed
+Var _StringStorage.count has been removed
+Var _StringStorage.mutableStart has been removed
+Var _StringStorage.start has been removed
+Class _StringStorage is now without @_fixed_layout
+Class _SharedStringStorage has removed conformance to _NSStringCore
+Class _StringStorage has removed conformance to _NSStringCore
+Protocol _NSStringCore has been removed
