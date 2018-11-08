@@ -1781,17 +1781,17 @@ bool AbstractStorageDecl::isFormallyResilient() const {
   if (getAttrs().hasAttribute<FixedLayoutAttr>())
     return false;
 
-  // Private and (unversioned) internal variables always have a
-  // fixed layout.
-  if (!getFormalAccessScope(/*useDC=*/nullptr,
-                            /*treatUsableFromInlineAsPublic=*/true).isPublic())
-    return false;
-
   // If we're an instance property of a nominal type, query the type.
   auto *dc = getDeclContext();
   if (!isStatic())
     if (auto *nominalDecl = dc->getSelfNominalTypeDecl())
       return nominalDecl->isResilient();
+
+  // Non-public global and static variables always have a
+  // fixed layout.
+  if (!getFormalAccessScope(/*useDC=*/nullptr,
+                            /*treatUsableFromInlineAsPublic=*/true).isPublic())
+    return false;
 
   return true;
 }
