@@ -1389,6 +1389,10 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerOutputType = file_types::TY_LLVM_BC;
       break;
 
+    case options::OPT_dump_ast:
+      OI.CompilerOutputType = file_types::TY_ASTDump;
+      break;
+
     case options::OPT_emit_pch:
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
       OI.CompilerOutputType = file_types::TY_PCH;
@@ -1410,10 +1414,6 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     case options::OPT_update_code:
       OI.CompilerOutputType = file_types::TY_Remapping;
       OI.LinkAction = LinkKind::None;
-      break;
-
-    case options::OPT_dump_ast:
-      OI.CompilerOutputType = file_types::TY_ASTDump;
       break;
 
     case options::OPT_parse:
