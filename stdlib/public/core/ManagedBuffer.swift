@@ -265,7 +265,9 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// an instance is created.
   @inlinable // FIXME(sil-serialize-all)
   public var capacity: Int {
-    return (_capacityInBytes &- _My._elementOffset) / MemoryLayout<Element>.stride
+    return (
+      _capacityInBytes &- ManagedBufferPointer._elementOffset
+    ) / MemoryLayout<Element>.stride
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the stored
@@ -352,13 +354,13 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
       minimumCapacity >= 0,
       "ManagedBufferPointer must have non-negative capacity")
 
-    let totalSize = _My._elementOffset
+    let totalSize = ManagedBufferPointer._elementOffset
       +  minimumCapacity * MemoryLayout<Element>.stride
 
     let newBuffer: AnyObject = _swift_bufferAllocate(
       bufferType: _uncheckedBufferClass,
       size: totalSize,
-      alignmentMask: _My._alignmentMask)
+      alignmentMask: ManagedBufferPointer._alignmentMask)
 
     self._nativeBuffer = Builtin.unsafeCastToNativeObject(newBuffer)
   }
@@ -371,9 +373,6 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   internal init(_ buffer: ManagedBuffer<Header, Element>) {
     _nativeBuffer = Builtin.unsafeCastToNativeObject(buffer)
   }
-
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal typealias _My = ManagedBufferPointer
 
   @inlinable // FIXME(sil-serialize-all)
   internal static func _checkValidBufferClass(
@@ -446,7 +445,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   @inlinable // FIXME(sil-serialize-all)
   internal var _headerPointer: UnsafeMutablePointer<Header> {
     _onFastPath()
-    return (_address + _My._headerOffset).assumingMemoryBound(
+    return (_address + ManagedBufferPointer._headerOffset).assumingMemoryBound(
       to: Header.self)
   }
 
@@ -456,7 +455,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   @inlinable // FIXME(sil-serialize-all)
   internal var _elementPointer: UnsafeMutablePointer<Element> {
     _onFastPath()
-    return (_address + _My._elementOffset).assumingMemoryBound(
+    return (_address + ManagedBufferPointer._elementOffset).assumingMemoryBound(
       to: Element.self)
   }
 
