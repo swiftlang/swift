@@ -163,29 +163,26 @@ static std::string mangleTypeAsContext(const NominalTypeDecl * NTD) {
 using MemberTableEntryTy = std::pair<ReferencedNameTracker::MemberPair, bool>;
 
 namespace {
-  struct DependName {
-    std::string name;
-    bool cascades;
-    DependName(const DeclBaseName name, const bool cascades) : DependName(name.userFacingName(), cascades) {}
-    DependName(const std::string &s, const bool cascades) : name(s), cascades(cascades) {}
-    int compare(DependName other) const { return name.compare(other.name); }
-    static int compare(const DependName &lhs, const DependName &rhs) {
-      return lhs.compare(rhs);
-    }
-    bool operator< (const DependName &other) const {return compare(other) == -1; }
-  };
-  
-  struct DependNameWithHolder {
-    const NominalTypeDecl *holderDecl;
+
+  struct DependProtoNode {
+    /// nil means either no container for the file, or topLevel
+    std::string holderName;
     std::string memberName;
     bool cascades;
+    Node::Kind kind;
 
-    DependNameWithHolder(const NominalTypeDecl *holder, DeclBaseName member, const bool cascades) : DependNameWithHolder(holder, member.userFacingName(), cascades) {}
-    DependNameWithHolder(const NominalTypeDecl *holder, const std::string memberName, bool cascades) :
-    holderDecl(holder), memberName(memberName), cascades(cascades) {}
+    DependProtoNode(const NominalTypeDecl *holder,
+                         DeclBaseName member,
+                         const bool cascades,
+                         const Node::Kind kind) :
+    DependProtoNode(holder ? mangleTypeAsContext(holder) : std::string(), member.userFacingName(), cascades, kind) {}
     
-    std::string holderName() const { return mangleTypeAsContext(holderDecl); }
-   };
+    DependProtoNode(const std::string holderName,
+                    const std::string memberName,
+                    bool cascades,
+                    const Node::Kind kind) :
+    holderName(holderName), memberName(memberName), cascades(cascades), kind(kind) {}
+  };
 }
 
 
@@ -193,101 +190,101 @@ namespace {
   class DependNames {
   private:
     const ReferencedNameTracker *const tracker;
-    std::vector<DependName> sortedTops;
-    std::vector<DependNameWithHolder> _members;
-    std::unordered_set<const NominalTypeDecl*>cascadingHolders;
-    std::vector<DependName> holdersWithMergedCascades;
-    std::vector<DependName> sortedDynamicLookupNames;
-    std::vector<DependName> externalNames;
+
+    std::vector<DependProtoNode> _members;
+    std::unordered_set<std::string>cascadingHolders;
+    std::vector<DependProtoNode> holdersWithMergedCascades;
+    std::vector<DependProtoNode> sortedDynamicLookupNames;
+    std::vector<DependProtoNode> externalNames;
 
 
-    static std::vector<DependName> linearizeAndSort(const llvm::DenseMap<DeclBaseName, bool> &map);
-    static std::unordered_set<const NominalTypeDecl*> findCascadingHolders(const std::vector<DependNameWithHolder> &in);
-    static std::vector<DependName> mergeCascades(const std::vector<DependNameWithHolder> &members,
-                                                 const std::unordered_set<const NominalTypeDecl*> &cascades);
-    static std::vector<DependName> reversePathSortedFilenames(const ArrayRef<std::string> in);
-    static std::vector<DependNameWithHolder> transformMembers(const llvm::DenseMap<std::pair<const NominalTypeDecl *, DeclBaseName>, bool>&);
+
+    void convertSetOfDeclBaseNames(const llvm::DenseMap<DeclBaseName, bool> &map, Node::Kind);
+    static std::unordered_set<std::string>
+    findCascadingHolders(
+                         std::vector<DependProtoNode>::const_iterator,
+                         std::vector<DependProtoNode>::const_iterator);
+    void mergeCascades(std::vector<DependProtoNode>::const_iterator,
+                       std::vector<DependProtoNode>::const_iterator,
+                       const std::unordered_set<std::string> &cascades);
+    void convertArrayOfFilenames(const ArrayRef<std::string> in);
+    void convertSetOfMemberPairs(const llvm::DenseMap<std::pair<const NominalTypeDecl *, DeclBaseName>, bool>&);
 
   public:
     DependNames(const SourceFile *const SF, const DependencyTracker &depTracker) :
-    tracker(SF->getReferencedNameTracker()),
-    sortedTops(linearizeAndSort(tracker->getTopLevelNames())),
-    _members(transformMembers(tracker->getUsedMembers())),
-    cascadingHolders(findCascadingHolders(_members)),
-    holdersWithMergedCascades(mergeCascades(_members, cascadingHolders)),
-    sortedDynamicLookupNames(linearizeAndSort(tracker->getDynamicLookupNames())),
-    externalNames(reversePathSortedFilenames(depTracker.getDependencies()))
+    tracker(SF->getReferencedNameTracker())
     {
+      convertSetOfDeclBaseNames(tracker->getTopLevelNames(), Node::Kind::topLevel);
+      auto beginMembers = names.cend();
+convertSetOfMemberPairs(tracker->getUsedMembers());
+      auto endMembers = names.cend();
+      auto cascadingHolders = findCascadingHolders(beginMembers, endMembers);
+      mergeCascades(beginMembers, endMembers, cascadingHolders);
+      convertSetOfDeclBaseNames(tracker->getDynamicLookupNames(), Node::Kind::dynamicLookup); // should sort/uniq for efficiency
+      convertArrayOfFilenames(depTracker.getDependencies());
     }
-    std::pair<const std::vector<DependName> &, Node::Kind> tops() const {
-      return std::make_pair(sortedTops, Node::Kind::topLevel);
-    }
-    std::pair<const std::vector<DependName> &, Node::Kind> nominals() const {
-      return std::make_pair(holdersWithMergedCascades, Node::Kind::nominals); } // nominals
-
-    std::pair<const std::vector<DependNameWithHolder> &, Node::Kind> members() const {
-      return std::make_pair(_members, Node::Kind::member); } // members
-
-    std::pair<const std::vector<DependName> &, Node::Kind> dynamicLookups() const {
-      return std::make_pair(sortedDynamicLookupNames, Node::Kind::dynamicLookup); }
-    
-    std::pair<const std::vector<DependName> &, Node::Kind> externals() const {
-      return std::make_pair(externalNames, Node::Kind::externalDepend); }
+ 
+    std::vector<DependProtoNode> names;
   };
 }
 
 //////////////////////
 
-std::vector<DependName> DependNames::linearizeAndSort(const llvm::DenseMap<DeclBaseName, bool> &map) {
-  std::vector<DependName> out;
-  for (const auto &p: map)
-    out.push_back(DependName{p.getFirst(), p.getSecond()});
-
-  std::sort(out.begin(), out.end());
-  return out;
+void DependNames::convertSetOfDeclBaseNames(const llvm::DenseMap<DeclBaseName, bool> &map, const Node::Kind kind) {
+  for (const auto &p: map) {
+    names.push_back(DependProtoNode{nullptr, p.getFirst(), p.getSecond(), kind}); // context container??
+  }
 }
 
-std::vector<DependNameWithHolder> DependNames::transformMembers(const llvm::DenseMap<std::pair<const NominalTypeDecl *, DeclBaseName>, bool>& memberMap) {
-  std::vector<DependNameWithHolder> out;
+void
+DependNames::convertSetOfMemberPairs(const llvm::DenseMap<
+                                     std::pair<const NominalTypeDecl *, DeclBaseName
+                                     >,
+                                     bool>& memberMap) {
   for (auto &entry: memberMap) {
-    out.push_back(DependNameWithHolder(entry.first.first, entry.first.second, entry.second));
-  // Do I need to sort?
+    names.push_back(DependProtoNode(entry.first.first, entry.first.second, entry.second, Node::Kind::member));
   }
 }
 
 
 
-std::unordered_set<const NominalTypeDecl*> DependNames::findCascadingHolders(const std::vector<DependNameWithHolder> &in) {
-  std::unordered_set<const NominalTypeDecl*> out;
-  for (const auto &entry: in)
-    if (entry.cascades)
-      out.insert(entry.holderDecl);
+
+
+std::unordered_set<std::string>
+DependNames::findCascadingHolders(
+                                  std::vector<DependProtoNode>::const_iterator beginMembers,
+                                  std::vector<DependProtoNode>::const_iterator endMembers) {
+  std::unordered_set<std::string> out;
+  std::for_each(beginMembers, endMembers,
+                [&] (const DependProtoNode &n) {
+                  if (n.cascades && !n.holderName.empty())
+                    out.insert(n.holderName);
+                });
   return out;
 }
 
-std::vector<DependName>
+void
 DependNames::mergeCascades(
-                           const std::vector<DependNameWithHolder> &members,
-                           const std::unordered_set<const NominalTypeDecl*> &cascades) {
-  std::vector<DependName> out;
-  for (DependNameWithHolder dependsNameWithHolder: members) {
-    const bool cascade = cascades.count(dependsNameWithHolder.holderDecl) != 0 ? true : false;
-    out.push_back(DependName(dependsNameWithHolder.holderName(), cascade));
-  }
-  return out;
+                           std::vector<DependProtoNode>::const_iterator beginMembers,
+                           std::vector<DependProtoNode>::const_iterator endMembers,
+                           const std::unordered_set<std::string> &cascades) {
+  std::transform(beginMembers, endMembers, std::back_inserter(names),
+                 [&] (const DependProtoNode &member)->DependProtoNode {
+                   const bool cascade = cascades.count(member.holderName) != 0 ? true : false;
+                   // TODO: COuld have holder here, since had NTD originally
+                   return DependProtoNode(nullptr, member.holderName, cascade, Node::Kind::nominals);
+                 });
 }
 
-std::vector<DependName> DependNames::reversePathSortedFilenames(const ArrayRef<std::string> in) {
-  std::vector<DependName> out;
-  for (auto s: in)
-    out.push_back(DependName(s, true));
-  std::sort(out.begin(), out.end(),  [](const DependName &a,
-                                        const DependName &b) -> bool {
-    return std::lexicographical_compare(a.name.rbegin(), a.name.rend(),
-                                        b.name.rbegin(), b.name.rend());
+void DependNames::convertArrayOfFilenames(const ArrayRef<std::string> elts) {
+  std::vector<std::string> tmp(elts.begin(), elts.end());
+  std::sort(tmp.begin(), tmp.end(), [](const std::string &a,
+                                       const std::string &b) -> bool {
+    return std::lexicographical_compare(a.rbegin(), a.rend(),
+                                        b.rbegin(), b.rend());
   });
- 
-  return out;
+  for (auto s: tmp)
+    names.push_back(DependProtoNode(nullptr, s, true, Node::Kind::externalDepend));
 }
 
 
@@ -309,7 +306,7 @@ class GraphConstructor {
     g.addNode(sourceFileNode);
     
     constructProvidesNodes();
-    constructDependsArcs();
+    constructDependArcs();
   }
   
 private:
@@ -323,8 +320,8 @@ private:
   }
   
   void constructProvidesNodes();
-  void constructDependsArcs();
-  void constructSingleNameDependsArcs(std::pair<const std::vector<DependName> &, Node::Kind>);
+  void constructDependArcs();
+  void constructDependArcs(const std::vector<DependProtoNode> &);
   
   
   
@@ -357,9 +354,12 @@ private:
     g.addNode(node);
   }
   
-  Node* getOrCreateDeclNode(Node::Kind kind, std::string name) {
-    auto iter = nodesByKindAndName[uint(kind)].find(name);
-    return iter->second;
+  Node* getOrCreateDependencyHeadNode(const DependProtoNode & protoNode) {
+    if (protoNode.holderName.empty())
+      return sourceFileNode; // no better info at present
+    auto &map = nodesByKindAndName[uint(protoNode.kind)];
+    auto iter = map.find(protoNode.holderName);
+    return iter == map.end() ? sourceFileNode : iter->second;
   }
 };
 
@@ -372,25 +372,22 @@ void GraphConstructor::constructProvidesNodes() {
   createNodes<NominalTypeDecl>(demux.topNominals, DeclNode::Kind::topLevel, getName);
   createNodes<ValueDecl>(demux.topValues, DeclNode::Kind::topLevel, getBaseName);
   
-  createNodes<NominalTypeDecl>(demux.allNominals, DeclNode::Kind::nominalAndBlankMembers, mangleTypeAsContext);
-  
+  createNodes<NominalTypeDecl>(demux.allNominals, DeclNode::Kind::nominals, mangleTypeAsContext);
+  createNodes<NominalTypeDecl>(demux.allNominals, DeclNode::Kind::blankMembers, mangleTypeAsContext); // TODO: fix someday
+
   createNodes<ValueDecl>(demux.valuesInExtensions, DeclNode::Kind::member, getBaseName);
   
   // could optimize by uniqueing by name, but then what of container?
   createNodes<ValueDecl>(demux.classMembers, DeclNode::Kind::dynamicLookup, getBaseName);
 }
-void GraphConstructor::constructDependsArcs() {
+void GraphConstructor::constructDependArcs() {
   DependNames dn(SF, depTracker);
-  constructSingleNameDependsArcs(dn.tops());
-#error up to here
-  constructSingleNameDependsArcs(dn.nominals()); // USE context for container
-  constructMemberDependArcs(dn.members());
-  constructSingleNameDependsArcs(dn.dynamicLookups());
-  constructSingleNameDependsArcs(dn.externals());
+  constructDependArcs(dn.names);
 }
-void GraphConstructor::constructSingleNameDependsArcs(std::pair<const std::vector<DependName> &, Node::Kind> namesAndKind) {
-  for (auto &dependName: namesAndKind.first) {
-    Node* def = getOrCreateDeclNode(namesAndKind.second, dependName.name);
+
+void GraphConstructor::constructDependArcs(const std::vector<DependProtoNode> & protoNodes) {
+  for (auto &protoNode: protoNodes) {
+    Node* def = getOrCreateDependencyHeadNode(protoNode);
     Node* use = sourceFileNode;
     g.addArc(Arc{use, def});
   }
@@ -432,7 +429,7 @@ public:
 
 
 // move filter etc into wherever
-// do depends decls
+// do depend decls
 // do output
 
 

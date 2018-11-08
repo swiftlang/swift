@@ -32,10 +32,9 @@ namespace experimental_dependencies {
   
   class Node {
   public:
-#error nominalAndBlankMembers
     enum class Kind { topLevel,
-    //  nominalAndBlankMembers, // FIXME or next one
       nominals,
+      blankMembers,
       member, dynamicLookup, externalDepend,
       sourceFileProvide, end };
 
