@@ -63,10 +63,10 @@ public:
 
 /// \brief Abstract interface that loads named modules into the AST.
 class ModuleLoader {
-  DependencyTracker * const dependencyTracker;
   virtual void anchor();
 
 protected:
+  DependencyTracker * const dependencyTracker;
   ModuleLoader(DependencyTracker *tracker) : dependencyTracker(tracker) {}
 
   void addDependency(StringRef file, bool IsSystem=false) {
