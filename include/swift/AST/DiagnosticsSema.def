@@ -759,6 +759,10 @@ ERROR(ambiguous_decl_in_module,none,
 ERROR(module_not_testable,none,
       "module %0 was not compiled for testing", (Identifier))
 
+ERROR(module_not_compiled_for_private_import,none,
+      "module %0 was not compiled for private import", (Identifier))
+
+
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
       "ambiguous operator declarations found for operator", ())

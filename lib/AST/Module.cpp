@@ -778,7 +778,8 @@ namespace {
 class SourceFile::Impl {
 public:
   /// Only intended for use by lookupOperatorDeclForName.
-  static ArrayRef<std::pair<ModuleDecl::ImportedModule, SourceFile::ImportOptions>>
+  static ArrayRef<std::pair<ModuleDecl::ImportedModule,
+                            std::pair<SourceFile::ImportOptions, StringRef>>>
   getImportsForSourceFile(const SourceFile &SF) {
     return SF.Imports;
   }
@@ -892,7 +893,7 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
       continue;
 
     bool isExported =
-        imported.second.contains(SourceFile::ImportFlags::Exported);
+        imported.second.first.contains(SourceFile::ImportFlags::Exported);
     if (!includePrivate && !isExported)
       continue;
 
@@ -994,11 +995,11 @@ SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modu
     case ModuleDecl::ImportFilter::All:
       break;
     case ModuleDecl::ImportFilter::Public:
-      if (!importPair.second.contains(ImportFlags::Exported))
+      if (!importPair.second.first.contains(ImportFlags::Exported))
         continue;
       break;
     case ModuleDecl::ImportFilter::Private:
-      if (importPair.second.contains(ImportFlags::Exported))
+      if (importPair.second.first.contains(ImportFlags::Exported))
         continue;
       break;
     }
@@ -1374,8 +1375,11 @@ void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
 }
 
 void SourceFile::addImports(
-    ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> IM) {
-  using ImportPair = std::pair<ModuleDecl::ImportedModule, ImportOptions>;
+    ArrayRef<std::pair<ModuleDecl::ImportedModule,
+                       std::pair<ImportOptions, StringRef>>>
+        IM) {
+  using ImportPair = std::pair<ModuleDecl::ImportedModule,
+                               std::pair<ImportOptions, StringRef>>;
   if (IM.empty())
     return;
   ASTContext &ctx = getASTContext();
@@ -1391,12 +1395,60 @@ void SourceFile::addImports(
 }
 
 bool SourceFile::hasTestableImport(const swift::ModuleDecl *module) const {
-  using ImportPair = std::pair<ModuleDecl::ImportedModule, ImportOptions>;
+  using ImportPair = std::pair<ModuleDecl::ImportedModule,
+                               std::pair<ImportOptions, StringRef>>;
+  return std::any_of(
+      Imports.begin(), Imports.end(), [module](ImportPair importPair) -> bool {
+        return importPair.first.second == module &&
+               importPair.second.first.contains(ImportFlags::Testable);
+      });
+}
+
+bool SourceFile::hasPrivateImport(AccessLevel accessLevel,
+                                  const swift::ValueDecl *ofDecl) const {
+  using ImportPair = std::pair<ModuleDecl::ImportedModule,
+                               std::pair<ImportOptions, StringRef>>;
+
+  auto *module = ofDecl->getModuleContext();
+
+  if (accessLevel == AccessLevel::Internal ||
+      accessLevel == AccessLevel::Public) {
+    // internal/public access only needs an import marked as @_private. The
+    // filename does not need to match (and we don't serialize it for such
+    // decls).
+    return std::any_of(Imports.begin(), Imports.end(),
+                       [module](ImportPair importPair) -> bool {
+                         return importPair.first.second == module &&
+                                importPair.second.first.contains(
+                                    ImportFlags::PrivateImport);
+                       });
+  }
+  auto *DC = ofDecl->getDeclContext();
+  if (!DC)
+    return false;
+  auto *scope = DC->getModuleScopeContext();
+  if (!scope)
+    return false;
+
+  StringRef filename;
+  if (auto *file = dyn_cast<LoadedFile>(scope)) {
+    filename = file->getFilenameForPrivateDecl(ofDecl);
+  } else if (auto *file = dyn_cast<SourceFile>(scope)) {
+    // Source files cannot be imported from another module.
+    return false;
+  } else
+    return false;
+
+  if (filename.empty())
+    return false;
+
   return std::any_of(Imports.begin(), Imports.end(),
-                     [module](ImportPair importPair) -> bool {
-    return importPair.first.second == module &&
-        importPair.second.contains(ImportFlags::Testable);
-  });
+                     [module, filename](ImportPair importPair) -> bool {
+                       return importPair.first.second == module &&
+                              importPair.second.first.contains(
+                                  ImportFlags::PrivateImport) &&
+                              importPair.second.second == filename;
+                     });
 }
 
 void SourceFile::clearLookupCache() {
@@ -1445,7 +1497,8 @@ static void performAutoImport(
   // FIXME: These will be the same for most source files, but we copy them
   // over and over again.
   auto Imports =
-    std::make_pair(ModuleDecl::ImportedModule({}, M), SourceFile::ImportOptions());
+      std::make_pair(ModuleDecl::ImportedModule({}, M),
+                     std::make_pair(SourceFile::ImportOptions(), StringRef()));
   SF.addImports(Imports);
 }
 

@@ -1417,6 +1417,15 @@ ERROR(attr_dynamic_replacement_expected_for,none,
 ERROR(attr_dynamic_replacement_expected_colon,none,
       "expected ':' after @_dynamicReplacement(for", ())
 
+ERROR(attr_private_import_expected_rparen,none,
+      "expected ')' after function name for @_private", ())
+ERROR(attr_private_import_expected_sourcefile, none,
+      "expected 'sourceFile' in '_private' attribute", ())
+ERROR(attr_private_import_expected_sourcefile_name,none,
+      "expected a source file name in @_private(sourceFile:)", ())
+ERROR(attr_private_import_expected_colon,none,
+      "expected ':' after @_private(sourceFile", ())
+
 // opened
 ERROR(opened_attribute_expected_lparen,none,
       "expected '(' after 'opened' attribute", ())

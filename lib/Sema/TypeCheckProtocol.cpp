@@ -1267,6 +1267,12 @@ bool WitnessChecker::checkWitnessAccess(AccessScope &requiredAccessScope,
           parentFile->hasTestableImport(witnessModule) &&
           witness->isAccessibleFrom(parentFile)) {
         actualScopeToCheck = parentFile;
+      // Same with @_private(sourceFile:) import.
+      } else if (parentFile->getParentModule() != witnessModule &&
+                 parentFile->hasPrivateImport(witness->getFormalAccess(),
+                                              witness) &&
+                 witness->isAccessibleFrom(parentFile)) {
+        actualScopeToCheck = parentFile;
       }
     }
 

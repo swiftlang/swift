@@ -486,6 +486,8 @@ ModuleDecl *CompilerInstance::getMainModule() {
     MainModule = ModuleDecl::create(ID, *Context);
     if (Invocation.getFrontendOptions().EnableTesting)
       MainModule->setTestingEnabled();
+    if (Invocation.getFrontendOptions().EnablePrivateImports)
+      MainModule->setPrivateImportsEnabled();
 
     if (Invocation.getFrontendOptions().EnableResilience)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
@@ -495,22 +497,23 @@ ModuleDecl *CompilerInstance::getMainModule() {
 
 static void addAdditionalInitialImportsTo(
     SourceFile *SF, const CompilerInstance::ImplicitImports &implicitImports) {
-  using ImportPair =
-      std::pair<ModuleDecl::ImportedModule, SourceFile::ImportOptions>;
+  using ImportPair = std::pair<ModuleDecl::ImportedModule,
+                               std::pair<SourceFile::ImportOptions, StringRef>>;
   SmallVector<ImportPair, 4> additionalImports;
 
   if (implicitImports.objCModuleUnderlyingMixedFramework)
     additionalImports.push_back(
         {{/*accessPath=*/{},
           implicitImports.objCModuleUnderlyingMixedFramework},
-         SourceFile::ImportFlags::Exported});
+         {SourceFile::ImportFlags::Exported, StringRef()}});
   if (implicitImports.headerModule)
     additionalImports.push_back(
         {{/*accessPath=*/{}, implicitImports.headerModule},
-         SourceFile::ImportFlags::Exported});
+         {SourceFile::ImportFlags::Exported, StringRef()}});
   if (!implicitImports.modules.empty()) {
     for (auto &importModule : implicitImports.modules) {
-      additionalImports.push_back({{/*accessPath=*/{}, importModule}, {}});
+      additionalImports.push_back(
+          {{/*accessPath=*/{}, importModule}, {{}, StringRef()}});
     }
   }
 

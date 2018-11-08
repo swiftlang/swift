@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 462; // Last change: Add dynamicReplacement(for:)
+const uint16_t SWIFTMODULE_VERSION_MINOR = 463; // Last change: enable-private-imports
 
 using DeclIDField = BCFixed<31>;
 
@@ -592,7 +592,8 @@ namespace options_block {
     XCC,
     IS_SIB,
     IS_TESTABLE,
-    RESILIENCE_STRATEGY
+    RESILIENCE_STRATEGY,
+    ARE_PRIVATE_IMPORTS_ENABLED
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -612,6 +613,10 @@ namespace options_block {
 
   using IsTestableLayout = BCRecordLayout<
     IS_TESTABLE
+  >;
+
+  using ArePrivateImportsEnabledLayout = BCRecordLayout<
+    ARE_PRIVATE_IMPORTS_ENABLED
   >;
 
   using ResilienceStrategyLayout = BCRecordLayout<
@@ -1309,6 +1314,11 @@ namespace decls_block {
     BCVBR<2> // context-scoped discriminator counter
   >;
 
+  using FilenameForPrivateLayout = BCRecordLayout<
+    FILENAME_FOR_PRIVATE,
+    IdentifierIDField  // the file name, as an identifier
+  >;
+
   /// A placeholder for lack of concrete conformance information.
   using AbstractProtocolConformanceLayout = BCRecordLayout<
     ABSTRACT_PROTOCOL_CONFORMANCE,
@@ -1513,6 +1523,7 @@ namespace decls_block {
     = BCRecordLayout<RestatedObjCConformance_DECL_ATTR>;
   using ClangImporterSynthesizedTypeDeclAttrLayout
     = BCRecordLayout<ClangImporterSynthesizedType_DECL_ATTR>;
+  using PrivateImportDeclAttrLayout = BCRecordLayout<PrivateImport_DECL_ATTR>;
 
   using InlineDeclAttrLayout = BCRecordLayout<
     Inline_DECL_ATTR,

@@ -468,6 +468,12 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     }
     break;
   }
+
+  case DAK_PrivateImport: {
+    Printer.printAttrName("@_private(sourceFile: \"");
+    Printer << cast<PrivateImportAttr>(this)->getSourceFile() << "\")";
+    break;
+  }
     
   case DAK_SwiftNativeObjCRuntimeBase: {
     auto *attr = cast<SwiftNativeObjCRuntimeBaseAttr>(this);
@@ -621,6 +627,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "objc";
   case DAK_DynamicReplacement:
     return "_dynamicReplacement";
+  case DAK_PrivateImport:
+    return "_private";
   case DAK_RestatedObjCConformance:
     return "_restatedObjCConformance";
   case DAK_Inline: {
@@ -783,6 +791,22 @@ ObjCAttr *ObjCAttr::clone(ASTContext &context) const {
   auto attr = new (context) ObjCAttr(getName(), isNameImplicit());
   attr->setSwift3Inferred(isSwift3Inferred());
   return attr;
+}
+
+PrivateImportAttr::PrivateImportAttr(SourceLoc atLoc, SourceRange baseRange,
+                                     StringRef sourceFile,
+                                     SourceRange parenRange)
+    : DeclAttribute(DAK_PrivateImport, atLoc, baseRange, /*Implicit=*/false),
+      SourceFile(sourceFile) {}
+
+PrivateImportAttr *PrivateImportAttr::create(ASTContext &Ctxt, SourceLoc AtLoc,
+                                             SourceLoc PrivateLoc,
+                                             SourceLoc LParenLoc,
+                                             StringRef sourceFile,
+                                             SourceLoc RParenLoc) {
+  return new (Ctxt)
+      PrivateImportAttr(AtLoc, SourceRange(PrivateLoc, LParenLoc), sourceFile,
+                        SourceRange(LParenLoc, RParenLoc));
 }
 
 DynamicReplacementAttr::DynamicReplacementAttr(SourceLoc atLoc,
