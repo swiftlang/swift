@@ -185,12 +185,12 @@ namespace {
     /// Either a Metadata* or a NominalTypeDescriptor*.
     const void *Type;
     const ProtocolDescriptor *Proto;
-    /// Module in which we expect to find the conformance, or nullptr if
+    /// Module in which we expect to find the conformance, or empty if
     /// we don't know/care.
-    const char *Module;
+    StringRef Module;
 
     ConformanceCacheKey(const void *type, const ProtocolDescriptor *proto,
-                        const char *module)
+                        StringRef module)
         : Type(type), Proto(proto), Module(module) {
       assert(type);
     }
@@ -200,9 +200,9 @@ namespace {
   private:
     const void *Type; 
     const ProtocolDescriptor *Proto;
-    /// Module in which we expect to find the conformance, or nullptr if
+    /// Module in which we expect to find the conformance, or empty if
     /// we don't know/care.
-    const char *Module;
+    StringRef Module;
     std::atomic<const ProtocolConformanceDescriptor *> Description;
     std::atomic<size_t> FailureGeneration;
 
@@ -222,12 +222,8 @@ namespace {
       if (key.Proto != Proto) {
         return (uintptr_t(key.Proto) < uintptr_t(Proto) ? -1 : 1);
       }
-      if (key.Module != Module) {
-        if (!key.Module) return -1;
-        if (!Module) return 1;
-        if (int result = strcmp(key.Module, Module))
-          return result;
-      }
+      if (int result = key.Module.compare(Module))
+        return result;
 
       return 0;
     }
@@ -251,7 +247,7 @@ namespace {
     }
 
     /// Get the module in which we expected to find this conformance.
-    const char *getModule() const { return Module; }
+    StringRef getModule() const { return Module; }
 
     /// Get the cached conformance descriptor, if successful.
     const ProtocolConformanceDescriptor *getDescription() const {
@@ -282,12 +278,12 @@ struct ConformanceState {
 
   std::pair<ConformanceCacheEntry *, bool>
   cacheResult(const void *type, const ProtocolDescriptor *proto,
-              const char *module,
+              StringRef module,
               const ProtocolConformanceDescriptor *description,
               size_t failureGeneration) {
     // When there is no module, directly check/update the cache.
     ConformanceCacheKey key(type, proto, module);
-    if (!module)
+    if (module.empty())
       return Cache.getOrInsert(key, description, failureGeneration);
 
     // Look for an existing entry. If we have one, return it.
@@ -296,12 +292,11 @@ struct ConformanceState {
 
     // Clone the module string into the conformance allocator, so it refers
     // to permanent storage if it does get inserted.
-    size_t moduleLen = strlen(module);
-    size_t moduleAllocSize = roundUpToAlignment(moduleLen + 1, sizeof(void*));
+    size_t moduleAllocSize = roundUpToAlignment(module.size(), sizeof(void*));
     char *newModule =
       (char *)Cache.getAllocator().Allocate(moduleAllocSize, alignof(char));
-    strcpy(newModule, module);
-    key.Module = newModule;
+    memcpy(newModule, module.data(), module.size());
+    key.Module = StringRef(newModule, module.size());
 
     // Update the cache.
     auto result = Cache.getOrInsert(key, description, failureGeneration);
@@ -316,7 +311,7 @@ struct ConformanceState {
   }
 
   void cacheSuccess(const void *type, const ProtocolDescriptor *proto,
-                    const char *module,
+                    StringRef module,
                     const ProtocolConformanceDescriptor *description) {
     auto result = cacheResult(type, proto, module, description, 0);
 
@@ -327,7 +322,7 @@ struct ConformanceState {
   }
 
   void cacheFailure(const void *type, const ProtocolDescriptor *proto,
-                    const char *module,
+                    StringRef module,
                     size_t failureGeneration) {
     auto result = cacheResult(type, proto, module, nullptr, failureGeneration);
 
@@ -339,7 +334,7 @@ struct ConformanceState {
 
   ConformanceCacheEntry *findCached(const void *type,
                                     const ProtocolDescriptor *proto,
-                                    const char *module) {
+                                    StringRef module) {
     return Cache.find(ConformanceCacheKey(type, proto, module));
   }
 
@@ -440,7 +435,7 @@ static
 ConformanceCacheResult
 searchInConformanceCache(const Metadata *type,
                          const ProtocolDescriptor *protocol,
-                         const char *module) {
+                         StringRef module) {
   auto &C = Conformances.get();
   auto origType = type;
   ConformanceCacheEntry *failureEntry = nullptr;
@@ -556,7 +551,7 @@ bool isRelatedType(const Metadata *type, const void *candidate,
 const ProtocolConformanceDescriptor *
 swift::_conformsToSwiftProtocol(const Metadata * const type,
                                 const ProtocolDescriptor *protocol,
-                                const char *module) {
+                                StringRef module) {
   auto &C = Conformances.get();
 
   // See if we have a cached conformance. The ConcurrentMap data structure
@@ -607,7 +602,7 @@ swift::_conformsToSwiftProtocol(const Metadata * const type,
     bool isRetroactive = descriptor.isRetroactive();
 
     // If no module is specified, we can find any conformance.
-    if (!module) {
+    if (module.empty()) {
       return isRetroactive ? ModuleMatch::Retroactive : ModuleMatch::Exact;
     }
 
@@ -616,7 +611,7 @@ swift::_conformsToSwiftProtocol(const Metadata * const type,
     if (isRetroactive) {
       auto moduleContext =
         cast<ModuleContextDescriptor>(descriptor.getRetroactiveContext());
-      return strcmp(moduleContext->Name, module) == 0
+      return moduleContext->Name.get() == module
                ? ModuleMatch::Exact
                : ModuleMatch::None;
     }
@@ -778,8 +773,7 @@ swift::_conformsToSwiftProtocol(const Metadata * const type,
 static const WitnessTable *
 swift_conformsToProtocolImpl(const Metadata * const type,
                              const ProtocolDescriptor *protocol) {
-  auto description =
-    _conformsToSwiftProtocol(type, protocol, /*module=*/nullptr);
+  auto description = _conformsToSwiftProtocol(type, protocol, StringRef());
   if (!description)
     return nullptr;
 

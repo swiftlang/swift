@@ -457,7 +457,7 @@ public:
   const ProtocolConformanceDescriptor *
   _conformsToSwiftProtocol(const Metadata * const type,
                            const ProtocolDescriptor *protocol,
-                           const char *module);
+                           StringRef module);
 
   /// Given a type that we know conforms to the given protocol, find the
   /// superclass that introduced the conformance.
