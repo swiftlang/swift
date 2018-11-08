@@ -6,6 +6,7 @@ Func MutableCollection._introSort(within:by:) has been removed
 Func MutableCollection._introSortImpl(within:by:depthLimit:) has been removed
 Func MutableCollection._siftDown(_:within:by:) has been removed
 Func MutableCollection._sort3(_:_:_:by:) has been removed
+Func Optional.unwrappedOrError() has been removed
 Func MutableCollection._partition(within:by:) has parameter 0 type change from Range<τ_0_0.Index> to (τ_0_0.Element) throws -> Bool
 
 Func BinaryInteger._description(radix:uppercase:) has been removed
@@ -122,6 +123,7 @@ Struct Hasher._Core has removed conformance to _HasherCore
 Protocol _HasherCore has been removed
 Struct _BufferingHasher has been removed
 Struct _HasherTailBuffer has been removed
+Struct _UnwrappingFailed has been removed
 Var Hasher._core has declared type change from _BufferingHasher<Hasher._Core> to Hasher._Core
 Var Hasher._Core._buffer is added to a non-resilient type
 Var Hasher._Core._state in a non-resilient type changes position from 0 to 1
