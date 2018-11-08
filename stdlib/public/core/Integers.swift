@@ -27,8 +27,12 @@ extension ExpressibleByIntegerLiteral
 //===--- AdditiveArithmetic -----------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
+// FIXME: Add doc comment.
 public protocol AdditiveArithmetic : Equatable {
   /// The zero value.
+  ///
+  /// - Note: Zero is the identity element for addition; for any value,
+  ///   `x + .zero == x` and `.zero + x == x`.
   static var zero: Self { get }
 
   /// Adds two values and produces their sum.
@@ -101,6 +105,7 @@ public extension AdditiveArithmetic where Self : ExpressibleByIntegerLiteral {
 //===--- Numeric ----------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
+// FIXME: Update comment based on the `AdditiveArithmetic` change.
 /// Declares methods backing binary arithmetic operators--such as `+`, `-` and
 /// `*`--and their mutating counterparts.
 ///
