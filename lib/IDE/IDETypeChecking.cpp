@@ -28,7 +28,7 @@ using namespace swift;
 
 static bool shouldPrintAsFavorable(const Decl *D, const PrintOptions &Options) {
   if (!Options.TransformContext ||
-      !D->getDeclContext()->isExtensionContext() ||
+      !isa<ExtensionDecl>(D->getDeclContext()) ||
       !Options.TransformContext->isPrintingSynthesizedExtension())
     return true;
   auto DC = Options.TransformContext->getDeclContext();

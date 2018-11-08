@@ -972,7 +972,7 @@ static void validatePatternBindingEntry(TypeChecker &tc,
   // Validate 'static'/'class' on properties in nominal type decls.
   auto StaticSpelling = binding->getStaticSpelling();
   if (StaticSpelling != StaticSpellingKind::None &&
-      binding->getDeclContext()->isExtensionContext()) {
+      isa<ExtensionDecl>(binding->getDeclContext())) {
     if (auto *NTD = binding->getDeclContext()->getSelfNominalTypeDecl()) {
       if (!isa<ClassDecl>(NTD)) {
         if (StaticSpelling == StaticSpellingKind::KeywordClass) {
@@ -2341,8 +2341,16 @@ static bool computeIsSetterMutating(TypeChecker &TC,
   llvm_unreachable("bad storage kind");
 }
 
+static bool shouldUseOpaqueReadAccessor(TypeChecker &TC,
+                                        AbstractStorageDecl *storage) {
+  return storage->getAttrs().hasAttribute<BorrowedAttr>();
+}
+
 static void validateAbstractStorageDecl(TypeChecker &TC,
                                         AbstractStorageDecl *storage) {
+  if (shouldUseOpaqueReadAccessor(TC, storage))
+    storage->setOpaqueReadOwnership(OpaqueReadOwnership::Borrowed);
+
   // isGetterMutating and isSetterMutating are part of the signature
   // of a storage declaration and need to be validated immediately.
   storage->setIsGetterMutating(computeIsGetterMutating(TC, storage));
@@ -4186,7 +4194,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // Validate 'static'/'class' on functions in extensions.
     auto StaticSpelling = FD->getStaticSpelling();
     if (StaticSpelling != StaticSpellingKind::None &&
-        FD->getDeclContext()->isExtensionContext()) {
+        isa<ExtensionDecl>(FD->getDeclContext())) {
       if (auto *NTD = FD->getDeclContext()->getSelfNominalTypeDecl()) {
         if (!isa<ClassDecl>(NTD)) {
           if (StaticSpelling == StaticSpellingKind::KeywordClass) {

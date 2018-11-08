@@ -1,13 +1,6 @@
-
-/* Generic Signature Changes */
 Func MutableCollection._partition(within:by:) has generic signature change from <τ_0_0 where τ_0_0 : MutableCollection, τ_0_0 : RandomAccessCollection> to <τ_0_0 where τ_0_0 : BidirectionalCollection, τ_0_0 : MutableCollection>
 Protocol Numeric has generic signature change from <τ_0_0 : Equatable, τ_0_0 : ExpressibleByIntegerLiteral, τ_0_0.Magnitude : Comparable, τ_0_0.Magnitude : Numeric> to <τ_0_0 : AdditiveArithmetic, τ_0_0 : ExpressibleByIntegerLiteral, τ_0_0.Magnitude : Comparable, τ_0_0.Magnitude : Numeric>
-
-/* RawRepresentable Changes */
-
-/* Removed Decls */
-Class _stdlib_AtomicInt has been removed
-Func BinaryInteger._description(radix:uppercase:) has been removed
+Func MutableCollection._partition(within:by:) has been renamed to Func MutableCollection._partitionImpl(by:)
 Func MutableCollection._heapSort(within:by:) has been removed
 Func MutableCollection._heapify(within:by:) has been removed
 Func MutableCollection._introSort(within:by:) has been removed
@@ -19,14 +12,25 @@ Func Numeric.+(_:_:) has been removed
 Func Numeric.+=(_:_:) has been removed
 Func Numeric.-(_:_:) has been removed
 Func Numeric.-=(_:_:) has been removed
+Func MutableCollection._partition(within:by:) has parameter 0 type change from Range<τ_0_0.Index> to (τ_0_0.Element) throws -> Bool
+
+Func BinaryInteger._description(radix:uppercase:) has been removed
+Struct _Buffer32 has been removed
+Struct _Buffer72 has been removed
 Func _int64ToString(_:radix:uppercase:) has been removed
 Func _int64ToStringImpl(_:_:_:_:_:) has been removed
+Func _uint64ToStringImpl(_:_:_:_:_:) has been removed
+Func _withUninitializedString(_:) has been removed
+
+Class _stdlib_AtomicInt has been removed
 Func _stdlib_atomicCompareExchangeStrongInt(object:expected:desired:) has been removed
 Func _stdlib_atomicCompareExchangeStrongInt32(object:expected:desired:) has been removed
 Func _stdlib_atomicCompareExchangeStrongInt64(object:expected:desired:) has been removed
 Func _stdlib_atomicCompareExchangeStrongUInt32(object:expected:desired:) has been removed
 Func _stdlib_atomicCompareExchangeStrongUInt64(object:expected:desired:) has been removed
 Func _swift_stdlib_atomicFetchAddInt(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchAddInt32(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchAddInt64(object:operand:) has been removed
 Func _swift_stdlib_atomicFetchAddUInt32(object:operand:) has been removed
 Func _swift_stdlib_atomicFetchAddUInt64(object:operand:) has been removed
 Func _swift_stdlib_atomicFetchAndInt(object:operand:) has been removed
@@ -54,20 +58,11 @@ Func _swift_stdlib_atomicStoreInt32(object:desired:) has been removed
 Func _swift_stdlib_atomicStoreInt64(object:desired:) has been removed
 Func _swift_stdlib_atomicStoreUInt32(object:desired:) has been removed
 Func _swift_stdlib_atomicStoreUInt64(object:desired:) has been removed
-Func _uint64ToStringImpl(_:_:_:_:_:) has been removed
+
+Struct Hasher._Core has removed conformance to _HasherCore
 Protocol _HasherCore has been removed
-Struct _Buffer32 has been removed
-Struct _Buffer72 has been removed
 Struct _BufferingHasher has been removed
 Struct _HasherTailBuffer has been removed
-
-/* Moved Decls */
-
-/* Renamed Decls */
-Func MutableCollection._partition(within:by:) has been renamed to Func MutableCollection._partitionImpl(by:)
-
-/* Type Changes */
-Func MutableCollection._partition(within:by:) has parameter 0 type change from Range<τ_0_0.Index> to (τ_0_0.Element) throws -> Bool
 Var Hasher._core has declared type change from _BufferingHasher<Hasher._Core> to Hasher._Core
 Var Hasher._Core._buffer is added to a non-resilient type
 Var Hasher._Core._state in a non-resilient type changes position from 0 to 1
@@ -83,4 +78,3 @@ Struct Hasher._Core has removed conformance to _HasherCore
 
 /* Decl Attribute changes */
 
-/* Protocol Requirement Changes */

@@ -105,18 +105,17 @@ testCharacters += [
   "\u{00a9}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 10 bytes
 ]
 
-// Only run it on ObjC platforms. Supported Linux versions do not have a
-// recent enough ICU
-#if _runtime(_ObjC)
-testCharacters += [
-  "\u{00a9}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 12 bytes
-  "\u{00a9}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 14 bytes
-  "\u{00a9}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 16 bytes
+// Only run it on recent enough versions of ICU
+if #available(iOS 11.0, macOS 10.13, tvOS 11.0, watchOS 4.0, *) {
+  testCharacters += [
+    "\u{00a9}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 12 bytes
+    "\u{00a9}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 14 bytes
+    "\u{00a9}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 16 bytes
 
-  "👩🏽‍💼", // UTF-8: 15 bytes
-  "👩‍👩‍👦‍👦", // UTF-8: 25 bytes
-]
-#endif
+    "👩🏽‍💼", // UTF-8: 15 bytes
+    "👩‍👩‍👦‍👦", // UTF-8: 25 bytes
+  ]
+}
 
 func randomGraphemeCluster(_ minSize: Int, _ maxSize: Int) -> String {
   let n = Int.random(in: (minSize + 1) ..< maxSize)

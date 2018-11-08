@@ -118,7 +118,6 @@ func _stdlib_atomicLoadARCRef(
 // These pieces are used in ThreadLocalStorage.swift in debug builds.
 // For tests, see similar functions from SwiftPrivate/AtomicInt.swift.gyb
 //===----------------------------------------------------------------------===//
-#if INTERNAL_CHECKS_ENABLED
 internal func _swift_stdlib_atomicLoadInt(
   object target: UnsafeMutablePointer<Int>) -> Int {
 #if arch(i386) || arch(arm)
@@ -133,7 +132,6 @@ internal func _swift_stdlib_atomicLoadInt(
 % for bits in [ 32, 64 ]:
 
 // Warning: no overflow checking.
-@inlinable // FIXME(sil-serialize-all)
 internal func _swift_stdlib_atomicFetchAddInt${bits}(
   object target: UnsafeMutablePointer<Int${bits}>,
   operand: Int${bits}) -> Int${bits} {
@@ -162,7 +160,6 @@ internal func _swift_stdlib_atomicFetchAddInt(
 #endif
   return Int(value)
 }
-#endif // INTERNAL_CHECKS_ENABLED
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
@@ -178,8 +175,7 @@ internal struct _Buffer32 {
 
   internal mutating func withBytes<Result>(
     _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
-  ) rethrows -> Result
-  {
+  ) rethrows -> Result {
     return try withUnsafeMutablePointer(to: &self) {
       try body(UnsafeMutableRawPointer($0).assumingMemoryBound(to: UInt8.self))
     }
@@ -195,8 +191,7 @@ internal struct _Buffer72 {
 
   internal mutating func withBytes<Result>(
     _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
-  ) rethrows -> Result
-  {
+  ) rethrows -> Result {
     return try withUnsafeMutablePointer(to: &self) {
       try body(UnsafeMutableRawPointer($0).assumingMemoryBound(to: UInt8.self))
     }

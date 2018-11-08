@@ -1787,10 +1787,7 @@ void ConstraintSystem::partitionForDesignatedTypes(
     auto *funcDecl = cast<FuncDecl>(decl);
 
     auto *parentDC = funcDecl->getParent();
-    auto *parentDecl = parentDC->getAsDecl();
-
-    if (parentDC->isExtensionContext())
-      parentDecl = cast<ExtensionDecl>(parentDecl)->getExtendedNominal();
+    auto *parentDecl = parentDC->getSelfNominalTypeDecl();
 
     for (auto designatedTypeIndex : indices(designatedNominalTypes)) {
       auto *designatedNominal =
@@ -1800,7 +1797,7 @@ void ConstraintSystem::partitionForDesignatedTypes(
         continue;
 
       auto &constraints =
-          parentDC->isExtensionContext()
+          isa<ExtensionDecl>(parentDC)
               ? definedInExtensionOfDesignatedType[designatedTypeIndex]
               : definedInDesignatedType[designatedTypeIndex];
 

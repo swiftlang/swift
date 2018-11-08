@@ -883,7 +883,7 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   DeclContext *context = FD->getDeclContext();
 
   // Methods from extensions don't go into vtables (yet).
-  if (context->isExtensionContext())
+  if (isa<ExtensionDecl>(context))
     return SubclassScope::NotApplicable;
 
   // Various forms of thunks don't either.
@@ -912,6 +912,8 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   case AccessLevel::Public:
     return SubclassScope::Internal;
   case AccessLevel::Open:
+    if (classType->isResilient())
+      return SubclassScope::Internal;
     return SubclassScope::External;
   }
 

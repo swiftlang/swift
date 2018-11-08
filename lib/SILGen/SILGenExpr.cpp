@@ -2617,6 +2617,14 @@ loadIndexValuesForKeyPathComponent(SILGenFunction &SGF, SILLocation loc,
   return indexValues;
 }
 
+static AccessorDecl *
+getRepresentativeAccessorForKeyPath(AbstractStorageDecl *storage) {
+  if (storage->requiresOpaqueGetter())
+    return storage->getGetter();
+  assert(storage->requiresOpaqueReadCoroutine());
+  return storage->getReadCoroutine();
+}
+
 static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
                          SILLocation loc,
                          AbstractStorageDecl *property,
@@ -2629,16 +2637,16 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   // back to the declaration whose getter introduced the witness table
   // entry.
   if (isa<ProtocolDecl>(property->getDeclContext())) {
-    auto getter = property->getGetter();
-    if (!SILDeclRef::requiresNewWitnessTableEntry(getter)) {
+    auto accessor = getRepresentativeAccessorForKeyPath(property);
+    if (!SILDeclRef::requiresNewWitnessTableEntry(accessor)) {
       // Find the getter that does have a witness table entry.
-      auto wtableGetter =
-        cast<AccessorDecl>(SILDeclRef::getOverriddenWitnessTableEntry(getter));
+      auto wtableAccessor =
+        cast<AccessorDecl>(SILDeclRef::getOverriddenWitnessTableEntry(accessor));
 
       // Substitute the 'Self' type of the base protocol.
       subs = SILGenModule::mapSubstitutionsForWitnessOverride(
-              getter, wtableGetter, subs);
-      property = wtableGetter->getStorage();
+              accessor, wtableAccessor, subs);
+      property = wtableAccessor->getStorage();
     }
   }
 
@@ -3239,7 +3247,7 @@ getIdForKeyPathComponentComputedProperty(SILGenModule &SGM,
     // observed property into a stored property.
     strategy = strategy.getReadStrategy();
     if (strategy.getKind() != AccessStrategy::Storage ||
-        !storage->getGetter()) {
+        !getRepresentativeAccessorForKeyPath(storage)) {
       return getIdForKeyPathComponentComputedProperty(SGM, storage, strategy);
     }
     LLVM_FALLTHROUGH;
@@ -3250,12 +3258,13 @@ getIdForKeyPathComponentComputedProperty(SILGenModule &SGM,
     // TODO: If the getter has shared linkage (say it's synthesized for a
     // Clang-imported thing), we'll need some other sort of
     // stable identifier.
-    auto getterRef = SILDeclRef(storage->getGetter(), SILDeclRef::Kind::Func);
+    auto getterRef = SILDeclRef(getRepresentativeAccessorForKeyPath(storage),
+                                SILDeclRef::Kind::Func);
     return SGM.getFunction(getterRef, NotForDefinition);
   }
   case AccessStrategy::DispatchToAccessor: {
     // Identify the property by its vtable or wtable slot.
-    return SGM.getAccessorDeclRef(storage->getGetter());
+    return SGM.getAccessorDeclRef(getRepresentativeAccessorForKeyPath(storage));
   }
   case AccessStrategy::BehaviorStorage:
     llvm_unreachable("unpossible");
@@ -3336,7 +3345,8 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
         // Properties that only dispatch via ObjC lookup do not have nor need
         // property descriptors, since the selector identifies the storage.
         && (!storage->hasAnyAccessors()
-            || !getAccessorDeclRef(storage->getGetter()).isForeign);
+            || !getAccessorDeclRef(getRepresentativeAccessorForKeyPath(storage))
+                  .isForeign);
     };
   
   auto strategy = storage->getAccessStrategy(AccessSemantics::Ordinary,

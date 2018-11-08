@@ -187,7 +187,6 @@ private func determineCodeUnitCapacity(_ desiredCapacity: Int) -> Int {
 
 // Creation
 extension _StringStorage {
-  @inline(never) // rdar://problem/44542202
   @_effects(releasenone)
   private static func create(
     realCodeUnitCapacity: Int, countAndFlags: CountAndFlags
