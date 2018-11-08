@@ -173,3 +173,35 @@ public struct TestBorrowedProperty {
   @_borrowed
   public var borrowedString = ""
 }
+
+protocol ReadableTitle {
+  @_borrowed
+  var title: String { get }
+}
+class OverridableGetter : ReadableTitle {
+  var title: String = ""
+}
+//   The concrete read accessor is generated on-demand and does a class dispatch to the getter.
+// CHECK-LABEL: sil shared @$s13read_accessor17OverridableGetterC5titleSSvr
+// CHECK:       class_method %0 : $OverridableGetter, #OverridableGetter.title!getter.1
+// CHECK-LABEL: // end sil function '$s13read_accessor17OverridableGetterC5titleSSvr'
+//   The read witness thunk does a direct call to the concrete read accessor.
+// CHECK-LABEL: sil private [transparent] [thunk] @$s13read_accessor17OverridableGetterCAA13ReadableTitleA2aDP5titleSSvrTW
+// CHECK:       function_ref @$s13read_accessor17OverridableGetterC5titleSSvr
+// CHECK-LABEL: // end sil function '$s13read_accessor17OverridableGetterCAA13ReadableTitleA2aDP5titleSSvrTW'
+
+protocol GettableTitle {
+  var title: String { get }
+}
+class OverridableReader : GettableTitle {
+  @_borrowed
+  var title: String = ""
+}
+//   The concrete getter is generated on-demand and does a class dispatch to the read accessor.
+// CHECK-LABEL: sil shared @$s13read_accessor17OverridableReaderC5titleSSvg
+// CHECK:       class_method %0 : $OverridableReader, #OverridableReader.title!read.1
+// CHECK-LABEL: // end sil function '$s13read_accessor17OverridableReaderC5titleSSvg'
+//   The getter witness thunk does a direct call to the concrete getter.
+// CHECK-LABEL: sil private [transparent] [thunk] @$s13read_accessor17OverridableReaderCAA13GettableTitleA2aDP5titleSSvgTW
+// CHECK:       function_ref @$s13read_accessor17OverridableReaderC5titleSSvg
+// CHECK-LABEL: // end sil function '$s13read_accessor17OverridableReaderCAA13GettableTitleA2aDP5titleSSvgTW'

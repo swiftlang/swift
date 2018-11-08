@@ -3064,10 +3064,9 @@ public:
           abort();
         }
 
-        if (AD->getAccessorKind() != AccessorKind::Read &&
-            AD->getAccessorKind() != AccessorKind::Modify) {
-          Out << "hasForcedStaticDispatch() set on accessor other than "
-                 "read or modify\n";
+        if (AD->getStorage()->requiresOpaqueAccessor(AD->getAccessorKind())) {
+          Out << "hasForcedStaticDispatch() set on accessor that's opaque "
+                 "for its storage\n";
           abort();
         }
       }
