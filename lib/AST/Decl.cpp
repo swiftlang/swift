@@ -2418,7 +2418,7 @@ bool ValueDecl::isUsableFromInline() const {
 
 /// Return the access level of an internal or public declaration
 /// that's been testably imported.
-static AccessLevel getTestableAccess(const ValueDecl *decl) {
+static AccessLevel getTestableOrPrivateImportsAccess(const ValueDecl *decl) {
   // Non-final classes are considered open to @testable importers.
   if (auto cls = dyn_cast<ClassDecl>(decl)) {
     if (!cls->isFinal())
@@ -2432,22 +2432,6 @@ static AccessLevel getTestableAccess(const ValueDecl *decl) {
   }
 
   // Everything else is considered public.
-  return AccessLevel::Public;
-}
-
-static AccessLevel getPrivateImportsAccess(const ValueDecl *decl) {
-  // Non-final classes are considered open to @_private(sourceFile:) importers.
-  if (auto cls = dyn_cast<ClassDecl>(decl)) {
-    if (!cls->isFinal())
-      return AccessLevel::Open;
-
-  // Non-final overridable class members are considered open to
-  // @_private(sourceFile:) importers.
-  } else if (decl->isPotentiallyOverridable()) {
-    if (!cast<ValueDecl>(decl)->isFinal())
-      return AccessLevel::Open;
-  }
-
   return AccessLevel::Public;
 }
 
@@ -2467,18 +2451,16 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
   }
 
   if (useDC) {
-    // Check whether we need to modific the access level based on
+    // Check whether we need to modify the access level based on
     // @testable/@_private import attributes.
     auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
     if (!useSF) return access;
-    if (access == AccessLevel::Internal || access == AccessLevel::Public) {
-      if (useSF->hasTestableImport(VD->getModuleContext())){
-        return getTestableAccess(VD);
-      } else if (useSF->hasPrivateImport(access, VD)) {
-        return getPrivateImportsAccess(VD);
-      }
-    } else if (useSF->hasPrivateImport(access, VD))
-      return getPrivateImportsAccess(VD);
+    if (useSF->hasPrivateImport(access, VD))
+      return getTestableOrPrivateImportsAccess(VD);
+    if ((access == AccessLevel::Internal || access == AccessLevel::Public) &&
+        useSF->hasTestableImport(VD->getModuleContext())) {
+      return getTestableOrPrivateImportsAccess(VD);
+    }
   }
 
   return access;
@@ -2504,19 +2486,18 @@ AccessLevel ValueDecl::getEffectiveAccess() const {
     break;
   case AccessLevel::Public:
   case AccessLevel::Internal:
-    if (getModuleContext()->isTestingEnabled())
-      effectiveAccess = getTestableAccess(this);
-    if (getModuleContext()->arePrivateImportsEnabled())
-      effectiveAccess = getPrivateImportsAccess(this);
+    if (getModuleContext()->isTestingEnabled() ||
+        getModuleContext()->arePrivateImportsEnabled())
+      effectiveAccess = getTestableOrPrivateImportsAccess(this);
     break;
   case AccessLevel::FilePrivate:
     if (getModuleContext()->arePrivateImportsEnabled())
-      effectiveAccess = getPrivateImportsAccess(this);
+      effectiveAccess = getTestableOrPrivateImportsAccess(this);
     break;
   case AccessLevel::Private:
     effectiveAccess = AccessLevel::FilePrivate;
     if (getModuleContext()->arePrivateImportsEnabled())
-      effectiveAccess = getPrivateImportsAccess(this);
+      effectiveAccess = getTestableOrPrivateImportsAccess(this);
     break;
   }
 

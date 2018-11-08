@@ -1410,9 +1410,9 @@ bool SourceFile::hasPrivateImport(AccessLevel accessLevel,
                                std::pair<ImportOptions, StringRef>>;
 
   auto *module = ofDecl->getModuleContext();
-
-  if (accessLevel == AccessLevel::Internal ||
-      accessLevel == AccessLevel::Public) {
+  switch (accessLevel) {
+  case AccessLevel::Internal:
+  case AccessLevel::Public:
     // internal/public access only needs an import marked as @_private. The
     // filename does not need to match (and we don't serialize it for such
     // decls).
@@ -1422,7 +1422,14 @@ bool SourceFile::hasPrivateImport(AccessLevel accessLevel,
                                 importPair.second.first.contains(
                                     ImportFlags::PrivateImport);
                        });
+  case AccessLevel::Open:
+    return true;
+  case AccessLevel::FilePrivate:
+  case AccessLevel::Private:
+    // Fallthrough.
+    break;
   }
+
   auto *DC = ofDecl->getDeclContext();
   if (!DC)
     return false;
@@ -1433,9 +1440,6 @@ bool SourceFile::hasPrivateImport(AccessLevel accessLevel,
   StringRef filename;
   if (auto *file = dyn_cast<LoadedFile>(scope)) {
     filename = file->getFilenameForPrivateDecl(ofDecl);
-  } else if (auto *file = dyn_cast<SourceFile>(scope)) {
-    // Source files cannot be imported from another module.
-    return false;
   } else
     return false;
 

@@ -1439,7 +1439,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       auto ForLoc = consumeToken();
 
       // Parse ':'.
-      if (Tok.getText() != ":") {
+      if (Tok.getKind() != tok::colon) {
         diagnose(ForLoc, diag::attr_private_import_expected_colon);
         return false;
       }

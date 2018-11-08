@@ -856,13 +856,14 @@ public:
     Testable = 0x2,
 
     /// This source file has access to private declarations in the imported
-    /// moduled.
+    /// module.
     PrivateImport = 0x4,
   };
 
   /// \see ImportFlags
   using ImportOptions = OptionSet<ImportFlags>;
 
+  typedef std::pair<ImportOptions, StringRef> ImportOptionsAndFilename;
 private:
   std::unique_ptr<LookupCache> Cache;
   LookupCache &getCache() const;
@@ -870,8 +871,7 @@ private:
   /// This is the list of modules that are imported by this module.
   ///
   /// This is filled in by the Name Binding phase.
-  ArrayRef<std::pair<ModuleDecl::ImportedModule,
-                     std::pair<ImportOptions, StringRef>>>
+  ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptionsAndFilename>>
       Imports;
 
   /// A unique identifier representing this file; used to mark private decls
@@ -976,9 +976,9 @@ public:
              ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,
              bool KeepSyntaxTree = false);
 
-  void addImports(ArrayRef<std::pair<ModuleDecl::ImportedModule,
-                                     std::pair<ImportOptions, StringRef>>>
-                      IM);
+  void addImports(
+      ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptionsAndFilename>>
+          IM);
 
   bool hasTestableImport(const ModuleDecl *module) const;
 
@@ -1262,7 +1262,7 @@ public:
     auto it = FilenameForPrivateDecls.find(decl);
     if (it == FilenameForPrivateDecls.end())
       return StringRef();
-    else return it->second.str();
+    return it->second.str();
   }
 
   /// Look up an operator declaration.
