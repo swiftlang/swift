@@ -285,7 +285,8 @@ public:
                       IsSerialized_t isSerialized);
 
   // Whether a conformance should be serialized.
-  static bool conformanceIsSerialized(ProtocolConformance *conformance);
+  static bool
+  conformanceIsSerialized(const NormalProtocolConformance *conformance);
 
   /// Call \c fn on each (split apart) conditional requirement of \c conformance
   /// that should appear in a witness table, i.e., conformance requirements that

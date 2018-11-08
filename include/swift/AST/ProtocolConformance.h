@@ -549,6 +549,10 @@ public:
   /// modules, but in a manner that ensures that all copies are equivalent.
   bool isSynthesizedNonUnique() const;
 
+  /// Whether clients from outside the module can rely on the value witnesses
+  /// being consistent across versions of the framework.
+  bool isResilient() const;
+
   /// Retrieve the type witness and type decl (if one exists)
   /// for the given associated type.
   std::pair<Type, TypeDecl *>

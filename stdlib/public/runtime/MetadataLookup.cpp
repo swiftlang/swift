@@ -227,6 +227,29 @@ static const TypeContextDescriptor *
 _findNominalTypeDescriptor(Demangle::NodePointer node,
                            Demangle::Demangler &Dem);
 
+/// Find the context descriptor for the type extended by the given extension.
+static const TypeContextDescriptor *
+_findExtendedTypeContextDescriptor(const ExtensionContextDescriptor *extension,
+                                   Demangle::NodePointer *demangledNode
+                                     = nullptr) {
+  Demangle::NodePointer localNode;
+  Demangle::NodePointer &node = demangledNode ? *demangledNode : localNode;
+
+  auto mangledName = extension->getMangledExtendedContext();
+  auto demangler = getDemanglerForRuntimeTypeResolution();
+  node = demangler.demangleType(mangledName);
+  if (!node)
+    return nullptr;
+  if (node->getKind() == Node::Kind::Type) {
+    if (node->getNumChildren() < 1)
+      return nullptr;
+    node = node->getChild(0);
+  }
+  node = stripGenericArgsFromContextNode(node, demangler);
+
+  return _findNominalTypeDescriptor(node, demangler);
+}
+
 /// Recognize imported tag types, which have a special mangling rule.
 ///
 /// This should be kept in sync with the AST mangler and with
@@ -392,24 +415,15 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
       
       // Check that the context being extended matches as well.
       auto extendedContextNode = node->getChild(1);
-      auto extendedContextMangledName = extension->getMangledExtendedContext();
       auto demangler = getDemanglerForRuntimeTypeResolution();
-      auto extendedContextDemangled =
-         demangler.demangleType(extendedContextMangledName);
-      if (!extendedContextDemangled)
-        return false;
-      if (extendedContextDemangled->getKind() == Node::Kind::Type) {
-        if (extendedContextDemangled->getNumChildren() < 1)
-          return false;
-        extendedContextDemangled = extendedContextDemangled->getChild(0);
-      }
-      extendedContextDemangled =
-        stripGenericArgsFromContextNode(extendedContextDemangled, demangler);
-      
+
       auto extendedDescriptorFromNode =
         _findNominalTypeDescriptor(extendedContextNode, demangler);
+
+      Demangle::NodePointer extendedContextDemangled;
       auto extendedDescriptorFromDemangled =
-        _findNominalTypeDescriptor(extendedContextDemangled, demangler);
+        _findExtendedTypeContextDescriptor(extension,
+                                           &extendedContextDemangled);
 
       // Determine whether the contexts match.
       bool contextsMatch =
@@ -418,6 +432,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
                       extendedDescriptorFromDemangled);
       
 #if SWIFT_OBJC_INTEROP
+      // If we have manglings of the same Objective-C type, the contexts match.
       if (!contextsMatch &&
           (!extendedDescriptorFromNode || !extendedDescriptorFromDemangled) &&
           sameObjCTypeManglings(extendedContextNode,
@@ -804,6 +819,13 @@ Optional<unsigned> swift::_depthIndexToFlatIndex(
 bool swift::_gatherGenericParameterCounts(
                                  const ContextDescriptor *descriptor,
                                  std::vector<unsigned> &genericParamCounts) {
+  // If we have an extension descriptor, extract the extended type and use
+  // that.
+  if (auto extension = dyn_cast<ExtensionContextDescriptor>(descriptor)) {
+    if (auto extendedType = _findExtendedTypeContextDescriptor(extension))
+      descriptor = extendedType;
+  }
+
   // Once we hit a non-generic descriptor, we're done.
   if (!descriptor->isGeneric()) return false;
 
@@ -1396,6 +1418,25 @@ const Metadata *SubstGenericParametersFromWrittenArgs::operator()(
   return nullptr;
 }
 
+/// Demangle the given type name to a generic parameter reference, which
+/// will be returned as (depth, index).
+static Optional<std::pair<unsigned, unsigned>>
+demangleToGenericParamRef(StringRef typeName) {
+  Demangler demangler;
+  NodePointer node = demangler.demangleType(typeName);
+  if (!node)
+    return None;
+
+  // Find the flat index that the right-hand side refers to.
+  if (node->getKind() == Demangle::Node::Kind::Type)
+    node = node->getChild(0);
+  if (node->getKind() != Demangle::Node::Kind::DependentGenericParamType)
+    return None;
+
+  return std::pair<unsigned, unsigned>(node->getChild(0)->getIndex(),
+                                       node->getChild(1)->getIndex());
+}
+
 void swift::gatherWrittenGenericArgs(
                              const Metadata *metadata,
                              const TypeContextDescriptor *description,
@@ -1462,21 +1503,23 @@ void swift::gatherWrittenGenericArgs(
     if (req.Flags.getKind() != GenericRequirementKind::SameType)
       continue;
 
-    // Where the left-hand side is a generic parameter.
-    if (req.Param.begin() != req.Param.end())
+    auto lhsParam = demangleToGenericParamRef(req.getParam());
+    if (!lhsParam)
       continue;
 
     // If we don't yet have an argument for this parameter, it's a
     // same-type-to-concrete constraint.
-    unsigned lhsFlatIndex = req.Param.getRootParamIndex();
-    if (lhsFlatIndex >= allGenericArgs.size())
+    auto lhsFlatIndex =
+      _depthIndexToFlatIndex(lhsParam->first, lhsParam->second,
+                             genericParamCounts);
+    if (!lhsFlatIndex || *lhsFlatIndex >= allGenericArgs.size())
       continue;
 
-    if (!allGenericArgs[lhsFlatIndex]) {
+    if (!allGenericArgs[*lhsFlatIndex]) {
       // Substitute into the right-hand side.
       SubstGenericParametersFromWrittenArgs substitutions(allGenericArgs,
                                                           genericParamCounts);
-      allGenericArgs[lhsFlatIndex] =
+      allGenericArgs[*lhsFlatIndex] =
           _getTypeByMangledName(req.getMangledTypeName(), substitutions);
       continue;
     }
@@ -1484,28 +1527,20 @@ void swift::gatherWrittenGenericArgs(
     // If we do have an argument for this parameter, it might be that
     // the right-hand side is itself a generic parameter, which means
     // we have a same-type constraint A == B where A is already filled in.
-    Demangler demangler;
-    NodePointer node = demangler.demangleType(req.getMangledTypeName());
-    if (!node)
-      continue;
-
-    // Find the flat index that the right-hand side refers to.
-    if (node->getKind() == Demangle::Node::Kind::Type)
-      node = node->getChild(0);
-    if (node->getKind() != Demangle::Node::Kind::DependentGenericParamType)
+    auto rhsParam = demangleToGenericParamRef(req.getMangledTypeName());
+    if (!rhsParam)
       continue;
 
     auto rhsFlatIndex =
-      _depthIndexToFlatIndex(node->getChild(0)->getIndex(),
-                             node->getChild(1)->getIndex(),
+      _depthIndexToFlatIndex(rhsParam->first, rhsParam->second,
                              genericParamCounts);
     if (!rhsFlatIndex || *rhsFlatIndex >= allGenericArgs.size())
       continue;
 
-    if (allGenericArgs[*rhsFlatIndex] || !allGenericArgs[lhsFlatIndex])
+    if (allGenericArgs[*rhsFlatIndex] || !allGenericArgs[*lhsFlatIndex])
       continue;
 
-    allGenericArgs[*rhsFlatIndex] = allGenericArgs[lhsFlatIndex];
+    allGenericArgs[*rhsFlatIndex] = allGenericArgs[*lhsFlatIndex];
   }
 }
 

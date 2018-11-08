@@ -113,7 +113,7 @@ Globals
   global ::= context 'MXE'               // extension descriptor
   global ::= context 'MXX'               // anonymous context descriptor
   global ::= context identifier 'MXY'    // anonymous context descriptor
-  global ::= type assoc-type-list 'MXA'  // generic parameter ref
+  global ::= type assoc-type-list 'MXA'  // generic parameter ref (HISTORICAL)
   global ::= protocol 'Mp'               // protocol descriptor
 
   global ::= nominal-type 'Mo'           // class metadata immediate member base offset
