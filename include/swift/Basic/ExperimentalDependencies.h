@@ -26,55 +26,76 @@ class SourceFile;
 
 /// Emit a Swift-style dependencies file for \p SF.
 namespace experimental_dependencies {
-bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
-                               const DependencyTracker &depTracker,
-                               StringRef outputPath);
-
+  bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
+                                 const DependencyTracker &depTracker,
+                                 StringRef outputPath);
+  
   class Node {
   public:
-    Node(Node* container,
+    enum class Kind { topLevel, nominalAndBlankMembers, member, dynamicLookup, externalDepend,
+      sourceFileProvide, end };
+
+    Node(Kind kind,
+         Node* container,
          std::vector<Node*> containees,
          std::string fingerprint,
          std::string nameForDependencies) :
+    kind(kind),
     container(container), containees(containees), fingerprint(fingerprint), nameForDependencies(nameForDependencies)
     {}
     
     virtual ~Node() = default;
+    Kind kind;
     Node* container;
     std::vector<Node*> containees;
     std::string fingerprint;
     std::string nameForDependencies;
+    
+    uint sequenceNumberInGraph;
+    
+    // sequence numbers of arcs pointing to and from this node.
+    std::vector<uint> arrivals, departures;
   };
   
-  class SourceFileNode: public Node {
-  public:
-    std::string swiftDepsPath() const { return nameForDependencies; }
-    SourceFileNode(StringRef swiftDepsPath, StringRef interfaceHash) : Node(nullptr, {}, interfaceHash, swiftDepsPath) {}
-    virtual ~SourceFileNode() = default;
-  };
   
   class DeclNode: public Node {
   public:
-    enum class Kind { topLevel, nominalAndBlankMembers, member, dynamicLookup };
+    /// can be null, for the target of a dependency
     const Decl *D;
-    Kind kind;
-
-    DeclNode(const Decl *D,
+    
+    DeclNode(Kind kind,
+             const Decl *D,
              Node* container,
              std::string fingerprint,
-             StringRef nameForDependencies,
-             Kind kind) :
-    Node(container, {}, fingerprint, nameForDependencies),
-    D(D), kind(kind) {}
+             StringRef nameForDependencies) :
+    Node(kind, container, {}, fingerprint, nameForDependencies),
+    D(D) {
+      container->containees.push_back(this);
+    }
     ~DeclNode() = default;
+  };
+  
+  
+  class Arc {
+  public:
+    const uint tailSeqNo, headSeqNo;
+    Arc(const Node* tail, const Node* head) :
+    tailSeqNo(tail->sequenceNumberInGraph), headSeqNo(head->sequenceNumberInGraph) {}
   };
   
   class Graph {
     std::vector<Node*> allNodes;
   public:
-    void addNode(Node* n) {allNodes.push_back(n); }
+    void addNode(Node* n) {
+      n->sequenceNumberInGraph = allNodes.size();
+      allNodes.push_back(n);
+    }
+    void addArc(const Arc arc) {
+      allNodes[arc.tailSeqNo]->departures.push_back(arc.headSeqNo);
+      allNodes[arc.headSeqNo]->arrivals  .push_back(arc.tailSeqNo);
+    }
   };
-
+  
 } // end namespace experimental_dependencies
 } // end namespace swift
 
