@@ -2466,10 +2466,10 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
                      Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS) {
   if (isa<ConstructorDecl>(Requirement)) {
     if (auto CD = Adopter->getSelfClassDecl()) {
-      if (!CD->isFinal() && Adopter->isExtensionContext()) {
-          // In this case, user should mark class as 'final' or define
-          // 'required' initializer directly in the class definition.
-          return false;
+      if (!CD->isFinal() && isa<ExtensionDecl>(Adopter)) {
+        // In this case, user should mark class as 'final' or define
+        // 'required' initializer directly in the class definition.
+        return false;
       }
     }
   }
@@ -2508,7 +2508,7 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
       if (auto CD = Adopter->getSelfClassDecl()) {
         if (!CD->isFinal()) {
           Printer << "required ";
-        } else if (Adopter->isExtensionContext()) {
+        } else if (isa<ExtensionDecl>(Adopter)) {
           Printer << "convenience ";
         }
       }
@@ -2530,7 +2530,7 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     };
     Options.setBaseType(AdopterTy);
     Options.CurrentModule = Adopter->getParentModule();
-    if (!Adopter->isExtensionContext()) {
+    if (!isa<ExtensionDecl>(Adopter)) {
       // Create a variable declaration instead of a computed property in
       // nominal types
       Options.PrintPropertyAccessors = false;

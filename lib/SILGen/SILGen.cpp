@@ -507,7 +507,7 @@ SILGenModule::getOrCreateProfilerForConstructors(DeclContext *ctx,
   // distinct files. For extensions, just pass in the constructor, because
   // there are no stored property initializers to visit.
   Decl *decl = nullptr;
-  if (ctx->isExtensionContext())
+  if (isa<ExtensionDecl>(ctx))
     decl = cd;
   else
     decl = ctx->getSelfNominalTypeDecl();
