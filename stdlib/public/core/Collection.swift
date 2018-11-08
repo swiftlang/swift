@@ -930,10 +930,7 @@ extension Collection {
   ) -> Element? {
     guard !isEmpty else { return nil }
     let random = Int.random(in: 0 ..< count, using: &generator)
-    let idx = index(
-      startIndex,
-      offsetBy: random
-    )
+    let idx = index(startIndex, offsetBy: random)
     return self[idx]
   }
 
