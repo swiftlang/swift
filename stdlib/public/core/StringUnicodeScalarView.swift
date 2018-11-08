@@ -161,12 +161,41 @@ extension String.UnicodeScalarView: BidirectionalCollection {
     @inline(__always) get {
       String(_guts)._boundsCheck(position)
       let i = _guts.scalarAlign(position)
-      if _fastPath(_guts.isFastUTF8) {
-        return _guts.fastUTF8Scalar(startingAt: i.encodedOffset)
-      }
-
-      return _foreignSubscript(aligned: i)
+      return _guts.errorCorrectedScalar(startingAt: i.encodedOffset).0
     }
+  }
+}
+
+extension String.UnicodeScalarView {
+  @_fixed_layout
+  public struct Iterator: IteratorProtocol {
+    @usableFromInline
+    internal var _guts: _StringGuts
+
+    @usableFromInline
+    internal var _position: Int = 0
+
+    @usableFromInline
+    internal var _end: Int
+
+    @inlinable
+    internal init(_ guts: _StringGuts) {
+      self._guts = guts
+      self._end = guts.count
+    }
+
+    @inlinable
+    public mutating func next() -> Unicode.Scalar? {
+      guard _fastPath(_position < _end) else { return nil }
+
+      let (result, len) = _guts.errorCorrectedScalar(startingAt: _position)
+      _position &+= len
+      return result
+    }
+  }
+  @inlinable
+  public __consuming func makeIterator() -> Iterator {
+    return Iterator(_guts)
   }
 }
 
@@ -402,15 +431,5 @@ extension String.UnicodeScalarView {
     let len = _isTrailingSurrogate(cu) ? 2 : 1
 
     return i.encoded(offsetBy: -len)
-  }
-
-  @usableFromInline @inline(never)
-  @_effects(releasenone)
-  internal func _foreignSubscript(aligned i: Index) -> Unicode.Scalar {
-    _sanityCheck(_guts.isForeign)
-    _sanityCheck(_guts.isOnUnicodeScalarBoundary(i),
-      "should of been aligned prior")
-
-    return _guts.foreignErrorCorrectedScalar(startingAt: i).0
   }
 }

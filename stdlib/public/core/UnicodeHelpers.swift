@@ -262,6 +262,7 @@ extension _StringGuts {
 #endif
   }
 
+  @usableFromInline
   @_effects(releasenone)
   internal func foreignErrorCorrectedScalar(
     startingAt idx: String.Index
@@ -373,5 +374,21 @@ extension _StringGuts {
     _sanityCheck(idx.encodedOffset > 0,
       "Error-correction shouldn't give trailing surrogate at position zero")
     return String.Index(encodedOffset: idx.encodedOffset &- 1)
+  }
+}
+
+// Higher level aggregate operations. These should only be called when the
+// result is the sole operation done by a caller, otherwise it's always more
+// efficient to use `withFastUTF8` in the caller.
+extension _StringGuts {
+  @inlinable @inline(__always)
+  internal func errorCorrectedScalar(
+    startingAt i: Int
+  ) -> (Unicode.Scalar, scalarLength: Int) {
+    if _fastPath(isFastUTF8) {
+      return withFastUTF8 { _decodeScalar($0, startingAt: i) }
+    }
+    return foreignErrorCorrectedScalar(
+      startingAt: String.Index(encodedOffset: i))
   }
 }
