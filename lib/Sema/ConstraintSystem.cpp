@@ -2401,19 +2401,6 @@ ConstraintSystem::isConversionNonEphemeral(ConversionRestrictionKind conversion,
       return access.getKind() == AccessStrategy::Storage;
     };
 
-    auto isSimpleMember = [&](Expr *baseExpr, ValueDecl *member) -> bool {
-      if (!isDirectlyAccessedStoredVar(member))
-        return false;
-
-      // The member is simple if it is either static
-      if (member->isStatic())
-        return true;
-
-      // ... or it's an instance member on an lvalue struct base.
-      auto lvalueTy = simplifyType(getType(baseExpr))->getAs<LValueType>();
-      return lvalueTy && lvalueTy->getObjectType()->is<StructType>();
-    };
-
     auto isValidBaseDecl = [&](ValueDecl *baseDecl) -> bool {
       if (!isDirectlyAccessedStoredVar(baseDecl))
         return false;
@@ -2433,6 +2420,14 @@ ConstraintSystem::isConversionNonEphemeral(ConversionRestrictionKind conversion,
         continue;
       }
 
+      // Look through load exprs. These can occur when projecting through a
+      // property on a class, which we want to support if the class is
+      // non-final.
+      if (auto *le = dyn_cast<LoadExpr>(subExpr)) {
+        subExpr = le->getSubExpr();
+        continue;
+      }
+
       if (auto *tee = dyn_cast<TupleElementExpr>(subExpr)) {
         isMember = true;
         subExpr = tee->getBase();
@@ -2440,7 +2435,7 @@ ConstraintSystem::isConversionNonEphemeral(ConversionRestrictionKind conversion,
       }
 
       if (auto *mre = dyn_cast<MemberRefExpr>(subExpr)) {
-        if (!isSimpleMember(mre->getBase(), mre->getMember().getDecl()))
+        if (!isDirectlyAccessedStoredVar(mre->getMember().getDecl()))
           return ConversionEphemeralness::Ephemeral;
         isMember = true;
         subExpr = mre->getBase();
@@ -2455,7 +2450,7 @@ ConstraintSystem::isConversionNonEphemeral(ConversionRestrictionKind conversion,
 
         if (choice->getKind() != OverloadChoiceKind::TupleIndex)
           if (!choice->isDecl() ||
-              !isSimpleMember(ude->getBase(), choice->getDecl()))
+              !isDirectlyAccessedStoredVar(choice->getDecl()))
             return ConversionEphemeralness::Ephemeral;
 
         isMember = true;

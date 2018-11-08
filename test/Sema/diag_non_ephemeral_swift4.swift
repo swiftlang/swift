@@ -141,11 +141,14 @@ takesRaw(&C.staticStoredProperty.storedProperty)
 takesRaw(&FinalC.staticStoredProperty.storedProperty)
 takesRaw(&metatypeOfC.staticStoredProperty.storedProperty)
 takesRaw(&type(of: topLevelC).staticStoredProperty.storedProperty)
+takesRaw(&topLevelFinalC.storedProperty)
 takesRaw(&topLevelS.storedProperty)
+takesRaw(&topLevelS.storedFinalC.storedProperty)
 takesRaw(&globalS.storedProperty)
 takesRaw(&topLevelTupleOfS.0)
 takesRaw(&topLevelTupleOfS.0.storedProperty)
 takesRaw(&topLevelFragileS.storedProperty)
+takesRaw(&topLevelFragileFinalC.storedProperty)
 
 extension C {
   static func bar() {
@@ -159,18 +162,9 @@ takesRaw(&topLevelOptOfS!.storedProperty)
 takesRaw(&topLevelOptOfResilientS!)
 
 // But we cannot do the same for:
-//   - Class bases
+//   - Non-final class bases
 
 takesMutableRaw(&topLevelC.storedProperty, 5) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting a pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
-
-takesMutableRaw(&topLevelFinalC.storedProperty, 5) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting a pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
-
-takesMutableRaw(&topLevelFragileFinalC.storedProperty, 5) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting a pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
-
-takesMutableRaw(&topLevelS.storedFinalC.storedProperty, 5) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting a pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
 
 //   - Resilient global or static variables
