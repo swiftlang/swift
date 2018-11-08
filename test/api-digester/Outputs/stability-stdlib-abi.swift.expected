@@ -1,6 +1,7 @@
 
 /* Generic Signature Changes */
 Func MutableCollection._partition(within:by:) has generic signature change from <τ_0_0 where τ_0_0 : MutableCollection, τ_0_0 : RandomAccessCollection> to <τ_0_0 where τ_0_0 : BidirectionalCollection, τ_0_0 : MutableCollection>
+Protocol Numeric has generic signature change from <τ_0_0 : Equatable, τ_0_0 : ExpressibleByIntegerLiteral, τ_0_0.Magnitude : Comparable, τ_0_0.Magnitude : Numeric> to <τ_0_0 : AdditiveArithmetic, τ_0_0 : ExpressibleByIntegerLiteral, τ_0_0.Magnitude : Comparable, τ_0_0.Magnitude : Numeric>
 
 /* RawRepresentable Changes */
 
@@ -13,6 +14,11 @@ Func MutableCollection._introSort(within:by:) has been removed
 Func MutableCollection._introSortImpl(within:by:depthLimit:) has been removed
 Func MutableCollection._siftDown(_:within:by:) has been removed
 Func MutableCollection._sort3(_:_:_:by:) has been removed
+Func Numeric.+(_:) has been removed
+Func Numeric.+(_:_:) has been removed
+Func Numeric.+=(_:_:) has been removed
+Func Numeric.-(_:_:) has been removed
+Func Numeric.-=(_:_:) has been removed
 Func _int64ToString(_:radix:uppercase:) has been removed
 Func _int64ToStringImpl(_:_:_:_:_:) has been removed
 Func _stdlib_atomicCompareExchangeStrongInt(object:expected:desired:) has been removed
@@ -21,6 +27,8 @@ Func _stdlib_atomicCompareExchangeStrongInt64(object:expected:desired:) has been
 Func _stdlib_atomicCompareExchangeStrongUInt32(object:expected:desired:) has been removed
 Func _stdlib_atomicCompareExchangeStrongUInt64(object:expected:desired:) has been removed
 Func _swift_stdlib_atomicFetchAddInt(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchAddInt32(object:operand:) has been removed
+Func _swift_stdlib_atomicFetchAddInt64(object:operand:) has been removed
 Func _swift_stdlib_atomicFetchAddUInt32(object:operand:) has been removed
 Func _swift_stdlib_atomicFetchAddUInt64(object:operand:) has been removed
 Func _swift_stdlib_atomicFetchAndInt(object:operand:) has been removed
@@ -65,6 +73,14 @@ Func MutableCollection._partition(within:by:) has parameter 0 type change from R
 Var Hasher._core has declared type change from _BufferingHasher<Hasher._Core> to Hasher._Core
 Var Hasher._Core._buffer is added to a non-resilient type
 Var Hasher._Core._state in a non-resilient type changes position from 0 to 1
+Protocol BinaryFloatingPoint has added inherited protocol AdditiveArithmetic
+Protocol BinaryInteger has added inherited protocol AdditiveArithmetic
+Protocol FixedWidthInteger has added inherited protocol AdditiveArithmetic
+Protocol FloatingPoint has added inherited protocol AdditiveArithmetic
+Protocol Numeric has added inherited protocol AdditiveArithmetic
+Protocol SignedInteger has added inherited protocol AdditiveArithmetic
+Protocol SignedNumeric has added inherited protocol AdditiveArithmetic
+Protocol UnsignedInteger has added inherited protocol AdditiveArithmetic
 Struct Hasher._Core has removed conformance to _HasherCore
 
 /* Decl Attribute changes */

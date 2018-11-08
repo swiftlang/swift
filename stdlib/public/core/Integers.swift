@@ -24,81 +24,12 @@ extension ExpressibleByIntegerLiteral
 }
 
 //===----------------------------------------------------------------------===//
-//===--- Numeric ----------------------------------------------------------===//
+//===--- AdditiveArithmetic -----------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-/// Declares methods backing binary arithmetic operators--such as `+`, `-` and
-/// `*`--and their mutating counterparts.
-///
-/// The `Numeric` protocol provides a suitable basis for arithmetic on
-/// scalar values, such as integers and floating-point numbers. You can write
-/// generic methods that operate on any numeric type in the standard library
-/// by using the `Numeric` protocol as a generic constraint.
-///
-/// The following example declares a method that calculates the total of any
-/// sequence with `Numeric` elements.
-///
-///     extension Sequence where Element: Numeric {
-///         func sum() -> Element {
-///             return reduce(0, +)
-///         }
-///     }
-///
-/// The `sum()` method is now available on any sequence or collection with
-/// numeric values, whether it is an array of `Double` or a countable range of
-/// `Int`.
-///
-///     let arraySum = [1.1, 2.2, 3.3, 4.4, 5.5].sum()
-///     // arraySum == 16.5
-///
-///     let rangeSum = (1..<10).sum()
-///     // rangeSum == 45
-///
-/// Conforming to the Numeric Protocol
-/// =====================================
-///
-/// To add `Numeric` protocol conformance to your own custom type, implement
-/// the required mutating methods. Extensions to `Numeric` provide default
-/// implementations for the protocol's nonmutating methods based on the
-/// mutating variants.
-public protocol Numeric : Equatable, ExpressibleByIntegerLiteral {
-  /// Creates a new instance from the given integer, if it can be represented
-  /// exactly.
-  ///
-  /// If the value passed as `source` is not representable exactly, the result
-  /// is `nil`. In the following example, the constant `x` is successfully
-  /// created from a value of `100`, while the attempt to initialize the
-  /// constant `y` from `1_000` fails because the `Int8` type can represent
-  /// `127` at maximum:
-  ///
-  ///     let x = Int8(exactly: 100)
-  ///     // x == Optional(100)
-  ///     let y = Int8(exactly: 1_000)
-  ///     // y == nil
-  ///
-  /// - Parameter source: A value to convert to this type.
-  init?<T : BinaryInteger>(exactly source: T)
-
-  /// A type that can represent the absolute value of any possible value of the
-  /// conforming type.
-  associatedtype Magnitude : Comparable, Numeric
-
-  /// The magnitude of this value.
-  ///
-  /// For any numeric value `x`, `x.magnitude` is the absolute value of `x`.
-  /// You can use the `magnitude` property in operations that are simpler to
-  /// implement in terms of unsigned values, such as printing the value of an
-  /// integer, which is just printing a '-' character in front of an absolute
-  /// value.
-  ///
-  ///     let x = -200
-  ///     // x.magnitude == 200
-  ///
-  /// The global `abs(_:)` function provides more familiar syntax when you need
-  /// to find an absolute value. In addition, because `abs(_:)` always returns
-  /// a value of the same type, even in a generic context, using the function
-  /// instead of the `magnitude` property is encouraged.
-  var magnitude: Magnitude { get }
+public protocol AdditiveArithmetic : Equatable {
+  /// The zero value.
+  static var zero: Self { get }
 
   /// Adds two values and produces their sum.
   ///
@@ -158,6 +89,90 @@ public protocol Numeric : Equatable, ExpressibleByIntegerLiteral {
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
   static func -=(lhs: inout Self, rhs: Self)
+}
+
+public extension AdditiveArithmetic where Self : ExpressibleByIntegerLiteral {
+  static var zero: Self {
+    return 0
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//===--- Numeric ----------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+/// Declares methods backing binary arithmetic operators--such as `+`, `-` and
+/// `*`--and their mutating counterparts.
+///
+/// The `Numeric` protocol provides a suitable basis for arithmetic on
+/// scalar values, such as integers and floating-point numbers. You can write
+/// generic methods that operate on any numeric type in the standard library
+/// by using the `Numeric` protocol as a generic constraint.
+///
+/// The following example declares a method that calculates the total of any
+/// sequence with `Numeric` elements.
+///
+///     extension Sequence where Element: Numeric {
+///         func sum() -> Element {
+///             return reduce(0, +)
+///         }
+///     }
+///
+/// The `sum()` method is now available on any sequence or collection with
+/// numeric values, whether it is an array of `Double` or a countable range of
+/// `Int`.
+///
+///     let arraySum = [1.1, 2.2, 3.3, 4.4, 5.5].sum()
+///     // arraySum == 16.5
+///
+///     let rangeSum = (1..<10).sum()
+///     // rangeSum == 45
+///
+/// Conforming to the Numeric Protocol
+/// =====================================
+///
+/// To add `Numeric` protocol conformance to your own custom type, implement
+/// the required mutating methods. Extensions to `Numeric` provide default
+/// implementations for the protocol's nonmutating methods based on the
+/// mutating variants.
+public protocol Numeric : AdditiveArithmetic, ExpressibleByIntegerLiteral {
+  /// Creates a new instance from the given integer, if it can be represented
+  /// exactly.
+  ///
+  /// If the value passed as `source` is not representable exactly, the result
+  /// is `nil`. In the following example, the constant `x` is successfully
+  /// created from a value of `100`, while the attempt to initialize the
+  /// constant `y` from `1_000` fails because the `Int8` type can represent
+  /// `127` at maximum:
+  ///
+  ///     let x = Int8(exactly: 100)
+  ///     // x == Optional(100)
+  ///     let y = Int8(exactly: 1_000)
+  ///     // y == nil
+  ///
+  /// - Parameter source: A value to convert to this type.
+  init?<T : BinaryInteger>(exactly source: T)
+
+  /// A type that can represent the absolute value of any possible value of the
+  /// conforming type.
+  associatedtype Magnitude : Comparable, Numeric
+
+  /// The magnitude of this value.
+  ///
+  /// For any numeric value `x`, `x.magnitude` is the absolute value of `x`.
+  /// You can use the `magnitude` property in operations that are simpler to
+  /// implement in terms of unsigned values, such as printing the value of an
+  /// integer, which is just printing a '-' character in front of an absolute
+  /// value.
+  ///
+  ///     let x = -200
+  ///     // x.magnitude == 200
+  ///
+  /// The global `abs(_:)` function provides more familiar syntax when you need
+  /// to find an absolute value. In addition, because `abs(_:)` always returns
+  /// a value of the same type, even in a generic context, using the function
+  /// instead of the `magnitude` property is encouraged.
+  var magnitude: Magnitude { get }
 
   /// Multiplies two values and produces their product.
   ///
@@ -327,7 +342,7 @@ public func abs<T : SignedNumeric & Comparable>(_ x: T) -> T {
   return x < (0 as T) ? -x : x
 }
 
-extension Numeric {
+extension AdditiveArithmetic {
   /// Returns the given number unchanged.
   ///
   /// You can use the unary plus operator (`+`) to provide symmetry in your
