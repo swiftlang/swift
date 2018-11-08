@@ -22,8 +22,6 @@ Func _stdlib_atomicCompareExchangeStrongInt32(object:expected:desired:) has been
 Func _stdlib_atomicCompareExchangeStrongInt64(object:expected:desired:) has been removed
 Func _stdlib_atomicCompareExchangeStrongUInt32(object:expected:desired:) has been removed
 Func _stdlib_atomicCompareExchangeStrongUInt64(object:expected:desired:) has been removed
-Func _swift_stdlib_atomicFetchAddInt32(object:operand:) has been removed
-Func _swift_stdlib_atomicFetchAddInt64(object:operand:) has been removed
 Func _swift_stdlib_atomicFetchAddInt(object:operand:) has been removed
 Func _swift_stdlib_atomicFetchAddInt32(object:operand:) has been removed
 Func _swift_stdlib_atomicFetchAddInt64(object:operand:) has been removed
