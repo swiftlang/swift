@@ -912,6 +912,8 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   case AccessLevel::Public:
     return SubclassScope::Internal;
   case AccessLevel::Open:
+    if (classType->isResilient())
+      return SubclassScope::Internal;
     return SubclassScope::External;
   }
 
