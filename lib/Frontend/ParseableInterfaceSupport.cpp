@@ -27,6 +27,7 @@
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/xxhash.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
@@ -36,6 +37,7 @@
 #include "llvm/Support/StringSaver.h"
 
 using namespace swift;
+using FileDependency = SerializationOptions::FileDependency;
 
 #define SWIFT_TOOLS_VERSION_KEY "swift-tools-version"
 #define SWIFT_MODULE_FLAGS_KEY "swift-module-flags"
@@ -74,20 +76,19 @@ extractSwiftInterfaceVersionAndArgs(DiagnosticEngine &Diags,
   return false;
 }
 
-static bool
-getHashOfFile(clang::vfs::FileSystem &FS,
-              StringRef Path, uint64_t &HashOut,
-              DiagnosticEngine &Diags) {
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> Buf =
-    FS.getBufferForFile(Path, /*FileSize=*/-1,
-                        /*RequiresNullTerminator=*/false);
-  if (!Buf) {
-    Diags.diagnose(SourceLoc(), diag::cannot_open_file, Path,
-                   Buf.getError().message());
-    return true;
+static std::unique_ptr<llvm::MemoryBuffer>
+getBufferOfDependency(clang::vfs::FileSystem &FS,
+                      StringRef ModulePath, StringRef DepPath,
+                      DiagnosticEngine &Diags) {
+  auto DepBuf = FS.getBufferForFile(DepPath, /*FileSize=*/-1,
+                                    /*RequiresNullTerminator=*/false);
+  if (!DepBuf) {
+    Diags.diagnose(SourceLoc(),
+                   diag::missing_dependency_of_parseable_module_interface,
+                   DepPath, ModulePath, DepBuf.getError().message());
+    return nullptr;
   }
-  HashOut = xxHash64(Buf.get()->getBuffer());
-  return false;
+  return std::move(DepBuf.get());
 }
 
 /// Construct a cache key for the .swiftmodule being generated. There is a
@@ -174,19 +175,12 @@ swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
                       StringRef OutPath,
                       DiagnosticEngine &Diags) {
 
-  if (!FS.exists(OutPath))
-    return false;
-
-  auto OutStatus = FS.status(OutPath);
-  if (!OutStatus)
-    return false;
-
   auto OutBuf = FS.getBufferForFile(OutPath);
   if (!OutBuf)
     return false;
 
   LLVM_DEBUG(llvm::dbgs() << "Validating deps of " << OutPath << "\n");
-  SmallVector<SerializationOptions::FileDependency, 16> AllDeps;
+  SmallVector<FileDependency, 16> AllDeps;
   auto VI = serialization::validateSerializedAST(
       OutBuf.get()->getBuffer(),
       /*ExtendedValidationInfo=*/nullptr, &AllDeps);
@@ -195,24 +189,12 @@ swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
     return false;
 
   for (auto In : AllDeps) {
-    uint64_t Hash = 0;
-    auto InStatus = FS.status(In.Path);
-    if (!InStatus ||
-        (InStatus.get().getSize() != In.Size) ||
-        getHashOfFile(FS, In.Path, Hash, Diags) ||
-        (Hash != In.Hash)) {
+    auto DepBuf = getBufferOfDependency(FS, OutPath, In.Path, Diags);
+    if (!DepBuf ||
+        DepBuf->getBufferSize() != In.Size ||
+        xxHash64(DepBuf->getBuffer()) != In.Hash) {
       LLVM_DEBUG(llvm::dbgs() << "Dep " << In.Path
                  << " is directly out of date\n");
-      return false;
-    }
-    // Recursively check freshness of any .swiftmodules in the module cache.
-    auto Ext = llvm::sys::path::extension(In.Path);
-    auto Ty = file_types::lookupTypeForExtension(Ext);
-    if (Ty == file_types::TY_SwiftModuleFile &&
-        In.Path.startswith(ModuleCachePath) &&
-        !swiftModuleIsUpToDate(FS, ModuleCachePath, In.Path, Diags)) {
-      LLVM_DEBUG(llvm::dbgs() << "Dep " << In.Path
-                 << " is indirectly out of date\n");
       return false;
     }
     LLVM_DEBUG(llvm::dbgs() << "Dep " << In.Path << " is up to date\n");
@@ -220,9 +202,70 @@ swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
   return true;
 }
 
+/// Populate the provided \p Deps with \c FileDependency entries including:
+///
+///    - \p InPath - The .swiftinterface input file
+///
+///    - All the dependencies mentioned by \p SubInstance's DependencyTracker,
+///      that were read while compiling the module.
+///
+///    - For any file in the latter set that is itself a .swiftmodule
+///      living in \p ModuleCachePath, all of _its_ dependencies, copied
+///      out to avoid having to do recursive scanning when rechecking this
+///      dependency in the future.
+static bool
+collectDepsForSerialization(clang::vfs::FileSystem &FS,
+                            CompilerInstance &SubInstance,
+                            StringRef InPath, StringRef ModuleCachePath,
+                            SmallVectorImpl<FileDependency> &Deps,
+                            DiagnosticEngine &Diags) {
+  auto DTDeps = SubInstance.getDependencyTracker()->getDependencies();
+  SmallVector<StringRef, 16> InitialDepNames(DTDeps.begin(), DTDeps.end());
+  InitialDepNames.push_back(InPath);
+  llvm::StringSet<> AllDepNames;
+  for (auto const &DepName : InitialDepNames) {
+    AllDepNames.insert(DepName);
+    auto DepBuf = getBufferOfDependency(FS, InPath, DepName, Diags);
+    if (!DepBuf) {
+      return true;
+    }
+    uint64_t Size = DepBuf->getBufferSize();
+    uint64_t Hash = xxHash64(DepBuf->getBuffer());
+    Deps.push_back(FileDependency{Size, Hash, DepName});
+
+    // If Dep is itself a .swiftmodule in the cache dir, pull out its deps
+    // and include them in our own, so we have a single-file view of
+    // transitive deps: removes redundancies, and avoids opening and reading
+    // multiple swiftmodules during future loads.
+    auto Ext = llvm::sys::path::extension(DepName);
+    auto Ty = file_types::lookupTypeForExtension(Ext);
+    if (Ty == file_types::TY_SwiftModuleFile &&
+        DepName.startswith(ModuleCachePath)) {
+      SmallVector<FileDependency, 16> SubDeps;
+      auto VI = serialization::validateSerializedAST(
+          DepBuf->getBuffer(),
+          /*ExtendedValidationInfo=*/nullptr, &SubDeps);
+      if (VI.status != serialization::Status::Valid) {
+        Diags.diagnose(SourceLoc(),
+                       diag::error_extracting_dependencies_from_cached_module,
+                       DepName);
+        return true;
+      }
+      for (auto const &SubDep : SubDeps) {
+        if (AllDepNames.count(SubDep.Path) == 0) {
+          AllDepNames.insert(SubDep.Path);
+          Deps.push_back(SubDep);
+        }
+      }
+    }
+  }
+  return false;
+}
+
 static bool buildSwiftModuleFromSwiftInterface(
     clang::vfs::FileSystem &FS, DiagnosticEngine &Diags,
-    CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath) {
+    CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath,
+                                               StringRef ModuleCachePath) {
   bool SubError = false;
   bool RunSuccess = llvm::CrashRecoveryContext().RunSafelyOnThread([&] {
 
@@ -279,34 +322,19 @@ static bool buildSwiftModuleFromSwiftInterface(
     }
 
     LLVM_DEBUG(llvm::dbgs() << "Serializing " << OutPath << "\n");
-    SerializationOptions serializationOpts;
+    SerializationOptions SerializationOpts;
     std::string OutPathStr = OutPath;
-    serializationOpts.OutputPath = OutPathStr.c_str();
-    serializationOpts.SerializeAllSIL = true;
-    auto DTDeps = SubInstance.getDependencyTracker()->getDependencies();
-    SmallVector<std::string, 16> DepNames(DTDeps.begin(), DTDeps.end());
-    DepNames.push_back(InPath);
-    SmallVector<SerializationOptions::FileDependency, 16> Deps;
-    for (auto const &Dep : DepNames) {
-      auto DepStatus = FS.status(Dep);
-      if (!DepStatus) {
-        Diags.diagnose(SourceLoc(),
-                       diag::missing_dependency_of_parseable_module_interface,
-                       Dep, InPath, DepStatus.getError().message());
-        SubError = true;
-        return;
-      }
-      uint64_t Hash = 0;
-      if (getHashOfFile(FS, Dep, Hash, Diags)) {
-        SubError = true;
-        return;
-      }
-      Deps.push_back(SerializationOptions::FileDependency{
-          DepStatus.get().getSize(), Hash, Dep});
+    SerializationOpts.OutputPath = OutPathStr.c_str();
+    SerializationOpts.SerializeAllSIL = true;
+    SmallVector<FileDependency, 16> Deps;
+    if (collectDepsForSerialization(FS, SubInstance, InPath, ModuleCachePath,
+                                    Deps, Diags)) {
+      SubError = true;
+      return;
     }
-    serializationOpts.Dependencies = Deps;
+    SerializationOpts.Dependencies = Deps;
     SILMod->setSerializeSILAction([&]() {
-        serialize(Mod, serializationOpts, SILMod.get());
+        serialize(Mod, SerializationOpts, SILMod.get());
       });
     SILMod->serialize();
     SubError = Diags.hadAnyError();
@@ -343,7 +371,7 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
   // Evaluate if we need to run this sub-invocation, and if so run it.
   if (!swiftModuleIsUpToDate(FS, CacheDir, OutPath, Diags)) {
     if (buildSwiftModuleFromSwiftInterface(FS, Diags, SubInvocation, InPath,
-                                           OutPath))
+                                           OutPath, CacheDir))
       return std::make_error_code(std::errc::invalid_argument);
   }
 

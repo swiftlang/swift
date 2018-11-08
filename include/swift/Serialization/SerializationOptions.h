@@ -38,7 +38,7 @@ namespace swift {
     struct FileDependency {
       uint64_t Size;
       uint64_t Hash;
-      StringRef Path;
+      std::string Path;
     };
     ArrayRef<FileDependency> Dependencies;
 
