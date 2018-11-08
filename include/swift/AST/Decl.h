@@ -6795,12 +6795,6 @@ inline const GenericContext *Decl::getAsGenericContext() const {
   }
 }
 
-inline bool DeclContext::isExtensionContext() const {
-  if (auto D = getAsDecl())
-    return ExtensionDecl::classof(D);
-  return false;
-}
-
 inline bool DeclContext::classof(const Decl *D) {
   switch (D->getKind()) { //
   default: return false;

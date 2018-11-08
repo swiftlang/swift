@@ -1510,12 +1510,12 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   // Non-Objective-C declarations in extensions cannot override or
   // be overridden.
   if (!isAccessor &&
-      (base->getDeclContext()->isExtensionContext() ||
-       override->getDeclContext()->isExtensionContext()) &&
+      (isa<ExtensionDecl>(base->getDeclContext()) ||
+       isa<ExtensionDecl>(override->getDeclContext())) &&
       !base->isObjC()) {
     bool baseCanBeObjC = canBeRepresentedInObjC(base);
     diags.diagnose(override, diag::override_decl_extension, baseCanBeObjC,
-                   !base->getDeclContext()->isExtensionContext());
+                   !isa<ExtensionDecl>(base->getDeclContext()));
     if (baseCanBeObjC) {
       SourceLoc insertionLoc =
         override->getAttributeInsertionLoc(/*forModifier=*/false);
@@ -1559,8 +1559,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     if (!isAccessor &&
         baseDecl->hasKnownSwiftImplementation() &&
         !base->isObjCDynamic() &&
-        override->getDeclContext()->isExtensionContext()) {
-      // For compatibility, only generate a warning in Swift 3
+        isa<ExtensionDecl>(override->getDeclContext())) {
       diags.diagnose(override, diag::override_class_declaration_in_extension);
       diags.diagnose(base, diag::overridden_here);
     }
