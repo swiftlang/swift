@@ -187,6 +187,32 @@ public:
       TC.diagnose(attr->getLocation(), diag::alignment_not_power_of_two);
   }
 
+  void visitBorrowedAttr(BorrowedAttr *attr) {
+    // These criteria are the same preconditions laid out by
+    // AbstractStorageDecl::requiresOpaqueModifyCoroutine().
+
+    assert(!D->hasClangNode() && "@_borrowed on imported declaration?");
+
+    if (D->getAttrs().hasAttribute<DynamicAttr>()) {
+      TC.diagnose(attr->getLocation(), diag::borrowed_with_objc_dynamic,
+                  D->getDescriptiveKind())
+        .fixItRemove(attr->getRange());
+      D->getAttrs().removeAttribute(attr);
+      return;
+    }
+
+    auto dc = D->getDeclContext();
+    auto protoDecl = dyn_cast<ProtocolDecl>(dc);
+    if (protoDecl && protoDecl->isObjC()) {
+      TC.diagnose(attr->getLocation(),
+                  diag::borrowed_on_objc_protocol_requirement,
+                  D->getDescriptiveKind())
+        .fixItRemove(attr->getRange());
+      D->getAttrs().removeAttribute(attr);
+      return;
+    }
+  }
+
   void visitTransparentAttr(TransparentAttr *attr);
   void visitMutationAttr(DeclAttribute *attr);
   void visitMutatingAttr(MutatingAttr *attr) { visitMutationAttr(attr); }
@@ -781,6 +807,7 @@ public:
     void visit##CLASS##Attr(CLASS##Attr *) {}
 
     IGNORED_ATTR(Alignment)
+    IGNORED_ATTR(Borrowed)
     IGNORED_ATTR(HasInitialValue)
     IGNORED_ATTR(ClangImporterSynthesizedType)
     IGNORED_ATTR(Consuming)

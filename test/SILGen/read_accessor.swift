@@ -161,3 +161,15 @@ struct TestKeyPath {
 // CHECK-NEXT:    [[RET:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RET]] : $()
 // CHECK-LABEL: } // end sil function '$s13read_accessor11TestKeyPathV8readableSSvpACTK'
+
+//   Check that we emit a read coroutine but not a getter for this.
+//   This test assumes that we emit accessors in a particular order.
+// CHECK-LABEL: sil [transparent] @$s13read_accessor20TestBorrowedPropertyV14borrowedStringSSvpfi
+// CHECK-NOT:   sil [transparent] [serialized] @$s13read_accessor20TestBorrowedPropertyV14borrowedStringSSvg
+// CHECK:       sil [transparent] [serialized] @$s13read_accessor20TestBorrowedPropertyV14borrowedStringSSvr
+// CHECK-NOT:   sil [transparent] [serialized] @$s13read_accessor20TestBorrowedPropertyV14borrowedStringSSvg
+// CHECK-LABEL: sil [transparent] [serialized] @$s13read_accessor20TestBorrowedPropertyV14borrowedStringSSvs
+public struct TestBorrowedProperty {
+  @_borrowed
+  public var borrowedString = ""
+}
