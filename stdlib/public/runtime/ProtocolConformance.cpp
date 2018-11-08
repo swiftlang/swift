@@ -604,36 +604,6 @@ swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
   return nullptr;
 }
 
-/// Resolve a reference to a generic parameter to type metadata.
-static const Metadata *resolveGenericParamRef(
-                            const GenericParamRef &param,
-                            SubstFlatGenericParameterFn substFlatGenericParam) {
-  // Resolve the root generic parameter.
-  const Metadata *current = substFlatGenericParam(param.getRootParamIndex());
-  if (!current) return nullptr;
-
-  // Follow the associated type path.
-  for (const auto &assocTypeRef : param) {
-    // Look for the witness table.
-    auto witnessTable =
-      swift_conformsToProtocol(current, assocTypeRef.Protocol);
-    if (!witnessTable) return nullptr;
-
-    // Retrieve the associated type.
-    auto assocTypeReq = assocTypeRef.Requirement.get();
-    current = swift_getAssociatedTypeWitness(
-                                    MetadataState::Abstract,
-                                    const_cast<WitnessTable *>(witnessTable),
-                                    current,
-                                    assocTypeRef.Protocol
-                                      ->getRequirementBaseDescriptor(),
-                                    assocTypeReq).Value;
-    if (!current) return nullptr;
-  }
-
-  return current;
-}
-
 bool swift::_checkGenericRequirements(
                       llvm::ArrayRef<GenericRequirementDescriptor> requirements,
                       std::vector<const void *> &extraArguments,
@@ -644,9 +614,10 @@ bool swift::_checkGenericRequirements(
     if (!req.hasKnownKind()) return true;
 
     // Resolve the subject generic parameter.
-    auto subjectType =
-      resolveGenericParamRef(req.getParam(), substFlatGenericParam);
-    if (!subjectType) return true;
+    const Metadata *subjectType =
+      _getTypeByMangledName(req.getParam(), substGenericParam);
+    if (!subjectType)
+      return true;
 
     // Check the requirement.
     switch (req.getKind()) {
