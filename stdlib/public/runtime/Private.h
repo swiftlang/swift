@@ -464,10 +464,11 @@ public:
                            const ProtocolDescriptor *protocol,
                            StringRef module);
 
-  /// Given a type that we know conforms to the given protocol, find the
-  /// superclass that introduced the conformance.
-  const Metadata *findConformingSuperclass(const Metadata *type,
-                                           const ProtocolDescriptor *protocol);
+  /// Given a type that we know can be used with the given conformance, find
+  /// the superclass that introduced the conformance.
+  const Metadata *findConformingSuperclass(
+                             const Metadata *type,
+                             const ProtocolConformanceDescriptor *conformance);
 
 } // end namespace swift
 
