@@ -81,7 +81,18 @@ public struct OuterGeneric<T> {
   // CHECK-NEXT: {{^  }$}}
 }
 // CHECK-NEXT: {{^}$}}
+
+public protocol ConditionallyConformed {}
+public protocol ConditionallyConformedAgain {}
+
+// CHECK-END: extension conformances.OuterGeneric : ConditionallyConformed, ConditionallyConformedAgain where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
+extension OuterGeneric: ConditionallyConformed where T: PrivateProto {}
+extension OuterGeneric: ConditionallyConformedAgain where T == PrivateProto {}
+
 // CHECK-END: extension conformances.OuterGeneric.Inner : PublicBaseProto {}
+// CHECK-END: extension conformances.OuterGeneric.Inner : ConditionallyConformed, ConditionallyConformedAgain where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
+extension OuterGeneric.Inner: ConditionallyConformed where T: PrivateProto {}
+extension OuterGeneric.Inner: ConditionallyConformedAgain where T == PrivateProto {}
 
 private protocol AnotherPrivateSubProto: PublicBaseProto {}
 
@@ -147,3 +158,13 @@ private protocol BaseConstrainedProto: Base, PublicProto {}
 public class H1: Base, ClassConstrainedProto {}
 // CHECK: public class H1 : Base {
 // CHECK-END: extension conformances.H1 : PublicProto {}
+
+public struct MultiGeneric<T, U, V> {}
+extension MultiGeneric: PublicProto where U: PrivateProto {}
+
+// CHECK: public struct MultiGeneric<T, U, V> {
+// CHECK-END: extension conformances.MultiGeneric : PublicProto where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
+
+
+// CHECK-END: @usableFromInline
+// CHECK-END-NEXT: internal protocol _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
