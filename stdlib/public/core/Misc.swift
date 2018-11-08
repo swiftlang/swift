@@ -51,7 +51,6 @@ public func _autorelease(_ x: AnyObject) {
 ///
 /// This function is primarily useful to call various runtime functions
 /// written in C++.
-@inlinable
 internal func _withUninitializedString<R>(
   _ body: (UnsafeMutablePointer<String>) -> R
 ) -> (R, String) {
