@@ -50,7 +50,6 @@ void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
 }
 
 #elif defined(_WIN32) && !defined(__CYGWIN__)
-#warning TODO: Test swift_stdlib_random on Windows
 
 SWIFT_RUNTIME_STDLIB_API
 void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
