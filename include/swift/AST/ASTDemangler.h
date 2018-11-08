@@ -50,6 +50,8 @@ public:
   using BuiltType = swift::Type;
   using BuiltNominalTypeDecl = swift::NominalTypeDecl *;
   using BuiltProtocolDecl = swift::ProtocolDecl *;
+  using BuiltProtocolConformanceRef = swift::NormalProtocolConformance *;
+  using BuiltProtocolConformance = void *; // a swift::ProtocolConformanceRef
   explicit ASTBuilder(ASTContext &ctx) : Ctx(ctx) {}
 
   ASTContext &getASTContext() { return Ctx; }
@@ -69,10 +71,13 @@ public:
 
   Type createNominalType(NominalTypeDecl *decl, Type parent);
 
-  Type createBoundGenericType(NominalTypeDecl *decl, ArrayRef<Type> args);
-
-  Type createBoundGenericType(NominalTypeDecl *decl, ArrayRef<Type> args,
-                              Type parent);
+  Type createBoundGenericType(
+           NominalTypeDecl *decl, ArrayRef<Type> args,
+           ArrayRef<std::pair<unsigned, BuiltProtocolConformance>> retroactive);
+  Type createBoundGenericType(
+           NominalTypeDecl *decl, ArrayRef<Type> args,
+           ArrayRef<std::pair<unsigned, BuiltProtocolConformance>> retroactive,
+           Type parent);
 
   Type createTupleType(ArrayRef<Type> eltTypes, StringRef labels,
                        bool isVariadic);
@@ -108,6 +113,15 @@ public:
   Type getUnnamedForeignClassType();
 
   Type getOpaqueType();
+
+  BuiltProtocolConformanceRef
+  createProtocolConformanceRef(Type conformingType, ProtocolDecl *protocol,
+                               StringRef module);
+
+  BuiltProtocolConformance
+  createProtocolConformance(Type conformingType,
+                            NormalProtocolConformance *normal,
+                            ArrayRef<BuiltProtocolConformance> conditionalReqs);
 
 private:
   bool validateNominalParent(NominalTypeDecl *decl, Type parent);

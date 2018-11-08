@@ -1694,7 +1694,7 @@ private:
       auto builtGenerics = getGenericSubst(metadata, descriptor);
       if (builtGenerics.empty())
         return BuiltType();
-      nominal = Builder.createBoundGenericType(typeDecl, builtGenerics);
+      nominal = Builder.createBoundGenericType(typeDecl, builtGenerics, { });
     } else {
       nominal = Builder.createNominalType(typeDecl);
     }

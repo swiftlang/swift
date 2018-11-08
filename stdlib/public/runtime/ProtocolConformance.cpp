@@ -163,7 +163,10 @@ ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
     SubstGenericParametersFromMetadata substitutions(type);
     bool failed =
       _checkGenericRequirements(getConditionalRequirements(), conditionalArgs,
-                                substitutions, substitutions);
+                                substitutions, substitutions,
+                                [&](unsigned) -> const WitnessTable * {
+                                  return nullptr;
+                                });
     if (failed) return nullptr;
   }
 
@@ -826,10 +829,12 @@ static const Metadata *resolveGenericParamRef(
 }
 
 bool swift::_checkGenericRequirements(
-                      llvm::ArrayRef<GenericRequirementDescriptor> requirements,
-                      std::vector<const void *> &extraArguments,
-                      SubstFlatGenericParameterFn substFlatGenericParam,
-                      SubstGenericParameterFn substGenericParam) {
+          llvm::ArrayRef<GenericRequirementDescriptor> requirements,
+          std::vector<const void *> &extraArguments,
+          SubstFlatGenericParameterFn substFlatGenericParam,
+          SubstGenericParameterFn substGenericParam,
+          std::function<const WitnessTable *(unsigned index)> getWitnessTable) {
+  unsigned conformanceReqIndex = 0;
   for (const auto &req : requirements) {
     // Make sure we understand the requirement we're dealing with.
     if (!req.hasKnownKind()) return true;
@@ -842,6 +847,16 @@ bool swift::_checkGenericRequirements(
     // Check the requirement.
     switch (req.getKind()) {
     case GenericRequirementKind::Protocol: {
+      // If we need a witness table, check whether the caller can provide it
+      // directly.
+      if (req.getProtocol().needsWitnessTable()) {
+        if (auto witnessTable = getWitnessTable(conformanceReqIndex)) {
+          extraArguments.push_back(witnessTable);
+          ++conformanceReqIndex;
+          continue;
+        }
+      }
+
       const WitnessTable *witnessTable = nullptr;
       if (!_conformsToProtocol(nullptr, subjectType, req.getProtocol(),
                                &witnessTable))
@@ -851,6 +866,7 @@ bool swift::_checkGenericRequirements(
       if (req.getProtocol().needsWitnessTable()) {
         assert(witnessTable);
         extraArguments.push_back(witnessTable);
+        ++conformanceReqIndex;
       }
 
       continue;

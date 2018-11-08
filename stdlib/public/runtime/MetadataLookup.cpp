@@ -929,6 +929,8 @@ public:
   using BuiltType = const Metadata *;
   using BuiltNominalTypeDecl = const TypeContextDescriptor *;
   using BuiltProtocolDecl = ProtocolDescriptorRef;
+  using BuiltProtocolConformance = const WitnessTable *;
+  using BuiltProtocolConformanceRef = const ProtocolConformanceDescriptor *;
 
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
 
@@ -979,12 +981,14 @@ public:
                               BuiltType parent) const {
     // Treat nominal type creation the same way as generic type creation,
     // but with no generic arguments at this level.
-    return createBoundGenericType(metadataOrTypeDecl, { }, parent);
+    return createBoundGenericType(metadataOrTypeDecl, { }, { }, parent);
   }
 
-  BuiltType createBoundGenericType(BuiltNominalTypeDecl typeDecl,
-                                   const ArrayRef<BuiltType> genericArgs,
-                                   const BuiltType parent) const {
+  BuiltType createBoundGenericType(
+      BuiltNominalTypeDecl typeDecl,
+      const ArrayRef<BuiltType> genericArgs,
+      ArrayRef<std::pair<unsigned, BuiltProtocolConformance>> retroactive,
+      const BuiltType parent) const {
     // Figure out the various levels of generic parameters we have in
     // this type.
     std::vector<unsigned> genericParamCounts;
@@ -1045,7 +1049,14 @@ public:
       bool failed =
         _checkGenericRequirements(genericContext->getGenericRequirements(),
                                   allGenericArgsVec, substitutions,
-                                  substitutions);
+                                  substitutions,
+                                  [&](unsigned index) -> const WitnessTable * {
+          for (const auto &retro : retroactive) {
+            if (retro.first == index)
+              return retro.second;
+          }
+          return nullptr;
+        });
       if (failed)
         return BuiltType();
 
@@ -1167,6 +1178,29 @@ public:
   BuiltType createSILBoxType(BuiltType base) const {
     // FIXME: Implement.
     return BuiltType();
+  }
+
+  BuiltProtocolConformanceRef createProtocolConformanceRef(
+                                                     BuiltType conformingType,
+                                                     BuiltProtocolDecl protocol,
+                                                     StringRef module) {
+    return _conformsToSwiftProtocol(conformingType, protocol.getSwiftProtocol(),
+                                    module);
+  }
+
+  BuiltProtocolConformance createProtocolConformance(
+      BuiltType conformingType,
+      BuiltProtocolConformanceRef conformance,
+      ArrayRef<BuiltProtocolConformance> conditionalReqs) {
+    // Make sure we have the right number of conditional requirements.
+    if (conditionalReqs.size() !=
+          conformance->getConditionalRequirements().size())
+      return BuiltProtocolConformance();
+
+    // Retrieve the specific witness table.
+    return swift_getWitnessTable(
+             conformance, conformingType,
+             reinterpret_cast<const void * const *>(conditionalReqs.data()));
   }
 
   TypeReferenceOwnership getReferenceOwnership() const {

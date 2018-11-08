@@ -86,8 +86,10 @@ Type ASTBuilder::createNominalType(NominalTypeDecl *decl, Type parent) {
   return NominalType::get(decl, parent, Ctx);
 }
 
-Type ASTBuilder::createBoundGenericType(NominalTypeDecl *decl,
-                                        ArrayRef<Type> args) {
+Type ASTBuilder::createBoundGenericType(
+       NominalTypeDecl *decl,
+       ArrayRef<Type> args,
+       ArrayRef<std::pair<unsigned, BuiltProtocolConformance>> retroactive) {
   // If the declaration isn't generic, fail.
   if (!decl->isGenericContext())
     return Type();
@@ -123,9 +125,11 @@ Type ASTBuilder::createBoundGenericType(NominalTypeDecl *decl,
   return substType;
 }
 
-Type ASTBuilder::createBoundGenericType(NominalTypeDecl *decl,
-                                        ArrayRef<Type> args,
-                                        Type parent) {
+Type ASTBuilder::createBoundGenericType(
+    NominalTypeDecl *decl,
+    ArrayRef<Type> args,
+    ArrayRef<std::pair<unsigned, BuiltProtocolConformance>> retroactive,
+    Type parent) {
   // If the declaration isn't generic, fail.
   if (!decl->getGenericParams())
     return Type();
@@ -684,4 +688,21 @@ ASTBuilder::findForeignNominalTypeDecl(StringRef name,
   }
 
   return consumer.Result;
+}
+
+auto ASTBuilder::createProtocolConformanceRef(Type conformingType,
+                                              ProtocolDecl *protocol,
+                                              StringRef module)
+    -> BuiltProtocolConformanceRef {
+  // FIXME: Implement lookup.
+  return nullptr;
+}
+
+auto ASTBuilder::createProtocolConformance(
+                      Type conformingType,
+                      NormalProtocolConformance *normal,
+                      ArrayRef<BuiltProtocolConformance> conditionalReqs)
+    -> BuiltProtocolConformance {
+  // FIXME: Implement specialization.
+  return nullptr;
 }

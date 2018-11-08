@@ -1,11 +1,17 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -parse-stdlib %s -module-name main -o %t/a.out
+// RUN: %target-build-swift -parse-as-library -force-single-frontend-invocation %S/Inputs/RetroactiveCommon.swift -emit-module-path %t/RetroactiveCommon.swiftmodule -emit-object -o %t/RetroactiveCommon.o
+// RUN: %target-build-swift -parse-as-library -force-single-frontend-invocation -I %t %S/Inputs/RetroactiveA.swift -emit-module-path %t/RetroactiveA.swiftmodule -emit-object -o %t/RetroactiveA.o
+// RUN: %target-build-swift -parse-as-library -force-single-frontend-invocation -I %t %S/Inputs/RetroactiveB.swift -emit-module-path %t/RetroactiveB.swiftmodule -emit-object -o %t/RetroactiveB.o
+// RUN: %target-build-swift -parse-stdlib -I %t %s %t/RetroactiveCommon.o %t/RetroactiveA.o %t/RetroactiveB.o -module-name main -o %t/a.out 
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
 import Swift
 import StdlibUnittest
+import RetroactiveCommon
+import RetroactiveA
+import RetroactiveB
 
 let DemangleToMetadataTests = TestSuite("DemangleToMetadata")
 
@@ -432,6 +438,13 @@ DemangleToMetadataTests.test("Nested types in same-type-constrained extensions")
   // V !: P3 in InnerTEqualsU
   // T != ConformsToP1 in InnerTEqualsConformsToP1
   // V !: P3 in InnerTEqualsConformsToP1
+}
+
+DemangleToMetadataTests.test("Retroactive conformances") {
+  expectEqual(RetroactiveA.getCommonRequiresP1_Struct(),
+    _typeByMangledName("17RetroactiveCommon16CommonRequiresP1Vy17RetroactiveCommon12CommonStructV17RetroactiveCommon12CommonStructV17RetroactiveCommon8CommonP112RetroactiveAyHCg_G")!)
+  expectEqual(RetroactiveB.getCommonRequiresP1_Struct(),
+    _typeByMangledName("17RetroactiveCommon16CommonRequiresP1Vy17RetroactiveCommon12CommonStructV17RetroactiveCommon12CommonStructV17RetroactiveCommon8CommonP112RetroactiveByHCg_G")!)
 }
 
 runAllTests()

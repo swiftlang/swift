@@ -111,6 +111,10 @@ class TypeDecoder {
   using BuiltType = typename BuilderType::BuiltType;
   using BuiltNominalTypeDecl = typename BuilderType::BuiltNominalTypeDecl;
   using BuiltProtocolDecl = typename BuilderType::BuiltProtocolDecl;
+  using BuiltProtocolConformanceRef =
+    typename BuilderType::BuiltProtocolConformanceRef;
+  using BuiltProtocolConformance =
+    typename BuilderType::BuiltProtocolConformance;
   using NodeKind = Demangle::Node::Kind;
 
   BuilderType &Builder;
@@ -180,10 +184,11 @@ class TypeDecoder {
       if (!decodeMangledNominalType(Node->getChild(0), typeDecl, parent))
         return BuiltType();
 
+      // Generic arguments.
       std::vector<BuiltType> args;
-
       const auto &genericArgs = Node->getChild(1);
-      assert(genericArgs->getKind() == NodeKind::TypeList);
+      if (genericArgs->getKind() != NodeKind::TypeList)
+        return BuiltType();
 
       for (auto genericArg : *genericArgs) {
         auto paramType = decodeMangledType(genericArg);
@@ -192,7 +197,23 @@ class TypeDecoder {
         args.push_back(paramType);
       }
 
-      return Builder.createBoundGenericType(typeDecl, args, parent);
+      // Retroactive conformances.
+      std::vector<std::pair<unsigned, BuiltProtocolConformance>> retroactive;
+      if (Node->getNumChildren() > 2 &&
+          Node->getChild(2)->getKind() == NodeKind::TypeList) {
+        for (auto retroNode : *Node->getChild(2)) {
+          if (retroNode->getKind() != NodeKind::RetroactiveConformance ||
+              !retroNode->hasIndex() || retroNode->getNumChildren() < 1)
+            continue;
+
+          if (auto conformance =
+                decodeMangledProtocolConformance(retroNode->getChild(0)))
+            retroactive.push_back({retroNode->getIndex(), conformance});
+        }
+      }
+
+      return Builder.createBoundGenericType(typeDecl, args, retroactive,
+                                            parent);
     }
     case NodeKind::BuiltinTypeName: {
       auto mangledName = Demangle::mangleNode(Node);
@@ -517,6 +538,73 @@ class TypeDecoder {
     }
   }
 
+  /// Given a demangle tree, attempt to turn it into a protocol conformance.
+  BuiltProtocolConformance decodeMangledProtocolConformance(
+                                          const Demangle::NodePointer &Node) {
+    if (!Node) return BuiltProtocolConformance();
+
+    using NodeKind = Demangle::Node::Kind;
+    switch (Node->getKind()) {
+    case NodeKind::ConcreteProtocolConformance: {
+      if (Node->getNumChildren() < 2)
+        return BuiltProtocolConformance();
+
+      // Conforming type.
+      BuiltType conformingType = decodeMangledType(Node->getChild(0));
+      if (!conformingType)
+        return BuiltProtocolConformance();
+
+      // Protocol conformance reference.
+      auto conformanceRef = BuiltProtocolConformanceRef();
+      auto conformanceRefNode = Node->getChild(1);
+      if (conformanceRefNode->getKind() == NodeKind::ProtocolConformanceRef &&
+          conformanceRefNode->getNumChildren() > 0) {
+        // Protocol we are referring to.
+        auto protocol =
+          decodeMangledProtocolType(conformanceRefNode->getChild(0));
+        if (!protocol)
+          return BuiltProtocolConformance();
+
+        // The module in which the conformance resides, if it's retroactive.
+        StringRef module;
+        if (conformanceRefNode->getNumChildren() > 1 &&
+            conformanceRefNode->getChild(1)->getKind() == NodeKind::Module) {
+          module = conformanceRefNode->getChild(1)->getText();
+        }
+
+        // Resolve the conformance reference.
+        conformanceRef =
+          Builder.createProtocolConformanceRef(conformingType, protocol,
+                                               module);
+        if (!conformanceRef)
+          return BuiltProtocolConformance();
+      } else {
+        return BuiltProtocolConformance();
+      }
+
+      // Conditional requirements.
+      std::vector<BuiltProtocolConformance> conditionalReqs;
+      if (Node->getNumChildren() > 2 &&
+          Node->getChild(2)->getKind() == NodeKind::AnyProtocolConformanceList){
+        for (auto conditionalReqNode : *Node->getChild(2)) {
+          auto conditionalReq =
+            decodeMangledProtocolConformance(conditionalReqNode);
+          if (!conditionalReq)
+            return BuiltProtocolConformance();
+
+          conditionalReqs.push_back(conditionalReq);
+        }
+      }
+
+      return Builder.createProtocolConformance(conformingType, conformanceRef,
+                                               conditionalReqs);
+    }
+
+    // FIXME: Dependent protocol conformances.
+    default:
+      return BuiltProtocolConformance();
+    }
+  }
 private:
   bool decodeMangledNominalType(Demangle::NodePointer node,
                                 BuiltNominalTypeDecl &typeDecl,

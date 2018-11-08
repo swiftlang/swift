@@ -162,6 +162,10 @@ public:
   using BuiltNominalTypeDecl = Optional<std::string>;
   using BuiltProtocolDecl = Optional<std::pair<std::string, bool /*isObjC*/>>;
 
+  // FIXME: These are stubs
+  using BuiltProtocolConformanceRef = char;
+  using BuiltProtocolConformance = char;
+
   TypeRefBuilder();
 
   TypeRefBuilder(const TypeRefBuilder &other) = delete;
@@ -240,15 +244,21 @@ public:
   }
 
   const BoundGenericTypeRef *
-  createBoundGenericType(const Optional<std::string> &mangledName,
-                         const std::vector<const TypeRef *> &args) {
+  createBoundGenericType(
+      const Optional<std::string> &mangledName,
+      const std::vector<const TypeRef *> &args,
+      ArrayRef<std::pair<unsigned, BuiltProtocolConformance>> retroactive) {
+    // FIXME: Retroactive conformances.
     return BoundGenericTypeRef::create(*this, *mangledName, args, nullptr);
   }
 
   const BoundGenericTypeRef *
-  createBoundGenericType(const Optional<std::string> &mangledName,
-                         const std::vector<const TypeRef *> &args,
-                         const TypeRef *parent) {
+  createBoundGenericType(
+           const Optional<std::string> &mangledName,
+           const std::vector<const TypeRef *> &args,
+           ArrayRef<std::pair<unsigned, BuiltProtocolConformance>> retroactive,
+           const TypeRef *parent) {
+    // FIXME: Retroactive conformances.
     return BoundGenericTypeRef::create(*this, *mangledName, args, parent);
   }
 
@@ -347,6 +357,22 @@ public:
 
   const OpaqueTypeRef *getOpaqueType() {
     return OpaqueTypeRef::get();
+  }
+
+  BuiltProtocolConformanceRef createProtocolConformanceRef(
+                                                     BuiltType conformingType,
+                                                     BuiltProtocolDecl protocol,
+                                                     StringRef module) {
+    // FIXME: Implement protocol conformance descriptor lookup.
+    return false;
+  }
+
+  BuiltProtocolConformance createProtocolConformance(
+      BuiltType conformingType,
+      BuiltProtocolConformanceRef conformance,
+      ArrayRef<BuiltProtocolConformance> conditionalReqs) {
+    // FIXME: Implement witness table computation.
+    return false;
   }
 
   ///

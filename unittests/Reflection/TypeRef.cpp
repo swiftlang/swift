@@ -63,18 +63,18 @@ TEST(TypeRefTest, UniqueBoundGenericTypeRef) {
   auto GTP00 = Builder.createGenericTypeParameterType(0, 0);
   auto GTP01 = Builder.createGenericTypeParameterType(0, 1);
 
-  auto BG1 = Builder.createBoundGenericType(ABC, {}, nullptr);
-  auto BG2 = Builder.createBoundGenericType(ABC, {}, nullptr);
-  auto BG3 = Builder.createBoundGenericType(ABCD, {}, nullptr);
+  auto BG1 = Builder.createBoundGenericType(ABC, {}, {}, nullptr);
+  auto BG2 = Builder.createBoundGenericType(ABC, {}, {}, nullptr);
+  auto BG3 = Builder.createBoundGenericType(ABCD, {}, {}, nullptr);
 
   EXPECT_EQ(BG1, BG2);
   EXPECT_NE(BG2, BG3);
 
   std::vector<const TypeRef *> GenericParams { GTP00, GTP01 };
 
-  auto BG4 = Builder.createBoundGenericType(ABC, GenericParams, nullptr);
-  auto BG5 = Builder.createBoundGenericType(ABC, GenericParams, nullptr);
-  auto BG6 = Builder.createBoundGenericType(ABCD, GenericParams, nullptr);
+  auto BG4 = Builder.createBoundGenericType(ABC, GenericParams, {}, nullptr);
+  auto BG5 = Builder.createBoundGenericType(ABC, GenericParams, {}, nullptr);
+  auto BG6 = Builder.createBoundGenericType(ABCD, GenericParams, {}, nullptr);
 
   EXPECT_EQ(BG4, BG5);
   EXPECT_NE(BG5, BG6);
@@ -388,6 +388,7 @@ TEST(TypeRefTest, UniqueAfterSubstitution) {
 
   auto ConcreteBG = Builder.createBoundGenericType(MangledName,
                                                    ConcreteArgs,
+                                                   {},
                                                    /*parent*/ nullptr);
 
   auto GTP00 = Builder.createGenericTypeParameterType(0, 0);
@@ -395,7 +396,7 @@ TEST(TypeRefTest, UniqueAfterSubstitution) {
   std::vector<const TypeRef *> GenericParams { GTP00, GTP01 };
 
   auto Unbound = Builder.createBoundGenericType(MangledName, GenericParams,
-                                                /*parent*/ nullptr);
+                                                { }, /*parent*/ nullptr);
 
   GenericArgumentMap Subs;
   Subs[{0,0}] = NominalInt;
@@ -415,7 +416,7 @@ TEST(TypeRefTest, NestedTypes) {
   std::string ParentName("parent");
   std::vector<const TypeRef *> ParentArgs { GTP00 };
   auto Parent = Builder.createBoundGenericType(ParentName, ParentArgs,
-                                               /*parent*/ nullptr);
+                                               { }, /*parent*/ nullptr);
 
   std::string ChildName("child");
   auto Child = Builder.createNominalType(ChildName, Parent);
@@ -428,7 +429,7 @@ TEST(TypeRefTest, NestedTypes) {
   std::vector<const TypeRef *> SubstParentArgs { SubstArg };
   auto SubstParent = Builder.createBoundGenericType(ParentName,
                                                     SubstParentArgs,
-                                                    /*parent*/ nullptr);
+                                                    { }, /*parent*/ nullptr);
   auto SubstChild = Builder.createNominalType(ChildName, SubstParent);
 
   GenericArgumentMap Subs;
@@ -447,7 +448,7 @@ TEST(TypeRefTest, DeriveSubstitutions) {
   std::string NominalName("nominal");
   std::vector<const TypeRef *> NominalArgs { GTP00 };
   auto Nominal = Builder.createBoundGenericType(NominalName, NominalArgs,
-                                               /*parent*/ nullptr);
+                                                { }, /*parent*/ nullptr);
 
   auto Result = Builder.createTupleType({GTP00, GTP01}, "", false);
   auto Func =

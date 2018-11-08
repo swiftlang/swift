@@ -341,12 +341,17 @@ public:
   /// generic requirements (e.g., those that need to be
   /// passed to an instantiation function) will be added to this vector.
   ///
+  /// \param getWitnessTable Function object that returns the Ith witness table,
+  /// if it's already known. This can return NULL to indicate that the witness
+  /// table should be looked up dynamically.
+  ///
   /// \returns true if an error occurred, false otherwise.
   bool _checkGenericRequirements(
-                    llvm::ArrayRef<GenericRequirementDescriptor> requirements,
-                    std::vector<const void *> &extraArguments,
-                    SubstFlatGenericParameterFn substFlatGenericParam,
-                    SubstGenericParameterFn substGenericParam);
+          llvm::ArrayRef<GenericRequirementDescriptor> requirements,
+          std::vector<const void *> &extraArguments,
+          SubstFlatGenericParameterFn substFlatGenericParam,
+          SubstGenericParameterFn substGenericParam,
+          std::function<const WitnessTable *(unsigned index)> getWitnessTable);
 
   /// A helper function which avoids performing a store if the destination
   /// address already contains the source value.  This is useful when
