@@ -361,3 +361,32 @@ func testNonEphemeralInClosures() {
   fn(&local) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
 }
+
+struct S3 {
+  var ptr1: UnsafeMutableRawPointer
+  lazy var ptr2 = UnsafeMutableRawPointer(&topLevelS)
+}
+
+enum E {
+  case mutableRaw(UnsafeMutableRawPointer)
+  case const(UnsafePointer<Int8>)
+}
+
+func testNonEphemeralInMemberwiseInits() {
+  var local = 0
+
+  _ = S3(ptr1: &topLevelS, ptr2: &local) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer?' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer?' produces a pointer valid only for the duration of the call}}
+
+  _ = S3(ptr1: &local, ptr2: &topLevelS) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+
+  _ = E.mutableRaw(&local) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+
+  _ = E.const([1, 2, 3]) // expected-warning {{passing temporary pointer argument of type 'UnsafePointer<Int8>' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
+  // expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call}}
+
+  _ = E.const("hello") // expected-warning {{passing temporary pointer argument of type 'UnsafePointer<Int8>' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
+  // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call}}
+}

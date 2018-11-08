@@ -1207,14 +1207,25 @@ createValueConstructor(ClangImporter::Implementation &Impl,
           generateParamName = false;
     }
 
+    auto paramTy = var->getInterfaceType();
     Identifier argName = generateParamName ? var->getName() : Identifier();
     auto param = new (context)
         ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), argName,
                   SourceLoc(), var->getName(), structDecl);
-    param->setInterfaceType(var->getInterfaceType());
+    param->setInterfaceType(paramTy);
     param->setValidationToChecked();
     Impl.recordImplicitUnwrapForDecl(
         param, var->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>());
+
+    auto unwrappedParamType = paramTy;
+    if (auto objectType = paramTy->getOptionalObjectType())
+      unwrappedParamType = objectType;
+
+    // If the member is a pointer, then don't allow the parameter to accept
+    // ephemeral conversions.
+    if (unwrappedParamType->getAnyPointerElementType())
+      param->setNonEphemeral();
+
     valueParameters.push_back(param);
   }
 

@@ -2136,9 +2136,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   if (attrs.has(TAK_nonEphemeral)) {
     auto getLoc = [&] { return attrs.getLoc(TAK_nonEphemeral); };
-    // The attribute is meaningless except on parameter types.
-    if (!isParam ||
-        options.getBaseContext() == TypeResolverContext::EnumElementDecl) {
+    if (!isParam) {
       auto loc = getLoc();
       auto attrRange = getTypeAttrRangeWithAt(Context, loc);
 

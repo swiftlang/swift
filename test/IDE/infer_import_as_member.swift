@@ -111,3 +111,13 @@ let _ = mine.getCollisionNonProperty(1)
 // PRINT-NEXT:    init!(i i: Double)
 // PRINT-NEXT:    class func invert(_ iamOtherName: IAMOtherName!)
 // PRINT-NEXT:  }
+//
+// PRINT-LABEL: struct IAMStruct2 {
+// PRINT-NEXT:   var ptr1: UnsafeMutablePointer<Double>!
+// PRINT-NEXT:   var ptr2: UnsafeMutablePointer<Double>!
+// PRINT-NEXT:   init()
+// PRINT-NEXT:   init(ptr1 ptr1: @_nonEphemeral UnsafeMutablePointer<Double>!, ptr2 ptr2: @_nonEphemeral UnsafeMutablePointer<Double>!)
+// PRINT-NEXT: }
+// PRINT-NEXT: extension IAMStruct2 {
+// PRINT-NEXT:   init(otherPtr ptr: UnsafeMutablePointer<Double>!)
+// PRINT-NEXT: }

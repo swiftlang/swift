@@ -838,6 +838,16 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL,
     
     checkTypeModifyingDeclAttributes(param);
     if (!hadError) {
+      // If we're in an enum case, then infer @_nonEphemeral for pointer
+      // payloads.
+      if (options.getBaseContext() == TypeResolverContext::EnumElementDecl) {
+        auto unwrappedType = type;
+        if (auto objectType = type->getOptionalObjectType())
+          unwrappedType = objectType;
+        if (unwrappedType->getAnyPointerElementType())
+          param->setNonEphemeral();
+      }
+
       auto *nestedRepr = typeRepr;
 
       // Look through parens here; other than parens, specifiers

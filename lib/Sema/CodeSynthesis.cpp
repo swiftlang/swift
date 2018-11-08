@@ -2247,7 +2247,16 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
                     var->getName(), Loc, var->getName(), decl);
       arg->setInterfaceType(varInterfaceType);
       arg->setImplicit();
-      
+
+      auto unwrappedVarType = varInterfaceType;
+      if (auto objectType = varInterfaceType->getOptionalObjectType())
+        unwrappedVarType = objectType;
+
+      // If the member is a pointer, then don't allow the parameter to accept
+      // ephemeral conversions.
+      if (unwrappedVarType->getAnyPointerElementType())
+        arg->setNonEphemeral();
+
       params.push_back(arg);
     }
   }

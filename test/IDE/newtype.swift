@@ -170,14 +170,14 @@
 // PRINT-NEXT: }
 //
 // PRINT-NEXT: struct TRefRef : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
-// PRINT-NEXT:   init(_ rawValue: UnsafeMutablePointer<OpaquePointer>)
-// PRINT-NEXT:   init(rawValue: UnsafeMutablePointer<OpaquePointer>)
+// PRINT-NEXT:   init(_ rawValue: @_nonEphemeral UnsafeMutablePointer<OpaquePointer>)
+// PRINT-NEXT:   init(rawValue: @_nonEphemeral UnsafeMutablePointer<OpaquePointer>)
 // PRINT-NEXT:   let rawValue: UnsafeMutablePointer<OpaquePointer>
 // PRINT-NEXT:   typealias RawValue = UnsafeMutablePointer<OpaquePointer>
 // PRINT-NEXT: }
 // PRINT-NEXT: struct ConstTRefRef : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
-// PRINT-NEXT:   init(_ rawValue: UnsafePointer<OpaquePointer>)
-// PRINT-NEXT:   init(rawValue: UnsafePointer<OpaquePointer>)
+// PRINT-NEXT:   init(_ rawValue: @_nonEphemeral UnsafePointer<OpaquePointer>)
+// PRINT-NEXT:   init(rawValue: @_nonEphemeral UnsafePointer<OpaquePointer>)
 // PRINT-NEXT:   let rawValue: UnsafePointer<OpaquePointer>
 // PRINT-NEXT:   typealias RawValue = UnsafePointer<OpaquePointer>
 // PRINT-NEXT: }
@@ -233,4 +233,20 @@ func testConformances(ed: ErrorDomain) {
 func testFixit() {
 	let _ = NSMyContextName
 	  // expected-error@-1{{'NSMyContextName' has been renamed to 'NSSomeContext.Name.myContextName'}} {{10-25=NSSomeContext.Name.myContextName}}
+}
+
+func testNonEphemeralInitParams(x: OpaquePointer) {
+  var x = x
+
+  _ = TRefRef(&x) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutablePointer<OpaquePointer>' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
+  // expected-note@-1 {{implicit argument conversion from 'OpaquePointer' to 'UnsafeMutablePointer<OpaquePointer>' produces a pointer valid only for the duration of the call}}
+
+  _ = TRefRef(rawValue: &x) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutablePointer<OpaquePointer>' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
+  // expected-note@-1 {{implicit argument conversion from 'OpaquePointer' to 'UnsafeMutablePointer<OpaquePointer>' produces a pointer valid only for the duration of the call}}
+
+  _ = ConstTRefRef(&x) // expected-warning {{passing temporary pointer argument of type 'UnsafePointer<OpaquePointer>' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
+  // expected-note@-1 {{implicit argument conversion from 'OpaquePointer' to 'UnsafePointer<OpaquePointer>' produces a pointer valid only for the duration of the call}}
+
+  _ = ConstTRefRef(rawValue: &x) // expected-warning {{passing temporary pointer argument of type 'UnsafePointer<OpaquePointer>' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
+  // expected-note@-1 {{implicit argument conversion from 'OpaquePointer' to 'UnsafePointer<OpaquePointer>' produces a pointer valid only for the duration of the call}}
 }

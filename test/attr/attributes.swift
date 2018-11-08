@@ -295,7 +295,7 @@ extension P {
 
 enum E1 {
   case str(@_nonEphemeral String) // expected-error {{@_nonEphemeral attribute currently only applies to pointer types}}
-  case ptr(@_nonEphemeral UnsafeMutableRawPointer) // expected-error {{'_nonEphemeral' may only be used on parameters}}
+  case ptr(@_nonEphemeral UnsafeMutableRawPointer) // Redundant, but allowed.
 
   func foo() -> @_nonEphemeral UnsafeMutableRawPointer? { return nil } // expected-error {{'_nonEphemeral' may only be used on parameters}}
 }
