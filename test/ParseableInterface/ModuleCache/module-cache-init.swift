@@ -33,17 +33,26 @@
 //
 // Phase 3: build TestModule into a .swiftmodule explicitly us OtherModule via OtherModule.swiftinterface, creating OtherModule-*.swiftmodule along the way.
 //
-// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s
+// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -enable-parseable-module-interface -emit-module -emit-dependencies -emit-dependencies-path %t/TestModule.d -o %t/TestModule.swiftmodule -module-name TestModule %s
 // RUN: test -f %t/TestModule.swiftmodule
 // RUN: test -f %t/modulecache/OtherModule-*.swiftmodule
+// RUN: test -f %t/TestModule.d
 // RUN: llvm-bcanalyzer -dump %t/modulecache/OtherModule-*.swiftmodule | %FileCheck %s -check-prefix=CHECK-OTHERMODULE
+// RUN: %FileCheck %s -check-prefix=CHECK-DEPENDS <%t/TestModule.d
 // CHECK-OTHERMODULE: {{MODULE_NAME.*blob data = 'OtherModule'}}
 // CHECK-OTHERMODULE: {{FILE_DEPENDENCY.*Swift.swiftmodule'}}
 // CHECK-OTHERMODULE: {{FILE_DEPENDENCY.*SwiftOnoneSupport.swiftmodule'}}
-// CHECK-OTHERMODULE: {{FILE_DEPENDENCY.*LeafModule-.*.swiftmodule'}}
 // CHECK-OTHERMODULE: {{FILE_DEPENDENCY.*LeafModule.swiftinterface'}}
+// CHECK-OTHERMODULE: {{FILE_DEPENDENCY.*LeafModule-.*.swiftmodule'}}
 // CHECK-OTHERMODULE: {{FILE_DEPENDENCY.*OtherModule.swiftinterface'}}
 // CHECK-OTHERMODULE: FUNC_DECL
+// CHECK-DEPENDS: TestModule.swiftmodule :
+// CHECK-DEPENDS-SAME: LeafModule.swiftinterface
+// CHECK-DEPENDS-SAME: OtherModule.swiftinterface
+// CHECK-DEPENDS-SAME: {{LeafModule-[^ ]+.swiftmodule}}
+// CHECK-DEPENDS-SAME: {{OtherModule-[^ ]+.swiftmodule}}
+// CHECK-DEPENDS-SAME: Swift.swiftmodule
+// CHECK-DEPENDS-SAME: SwiftOnoneSupport.swiftmodule
 
 import OtherModule
 

@@ -173,7 +173,8 @@ static bool
 swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
                       StringRef ModuleCachePath,
                       StringRef OutPath,
-                      DiagnosticEngine &Diags) {
+                      DiagnosticEngine &Diags,
+                      DependencyTracker *OuterTracker) {
 
   auto OutBuf = FS.getBufferForFile(OutPath);
   if (!OutBuf)
@@ -189,6 +190,8 @@ swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
     return false;
 
   for (auto In : AllDeps) {
+    if (OuterTracker)
+      OuterTracker->addDependency(In.Path, /*IsSystem=*/false);
     auto DepBuf = getBufferOfDependency(FS, OutPath, In.Path, Diags);
     if (!DepBuf ||
         DepBuf->getBufferSize() != In.Size ||
@@ -218,13 +221,16 @@ collectDepsForSerialization(clang::vfs::FileSystem &FS,
                             CompilerInstance &SubInstance,
                             StringRef InPath, StringRef ModuleCachePath,
                             SmallVectorImpl<FileDependency> &Deps,
-                            DiagnosticEngine &Diags) {
+                            DiagnosticEngine &Diags,
+                            DependencyTracker *OuterTracker) {
   auto DTDeps = SubInstance.getDependencyTracker()->getDependencies();
   SmallVector<StringRef, 16> InitialDepNames(DTDeps.begin(), DTDeps.end());
   InitialDepNames.push_back(InPath);
   llvm::StringSet<> AllDepNames;
   for (auto const &DepName : InitialDepNames) {
     AllDepNames.insert(DepName);
+    if (OuterTracker)
+      OuterTracker->addDependency(DepName, /*IsSystem=*/false);
     auto DepBuf = getBufferOfDependency(FS, InPath, DepName, Diags);
     if (!DepBuf) {
       return true;
@@ -255,6 +261,8 @@ collectDepsForSerialization(clang::vfs::FileSystem &FS,
         if (AllDepNames.count(SubDep.Path) == 0) {
           AllDepNames.insert(SubDep.Path);
           Deps.push_back(SubDep);
+          if (OuterTracker)
+            OuterTracker->addDependency(SubDep.Path, /*IsSystem=*/false);
         }
       }
     }
@@ -265,7 +273,7 @@ collectDepsForSerialization(clang::vfs::FileSystem &FS,
 static bool buildSwiftModuleFromSwiftInterface(
     clang::vfs::FileSystem &FS, DiagnosticEngine &Diags,
     CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath,
-                                               StringRef ModuleCachePath) {
+    StringRef ModuleCachePath, DependencyTracker *OuterTracker) {
   bool SubError = false;
   bool RunSuccess = llvm::CrashRecoveryContext().RunSafelyOnThread([&] {
 
@@ -328,7 +336,7 @@ static bool buildSwiftModuleFromSwiftInterface(
     SerializationOpts.SerializeAllSIL = true;
     SmallVector<FileDependency, 16> Deps;
     if (collectDepsForSerialization(FS, SubInstance, InPath, ModuleCachePath,
-                                    Deps, Diags)) {
+                                    Deps, Diags, OuterTracker)) {
       SubError = true;
       return;
     }
@@ -369,9 +377,9 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
   configureSubInvocationAndOutputPaths(SubInvocation, InPath, OutPath);
 
   // Evaluate if we need to run this sub-invocation, and if so run it.
-  if (!swiftModuleIsUpToDate(FS, CacheDir, OutPath, Diags)) {
+  if (!swiftModuleIsUpToDate(FS, CacheDir, OutPath, Diags, dependencyTracker)) {
     if (buildSwiftModuleFromSwiftInterface(FS, Diags, SubInvocation, InPath,
-                                           OutPath, CacheDir))
+                                           OutPath, CacheDir, dependencyTracker))
       return std::make_error_code(std::errc::invalid_argument);
   }
 
