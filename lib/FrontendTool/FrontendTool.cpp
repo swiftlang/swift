@@ -685,16 +685,19 @@ static SourceFile *getPrimaryOrMainSourceFile(CompilerInvocation &Invocation,
   return SF;
 }
 
-static void dumpAST(CompilerInvocation &Invocation, CompilerInstance &Instance) {
-  SourceFile *sourceFile = getPrimaryOrMainSourceFile(Invocation, Instance);
-  const StringRef OutputFilename =
-  Instance.getPrimarySpecificPathsForSourceFile(*sourceFile).OutputFilename;
-  // PSP.OutputFilename is "-" whenever the output should be written to stdout.
-  if (OutputFilename == "-") {
-    sourceFile->dump();
-  } else {
-    auto OS = getFileOutputStream(OutputFilename, Instance.getMainModule()->getASTContext());
-    sourceFile->dump(*OS);
+/// Dumps the AST of all available primary source files. If corresponding output
+/// files were specified, use them; otherwise, dump the AST to stderr.
+static void dumpAST(CompilerInstance &Instance) {
+  for(SourceFile *sourceFile: Instance.getPrimarySourceFiles()) {
+    const StringRef OutputFilename =
+      Instance.getPrimarySpecificPathsForSourceFile(*sourceFile).OutputFilename;
+    // PSP.OutputFilename is "-" whenever the output should be written to the console.
+    if (OutputFilename == "-") {
+      sourceFile->dump();
+    } else {
+      auto OS = getFileOutputStream(OutputFilename, Instance.getMainModule()->getASTContext());
+      sourceFile->dump(*OS);
+    }
   }
 }
 
@@ -741,7 +744,7 @@ static Optional<bool> dumpASTIfNeeded(CompilerInvocation &Invocation,
 
   case FrontendOptions::ActionType::DumpParse:
   case FrontendOptions::ActionType::DumpAST:
-    dumpAST(Invocation, Instance);
+    dumpAST(Instance);
     break;
 
   case FrontendOptions::ActionType::EmitImportedModules:
