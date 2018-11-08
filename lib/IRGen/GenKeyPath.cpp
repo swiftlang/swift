@@ -120,8 +120,8 @@ getAccessorForComputedComponent(IRGenModule &IGM,
   // If it's only externally available, we need a local thunk to relative-
   // reference.
   if (requirements.empty() &&
-      !LinkEntity::forSILFunction(accessor, false).isAvailableExternally(IGM)) {
-
+      !isAvailableExternally(accessor->getLinkage()) &&
+      &IGM == IGM.IRGen.getGenModule(accessor)) {
     return IGM.getAddrOfSILFunction(accessor, NotForDefinition);
   }
   auto accessorFn = IGM.getAddrOfSILFunction(accessor, NotForDefinition);
@@ -1030,33 +1030,23 @@ emitKeyPathComponent(IRGenModule &IGM,
       fields.add(llvm::ConstantExpr::getTruncOrBitCast(idValue, IGM.Int32Ty));
       break;
     }
-    
-    if (isInstantiableOnce) {
-      // No generic arguments or indexes, so we can invoke the
-      // getter/setter as is.
+
+    // Push the accessors, possibly thunked to marshal generic environment.
+    fields.addRelativeAddress(
+      getAccessorForComputedComponent(IGM, component, Getter,
+                                      genericEnv, requirements,
+                                      hasSubscriptIndices));
+    if (settable)
       fields.addRelativeAddress(
-        IGM.getAddrOfSILFunction(component.getComputedPropertyGetter(),
-                                 NotForDefinition));
-      if (settable)
-        fields.addRelativeAddress(
-          IGM.getAddrOfSILFunction(component.getComputedPropertySetter(),
-                                   NotForDefinition));
-    } else {
+        getAccessorForComputedComponent(IGM, component, Setter,
+                                        genericEnv, requirements,
+                                        hasSubscriptIndices));
+
+    if (!isInstantiableOnce) {
       // If there's generic context or subscript indexes, embed as
       // arguments in the component. Thunk the SIL-level accessors to give the
       // runtime implementation a polymorphically-callable interface.
-      
-      // Push the accessors, possibly thunked to marshal generic environment.
-      fields.addRelativeAddress(
-        getAccessorForComputedComponent(IGM, component, Getter,
-                                        genericEnv, requirements,
-                                        hasSubscriptIndices));
-      if (settable)
-        fields.addRelativeAddress(
-          getAccessorForComputedComponent(IGM, component, Setter,
-                                          genericEnv, requirements,
-                                          hasSubscriptIndices));
-      
+
       fields.addRelativeAddress(
         getLayoutFunctionForComputedComponent(IGM, component,
                                               genericEnv, requirements));

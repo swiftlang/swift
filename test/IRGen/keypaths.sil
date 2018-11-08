@@ -249,13 +249,30 @@ entry:
 }
 
 sil @k_id : $@convention(thin) () -> ()
-sil @k_get : $@convention(thin) (@in_guaranteed S) -> @out Int
+sil @k_get : $@convention(thin) (@in_guaranteed S) -> @out Int {
+bb0(%0 : @trivial $*Int, %1 : @trivial $*S):
+  unreachable
+}
 
-sil @l_get : $@convention(thin) (@in_guaranteed C) -> @out Int
-sil @l_set : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ()
+sil @l_get : $@convention(thin) (@in_guaranteed C) -> @out Int {
+bb0(%0 : @trivial $*Int, %1 : @trivial $*C):
+  unreachable
+}
 
-sil @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed () -> @out ()
-sil @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed () -> @out (), @inout S) -> ()
+sil @l_set : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> () {
+bb0(%0 : @trivial $*Int, %1 : @trivial $*C):
+  unreachable
+}
+
+sil @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed () -> @out () {
+bb0(%0 : @trivial $*@callee_guaranteed () -> @out (), %1 : @trivial $*S):
+  unreachable
+}
+
+sil @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed () -> @out (), @inout S) -> () {
+bb0(%0 : @trivial $*@callee_guaranteed () -> @out (), %1 : @trivial $*S):
+  unreachable
+}
 
 sil @m2_get : $@convention(thin) (@in_guaranteed C2) -> @out @callee_guaranteed () -> @out ()
 sil @m2_set : $@convention(thin) (@in_guaranteed @callee_guaranteed () -> @out (), @inout C2) -> ()
