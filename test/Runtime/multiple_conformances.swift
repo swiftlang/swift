@@ -4,7 +4,7 @@
 // RUN: %target-build-swift -parse-as-library -force-single-frontend-invocation -I %t %S/Inputs/RetroactiveB.swift -emit-module-path %t/RetroactiveB.swiftmodule -emit-object -o %t/RetroactiveB.o
 // RUN: %target-build-swift -I %t %s %t/RetroactiveCommon.o %t/RetroactiveA.o %t/RetroactiveB.o -module-name main -o %t/a.out 
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out > %t.log 2>&1
+// RUN: env SWIFT_ENABLE_CONFLICTING_CONFORMANCES_CHECK=1 %target-run %t/a.out > %t.log 2>&1
 // RUN: %FileCheck %s < %t.log
 
 // REQUIRES: executable_test
