@@ -2385,19 +2385,6 @@ bool ConstraintSystem::isConversionNonEphemeral(
       return access.getKind() == AccessStrategy::Storage;
     };
 
-    auto isSimpleMember = [&](Expr *baseExpr, ValueDecl *member) -> bool {
-      if (!isDirectlyAccessedStoredVar(member))
-        return false;
-
-      // The member is simple if it is either static
-      if (member->isStatic())
-        return true;
-
-      // ... or it's an instance member on an lvalue struct base.
-      auto lvalueTy = simplifyType(getType(baseExpr))->getAs<LValueType>();
-      return lvalueTy && lvalueTy->getObjectType()->is<StructType>();
-    };
-
     auto isValidBaseDecl = [&](ValueDecl *baseDecl) -> bool {
       if (!isDirectlyAccessedStoredVar(baseDecl))
         return false;
@@ -2417,6 +2404,14 @@ bool ConstraintSystem::isConversionNonEphemeral(
         continue;
       }
 
+      // Look through load exprs. These can occur when projecting through a
+      // property on a class, which we want to support if the class is
+      // non-final.
+      if (auto *le = dyn_cast<LoadExpr>(subExpr)) {
+        subExpr = le->getSubExpr();
+        continue;
+      }
+
       if (auto *tee = dyn_cast<TupleElementExpr>(subExpr)) {
         isMember = true;
         subExpr = tee->getBase();
@@ -2424,7 +2419,7 @@ bool ConstraintSystem::isConversionNonEphemeral(
       }
 
       if (auto *mre = dyn_cast<MemberRefExpr>(subExpr)) {
-        if (!isSimpleMember(mre->getBase(), mre->getMember().getDecl()))
+        if (!isDirectlyAccessedStoredVar(mre->getMember().getDecl()))
           return false;
         isMember = true;
         subExpr = mre->getBase();
