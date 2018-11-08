@@ -583,6 +583,11 @@ namespace {
   };
 }
 
+static bool shouldWarnAboutConflictingConformances() {
+  return SWIFT_LAZY_CONSTANT(
+           (bool)getenv("SWIFT_ENABLE_CONFLICTING_CONFORMANCES_CHECK"));
+}
+
 const ProtocolConformanceDescriptor *
 swift::_conformsToSwiftProtocol(const Metadata * const type,
                                 const ProtocolDescriptor *protocol,
@@ -733,7 +738,7 @@ swift::_conformsToSwiftProtocol(const Metadata * const type,
       // If we have only retroactive conformances, complain about the
       // conflict.
       // FIXME: Only do this once per type descriptor/protocol combination.
-      if (!foundNonRetroactive) {
+      if (!foundNonRetroactive && shouldWarnAboutConflictingConformances()) {
         // Form the list of modules in which we found retroactive conformances.
         std::string moduleNamesStr;
         const char *firstModuleName = nullptr;
