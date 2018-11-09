@@ -39,8 +39,11 @@
 using namespace swift;
 using FileDependency = SerializationOptions::FileDependency;
 
+#define SWIFT_INTERFACE_FORMAT_VERSION_KEY "swift-interface-format-version"
 #define SWIFT_TOOLS_VERSION_KEY "swift-tools-version"
 #define SWIFT_MODULE_FLAGS_KEY "swift-module-flags"
+
+static swift::version::Version InterfaceFormatVersion({1, 0});
 
 static bool
 extractSwiftInterfaceVersionAndArgs(DiagnosticEngine &Diags,
@@ -56,7 +59,7 @@ extractSwiftInterfaceVersionAndArgs(DiagnosticEngine &Diags,
     return true;
   }
   auto SB = FileOrError.get()->getBuffer();
-  auto VersRe = getSwiftInterfaceToolsVersionRegex();
+  auto VersRe = getSwiftInterfaceFormatVersionRegex();
   auto FlagRe = getSwiftInterfaceModuleFlagsRegex();
   SmallVector<StringRef, 1> VersMatches, FlagMatches;
   if (!VersRe.match(SB, &VersMatches)) {
@@ -286,6 +289,17 @@ static bool buildSwiftModuleFromSwiftInterface(
       return;
     }
 
+    // For now: we support anything with the same "major version" and assume
+    // minor versions might be interesting for debugging, or special-casing a
+    // compatible field variant.
+    if (Vers.asMajorVersion() != InterfaceFormatVersion.asMajorVersion()) {
+      Diags.diagnose(SourceLoc(),
+                     diag::unsupported_version_of_parseable_interface,
+                     InPath, Vers);
+      SubError = true;
+      return;
+    }
+
     if (SubInvocation.parseArgs(SubArgs, Diags)) {
       SubError = true;
       return;
@@ -415,21 +429,26 @@ static void diagnoseScopedImports(DiagnosticEngine &diags,
   }
 }
 
-/// Prints to \p out a comment containing a tool-versions identifier as well
-/// as any relevant command-line flags in \p Opts used to construct \p M.
+/// Prints to \p out a comment containing a format version number, tool version
+/// string as well as any relevant command-line flags in \p Opts used to
+/// construct \p M.
 static void printToolVersionAndFlagsComment(raw_ostream &out,
                                             ParseableInterfaceOptions const &Opts,
                                             ModuleDecl *M) {
   auto &Ctx = M->getASTContext();
+  auto ToolsVersion = swift::version::getSwiftFullVersion(
+      Ctx.LangOpts.EffectiveLanguageVersion);
+  out << "// " SWIFT_INTERFACE_FORMAT_VERSION_KEY ": "
+      << InterfaceFormatVersion << "\n";
   out << "// " SWIFT_TOOLS_VERSION_KEY ": "
-      << Ctx.LangOpts.EffectiveLanguageVersion << "\n";
+      << ToolsVersion << "\n";
   out << "// " SWIFT_MODULE_FLAGS_KEY ": "
       << Opts.ParseableInterfaceFlags << "\n";
 }
 
-llvm::Regex swift::getSwiftInterfaceToolsVersionRegex() {
-  return llvm::Regex("^// " SWIFT_TOOLS_VERSION_KEY ": ([0-9\\.]+)$",
-                     llvm::Regex::Newline);
+llvm::Regex swift::getSwiftInterfaceFormatVersionRegex() {
+  return llvm::Regex("^// " SWIFT_INTERFACE_FORMAT_VERSION_KEY
+                     ": ([0-9\\.]+)$", llvm::Regex::Newline);
 }
 
 llvm::Regex swift::getSwiftInterfaceModuleFlagsRegex() {
