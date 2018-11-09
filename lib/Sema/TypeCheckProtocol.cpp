@@ -1293,7 +1293,7 @@ bool WitnessChecker::checkWitnessAccess(ValueDecl *requirement,
       const ModuleDecl *witnessModule = witness->getModuleContext();
       if (parentFile->getParentModule() != witnessModule &&
           parentFile->hasTestableOrPrivateImport(witness->getFormalAccess(),
-                                                 witnessModule) &&
+                                                 witness) &&
           witness->isAccessibleFrom(parentFile)) {
         actualScopeToCheck = parentFile;
       }
