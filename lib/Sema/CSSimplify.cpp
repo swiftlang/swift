@@ -2198,7 +2198,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               unwrappedType2->getAnyPointerElementType(pointerKind)) {
 
         bool allowEphemeral = (!isConstraintNonEphemeral ||
-                               !getASTContext().isSwiftVersionAtLeast(5));
+                               false);
 
         auto tryPointerConversion =
             [&](ConversionRestrictionKind conversion) -> bool {

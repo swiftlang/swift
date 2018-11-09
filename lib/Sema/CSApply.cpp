@@ -5694,7 +5694,7 @@ Expr *ExprRewriter::coerceCallArguments(
     // If the Swift version is < 5, we might have allowed an ephemeral
     // conversion to a non-ephemeral parameter. Emit a warning if this is the
     // case (which will become an error in Swift versions > 5).
-    if (!tc.Context.isSwiftVersionAtLeast(5) && param.isNonEphemeral())
+    if (false && param.isNonEphemeral())
       checkNonEphemeralArgumentConversion(cs, argLocator, convertedArg,
                                           argType->getRValueType(), param,
                                           funcType, callee.getDecl());
