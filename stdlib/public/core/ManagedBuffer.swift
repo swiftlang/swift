@@ -244,8 +244,8 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// The stored `Header` instance.
   @inlinable // FIXME(sil-serialize-all)
   public var header: Header {
-    addressWithNativeOwner {
-      return (UnsafePointer(_headerPointer), _nativeBuffer)
+    _read {
+      yield _headerPointer.pointee
     }
     _modify {
       yield &_headerPointer.pointee
