@@ -24,6 +24,25 @@ CHANGELOG
 Swift 5.0
 ---------
 
+* [SE-0216][]:
+
+  The `@dynamicCallable` attribute enables nominal types to be "callable" via a
+  simple syntactic sugar. The primary use case is dynamic language
+  interoperability.
+
+  Toy example:
+
+  ```swift
+  @dynamicCallable
+  struct ToyCallable {
+    func dynamicallyCall(withArguments: [Int]) {}
+    func dynamicallyCall(withKeywordArguments: KeyValuePairs<String, Int>) {}
+  }
+  let x = ToyCallable()
+  x(1, 2, 3) // desugars to `x.dynamicallyCall(withArguments: [1, 2, 3])`
+  x(label: 1, 2) // desugars to `x.dynamicallyCall(withKeywordArguments: ["label": 1, "": 2])`
+  ```
+
 * [SR-7251][]:
 
   In Swift 5 mode, attempting to declare a static property with the same name as a
