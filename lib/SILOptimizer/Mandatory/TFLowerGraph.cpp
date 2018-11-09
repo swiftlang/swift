@@ -587,7 +587,7 @@ public: // Lowering functionality.
   GLStatus lowerBasicBlock(SILBasicBlock *bb, bool skipTerminator = false);
   GLStatus lowerRegion(SESERegionTree *region);
   GLStatus lowerSequenceRegion(SequenceSESERegion *r);
-  GLStatus lowerFunctionRegion(FunctionSESERegion *r);
+  GLStatus lowerSharedRegion(SharedSESERegion *r);
   GLStatus lowerWhileLoopRegion(WhileLoopSESERegion *r);
   GLStatus lowerConditionalRegion(ConditionalSESERegion *r);
 
@@ -2003,7 +2003,7 @@ GLStatus TFGraphFunctionLowering::lowerSequenceRegion(SequenceSESERegion *r) {
     // Do not clear the outputs if the next region is a function as the outputs
     // are required to process that function region.
     auto &graphFn = getCurrentGraphFunction();
-    if (child->getKind() == SESERegionTree::Function) {
+    if (child->getKind() == SESERegionTree::Shared) {
       for (int i = 0, e = graphFn.outputs.size(); i != e; ++i) {
         addValueMapping({graphFn.outputs[i].first, 0},
                         graphFn.outputs[i].second);
@@ -2017,8 +2017,8 @@ GLStatus TFGraphFunctionLowering::lowerSequenceRegion(SequenceSESERegion *r) {
   return GLStatus::Success;
 }
 
-GLStatus TFGraphFunctionLowering::lowerFunctionRegion(FunctionSESERegion *r) {
-  return lowerRegion(r->getFunctionRegion());
+GLStatus TFGraphFunctionLowering::lowerSharedRegion(SharedSESERegion *r) {
+  return lowerRegion(r->getSharedRegionTree());
 }
 
 /// Given a conditional branch, produce the TF_Output for its branch condition.
@@ -2521,8 +2521,8 @@ GLStatus TFGraphFunctionLowering::lowerRegion(SESERegionTree *region) {
     return lowerBasicBlock(cast<SingleBlockSESERegion>(region)->getBB());
   case SESERegionTree::Sequence:
     return lowerSequenceRegion(cast<SequenceSESERegion>(region));
-  case SESERegionTree::Function:
-    return lowerFunctionRegion(cast<FunctionSESERegion>(region));
+  case SESERegionTree::Shared:
+    return lowerSharedRegion(cast<SharedSESERegion>(region));
   case SESERegionTree::WhileLoop:
     return lowerWhileLoopRegion(cast<WhileLoopSESERegion>(region));
   case SESERegionTree::Conditional:

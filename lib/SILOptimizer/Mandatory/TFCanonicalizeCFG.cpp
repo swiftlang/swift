@@ -67,7 +67,7 @@ void SESERegionTree::print(llvm::raw_ostream &OS, unsigned indent) const {
   case Sequence:    return cast<SequenceSESERegion>(this)->print(OS, indent);
   case WhileLoop:   return cast<WhileLoopSESERegion>(this)->print(OS, indent);
   case Conditional: return cast<ConditionalSESERegion>(this)->print(OS, indent);
-  case Function:    return cast<FunctionSESERegion>(this)->print(OS, indent);
+  case Shared:      return cast<SharedSESERegion>(this)->print(OS, indent);
   }
 };
 
@@ -86,9 +86,9 @@ void SequenceSESERegion::print(llvm::raw_ostream &OS, unsigned indent) const {
   OS << "]";
 }
 
-void FunctionSESERegion::print(llvm::raw_ostream &OS, unsigned indent) const {
-  OS.indent(indent) << "{function\n";
-  functionRegionTree->print(OS, indent + 2);
+void SharedSESERegion::print(llvm::raw_ostream &OS, unsigned indent) const {
+  OS.indent(indent) << "{shared\n";
+  sharedRegionTree->print(OS, indent + 2);
   OS << "\n";
   OS.indent(indent) << "}";
 }
@@ -162,13 +162,13 @@ namespace {
     llvm::DenseMap<SILBasicBlock*, WhileLoopSESERegion*> loopPreheaders;
 
     /// Map that keeps track of the underlying SESERegionTree for the
-    /// FunctionSESERegion that starts at the given block. The key is starting
-    /// block of the function region. The value is a pair consiting of the
-    /// SESERegionTree for the function and the exit block for the function
+    /// SharedSESERegion that starts at the given block. The key is starting
+    /// block of the shared region. The value is a pair consiting of the
+    /// SESERegionTree for the shared region and the exit block for the function
     /// region.
     llvm::DenseMap<SILBasicBlock *,
                    std::pair<std::shared_ptr<SESERegionTree>, SILBasicBlock *>>
-        functionRegions;
+        sharedRegions;
 
   public:
     SESERegionBuilder(SILFunction *F) : DI(F), PDI(F), LI(F, &DI), F(F) {}
@@ -217,12 +217,12 @@ namespace {
     void processLoop(SILLoop *loop);
     void ensureSingleExitFromLoops();
 
-    /// Extract a FunctionSESERegion starting at `startBB` and return a pair
-    /// consisting of the SESERegionTree for the function region and the exit
-    /// block.  If the function region has no exit blocks (e.g., ends with a
+    /// Extract a SharedSESERegion starting at `startBB` and return a pair
+    /// consisting of the SESERegionTree for the shared region and the exit
+    /// block.  If the shared region has no exit blocks (e.g., ends with a
     /// return instruction), the exit block is set to nullptr.
     std::pair<std::shared_ptr<SESERegionTree>, SILBasicBlock *>
-    createFunctionRegion(SILBasicBlock *startBB);
+    createSharedRegion(SILBasicBlock *startBB);
 
     // Dump top-level loop information for debugging purposes.
     void dumpTopLevelLoopInfo(llvm::raw_ostream* outs, const char* stage) {
@@ -268,9 +268,9 @@ SESERegionBuilder::processAcyclicRegion(SILBasicBlock *startBB,
 }
 
 std::pair<std::shared_ptr<SESERegionTree>, SILBasicBlock *>
-SESERegionBuilder::createFunctionRegion(SILBasicBlock *startBB) {
-  auto iter = functionRegions.find(startBB);
-  if (iter == functionRegions.end()) {
+SESERegionBuilder::createSharedRegion(SILBasicBlock *startBB) {
+  auto iter = sharedRegions.find(startBB);
+  if (iter == sharedRegions.end()) {
     // Create and cache the function region.
     llvm::SmallVector<SILBasicBlock *, 32> descendants;
     DI.getDescendants(startBB, descendants);
@@ -286,10 +286,10 @@ SESERegionBuilder::createFunctionRegion(SILBasicBlock *startBB) {
     } else {
       exitBB = subRegionEndBB->getSingleSuccessorBlock();
       assert(exitBB &&
-             "Function region should end with an unconditional branch");
+             "Shared region should end with an unconditional branch");
     }
-    auto emplace_result = functionRegions.try_emplace(
-      startBB, std::make_pair(subSESERegion, exitBB));
+    auto emplace_result = sharedRegions.try_emplace(
+        startBB, std::make_pair(subSESERegion, exitBB));
     iter = emplace_result.first;
   }
   return iter->second;
@@ -317,11 +317,11 @@ SESERegionBuilder::processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
     // If currentBB is not dominated by startBB, we create a function region.
     if (!DI.dominates(startBB, currentBB)) {
       // We need to create a new SESE Region so that this can be marked
-      // as a shared FunctionSESERegion.
-      std::shared_ptr<SESERegionTree> funcRegionTree;
+      // as a shared SharedSESERegion.
+      std::shared_ptr<SESERegionTree> sharedRegionTree;
       SILBasicBlock *exitBB;
-      std::tie(funcRegionTree, exitBB) = createFunctionRegion(currentBB);
-      results.push_back(llvm::make_unique<FunctionSESERegion>(funcRegionTree));
+      std::tie(sharedRegionTree, exitBB) = createSharedRegion(currentBB);
+      results.push_back(llvm::make_unique<SharedSESERegion>(sharedRegionTree));
       currentBB = (exitBB == nullptr) ? endBB : exitBB;
       continue;
     }

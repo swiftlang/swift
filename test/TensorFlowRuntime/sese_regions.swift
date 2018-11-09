@@ -63,14 +63,14 @@ SESERegionTests.testAllBackends("testFunctionRegion") {
 // CHECK:      block {{bb[0-9]+}}
 // CHECK:      [sequence
 // CHECK:        block {{bb[0-9]+}}
-// CHECK:        {function
+// CHECK:        {shared
 // CHECK:          block [[FBLK:bb[0-9]+]]
 // CHECK:        }]}
 // CHECK:    {condition Header: {{bb[0-9]+}}
 // CHECK:      block {{bb[0-9]+}}
 // CHECK:      [sequence
 // CHECK:        block {{bb[0-9]+}}
-// CHECK:        {function
+// CHECK:        {shared
 // CHECK:          block [[FBLK]]
 // CHECK:        }]}}
 // CHECK:  block {{bb[0-9]+}}]
@@ -129,7 +129,7 @@ SESERegionTests.testAllBackends("testFunctionRegionWithLoop") {
 // CHECK:      block {{bb[0-9]+}}
 // CHECK:      [sequence
 // CHECK:        block {{bb[0-9]+}}
-// CHECK:        {function
+// CHECK:        {shared
 // CHECK:          [sequence
 // CHECK:            <while Preheader: [[PHDR:bb[0-9]+]], Header: [[HDR:bb[0-9]+]], exit: [[EXIT:bb[0-9]+]]
 // CHECK:              [sequence
@@ -143,7 +143,7 @@ SESERegionTests.testAllBackends("testFunctionRegionWithLoop") {
 // CHECK:      block {{bb[0-9]+}}
 // CHECK:      [sequence
 // CHECK:        block {{bb[0-9]+}}
-// CHECK:        {function
+// CHECK:        {shared
 // CHECK:          [sequence
 // CHECK:            <while Preheader: [[PHDR]], Header: [[HDR]], exit: [[EXIT]]
 // CHECK:              [sequence

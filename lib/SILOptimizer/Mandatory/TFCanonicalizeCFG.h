@@ -34,7 +34,7 @@ namespace tf {
       Sequence,
       WhileLoop,
       Conditional,
-      Function
+      Shared
     };
   protected:
     KindTy kind;
@@ -97,20 +97,22 @@ namespace tf {
   };
 
   /// Represents an SESERegion that is shared between different SESERegions.
-  class FunctionSESERegion : public SESERegionTree {
-    std::shared_ptr<SESERegionTree> functionRegionTree;
+  class SharedSESERegion : public SESERegionTree {
+    std::shared_ptr<SESERegionTree> sharedRegionTree;
 
   public:
-    FunctionSESERegion(
-        const std::shared_ptr<SESERegionTree> &functionRegionTree)
-        : SESERegionTree(Function), functionRegionTree(functionRegionTree) {}
+    SharedSESERegion(
+        const std::shared_ptr<SESERegionTree> &sharedRegionTree)
+        : SESERegionTree(Shared), sharedRegionTree(sharedRegionTree) {}
 
-    SESERegionTree* getFunctionRegion() const { return functionRegionTree.get(); }
+    SESERegionTree *getSharedRegionTree() const {
+      return sharedRegionTree.get();
+    }
 
     void print(llvm::raw_ostream &OS, unsigned indent = 0) const;
 
     static bool classof(const SESERegionTree *n) {
-      return n->getKind() == Function;
+      return n->getKind() == Shared;
     }
   };
 
