@@ -929,12 +929,9 @@ extension Collection {
     using generator: inout T
   ) -> Element? {
     guard !isEmpty else { return nil }
-    let random = generator.next(upperBound: UInt(count))
-    let index = self.index(
-      startIndex,
-      offsetBy: numericCast(random)
-    )
-    return self[index]
+    let random = Int.random(in: 0 ..< count, using: &generator)
+    let idx = index(startIndex, offsetBy: random)
+    return self[idx]
   }
 
   /// Returns a random element of the collection.
