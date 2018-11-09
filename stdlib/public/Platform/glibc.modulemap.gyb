@@ -120,6 +120,9 @@ module SwiftGlibc [system] {
       export *
     }
     module math {
+% if CMAKE_SDK == "LINUX":
+      link "m"
+% end
       header "${GLIBC_INCLUDE_PATH}/math.h"
       export *
     }
