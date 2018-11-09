@@ -686,18 +686,13 @@ static SourceFile *getPrimaryOrMainSourceFile(CompilerInvocation &Invocation,
 }
 
 /// Dumps the AST of all available primary source files. If corresponding output
-/// files were specified, use them; otherwise, dump the AST to stderr.
+/// files were specified, use them; otherwise, dump the AST to stdout.
 static void dumpAST(CompilerInstance &Instance) {
-  for(SourceFile *sourceFile: Instance.getPrimarySourceFiles()) {
+  for (SourceFile *sourceFile: Instance.getPrimarySourceFiles()) {
     const StringRef OutputFilename =
       Instance.getPrimarySpecificPathsForSourceFile(*sourceFile).OutputFilename;
-    // PSP.OutputFilename is "-" whenever the output should be written to the console.
-    if (OutputFilename == "-") {
-      sourceFile->dump();
-    } else {
-      auto OS = getFileOutputStream(OutputFilename, Instance.getMainModule()->getASTContext());
-      sourceFile->dump(*OS);
-    }
+    auto OS = getFileOutputStream(OutputFilename, Instance.getASTContext());
+    sourceFile->dump(*OS);
   }
 }
 
