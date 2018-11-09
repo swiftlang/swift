@@ -162,7 +162,10 @@ namespace {
     llvm::DenseMap<SILBasicBlock*, WhileLoopSESERegion*> loopPreheaders;
 
     /// Map that keeps track of the underlying SESERegionTree for the
-    /// FunctionSESERegion that starts at the given block.
+    /// FunctionSESERegion that starts at the given block. The key is starting
+    /// block of the function region. The value is a pair consiting of the
+    /// SESERegionTree for the function and the exit block for the function
+    /// region.
     llvm::DenseMap<SILBasicBlock *,
                    std::pair<std::shared_ptr<SESERegionTree>, SILBasicBlock *>>
         functionRegions;
@@ -214,6 +217,13 @@ namespace {
     void processLoop(SILLoop *loop);
     void ensureSingleExitFromLoops();
 
+    /// Extract a FunctionSESERegion starting at `startBB` and return a pair
+    /// consisting of the SESERegionTree for the function region and the exit
+    /// block.  If the function region has no exit blocks (e.g., ends with a
+    /// return instruction), the exit block is set to nullptr.
+    std::pair<std::shared_ptr<SESERegionTree>, SILBasicBlock *>
+    createFunctionRegion(SILBasicBlock *startBB);
+
     // Dump top-level loop information for debugging purposes.
     void dumpTopLevelLoopInfo(llvm::raw_ostream* outs, const char* stage) {
       *outs << "--- XLA CFG Loops " << stage << " Canonicalize: " << F->getName()
@@ -257,6 +267,33 @@ SESERegionBuilder::processAcyclicRegion(SILBasicBlock *startBB,
   return std::unique_ptr<SESERegionTree>(result);
 }
 
+std::pair<std::shared_ptr<SESERegionTree>, SILBasicBlock *>
+SESERegionBuilder::createFunctionRegion(SILBasicBlock *startBB) {
+  auto iter = functionRegions.find(startBB);
+  if (iter == functionRegions.end()) {
+    // Create and cache the function region.
+    llvm::SmallVector<SILBasicBlock *, 32> descendants;
+    DI.getDescendants(startBB, descendants);
+    SILBasicBlock *subRegionEndBB = startBB;
+    for (SILBasicBlock *otherBB : descendants) {
+      subRegionEndBB = PDI.findNearestCommonDominator(subRegionEndBB, otherBB);
+    }
+    std::shared_ptr<SESERegionTree> subSESERegion(
+        processAcyclicRegion(startBB, subRegionEndBB).release());
+    SILBasicBlock *exitBB = nullptr;
+    if (subRegionEndBB->getTerminator()->getNumSuccessors() == 0) {
+      exitBB = nullptr;
+    } else {
+      exitBB = subRegionEndBB->getSingleSuccessorBlock();
+      assert(exitBB &&
+             "Function region should end with an unconditional branch");
+    }
+    auto emplace_result = functionRegions.try_emplace(
+      startBB, std::make_pair(subSESERegion, exitBB));
+    iter = emplace_result.first;
+  }
+  return iter->second;
+}
 
 /// Transform the specified acyclic region (possibly with internal while loop
 /// nodes collapsed) from startBB to endBB inclusive into properly nested SESE
@@ -279,34 +316,13 @@ SESERegionBuilder::processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
   while (currentBB != endBB) {
     // If currentBB is not dominated by startBB, we create a function region.
     if (!DI.dominates(startBB, currentBB)) {
-      auto iter = functionRegions.find(currentBB);
-      if (iter == functionRegions.end()) {
-        // Create and cache the function region.
-        llvm::SmallVector<SILBasicBlock *, 32> descendants;
-        DI.getDescendants(currentBB, descendants);
-        SILBasicBlock *subRegionEndBB = startBB;
-        for (SILBasicBlock *otherBB : descendants) {
-          subRegionEndBB = PDI.findNearestCommonDominator(subRegionEndBB, otherBB);
-        }
-        // We need to create a new SESE Region so that this will end up as a
-        // separate function in the lowered graph.
-        std::shared_ptr<SESERegionTree> subSESERegion(
-            processAcyclicRegion(currentBB, subRegionEndBB).release());
-        SILBasicBlock *nextBB = nullptr;
-        if (subRegionEndBB == endBB) {
-          nextBB = endBB;
-        } else {
-          auto *branch = dyn_cast<BranchInst>(subRegionEndBB->getTerminator());
-          assert(branch &&
-                 "Function region should end with an unconditional branch");
-          nextBB = branch->getDestBB();
-        }
-        auto emplace_result = functionRegions.try_emplace(
-            currentBB, std::make_pair(subSESERegion, nextBB));
-        iter = emplace_result.first;
-      }
-      results.push_back(llvm::make_unique<FunctionSESERegion>(iter->second.first));
-      currentBB = iter->second.second;
+      // We need to create a new SESE Region so that this can be marked
+      // as a shared FunctionSESERegion.
+      std::shared_ptr<SESERegionTree> funcRegionTree;
+      SILBasicBlock *exitBB;
+      std::tie(funcRegionTree, exitBB) = createFunctionRegion(currentBB);
+      results.push_back(llvm::make_unique<FunctionSESERegion>(funcRegionTree));
+      currentBB = (exitBB == nullptr) ? endBB : exitBB;
       continue;
     }
     // If this ends with a loop, it will already have been processed and

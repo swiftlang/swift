@@ -2002,9 +2002,14 @@ GLStatus TFGraphFunctionLowering::lowerSequenceRegion(SequenceSESERegion *r) {
     // in the sequence. Hence, clear outputs for the current function if any.
     // Do not clear the outputs if the next region is a function as the outputs
     // are required to process that function region.
-    if (child->getKind() != SESERegionTree::Function) {
-      getCurrentGraphFunction().outputs.clear();
+    auto &graphFn = getCurrentGraphFunction();
+    if (child->getKind() == SESERegionTree::Function) {
+      for (int i = 0, e = graphFn.outputs.size(); i != e; ++i) {
+        addValueMapping({graphFn.outputs[i].first, 0},
+                        graphFn.outputs[i].second);
+      }
     }
+    graphFn.outputs.clear();
     GLStatus S = lowerRegion(child.get());
     if (S != GLStatus::Success)
       return S;
@@ -2013,12 +2018,6 @@ GLStatus TFGraphFunctionLowering::lowerSequenceRegion(SequenceSESERegion *r) {
 }
 
 GLStatus TFGraphFunctionLowering::lowerFunctionRegion(FunctionSESERegion *r) {
-  auto &graphFn = getCurrentGraphFunction();
-  for (int i = 0, e = graphFn.outputs.size(); i != e; ++i) {
-    addValueMapping({graphFn.outputs[i].first, 0},
-                    graphFn.outputs[i].second);
-  }
-  graphFn.outputs.clear();
   return lowerRegion(r->getFunctionRegion());
 }
 
