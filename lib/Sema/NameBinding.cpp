@@ -53,11 +53,8 @@ namespace {
       return Context.Diags.diagnose(std::forward<ArgTypes>(Args)...);
     }
 
-    void addImport(
-        SmallVectorImpl<
-            std::pair<ImportedModule, std::pair<ImportOptions, StringRef>>>
-            &imports,
-        ImportDecl *ID);
+    void addImport(SmallVectorImpl<SourceFile::ImportedModuleDesc> &imports,
+                   ImportDecl *ID);
 
     /// Load a module referenced by an import statement.
     ///
@@ -170,9 +167,7 @@ static bool shouldImportSelfImportClang(const ImportDecl *ID,
 }
 
 void NameBinder::addImport(
-    SmallVectorImpl<std::pair<ImportedModule,
-                              std::pair<ImportOptions, StringRef>>> &imports,
-    ImportDecl *ID) {
+    SmallVectorImpl<SourceFile::ImportedModuleDesc> &imports, ImportDecl *ID) {
   if (ID->getModulePath().front().first == SF.getParentModule()->getName() &&
       ID->getModulePath().size() == 1 && !shouldImportSelfImportClang(ID, SF)) {
     // If the imported module name is the same as the current module,
@@ -257,11 +252,12 @@ void NameBinder::addImport(
   if (privateImportAttr)
     options |= SourceFile::ImportFlags::PrivateImport;
 
-  imports.push_back({{ID->getDeclPath(), M}, {options, privateImportFileName}});
+  imports.push_back(SourceFile::ImportedModuleDesc(
+      {ID->getDeclPath(), M}, options, privateImportFileName));
 
   if (topLevelModule != M)
-    imports.push_back({{ID->getDeclPath(), topLevelModule},
-                       {options, privateImportFileName}});
+    imports.push_back(SourceFile::ImportedModuleDesc(
+        {ID->getDeclPath(), topLevelModule}, options, privateImportFileName));
 
   if (ID->getImportKind() != ImportKind::Module) {
     // If we're importing a specific decl, validate the import kind.
@@ -387,8 +383,7 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
 
   NameBinder Binder(SF);
 
-  SmallVector<std::pair<ImportedModule, std::pair<ImportOptions, StringRef>>, 8>
-      ImportedModules;
+  SmallVector<SourceFile::ImportedModuleDesc, 8> ImportedModules;
 
   // Do a prepass over the declarations to find and load the imported modules
   // and map operator decls.

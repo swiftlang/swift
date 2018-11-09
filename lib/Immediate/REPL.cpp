@@ -171,22 +171,17 @@ typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
 
   ModuleDecl::ImportedModule ImportOfMostRecentModule{
       /*AccessPath*/{}, MostRecentModule};
-  REPLInputFile.addImports(
-      std::make_pair(ImportOfMostRecentModule,
-                     std::make_pair(SourceFile::ImportOptions(), StringRef())));
+  REPLInputFile.addImports(SourceFile::ImportedModuleDesc(
+      ImportOfMostRecentModule, SourceFile::ImportOptions()));
 
   SmallVector<ModuleDecl::ImportedModule, 8> Imports;
   MostRecentModule->getImportedModules(Imports,
                                        ModuleDecl::ImportFilter::Private);
   if (!Imports.empty()) {
-    SmallVector<std::pair<ModuleDecl::ImportedModule,
-                          std::pair<SourceFile::ImportOptions, StringRef>>,
-                8>
-        ImportsWithOptions;
+    SmallVector<SourceFile::ImportedModuleDesc, 8> ImportsWithOptions;
     for (auto Import : Imports) {
-      ImportsWithOptions.emplace_back(
-          Import,
-          std::make_pair(SourceFile::ImportFlags::Exported, StringRef()));
+      ImportsWithOptions.emplace_back(SourceFile::ImportedModuleDesc(
+          Import, SourceFile::ImportFlags::Exported));
     }
     REPLInputFile.addImports(ImportsWithOptions);
   }

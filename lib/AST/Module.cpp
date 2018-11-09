@@ -778,8 +778,7 @@ namespace {
 class SourceFile::Impl {
 public:
   /// Only intended for use by lookupOperatorDeclForName.
-  static ArrayRef<std::pair<ModuleDecl::ImportedModule,
-                            std::pair<SourceFile::ImportOptions, StringRef>>>
+  static ArrayRef<SourceFile::ImportedModuleDesc>
   getImportsForSourceFile(const SourceFile &SF) {
     return SF.Imports;
   }
@@ -889,16 +888,16 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
   ImportedOperatorsMap<OP_DECL> importedOperators;
   for (auto &imported : SourceFile::Impl::getImportsForSourceFile(SF)) {
     // Protect against source files that contrive to import their own modules.
-    if (imported.first.second == ownModule)
+    if (imported.module.second == ownModule)
       continue;
 
     bool isExported =
-        imported.second.first.contains(SourceFile::ImportFlags::Exported);
+        imported.importOptions.contains(SourceFile::ImportFlags::Exported);
     if (!includePrivate && !isExported)
       continue;
 
-    Optional<OP_DECL *> maybeOp
-      = lookupOperatorDeclForName(imported.first.second, Loc, Name, OP_MAP);
+    Optional<OP_DECL *> maybeOp =
+        lookupOperatorDeclForName(imported.module.second, Loc, Name, OP_MAP);
     if (!maybeOp)
       return None;
     
@@ -990,21 +989,21 @@ void
 SourceFile::getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &modules,
                                ModuleDecl::ImportFilter filter) const {
   assert(ASTStage >= Parsed || Kind == SourceFileKind::SIL);
-  for (auto importPair : Imports) {
+  for (auto desc : Imports) {
     switch (filter) {
     case ModuleDecl::ImportFilter::All:
       break;
     case ModuleDecl::ImportFilter::Public:
-      if (!importPair.second.first.contains(ImportFlags::Exported))
+      if (!desc.importOptions.contains(ImportFlags::Exported))
         continue;
       break;
     case ModuleDecl::ImportFilter::Private:
-      if (importPair.second.first.contains(ImportFlags::Exported))
+      if (desc.importOptions.contains(ImportFlags::Exported))
         continue;
       break;
     }
 
-    modules.push_back(importPair.first);
+    modules.push_back(desc.module);
   }
 }
 
@@ -1374,17 +1373,12 @@ void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
   }
 }
 
-void SourceFile::addImports(
-    ArrayRef<std::pair<ModuleDecl::ImportedModule,
-                       std::pair<ImportOptions, StringRef>>>
-        IM) {
-  using ImportPair = std::pair<ModuleDecl::ImportedModule,
-                               std::pair<ImportOptions, StringRef>>;
+void SourceFile::addImports(ArrayRef<ImportedModuleDesc> IM) {
   if (IM.empty())
     return;
   ASTContext &ctx = getASTContext();
   auto newBuf =
-     ctx.AllocateUninitialized<ImportPair>(Imports.size() + IM.size());
+      ctx.AllocateUninitialized<ImportedModuleDesc>(Imports.size() + IM.size());
 
   auto iter = newBuf.begin();
   iter = std::uninitialized_copy(Imports.begin(), Imports.end(), iter);
@@ -1395,20 +1389,16 @@ void SourceFile::addImports(
 }
 
 bool SourceFile::hasTestableImport(const swift::ModuleDecl *module) const {
-  using ImportPair = std::pair<ModuleDecl::ImportedModule,
-                               std::pair<ImportOptions, StringRef>>;
   return std::any_of(
-      Imports.begin(), Imports.end(), [module](ImportPair importPair) -> bool {
-        return importPair.first.second == module &&
-               importPair.second.first.contains(ImportFlags::Testable);
+      Imports.begin(), Imports.end(),
+      [module](ImportedModuleDesc desc) -> bool {
+        return desc.module.second == module &&
+               desc.importOptions.contains(ImportFlags::Testable);
       });
 }
 
 bool SourceFile::hasPrivateImport(AccessLevel accessLevel,
                                   const swift::ValueDecl *ofDecl) const {
-  using ImportPair = std::pair<ModuleDecl::ImportedModule,
-                               std::pair<ImportOptions, StringRef>>;
-
   auto *module = ofDecl->getModuleContext();
   switch (accessLevel) {
   case AccessLevel::Internal:
@@ -1417,9 +1407,9 @@ bool SourceFile::hasPrivateImport(AccessLevel accessLevel,
     // filename does not need to match (and we don't serialize it for such
     // decls).
     return std::any_of(Imports.begin(), Imports.end(),
-                       [module](ImportPair importPair) -> bool {
-                         return importPair.first.second == module &&
-                                importPair.second.first.contains(
+                       [module](ImportedModuleDesc desc) -> bool {
+                         return desc.module.second == module &&
+                                desc.importOptions.contains(
                                     ImportFlags::PrivateImport);
                        });
   case AccessLevel::Open:
@@ -1447,11 +1437,11 @@ bool SourceFile::hasPrivateImport(AccessLevel accessLevel,
     return false;
 
   return std::any_of(Imports.begin(), Imports.end(),
-                     [module, filename](ImportPair importPair) -> bool {
-                       return importPair.first.second == module &&
-                              importPair.second.first.contains(
+                     [module, filename](ImportedModuleDesc desc) -> bool {
+                       return desc.module.second == module &&
+                              desc.importOptions.contains(
                                   ImportFlags::PrivateImport) &&
-                              importPair.second.second == filename;
+                              desc.filename == filename;
                      });
 }
 
@@ -1500,9 +1490,8 @@ static void performAutoImport(
 
   // FIXME: These will be the same for most source files, but we copy them
   // over and over again.
-  auto Imports =
-      std::make_pair(ModuleDecl::ImportedModule({}, M),
-                     std::make_pair(SourceFile::ImportOptions(), StringRef()));
+  auto Imports = SourceFile::ImportedModuleDesc(
+      ModuleDecl::ImportedModule({}, M), SourceFile::ImportOptions());
   SF.addImports(Imports);
 }
 

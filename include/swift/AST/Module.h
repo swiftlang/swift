@@ -864,6 +864,19 @@ public:
   using ImportOptions = OptionSet<ImportFlags>;
 
   typedef std::pair<ImportOptions, StringRef> ImportOptionsAndFilename;
+
+  struct ImportedModuleDesc {
+    ModuleDecl::ImportedModule module;
+    ImportOptions importOptions;
+    StringRef filename;
+
+    ImportedModuleDesc(ModuleDecl::ImportedModule module, ImportOptions options)
+        : module(module), importOptions(options) {}
+    ImportedModuleDesc(ModuleDecl::ImportedModule module, ImportOptions options,
+                       StringRef filename)
+        : module(module), importOptions(options), filename(filename) {}
+  };
+
 private:
   std::unique_ptr<LookupCache> Cache;
   LookupCache &getCache() const;
@@ -871,8 +884,7 @@ private:
   /// This is the list of modules that are imported by this module.
   ///
   /// This is filled in by the Name Binding phase.
-  ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptionsAndFilename>>
-      Imports;
+  ArrayRef<ImportedModuleDesc> Imports;
 
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
@@ -976,9 +988,7 @@ public:
              ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,
              bool KeepSyntaxTree = false);
 
-  void addImports(
-      ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptionsAndFilename>>
-          IM);
+  void addImports(ArrayRef<ImportedModuleDesc> IM);
 
   bool hasTestableImport(const ModuleDecl *module) const;
 
