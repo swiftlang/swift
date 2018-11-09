@@ -133,7 +133,9 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(optional, Optional,
   OnConstructor | OnFunc | OnAccessor | OnVar | OnSubscript |
   DeclModifier,
   5)
-// NOTE: 6 is unused
+SIMPLE_DECL_ATTR(dynamicCallable, DynamicCallable,
+  OnNominalType,
+  6)
 SIMPLE_DECL_ATTR(noreturn, NoReturn,
   OnFunc | OnAccessor,
   7)
