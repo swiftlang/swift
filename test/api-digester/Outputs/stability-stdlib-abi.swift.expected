@@ -184,3 +184,78 @@ Protocol SignedInteger has added inherited protocol AdditiveArithmetic
 Protocol SignedNumeric has added inherited protocol AdditiveArithmetic
 Protocol UnsignedInteger has added inherited protocol AdditiveArithmetic
 
+/* SE-0234 */
+AssociatedType Sequence.SubSequence has been removed
+Constructor _DropWhileSequence.init(iterator:nextElement:predicate:) has been removed
+Func AnyBidirectionalCollection.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func AnyCollection.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func AnyRandomAccessCollection.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func AnySequence.dropLast(_:) has return type change from AnySequence<τ_0_0> to Array<τ_0_0>
+Func AnySequence.prefix(while:) has return type change from AnySequence<τ_0_0> to Array<τ_0_0>
+Func AnySequence.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func AnySequence.suffix(_:) has return type change from AnySequence<τ_0_0> to Array<τ_0_0>
+Func Collection.joined() has been removed
+Func DropFirstSequence.dropFirst(_:) has return type change from AnySequence<τ_0_0.Element> to DropFirstSequence<τ_0_0>
+Func PrefixSequence.prefix(_:) has return type change from AnySequence<τ_0_0.Element> to PrefixSequence<τ_0_0>
+Func Sequence.drop(while:) has return type change from τ_0_0.SubSequence to DropWhileSequence<τ_0_0>
+Func Sequence.dropFirst() has been removed
+Func Sequence.dropFirst(_:) has return type change from τ_0_0.SubSequence to DropFirstSequence<τ_0_0>
+Func Sequence.dropLast() has been removed
+Func Sequence.dropLast(_:) has return type change from τ_0_0.SubSequence to Array<τ_0_0.Element>
+Func Sequence.prefix(_:) has return type change from τ_0_0.SubSequence to PrefixSequence<τ_0_0>
+Func Sequence.prefix(while:) has return type change from τ_0_0.SubSequence to Array<τ_0_0.Element>
+Func Sequence.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has return type change from Array<τ_0_0.SubSequence> to Array<ArraySlice<τ_0_0.Element>>
+Func Sequence.split(separator:maxSplits:omittingEmptySubsequences:) has return type change from Array<τ_0_0.SubSequence> to Array<ArraySlice<τ_0_0.Element>>
+Func Sequence.suffix(_:) has return type change from τ_0_0.SubSequence to Array<τ_0_0.Element>
+Func _AnyBidirectionalCollectionBox._formIndex(before:) in a non-resilient type changes position from 8 to 7
+Func _AnyBidirectionalCollectionBox._index(before:) in a non-resilient type changes position from 7 to 6
+Func _AnyBidirectionalCollectionBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _AnyCollectionBox._distance(from:to:) in a non-resilient type changes position from 13 to 12
+Func _AnyCollectionBox._formIndex(_:offsetBy:) in a non-resilient type changes position from 11 to 10
+Func _AnyCollectionBox._formIndex(_:offsetBy:limitedBy:) in a non-resilient type changes position from 12 to 11
+Func _AnyCollectionBox._formIndex(after:) in a non-resilient type changes position from 8 to 7
+Func _AnyCollectionBox._index(_:offsetBy:) in a non-resilient type changes position from 9 to 8
+Func _AnyCollectionBox._index(_:offsetBy:limitedBy:) in a non-resilient type changes position from 10 to 9
+Func _AnyCollectionBox._index(after:) in a non-resilient type changes position from 7 to 6
+Func _AnyCollectionBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _AnyRandomAccessCollectionBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _AnySequenceBox._dropLast(_:) has return type change from _AnySequenceBox<τ_0_0> to Array<τ_0_0>
+Func _AnySequenceBox._prefix(while:) has return type change from _AnySequenceBox<τ_0_0> to Array<τ_0_0>
+Func _AnySequenceBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _AnySequenceBox._suffix(_:) has return type change from _AnySequenceBox<τ_0_0> to Array<τ_0_0>
+Func _BidirectionalCollectionBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _CollectionBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _DropWhileSequence.drop(while:) has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
+Func _DropWhileSequence.drop(while:) has return type change from AnySequence<τ_0_0.Element> to DropWhileSequence<τ_0_0>
+Func _DropWhileSequence.makeIterator() has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
+Func _DropWhileSequence.makeIterator() has return type change from _DropWhileSequence<τ_0_0> to DropWhileSequence<τ_0_0>.Iterator
+Func _DropWhileSequence.makeIterator() has self access kind changing from __Consuming to NonMutating
+Func _DropWhileSequence.next() has been removed
+Func _RandomAccessCollectionBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _SequenceBox._dropLast(_:) has return type change from _AnySequenceBox<τ_0_0.Element> to Array<τ_0_0.Element>
+Func _SequenceBox._prefix(while:) has return type change from _AnySequenceBox<τ_0_0.Element> to Array<τ_0_0.Element>
+Func _SequenceBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _SequenceBox._suffix(_:) has return type change from _AnySequenceBox<τ_0_0.Element> to Array<τ_0_0.Element>
+Protocol Collection has generic signature change from <τ_0_0 : Sequence, τ_0_0.Index : Comparable, τ_0_0.Index == τ_0_0.Indices.Element, τ_0_0.Indices : Collection, τ_0_0.Indices == τ_0_0.Indices.SubSequence, τ_0_0.SubSequence : Collection, τ_0_0.Indices.Element == τ_0_0.Indices.Index, τ_0_0.Indices.Index == τ_0_0.SubSequence.Index, τ_0_0.SubSequence.Index == τ_0_0.Indices.Indices.Element, τ_0_0.Indices.Indices.Element == τ_0_0.Indices.Indices.Index, τ_0_0.Indices.Indices.Index == τ_0_0.SubSequence.Indices.Element, τ_0_0.SubSequence.Indices.Element == τ_0_0.SubSequence.Indices.Index, τ_0_0.SubSequence.Indices.Index == τ_0_0.SubSequence.Indices.Indices.Element, τ_0_0.SubSequence.Indices.Indices.Element == τ_0_0.SubSequence.Indices.Indices.Index> to <τ_0_0 : Sequence, τ_0_0.Element == τ_0_0.SubSequence.Element, τ_0_0.Index : Comparable, τ_0_0.Index == τ_0_0.Indices.Element, τ_0_0.Indices : Collection, τ_0_0.Indices == τ_0_0.Indices.SubSequence, τ_0_0.SubSequence : Collection, τ_0_0.SubSequence == τ_0_0.SubSequence.SubSequence, τ_0_0.Indices.Element == τ_0_0.Indices.Index, τ_0_0.Indices.Index == τ_0_0.SubSequence.Index, τ_0_0.SubSequence.Index == τ_0_0.Indices.Indices.Element, τ_0_0.Indices.Indices.Element == τ_0_0.Indices.Indices.Index, τ_0_0.Indices.Indices.Index == τ_0_0.SubSequence.Indices.Element, τ_0_0.SubSequence.Indices.Element == τ_0_0.SubSequence.Indices.Index, τ_0_0.SubSequence.Indices.Index == τ_0_0.SubSequence.Indices.Indices.Element, τ_0_0.SubSequence.Indices.Indices.Element == τ_0_0.SubSequence.Indices.Indices.Index>
+Protocol LazyCollectionProtocol has been removed
+Protocol Sequence has generic signature change from <τ_0_0.Element == τ_0_0.Iterator.Element, τ_0_0.Iterator : IteratorProtocol, τ_0_0.SubSequence : Sequence, τ_0_0.SubSequence == τ_0_0.SubSequence.SubSequence, τ_0_0.Iterator.Element == τ_0_0.SubSequence.Element, τ_0_0.SubSequence.Element == τ_0_0.SubSequence.Iterator.Element> to <τ_0_0.Element == τ_0_0.Iterator.Element, τ_0_0.Iterator : IteratorProtocol>
+Protocol _SequenceWrapper has been removed
+Struct AnySequence has removed conformance to Sequence
+Struct FlattenCollection has been removed
+Struct LazyCollection has been removed
+Struct LazyDropWhileCollection has been removed
+Struct LazyFilterCollection has been removed
+Struct LazyMapCollection has been removed
+Struct LazyPrefixWhileCollection has been removed
+Struct LazySequence has removed conformance to _SequenceWrapper
+Struct ReversedCollection has removed conformance to LazyCollectionProtocol
+Struct Slice has removed conformance to LazyCollectionProtocol
+Struct _DropWhileSequence has been renamed to Struct DropWhileSequence
+Struct _DropWhileSequence has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
+Struct _DropWhileSequence has removed conformance to IteratorProtocol
+Struct _DropWhileSequence has type witness type for Sequence.Iterator changing from _DropWhileSequence<τ_0_0> to DropWhileSequence<τ_0_0>.Iterator
+Var Collection.lazy has been removed
+Var Dictionary.keys has declared type change from LazyMapCollection<Dictionary<τ_0_0, τ_0_1>, τ_0_0> to LazyMapSequence<Dictionary<τ_0_0, τ_0_1>, τ_0_0>
+Var Dictionary.values has declared type change from LazyMapCollection<Dictionary<τ_0_0, τ_0_1>, τ_0_1> to LazyMapSequence<Dictionary<τ_0_0, τ_0_1>, τ_0_1>
+Var LazySequence._base has removed its setter
+Var _DropWhileSequence._iterator has declared type change from τ_0_0 to τ_0_0.Iterator
