@@ -75,7 +75,6 @@ private:
 
   static IRGenOptions createIRGenOptions() {
     IRGenOptions IROpts;
-    IROpts.EnableResilienceBypass = true;
     return IROpts;
   }
 
@@ -185,7 +184,7 @@ private:
     VarDecl *member = findField(typeDecl, memberName);
 
     // If we found a member, try to find its offset statically.
-    if (member) {
+    if (member && member->hasStorage() && !typeDecl->isResilient()) {
       if (auto irgen = getIRGen()) {
         return getOffsetOfFieldFromIRGen(irgen->IGM, type, typeDecl,
                                           optMetadata, member);
