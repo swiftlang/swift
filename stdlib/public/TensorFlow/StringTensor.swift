@@ -20,7 +20,7 @@ import CTensorFlow
 // StringTensor
 //===----------------------------------------------------------------------===//
 
-/// `StringTensor` is a multi-dimensional array whose elements are Strings.
+/// `StringTensor` is a multi-dimensional array whose elements are `String`s.
 @_fixed_layout
 public struct StringTensor {
   /// The underlying `TensorHandle`.
@@ -89,7 +89,7 @@ func _TFStringTensorFromScalars(
         .bindMemory(to: Int8.self, capacity: dataByteCount)
       let status = TF_NewStatus()
       for (cString, tfEncodedSize) in zip(cStrings, tfEncodedSizes) {
-        let _ = cString.withUnsafeBufferPointer { buffer in
+        _ = cString.withUnsafeBufferPointer { buffer in
           TF_StringEncode(buffer.baseAddress, buffer.count, dataAddr,
                           tfEncodedSize, status)
         }
@@ -140,16 +140,11 @@ public extension StringTensor {
 //===----------------------------------------------------------------------===//
 
 public extension StringTensor {
-  @inlinable
   var array: ShapedArray<String> {
-    @inline(__always)
-    get {
-      debugLog("Returning a host copy of string array.")
-      return handle.makeHostCopy()
-    }
+    debugLog("Returning a host copy of string array.")
+    return handle.makeHostCopy()
   }
 
-  @inlinable
   var scalars: [String] {
     return array.scalars
   }
