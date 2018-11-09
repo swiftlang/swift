@@ -76,6 +76,11 @@ Class _SharedStringStorage has removed conformance to _NSStringCore
 Class _StringStorage has removed conformance to _NSStringCore
 Protocol _NSStringCore has been removed
 
+Func Unicode.UTF32._decode(_:) has been removed
+Func _UnicodeParser._decode(_:repairingIllFormedSequences:into:) has been removed
+Func _UnicodeParser._parse(_:repairingIllFormedSequences:into:) has been removed
+Struct Unicode._ParsingIterator has been removed
+
 Constructor ManagedBuffer.init(_doNotCallMe:) has been removed
 Func _makeAnyHashableUpcastingToHashableBaseType(_:storingResultInto:) has been removed
 
