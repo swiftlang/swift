@@ -1595,26 +1595,6 @@ static StringRef getAccessorLabel(AccessorDecl *accessor) {
   case AccessorKind::ID: return #KEYWORD;
 #define ACCESSOR(ID)
 #include "swift/AST/AccessorKinds.def"
-
-  case AccessorKind::Address:
-    switch (accessor->getAddressorKind()) {
-    case AddressorKind::NotAddressor: llvm_unreachable("bad combination");
-#define IMMUTABLE_ADDRESSOR(ID, KEYWORD) \
-    case AddressorKind::ID: return #KEYWORD;
-#define ACCESSOR(ID)
-#include "swift/AST/AccessorKinds.def"
-    }
-    llvm_unreachable("bad addressor kind");
-
-  case AccessorKind::MutableAddress:
-    switch (accessor->getAddressorKind()) {
-    case AddressorKind::NotAddressor: llvm_unreachable("bad combination");
-#define MUTABLE_ADDRESSOR(ID, KEYWORD) \
-    case AddressorKind::ID: return #KEYWORD;
-#define ACCESSOR(ID)
-#include "swift/AST/AccessorKinds.def"
-    }
-    llvm_unreachable("bad addressor kind");
   }
   llvm_unreachable("bad accessor kind");
 }

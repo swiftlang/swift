@@ -5620,7 +5620,6 @@ AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
                                        SourceLoc declLoc,
                                        SourceLoc accessorKeywordLoc,
                                        AccessorKind accessorKind,
-                                       AddressorKind addressorKind,
                                        AbstractStorageDecl *storage,
                                        SourceLoc staticLoc,
                                        StaticSpellingKind staticSpelling,
@@ -5635,7 +5634,7 @@ AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
   void *buffer = allocateMemoryForDecl<AccessorDecl>(ctx, size,
                                                      !clangNode.isNull());
   auto D = ::new (buffer)
-      AccessorDecl(declLoc, accessorKeywordLoc, accessorKind, addressorKind,
+      AccessorDecl(declLoc, accessorKeywordLoc, accessorKind,
                    storage, staticLoc, staticSpelling, throws, throwsLoc,
                    hasImplicitSelfDecl, genericParams, parent);
   if (clangNode)
@@ -5650,7 +5649,6 @@ AccessorDecl *AccessorDecl::createDeserialized(ASTContext &ctx,
                                                SourceLoc declLoc,
                                                SourceLoc accessorKeywordLoc,
                                                AccessorKind accessorKind,
-                                               AddressorKind addressorKind,
                                                AbstractStorageDecl *storage,
                                                SourceLoc staticLoc,
                                               StaticSpellingKind staticSpelling,
@@ -5658,7 +5656,7 @@ AccessorDecl *AccessorDecl::createDeserialized(ASTContext &ctx,
                                                GenericParamList *genericParams,
                                                DeclContext *parent) {
   return createImpl(ctx, declLoc, accessorKeywordLoc, accessorKind,
-                    addressorKind, storage, staticLoc, staticSpelling,
+                    storage, staticLoc, staticSpelling,
                     throws, throwsLoc, genericParams, parent,
                     ClangNode());
 }
@@ -5667,7 +5665,6 @@ AccessorDecl *AccessorDecl::create(ASTContext &ctx,
                                    SourceLoc declLoc,
                                    SourceLoc accessorKeywordLoc,
                                    AccessorKind accessorKind,
-                                   AddressorKind addressorKind,
                                    AbstractStorageDecl *storage,
                                    SourceLoc staticLoc,
                                    StaticSpellingKind staticSpelling,
@@ -5678,7 +5675,7 @@ AccessorDecl *AccessorDecl::create(ASTContext &ctx,
                                    DeclContext *parent,
                                    ClangNode clangNode) {
   auto *D = AccessorDecl::createImpl(
-      ctx, declLoc, accessorKeywordLoc, accessorKind, addressorKind, storage,
+      ctx, declLoc, accessorKeywordLoc, accessorKind, storage,
       staticLoc, staticSpelling, throws, throwsLoc,
       genericParams, parent, clangNode);
   D->setParameters(bodyParams);

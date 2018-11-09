@@ -3172,28 +3172,6 @@ public:
         abort();
       }
 
-      switch (FD->getAccessorKind()) {
-      case AccessorKind::Get:
-      case AccessorKind::Set:
-      case AccessorKind::WillSet:
-      case AccessorKind::DidSet:
-      case AccessorKind::Read:
-      case AccessorKind::Modify:
-        if (FD->getAddressorKind() != AddressorKind::NotAddressor) {
-          Out << "non-addressor accessor has an addressor kind\n";
-          abort();
-        }
-        break;
-
-      case AccessorKind::Address:
-      case AccessorKind::MutableAddress:
-        if (FD->getAddressorKind() == AddressorKind::NotAddressor) {
-          Out << "addressor does not have an addressor kind\n";
-          abort();
-        }
-        break;
-      }
-
       verifyCheckedBase(FD);
     }
 

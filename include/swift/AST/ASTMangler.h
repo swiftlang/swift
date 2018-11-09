@@ -92,7 +92,6 @@ public:
                                           bool isDestroyer, SymbolKind SKind);
 
   std::string mangleAccessorEntity(AccessorKind kind,
-                                   AddressorKind addressorKind,
                                    const AbstractStorageDecl *decl,
                                    bool isStatic,
                                    SymbolKind SKind);
@@ -162,7 +161,6 @@ public:
   std::string mangleDeclAsUSR(const ValueDecl *Decl, StringRef USRPrefix);
 
   std::string mangleAccessorEntityAsUSR(AccessorKind kind,
-                                        AddressorKind addressorKind,
                                         const AbstractStorageDecl *decl,
                                         StringRef USRPrefix);
 

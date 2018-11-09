@@ -289,8 +289,8 @@ Entities
   ACCESSOR ::= 'p'                           // pseudo accessor referring to the storage itself
 
   ADDRESSOR-KIND ::= 'u'                     // unsafe addressor (no owner)
-  ADDRESSOR-KIND ::= 'O'                     // owning addressor (non-native owner)
-  ADDRESSOR-KIND ::= 'o'                     // owning addressor (native owner)
+  ADDRESSOR-KIND ::= 'O'                     // owning addressor (non-native owner), not used anymore
+  ADDRESSOR-KIND ::= 'o'                     // owning addressor (native owner), not used anymore
   ADDRESSOR-KIND ::= 'p'                     // pinning addressor (native owner), not used anymore
 
   decl-name ::= identifier

@@ -1519,36 +1519,19 @@ namespace {
       assert(SGF.isInFormalEvaluationScope() &&
              "offsetting l-value for modification without writeback scope");
 
-      std::pair<ManagedValue, ManagedValue> result;
+      ManagedValue addr;
       {
         FormalEvaluationScope scope(SGF);
 
         auto args =
             std::move(*this).prepareAccessorArgs(SGF, loc, base, Accessor);
-        result = SGF.emitAddressorAccessor(
+        addr = SGF.emitAddressorAccessor(
             loc, Accessor, Substitutions, std::move(args.base), IsSuper,
             IsDirectAccessorUse, std::move(args.Indices), SubstFieldType,
             IsOnSelfParameter);
       }
 
-      switch (getAccessorDecl()->getAddressorKind()) {
-      case AddressorKind::NotAddressor:
-        llvm_unreachable("not an addressor!");
-
-      // For unsafe addressors, we have no owner pointer to manage.
-      case AddressorKind::Unsafe:
-        assert(!result.second);
-        break;
-
-      // For owning addressors, we can just let the owner get released
-      // at an appropriate point.
-      case AddressorKind::Owning:
-      case AddressorKind::NativeOwning:
-        break;
-      }
-
       // Enter an unsafe access scope for the access.
-      auto addr = result.first;
       addr = enterAccessScope(SGF, loc, addr, getTypeData(), getAccessKind(),
                               SILAccessEnforcement::Unsafe);
 

@@ -1252,7 +1252,7 @@ public:
                                        AccessorDecl *witness,
                                        SubstitutionMap witnessSubs);
 
-  std::pair<ManagedValue, ManagedValue> emitAddressorAccessor(
+  ManagedValue emitAddressorAccessor(
       SILLocation loc, SILDeclRef addressor, SubstitutionMap substitutions,
       ArgumentSource &&optionalSelfValue, bool isSuper,
       bool isDirectAccessorUse, PreparedArguments &&optionalSubscripts,
