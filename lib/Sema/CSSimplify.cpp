@@ -4529,8 +4529,9 @@ lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
     auto cand = cast<FuncDecl>(choice.getDecl());
     return !isValidDynamicCallableMethod(cand, decl, CS.TC, hasKeywordArgs);
   };
-  candidates.erase(std::remove_if(candidates.begin(), candidates.end(), filter),
-                   candidates.end());
+  candidates.erase(
+      std::remove_if(candidates.begin(), candidates.end(), filter),
+      candidates.end());
 
   llvm::DenseSet<FuncDecl *> methods;
   for (auto candidate : candidates)
@@ -4539,8 +4540,8 @@ lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
 }
 
 /// Looks up and returns the @dynamicCallable required methods (if they exist)
-/// implemented by a type. This function should not be called directly: instead,
-/// call `getDynamicCallableMethods` which performs caching.
+/// implemented by a type. This function should not be called directly:
+/// instead, call `getDynamicCallableMethods` which performs caching.
 static DynamicCallableMethods
 lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
                              const ConstraintLocatorBuilder &locator) {
@@ -4550,13 +4551,14 @@ lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
     lookupDynamicCallableMethods(type, CS, locator, ctx.Id_withArguments,
                                  /*hasKeywordArgs*/ false);
   methods.keywordArgumentsMethods =
-    lookupDynamicCallableMethods(type, CS, locator, ctx.Id_withKeywordArguments,
+    lookupDynamicCallableMethods(type, CS, locator,
+                                 ctx.Id_withKeywordArguments,
                                  /*hasKeywordArgs*/ true);
   return methods;
 }
 
-/// Returns the @dynamicCallable required methods (if they exist) implemented by
-/// a type.
+/// Returns the @dynamicCallable required methods (if they exist) implemented
+/// by a type.
 /// This function may be slow for deep class hierarchies and multiple protocol
 /// conformances, but it is invoked only after other constraint simplification
 /// rules fail.
@@ -4640,10 +4642,10 @@ getDynamicCallableMethods(Type type, ConstraintSystem &CS,
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
-                                             Type type1,
-                                             Type type2,
-                                             TypeMatchOptions flags,
-                                             ConstraintLocatorBuilder locator) {
+                                            Type type1,
+                                            Type type2,
+                                            TypeMatchOptions flags,
+                                            ConstraintLocatorBuilder locator) {
   auto &ctx = getASTContext();
 
   // By construction, the left hand side is a function type: $T1 -> $T2.
@@ -4675,8 +4677,9 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   if (desugar2->isTypeVariableOrMember())
     return formUnsolved();
 
-  // If right-hand side is a function type, it must be a valid `dynamicallyCall`
-  // method type. Bind the output and convert the argument to the input.
+  // If right-hand side is a function type, it must be a valid
+  // `dynamicallyCall` method type. Bind the output and convert the argument
+  // to the input.
   auto func1 = type1->castTo<FunctionType>();
   if (auto func2 = dyn_cast<FunctionType>(desugar2)) {
     // The argument type must be convertible to the input type.

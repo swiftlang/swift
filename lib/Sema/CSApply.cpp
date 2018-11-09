@@ -7464,8 +7464,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     // We're constructing a value of nominal type. Look for the constructor or
     // enum element to use.
     auto ctorLocator = cs.getConstraintLocator(
-                   locator.withPathElement(ConstraintLocator::ApplyFunction)
-                          .withPathElement(ConstraintLocator::ConstructorMember));
+        locator.withPathElement(ConstraintLocator::ApplyFunction)
+               .withPathElement(ConstraintLocator::ConstructorMember));
     auto selected = solution.getOverloadChoiceIfAvailable(ctorLocator);
     if (!selected) {
       assert(ty->hasError() || ty->hasUnresolvedType());
@@ -7486,7 +7486,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                    /*dotLoc=*/SourceLoc(), choice,
                                    DeclNameLoc(fn->getEndLoc()),
                                    selected->openedType, locator, ctorLocator,
-                                   /*Implicit=*/true, choice.getFunctionRefKind(),
+                                   /*Implicit=*/true,
+                                   choice.getFunctionRefKind(),
                                    AccessSemantics::Ordinary, isDynamic);
     if (!declRef)
       return nullptr;

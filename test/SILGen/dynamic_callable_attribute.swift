@@ -5,7 +5,7 @@
 @dynamicCallable
 public struct Callable {
   func dynamicallyCall(withArguments: [Int]) {}
-  func dynamicallyCall(withKeywordArguments: DictionaryLiteral<String, Int>) {}
+  func dynamicallyCall(withKeywordArguments: KeyValuePairs<String, Int>) {}
 }
 
 @_silgen_name("foo")
