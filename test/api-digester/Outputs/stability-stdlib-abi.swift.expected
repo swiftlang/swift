@@ -78,3 +78,6 @@ Protocol _NSStringCore has been removed
 
 Constructor ManagedBuffer.init(_doNotCallMe:) has been removed
 Func _makeAnyHashableUpcastingToHashableBaseType(_:storingResultInto:) has been removed
+
+Func RandomNumberGenerator._fill(bytes:) has been removed
+Func SystemRandomNumberGenerator._fill(bytes:) has been removed
