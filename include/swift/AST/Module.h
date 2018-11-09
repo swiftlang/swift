@@ -283,6 +283,15 @@ public:
     Bits.ModuleDecl.TestingEnabled = enabled;
   }
 
+  /// Returns true if this module was or is begin compile with
+  /// `-enable-private-imports`.
+  bool arePrivateImportsEnabled() const {
+    return Bits.ModuleDecl.PrivateImportsEnabled;
+  }
+  void setPrivateImportsEnabled(bool enabled = true) {
+    Bits.ModuleDecl.PrivateImportsEnabled = true;
+  }
+
   /// Returns true if there was an error trying to load this module.
   bool failedToLoad() const {
     return Bits.ModuleDecl.FailedToLoad;
@@ -844,11 +853,29 @@ public:
 
     /// This source file has access to testable declarations in the imported
     /// module.
-    Testable = 0x2
+    Testable = 0x2,
+
+    /// This source file has access to private declarations in the imported
+    /// module.
+    PrivateImport = 0x4,
   };
 
   /// \see ImportFlags
   using ImportOptions = OptionSet<ImportFlags>;
+
+  typedef std::pair<ImportOptions, StringRef> ImportOptionsAndFilename;
+
+  struct ImportedModuleDesc {
+    ModuleDecl::ImportedModule module;
+    ImportOptions importOptions;
+    StringRef filename;
+
+    ImportedModuleDesc(ModuleDecl::ImportedModule module, ImportOptions options)
+        : module(module), importOptions(options) {}
+    ImportedModuleDesc(ModuleDecl::ImportedModule module, ImportOptions options,
+                       StringRef filename)
+        : module(module), importOptions(options), filename(filename) {}
+  };
 
 private:
   std::unique_ptr<LookupCache> Cache;
@@ -857,7 +884,7 @@ private:
   /// This is the list of modules that are imported by this module.
   ///
   /// This is filled in by the Name Binding phase.
-  ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> Imports;
+  ArrayRef<ImportedModuleDesc> Imports;
 
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
@@ -961,10 +988,9 @@ public:
              ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,
              bool KeepSyntaxTree = false);
 
-  void
-  addImports(ArrayRef<std::pair<ModuleDecl::ImportedModule, ImportOptions>> IM);
+  void addImports(ArrayRef<ImportedModuleDesc> IM);
 
-  bool hasTestableImport(const ModuleDecl *module) const;
+  bool hasTestableOrPrivateImport(AccessLevel accessLevel, const ValueDecl *ofDecl) const;
 
   void clearLookupCache();
 
@@ -1224,11 +1250,28 @@ protected:
     assert(classof(this) && "invalid kind");
   }
 
+  /// A map from private/fileprivate decls to the file they were defined in.
+  llvm::DenseMap<const ValueDecl *, Identifier> FilenameForPrivateDecls;
+
 public:
+
   /// Returns an arbitrary string representing the storage backing this file.
   ///
   /// This is usually a filesystem path.
   virtual StringRef getFilename() const;
+
+  void addFilenameForPrivateDecl(const ValueDecl *decl, Identifier id) {
+    assert(!FilenameForPrivateDecls.count(decl) ||
+           FilenameForPrivateDecls[decl] == id);
+    FilenameForPrivateDecls[decl] = id;
+  }
+
+  StringRef getFilenameForPrivateDecl(const ValueDecl *decl) {
+    auto it = FilenameForPrivateDecls.find(decl);
+    if (it == FilenameForPrivateDecls.end())
+      return StringRef();
+    return it->second.str();
+  }
 
   /// Look up an operator declaration.
   ///

@@ -2418,7 +2418,7 @@ bool ValueDecl::isUsableFromInline() const {
 
 /// Return the access level of an internal or public declaration
 /// that's been testably imported.
-static AccessLevel getTestableAccess(const ValueDecl *decl) {
+static AccessLevel getTestableOrPrivateImportsAccess(const ValueDecl *decl) {
   // Non-final classes are considered open to @testable importers.
   if (auto cls = dyn_cast<ClassDecl>(decl)) {
     if (!cls->isFinal())
@@ -2450,11 +2450,13 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
     return AccessLevel::Public;
   }
 
-  if (useDC && (access == AccessLevel::Internal ||
-                access == AccessLevel::Public)) {
-    if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
-      if (useSF->hasTestableImport(VD->getModuleContext()))
-        return getTestableAccess(VD);
+  if (useDC) {
+    // Check whether we need to modify the access level based on
+    // @testable/@_private import attributes.
+    auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
+    if (!useSF) return access;
+    if (useSF->hasTestableOrPrivateImport(access, VD))
+      return getTestableOrPrivateImportsAccess(VD);
   }
 
   return access;
@@ -2474,19 +2476,24 @@ AccessLevel ValueDecl::getEffectiveAccess() const {
     getAdjustedFormalAccess(this, /*useDC=*/nullptr,
                             /*treatUsableFromInlineAsPublic=*/true);
 
-  // Handle @testable.
+  // Handle @testable/@_private(sourceFile:)
   switch (effectiveAccess) {
   case AccessLevel::Open:
     break;
   case AccessLevel::Public:
   case AccessLevel::Internal:
-    if (getModuleContext()->isTestingEnabled())
-      effectiveAccess = getTestableAccess(this);
+    if (getModuleContext()->isTestingEnabled() ||
+        getModuleContext()->arePrivateImportsEnabled())
+      effectiveAccess = getTestableOrPrivateImportsAccess(this);
     break;
   case AccessLevel::FilePrivate:
+    if (getModuleContext()->arePrivateImportsEnabled())
+      effectiveAccess = getTestableOrPrivateImportsAccess(this);
     break;
   case AccessLevel::Private:
     effectiveAccess = AccessLevel::FilePrivate;
+    if (getModuleContext()->arePrivateImportsEnabled())
+      effectiveAccess = getTestableOrPrivateImportsAccess(this);
     break;
   }
 
@@ -2664,18 +2671,30 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
 
   switch (access) {
   case AccessLevel::Private:
+    if (useDC != sourceDC) {
+      auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
+      if (useSF && useSF->hasTestableOrPrivateImport(access, VD))
+        return true;
+    }
     return (useDC == sourceDC ||
       AccessScope::allowsPrivateAccess(useDC, sourceDC));
   case AccessLevel::FilePrivate:
-    return useDC->getModuleScopeContext() == sourceDC->getModuleScopeContext();
+    if (useDC->getModuleScopeContext() != sourceDC->getModuleScopeContext()) {
+      auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
+      if (useSF && useSF->hasTestableOrPrivateImport(access, VD))
+        return true;
+      return false;
+    }
+    return true;
   case AccessLevel::Internal: {
     const ModuleDecl *sourceModule = sourceDC->getParentModule();
     const DeclContext *useFile = useDC->getModuleScopeContext();
     if (useFile->getParentModule() == sourceModule)
       return true;
-    if (auto *useSF = dyn_cast<SourceFile>(useFile))
-      if (useSF->hasTestableImport(sourceModule))
-        return true;
+    auto *useSF = dyn_cast<SourceFile>(useFile);
+    if (!useSF) return false;
+    if (useSF->hasTestableOrPrivateImport(access, sourceModule))
+      return true;
     return false;
   }
   case AccessLevel::Public:
@@ -3613,7 +3632,8 @@ bool EnumDecl::isFormallyExhaustive(const DeclContext *useDC) const {
   // Testably imported enums are exhaustive, on the grounds that only the author
   // of the original library can import it testably.
   if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
-    if (useSF->hasTestableImport(containingModule))
+    if (useSF->hasTestableOrPrivateImport(AccessLevel::Internal,
+                                          containingModule))
       return true;
 
   // Otherwise, the enum is non-exhaustive.

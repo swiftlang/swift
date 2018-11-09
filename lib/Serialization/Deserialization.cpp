@@ -2334,9 +2334,33 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     }
   };
 
+  class FilenameForPrivateRAII {
+    Serialized<Decl *> &declOrOffset;
+
+  public:
+    Identifier filename;
+
+    FilenameForPrivateRAII(Serialized<Decl *> &decl) : declOrOffset(decl) {}
+    ~FilenameForPrivateRAII() {
+      if (filename.empty())
+        return;
+      if (!declOrOffset.isComplete())
+        return;
+      auto *valueDecl = dyn_cast<ValueDecl>(declOrOffset.get());
+      if (!valueDecl)
+        return;
+      auto *loadedFile = dyn_cast<LoadedFile>(
+          valueDecl->getDeclContext()->getModuleScopeContext());
+      if (!loadedFile)
+        return;
+      loadedFile->addFilenameForPrivateDecl(valueDecl, filename);
+    }
+  };
+
   PrivateDiscriminatorRAII privateDiscriminatorRAII{*this, declOrOffset};
   LocalDiscriminatorRAII localDiscriminatorRAII(declOrOffset);
   DeserializingEntityRAII deserializingEntity(*this);
+  FilenameForPrivateRAII filenameForPrivate(declOrOffset);
 
   // Local function that handles the "inherited" list for a type.
   auto handleInherited
@@ -2596,6 +2620,10 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       unsigned discriminator;
       decls_block::LocalDiscriminatorLayout::readRecord(scratch, discriminator);
       localDiscriminatorRAII.discriminator = discriminator;
+    } else if (recordID == decls_block::FILENAME_FOR_PRIVATE) {
+      IdentifierID filenameID;
+      decls_block::FilenameForPrivateLayout::readRecord(scratch, filenameID);
+      filenameForPrivate.filename = getIdentifier(filenameID);
     } else {
       break;
     }

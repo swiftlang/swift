@@ -304,6 +304,8 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     M.addFile(*fileUnit);
     if (extendedInfo.isTestable())
       M.setTestingEnabled();
+    if (extendedInfo.arePrivateImportsEnabled())
+      M.setPrivateImportsEnabled();
 
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     loadInfo.status =

@@ -384,6 +384,10 @@ DECL_ATTR(_dynamicReplacement, DynamicReplacement,
 SIMPLE_DECL_ATTR(_borrowed, Borrowed,
   OnVar | OnSubscript | UserInaccessible |
   NotSerialized, 81)
+DECL_ATTR(_private, PrivateImport,
+  OnImport |
+  UserInaccessible |
+  NotSerialized, 82)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
