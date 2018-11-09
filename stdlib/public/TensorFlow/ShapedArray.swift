@@ -67,7 +67,7 @@ internal final class TensorBuffer<Scalar> {
 }
 
 /// TF Tensor-specific initializer
-extension TensorBuffer where Scalar : AccelerableByTensorFlow {
+extension TensorBuffer where Scalar : _TensorFlowDataTypeCompatible {
   /// Creates a local tensor buffer from a C `TF_Tensor*` value and takes
   /// ownership of the value.
   convenience init(owning cTensor: CTensor, count: Int) {
@@ -317,7 +317,7 @@ fileprivate extension ShapedArray {
   }
 }
 
-internal extension ShapedArray where Scalar : AccelerableByTensorFlow {
+internal extension ShapedArray where Scalar : _TensorFlowDataTypeCompatible {
   @usableFromInline
   init(owning cTensor: CTensor) {
     // Including \(Scalar.self) into the message would cause non-deterministic
@@ -502,7 +502,7 @@ public extension ShapedArray {
 }
 
 /// Tensor conversion
-extension ShapedArray where Scalar : AccelerableByTensorFlow {
+extension ShapedArray where Scalar : TensorFlowScalar {
   var byteCount: Int {
     return MemoryLayout<Scalar>.stride * scalarCount
   }
@@ -533,7 +533,7 @@ extension ShapedArray where Scalar : AccelerableByTensorFlow {
 }
 
 /// Tensor conversion
-public extension Tensor where Scalar : AccelerableByTensorFlow {
+public extension Tensor {
   init(_ array: ShapedArray<Scalar>) {
     self.init(handle: array.makeTensorHandle())
   }
@@ -541,7 +541,7 @@ public extension Tensor where Scalar : AccelerableByTensorFlow {
 
 /// Array literal conversion
 extension ShapedArray : ExpressibleByArrayLiteral
-  where Scalar : AccelerableByTensorFlow {
+  where Scalar : TensorFlowScalar {
   public typealias ArrayLiteralElement = TensorElementLiteral<Scalar>
   @inlinable @inline(__always)
   public init(arrayLiteral elements: TensorElementLiteral<Scalar>...) {
@@ -866,7 +866,7 @@ extension ShapedArraySlice : RandomAccessCollection, MutableCollection {
 }
 
 /// Tensor conversion
-public extension ShapedArraySlice where Scalar : AccelerableByTensorFlow {
+public extension ShapedArraySlice where Scalar : TensorFlowScalar {
   init(_ tensor: Tensor<Scalar>) {
     self.init(base: tensor.array)
   }
@@ -874,7 +874,7 @@ public extension ShapedArraySlice where Scalar : AccelerableByTensorFlow {
 
 /// Array literal conversion
 extension ShapedArraySlice : ExpressibleByArrayLiteral
-  where Scalar : AccelerableByTensorFlow {
+  where Scalar : TensorFlowScalar {
   public typealias ArrayLiteralElement = TensorElementLiteral<Scalar>
   @inlinable @inline(__always)
   public init(arrayLiteral elements: TensorElementLiteral<Scalar>...) {

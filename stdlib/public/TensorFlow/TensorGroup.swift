@@ -177,6 +177,27 @@ extension TensorElementLiteral : TensorGroup {
   }
 }
 
+extension StringTensor : TensorGroup {
+  @inlinable
+  public static var _unknownShapeList: [TensorShape?] {
+    return [nil]
+  }
+
+  @inlinable
+  public static var _typeList: [TensorDataType] {
+    return [String.tensorFlowDataType]
+  }
+
+  public func _unpackTensorHandles(
+      into address: UnsafeMutablePointer<CTensorHandle>?) {
+    address!.initialize(to: handle._cTensorHandle)
+  }
+
+  public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
+    self.init(handle: TensorHandle(_owning: tensorHandles!.pointee))
+  }
+}
+
 extension Array : TensorArrayProtocol where Element : TensorArrayProtocol {
   public func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>?) {
     var ptr = address

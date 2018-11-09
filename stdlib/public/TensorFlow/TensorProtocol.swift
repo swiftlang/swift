@@ -16,7 +16,7 @@
 
 public protocol TensorProtocol {
   /// Scalar type.
-  associatedtype Scalar : AccelerableByTensorFlow
+  associatedtype Scalar : TensorFlowScalar
 
   /// The underlying `TensorHandle`.
   /// - Note: Do NOT remove this. This is a compiler requirement.
@@ -52,7 +52,7 @@ protocol TensorSendableReceivable {
   /// scalar value to accelerator.
   ///
   /// - Note: This is different from protocol method
-  /// `AccelerableByTensorFlow._makeScalarTensor()`, a marker function to assist
+  /// `TensorFlowScalar._makeScalarTensor()`, a marker function to assist
   /// compiler in generating Accelerator code, and has no runtime effects.
   static func scalar(_ scalar: Scalar) -> Self
 }

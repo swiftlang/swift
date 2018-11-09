@@ -2686,9 +2686,9 @@ static SILValue createHostReceive(SILBuilder &B, SILLocation loc,
   // ) -> TensorHandle<Scalar> {...}
   // In SIL:
   // function_ref @... : $@convention(method)
-  //   <T where T : AccelerableByTensorFlow> (@owned _TensorComputation,
-  //                                          Int,
-  //                                          @thick TensorHandle<T>.Type
+  //   <T where T : _TensorFlowDataTypeCompatible> (@owned _TensorComputation,
+  //                                                Int,
+  //                                                @thick TensorHandle<T>.Type
   // ) -> @owned TensorHandle<T>
 
   // Example SIL code to generate:
@@ -2824,9 +2824,9 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
   // ) {...}
   // SIL:
   // function_ref @... : $@convention(method)
-  //   <T where T : AccelerableByTensorFlow> (@owned _TensorComputation,
-  //                                          Int,
-  //                                          @thick TensorHandle<T>.Type
+  //   <T where T : _TensorFlowDataTypeCompatible> (@owned _TensorComputation,
+  //                                                Int,
+  //                                                @thick TensorHandle<T>.Type
   // ) -> @owned TensorHandle<T>
   auto tensorId = createIntValue(idNumber, B, loc);
 
@@ -2848,9 +2848,9 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
     LLVM_DEBUG(llvm::dbgs() << "Sending a scalar tensor: " << value << "\n");
 
     assert(createScalarTensorFn);
-    // Here scalar type is something like $Builtin.FPIEEE32 -- convert it to an
-    // AccelerableByTensorFlow conforming type like Float first, and then create
-    // a scalar tensor to send that value.
+    // Here scalar type is something like $Builtin.FPIEEE32 -- convert it to a
+    // _TensorFlowDataTypeCompatible conforming type like Float first, and then
+    // create a scalar tensor to send that value.
     auto scalarValueTy = value->getType().getASTType();
     if (!scalarValueTy->getAs<StructType>()) {
       assert(value->getDefiningInstruction());
@@ -3007,8 +3007,8 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
     // for the SILLocation of the synthesized host code here (such as
     // `caseIdInst`). This is achieved via getAsRegularLocationWithOverwrite().
     auto loc = caseBB->front().getLoc().getAsRegularLocationWithOverwrite();
-    // `caseId` must be of a type conforming to `AccelerableByTensorFlow`, so we
-    // chose Int32 here.
+    // `caseId` must be of a type conforming to `_TensorFlowDataTypeCompatible`,
+    // so we chose Int32 here.
     auto caseIdInst = createSomeIntegerValue(caseId /*caseEntry.index()*/, BH,
                                              loc, int32Decl);
 

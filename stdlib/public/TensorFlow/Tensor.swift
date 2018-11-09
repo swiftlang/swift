@@ -30,7 +30,7 @@ import CTensorFlow
 /// `Tensor` is a multi-dimensional array used for computation. It is a wrapper
 /// around a `TensorHandle`.
 @_fixed_layout
-public struct Tensor<Scalar : AccelerableByTensorFlow> : TensorProtocol {
+public struct Tensor<Scalar : TensorFlowScalar> : TensorProtocol {
   /// The underlying `TensorHandle`.
   /// - Note: `handle` is public to allow user defined ops, but should not
   /// normally be used otherwise.
@@ -72,14 +72,18 @@ func _TFToHost<Scalar>(_ handle: TensorHandle<Scalar>)
 /// where it is known that the op always returns a 0-d tensor. It is not for use
 /// in general code.
 @inlinable @inline(__always)
-func _TFGetScalarOrDie<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar {
+func _TFGetScalarOrDie<Scalar : TensorFlowScalar>(
+  _ handle: TensorHandle<Scalar>
+) -> Scalar {
   return Scalar._getScalarOrDie(handle)
 }
 
 /// This function converts a `TensorHandle` into a scalar if it is 0-d, or
 /// returns nil otherwise.
 @inlinable @inline(__always)
-func _TFGetScalar<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar? {
+func _TFGetScalar<Scalar : TensorFlowScalar>(
+  _ handle: TensorHandle<Scalar>
+) -> Scalar? {
   return Scalar._getScalar(handle)
 }
 
@@ -88,7 +92,7 @@ func _TFGetScalar<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar? {
 /// designed to align with the requirements of the `Const` TensorFlow operation.
 @usableFromInline @inline(never)
 @_silgen_name("__tf_tensor_from_scalars")
-func _TFTensorFromScalars<Scalar>(
+func _TFTensorFromScalars<Scalar : TensorFlowScalar>(
   _ scalars: [Scalar], shape: [Int32]
 ) -> TensorHandle<Scalar> {
   let contiguousSize = shape.map(Int.init).reduce(1, *)
@@ -123,7 +127,7 @@ func _TFTensorFromScalars<Scalar>(
 /// In eager mode, this function is executed directly.
 @usableFromInline @inline(never)
 @_silgen_name("__tf_tensor_from_scalar")
-func _TFTensorFromScalar<Scalar>(
+func _TFTensorFromScalar<Scalar : TensorFlowScalar>(
   _ scalar: Scalar
 ) -> TensorHandle<Scalar> {
   return _TFTensorFromScalars([scalar], shape: [])
@@ -131,7 +135,7 @@ func _TFTensorFromScalar<Scalar>(
 
 @usableFromInline @inline(never)
 @_silgen_name("__tf_tensor_from_scalars_1d")
-func _TFTensorFromScalars1D<Scalar>(_ scalars: [Scalar])
+func _TFTensorFromScalars1D<Scalar : TensorFlowScalar>(_ scalars: [Scalar])
   -> TensorHandle<Scalar> {
   return _TFTensorFromScalars(scalars, shape: [Int32(scalars.count)])
 }
@@ -209,7 +213,7 @@ public extension Tensor {
   /// Creates a tensor from a scalar value.
   @inlinable @inline(__always)
   init(_ value: Scalar) {
-    self.init(handle: Scalar._makeScalarTensor(value))
+    self.init(handle: _TFTensorFromScalar(value))
   }
 
   /// Creates a tensor from an array of tensors (which may themselves be
@@ -219,24 +223,20 @@ public extension Tensor {
     self = Raw.pack(elements)
   }
 
-  /// Creates a 1D tensor in from contiguous scalars in row-major order.
+  /// Creates a 1D tensor from contiguous scalars.
   ///
   /// - Parameters:
   ///   - vector: The scalar contents of the tensor.
-  /// - Precondition: The number of scalars must equal the product of the
-  ///   dimensions of the shape.
   ///
   @inlinable @inline(__always)
   init(_ vector: [Scalar]) {
     self.init(handle: _TFTensorFromScalars1D(vector))
   }
 
-  /// Creates a 1D tensor in from contiguous scalars in row-major order.
+  /// Creates a 1D tensor from contiguous scalars.
   ///
   /// - Parameters:
   ///   - vector: The scalar contents of the tensor.
-  /// - Precondition: The number of scalars must equal the product of the
-  ///   dimensions of the shape.
   ///
   @inlinable @inline(__always)
   init<C : RandomAccessCollection>(_ vector: C) where C.Element == Scalar {
@@ -409,7 +409,7 @@ public extension Tensor {
 /// conversion from an array literal to a `Tensor`.
 @_fixed_layout
 public struct TensorElementLiteral<Scalar> : TensorProtocol
-  where Scalar : AccelerableByTensorFlow {
+  where Scalar : TensorFlowScalar {
 
   @usableFromInline let tensor: Tensor<Scalar>
 
@@ -765,7 +765,7 @@ public extension Tensor where Scalar : BinaryFloatingPoint,
 // Shape transformations
 //===----------------------------------------------------------------------===//
 
-public extension AccelerableByTensorFlow {
+public extension TensorFlowScalar {
   /// Convert to a tensor with the specified rank, with all dimensions equal to
   /// 1.
   @inlinable @inline(__always)
@@ -869,7 +869,7 @@ public extension Tensor {
   }
 }
 
-public extension AccelerableByTensorFlow {
+public extension TensorFlowScalar {
   @inlinable @inline(__always)
   init?(_ tensor: Tensor<Self>) {
     guard let scalar = _TFGetScalar(tensor.handle) else {

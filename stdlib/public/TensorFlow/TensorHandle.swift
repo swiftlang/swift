@@ -41,7 +41,7 @@ public class _AnyTensorHandle {
 /// into a tensor program.
 @_fixed_layout // required because the compiler accesses _cTensorHandle directly.
 public final class TensorHandle<Scalar> : _AnyTensorHandle
-  where Scalar : AccelerableByTensorFlow {
+  where Scalar : _TensorFlowDataTypeCompatible {
   public init(_owning cTensorHandle: CTensorHandle) {
     super.init(base: cTensorHandle)
   }
@@ -60,21 +60,23 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
     TFE_DeleteTensorHandle(_cTensorHandle)
     debugLog("Returning from deinit of TensorHandle.")
   }
-  
+
   /// Create a `TensorHandle` with a closure that initializes the underlying
   /// buffer.
   ///
-  /// - Note: `scalarsInitializer` must initialize all scalars in the underlying
-  /// buffer.
+  /// Users initializing TensorHandles with non-String scalars should use the
+  /// `init(shape:scalarsInitializer:)` initializer instead of this one.  It
+  /// enforces additional constraints on the buffer that hold for all
+  /// non-String scalars.
+  ///
+  /// `bufferInitializer` receives a buffer with exactly `byteCount` bytes of
+  /// capacity. `bufferInitializer` must initialize the entire buffer.
   @usableFromInline
   convenience init(
     shape: [Int32],
-    scalarsInitializer: (UnsafeMutablePointer<Scalar>) -> Void
+    byteCount: Int,
+    bufferInitializer: (UnsafeMutableRawPointer) -> Void
   ) {
-    let contiguousSize = shape.lazy.map(Int.init).reduce(1, *)
-    let byteCount = contiguousSize * MemoryLayout<Scalar>.stride
-    // Initialize tensor and copy data.
-    // TF_AllocateTensor() never returns nil.
     let cTensor = TF_AllocateTensor(
       Scalar.tensorFlowDataType.cDataType,
       shape.map(Int64.init),
@@ -82,11 +84,31 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
       byteCount
     )!
     assert(TF_TensorByteSize(cTensor) == byteCount)
-    let addr = TF_TensorData(cTensor).assumingMemoryBound(to: Scalar.self)
-    scalarsInitializer(addr)
-
+    bufferInitializer(TF_TensorData(cTensor))
     self.init(copyingFromCTensor: cTensor)
     TF_DeleteTensor(cTensor)
+  }
+}
+
+extension TensorHandle where Scalar : TensorFlowScalar {
+  /// Create a `TensorHandle` with a closure that initializes the underlying
+  /// buffer.
+  ///
+  /// `scalarsInitializer` receives a buffer with exactly enough capacity to
+  /// hold the scalars in a tensor with shape `shape`.  `scalarsInitializer`
+  /// must initialize the entire buffer, with contiguous scalars in row-major
+  /// order.
+  @usableFromInline
+  convenience init(
+    shape: [Int32],
+    scalarsInitializer: (UnsafeMutablePointer<Scalar>) -> Void
+  ) {
+    let contiguousSize = shape.lazy.map(Int.init).reduce(1, *)
+    let byteCount = contiguousSize * MemoryLayout<Scalar>.stride
+    self.init(shape: shape, byteCount: byteCount) { buffer in
+      scalarsInitializer(buffer.bindMemory(to: Scalar.self,
+                                           capacity: contiguousSize))
+    }
   }
 }
 
@@ -169,7 +191,7 @@ extension TensorHandle : TensorSendableReceivable {
   }
 }
 
-internal extension ShapedArray where Scalar : AccelerableByTensorFlow {
+internal extension ShapedArray where Scalar : _TensorFlowDataTypeCompatible {
   @usableFromInline
   @inline(never)
   init(cTensorHandle: CTensorHandle) {
