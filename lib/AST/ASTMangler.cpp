@@ -18,7 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Ownership.h"
@@ -378,18 +378,15 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
   return finalize();
 }
 
-std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC,
-                                              GenericEnvironment *GE) {
+std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   PrettyStackTraceType prettyStackTrace(Ty->getASTContext(),
                                         "mangling type for debugger", Ty);
 
-  GenericEnv = GE;
   DWARFMangling = true;
   beginMangling();
   
   if (DC)
     bindGenericParameters(DC);
-  DeclCtx = DC;
 
   if (auto *fnType = Ty->getAs<AnyFunctionType>()) {
     appendFunction(fnType, false);
@@ -682,20 +679,10 @@ static bool shouldMangleAsGeneric(Type type) {
   if (!type)
     return false;
 
-  TypeBase *typePtr = type.getPointer();
-  if (auto typeAlias = dyn_cast<NameAliasType>(typePtr))
+  if (auto typeAlias = dyn_cast<NameAliasType>(type.getPointer()))
     return !typeAlias->getSubstitutionMap().empty();
 
-  if (auto bound = dyn_cast<BoundGenericType>(typePtr))
-    return true;
-
-  if (auto nominal = dyn_cast<NominalType>(typePtr))
-    return shouldMangleAsGeneric(nominal->getParent());
-
-  if (auto unbound = dyn_cast<UnboundGenericType>(typePtr))
-    return shouldMangleAsGeneric(unbound->getParent());
-
-  return false;
+  return type->isSpecialized();
 }
 
 /// Mangle a type into the buffer.
@@ -1113,15 +1100,15 @@ void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
 
   if (auto *unboundType = dyn_cast<UnboundGenericType>(typePtr)) {
     if (Type parent = unboundType->getParent())
-      appendBoundGenericArgs(parent, isFirstArgList);
+      appendBoundGenericArgs(parent->getDesugaredType(), isFirstArgList);
   } else if (auto *nominalType = dyn_cast<NominalType>(typePtr)) {
     if (Type parent = nominalType->getParent())
-      appendBoundGenericArgs(parent, isFirstArgList);
+      appendBoundGenericArgs(parent->getDesugaredType(), isFirstArgList);
   } else {
     auto boundType = cast<BoundGenericType>(typePtr);
     genericArgs = boundType->getGenericArgs();
     if (Type parent = boundType->getParent())
-      appendBoundGenericArgs(parent, isFirstArgList);
+      appendBoundGenericArgs(parent->getDesugaredType(), isFirstArgList);
   }
   if (isFirstArgList) {
     appendOperator("y");
@@ -2060,29 +2047,24 @@ void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt) {
 void ASTMangler::appendClosureEntity(
                               const SerializedAbstractClosureExpr *closure) {
   appendClosureComponents(closure->getType(), closure->getDiscriminator(),
-                          closure->isImplicit(), closure->getParent(),
-                          closure->getLocalContext());
+                          closure->isImplicit(), closure->getParent());
 }
 
 void ASTMangler::appendClosureEntity(const AbstractClosureExpr *closure) {
   appendClosureComponents(closure->getType(), closure->getDiscriminator(),
-                          isa<AutoClosureExpr>(closure), closure->getParent(),
-                          closure->getLocalContext());
+                          isa<AutoClosureExpr>(closure), closure->getParent());
 }
 
 void ASTMangler::appendClosureComponents(Type Ty, unsigned discriminator,
-                                      bool isImplicit,
-                                      const DeclContext *parentContext,
-                                      const DeclContext *localContext) {
-  if (!DeclCtx) DeclCtx = localContext;
-
+                                         bool isImplicit,
+                                         const DeclContext *parentContext) {
   assert(discriminator != AbstractClosureExpr::InvalidDiscriminator
          && "closure must be marked correctly with discriminator");
 
   appendContext(parentContext);
 
   if (!Ty)
-    Ty = ErrorType::get(localContext->getASTContext());
+    Ty = ErrorType::get(parentContext->getASTContext());
 
   Ty = Ty->mapTypeOutOfContext();
   appendType(Ty->getCanonicalType());
@@ -2226,7 +2208,6 @@ void ASTMangler::appendAccessorEntity(StringRef accessorKindCode,
 
 void ASTMangler::appendEntity(const ValueDecl *decl, StringRef EntityOp,
                               bool isStatic) {
-  if (!DeclCtx) DeclCtx = decl->getInnermostDeclContext();
   appendContextOf(decl);
   appendDeclName(decl);
   appendDeclType(decl);
@@ -2236,7 +2217,6 @@ void ASTMangler::appendEntity(const ValueDecl *decl, StringRef EntityOp,
 }
 
 void ASTMangler::appendEntity(const ValueDecl *decl) {
-  if (!DeclCtx) DeclCtx = decl->getInnermostDeclContext();
   assert(!isa<ConstructorDecl>(decl));
   assert(!isa<DestructorDecl>(decl));
   
