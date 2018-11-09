@@ -658,6 +658,9 @@ internal func _isUnique<T>(_ object: inout T) -> Bool {
   return Bool(Builtin.isUnique(&object))
 }
 
+@_silgen_name("_swift_reallocObject")
+internal func _reallocObject(_ object: UnsafeMutableRawPointer, _ newSizeInBytes: Int) -> UnsafeMutableRawPointer?
+
 /// Returns `true` if `object` is uniquely referenced.
 /// This provides sanity checks on top of the Builtin.
 @_transparent
