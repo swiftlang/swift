@@ -147,15 +147,10 @@ extension ContiguousArray: _ArrayProtocol {
 }
 
 extension ContiguousArray: RandomAccessCollection, MutableCollection {
-  /// The index type for arrays, `Int`.
   public typealias Index = Int
-
-  /// The type that represents the indices that are valid for subscripting an
-  /// array, in ascending order.
   public typealias Indices = Range<Int>
-
-  /// The type that allows iteration over an array's elements.
   public typealias Iterator = IndexingIterator<ContiguousArray>
+  public typealias SubSequence = ArraySlice<Element>
 
   /// The position of the first element in a nonempty array.
   ///
@@ -418,7 +413,7 @@ extension ContiguousArray: RandomAccessCollection, MutableCollection {
   /// - Parameter bounds: A range of integers. The bounds of the range must be
   ///   valid indices of the array.
   @inlinable
-  public subscript(bounds: Range<Int>) -> ArraySlice<Element> {
+  public subscript(bounds: Range<Int>) -> SubSequence {
     get {
       _checkIndex(bounds.lowerBound)
       _checkIndex(bounds.upperBound)
@@ -912,16 +907,6 @@ extension ContiguousArray: RangeReplaceableCollection {
   }
 
   //===--- algorithms -----------------------------------------------------===//
-
-  @inlinable
-  public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
-    return try withUnsafeMutableBufferPointer {
-      (bufferPointer) -> R in
-      return try body(&bufferPointer)
-    }
-  }
 
   @inlinable
   public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {

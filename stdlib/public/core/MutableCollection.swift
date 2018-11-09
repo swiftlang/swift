@@ -58,8 +58,7 @@
 ///     a[i] = x
 ///     let y = x
 public protocol MutableCollection: Collection
-where SubSequence: MutableCollection
-{
+where SubSequence: MutableCollection {
   // FIXME: Associated type inference requires these.
   override associatedtype Element
   override associatedtype Index

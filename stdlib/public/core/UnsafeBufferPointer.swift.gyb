@@ -408,13 +408,6 @@ extension Unsafe${Mutable}BufferPointer {
     count = other.count
   }
 
-  @inlinable
-  public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
-    return try body(&self)
-  }
-
 %  else:
 
   /// Creates an immutable typed buffer pointer referencing the same memory as the 

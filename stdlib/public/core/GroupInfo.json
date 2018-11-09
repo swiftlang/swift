@@ -64,6 +64,7 @@
     "BidirectionalCollection.swift",
     "RandomAccessCollection.swift",
     "MutableCollection.swift",
+    "ContiguousCollection.swift",
     "CollectionAlgorithms.swift",
     "EmptyCollection.swift",
     "Stride.swift",
