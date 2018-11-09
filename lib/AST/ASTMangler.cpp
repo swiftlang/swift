@@ -679,20 +679,10 @@ static bool shouldMangleAsGeneric(Type type) {
   if (!type)
     return false;
 
-  TypeBase *typePtr = type.getPointer();
-  if (auto typeAlias = dyn_cast<NameAliasType>(typePtr))
+  if (auto typeAlias = dyn_cast<NameAliasType>(type.getPointer()))
     return !typeAlias->getSubstitutionMap().empty();
 
-  if (auto bound = dyn_cast<BoundGenericType>(typePtr))
-    return true;
-
-  if (auto nominal = dyn_cast<NominalType>(typePtr))
-    return shouldMangleAsGeneric(nominal->getParent());
-
-  if (auto unbound = dyn_cast<UnboundGenericType>(typePtr))
-    return shouldMangleAsGeneric(unbound->getParent());
-
-  return false;
+  return type->isSpecialized();
 }
 
 /// Mangle a type into the buffer.
@@ -1110,15 +1100,15 @@ void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
 
   if (auto *unboundType = dyn_cast<UnboundGenericType>(typePtr)) {
     if (Type parent = unboundType->getParent())
-      appendBoundGenericArgs(parent, isFirstArgList);
+      appendBoundGenericArgs(parent->getDesugaredType(), isFirstArgList);
   } else if (auto *nominalType = dyn_cast<NominalType>(typePtr)) {
     if (Type parent = nominalType->getParent())
-      appendBoundGenericArgs(parent, isFirstArgList);
+      appendBoundGenericArgs(parent->getDesugaredType(), isFirstArgList);
   } else {
     auto boundType = cast<BoundGenericType>(typePtr);
     genericArgs = boundType->getGenericArgs();
     if (Type parent = boundType->getParent())
-      appendBoundGenericArgs(parent, isFirstArgList);
+      appendBoundGenericArgs(parent->getDesugaredType(), isFirstArgList);
   }
   if (isFirstArgList) {
     appendOperator("y");
