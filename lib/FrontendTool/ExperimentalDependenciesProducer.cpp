@@ -45,14 +45,12 @@ using namespace experimental_dependencies;
 
 
 
-
 // shorthands
 
 using StringVec = std::vector<std::string>;
 template <typename T> using CPVec = std::vector<const T*>;
 template <typename T1 = std::string, typename T2 = std::string> using PairVec = std::vector<std::pair<T1, T2>>;
 template <typename T1, typename T2> using CPPairVec = std::vector<std::pair<const T1*, const T2*>>;
-
 
 
 
@@ -148,8 +146,27 @@ static std::string mangleTypeAsContext(const NominalTypeDecl * NTD) {
 
 
 ////////////
+using LocalOrForeignNodesKey = std::tuple<std::string, std::string, Node::Kind>;
 
+template <>
+struct std::hash<Node::Kind>
+: public unary_function<Node::Kind, size_t>
+{
+  size_t operator()(const Node::Kind k) const {
+    return (size_t)(k);
+  }
+};
 
+template <>
+struct std::hash<LocalOrForeignNodesKey>
+: public unary_function<LocalOrForeignNodesKey, size_t>
+{
+  size_t operator()(const LocalOrForeignNodesKey key) const {
+    return std::hash<std::string>()(std::get<0>(key)) ^
+    std::hash<std::string>()(std::get<1>(key)) ^
+    std::hash<Node::Kind>()(std::get<2>(key));
+  }
+};
 
 class GraphConstructor {
   SourceFile *SF;
@@ -174,7 +191,8 @@ class GraphConstructor {
   
 private:
   std::unordered_map<const Decl*, Node*> nodesByDecl;
-  std::unordered_map<std::tuple<std::string, std::string, Node::Kind>, Node*> localOrForeignNodes{};
+  
+  std::unordered_map<LocalOrForeignNodesKey, Node*> localOrForeignNodes{};
   
   std::string getInterfaceHash() const {
     llvm::SmallString<32> interfaceHash;
@@ -216,7 +234,8 @@ private:
   Node* addDeclNode(const Decl* D, DeclNode *node) {
     bool inserted = nodesByDecl.insert(std::make_pair(D, node)).second;
     assert(inserted && "dup node?");
-    inserted = localOrForeignNodes[uint(node->kind)].insert(std::make_pair(node->nameForDependencies, node)).second;
+    LocalOrForeignNodesKey key = std::make_tuple<xxx, node->nameForDependencies, node->kind>;
+    inserted = localOrForeignNodes.insert(std::make_pair(key, node)).second;
     assert(inserted && "dup node??");
     g.addNode(node);
     return node;

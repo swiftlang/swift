@@ -18,6 +18,8 @@
 #include <vector>
 #include "swift/AST/Decl.h"
 
+
+
 namespace swift {
 class DependencyTracker;
 class DiagnosticEngine;
@@ -60,6 +62,8 @@ namespace experimental_dependencies {
     std::vector<uint> arrivals, departures;
   };
   
+ 
+
   
   class DeclNode: public Node {
   public:
