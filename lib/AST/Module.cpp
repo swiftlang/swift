@@ -1388,17 +1388,8 @@ void SourceFile::addImports(ArrayRef<ImportedModuleDesc> IM) {
   Imports = newBuf;
 }
 
-bool SourceFile::hasTestableImport(const swift::ModuleDecl *module) const {
-  return std::any_of(
-      Imports.begin(), Imports.end(),
-      [module](ImportedModuleDesc desc) -> bool {
-        return desc.module.second == module &&
-               desc.importOptions.contains(ImportFlags::Testable);
-      });
-}
-
-bool SourceFile::hasPrivateImport(AccessLevel accessLevel,
-                                  const swift::ValueDecl *ofDecl) const {
+bool SourceFile::hasTestableOrPrivateImport(
+    AccessLevel accessLevel, const swift::ValueDecl *ofDecl) const {
   auto *module = ofDecl->getModuleContext();
   switch (accessLevel) {
   case AccessLevel::Internal:
@@ -1406,12 +1397,13 @@ bool SourceFile::hasPrivateImport(AccessLevel accessLevel,
     // internal/public access only needs an import marked as @_private. The
     // filename does not need to match (and we don't serialize it for such
     // decls).
-    return std::any_of(Imports.begin(), Imports.end(),
-                       [module](ImportedModuleDesc desc) -> bool {
-                         return desc.module.second == module &&
-                                desc.importOptions.contains(
-                                    ImportFlags::PrivateImport);
-                       });
+    return std::any_of(
+        Imports.begin(), Imports.end(),
+        [module](ImportedModuleDesc desc) -> bool {
+          return desc.module.second == module &&
+                 (desc.importOptions.contains(ImportFlags::PrivateImport) ||
+                  desc.importOptions.contains(ImportFlags::Testable));
+        });
   case AccessLevel::Open:
     return true;
   case AccessLevel::FilePrivate:

@@ -2455,12 +2455,8 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
     // @testable/@_private import attributes.
     auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
     if (!useSF) return access;
-    if (useSF->hasPrivateImport(access, VD))
+    if (useSF->hasTestableOrPrivateImport(access, VD))
       return getTestableOrPrivateImportsAccess(VD);
-    if ((access == AccessLevel::Internal || access == AccessLevel::Public) &&
-        useSF->hasTestableImport(VD->getModuleContext())) {
-      return getTestableOrPrivateImportsAccess(VD);
-    }
   }
 
   return access;
@@ -2677,7 +2673,7 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   case AccessLevel::Private:
     if (useDC != sourceDC) {
       auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
-      if (useSF && useSF->hasPrivateImport(access, VD))
+      if (useSF && useSF->hasTestableOrPrivateImport(access, VD))
         return true;
     }
     return (useDC == sourceDC ||
@@ -2685,7 +2681,7 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   case AccessLevel::FilePrivate:
     if (useDC->getModuleScopeContext() != sourceDC->getModuleScopeContext()) {
       auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
-      if (useSF && useSF->hasPrivateImport(access, VD))
+      if (useSF && useSF->hasTestableOrPrivateImport(access, VD))
         return true;
       return false;
     }
@@ -2697,10 +2693,8 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
       return true;
     auto *useSF = dyn_cast<SourceFile>(useFile);
     if (!useSF) return false;
-    if (useSF->hasTestableImport(sourceModule))
+    if (useSF->hasTestableOrPrivateImport(access, sourceModule))
       return true;
-    if (useSF->hasPrivateImport(access, VD))
-        return true;
     return false;
   }
   case AccessLevel::Public:
@@ -3638,7 +3632,8 @@ bool EnumDecl::isFormallyExhaustive(const DeclContext *useDC) const {
   // Testably imported enums are exhaustive, on the grounds that only the author
   // of the original library can import it testably.
   if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
-    if (useSF->hasTestableImport(containingModule))
+    if (useSF->hasTestableOrPrivateImport(AccessLevel::Internal,
+                                          containingModule))
       return true;
 
   // Otherwise, the enum is non-exhaustive.

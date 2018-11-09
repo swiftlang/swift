@@ -990,9 +990,7 @@ public:
 
   void addImports(ArrayRef<ImportedModuleDesc> IM);
 
-  bool hasTestableImport(const ModuleDecl *module) const;
-
-  bool hasPrivateImport(AccessLevel accessLevel, const ValueDecl *ofDecl) const;
+  bool hasTestableOrPrivateImport(AccessLevel accessLevel, const ValueDecl *ofDecl) const;
 
   void clearLookupCache();
 
