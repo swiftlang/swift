@@ -39,13 +39,9 @@ struct _OpaqueStringSwitchCache {
   var b: Builtin.Word
 }
 
-@usableFromInline // FIXME(sil-serialize-all)
 internal typealias _StringSwitchCache = Dictionary<String, Int>
 
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal struct _StringSwitchContext {
-  @inlinable // FIXME(sil-serialize-all)
   internal init(
     cases: [StaticString],
     cachePtr: UnsafeMutablePointer<_StringSwitchCache>
@@ -54,9 +50,7 @@ internal struct _StringSwitchContext {
     self.cachePtr = cachePtr
   }
 
-  @usableFromInline // FIXME(sil-serialize-all)
   internal let cases: [StaticString]
-  @usableFromInline // FIXME(sil-serialize-all)
   internal let cachePtr: UnsafeMutablePointer<_StringSwitchCache>
 }
 
@@ -94,7 +88,6 @@ func _findStringSwitchCaseWithCache(
 }
 
 /// Builds the string switch case.
-@inlinable // FIXME(sil-serialize-all)
 internal func _createStringTableCache(_ cacheRawPtr: Builtin.RawPointer) {
   let context = UnsafePointer<_StringSwitchContext>(cacheRawPtr).pointee
   var cache = _StringSwitchCache()

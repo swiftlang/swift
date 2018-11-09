@@ -81,3 +81,6 @@ Func _makeAnyHashableUpcastingToHashableBaseType(_:storingResultInto:) has been 
 
 Func RandomNumberGenerator._fill(bytes:) has been removed
 Func SystemRandomNumberGenerator._fill(bytes:) has been removed
+
+Func _createStringTableCache(_:) has been removed
+Struct _StringSwitchContext has been removed
