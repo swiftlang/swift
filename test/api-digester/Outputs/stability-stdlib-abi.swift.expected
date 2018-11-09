@@ -82,6 +82,13 @@ Struct String.UnicodeScalarView has type witness type for Sequence.Iterator chan
 Func String._foreignSubscript(position:distance:) has been removed
 Struct String has type witness type for Collection.Iterator changing from IndexingIterator<String> to String.Iterator
 Struct String has type witness type for Sequence.Iterator changing from IndexingIterator<String> to String.Iterator
+Func Unicode.UTF32._decode(_:) has been removed
+Func _UnicodeParser._decode(_:repairingIllFormedSequences:into:) has been removed
+Func _UnicodeParser._parse(_:repairingIllFormedSequences:into:) has been removed
+Struct Unicode._ParsingIterator has been removed
 
 Constructor ManagedBuffer.init(_doNotCallMe:) has been removed
 Func _makeAnyHashableUpcastingToHashableBaseType(_:storingResultInto:) has been removed
+
+Func RandomNumberGenerator._fill(bytes:) has been removed
+Func SystemRandomNumberGenerator._fill(bytes:) has been removed

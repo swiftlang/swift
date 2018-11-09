@@ -424,15 +424,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentConversion:
     case ConstraintKind::OptionalObject: {
-      // If there is a `bind param` constraint associated with
-      // current type variable, result should be aware of that
-      // fact. Binding set might be incomplete until
-      // this constraint is resolved, because we currently don't
-      // look-through constraints expect to `subtype` to try and
-      // find related bindings.
-      if (constraint->getKind() == ConstraintKind::BindParam)
-        result.PotentiallyIncomplete = true;
-
       auto binding = getPotentialBindingForRelationalConstraint(
           result, constraint, hasDependentMemberRelationalConstraints,
           hasNonDependentMemberRelationalConstraints,
