@@ -24,7 +24,6 @@ namespace llvm {
   void initializeSwiftARCOptPass(PassRegistry &);
   void initializeSwiftARCContractPass(PassRegistry &);
   void initializeInlineTreePrinterPass(PassRegistry &);
-  void initializeSwiftMergeFunctionsPass(PassRegistry &);
 }
 
 namespace swift {
