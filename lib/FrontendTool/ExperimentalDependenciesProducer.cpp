@@ -168,6 +168,25 @@ struct std::hash<LocalOrForeignNodesKey>
   }
 };
 
+/// Memoize nodes serving as heads of dependency arcs:
+/// Could be a definition in another file that a lookup here depends upon,
+/// or could be definition in this file that a lookup here depends upon.
+
+class NodeCache {
+   std::unordered_map<LocalOrForeignNodesKey, Node*> localOrForeignNodes{};
+public:
+  Node* memoize(Node *n) {
+    auto key = std::make_tuple(n->getContainerName(), n->getName(), n->getKind());
+    auto iter = localOrForeignNodes.find(key);
+    if (iter == localOrForeignNodes.end()) {
+      *iter = n;
+      return n;
+    }
+    delete n;
+    return *iter;
+  }
+};
+
 class GraphConstructor {
   SourceFile *SF;
   const DependencyTracker &depTracker;
@@ -190,9 +209,10 @@ class GraphConstructor {
   }
   
 private:
+  NodeCache nodeCache;
   std::unordered_map<const Decl*, Node*> nodesByDecl;
   
-  std::unordered_map<LocalOrForeignNodesKey, Node*> localOrForeignNodes{};
+ 
   
   std::string getInterfaceHash() const {
     llvm::SmallString<32> interfaceHash;

@@ -39,54 +39,53 @@ namespace experimental_dependencies {
       blankMembers,
       member, dynamicLookup, externalDepend,
       sourceFileProvide, end };
+  private:
+    Kind kind;
+    std::string nameForDependencies;
+    Node* containerIfKnown;
+    
+    friend class Graph;
+    uint sequenceNumberInGraph;
 
-    Node(Kind kind,
-         Node* container,
-         std::vector<Node*> containees,
-         std::string fingerprint,
-         std::string nameForDependencies) :
-    kind(kind),
-    container(container), containees(containees), fingerprint(fingerprint), nameForDependencies(nameForDependencies)
+  public:
+  Node(
+       Kind kind,
+       std::string nameForDependencies,
+       Node* containerIfKnown = nullptr) :
+    kind(kind), nameForDependencies(nameForDependencies)
     {}
     
     virtual ~Node() = default;
-    Kind kind;
-    Node* container;
-    std::vector<Node*> containees;
-    std::string fingerprint;
-    std::string nameForDependencies;
-    
-    uint sequenceNumberInGraph;
-    
-    // sequence numbers of arcs pointing to and from this node.
-    std::vector<uint> arrivals, departures;
+    Kind getKind() const { return kind; }
+    std::string getNameForDependencies() const { return nameForDependencies; }
+    Node* getContainerIfKnown() const { return containerIfKnown; }
   };
   
  
 
-  
+  template <typename DeclT, Node::Kind kind2>
   class DeclNode: public Node {
+    DeclT *decl;
   public:
-    /// can be null, for the target of a dependency
-    const Decl *D;
-    
-    DeclNode(Kind kind,
-             const Decl *D,
-             Node* container,
-             std::string fingerprint,
-             StringRef nameForDependencies) :
-    Node(kind, container, {}, fingerprint, nameForDependencies),
-    D(D) {
-      container->containees.push_back(this);
-    }
+    DeclNode( const DeclT *decl,
+              Node* containerIfKnown) :
+    Node(kind2, computeNameForDependencies(kind2, decl), containerIfKnown),
+    decl(decl) {}
     ~DeclNode() = default;
+    
+    Decl *getDecl() const { return decl; }
+    
+  private:
+    static std::string computeNameForDependencies(const DeclT *decl);
+  };
+  template <> DeclNode<NominalTypeDecl, Node::Kind::topLevel>
+  class {
+    static std::string computeNameForDependencies() { return "";}
   };
   
 /// A decl node referenced from here that exists elsewhere
   class ForeignDeclNode: public Node {
   public:
-    ForeignDeclNode(Kind kind, StringRef nameForDependencies) :
-    Node(kind, nullptr, {}, "", nameForDependencies) {}
   };
   
   
