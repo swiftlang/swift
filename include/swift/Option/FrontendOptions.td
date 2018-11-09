@@ -362,6 +362,11 @@ def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Add 'dynamic' to all declarations">;
 
+def enable_dynamic_replacement_chaining :
+  Flag<["-"], "enable-dynamic-replacement-chaining">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Enable chaining of dynamic replacements">;
+
 def enable_nskeyedarchiver_diagnostics :
   Flag<["-"], "enable-nskeyedarchiver-diagnostics">,
   HelpText<"Diagnose classes with unstable mangled names adopting NSCoding">;

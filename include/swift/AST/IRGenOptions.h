@@ -187,6 +187,9 @@ public:
   /// Instrument code to generate profiling information.
   unsigned GenerateProfile : 1;
 
+  /// Enable chaining of dynamic replacements.
+  unsigned EnableDynamicReplacementChaining : 1;
+
   /// Path to the profdata file to be used for PGO, or the empty string.
   std::string UseProfile = "";
 
@@ -219,7 +222,8 @@ public:
         ValueNames(false), EnableReflectionMetadata(true),
         EnableReflectionNames(true), EnableClassResilience(false),
         EnableResilienceBypass(false), UseIncrementalLLVMCodeGen(true),
-        UseSwiftCall(false), GenerateProfile(false), CmdArgs(),
+        UseSwiftCall(false), GenerateProfile(false),
+        EnableDynamicReplacementChaining(false), CmdArgs(),
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
 

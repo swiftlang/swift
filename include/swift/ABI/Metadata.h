@@ -4127,6 +4127,8 @@ class DynamicReplacementDescriptor {
   RelativeDirectPointer<DynamicReplacementChainEntry, false> chainEntry;
   uint32_t flags;
 
+  enum : uint32_t { EnableChainingMask = 0x1 };
+
 public:
   /// Enable this replacement by changing the function's replacement chain's
   /// root entry.
@@ -4143,6 +4145,8 @@ public:
   void disableReplacement() const;
 
   uint32_t getFlags() const { return flags; }
+
+  bool shouldChain() const { return (flags & EnableChainingMask); }
 };
 
 /// A collection of dynamic replacement records.
