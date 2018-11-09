@@ -80,6 +80,9 @@ enum class FixKind : uint8_t {
   /// and assume that types are related.
   SkipSuperclassRequirement,
 
+  /// Fix up one of the sides of conversion to make it seem
+  /// like the types are aligned.
+  ContextualMismatch,
 };
 
 class ConstraintFix {
@@ -345,6 +348,35 @@ public:
 
   static SkipSuperclassRequirement *
   create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator);
+};
+
+/// For example: Sometimes type returned from the body of the
+/// closure doesn't match expected contextual type:
+///
+/// func foo(_: () -> Int) {}
+/// foo { "ultimate question" }
+///
+/// Body of the closure produces `String` type when `Int` is expected
+/// by the context.
+class ContextualMismatch : public ConstraintFix {
+  Type LHS, RHS;
+
+protected:
+  ContextualMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
+                     ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::ContextualMismatch, locator), LHS(lhs),
+        RHS(rhs) {}
+
+public:
+  std::string getName() const override { return "fix contextual mismatch"; }
+
+  Type getFromType() const { return LHS; }
+  Type getToType() const { return RHS; }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                    ConstraintLocator *locator);
 };
 
 } // end namespace constraints

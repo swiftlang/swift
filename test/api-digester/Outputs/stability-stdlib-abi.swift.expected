@@ -76,6 +76,9 @@ Class _SharedStringStorage has removed conformance to _NSStringCore
 Class _StringStorage has removed conformance to _NSStringCore
 Protocol _NSStringCore has been removed
 
+Constructor ManagedBuffer.init(_doNotCallMe:) has been removed
+Func _makeAnyHashableUpcastingToHashableBaseType(_:storingResultInto:) has been removed
+
 Protocol Numeric has generic signature change from <τ_0_0 : Equatable, τ_0_0 : ExpressibleByIntegerLiteral, τ_0_0.Magnitude : Comparable, τ_0_0.Magnitude : Numeric> to <τ_0_0 : AdditiveArithmetic, τ_0_0 : ExpressibleByIntegerLiteral, τ_0_0.Magnitude : Comparable, τ_0_0.Magnitude : Numeric>
 Func Numeric.+(_:) has been removed
 Func Numeric.+(_:_:) has been removed
@@ -90,3 +93,4 @@ Protocol Numeric has added inherited protocol AdditiveArithmetic
 Protocol SignedInteger has added inherited protocol AdditiveArithmetic
 Protocol SignedNumeric has added inherited protocol AdditiveArithmetic
 Protocol UnsignedInteger has added inherited protocol AdditiveArithmetic
+

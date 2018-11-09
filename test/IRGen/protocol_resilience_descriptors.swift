@@ -90,7 +90,6 @@ func useOtherResilientProtocol<T: OtherResilientProtocol>(_: T.Type) { }
 
 // CHECK-USAGE: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s31protocol_resilience_descriptors23extractAssocConformanceyyx010resilient_A0012ProtocolWithE12TypeDefaultsRzlF"
 public func extractAssocConformance<T: ProtocolWithAssocTypeDefaults>(_: T) {
-  // CHECK-USAGE: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.ProtocolWithAssocTypeDefaults, [[INT]] udiv ([[INT]] sub ([[INT]] ptrtoint (%swift.protocol_requirement* @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2AC_AA014OtherResilientC0Tn" to [[INT]]), [[INT]] ptrtoint (%swift.protocol_requirement* @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsTL" to [[INT]])), [[INT]] 8)
-  // CHECK-USAGE: load i8*, i8** [[WITNESS_ADDR]]
+  // CHECK-USAGE: swift_getAssociatedConformanceWitness
   useOtherResilientProtocol(T.T2.self)
 }

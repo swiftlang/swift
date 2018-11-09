@@ -67,6 +67,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
 
   Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
+  Opts.EnablePrivateImports |= Args.hasArg(OPT_enable_private_imports);
   Opts.EnableResilience |= Args.hasArg(OPT_enable_resilience);
 
   Opts.TrackSystemDeps |= Args.hasArg(OPT_track_system_dependencies);

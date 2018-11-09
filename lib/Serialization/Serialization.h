@@ -489,6 +489,13 @@ public:
     return addUniquedString(str).second;
   }
 
+  /// Records the use of the given file name.
+  ///
+  /// The Identifier will be scheduled for serialization if necessary.
+  ///
+  /// \returns The ID for the given file name in this module.
+  IdentifierID addFilename(StringRef filename);
+
   /// Records the use of the given Decl.
   ///
   /// The Decl will be scheduled for serialization if necessary.

@@ -759,6 +759,10 @@ ERROR(ambiguous_decl_in_module,none,
 ERROR(module_not_testable,none,
       "module %0 was not compiled for testing", (Identifier))
 
+ERROR(module_not_compiled_for_private_import,none,
+      "module %0 was not compiled for private import", (Identifier))
+
+
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
       "ambiguous operator declarations found for operator", ())
@@ -1041,6 +1045,14 @@ NOTE(archetype_declared_in_type,none,
      "%0 declared as parameter to type %1", (Type, Type))
 NOTE(unbound_generic_parameter_explicit_fix,none,
      "explicitly specify the generic arguments to fix this issue", ())
+
+ERROR(invalid_dynamic_callable_type,none,
+      "@dynamicCallable attribute requires %0 to have either a valid "
+      "'dynamicallyCall(withArguments:)' method or "
+      "'dynamicallyCall(withKeywordArguments:)' method", (Type))
+ERROR(missing_dynamic_callable_kwargs_method,none,
+      "@dynamicCallable type %0 cannot be applied with keyword arguments; "
+      "missing 'dynamicCall(withKeywordArguments:)' method", (Type))
 
 ERROR(type_invalid_dml,none,
       "@dynamicMemberLookup attribute requires %0 to have a "
@@ -3926,6 +3938,8 @@ NOTE(dynamic_replacement_found_function_of_type, none,
       "found function %0 of type %1", (DeclName, Type))
 ERROR(dynamic_replacement_not_in_extension, none,
       "dynamicReplacement(for:) of %0 is not defined in an extension or at the file level", (DeclName))
+ERROR(dynamic_replacement_must_not_be_dynamic, none,
+      "dynamicReplacement(for:) of %0 must not be dynamic itself", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: @available

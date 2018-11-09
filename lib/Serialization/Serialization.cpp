@@ -48,6 +48,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <vector>
@@ -721,6 +722,12 @@ std::pair<StringRef, IdentifierID> Serializer::addUniquedString(StringRef str) {
   return {iter->getKey(), LastUniquedStringID};
 }
 
+IdentifierID Serializer::addFilename(StringRef filename) {
+  assert(!filename.empty() && "Attemping to add an empty filename");
+
+  return addUniquedString(filename).second;
+}
+
 IdentifierID Serializer::addModuleRef(const ModuleDecl *M) {
   if (M == this->M)
     return CURRENT_MODULE_ID;
@@ -814,6 +821,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, XCC);
   BLOCK_RECORD(options_block, IS_SIB);
   BLOCK_RECORD(options_block, IS_TESTABLE);
+  BLOCK_RECORD(options_block, ARE_PRIVATE_IMPORTS_ENABLED);
   BLOCK_RECORD(options_block, RESILIENCE_STRATEGY);
 
   BLOCK(INPUT_BLOCK);
@@ -966,6 +974,11 @@ void Serializer::writeHeader(const SerializationOptions &options) {
       if (M->isTestingEnabled()) {
         options_block::IsTestableLayout IsTestable(Out);
         IsTestable.emit(ScratchRecord);
+      }
+
+      if (M->arePrivateImportsEnabled()) {
+        options_block::ArePrivateImportsEnabledLayout PrivateImports(Out);
+        PrivateImports.emit(ScratchRecord);
       }
 
       if (M->getResilienceStrategy() != ResilienceStrategy::Default) {
@@ -2185,6 +2198,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   case DAK_ObjCRuntimeName:
   case DAK_RestatedObjCConformance:
   case DAK_ClangImporterSynthesizedType:
+  case DAK_PrivateImport:
     llvm_unreachable("cannot serialize attribute");
 
   case DAK_Count:
@@ -2667,17 +2681,37 @@ void Serializer::writeDecl(const Decl *D) {
   if (auto *value = dyn_cast<ValueDecl>(D)) {
     if (value->getFormalAccess() <= swift::AccessLevel::FilePrivate &&
         !value->getDeclContext()->isLocalContext()) {
-      // FIXME: We shouldn't need to encode this for /all/ private decls.
-      // In theory we can follow the same rules as mangling and only include
-      // the outermost private context.
       auto topLevelContext = value->getDeclContext()->getModuleScopeContext();
       if (auto *enclosingFile = dyn_cast<FileUnit>(topLevelContext)) {
+        // FIXME: We shouldn't need to encode this for /all/ private decls.
+        // In theory we can follow the same rules as mangling and only include
+        // the outermost private context.
         Identifier discriminator =
           enclosingFile->getDiscriminatorForPrivateValue(value);
         unsigned abbrCode =
           DeclTypeAbbrCodes[PrivateDiscriminatorLayout::Code];
         PrivateDiscriminatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                         addDeclBaseNameRef(discriminator));
+        auto getFilename = [](FileUnit *enclosingFile,
+                              const ValueDecl *decl) -> StringRef {
+          if (auto *SF = dyn_cast<SourceFile>(enclosingFile)) {
+            return llvm::sys::path::filename(SF->getFilename());
+          } else if (auto *LF = dyn_cast<LoadedFile>(enclosingFile)) {
+            return llvm::sys::path::filename(
+                (LF->getFilenameForPrivateDecl(decl)));
+          }
+          return StringRef();
+        };
+        // Only if compiled with -enable-private-imports.
+        if (M->arePrivateImportsEnabled()) {
+          auto filename = getFilename(enclosingFile, value);
+          if (!filename.empty()) {
+            auto filenameID = addFilename(filename);
+            FilenameForPrivateLayout::emitRecord(
+                Out, ScratchRecord,
+                DeclTypeAbbrCodes[FilenameForPrivateLayout::Code], filenameID);
+          }
+        }
       }
     }
 
@@ -4130,6 +4164,7 @@ void Serializer::writeAllDeclsAndTypes() {
 
   registerDeclTypeAbbr<LocalDiscriminatorLayout>();
   registerDeclTypeAbbr<PrivateDiscriminatorLayout>();
+  registerDeclTypeAbbr<FilenameForPrivateLayout>();
   registerDeclTypeAbbr<MembersLayout>();
   registerDeclTypeAbbr<XRefLayout>();
 

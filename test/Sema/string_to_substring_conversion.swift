@@ -5,7 +5,7 @@ let ss = s[s.startIndex..<s.endIndex]
 
 // CTP_Initialization
 do {
-  let s1: Substring = { return s }() // expected-error {{cannot convert value of type 'String' to specified type 'Substring'}} {{37-37=[]}}
+  let s1: Substring = { return s }() // expected-error {{cannot convert value of type 'String' to closure result type 'Substring'}} {{33-33=[]}}
   _ = s1
 }
 
