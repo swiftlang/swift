@@ -466,10 +466,15 @@ namespace {
 /// spelling of the protocol type, as well as the locality in the file), but it
 /// does work.
 class InheritedProtocolCollector {
+  static const StringLiteral DummyProtocolName;
+
   /// Protocols that will be included by the ASTPrinter without any extra work.
   SmallVector<ProtocolDecl *, 8> IncludedProtocols;
   /// Protocols that will not be printed by the ASTPrinter.
   SmallVector<ProtocolDecl *, 8> ExtraProtocols;
+  /// Protocols that can be printed, but whose conformances are constrained with
+  /// something that \e can't be printed.
+  SmallVector<const ProtocolType *, 8> ConditionalConformanceProtocols;
 
   /// For each type in \p directlyInherited, classify the protocols it refers to
   /// as included for printing or not, and record them in the appropriate
@@ -487,6 +492,23 @@ class InheritedProtocolCollector {
       ExistentialLayout layout = inheritedTy->getExistentialLayout();
       for (ProtocolType *protoTy : layout.getProtocols())
         whichProtocols.push_back(protoTy->getDecl());
+      // FIXME: This ignores layout constraints, but currently we don't support
+      // any of those besides 'AnyObject'.
+    }
+  }
+
+  /// For each type in \p directlyInherited, record any protocols that we would
+  /// have printed in ConditionalConformanceProtocols.
+  void recordConditionalConformances(ArrayRef<TypeLoc> directlyInherited) {
+    for (TypeLoc inherited : directlyInherited) {
+      Type inheritedTy = inherited.getType();
+      if (!inheritedTy || !inheritedTy->isExistentialType())
+        continue;
+
+      ExistentialLayout layout = inheritedTy->getExistentialLayout();
+      for (ProtocolType *protoTy : layout.getProtocols())
+        if (isPublicOrUsableFromInline(protoTy))
+          ConditionalConformanceProtocols.push_back(protoTy);
       // FIXME: This ignores layout constraints, but currently we don't support
       // any of those besides 'AnyObject'.
     }
@@ -528,6 +550,21 @@ public:
     // Recurse to find any nested types.
     for (const Decl *member : memberContext->getMembers())
       collectProtocols(map, member);
+  }
+
+  /// If \p D is an extension providing conditional conformances, record those
+  /// in \p map.
+  ///
+  /// \sa recordConditionalConformances
+  static void collectSkippedConditionalConformances(PerTypeMap &map,
+                                                    const Decl *D) {
+    auto *extension = dyn_cast<ExtensionDecl>(D);
+    if (!extension || !extension->isConstrainedExtension())
+      return;
+
+    const NominalTypeDecl *nominal = extension->getExtendedNominal();
+    map[nominal].recordConditionalConformances(extension->getInherited());
+    // No recursion here because extensions are never nested.
   }
 
   /// If there were any public protocols that need to be printed (i.e. they
@@ -580,7 +617,40 @@ public:
                       }, [&out] { out << ", "; });
     out << " {}\n";
   }
+
+  /// If there were any conditional conformances that couldn't be printed,
+  /// make a dummy extension that conforms to all of them, constrained by a
+  /// fake protocol.
+  bool printInaccessibleConformanceExtensionIfNeeded(
+      raw_ostream &out, const PrintOptions &printOptions,
+      const NominalTypeDecl *nominal) const {
+    if (ConditionalConformanceProtocols.empty())
+      return false;
+    assert(nominal->isGenericContext());
+
+    out << "extension ";
+    nominal->getDeclaredType().print(out, printOptions);
+    out << " : ";
+    swift::interleave(ConditionalConformanceProtocols,
+                      [&out, &printOptions](const ProtocolType *protoTy) {
+                        protoTy->print(out, printOptions);
+                      }, [&out] { out << ", "; });
+    out << " where "
+        << nominal->getGenericParamsOfContext()->getParams().front()->getName()
+        << " : " << DummyProtocolName << " {}\n";
+    return true;
+  }
+
+  /// Print a fake protocol declaration for use by
+  /// #printInaccessibleConformanceExtensionIfNeeded.
+  static void printDummyProtocolDeclaration(raw_ostream &out) {
+    out << "\n@usableFromInline\ninternal protocol " << DummyProtocolName
+        << " {}\n";
+  }
 };
+
+const StringLiteral InheritedProtocolCollector::DummyProtocolName =
+    "_ConstraintThatIsNotPartOfTheAPIOfThisLibrary";
 } // end anonymous namespace
 
 bool swift::emitParseableInterface(raw_ostream &out,
@@ -597,8 +667,12 @@ bool swift::emitParseableInterface(raw_ostream &out,
   SmallVector<Decl *, 16> topLevelDecls;
   M->getTopLevelDecls(topLevelDecls);
   for (const Decl *D : topLevelDecls) {
-    if (!D->shouldPrintInContext(printOptions))
+    if (!D->shouldPrintInContext(printOptions) ||
+        !printOptions.CurrentPrintabilityChecker->shouldPrint(D, printOptions)){
+      InheritedProtocolCollector::collectSkippedConditionalConformances(
+          inheritedProtocolMap, D);
       continue;
+    }
 
     D->print(out, printOptions);
     out << "\n";
@@ -607,11 +681,18 @@ bool swift::emitParseableInterface(raw_ostream &out,
   }
 
   // Print dummy extensions for any protocols that were indirectly conformed to.
+  bool needDummyProtocolDeclaration = false;
   for (const auto &nominalAndCollector : inheritedProtocolMap) {
+    const NominalTypeDecl *nominal = nominalAndCollector.first;
     const InheritedProtocolCollector &collector = nominalAndCollector.second;
-    collector.printSynthesizedExtensionIfNeeded(out, printOptions,
-                                                nominalAndCollector.first);
+    collector.printSynthesizedExtensionIfNeeded(out, printOptions, nominal);
+    needDummyProtocolDeclaration |=
+        collector.printInaccessibleConformanceExtensionIfNeeded(out,
+                                                                printOptions,
+                                                                nominal);
   }
+  if (needDummyProtocolDeclaration)
+    InheritedProtocolCollector::printDummyProtocolDeclaration(out);
 
   return false;
 }

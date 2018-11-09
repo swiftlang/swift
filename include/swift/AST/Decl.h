@@ -573,7 +573,7 @@ protected:
     HasAnyUnavailableValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1,
     /// If the module was or is being compiled with `-enable-testing`.
     TestingEnabled : 1,
 
@@ -586,7 +586,10 @@ protected:
     RawResilienceStrategy : 1,
 
     /// Whether all imports have been resolved. Used to detect circular imports.
-    HasResolvedImports : 1
+    HasResolvedImports : 1,
+
+    // If the module was or is being compiled with `-enable-private-imports`.
+    PrivateImportsEnabled : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -3019,6 +3022,14 @@ static inline bool isRawPointerKind(PointerTypeKind PTK) {
   llvm_unreachable("Unhandled PointerTypeKind in switch.");
 }
 
+enum KeyPathTypeKind : unsigned char {
+  KPTK_AnyKeyPath,
+  KPTK_PartialKeyPath,
+  KPTK_KeyPath,
+  KPTK_WritableKeyPath,
+  KPTK_ReferenceWritableKeyPath
+};
+
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.
 class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   SourceRange Braces;
@@ -3239,6 +3250,9 @@ public:
 
   /// Is this the decl for Optional<T>?
   bool isOptionalDecl() const;
+
+  /// Is this a key path type?
+  Optional<KeyPathTypeKind> getKeyPathTypeKind() const;
 
 private:
   /// Predicate used to filter StoredPropertyRange.

@@ -133,7 +133,9 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(optional, Optional,
   OnConstructor | OnFunc | OnAccessor | OnVar | OnSubscript |
   DeclModifier,
   5)
-// NOTE: 6 is unused
+SIMPLE_DECL_ATTR(dynamicCallable, DynamicCallable,
+  OnNominalType,
+  6)
 SIMPLE_DECL_ATTR(noreturn, NoReturn,
   OnFunc | OnAccessor,
   7)
@@ -384,6 +386,10 @@ DECL_ATTR(_dynamicReplacement, DynamicReplacement,
 SIMPLE_DECL_ATTR(_borrowed, Borrowed,
   OnVar | OnSubscript | UserInaccessible |
   NotSerialized, 81)
+DECL_ATTR(_private, PrivateImport,
+  OnImport |
+  UserInaccessible |
+  NotSerialized, 82)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

@@ -231,6 +231,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'IdentifierList': 226,
     'NamedAttributeStringArgument': 227,
     'DeclName': 228,
+    'PoundAssertStmt': 229,
 }
 
 

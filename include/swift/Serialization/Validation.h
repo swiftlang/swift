@@ -93,6 +93,7 @@ class ExtendedValidationInfo {
   SmallVector<StringRef, 4> ExtraClangImporterOpts;
   StringRef SDKPath;
   struct {
+    unsigned ArePrivateImportsEnabled : 1;
     unsigned IsSIB : 1;
     unsigned IsTestable : 1;
     unsigned ResilienceStrategy : 2;
@@ -116,6 +117,10 @@ public:
   bool isSIB() const { return Bits.IsSIB; }
   void setIsSIB(bool val) {
       Bits.IsSIB = val;
+  }
+  bool arePrivateImportsEnabled() { return Bits.ArePrivateImportsEnabled; }
+  void setPrivateImportsEnabled(bool enabled) {
+    Bits.ArePrivateImportsEnabled = enabled;
   }
   bool isTestable() const { return Bits.IsTestable; }
   void setIsTestable(bool val) {

@@ -1014,6 +1014,29 @@ void Parser::diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New) {
   diagnose(Prev->getLoc(), diag::previous_decldef, Prev->getBaseName());
 }
 
+Optional<StringRef>
+Parser::getStringLiteralIfNotInterpolated(SourceLoc Loc,
+                                          StringRef DiagText) {
+  assert(Tok.is(tok::string_literal));
+
+  // FIXME: Support extended escaping string literal.
+  if (Tok.getCustomDelimiterLen()) {
+    diagnose(Loc, diag::forbidden_extended_escaping_string, DiagText);
+    return None;
+  }
+
+  SmallVector<Lexer::StringSegment, 1> Segments;
+  L->getStringLiteralSegments(Tok, Segments);
+  if (Segments.size() != 1 ||
+      Segments.front().Kind == Lexer::StringSegment::Expr) {
+    diagnose(Loc, diag::forbidden_interpolated_string, DiagText);
+    return None;
+  }
+
+  return SourceMgr.extractText(CharSourceRange(Segments.front().Loc,
+                                               Segments.front().Length));
+}
+
 struct ParserUnit::Implementation {
   LangOptions LangOpts;
   SearchPathOptions SearchPathOpts;

@@ -7046,6 +7046,74 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
   return literal;
 }
 
+// Resolve @dynamicCallable applications.
+static Expr *finishApplyDynamicCallable(ConstraintSystem &cs,
+                                        const Solution &solution,
+                                        ApplyExpr *apply,
+                                        ConstraintLocatorBuilder locator) {
+  auto &ctx = cs.getASTContext();
+  auto *fn = apply->getFn();
+
+  TupleExpr *arg = dyn_cast<TupleExpr>(apply->getArg());
+  if (auto parenExpr = dyn_cast<ParenExpr>(apply->getArg()))
+    arg = TupleExpr::createImplicit(ctx, parenExpr->getSubExpr(), {});
+
+  // Get resolved `dynamicallyCall` method and verify it.
+  auto loc = locator.withPathElement(ConstraintLocator::ApplyFunction);
+  auto selected = solution.getOverloadChoice(cs.getConstraintLocator(loc));
+  auto *method = dyn_cast<FuncDecl>(selected.choice.getDecl());
+  auto methodType = selected.openedType->castTo<AnyFunctionType>();
+  assert(method->getName() == ctx.Id_dynamicallyCall &&
+         "Expected 'dynamicallyCall' method");
+  assert(methodType->getParams().size() == 1 &&
+         "Expected 'dynamicallyCall' method with one parameter");
+  auto argumentLabel = methodType->getParams()[0].getLabel();
+  assert((argumentLabel == ctx.Id_withArguments ||
+          argumentLabel == ctx.Id_withKeywordArguments) &&
+         "Expected 'dynamicallyCall' method argument label 'withArguments' or "
+         "'withKeywordArguments'");
+
+  // Determine which method was resolved: a `withArguments` method or a
+  // `withKeywordArguments` method.
+  bool useKwargsMethod = argumentLabel == ctx.Id_withKeywordArguments;
+
+  // Construct expression referencing the `dynamicallyCall` method.
+  Expr *member =
+    new (ctx) MemberRefExpr(fn, fn->getEndLoc(), ConcreteDeclRef(method),
+                            DeclNameLoc(method->getNameLoc()),
+                            /*Implicit*/ true);
+
+  // Construct argument to the method (either an array or dictionary
+  // expression).
+  Expr *argument = nullptr;
+  if (!useKwargsMethod) {
+    argument = ArrayExpr::create(ctx, SourceLoc(), arg->getElements(),
+                                 {}, SourceLoc());
+  } else {
+    SmallVector<Identifier, 4> names;
+    SmallVector<Expr *, 4> dictElements;
+    for (unsigned i = 0, n = arg->getNumElements(); i < n; i++) {
+      Expr *labelExpr =
+        new (ctx) StringLiteralExpr(arg->getElementName(i).get(),
+                                    arg->getElementNameLoc(i),
+                                    /*Implicit*/ true);
+      Expr *pair =
+        TupleExpr::createImplicit(ctx, { labelExpr, arg->getElement(i) }, {});
+      dictElements.push_back(pair);
+    }
+    argument = DictionaryExpr::create(ctx, SourceLoc(), dictElements, {},
+                                      SourceLoc());
+  }
+  argument->setImplicit();
+
+  // Construct call to the `dynamicallyCall` method.
+  Expr *result = CallExpr::createImplicit(ctx, member, argument,
+                                          { argumentLabel });
+  cs.TC.typeCheckExpression(result, cs.DC);
+  cs.cacheExprTypes(result);
+  return result;
+}
+
 Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                 ConstraintLocatorBuilder locator) {
   TypeChecker &tc = cs.getTypeChecker();
@@ -7340,67 +7408,73 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   }
 
   // We have a type constructor.
-  auto metaTy = cs.getType(fn)->castTo<AnyMetatypeType>();
-  auto ty = metaTy->getInstanceType();
+  if (auto metaTy = cs.getType(fn)->getAs<AnyMetatypeType>()) {
+    auto ty = metaTy->getInstanceType();
 
-  if (!cs.isTypeReference(fn)) {
-    bool isExistentialType = false;
-    // If this is an attempt to initialize existential type.
-    if (auto metaType = cs.getType(fn)->getAs<MetatypeType>()) {
-      auto instanceType = metaType->getInstanceType();
-      isExistentialType = instanceType->isExistentialType();
+    if (!cs.isTypeReference(fn)) {
+      bool isExistentialType = false;
+      // If this is an attempt to initialize existential type.
+      if (auto metaType = cs.getType(fn)->getAs<MetatypeType>()) {
+        auto instanceType = metaType->getInstanceType();
+        isExistentialType = instanceType->isExistentialType();
+      }
+
+      if (!isExistentialType) {
+        // If the metatype value isn't a type expression,
+        // the user should reference '.init' explicitly, for clarity.
+        cs.TC
+            .diagnose(apply->getArg()->getStartLoc(),
+                      diag::missing_init_on_metatype_initialization)
+            .fixItInsert(apply->getArg()->getStartLoc(), ".init");
+      }
     }
 
-    if (!isExistentialType) {
-      // If the metatype value isn't a type expression,
-      // the user should reference '.init' explicitly, for clarity.
-      cs.TC
-          .diagnose(apply->getArg()->getStartLoc(),
-                    diag::missing_init_on_metatype_initialization)
-          .fixItInsert(apply->getArg()->getStartLoc(), ".init");
+    // If we're "constructing" a tuple type, it's simply a conversion.
+    if (auto tupleTy = ty->getAs<TupleType>()) {
+      // FIXME: Need an AST to represent this properly.
+      return coerceToType(apply->getArg(), tupleTy, locator);
     }
+
+    // We're constructing a value of nominal type. Look for the constructor or
+    // enum element to use.
+    auto ctorLocator = cs.getConstraintLocator(
+        locator.withPathElement(ConstraintLocator::ApplyFunction)
+               .withPathElement(ConstraintLocator::ConstructorMember));
+    auto selected = solution.getOverloadChoiceIfAvailable(ctorLocator);
+    if (!selected) {
+      assert(ty->hasError() || ty->hasUnresolvedType());
+      cs.setType(apply, ty);
+      return apply;
+    }
+
+    assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
+           ty->isExistentialType() || ty->is<ArchetypeType>());
+
+    // We have the constructor.
+    auto choice = selected->choice;
+
+    // Consider the constructor decl reference expr 'implicit', but the
+    // constructor call expr itself has the apply's 'implicitness'.
+    bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
+    Expr *declRef = buildMemberRef(fn, selected->openedFullType,
+                                   /*dotLoc=*/SourceLoc(), choice,
+                                   DeclNameLoc(fn->getEndLoc()),
+                                   selected->openedType, locator, ctorLocator,
+                                   /*Implicit=*/true,
+                                   choice.getFunctionRefKind(),
+                                   AccessSemantics::Ordinary, isDynamic);
+    if (!declRef)
+      return nullptr;
+    declRef->setImplicit(apply->isImplicit());
+    apply->setFn(declRef);
+
+    // Tail-recur to actually call the constructor.
+    return finishApply(apply, openedType, locator);
   }
 
-  // If we're "constructing" a tuple type, it's simply a conversion.
-  if (auto tupleTy = ty->getAs<TupleType>()) {
-    // FIXME: Need an AST to represent this properly.
-    return coerceToType(apply->getArg(), tupleTy, locator);
-  }
-
-  // We're constructing a value of nominal type. Look for the constructor or
-  // enum element to use.
-  auto ctorLocator = cs.getConstraintLocator(
-                 locator.withPathElement(ConstraintLocator::ApplyFunction)
-                        .withPathElement(ConstraintLocator::ConstructorMember));
-  auto selected = solution.getOverloadChoiceIfAvailable(ctorLocator);
-  if (!selected) {
-    assert(ty->hasError() || ty->hasUnresolvedType());
-    cs.setType(apply, ty);
-    return apply;
-  }
-
-  assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
-         ty->isExistentialType() || ty->is<ArchetypeType>());
-
-  // We have the constructor.
-  auto choice = selected->choice;
-  
-  // Consider the constructor decl reference expr 'implicit', but the
-  // constructor call expr itself has the apply's 'implicitness'.
-  bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
-  Expr *declRef = buildMemberRef(fn, selected->openedFullType,
-                                 /*dotLoc=*/SourceLoc(), choice,
-                                 DeclNameLoc(fn->getEndLoc()),
-                                 selected->openedType, locator, ctorLocator,
-                                 /*Implicit=*/true, choice.getFunctionRefKind(),
-                                 AccessSemantics::Ordinary, isDynamic);
-  if (!declRef)
-    return nullptr;
-  declRef->setImplicit(apply->isImplicit());
-  apply->setFn(declRef);
-
-  // Tail-recur to actually call the constructor.
-  return finishApply(apply, openedType, locator);
+  // Handle @dynamicCallable applications.
+  // At this point, all other ApplyExpr cases have been handled.
+  return finishApplyDynamicCallable(cs, solution, apply, locator);
 }
 
 

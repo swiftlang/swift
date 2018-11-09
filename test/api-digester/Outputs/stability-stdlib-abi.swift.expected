@@ -83,3 +83,5 @@ Func String._foreignSubscript(position:distance:) has been removed
 Struct String has type witness type for Collection.Iterator changing from IndexingIterator<String> to String.Iterator
 Struct String has type witness type for Sequence.Iterator changing from IndexingIterator<String> to String.Iterator
 
+Constructor ManagedBuffer.init(_doNotCallMe:) has been removed
+Func _makeAnyHashableUpcastingToHashableBaseType(_:storingResultInto:) has been removed

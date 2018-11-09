@@ -4151,6 +4151,32 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
   return response;
 }
 
+const WitnessTable *swift::swift_getAssociatedConformanceWitness(
+                                  WitnessTable *wtable,
+                                  const Metadata *conformingType,
+                                  const Metadata *assocType,
+                                  const ProtocolRequirement *reqBase,
+                                  const ProtocolRequirement *assocConformance) {
+#ifndef NDEBUG
+  {
+    const ProtocolConformanceDescriptor *conformance = wtable->Description;
+    const ProtocolDescriptor *protocol = conformance->getProtocol();
+    auto requirements = protocol->getRequirements();
+    assert(assocConformance >= requirements.begin() &&
+           assocConformance < requirements.end());
+    assert(reqBase == requirements.data() - WitnessTableFirstRequirementOffset);
+    assert(assocConformance->Flags.getKind() ==
+           ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction);
+  }
+#endif
+
+  // Call the access function.
+  unsigned witnessIndex = assocConformance - reqBase;
+  auto witness =
+    ((AssociatedWitnessTableAccessFunction* const *)wtable)[witnessIndex];
+  return witness(assocType, conformingType, wtable);
+}
+
 /***************************************************************************/
 /*** Recursive metadata dependencies ***************************************/
 /***************************************************************************/

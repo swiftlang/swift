@@ -631,20 +631,21 @@ func evaluateIgnoredKeyPathExpr(_ s: inout NonTrivialStruct, _ kp: WritableKeyPa
 // CHECK: bb0(%0 : @trivial $*NonTrivialStruct, %1 : @guaranteed $WritableKeyPath<NonTrivialStruct, Int>):
 // CHECK-NEXT: debug_value_addr %0
 // CHECK-NEXT: debug_value %1
+// CHECK-NEXT: [[KP_TEMP:%[0-9]+]] = copy_value %1
 // CHECK-NEXT: [[S_READ:%[0-9]+]] = begin_access [read] [unknown] %0
+// CHECK-NEXT: [[KP:%[0-9]+]] = upcast [[KP_TEMP]]
 // CHECK-NEXT: [[S_TEMP:%[0-9]+]] = alloc_stack $NonTrivialStruct
 // CHECK-NEXT: copy_addr [[S_READ]] to [initialization] [[S_TEMP]]
-// CHECK-NEXT: [[KP_TEMP:%[0-9]+]] = copy_value %1
-// CHECK-NEXT: [[KP:%[0-9]+]] = upcast [[KP_TEMP]]
-// CHECK-NEXT: [[RESULT:%[0-9]+]] = alloc_stack $Int
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[PROJECT_FN:%[0-9]+]] = function_ref @$ss23_projectKeyPathReadOnly{{[_0-9a-zA-Z]*}}F
+// CHECK-NEXT: [[RESULT:%[0-9]+]] = alloc_stack $Int
 // CHECK-NEXT: apply [[PROJECT_FN]]<NonTrivialStruct, Int>([[RESULT]], [[S_TEMP]], [[KP]])
+// CHECK-NEXT: load [trivial] [[RESULT]]
 // CHECK-NEXT: end_access [[S_READ]]
 // CHECK-NEXT: dealloc_stack [[RESULT]]
-// CHECK-NEXT: destroy_value [[KP]]
 // CHECK-NEXT: destroy_addr [[S_TEMP]]
 // CHECK-NEXT: dealloc_stack [[S_TEMP]]
+// CHECK-NEXT: destroy_value [[KP]]
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin Int.Type
 // CHECK-NOT: destroy_value %1
 // CHECK-NEXT: return [[METATYPE]]

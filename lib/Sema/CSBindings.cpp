@@ -153,6 +153,7 @@ static bool shouldBindToValueType(Constraint *constraint) {
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::ApplicableFunction:
+  case ConstraintKind::DynamicCallableApplicableFunction:
   case ConstraintKind::BindOverload:
   case ConstraintKind::OptionalObject:
     return false;
@@ -575,6 +576,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     }
 
     case ConstraintKind::ApplicableFunction:
+    case ConstraintKind::DynamicCallableApplicableFunction:
     case ConstraintKind::BindOverload: {
       if (result.FullyBound && result.InvolvesTypeVariables)
         continue;

@@ -2738,6 +2738,48 @@ public:
       verifyCheckedBase(nominal);
     }
 
+    void verifyCheckedAlways(GenericTypeParamDecl *GTPD) {
+      PrettyStackTraceDecl debugStack("verifying GenericTypeParamDecl", GTPD);
+
+      const DeclContext *DC = GTPD->getDeclContext();
+      if (!GTPD->getDeclContext()->isInnermostContextGeneric()) {
+        Out << "DeclContext of GenericTypeParamDecl does not have "
+               "generic params\n";
+        abort();
+      }
+
+      GenericParamList *paramList =
+          static_cast<const GenericContext *>(DC)->getGenericParams();
+      if (!paramList) {
+        Out << "DeclContext of GenericTypeParamDecl does not have "
+               "generic params\n";
+        abort();
+      }
+
+      unsigned currentDepth = paramList->getDepth();
+      if (currentDepth < GTPD->getDepth()) {
+        Out << "GenericTypeParamDecl has incorrect depth\n";
+        abort();
+      }
+      while (currentDepth > GTPD->getDepth()) {
+        paramList = paramList->getOuterParameters();
+        --currentDepth;
+      }
+      assert(paramList && "this is guaranteed by the parameter list's depth");
+
+      if (paramList->size() <= GTPD->getIndex() ||
+          paramList->getParams()[GTPD->getIndex()] != GTPD) {
+        if (llvm::is_contained(paramList->getParams(), GTPD))
+          Out << "GenericTypeParamDecl has incorrect index\n";
+        else
+          Out << "GenericTypeParamDecl not found in GenericParamList; "
+                 "incorrect depth or wrong DeclContext\n";
+        abort();
+      }
+
+      verifyCheckedBase(GTPD);
+    }
+
     void verifyChecked(ExtensionDecl *ext) {
       // Make sure that the protocol conformances are complete.
       for (auto conformance : ext->getLocalConformances()) {

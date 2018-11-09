@@ -906,8 +906,28 @@ struct MemberLookupResult {
   }
   
 };
-  
-  
+
+/// \brief Stores the required methods for @dynamicCallable types.
+struct DynamicCallableMethods {
+  llvm::DenseSet<FuncDecl *> argumentsMethods;
+  llvm::DenseSet<FuncDecl *> keywordArgumentsMethods;
+
+  void addArgumentsMethod(FuncDecl *method) {
+    argumentsMethods.insert(method);
+  }
+
+  void addKeywordArgumentsMethod(FuncDecl *method) {
+    keywordArgumentsMethods.insert(method);
+  }
+
+  /// \brief Returns true if type defines either of the @dynamicCallable
+  /// required methods. Returns false iff type does not satisfy @dynamicCallable
+  /// requirements.
+  bool isValid() const {
+    return !argumentsMethods.empty() || !keywordArgumentsMethods.empty();
+  }
+};
+
 /// \brief Describes a system of constraints on type variables, the
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
@@ -1060,6 +1080,10 @@ private:
 public:
   /// The locators of \c Defaultable constraints whose defaults were used.
   SmallVector<ConstraintLocator *, 8> DefaultedConstraints;
+
+  /// A cache that stores the @dynamicCallable required methods implemented by
+  /// types.
+  llvm::DenseMap<CanType, DynamicCallableMethods> DynamicCallableCache;
 
   /// This is a cache that keeps track of whether a given type is known (or not)
   /// to be a @dynamicMemberLookup type.
@@ -2644,6 +2668,13 @@ private:
 
   /// \brief Attempt to simplify the ApplicableFunction constraint.
   SolutionKind simplifyApplicableFnConstraint(
+                                      Type type1,
+                                      Type type2,
+                                      TypeMatchOptions flags,
+                                      ConstraintLocatorBuilder locator);
+
+  /// \brief Attempt to simplify the DynamicCallableApplicableFunction constraint.
+  SolutionKind simplifyDynamicCallableApplicableFnConstraint(
                                       Type type1,
                                       Type type2,
                                       TypeMatchOptions flags,

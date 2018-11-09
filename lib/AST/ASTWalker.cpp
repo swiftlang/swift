@@ -1299,6 +1299,14 @@ Stmt *Traversal::visitThrowStmt(ThrowStmt *TS) {
   return nullptr;
 }
 
+Stmt *Traversal::visitPoundAssertStmt(PoundAssertStmt *S) {
+  if (auto *condition = doIt(S->getCondition())) {
+    S->setCondition(condition);
+  } else {
+    return nullptr;
+  }
+  return S;
+}
 
 Stmt *Traversal::visitBraceStmt(BraceStmt *BS) {
   for (auto &Elem : BS->getElements()) {
