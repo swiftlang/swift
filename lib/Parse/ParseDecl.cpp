@@ -307,27 +307,6 @@ bool Parser::parseTopLevel() {
   return FoundTopLevelCodeToExecute;
 }
 
-static Optional<StringRef>
-getStringLiteralIfNotInterpolated(Parser &P, SourceLoc Loc, const Token &Tok,
-                                  StringRef DiagText) {
-  // FIXME: Support extended escaping string literal.
-  if (Tok.getCustomDelimiterLen()) {
-    P.diagnose(Loc, diag::attr_extended_escaping_string, DiagText);
-    return None;
-  }
-
-  SmallVector<Lexer::StringSegment, 1> Segments;
-  P.L->getStringLiteralSegments(Tok, Segments);
-  if (Segments.size() != 1 ||
-      Segments.front().Kind == Lexer::StringSegment::Expr) {
-   P.diagnose(Loc, diag::attr_interpolated_string, DiagText);
-   return None;
-  }
-
-  return P.SourceMgr.extractText(CharSourceRange(Segments.front().Loc,
-                                                 Segments.front().Length));
-}
-
 ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     SourceLoc AtLoc, SourceLoc AttrLoc, StringRef AttrName) {
   // Check 'Tok', return false if ':' or '=' cannot be found.
@@ -439,8 +418,8 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
         break;
       }
 
-      auto Value = getStringLiteralIfNotInterpolated(*this, AttrLoc, Tok,
-                                                     ArgumentKindStr);
+      auto Value = getStringLiteralIfNotInterpolated(
+          AttrLoc, ("'" + ArgumentKindStr + "'").str());
       consumeToken();
       if (!Value) {
         AnyArgumentInvalid = true;
@@ -1155,8 +1134,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     }
 
-    Optional<StringRef> AsmName =
-      getStringLiteralIfNotInterpolated(*this, Loc, Tok, AttrName);
+    Optional<StringRef> AsmName = getStringLiteralIfNotInterpolated(
+        Loc, ("'" + AttrName + "'").str());
 
     consumeToken(tok::string_literal);
 
@@ -1269,7 +1248,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     }
 
-    auto Value = getStringLiteralIfNotInterpolated(*this, Loc, Tok, AttrName);
+    auto Value = getStringLiteralIfNotInterpolated(
+        Loc, ("'" + AttrName + "'").str());
 
     consumeToken(tok::string_literal);
 
@@ -3666,7 +3646,7 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
       }
 
       Filename =
-          getStringLiteralIfNotInterpolated(*this, Loc, Tok, "#sourceLocation");
+          getStringLiteralIfNotInterpolated(Loc, "'#sourceLocation'");
       if (!Filename.hasValue())
         return makeParserError();
       consumeToken(tok::string_literal);
@@ -3727,8 +3707,7 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
       return makeParserError();
     }
     
-    Filename = getStringLiteralIfNotInterpolated(*this, Loc, Tok,
-                                                 "#line");
+    Filename = getStringLiteralIfNotInterpolated(Loc, "'#line'");
     if (!Filename.hasValue())
       return makeParserError();
   }

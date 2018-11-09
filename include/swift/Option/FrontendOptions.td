@@ -319,6 +319,10 @@ def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
 def enable_large_loadable_types : Flag<["-"], "enable-large-loadable-types">,
   HelpText<"Enable Large Loadable types IRGen pass">;
 
+def enable_experimental_static_assert :
+  Flag<["-"], "enable-experimental-static-assert">,
+  HelpText<"Enable experimental #assert">;
+
 def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
   HelpText<"Enable experimental property behaviors">;
