@@ -8413,18 +8413,124 @@ bool swift::diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
   return true;
 }
 
-void swift::diagnoseIllegalEphemeralConversion(
-    ASTContext &ctx, const Expr *argExpr, Type argType, Type paramType,
-    const ValueDecl *callee, AnyFunctionType *fnType, const Expr *anchor,
-    bool downgradeToWarning) {
-  auto &diags = ctx.Diags;
-
-  auto emitArgumentConversionNote = [&]() {
-    diags.diagnose(argExpr->getLoc(),
-                   diag::ephemeral_pointer_argument_conversion_note,
-                   argType->getWithoutSpecifierType(), paramType)
-        .highlight(argExpr->getSourceRange());
+/// Emits a note explaining to the user that an ephemeral conversion is only
+/// valid for the duration of the call, and suggests an alternative to use.
+static void emitIllegalEphemeralConversionNotes(
+    DiagnosticEngine &diags, ConversionRestrictionKind conversion,
+    const Expr *argExpr, Type argType, Type paramType) {
+  auto getPointerKind = [](Type ty) -> PointerTypeKind {
+    auto unwrappedType = ty;
+    if (auto objectType = ty->getOptionalObjectType())
+      unwrappedType = objectType;
+    PointerTypeKind pointerKind;
+    auto pointeeType = unwrappedType->getAnyPointerElementType(pointerKind);
+    assert(pointeeType && "expected a pointer!");
+    return pointerKind;
   };
+
+  // This must stay in sync with diag::ephemeral_use_array_with_unsafe_buffer
+  // and diag::ephemeral_use_with_unsafe_pointer.
+  enum AlternativeKind {
+    AK_Raw = 0,
+    AK_MutableRaw,
+    AK_Typed,
+    AK_MutableTyped,
+  };
+
+  auto getAlternativeKind = [&]() -> Optional<AlternativeKind> {
+    switch (getPointerKind(paramType)) {
+    case PTK_UnsafeRawPointer:
+      return AK_Raw;
+    case PTK_UnsafeMutableRawPointer:
+      return AK_MutableRaw;
+    case PTK_UnsafePointer:
+      return AK_Typed;
+    case PTK_UnsafeMutablePointer:
+      return AK_MutableTyped;
+    case PTK_AutoreleasingUnsafeMutablePointer:
+      return None;
+    }
+  };
+
+  // First emit a note about the implicit conversion only lasting for the
+  // duration of the call.
+  diags.diagnose(argExpr->getLoc(),
+                 diag::ephemeral_pointer_argument_conversion_note,
+                 argType->getWithoutSpecifierType(), paramType)
+      .highlight(argExpr->getSourceRange());
+
+  // Then try to find a suitable alternative.
+  switch (conversion) {
+  case ConversionRestrictionKind::ArrayToPointer: {
+    // Don't suggest anything for optional arrays, as there's currently no
+    // direct alternative.
+    if (argType->getOptionalObjectType())
+      break;
+
+    // We can suggest using withUnsafe[Mutable][Bytes/BufferPointer].
+    if (auto alternative = getAlternativeKind())
+      diags.diagnose(argExpr->getLoc(),
+                     diag::ephemeral_use_array_with_unsafe_buffer,
+                     *alternative);
+    break;
+  }
+  case ConversionRestrictionKind::StringToPointer: {
+    // Don't suggest anything for optional strings, as there's currently no
+    // direct alternative.
+    if (argType->getOptionalObjectType())
+      break;
+
+    // We can suggest withCString as long as the resulting pointer is
+    // immutable.
+    switch (getPointerKind(paramType)) {
+    case PTK_UnsafePointer:
+    case PTK_UnsafeRawPointer:
+      diags.diagnose(argExpr->getLoc(),
+                     diag::ephemeral_use_string_with_c_string);
+      break;
+    case PTK_UnsafeMutableRawPointer:
+    case PTK_UnsafeMutablePointer:
+    case PTK_AutoreleasingUnsafeMutablePointer:
+      // There's nothing really sensible we can suggest for a mutable pointer.
+      break;
+    }
+    break;
+  }
+  case ConversionRestrictionKind::InoutToPointer:
+    // For an arbitrary inout-to-pointer, we can suggest
+    // withUnsafe[Mutable][Bytes/Pointer].
+    if (auto alternative = getAlternativeKind())
+      diags.diagnose(argExpr->getLoc(), diag::ephemeral_use_with_unsafe_pointer,
+                     *alternative);
+    break;
+  case ConversionRestrictionKind::TupleToTuple:
+  case ConversionRestrictionKind::DeepEquality:
+  case ConversionRestrictionKind::Superclass:
+  case ConversionRestrictionKind::LValueToRValue:
+  case ConversionRestrictionKind::Existential:
+  case ConversionRestrictionKind::MetatypeToExistentialMetatype:
+  case ConversionRestrictionKind::ExistentialMetatypeToMetatype:
+  case ConversionRestrictionKind::ValueToOptional:
+  case ConversionRestrictionKind::OptionalToOptional:
+  case ConversionRestrictionKind::ClassMetatypeToAnyObject:
+  case ConversionRestrictionKind::ExistentialMetatypeToAnyObject:
+  case ConversionRestrictionKind::ProtocolMetatypeToProtocolClass:
+  case ConversionRestrictionKind::PointerToPointer:
+  case ConversionRestrictionKind::ArrayUpcast:
+  case ConversionRestrictionKind::DictionaryUpcast:
+  case ConversionRestrictionKind::SetUpcast:
+  case ConversionRestrictionKind::HashableToAnyHashable:
+  case ConversionRestrictionKind::CFTollFreeBridgeToObjC:
+  case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
+    llvm_unreachable("expected an ephemeral conversion!");
+  }
+}
+
+void swift::diagnoseIllegalEphemeralConversion(
+    ASTContext &ctx, ConversionRestrictionKind conversion, const Expr *argExpr,
+    Type argType, Type paramType, const ValueDecl *callee,
+    AnyFunctionType *fnType, const Expr *anchor, bool downgradeToWarning) {
+  auto &diags = ctx.Diags;
 
   // Emit a specialised diagnostic for
   // Unsafe[Mutable][Raw]Pointer.init([mutating]:) &
@@ -8477,7 +8583,8 @@ void swift::diagnoseIllegalEphemeralConversion(
     diags.diagnose(anchor->getLoc(), diagID, instanceTy, constructorKind)
         .highlight(anchor->getSourceRange());
 
-    emitArgumentConversionNote();
+    emitIllegalEphemeralConversionNotes(diags, conversion, argExpr, argType,
+                                        paramType);
     return true;
   };
 
@@ -8490,5 +8597,6 @@ void swift::diagnoseIllegalEphemeralConversion(
   diags.diagnose(argExpr->getLoc(), diagID, paramType)
       .highlight(argExpr->getSourceRange());
 
-  emitArgumentConversionNote();
+  emitIllegalEphemeralConversionNotes(diags, conversion, argExpr, argType,
+                                      paramType);
 }

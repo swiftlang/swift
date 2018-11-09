@@ -11,21 +11,27 @@ func unsafePointerInitEphemeralConversions() {
 
   _ = UnsafePointer(&foo) // expected-warning {{initialization of 'UnsafePointer<Int>' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use 'withUnsafePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 
   _ = UnsafePointer<Int8>("") // expected-warning {{initialization of 'UnsafePointer<Int8>' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 
   _ = UnsafePointer<Int8>(str) // expected-warning {{initialization of 'UnsafePointer<Int8>' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 
   _ = UnsafePointer([0]) // expected-warning {{initialization of 'UnsafePointer<Int>' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = UnsafePointer(arr) // expected-warning {{initialization of 'UnsafePointer<Int>' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = UnsafePointer(&arr) // expected-warning {{initialization of 'UnsafePointer<Int>' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = UnsafePointer(optionalArr) // expected-warning {{initialization of 'UnsafePointer<Int>' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from '[Int]?' to 'UnsafePointer<Int>?' produces a pointer valid only for the duration of the call}}
@@ -33,27 +39,35 @@ func unsafePointerInitEphemeralConversions() {
 
   _ = UnsafeMutablePointer(&foo) // expected-warning {{initialization of 'UnsafeMutablePointer<Int>' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutablePointer<Int>' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use 'withUnsafeMutablePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 
   _ = UnsafeMutablePointer(&arr) // expected-warning {{initialization of 'UnsafeMutablePointer<Int>' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeMutablePointer<Int>' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withUnsafeMutableBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = UnsafeMutablePointer(mutating: &foo) // expected-warning {{initialization of 'UnsafeMutablePointer<Int>' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use 'withUnsafePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 
   _ = UnsafeMutablePointer<Int8>(mutating: "") // expected-warning {{initialization of 'UnsafeMutablePointer<Int8>' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 
   _ = UnsafeMutablePointer<Int8>(mutating: str) // expected-warning {{initialization of 'UnsafeMutablePointer<Int8>' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 
   _ = UnsafeMutablePointer(mutating: [0]) // expected-warning {{initialization of 'UnsafeMutablePointer<Int>' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = UnsafeMutablePointer(mutating: arr) // expected-warning {{initialization of 'UnsafeMutablePointer<Int>' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = UnsafeMutablePointer(mutating: &arr) // expected-warning {{initialization of 'UnsafeMutablePointer<Int>' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = UnsafeMutablePointer(mutating: optionalArr) // expected-warning {{initialization of 'UnsafeMutablePointer<Int>' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from '[Int]?' to 'UnsafePointer<Int>?' produces a pointer valid only for the duration of the call}}
@@ -61,15 +75,19 @@ func unsafePointerInitEphemeralConversions() {
 
   _ = UnsafeRawPointer(&foo) // expected-warning {{initialization of 'UnsafeRawPointer' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = UnsafeRawPointer(str) // expected-warning {{initialization of 'UnsafeRawPointer' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 
   _ = UnsafeRawPointer(arr) // expected-warning {{initialization of 'UnsafeRawPointer' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withUnsafeBytes' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = UnsafeRawPointer(&arr) // expected-warning {{initialization of 'UnsafeRawPointer' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withUnsafeMutableBytes' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = UnsafeRawPointer(optionalArr) // expected-warning {{initialization of 'UnsafeRawPointer' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from '[Int]?' to 'UnsafeRawPointer?' produces a pointer valid only for the duration of the call}}
@@ -77,21 +95,27 @@ func unsafePointerInitEphemeralConversions() {
 
   _ = UnsafeMutableRawPointer(&foo) // expected-warning {{initialization of 'UnsafeMutableRawPointer' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = UnsafeMutableRawPointer(&arr) // expected-warning {{initialization of 'UnsafeMutableRawPointer' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withUnsafeMutableBytes' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = UnsafeMutableRawPointer(mutating: &foo) // expected-warning {{initialization of 'UnsafeMutableRawPointer' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = UnsafeMutableRawPointer(mutating: str) // expected-warning {{initialization of 'UnsafeMutableRawPointer' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 
   _ = UnsafeMutableRawPointer(mutating: arr) // expected-warning {{initialization of 'UnsafeMutableRawPointer' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withUnsafeBytes' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = UnsafeMutableRawPointer(mutating: &arr) // expected-warning {{initialization of 'UnsafeMutableRawPointer' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withUnsafeBytes' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = UnsafeMutableRawPointer(mutating: optionalArr) // expected-warning {{initialization of 'UnsafeMutableRawPointer' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from '[Int]?' to 'UnsafeRawPointer?' produces a pointer valid only for the duration of the call}}
@@ -103,38 +127,47 @@ func unsafePointerInitEphemeralConversions() {
 
   _ = UnsafeBufferPointer(start: &foo, count: 0) // expected-warning {{initialization of 'UnsafeBufferPointer<Int>' results in a dangling buffer pointer}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafePointer<Int>?' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use 'withUnsafePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 
   _ = UnsafeBufferPointer<Int8>(start: str, count: 0) // expected-warning {{initialization of 'UnsafeBufferPointer<Int8>' results in a dangling buffer pointer}}
   // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>?' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 
   _ = UnsafeBufferPointer(start: arr, count: 0) // expected-warning {{initialization of 'UnsafeBufferPointer<Int>' results in a dangling buffer pointer}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>?' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = UnsafeBufferPointer(start: &arr, count: 0) // expected-warning {{initialization of 'UnsafeBufferPointer<Int>' results in a dangling buffer pointer}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>?' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = UnsafeBufferPointer(start: optionalArr, count: 0) // expected-warning {{initialization of 'UnsafeBufferPointer<Int>' results in a dangling buffer pointer}}
   // expected-note@-1 {{implicit argument conversion from '[Int]?' to 'UnsafePointer<Int>?' produces a pointer valid only for the duration of the call}}
 
-
   _ = UnsafeMutableBufferPointer(start: &foo, count: 0) // expected-warning {{initialization of 'UnsafeMutableBufferPointer<Int>' results in a dangling buffer pointer}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutablePointer<Int>?' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use 'withUnsafeMutablePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 
   _ = UnsafeMutableBufferPointer(start: &arr, count: 0) // expected-warning {{initialization of 'UnsafeMutableBufferPointer<Int>' results in a dangling buffer pointer}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeMutablePointer<Int>?' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withUnsafeMutableBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
 
   _ = UnsafeRawBufferPointer(start: &foo, count: 0) // expected-warning {{initialization of 'UnsafeRawBufferPointer' results in a dangling buffer pointer}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeRawPointer?' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = UnsafeRawBufferPointer(start: str, count: 0) // expected-warning {{initialization of 'UnsafeRawBufferPointer' results in a dangling buffer pointer}}
   // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafeRawPointer?' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 
   _ = UnsafeRawBufferPointer(start: arr, count: 0) // expected-warning {{initialization of 'UnsafeRawBufferPointer' results in a dangling buffer pointer}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeRawPointer?' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withUnsafeBytes' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = UnsafeRawBufferPointer(start: &arr, count: 0) // expected-warning {{initialization of 'UnsafeRawBufferPointer' results in a dangling buffer pointer}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeRawPointer?' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withUnsafeBytes' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = UnsafeRawBufferPointer(start: optionalArr, count: 0) // expected-warning {{initialization of 'UnsafeRawBufferPointer' results in a dangling buffer pointer}}
   // expected-note@-1 {{implicit argument conversion from '[Int]?' to 'UnsafeRawPointer?' produces a pointer valid only for the duration of the call}}
@@ -142,9 +175,11 @@ func unsafePointerInitEphemeralConversions() {
 
   _ = UnsafeMutableRawBufferPointer(start: &foo, count: 0) // expected-warning {{initialization of 'UnsafeMutableRawBufferPointer' results in a dangling buffer pointer}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer?' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = UnsafeMutableRawBufferPointer(start: &arr, count: 0) // expected-warning {{initialization of 'UnsafeMutableRawBufferPointer' results in a dangling buffer pointer}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeMutableRawPointer?' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withUnsafeMutableBytes' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
 
   // FIXME: This is currently ambiguous.
@@ -155,9 +190,11 @@ func unsafePointerInitEphemeralConversions() {
 
   _ = OpaquePointer(arr) // expected-warning {{initialization of 'OpaquePointer' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withUnsafeBytes' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   _ = OpaquePointer(str) // expected-warning {{initialization of 'OpaquePointer' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 }
 
 var global = 0

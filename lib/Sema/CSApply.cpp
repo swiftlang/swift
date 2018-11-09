@@ -5487,10 +5487,10 @@ static void checkNonEphemeralArgumentConversion(
     conversion = ConversionRestrictionKind::StringToPointer;
 
   if (conversion && !cs.isConversionNonEphemeral(*conversion, argLocator))
-    diagnoseIllegalEphemeralConversion(cs.getASTContext(), argExpr, argType,
-                                       param.getPlainType(), callee, fnType,
-                                       argLocator.getAnchor(),
-                                       /*downgradeToWarning*/ true);
+    diagnoseIllegalEphemeralConversion(
+        cs.getASTContext(), *conversion, argExpr, argType, param.getPlainType(),
+        callee, fnType, argLocator.getAnchor(),
+        /*downgradeToWarning*/ true);
 }
 
 Expr *ExprRewriter::coerceCallArguments(

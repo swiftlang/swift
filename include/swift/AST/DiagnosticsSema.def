@@ -382,6 +382,17 @@ WARNING(cannot_construct_dangling_pointer_warning,none,
 NOTE(ephemeral_pointer_argument_conversion_note,none,
      "implicit argument conversion from %0 to %1 produces a pointer valid only "
      "for the duration of the call", (Type, Type))
+NOTE(ephemeral_use_with_unsafe_pointer,none,
+     "use 'withUnsafe%select{Bytes|MutableBytes|Pointer|MutablePointer}0' in "
+     "order to explicitly convert argument to %select{buffer |buffer ||}0"
+     "pointer valid for a defined scope", (unsigned))
+NOTE(ephemeral_use_string_with_c_string,none,
+     "use the 'withCString' method on String in order to explicitly "
+     "convert argument to pointer valid for a defined scope", ())
+NOTE(ephemeral_use_array_with_unsafe_buffer,none,
+     "use the 'withUnsafe%select{Bytes|MutableBytes|BufferPointer|"
+     "MutableBufferPointer}0' method on Array in order to explicitly convert "
+     "argument to buffer pointer valid for a defined scope", (unsigned))
 
 ERROR(cannot_convert_argument_value_protocol,none,
       "argument type %0 does not conform to expected type %1", (Type, Type))

@@ -3789,6 +3789,7 @@ bool diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
 /// conversion to a non-ephemeral parameter.
 ///
 /// \param ctx The AST context.
+/// \param conversion The type of ephemeral conversion being performed.
 /// \param argExpr The argument expression.
 /// \param argType The type of the argument expression prior to the solution
 /// being fully applied. For example, for an array-to-pointer conversion,
@@ -3799,12 +3800,10 @@ bool diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
 /// \param anchor The expression that anchors the argument, this should be
 /// the apply expr of the call being made.
 /// \param downgradeToWarning Whether to downgrade the diagnostic to a warning.
-void diagnoseIllegalEphemeralConversion(ASTContext &ctx, const Expr *argExpr,
-                                        Type argType, Type paramType,
-                                        const ValueDecl *callee,
-                                        AnyFunctionType *fnType,
-                                        const Expr *anchor,
-                                        bool downgradeToWarning);
+void diagnoseIllegalEphemeralConversion(
+    ASTContext &ctx, constraints::ConversionRestrictionKind conversion,
+    const Expr *argExpr, Type argType, Type paramType, const ValueDecl *callee,
+    AnyFunctionType *fnType, const Expr *anchor, bool downgradeToWarning);
 
 // Return true if, when replacing "<expr>" with "<expr> ?? T", parentheses need
 // to be added around <expr> first in order to maintain the correct precedence.
