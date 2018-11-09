@@ -80,4 +80,6 @@ KNOWN_STDLIB_TYPE_DECL(KeyedEncodingContainer, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(KeyedDecodingContainer, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(RangeReplaceableCollection, ProtocolDecl, 1)
 
+KNOWN_STDLIB_TYPE_DECL(DefaultStringInterpolation, NominalTypeDecl, 0)
+
 #undef KNOWN_STDLIB_TYPE_DECL

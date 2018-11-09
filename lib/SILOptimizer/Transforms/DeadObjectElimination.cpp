@@ -191,8 +191,20 @@ removeInstructions(ArrayRef<SILInstruction*> UsersToRemove) {
 //                             Use Graph Analysis
 //===----------------------------------------------------------------------===//
 
-static bool isCallToInterpolationEliminatableMethod(ApplyInst *Apply,
-                                                    SILInstruction *AllocInst) {
+/// Returns true if silTy is the Swift.DefaultStringInterpolation type.
+static bool isDefaultStringInterpolation(SILType silTy) {
+  auto astTy = silTy.getASTType();
+  if (!astTy) return false;
+
+  auto decl = astTy.getNominalOrBoundGenericNominal();
+
+  return decl == silTy.getASTContext().getDefaultStringInterpolationDecl();
+}
+
+/// Returns true if Apply applies a method with the interpolation.append
+/// semantic and AllocInst is the call's self parameter.
+static bool appendsToAllocatedInterpolation(ApplyInst *Apply,
+                                            SILInstruction *AllocInst) {
   if (!Apply->hasSemantics("interpolation.append"))
     return false;
 
@@ -207,24 +219,18 @@ static bool isCallToInterpolationEliminatableMethod(ApplyInst *Apply,
   return SelfInst == AllocInst;
 }
 
-// FIXME: This is blatantly awful and needs to be better.
-static bool isStringObjectReleaseLoad(LoadInst *Load) {
-  // Are we dereferencing a pointer stored in _StringGuts._object?
-  auto *SourceInst = Load->getOperand()->getDefiningInstruction();
-  if (auto *StructLookup = dyn_cast<StructElementAddrInst>(SourceInst)) {
-    if (StructLookup->getField()->getName().is("_object") &&
-        StructLookup->getStructDecl()->getName().is("_StringObject")) {
-
-      // Are the only uses strong_release?
-      for (auto Use : Load->getUses()) {
-        if (!isa<StrongReleaseInst>(Use->getUser()))
-          return false;
-      }
-      return true;
-    }
+/// Returns the instruction which the address being loaded by Load initially
+/// derived from, drilling through known pointer arithmetic instructions like
+/// StructElementAddrInst.
+static SILInstruction *getBaseAddrInst(LoadInst *Load) {
+  SILInstruction *Inst = Load->getOperand()->getDefiningInstruction();
+  // FIXME: This could support e.g. TupleElementAddrInst, but we don't need
+  // that for string interpolation.
+  while (Inst && isa<StructElementAddrInst>(Inst)) {
+    Inst = cast<StructElementAddrInst>(Inst)
+      ->getOperand()->getDefiningInstruction();
   }
-
-  return false;
+  return Inst;
 }
 
 /// Returns false if Inst is an instruction that would require us to keep the
@@ -261,15 +267,27 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
   if (isa<DestroyAddrInst>(Inst))
     return true;
 
-  // We can remove applies of certain interpolation-related methods.
+  // As a special rule, a string interpolation is eliminatable if its result is
+  // unused, even though this theoretically could remove the side effects of
+  // StringInterpolationProtocol methods or the string-conversion witnesses they
+  // would have called if not eliminated. Mutating methods this rule applies to
+  // should be marked with @_semantic("interpolation.append"); they will only
+  // allow their self parameter to be eliminated.
   if (auto *Apply = dyn_cast<ApplyInst>(Inst))
-    if (isCallToInterpolationEliminatableMethod(Apply, AllocInst))
+    if (appendsToAllocatedInterpolation(Apply, AllocInst))
       return true;
 
-  // FIXME: Necessary for string interpolation, but is it correct?
+  // We can remove loads of addresses within the allocation.
   if (auto *Load = dyn_cast<LoadInst>(Inst))
-    if (isStringObjectReleaseLoad(Load))
-      return true;
+    return getBaseAddrInst(Load) == AllocInst &&
+            // HACK: In the general case, we should find any memory management
+            // done with the results of this load, then find any corresponding
+            // stores into the allocation and replace the stores with equivalent
+            // memory management. We don't do that here (that's what
+            // DeadObjectAnalysis below is supposed to do), but we know we don't
+            // need to for DefaultStringInterpolation, because we know that the
+            // initialization of its sole property will be eliminated too.
+            isDefaultStringInterpolation(*AllocInst->getResultTypes().begin());
 
   // Otherwise we do not know how to handle this instruction. Be conservative
   // and don't zap it.
@@ -762,20 +780,11 @@ bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
   return true;
 }
 
-static bool isDefaultStringInterpolation(SILType silTy) {
-  auto astTy = silTy.getASTType();
-  if (!astTy) return false;
-
-  auto nomTy = astTy.getNominalOrBoundGenericNominal();
-  if (!nomTy) return false;
-
-  // FIXME: Do this in a non-horrible way.
-  return nomTy->getName().is("DefaultStringInterpolation");
-}
-
 bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
   // Trivial types don't have destructors. Let's try to zap this AllocStackInst.
   if (!ASI->getElementType().isTrivial(ASI->getModule()) &&
+      // DefaultStringInterpolation is not trivial, but canZapInstruction()
+      // can recognize and eliminate its memory management.
       !isDefaultStringInterpolation(ASI->getElementType())) {
     LLVM_DEBUG(llvm::dbgs() << "    Skipping due to non-trivial type:" << *ASI);
     return false;
