@@ -77,7 +77,7 @@ namespace swift {
   enum PointerTypeKind : unsigned;
   struct ValueOwnershipKind;
   // SWIFT_ENABLE_TENSORFLOW
-  struct SILReverseAutoDiffConfig;
+  struct SILAutoDiffConfig;
 
   enum class TypeKind : uint8_t {
 #define TYPE(id, parent) id,
@@ -4072,7 +4072,7 @@ public:
 
   /// SWIFT_ENABLE_TENSORFLOW
   CanSILFunctionType getGradientType(
-    const SILReverseAutoDiffConfig &config, SILModule &M);
+    const SILAutoDiffConfig &config, SILModule &M);
 
   /// If this is a @convention(witness_method) function with a protocol
   /// constrained self parameter, return the protocol constraint for

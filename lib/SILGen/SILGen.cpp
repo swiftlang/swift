@@ -836,7 +836,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
       auto paramIndices =
           getLoweredAutoDiffParameterIndices(*this, AFD, silOriginalFn,
                                              diffAttr);
-      SILReverseAutoDiffIndices indices(/*source*/ 0, paramIndices);
+      SILAutoDiffIndices indices(/*source*/ 0, paramIndices);
       silOriginalFn->addReverseDifferentiableAttr(
           SILReverseDifferentiableAttr::create(
             M, indices, primName, adjName,
