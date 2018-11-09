@@ -823,11 +823,13 @@ public:
       genVTable.emitVTable();
     }
 
-    // Build a default witness table if this is a protocol.
+    // Build a default witness table if this is a protocol that needs one.
     if (auto protocol = dyn_cast<ProtocolDecl>(theType)) {
-      if (!protocol->isObjC() &&
-          protocol->isResilient())
-        SGM.emitDefaultWitnessTable(protocol);
+      if (!protocol->isObjC() && protocol->isResilient()) {
+        auto *SF = protocol->getParentSourceFile();
+        if (!SF || SF->Kind != SourceFileKind::Interface)
+          SGM.emitDefaultWitnessTable(protocol);
+      }
       return;
     }
 
