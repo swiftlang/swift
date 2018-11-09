@@ -1450,7 +1450,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         diagnose(ColonLoc, diag::attr_private_import_expected_sourcefile_name);
         return false;
       }
-      filename = getStringLiteralIfNotInterpolated(*this, Loc, Tok, "_private");
+      filename = getStringLiteralIfNotInterpolated(Loc, "_private");
       if (!filename.hasValue()) {
         diagnose(ColonLoc, diag::attr_private_import_expected_sourcefile_name);
         return false;
