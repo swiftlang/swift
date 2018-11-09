@@ -1714,7 +1714,7 @@ static GraphOperationInst *tryToPromoteTensorFromScalars(
     ApplyInst *inst, const DenseMap<SILValue, SymbolicValue> &constants,
     GraphFunctionDeviceInfo &deviceInfo) {
   assert(inst->getNumOperands() == 3 && isTensorHandle(inst->getType()) &&
-         ("Unexpected type signature for __tf_tensor_from_scalars / " +
+         ("Unexpected type signature for __tf_tensor_from_scalars / "
           "__tf_string_tensor_from_strings"));
 
   auto scalarsValue = inst->getOperand(1);
@@ -1903,7 +1903,7 @@ static GraphOperationInst *tryToPromoteTensorFromScalars1D(
     ApplyInst *inst, const DenseMap<SILValue, SymbolicValue> &constants,
     GraphFunctionDeviceInfo &deviceInfo) {
   assert(inst->getNumOperands() == 2 && isTensorHandle(inst->getType()) &&
-         ("Unexpected type signature for __tf_tensor_from_scalars_1d / " +
+         ("Unexpected type signature for __tf_tensor_from_scalars_1d / "
           "__tf_string_tensor_from_strings_1d"));
 
   auto arrayValue = inst->getOperand(1);

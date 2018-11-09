@@ -66,6 +66,8 @@ public protocol _TensorFlowDataTypeCompatible {
 ///
 /// Types that conform to `TensorFlowScalar` can be used as the `Scalar`
 /// associated type of `Tensor`.
+//
+// This includes all `_TensorFlowDataTypeCompatible` types except `String`.
 public protocol TensorFlowScalar : _TensorFlowDataTypeCompatible {}
 
 // This is the implementation of the _getScalarOrDie requirement for each
