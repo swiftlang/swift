@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -disable-sil-perf-optzns -O -Xllvm -swiftmergefunc-threshold=0 -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -disable-sil-perf-optzns -O -Xllvm -mergesimfunc-threshold=0 -emit-ir %s | %FileCheck %s
 
 // Check that IRGen lowers non-atomic reference counting instructions to
 // proper runtime calls.
