@@ -305,8 +305,8 @@ extension ManagedBufferPointer {
   /// The stored `Header` instance.
   @inlinable
   public var header: Header {
-    addressWithNativeOwner {
-      return (UnsafePointer(_headerPointer), _nativeBuffer)
+    _read {
+      yield _headerPointer.pointee
     }
     _modify {
       yield &_headerPointer.pointee
