@@ -798,15 +798,6 @@ func test<Instances : Collection>(
 
 test([1]) { _, _ in fatalError(); () }
 
-// rdar://problem/45659733
-func rdar_45659733() {
-  func foo<T : BinaryInteger>(_: AnyHashable, _: T) {}
-  func bar(_ a: Int, _ b: Int) {
-    _ = (a ..< b).map { i in foo(i, i) } // Ok
-  }
-}
-
-
 // rdar://problem/40537960 - Misleading diagnostic when using closure with wrong type
 
 protocol P_40537960 {}
@@ -831,3 +822,4 @@ func rdar_40537960() {
   var arr: [S] = []
   _ = A(arr, fn: { L($0.v) }) // expected-error {{cannot convert value of type 'L' to closure result type 'R<T>'}}
 }
+
