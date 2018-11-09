@@ -452,16 +452,15 @@ extension MutableCollection where Self : RandomAccessCollection {
   public mutating func shuffle<T: RandomNumberGenerator>(
     using generator: inout T
   ) {
-    let count = self.count
     guard count > 1 else { return }
     var amount = count
     var currentIndex = startIndex
     while amount > 1 {
-      let random = generator.next(upperBound: UInt(amount))
+      let random = Int.random(in: 0 ..< amount, using: &generator)
       amount -= 1
       swapAt(
         currentIndex,
-        index(currentIndex, offsetBy: numericCast(random))
+        index(currentIndex, offsetBy: random)
       )
       formIndex(after: &currentIndex)
     }
