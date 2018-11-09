@@ -688,6 +688,9 @@ static SourceFile *getPrimaryOrMainSourceFile(CompilerInvocation &Invocation,
 /// Dumps the AST of all available primary source files. If corresponding output
 /// files were specified, use them; otherwise, dump the AST to stdout.
 static void dumpAST(CompilerInstance &Instance) {
+  // FIXME: WMO doesn't use the notion of primary files, so this doesn't do the
+  // right thing. Perhaps it'd be best to ignore WMO when dumping the AST, just
+  // like WMO ignores `-incremental`.
   for (SourceFile *sourceFile: Instance.getPrimarySourceFiles()) {
     const StringRef OutputFilename =
       Instance.getPrimarySpecificPathsForSourceFile(*sourceFile).OutputFilename;
