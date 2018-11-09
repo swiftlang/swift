@@ -119,7 +119,7 @@ static void addSwiftContractPass(const PassManagerBuilder &Builder,
 static void addSwiftMergeFunctionsPass(const PassManagerBuilder &Builder,
                                        PassManagerBase &PM) {
   if (Builder.OptLevel > 0)
-    PM.add(createSwiftMergeFunctionsPass());
+    PM.add(llvm::createMergeSimilarFunctionsPass());
 }
 
 static void addAddressSanitizerPasses(const PassManagerBuilder &Builder,
