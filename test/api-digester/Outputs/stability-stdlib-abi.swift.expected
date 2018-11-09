@@ -79,3 +79,7 @@ Protocol _NSStringCore has been removed
 Func String.UnicodeScalarView._foreignSubscript(aligned:) has been removed
 Struct String.UnicodeScalarView has type witness type for Collection.Iterator changing from IndexingIterator<String.UnicodeScalarView> to String.UnicodeScalarView.Iterator
 Struct String.UnicodeScalarView has type witness type for Sequence.Iterator changing from IndexingIterator<String.UnicodeScalarView> to String.UnicodeScalarView.Iterator
+Func String._foreignSubscript(position:distance:) has been removed
+Struct String has type witness type for Collection.Iterator changing from IndexingIterator<String> to String.Iterator
+Struct String has type witness type for Sequence.Iterator changing from IndexingIterator<String> to String.Iterator
+
