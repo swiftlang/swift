@@ -40,4 +40,5 @@ Constructor String.init(stringInterpolation:) has parameter 0 type change from [
 /* Decl Attribute changes */
 
 /* Protocol Requirement Changes */
+TypeAlias Unicode.UTF8.EncodedScalar has underlying type change from _ValidUTF8Buffer<UInt32> to _ValidUTF8Buffer
 Protocol StringProtocol has added inherited protocol ExpressibleByStringInterpolation

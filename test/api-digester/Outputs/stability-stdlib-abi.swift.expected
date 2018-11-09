@@ -75,3 +75,94 @@ Class _StringStorage is now without @_fixed_layout
 Class _SharedStringStorage has removed conformance to _NSStringCore
 Class _StringStorage has removed conformance to _NSStringCore
 Protocol _NSStringCore has been removed
+
+
+Constructor _ValidUTF8Buffer.Iterator.init(_:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Constructor _ValidUTF8Buffer.init() has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.Index.<(_:_:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.Index.==(_:_:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.Iterator.next() has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.append(_:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.append(contentsOf:) has generic signature change from <τ_0_0, τ_1_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_1_0 : FixedWidthInteger, τ_1_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.distance(from:to:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.index(_:offsetBy:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.index(after:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.index(before:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.makeIterator() has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.removeFirst() has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.replaceSubrange(_:with:) has generic signature change from <τ_0_0, τ_1_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_1_0 : Collection, τ_1_0.Element == UInt8> to <τ_0_0 where τ_0_0 : Collection, τ_0_0.Element == UInt8>
+Struct _ValidUTF8Buffer has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Struct _ValidUTF8Buffer.Index has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Struct _ValidUTF8Buffer.Iterator has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Subscript _ValidUTF8Buffer.subscript(_:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Constructor _UIntBuffer.Index.init(bitOffset:) has been removed
+Constructor _ValidUTF8Buffer.Index.init(_biasedBits:) has been removed
+Func FixedWidthInteger._fullShiftLeft(_:) has been removed
+Func FixedWidthInteger._fullShiftRight(_:) has been removed
+Func FixedWidthInteger._lowBits(_:) has been removed
+Func Range._contains_(_:) has been removed
+Func Unicode.UTF16._decodeOne(_:) has been removed
+Func Unicode.UTF16._decodeSurrogates(_:_:) has been removed
+Func Unicode.UTF32._decode(_:) has been removed
+Func Unicode.UTF8.ForwardParser._invalidLength() has been removed
+Func Unicode.UTF8.ReverseParser._invalidLength() has been removed
+Func _UnicodeEncoding._encode(_:) has been removed
+Func _UnicodeEncoding._transcode(_:from:) has been removed
+Func _UnicodeEncoding._transcode(_:from:into:) has been removed
+Func _ValidUTF8Buffer._isValid(_:) has been removed
+
+Var Unicode.Scalar._replacementCharacter has been removed
+Var Unicode.UTF16._replacementCodeUnit has been removed
+Var Unicode.UTF32._replacementCodeUnit has been removed
+Var _UIntBuffer._elementWidth has been removed
+Constructor _ValidUTF8Buffer.Iterator.init(_:) has parameter 0 type change from _ValidUTF8Buffer<τ_0_0> to _ValidUTF8Buffer
+Constructor _ValidUTF8Buffer.init() has return type change from _ValidUTF8Buffer<τ_0_0> to _ValidUTF8Buffer
+Enum Unicode.UTF8 has type witness type for _UnicodeEncoding.EncodedScalar changing from _ValidUTF8Buffer<UInt32> to _ValidUTF8Buffer
+Func Unicode.UTF8.ForwardParser._bufferedScalar(bitCount:) has return type change from _ValidUTF8Buffer<UInt32> to _ValidUTF8Buffer
+Func Unicode.UTF8.ReverseParser._bufferedScalar(bitCount:) has return type change from _ValidUTF8Buffer<UInt32> to _ValidUTF8Buffer
+Func Unicode.UTF8.decode(_:) has parameter 0 type change from _ValidUTF8Buffer<UInt32> to _ValidUTF8Buffer
+Func Unicode.UTF8.encode(_:) has return type change from Optional<_ValidUTF8Buffer<UInt32>> to Optional<_ValidUTF8Buffer>
+Func Unicode.UTF8.transcode(_:from:) has return type change from Optional<_ValidUTF8Buffer<UInt32>> to Optional<_ValidUTF8Buffer>
+Func _ValidUTF8Buffer.append(contentsOf:) has parameter 0 type change from _ValidUTF8Buffer<τ_1_0> to _ValidUTF8Buffer
+Struct _ValidUTF8Buffer has type witness type for BidirectionalCollection.Indices changing from DefaultIndices<_ValidUTF8Buffer<τ_0_0>> to DefaultIndices<_ValidUTF8Buffer>
+Struct _ValidUTF8Buffer has type witness type for BidirectionalCollection.SubSequence changing from Slice<_ValidUTF8Buffer<τ_0_0>> to Slice<_ValidUTF8Buffer>
+Struct _ValidUTF8Buffer has type witness type for Collection.Indices changing from DefaultIndices<_ValidUTF8Buffer<τ_0_0>> to DefaultIndices<_ValidUTF8Buffer>
+Struct _ValidUTF8Buffer has type witness type for Collection.SubSequence changing from Slice<_ValidUTF8Buffer<τ_0_0>> to Slice<_ValidUTF8Buffer>
+Struct _ValidUTF8Buffer has type witness type for RandomAccessCollection.Indices changing from DefaultIndices<_ValidUTF8Buffer<τ_0_0>> to DefaultIndices<_ValidUTF8Buffer>
+Struct _ValidUTF8Buffer has type witness type for RandomAccessCollection.SubSequence changing from Slice<_ValidUTF8Buffer<τ_0_0>> to Slice<_ValidUTF8Buffer>
+Struct _ValidUTF8Buffer has type witness type for RangeReplaceableCollection.SubSequence changing from Slice<_ValidUTF8Buffer<τ_0_0>> to Slice<_ValidUTF8Buffer>
+Struct _ValidUTF8Buffer has type witness type for Sequence.SubSequence changing from Slice<_ValidUTF8Buffer<τ_0_0>> to Slice<_ValidUTF8Buffer>
+Var Unicode.UTF8.encodedReplacementCharacter has declared type change from _ValidUTF8Buffer<UInt32> to _ValidUTF8Buffer
+Var _ValidUTF8Buffer.Index._biasedBits has declared type change from τ_0_0 to UInt32
+Var _ValidUTF8Buffer.Iterator._biasedBits has declared type change from τ_0_0 to UInt32
+Var _ValidUTF8Buffer._biasedBits has declared type change from τ_0_0 to UInt32
+Var _ValidUTF8Buffer.encodedReplacementCharacter has declared type change from _ValidUTF8Buffer<τ_0_0> to _ValidUTF8Buffer
+Enum Unicode.ASCII is now without @_frozen
+Enum Unicode.UTF16 is now without @_frozen
+Enum Unicode.UTF32 is now without @_frozen
+Enum Unicode.UTF8 is now without @_frozen
+Struct Unicode.ASCII.Parser is now without @_fixed_layout
+Struct Unicode.UTF16.ForwardParser is now without @_fixed_layout
+Struct Unicode.UTF16.ReverseParser is now without @_fixed_layout
+Struct Unicode.UTF32.Parser is now without @_fixed_layout
+Struct Unicode.UTF8.ForwardParser is now without @_fixed_layout
+Struct Unicode.UTF8.ReverseParser is now without @_fixed_layout
+EnumElement Unicode.UTF16._swift3Buffer is no longer a stored property
+EnumElement Unicode.UTF32._swift3Codec is no longer a stored property
+EnumElement Unicode.UTF8._swift3Buffer is no longer a stored property
+Var Unicode.UTF16.ForwardParser._buffer is no longer a stored property
+Var Unicode.UTF16.ReverseParser._buffer is no longer a stored property
+Var Unicode.UTF8.ForwardParser._buffer is no longer a stored property
+Var Unicode.UTF8.ReverseParser._buffer is no longer a stored property
+
+Constructor _UIntBuffer.Iterator.init(_:) has been removed
+Constructor _UIntBuffer.init(containing:) has been removed
+Constructor _ValidUTF8Buffer.init(_biasedBits:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Constructor _ValidUTF8Buffer.init(_biasedBits:) has parameter 0 type change from τ_0_0 to UInt32
+Constructor _ValidUTF8Buffer.init(_biasedBits:) has return type change from _ValidUTF8Buffer<τ_0_0> to _ValidUTF8Buffer
+Constructor _ValidUTF8Buffer.init(_containing:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Constructor _ValidUTF8Buffer.init(_containing:) has return type change from _ValidUTF8Buffer<τ_0_0> to _ValidUTF8Buffer
+Var _UIntBuffer.Iterator._impl has removed its setter
+Var _UIntBuffer._bitCount has removed its setter
+Var _UIntBuffer._storage has removed its setter
+

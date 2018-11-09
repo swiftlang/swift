@@ -451,7 +451,6 @@ func _ascii16(_ c: Unicode.Scalar) -> UTF16.CodeUnit {
 }
 
 extension Unicode.Scalar {
-  @inlinable // FIXME(sil-serialize-all)
   internal static var _replacementCharacter: Unicode.Scalar {
     return Unicode.Scalar(_value: UTF32._replacementCodeUnit)
   }
