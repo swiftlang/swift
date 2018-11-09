@@ -1645,12 +1645,14 @@ void swift::addImageDynamicReplacementBlockCallback(
       [&] { automaticReplacements->enableReplacements(); });
 }
 
-void swift::swift_enableDynamicReplacementScope(const DynamicReplacementScope *scope) {
-  scope->enable();
+void swift::swift_enableDynamicReplacementScope(
+    const DynamicReplacementScope *scope) {
+  DynamicReplacementLock.get().withLock([=] { scope->enable(); });
 }
 
-void swift::swift_disableDynamicReplacementScope(const DynamicReplacementScope *scope) {
-  scope->disable();
+void swift::swift_disableDynamicReplacementScope(
+    const DynamicReplacementScope *scope) {
+  DynamicReplacementLock.get().withLock([=] { scope->disable(); });
 }
 #define OVERRIDE_METADATALOOKUP COMPATIBILITY_OVERRIDE
 #include "CompatibilityOverride.def"
