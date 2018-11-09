@@ -1419,6 +1419,7 @@ static bool isPolymorphic(const AbstractStorageDecl *storage) {
   if (storage->isDynamic())
     return true;
 
+
   // Imported declarations behave like they are dynamic, even if they're
   // not marked as such explicitly.
   if (storage->isObjC() && storage->hasClangNode())
@@ -1535,14 +1536,25 @@ getDirectWriteAccessStrategy(const AbstractStorageDecl *storage) {
 }
 
 static AccessStrategy
+getOpaqueReadAccessStrategy(const AbstractStorageDecl *storage, bool dispatch);
+static AccessStrategy
+getOpaqueWriteAccessStrategy(const AbstractStorageDecl *storage, bool dispatch);
+
+static AccessStrategy
 getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
   switch (storage->getReadWriteImpl()) {
   case ReadWriteImplKind::Immutable:
     assert(isa<VarDecl>(storage) && cast<VarDecl>(storage)->isLet() &&
            "mutation of a immutable variable that isn't a let");
     return AccessStrategy::getStorage();
-  case ReadWriteImplKind::Stored:
+  case ReadWriteImplKind::Stored: {
+    // If the storage isDynamic (and not @objc) use the accessors.
+    if (storage->isDynamic() && !storage->isObjC())
+      return AccessStrategy::getMaterializeToTemporary(
+          getOpaqueReadAccessStrategy(storage, false),
+          getOpaqueWriteAccessStrategy(storage, false));
     return AccessStrategy::getStorage();
+  }
   case ReadWriteImplKind::MutableAddress:
     return AccessStrategy::getAccessor(AccessorKind::MutableAddress,
                                        /*dispatch*/ false);
@@ -1698,7 +1710,7 @@ bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
   // Dynamic storage suppresses the modify coroutine.
   // If we add a Swift-native concept of `dynamic`, this should be restricted
   // to the ObjC-supported concept.
-  if (isDynamic())
+  if (isObjCDynamic())
     return false;
 
   // Requirements of ObjC protocols don't support the modify coroutine.
@@ -2406,7 +2418,7 @@ bool ValueDecl::isUsableFromInline() const {
 
 /// Return the access level of an internal or public declaration
 /// that's been testably imported.
-static AccessLevel getTestableAccess(const ValueDecl *decl) {
+static AccessLevel getTestableOrPrivateImportsAccess(const ValueDecl *decl) {
   // Non-final classes are considered open to @testable importers.
   if (auto cls = dyn_cast<ClassDecl>(decl)) {
     if (!cls->isFinal())
@@ -2438,11 +2450,13 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
     return AccessLevel::Public;
   }
 
-  if (useDC && (access == AccessLevel::Internal ||
-                access == AccessLevel::Public)) {
-    if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
-      if (useSF->hasTestableImport(VD->getModuleContext()))
-        return getTestableAccess(VD);
+  if (useDC) {
+    // Check whether we need to modify the access level based on
+    // @testable/@_private import attributes.
+    auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
+    if (!useSF) return access;
+    if (useSF->hasTestableOrPrivateImport(access, VD))
+      return getTestableOrPrivateImportsAccess(VD);
   }
 
   return access;
@@ -2462,19 +2476,24 @@ AccessLevel ValueDecl::getEffectiveAccess() const {
     getAdjustedFormalAccess(this, /*useDC=*/nullptr,
                             /*treatUsableFromInlineAsPublic=*/true);
 
-  // Handle @testable.
+  // Handle @testable/@_private(sourceFile:)
   switch (effectiveAccess) {
   case AccessLevel::Open:
     break;
   case AccessLevel::Public:
   case AccessLevel::Internal:
-    if (getModuleContext()->isTestingEnabled())
-      effectiveAccess = getTestableAccess(this);
+    if (getModuleContext()->isTestingEnabled() ||
+        getModuleContext()->arePrivateImportsEnabled())
+      effectiveAccess = getTestableOrPrivateImportsAccess(this);
     break;
   case AccessLevel::FilePrivate:
+    if (getModuleContext()->arePrivateImportsEnabled())
+      effectiveAccess = getTestableOrPrivateImportsAccess(this);
     break;
   case AccessLevel::Private:
     effectiveAccess = AccessLevel::FilePrivate;
+    if (getModuleContext()->arePrivateImportsEnabled())
+      effectiveAccess = getTestableOrPrivateImportsAccess(this);
     break;
   }
 
@@ -2652,18 +2671,30 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
 
   switch (access) {
   case AccessLevel::Private:
+    if (useDC != sourceDC) {
+      auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
+      if (useSF && useSF->hasTestableOrPrivateImport(access, VD))
+        return true;
+    }
     return (useDC == sourceDC ||
       AccessScope::allowsPrivateAccess(useDC, sourceDC));
   case AccessLevel::FilePrivate:
-    return useDC->getModuleScopeContext() == sourceDC->getModuleScopeContext();
+    if (useDC->getModuleScopeContext() != sourceDC->getModuleScopeContext()) {
+      auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext());
+      if (useSF && useSF->hasTestableOrPrivateImport(access, VD))
+        return true;
+      return false;
+    }
+    return true;
   case AccessLevel::Internal: {
     const ModuleDecl *sourceModule = sourceDC->getParentModule();
     const DeclContext *useFile = useDC->getModuleScopeContext();
     if (useFile->getParentModule() == sourceModule)
       return true;
-    if (auto *useSF = dyn_cast<SourceFile>(useFile))
-      if (useSF->hasTestableImport(sourceModule))
-        return true;
+    auto *useSF = dyn_cast<SourceFile>(useFile);
+    if (!useSF) return false;
+    if (useSF->hasTestableOrPrivateImport(access, sourceModule))
+      return true;
     return false;
   }
   case AccessLevel::Public:
@@ -3016,6 +3047,18 @@ bool NominalTypeDecl::isOptionalDecl() const {
   return this == getASTContext().getOptionalDecl();
 }
 
+Optional<KeyPathTypeKind> NominalTypeDecl::getKeyPathTypeKind() const {
+  auto &ctx = getASTContext();
+#define CASE(NAME) if (this == ctx.get##NAME##Decl()) return KPTK_##NAME;
+  CASE(KeyPath)
+  CASE(WritableKeyPath)
+  CASE(ReferenceWritableKeyPath)
+  CASE(AnyKeyPath)
+  CASE(PartialKeyPath)
+#undef CASE
+  return None;
+}
+
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  Identifier name, SourceLoc nameLoc,
                                  MutableArrayRef<TypeLoc> inherited,
@@ -3210,6 +3253,7 @@ AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
   // Find the best anchor among the anchors of the overridden decls.
   AssociatedTypeDecl *bestAnchor = nullptr;
   for (auto assocType : overridden) {
+    assert(this != assocType && "AssociatedTypeDecl cannot override itself");
     auto anchor = assocType->getAssociatedTypeAnchor();
     if (!bestAnchor || compare(anchor, bestAnchor) < 0)
       bestAnchor = anchor;
@@ -3600,7 +3644,8 @@ bool EnumDecl::isFormallyExhaustive(const DeclContext *useDC) const {
   // Testably imported enums are exhaustive, on the grounds that only the author
   // of the original library can import it testably.
   if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
-    if (useSF->hasTestableImport(containingModule))
+    if (useSF->hasTestableOrPrivateImport(AccessLevel::Internal,
+                                          containingModule))
       return true;
 
   // Otherwise, the enum is non-exhaustive.
@@ -5293,7 +5338,7 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
 
   // Final members are always be called directly.
   // Dynamic methods are always accessed by objc_msgSend().
-  if (decl->isFinal() || decl->isDynamic() || decl->hasClangNode())
+  if (decl->isFinal() || decl->isObjCDynamic() || decl->hasClangNode())
     return false;
   
   // Initializers are not normally inherited, but required initializers can
@@ -5316,7 +5361,8 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   }
 
   auto base = decl->getOverriddenDecl();
-  if (!base || base->hasClangNode() || base->isDynamic())
+
+  if (!base || base->hasClangNode() || base->isObjCDynamic())
     return true;
   
   // As above, convenience initializers are not formally overridable in Swift

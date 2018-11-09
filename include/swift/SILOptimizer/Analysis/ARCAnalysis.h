@@ -51,9 +51,6 @@ bool isReleaseInstruction(SILInstruction *II);
 bool mayDecrementRefCount(SILInstruction *User, SILValue Ptr,
                           AliasAnalysis *AA);
 
-/// \returns True if the user \p User checks the ref count of a pointer.
-bool mayCheckRefCount(SILInstruction *User);
-
 /// \returns True if the \p User might use the pointer \p Ptr in a manner that
 /// requires \p Ptr to be alive before Inst or the release of Ptr may use memory
 /// accessed by \p User.

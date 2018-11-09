@@ -151,21 +151,21 @@ void SILWitnessTable::convertToDefinition(
   }
 }
 
-bool SILWitnessTable::conformanceIsSerialized(ProtocolConformance *conformance) {
+bool SILWitnessTable::conformanceIsSerialized(
+    const NormalProtocolConformance *conformance) {
+  if (conformance->isResilient())
+    return false;
+
   // Serialize witness tables for conformances synthesized by
   // the ClangImporter.
   if (isa<ClangModuleUnit>(conformance->getDeclContext()->getModuleScopeContext()))
     return true;
 
+  if (conformance->getProtocol()->getEffectiveAccess() < AccessLevel::Public)
+    return false;
+
   auto *nominal = conformance->getType()->getAnyNominal();
-  // Only serialize witness tables for fixed layout types.
-  //
-  // FIXME: This is not the right long term solution. We need an explicit
-  // mechanism for declaring conformances as 'fragile'.
-  auto protocolIsPublic =
-      conformance->getProtocol()->getEffectiveAccess() >= AccessLevel::Public;
-  auto typeIsPublic = nominal->getEffectiveAccess() >= AccessLevel::Public;
-  return !nominal->isResilient() && protocolIsPublic && typeIsPublic;
+  return nominal->getEffectiveAccess() >= AccessLevel::Public;
 }
 
 bool SILWitnessTable::enumerateWitnessTableConditionalConformances(

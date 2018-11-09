@@ -120,8 +120,8 @@ getAccessorForComputedComponent(IRGenModule &IGM,
   // If it's only externally available, we need a local thunk to relative-
   // reference.
   if (requirements.empty() &&
-      !LinkEntity::forSILFunction(accessor).isAvailableExternally(IGM)) {
-    
+      !LinkEntity::forSILFunction(accessor, false).isAvailableExternally(IGM)) {
+
     return IGM.getAddrOfSILFunction(accessor, NotForDefinition);
   }
   auto accessorFn = IGM.getAddrOfSILFunction(accessor, NotForDefinition);
@@ -728,7 +728,7 @@ emitWitnessTableGeneratorForKeyPath(IRGenModule &IGM,
 static unsigned getClassFieldIndex(ClassDecl *classDecl, VarDecl *property) {
   SmallVector<ClassDecl *, 3> superclasses;
   for (auto *superDecl = classDecl; superDecl != nullptr;
-       superDecl = classDecl->getSuperclassDecl()) {
+       superDecl = superDecl->getSuperclassDecl()) {
     superclasses.push_back(superDecl);
   }
 
@@ -920,7 +920,7 @@ emitKeyPathComponent(IRGenModule &IGM,
     case KeyPathPatternComponent::ComputedPropertyId::Function: {
       idKind = KeyPathComponentHeader::Pointer;
       auto idRef = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
-        LinkEntity::forSILFunction(id.getFunction()));
+        LinkEntity::forSILFunction(id.getFunction(), false));
       
       idValue = idRef.getValue();
       // If we got an indirect reference, we'll need to resolve it at

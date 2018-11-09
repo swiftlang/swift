@@ -359,3 +359,41 @@ class C6 {
     if x == x && x = x { } // expected-error{{cannot convert value of type 'C6' to expected argument type 'Bool'}}
   }
 }
+
+prefix operator ∫
+
+prefix func ∫(arg: (Int, Int)) {}
+
+func testPrefixOperatorOnTuple() {
+
+  let foo = (1, 2)
+  _ = ∫foo
+  _ = (∫)foo
+  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-warning@-2 {{expression of type '(Int, Int)' is unused}}
+  _ = (∫)(foo)
+  _ = ∫(1, 2)
+  _ = (∫)(1, 2) // expected-error {{operator function '∫' expects a single parameter of type '(Int, Int)'}}
+  _ = (∫)((1, 2))
+}
+
+postfix operator §
+
+postfix func §<T, U>(arg: (T, (U, U), T)) {} // expected-note {{in call to operator '§'}}
+
+func testPostfixOperatorOnTuple<A, B>(a: A, b: B) {
+
+  let foo = (a, (b, b), a)
+  _ = foo§
+
+  // FIX-ME: "...could not be inferred" is irrelevant
+  _ = (§)foo
+  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+  // expected-warning@-3 {{expression of type '(A, (B, B), A)' is unused}}
+  _ = (§)(foo)
+  _ = (a, (b, b), a)§
+  _ = (§)(a, (b, b), a) // expected-error {{operator function '§' expects a single parameter of type '(T, (U, U), T)'}}
+  _ = (§)((a, (b, b), a))
+  _ = (a, ((), (b, (a, a), b)§), a)§
+}

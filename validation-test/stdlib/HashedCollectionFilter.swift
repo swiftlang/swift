@@ -5,9 +5,7 @@ import StdlibUnittest
 
 var FilterTestSuite = TestSuite("HashedCollectionFilter")
 
-FilterTestSuite.test("Dictionary.filter(_:) -> [Key: Value]")
-  .xfail(.always("Not actually running under Swift 4")).code
-{
+FilterTestSuite.test("Dictionary.filter(_:) -> [Key: Value]") {
   let d = [10: 1010, 20: 1020, 30: 1030, 40: 1040]
   // filter(_:) should produce a dictionary in Swift 4
   let f: Any = d.filter { $0.key > 20 }
@@ -21,9 +19,7 @@ FilterTestSuite.test("Dictionary.filter(_:) -> [(Key, Value)] available") {
   expectEqual(2, f.count)
 }
 
-FilterTestSuite.test("Set.filter(_:) -> Set<Element>")
-  .xfail(.always("Not actually running under Swift 4")).code
-{
+FilterTestSuite.test("Set.filter(_:) -> Set<Element>") {
   let s: Set = [10, 20, 30, 40]
   // filter(_:) should produce a set in Swift 4
   let f: Any = s.filter { $0 > 20 }
@@ -37,18 +33,14 @@ FilterTestSuite.test("Set.filter(_:) -> [Element] available") {
   expectEqual(2, f.count)
 }
 
-FilterTestSuite.test("Dictionary.keys -> Keys")
-  .xfail(.always("Not actually running under Swift 4")).code
-{
+FilterTestSuite.test("Dictionary.keys -> Keys") {
   let d = [10: 1010, 20: 1020, 30: 1030, 40: 1040]
   // .keys should produce a Dictionary.Keys in Swift 4
   let f: Any = d.keys
   expectTrue(f is Dictionary<Int, Int>.Keys)
 }
 
-FilterTestSuite.test("Dictionary.values -> Values")
-  .xfail(.always("Not actually running under Swift 4")).code
-{
+FilterTestSuite.test("Dictionary.values -> Values") {
   let d = [10: 1010, 20: 1020, 30: 1030, 40: 1040]
   // .values should produce a Dictionary.Values in Swift 4
   let f: Any = d.values

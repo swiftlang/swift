@@ -28,7 +28,9 @@ import SwiftShims
 @usableFromInline
 @_fixed_layout
 internal struct _CocoaArrayWrapper : RandomAccessCollection {
+  @usableFromInline
   typealias Indices = Range<Int>
+
   @inlinable
   internal var startIndex: Int {
     return 0

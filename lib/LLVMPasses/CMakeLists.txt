@@ -6,7 +6,7 @@ add_swift_host_library(swiftLLVMPasses STATIC
   LLVMInlineTree.cpp
   LLVMMergeFunctions.cpp
 
-  LINK_COMPONENTS
-    analysis
+  LLVM_COMPONENT_DEPENDS
+  analysis
   )
 

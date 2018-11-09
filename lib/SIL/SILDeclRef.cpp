@@ -41,8 +41,9 @@ swift::getMethodDispatch(AbstractFunctionDecl *method) {
   auto dc = method->getDeclContext();
 
   if (dc->getSelfClassDecl()) {
-    if (method->isDynamic())
+    if (method->isObjCDynamic()) {
       return MethodDispatch::Class;
+    }
 
     // Final methods can be statically referenced.
     if (method->isFinal())
@@ -87,8 +88,9 @@ bool swift::requiresForeignToNativeThunk(ValueDecl *vd) {
 bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   assert(!isa<AbstractStorageDecl>(vd));
 
-  if (vd->isDynamic())
+  if (vd->isObjCDynamic()) {
     return true;
+  }
 
   if (vd->isObjC() && isa<ProtocolDecl>(vd->getDeclContext()))
     return true;
@@ -777,7 +779,7 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     if (overridden.kind == SILDeclRef::Kind::Initializer) {
       return SILDeclRef();
     }
-    if (overridden.getDecl()->isDynamic()) {
+    if (overridden.getDecl()->isObjCDynamic()) {
       return SILDeclRef();
     }
     
@@ -785,8 +787,9 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
       auto *asd = accessor->getStorage();
       if (asd->hasClangNode())
         return SILDeclRef();
-      if (asd->isDynamic())
+      if (asd->isObjCDynamic()) {
         return SILDeclRef();
+      }
     }
 
     // If we overrode a decl from an extension, it won't be in a vtable
@@ -880,7 +883,7 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   DeclContext *context = FD->getDeclContext();
 
   // Methods from extensions don't go into vtables (yet).
-  if (context->isExtensionContext())
+  if (isa<ExtensionDecl>(context))
     return SubclassScope::NotApplicable;
 
   // Various forms of thunks don't either.
@@ -909,6 +912,8 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   case AccessLevel::Public:
     return SubclassScope::Internal;
   case AccessLevel::Open:
+    if (classType->isResilient())
+      return SubclassScope::Internal;
     return SubclassScope::External;
   }
 
@@ -932,4 +937,20 @@ unsigned SILDeclRef::getParameterListCount() const {
   } else {
     llvm_unreachable("Unhandled ValueDecl for SILDeclRef");
   }
+}
+
+bool SILDeclRef::isDynamicallyReplaceable() const {
+  if (isStoredPropertyInitializer())
+    return false;
+
+  if (kind == SILDeclRef::Kind::Destroyer ||
+      kind == SILDeclRef::Kind::Initializer) {
+    return false;
+  }
+
+  if (!hasDecl())
+    return false;
+
+  auto decl = getDecl();
+  return decl->isDynamic() && !decl->isObjC();
 }

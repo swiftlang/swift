@@ -19,11 +19,15 @@ if (LLVM_ENABLE_ASSERTIONS)
     "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp")
 endif(LLVM_ENABLE_ASSERTIONS)
 
-add_swift_target_library(swiftReflection STATIC TARGET_LIBRARY
-  ${swiftReflection_SOURCES}
-  C_COMPILE_FLAGS ${SWIFT_RUNTIME_CXX_FLAGS}
-  LINK_FLAGS ${SWIFT_RUNTIME_LINK_FLAGS}
-  INSTALL_IN_COMPONENT dev)
+if(SWIFT_BUILD_STDLIB)
+  add_swift_target_library(swiftReflection STATIC TARGET_LIBRARY
+    ${swiftReflection_SOURCES}
+    C_COMPILE_FLAGS ${SWIFT_RUNTIME_CXX_FLAGS}
+    LINK_FLAGS ${SWIFT_RUNTIME_LINK_FLAGS}
+    INSTALL_IN_COMPONENT dev)
+else()
+  add_custom_target(swiftReflection-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
+endif()
 
 # Build a specific version for the host with the host toolchain.  This is going
 # to be used by tools (e.g. lldb)

@@ -71,6 +71,20 @@ static bool isPublicOrUsableFromInline(const ValueDecl *VD) {
   return scope.isPublic();
 }
 
+static bool isPublicOrUsableFromInline(Type ty) {
+  // Note the double negative here: we're looking for any referenced decls that
+  // are *not* public-or-usableFromInline.
+  return !ty.findIf([](Type typePart) -> bool {
+    // FIXME: If we have an internal typealias for a non-internal type, we ought
+    // to be able to print it by desugaring.
+    if (auto *aliasTy = dyn_cast<NameAliasType>(typePart.getPointer()))
+      return !isPublicOrUsableFromInline(aliasTy->getDecl());
+    if (auto *nominal = typePart->getAnyNominal())
+      return !isPublicOrUsableFromInline(nominal);
+    return false;
+  });
+}
+
 static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
   auto *DC = ASD->getDeclContext()->getAsDecl();
   if (!DC) return false;
@@ -118,8 +132,21 @@ PrintOptions PrintOptions::printParseableInterfaceFile() {
       if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
         if (!shouldPrint(ED->getExtendedNominal(), options))
           return false;
-        // FIXME: We also need to check the generic signature for constraints
-        // that we can't reference.
+        for (const Requirement &req : ED->getGenericRequirements()) {
+          if (!isPublicOrUsableFromInline(req.getFirstType()))
+            return false;
+
+          switch (req.getKind()) {
+          case RequirementKind::Conformance:
+          case RequirementKind::Superclass:
+          case RequirementKind::SameType:
+            if (!isPublicOrUsableFromInline(req.getSecondType()))
+              return false;
+            break;
+          case RequirementKind::Layout:
+            break;
+          }
+        }
       }
 
       // Skip typealiases that just redeclare generic parameters.
@@ -3030,6 +3057,11 @@ void PrintAST::visitThrowStmt(ThrowStmt *stmt) {
   // FIXME: print expression.
 }
 
+void PrintAST::visitPoundAssertStmt(PoundAssertStmt *stmt) {
+  Printer << tok::pound_assert << " ";
+  // FIXME: print expression.
+}
+
 void PrintAST::visitDeferStmt(DeferStmt *stmt) {
   Printer << tok::kw_defer << " ";
   visit(stmt->getBodyAsWritten());
@@ -4418,12 +4450,18 @@ swift::getInheritedForPrinting(const Decl *decl,
     inherited = ed->getInherited();
   }
 
-  // Collect explicit inheritted types.
+  // Collect explicit inherited types.
   for (auto TL: inherited) {
-    if (auto Ty = TL.getType()) {
-      if (auto NTD = Ty->getAnyNominal())
-        if (!shouldPrint(NTD))
-          continue;
+    if (auto ty = TL.getType()) {
+      bool foundUnprintable = ty.findIf([shouldPrint](Type subTy) {
+        if (auto aliasTy = dyn_cast<NameAliasType>(subTy.getPointer()))
+          return !shouldPrint(aliasTy->getDecl());
+        if (auto NTD = subTy->getAnyNominal())
+          return !shouldPrint(NTD);
+        return false;
+      });
+      if (foundUnprintable)
+        continue;
     }
     Results.push_back(TL);
   }

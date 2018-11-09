@@ -759,6 +759,10 @@ ERROR(ambiguous_decl_in_module,none,
 ERROR(module_not_testable,none,
       "module %0 was not compiled for testing", (Identifier))
 
+ERROR(module_not_compiled_for_private_import,none,
+      "module %0 was not compiled for private import", (Identifier))
+
+
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
       "ambiguous operator declarations found for operator", ())
@@ -1691,6 +1695,14 @@ ERROR(type_witness_not_accessible_type,none,
       "%0 %1 must be as accessible as its enclosing type because it "
       "matches a requirement in protocol %3",
       (DescriptiveDeclKind, DeclName, AccessLevel, DeclName))
+ERROR(witness_not_usable_from_inline,none,
+      "%0 %1 must be declared '@usableFromInline' because "
+      "because it matches a requirement in protocol %2",
+      (DescriptiveDeclKind, DeclName, DeclName))
+WARNING(witness_not_usable_from_inline_warn,none,
+        "%0 %1 should be declared '@usableFromInline' because "
+        "because it matches a requirement in protocol %2",
+        (DescriptiveDeclKind, DeclName, DeclName))
 ERROR(type_witness_objc_generic_parameter,none,
       "type %0 involving Objective-C type parameter%select{| %1}2 cannot be "
       "used for associated type %3 of protocol %4",
@@ -3867,6 +3879,16 @@ ERROR(nonobjc_not_allowed,none,
 #undef OBJC_ATTR_SELECT
 
 //------------------------------------------------------------------------------
+// MARK: @_borrowed
+//------------------------------------------------------------------------------
+ERROR(borrowed_with_objc_dynamic,none,
+      "%0 cannot be '@_borrowed' if it is '@objc dynamic'",
+      (DescriptiveDeclKind))
+ERROR(borrowed_on_objc_protocol_requirement,none,
+      "%0 cannot be '@_borrowed' if it is an @objc protocol requirement",
+      (DescriptiveDeclKind))
+
+//------------------------------------------------------------------------------
 // MARK: dynamic
 //------------------------------------------------------------------------------
 
@@ -3878,9 +3900,38 @@ ERROR(dynamic_with_final,none,
 ERROR(dynamic_with_nonobjc,none,
       "a declaration cannot be both '@nonobjc' and 'dynamic'",
       ())
+ERROR(dynamic_with_transparent,none,
+      "a declaration cannot be both '@_tranparent' and 'dynamic'",
+      ())
 ERROR(dynamic_requires_objc,none,
       "'dynamic' %0 %1 must also be '@objc'",
       (DescriptiveDeclKind, DeclName))
+
+//------------------------------------------------------------------------------
+// MARK: @_dynamicReplacement(for:)
+//------------------------------------------------------------------------------
+
+ERROR(dynamic_replacement_accessor_type_mismatch, none,
+      "replaced accessor %0's type does not match", (DeclName))
+ERROR(dynamic_replacement_accessor_not_dynamic, none,
+      "replaced accessor for %0 is not marked dynamic", (DeclName))
+ERROR(dynamic_replacement_accessor_not_explicit, none,
+      "replaced accessor %select{get|set|_read|_modify|willSet|didSet|unsafeAddress|addressWithOwner|addressWithNativeOwner|unsafeMutableAddress|mutableAddressWithOwner|}0 for %1 is not explicitly defined",
+      (unsigned, DeclName))
+ERROR(dynamic_replacement_function_not_dynamic, none,
+      "replaced function %0 is not marked dynamic", (DeclName))
+ERROR(dynamic_replacement_function_not_found, none,
+     "replaced function %0 could not be found", (DeclName))
+ERROR(dynamic_replacement_accessor_not_found, none,
+      "replaced accessor for %0 could not be found", (DeclName))
+ERROR(dynamic_replacement_function_of_type_not_found, none,
+      "replaced function %0 of type %1 could not be found", (DeclName, Type))
+NOTE(dynamic_replacement_found_function_of_type, none,
+      "found function %0 of type %1", (DeclName, Type))
+ERROR(dynamic_replacement_not_in_extension, none,
+      "dynamicReplacement(for:) of %0 is not defined in an extension or at the file level", (DeclName))
+ERROR(dynamic_replacement_must_not_be_dynamic, none,
+      "dynamicReplacement(for:) of %0 must not be dynamic itself", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: @available

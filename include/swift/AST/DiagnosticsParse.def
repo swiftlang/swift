@@ -99,6 +99,11 @@ WARNING(escaped_parameter_name,none,
         "keyword '%0' does not need to be escaped in argument list",
         (StringRef))
 
+ERROR(forbidden_interpolated_string,none,
+      "%0 cannot be an interpolated string literal", (StringRef))
+ERROR(forbidden_extended_escaping_string,none,
+      "%0 cannot be an extended escaping string literal", (StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: Lexer diagnostics
 //------------------------------------------------------------------------------
@@ -625,6 +630,8 @@ ERROR(expected_sil_rbrace,none,
       "expected '}' at the end of a sil body", ())
 ERROR(expected_sil_function_type, none,
       "sil function expected to have SIL function type", ())
+ERROR(sil_dynamically_replaced_func_not_found,none,
+      "dynamically replaced function not found %0", (Identifier))
 
 // SIL Stage
 ERROR(expected_sil_stage_name, none,
@@ -1261,6 +1268,17 @@ ERROR(expr_typeof_expected_rparen,PointsToFirstBadToken,
 ERROR(expr_dynamictype_deprecated,PointsToFirstBadToken,
       "'.dynamicType' is deprecated. Use 'type(of: ...)' instead", ())
 
+ERROR(pound_assert_disabled,PointsToFirstBadToken,
+      "#assert is an experimental feature that is currently disabled", ())
+ERROR(pound_assert_expected_lparen,PointsToFirstBadToken,
+      "expected '(' in #assert directive", ())
+ERROR(pound_assert_expected_rparen,PointsToFirstBadToken,
+      "expected ')' in #assert directive", ())
+ERROR(pound_assert_expected_expression,PointsToFirstBadToken,
+      "expected a condition expression", ())
+ERROR(pound_assert_expected_string_literal,PointsToFirstBadToken,
+      "expected a string literal", ())
+
 //------------------------------------------------------------------------------
 // MARK: Attribute-parsing diagnostics
 //------------------------------------------------------------------------------
@@ -1308,11 +1326,6 @@ ERROR(alignment_must_be_positive_integer,none,
 
 ERROR(swift_native_objc_runtime_base_must_be_identifier,none,
       "@_swift_native_objc_runtime_base class name must be an identifier", ())
-
-ERROR(attr_interpolated_string,none,
-"'%0' cannot be an interpolated string literal", (StringRef))
-ERROR(attr_extended_escaping_string,none,
-"'%0' cannot be an extended escaping string literal", (StringRef))
 
 ERROR(attr_only_at_non_local_scope, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
@@ -1405,6 +1418,24 @@ ERROR(attr_nskeyedarchiverclassname_removed, none,
 ERROR(attr_nskeyedarchiverencodenongenericsubclassesonly_removed, none,
       "@NSKeyedArchiverEncodeNonGenericSubclassesOnly is no longer necessary",
       ())
+
+ERROR(attr_dynamic_replacement_expected_rparen,none,
+      "expected ')' after function name for @_dynamicReplacement", ())
+ERROR(attr_dynamic_replacement_expected_function,none,
+      "expected a function name in @_dynamicReplacement(for:)", ())
+ERROR(attr_dynamic_replacement_expected_for,none,
+      "expected 'for' in '_dynamicReplacement' attribute", ())
+ERROR(attr_dynamic_replacement_expected_colon,none,
+      "expected ':' after @_dynamicReplacement(for", ())
+
+ERROR(attr_private_import_expected_rparen,none,
+      "expected ')' after function name for @_private", ())
+ERROR(attr_private_import_expected_sourcefile, none,
+      "expected 'sourceFile' in '_private' attribute", ())
+ERROR(attr_private_import_expected_sourcefile_name,none,
+      "expected a source file name in @_private(sourceFile:)", ())
+ERROR(attr_private_import_expected_colon,none,
+      "expected ':' after @_private(sourceFile", ())
 
 // opened
 ERROR(opened_attribute_expected_lparen,none,

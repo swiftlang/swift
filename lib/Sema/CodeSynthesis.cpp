@@ -255,6 +255,9 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
   if (storage->isStatic())
     getter->setStatic();
 
+  if (!storage->requiresOpaqueAccessor(AccessorKind::Get))
+    getter->setForcedStaticDispatch(true);
+
   // Always add the getter to the context immediately after the storage.
   addMemberToContextIfNeeded(getter, storage->getDeclContext(), storage);
 
@@ -298,6 +301,9 @@ static AccessorDecl *createSetterPrototype(TypeChecker &TC,
   if (isStatic)
     setter->setStatic();
 
+  // All mutable storage requires a setter.
+  assert(storage->requiresOpaqueAccessor(AccessorKind::Set));
+
   // Always add the setter to the context immediately after the getter.
   if (!getter) getter = storage->getGetter();
   if (!getter) getter = storage->getReadCoroutine();
@@ -305,14 +311,6 @@ static AccessorDecl *createSetterPrototype(TypeChecker &TC,
   addMemberToContextIfNeeded(setter, storage->getDeclContext(), getter);
 
   return setter;
-}
-
-// True if the storage is dynamic or imported from Objective-C. In these cases,
-// we need to emit static coroutine accessors that dynamically dispatch
-// to 'get' and 'set', rather than the normal dynamically dispatched
-// opaque accessors that peer dispatch to 'get' and 'set'.
-static bool needsDynamicCoroutineAccessors(AbstractStorageDecl *storage) {
-  return storage->isDynamic() || storage->hasClangNode();
 }
 
 /// Mark the accessor as transparent if we can.
@@ -418,11 +416,11 @@ createCoroutineAccessorPrototype(TypeChecker &TC,
   if (storage->isFinal())
     makeFinal(ctx, accessor);
 
-  // If the storage is dynamic or ObjC-native, we can't add a dynamically-
-  // dispatched method entry for the accessor, so force it to be
-  // statically dispatched. ("final" would be inappropriate because the
-  // property can still be overridden.)
-  if (needsDynamicCoroutineAccessors(storage))
+  // If the storage does not provide this accessor as an opaque accessor,
+  // we can't add a dynamically-dispatched method entry for the accessor,
+  // so force it to be statically dispatched. ("final" would be inappropriate
+  // because the property can still be overridden.)
+  if (!storage->requiresOpaqueAccessor(kind))
     accessor->setForcedStaticDispatch(true);
 
   // Make sure the coroutine is available enough to access
@@ -2093,6 +2091,11 @@ void swift::maybeAddAccessorsToStorage(TypeChecker &TC,
 }
 
 static void synthesizeGetterBody(TypeChecker &TC, AccessorDecl *getter) {
+  if (getter->hasForcedStaticDispatch()) {
+    synthesizeTrivialGetterBody(TC, getter, TargetImpl::Ordinary);
+    return;
+  }
+
   switch (getter->getStorage()->getReadImpl()) {
   case ReadImplKind::Stored:
     synthesizeTrivialGetterBody(TC, getter);

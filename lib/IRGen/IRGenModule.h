@@ -235,6 +235,8 @@ private:
 
   llvm::SmallPtrSet<SILFunction*, 4> LazilyEmittedFunctions;
 
+  llvm::SetVector<SILFunction*> DynamicReplacements;
+
   struct FieldTypeMetadata {
     IRGenModule *IGM;
     std::vector<CanType> fieldTypes;
@@ -338,6 +340,9 @@ public:
 
   void emitEagerClassInitialization();
 
+  // Emit the code to replace dynamicReplacement(for:) functions.
+  void emitDynamicReplacements();
+
   /// Checks if the metadata of \p Nominal can be emitted lazily.
   ///
   /// If yes, \p Nominal is added to eligibleLazyMetadata and true is returned.
@@ -347,6 +352,8 @@ public:
   void emitLazyDefinitions();
 
   void addLazyFunction(SILFunction *f);
+
+  void addDynamicReplacement(SILFunction *f) { DynamicReplacements.insert(f); }
 
   void forceLocalEmitOfLazyFunction(SILFunction *f) {
     DefaultIGMForFunction[f] = CurrentIGM;
@@ -640,6 +647,13 @@ public:
   llvm::PointerType *WitnessTablePtrPtrTy;   /// i8***
   llvm::Type *FloatTy;
   llvm::Type *DoubleTy;
+  llvm::StructType *DynamicReplacementsTy; // { i8**, i8* }
+  llvm::PointerType *DynamicReplacementsPtrTy;
+
+  llvm::StructType *DynamicReplacementLinkEntryTy; // %link_entry = { i8*, %link_entry*}
+  llvm::PointerType
+      *DynamicReplacementLinkEntryPtrTy; // %link_entry*
+  llvm::StructType *DynamicReplacementKeyTy; // { i32, i32}
 
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
@@ -866,8 +880,6 @@ public:
                                            ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfKeyPathPattern(KeyPathPattern *pattern,
                                           SILLocation diagLoc);
-  llvm::Constant *getAddrOfAssociatedTypeGenericParamRef(GenericSignature *sig,
-                                                    CanDependentMemberType dmt);
   ConstantReference getConstantReferenceForProtocolDescriptor(ProtocolDecl *proto);
 
   ConstantIntegerLiteral getConstantIntegerLiteral(APInt value);
@@ -1317,11 +1329,17 @@ public:
   Address getAddrOfObjCClassRef(ClassDecl *D);
   llvm::Constant *getAddrOfMetaclassObject(ClassDecl *D,
                                            ForDefinition_t forDefinition);
+
   llvm::Function *getAddrOfObjCMetadataUpdateFunction(ClassDecl *D,
                                                       ForDefinition_t forDefinition);
 
-  llvm::Function *getAddrOfSILFunction(SILFunction *f,
-                                       ForDefinition_t forDefinition);
+  llvm::Function *
+  getAddrOfSILFunction(SILFunction *f, ForDefinition_t forDefinition,
+                       bool isDynamicallyReplaceableImplementation = false,
+                       bool shouldCallPreviousImplementation = false);
+
+  void emitDynamicReplacementOriginalFunctionThunk(SILFunction *f);
+
   llvm::Function *getAddrOfContinuationPrototype(CanSILFunctionType fnType);
   Address getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                      const TypeInfo &ti,
@@ -1383,6 +1401,10 @@ public:
   void emitSharedContextDescriptor(DeclContext *dc);
 
   void ensureRelativeSymbolCollocation(SILWitnessTable &wt);
+
+  llvm::GlobalVariable *
+  getGlobalForDynamicallyReplaceableThunk(LinkEntity &entity, llvm::Type *type,
+                                          ForDefinition_t forDefinition);
 
 private:
   llvm::Constant *

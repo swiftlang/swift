@@ -144,6 +144,10 @@ namespace swift {
     /// was not compiled with -enable-testing.
     bool EnableTestableAttrRequiresTestableModule = true;
 
+    /// If true, the 'dynamic' attribute is added to all applicable
+    /// declarations.
+    bool EnableImplicitDynamic = false;
+
     ///
     /// Flags for developers
     ///
@@ -206,6 +210,9 @@ namespace swift {
     /// \brief Perform all dynamic allocations using malloc/free instead of
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
+
+    /// \brief Enable experimental #assert feature.
+    bool EnableExperimentalStaticAssert = false;
 
     /// \brief Enable experimental property behavior feature.
     bool EnableExperimentalPropertyBehaviors = false;

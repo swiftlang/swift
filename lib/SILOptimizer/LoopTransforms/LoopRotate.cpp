@@ -72,6 +72,13 @@ canDuplicateOrMoveToPreheader(SILLoop *L, SILBasicBlock *Preheader,
     else if (isa<FunctionRefInst>(Inst)) {
       Move.push_back(Inst);
       Invariant.insert(Inst);
+    } else if (isa<DynamicFunctionRefInst>(Inst)) {
+      Move.push_back(Inst);
+      Invariant.insert(Inst);
+    }
+    else if (isa<PreviousDynamicFunctionRefInst>(Inst)) {
+      Move.push_back(Inst);
+      Invariant.insert(Inst);
     } else if (isa<IntegerLiteralInst>(Inst)) {
       Move.push_back(Inst);
       Invariant.insert(Inst);

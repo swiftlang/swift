@@ -282,17 +282,6 @@ public:
     return finalize();
   }
 
-  std::string mangleAssociatedTypeGenericParamRef(unsigned baseOrdinal,
-                                                  CanType member) {
-    beginMangling();
-    bool isFirstAssociatedTypeIdentifier = true;
-    appendType(GenericTypeParamType::get(0, baseOrdinal,
-                                         member->getASTContext()));
-    appendAssociatedTypePath(member, isFirstAssociatedTypeIdentifier);
-    appendOperator("MXA");
-    return finalize();
-  }
-
   void appendAssociatedTypePath(CanType associatedType, bool &isFirst) {
     if (auto memberType = dyn_cast<DependentMemberType>(associatedType)) {
       appendAssociatedTypePath(memberType.getBase(), isFirst);

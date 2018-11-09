@@ -71,13 +71,13 @@ internal var _emptyArrayStorage : __EmptyArrayStorage {
 }
 
 // The class that implements the storage for a ContiguousArray<Element>
-@_fixed_layout // FIXME(sil-serialize-all)
+@_fixed_layout
 @usableFromInline
 internal final class _ContiguousArrayStorage<
   Element
 > : __ContiguousArrayStorageBase {
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   deinit {
     _elementPointer.deinitialize(count: countAndCapacity.count)
     _fixLifetime(self)
@@ -551,6 +551,7 @@ extension _ContiguousArrayBuffer : RandomAccessCollection {
     return count
   }
 
+  @usableFromInline
   internal typealias Indices = Range<Int>
 }
 
@@ -654,7 +655,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
 
   /// Initialize the buffer with an initial size of `initialCapacity`
   /// elements.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always) // For performance reasons.
   internal init(initialCapacity: Int) {
     if initialCapacity == 0 {
@@ -670,7 +671,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   }
 
   /// Add an element to the buffer, reallocating if necessary.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always) // For performance reasons.
   internal mutating func add(_ element: Element) {
     if remainingCapacity == 0 {
@@ -693,7 +694,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   }
 
   /// Add an element to the buffer, which must have remaining capacity.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always) // For performance reasons.
   internal mutating func addWithExistingCapacity(_ element: Element) {
     _sanityCheck(remainingCapacity > 0,
@@ -709,7 +710,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   ///
   /// Returns the fully-initialized buffer. `self` is reset to contain an
   /// empty buffer and cannot be used afterward.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always) // For performance reasons.
   internal mutating func finish() -> ContiguousArray<Element> {
     // Adjust the initialized count of the buffer.
@@ -724,7 +725,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   ///
   /// Returns the fully-initialized buffer. `self` is reset to contain an
   /// empty buffer and cannot be used afterward.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always) // For performance reasons.
   internal mutating func finishWithOriginalCount() -> ContiguousArray<Element> {
     _sanityCheck(remainingCapacity == result.capacity - result.count,

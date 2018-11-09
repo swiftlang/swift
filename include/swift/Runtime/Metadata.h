@@ -385,13 +385,31 @@ swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
 /// \param assocType Associated type descriptor.
 ///
 /// \returns metadata for the associated type witness.
-SWIFT_RUNTIME_EXPORT
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse swift_getAssociatedTypeWitness(
                                           MetadataRequest request,
                                           WitnessTable *wtable,
                                           const Metadata *conformingType,
                                           const ProtocolRequirement *reqBase,
                                           const ProtocolRequirement *assocType);
+
+/// Retrieve an associated conformance witness table from the given witness
+/// table.
+///
+/// \param wtable The witness table.
+/// \param conformingType Metadata for the conforming type.
+/// \param assocType Metadata for the sasociated type.
+/// \param reqBase "Base" requirement used to compute the witness index
+/// \param assocConformance Associated conformance descriptor.
+///
+/// \returns corresponding witness table.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+const WitnessTable *swift_getAssociatedConformanceWitness(
+                                  WitnessTable *wtable,
+                                  const Metadata *conformingType,
+                                  const Metadata *assocType,
+                                  const ProtocolRequirement *reqBase,
+                                  const ProtocolRequirement *assocConformance);
 
 /// \brief Fetch a uniqued metadata for a function type.
 SWIFT_RUNTIME_EXPORT
@@ -787,6 +805,12 @@ const TypeContextDescriptor *swift_getTypeContextDescriptor(const Metadata *type
 // Defined in KeyPath.swift in the standard library.
 SWIFT_RUNTIME_EXPORT
 const HeapObject *swift_getKeyPath(const void *pattern, const void *arguments);
+
+SWIFT_RUNTIME_EXPORT
+void swift_enableDynamicReplacementScope(const DynamicReplacementScope *scope);
+
+SWIFT_RUNTIME_EXPORT
+void swift_disableDynamicReplacementScope(const DynamicReplacementScope *scope);
 
 } // end namespace swift
 

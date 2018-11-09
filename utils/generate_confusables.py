@@ -57,7 +57,7 @@ def main(args=sys.argv):
 
     pairs = []
     with open(confusablesFilePath, 'r') as f:
-        pattern = re.compile("(.+)\W+;\W+(.+)\W+;")
+        pattern = re.compile(r"(.+)\W+;\W+(.+)\W+;")
         for line in f:
             match = pattern.match(line)
             if match is not None:

@@ -56,6 +56,12 @@ func expectSortedCollection(_ sortedAry: ArraySlice<Int>, _ originalAry: ArraySl
   expectSortedCollection([Int](sortedAry), [Int](originalAry))
 }
 
+func expectSortedCollection<C: Collection>(_ a: C,
+  by areInIncreasingOrder: (C.Element, C.Element) -> Bool
+) {
+  expectFalse(zip(a.dropFirst(), a).contains(where: areInIncreasingOrder))
+}
+
 class OffsetCollection : MutableCollection, RandomAccessCollection {
   typealias Indices = Range<Int>
 
@@ -104,28 +110,44 @@ class OffsetCollection : MutableCollection, RandomAccessCollection {
 
 Algorithm.test("${t}/sorted/${name}") {
   let count = 1000
-  var ary = ${t}((0 ..< count).map { _ in Int.random(in: .min ... .max) })
-  var sortedAry1 = [Int]()
-  var sortedAry2 = ${t}<Int>()
+  let ary = ${t}((0 ..< count).map { _ in Int.random(in: .min ... .max) })
 
   // Similar test for sorting with predicate
 %       if comparePredicate:
-  sortedAry1 = ary.sorted(by: ${comparePredicate})
+  let sortedAry1 = ary.sorted(by: ${comparePredicate})
 %       else:
-  sortedAry1 = ary.sorted()
+  let sortedAry1 = ary.sorted()
 %       end
   expectSortedCollection(sortedAry1, ary)
 
   // Check that sorting works well on intervals
   let i1 = 400
   let i2 = 700
-  sortedAry2 = ary
-  sortedAry2._introSort(within: i1..<i2, by: <)
+  var sortedAry2 = ary
+  sortedAry2[i1..<i2].sort(by: <)
   expectEqual(ary[0..<i1], sortedAry2[0..<i1])
   expectSortedCollection(sortedAry2[i1..<i2], ary[i1..<i2])
   expectEqual(ary[i2..<count], sortedAry2[i2..<count])
 }
 %   end
+
+Algorithm.test("${t}/sorted/stable") {
+  let count = 1000
+  // Using a small range in the random array so that we have repeated elements
+  let ary = (0 ..< count).map { _ in Int.random(in: 1...20) }
+
+  // Decorate with offset, but sort by value
+  var input = ${t}(ary.enumerated())
+  input.sort(by: { $0.element < $1.element })
+
+  // Offsets should still be ordered for equal values
+  expectSortedCollection(input) {
+    if $0.element == $1.element {
+      return $0.offset < $1.offset
+    }
+    return $0.element < $1.element
+  }
+}
 % end
 
 Algorithm.test("sort/CollectionsWithUnusualIndices") {
@@ -134,19 +156,19 @@ Algorithm.test("sort/CollectionsWithUnusualIndices") {
 
   // Check if sorting routines work well on collections with startIndex != 0.
   var offsetAry = OffsetCollection(ary, offset: 500, forward: false)
-  offsetAry.sort(${comparePredicate})
+  offsetAry.sort()
   expectSortedCollection(offsetAry.toArray(), ary)
 
   // Check if sorting routines work well on collections with endIndex = Int.max.
   // That could expose overflow errors in index computations.
   offsetAry = OffsetCollection(ary, offset: Int.max, forward: false)
-  offsetAry.sort(${comparePredicate})
+  offsetAry.sort()
   expectSortedCollection(offsetAry.toArray(), ary)
 
   // Check if sorting routines work well on collections with
   // startIndex = Int.min.
   offsetAry = OffsetCollection(ary, offset: Int.min, forward: true)
-  offsetAry.sort(${comparePredicate})
+  offsetAry.sort()
   expectSortedCollection(offsetAry.toArray(), ary)
 }
 

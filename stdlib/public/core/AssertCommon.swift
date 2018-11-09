@@ -248,7 +248,6 @@ func _unimplementedInitializer(className: StaticString,
   Builtin.int_trap()
 }
 
-@inlinable // FIXME(sil-serialize-all)
 public // COMPILER_INTRINSIC
 func _undefined<T>(
   _ message: @autoclosure () -> String = String(),

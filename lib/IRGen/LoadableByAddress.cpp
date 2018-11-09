@@ -539,6 +539,18 @@ struct StructLoweringState {
   SILType getNewSILType(SILType type) {
     return Mapper.getNewSILType(F->getGenericEnvironment(), type, Mod);
   }
+
+  bool hasLargeLoadableYields() {
+    auto fnType = F->getLoweredFunctionType();
+    if (!fnType->isCoroutine()) return false;
+
+    auto env = F->getGenericEnvironment();
+    for (auto yield : fnType->getYields()) {
+      if (Mapper.shouldTransformParameter(env, yield, Mod))
+        return true;
+    }
+    return false;
+  }
 };
 } // end anonymous namespace
 
@@ -2296,8 +2308,10 @@ void LoadableByAddress::runOnFunction(SILFunction *F) {
 
   // If we modified the function arguments - add to list of functions to clone
   if (modifiableFunction(funcType) &&
-      (rewrittenReturn || !pass.largeLoadableArgs.empty() ||
-       !pass.funcSigArgs.empty())) {
+      (rewrittenReturn ||
+       !pass.largeLoadableArgs.empty() ||
+       !pass.funcSigArgs.empty() ||
+       pass.hasLargeLoadableYields())) {
     modFuncs.insert(F);
   }
   // If we modified any applies - add them to the global list for recreation
@@ -2683,11 +2697,11 @@ void LoadableByAddress::run() {
   }
 
   // Scan the module for all references of the modified functions:
-  llvm::SetVector<FunctionRefInst *> funcRefs;
+  llvm::SetVector<FunctionRefBaseInst *> funcRefs;
   for (SILFunction &CurrF : *getModule()) {
     for (SILBasicBlock &BB : CurrF) {
       for (SILInstruction &I : BB) {
-        if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
+        if (auto *FRI = dyn_cast<FunctionRefBaseInst>(&I)) {
           SILFunction *RefF = FRI->getReferencedFunction();
           if (modFuncs.count(RefF) != 0) {
             // Go over the uses and add them to lists to modify
@@ -2792,11 +2806,11 @@ void LoadableByAddress::run() {
   // Note: We don't need to update the witness tables and vtables
   // They just contain a pointer to the function
   // The pointer does not change
-  for (FunctionRefInst *instr : funcRefs) {
+  for (auto *instr : funcRefs) {
     SILFunction *F = instr->getReferencedFunction();
     SILBuilderWithScope refBuilder(instr);
-    FunctionRefInst *newInstr =
-        refBuilder.createFunctionRef(instr->getLoc(), F);
+    SingleValueInstruction *newInstr =
+        refBuilder.createFunctionRef(instr->getLoc(), F, instr->getKind());
     instr->replaceAllUsesWith(newInstr);
     instr->getParent()->erase(instr);
   }

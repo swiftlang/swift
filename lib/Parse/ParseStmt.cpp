@@ -53,6 +53,7 @@ bool Parser::isStartOfStmt() {
   case tok::kw_case:
   case tok::kw_default:
   case tok::kw_yield:
+  case tok::pound_assert:
   case tok::pound_if:
   case tok::pound_warning:
   case tok::pound_error:
@@ -636,6 +637,10 @@ ParserResult<Stmt> Parser::parseStmt() {
     return makeParserResult(
         new (Context) FallthroughStmt(consumeToken(tok::kw_fallthrough)));
   }
+  case tok::pound_assert:
+    if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
+    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
+    return parseStmtPoundAssert();
   }
 }
 
@@ -2399,4 +2404,54 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
       Status, CaseStmt::create(Context, CaseLoc, CaseLabelItems,
                                !BoundDecls.empty(), UnknownAttrLoc, ColonLoc,
                                Body));
+}
+
+/// stmt-pound-assert:
+///   '#assert' '(' expr (',' string_literal)? ')'
+ParserResult<Stmt> Parser::parseStmtPoundAssert() {
+  SyntaxContext->setCreateSyntax(SyntaxKind::PoundAssertStmt);
+
+  SourceLoc startLoc = consumeToken(tok::pound_assert);
+  SourceLoc endLoc;
+
+  if (Tok.isNot(tok::l_paren)) {
+    diagnose(Tok, diag::pound_assert_expected_lparen);
+    return makeParserError();
+  }
+  SourceLoc LBLoc = consumeToken(tok::l_paren);
+
+  auto conditionExprResult = parseExpr(diag::pound_assert_expected_expression);
+  if (conditionExprResult.isParseError())
+    return ParserStatus(conditionExprResult);
+
+  StringRef message;
+  if (consumeIf(tok::comma)) {
+    if (Tok.isNot(tok::string_literal)) {
+      diagnose(Tok.getLoc(), diag::pound_assert_expected_string_literal);
+      return makeParserError();
+    }
+
+    auto messageOpt = getStringLiteralIfNotInterpolated(Tok.getLoc(),
+                                                        "'#assert' message");
+    consumeToken();
+    if (!messageOpt)
+      return makeParserError();
+
+    message = *messageOpt;
+  }
+
+  if (parseMatchingToken(tok::r_paren, endLoc,
+                         diag::pound_assert_expected_rparen, LBLoc)) {
+    return makeParserError();
+  }
+
+  // We check this after consuming everything, so that the SyntaxContext
+  // understands this statement even when the feature is disabled.
+  if (!Context.LangOpts.EnableExperimentalStaticAssert) {
+    diagnose(startLoc, diag::pound_assert_disabled);
+    return makeParserError();
+  }
+
+  return makeParserResult<Stmt>(new (Context) PoundAssertStmt(
+      SourceRange(startLoc, endLoc), conditionExprResult.get(), message));
 }

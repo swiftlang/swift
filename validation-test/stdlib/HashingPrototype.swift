@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift-swift
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -140,12 +140,12 @@ struct InProcessHashtableHasher : Hasher {
   mutating func squeezeHashValue<I : SignedInteger>(
     _ resultRange: Range<I>) -> I {
     // ... finalize hash value computation first...
-    return I(IntMax(_state)) // Should actually clamp the value
+    return I(Int64(_state)) // Should actually clamp the value
   }
   mutating func squeezeHashValue<I : UnsignedInteger>(
     _ resultRange: Range<I>) -> I {
     // ... finalize hash value computation first...
-    return I(UIntMax(_state)) // Should actually clamp the value
+    return I(UInt64(_state)) // Should actually clamp the value
   }
 }
 
