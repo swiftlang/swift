@@ -28,4 +28,15 @@ StringTensorTests.test("StringComparison") {
               result3.array)
 }
 
+StringTensorTests.test("StringTFOP") {
+  // Const op over a String tensor cannot live on GPU.
+  TensorFlow.enableCPU()
+
+  let encoded = StringTensor("aGVsbG8gd29ybGQ=")
+  let decoded: StringTensor = #tfop("DecodeBase64", encoded)
+  let expectedDecoded = StringTensor("hello world")
+  let comparison = expectedDecoded.elementsEqual(decoded)
+  expectEqual(ShapedArray(shape: [], scalars: [true]), comparison.array)
+}
+
 runAllTests()
