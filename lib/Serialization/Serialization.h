@@ -342,8 +342,8 @@ private:
   /// Writes the given pattern, recursively.
   void writePattern(const Pattern *pattern, DeclContext *owningDC);
 
-  /// Writes a generic parameter list.
-  bool writeGenericParams(const GenericParamList *genericParams);
+  /// Writes a generic parameter list, if non-null.
+  void writeGenericParams(const GenericParamList *genericParams);
 
   /// Writes the body text of the provided funciton, if the function is
   /// inlinable and has body text.

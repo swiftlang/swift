@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 463; // Last change: enable-private-imports
+const uint16_t SWIFTMODULE_VERSION_MINOR = 464; // Last change: simplify GenericParamLists
 
 using DeclIDField = BCFixed<31>;
 
@@ -1259,13 +1259,8 @@ namespace decls_block {
   >;
 
   using GenericParamListLayout = BCRecordLayout<
-    GENERIC_PARAM_LIST
-    // The actual parameters and requirements trail the record.
-  >;
-
-  using GenericParamLayout = BCRecordLayout<
-    GENERIC_PARAM,
-    DeclIDField // Typealias
+    GENERIC_PARAM_LIST,
+    BCArray<DeclIDField>        // the GenericTypeParamDecls
   >;
 
   using GenericSignatureLayout = BCRecordLayout<
