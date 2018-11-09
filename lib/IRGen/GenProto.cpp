@@ -2505,40 +2505,17 @@ emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
                                   AssociatedConformance conformance,
                                   llvm::Value *associatedTypeMetadata) {
   auto sourceProtocol = conformance.getSourceProtocol();
-  llvm::Value *witness;
-  if (IGF.IGM.isResilient(sourceProtocol, ResilienceExpansion::Maximal)) {
-    // For resilient protocols, use the associated conformance descriptor to
-    // determine the index.
-    auto assocConformanceDescriptor =
-      IGF.IGM.getAddrOfAssociatedConformanceDescriptor(conformance);
+  auto assocConformanceDescriptor =
+    IGF.IGM.getAddrOfAssociatedConformanceDescriptor(conformance);
+  auto baseDescriptor =
+    IGF.IGM.getAddrOfProtocolRequirementsBaseDescriptor(sourceProtocol);
 
-    auto index =
-      computeResilientWitnessTableIndex(IGF, sourceProtocol,
-                                        assocConformanceDescriptor);
-
-    witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
-  } else {
-    // For non-resilient protocols, the index is a constant.
-    auto &pi = IGF.IGM.getProtocolInfo(sourceProtocol,
-                                       ProtocolInfoKind::RequirementSignature);
-
-    auto index = pi.getAssociatedConformanceIndex(conformance);
-    witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable,
-                                               index.forProtocolWitnessTable());
-  }
-
-  // Cast the witness to the appropriate function type.
-  auto sig = IGF.IGM.getAssociatedTypeWitnessTableAccessFunctionSignature();
-  auto witnessTy = sig.getType();
-  witness = IGF.Builder.CreateBitCast(witness, witnessTy->getPointerTo());
-
-  FunctionPointer witnessFnPtr(witness, sig);
-
-  // Call the accessor.
-  auto call = IGF.Builder.CreateCall(witnessFnPtr,
-                            { associatedTypeMetadata, parentMetadata, wtable });
-
-  return call;
+  return IGF.Builder.CreateCall(IGF.IGM.getGetAssociatedConformanceWitnessFn(),
+                                {
+                                  wtable, parentMetadata,
+                                  associatedTypeMetadata,
+                                  baseDescriptor, assocConformanceDescriptor
+                                });
 }
 
 /// Drill down on a single stage of component.
