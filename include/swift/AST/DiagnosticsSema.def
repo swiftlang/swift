@@ -3930,6 +3930,8 @@ NOTE(dynamic_replacement_found_function_of_type, none,
       "found function %0 of type %1", (DeclName, Type))
 ERROR(dynamic_replacement_not_in_extension, none,
       "dynamicReplacement(for:) of %0 is not defined in an extension or at the file level", (DeclName))
+ERROR(dynamic_replacement_must_not_be_dynamic, none,
+      "dynamicReplacement(for:) of %0 must not be dynamic itself", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: @available

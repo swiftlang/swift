@@ -2082,13 +2082,14 @@ void TypeChecker::checkDynamicReplacementAttribute(ValueDecl *D) {
   if (!isa<ExtensionDecl>(D->getDeclContext()) &&
       !D->getDeclContext()->isModuleScopeContext()) {
     diagnose(attr->getLocation(), diag::dynamic_replacement_not_in_extension,
-                D->getBaseName());
+             D->getBaseName());
     attr->setInvalid();
     return;
   }
 
   if (D->isDynamic() && !D->isObjC()) {
-    assert(false && "dynamic replacement must not be dynamic itself");
+    diagnose(attr->getLocation(), diag::dynamic_replacement_must_not_be_dynamic,
+             D->getBaseName());
     attr->setInvalid();
     return;
   }
