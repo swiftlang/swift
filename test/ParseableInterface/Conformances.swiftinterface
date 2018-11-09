@@ -47,3 +47,15 @@ public struct OpaqueStructImpl: MyProto {}
 // CHECK: function_ref @$s12Conformances7MyProtoP4propSivs
 // CHECK: function_ref @$s12Conformances7MyProtoPyS2icig
 // CHECK: end sil function '$s16ConformancesUser10testOpaqueSiyF'
+
+public struct ResilientStructImpl: MyProto {
+  @available(*, unavailable) // Ignore this, because the conformance is resilient.
+  public init()
+}
+
+// CHECK-LABEL: sil @$s16ConformancesUser13testResilientSiyF
+// CHECK: witness_method $ResilientStructImpl, #MyProto.init!allocator.1
+// CHECK: witness_method $ResilientStructImpl, #MyProto.method!1
+// CHECK: witness_method $ResilientStructImpl, #MyProto.prop!setter.1
+// CHECK: witness_method $ResilientStructImpl, #MyProto.subscript!getter.1
+// CHECK: end sil function '$s16ConformancesUser13testResilientSiyF'
