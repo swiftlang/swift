@@ -248,7 +248,10 @@ private:
   }
   
   void convertSetOfDeclBaseNames(const llvm::DenseMap<DeclBaseName, bool>&, Node::Kind);
-  void convertSetOfMemberPairsForNominals(const llvm::DenseMap<std::pair<const NominalTypeDecl *, DeclBaseName>);
+  void convertSetOfMemberPairsForNominals(
+                                          const llvm::DenseMap<
+                                          std::pair<const NominalTypeDecl *, DeclBaseName>,
+                                          bool> &);
   void convertSetOfMemberPairsForMembers(const llvm::DenseMap<std::pair<const NominalTypeDecl *, DeclBaseName>,
                                          bool>&);
   void convertFilenames(ArrayRef<std::string>);
@@ -297,12 +300,13 @@ void GraphConstructor::everyOneOfMyDeclsDependsOn(Node* dependedUpon) {
 }
 
 void GraphConstructor::convertSetOfMemberPairsForNominals(
-                                                          const llvm::DenseMap<std::pair<const NominalTypeDecl *, DeclBaseName>,
+                                                          const llvm::DenseMap<
+                                                          std::pair<const NominalTypeDecl *, DeclBaseName>,
                                                           bool> &map) {
   std::unordered_set<const NominalTypeDecl*> holdersOfCascadingMembers;
   for (auto &entry: map)
     if (entry.second)
-      cascadingHolders.insert(entry.first.first);
+      holdersOfCascadingMembers.insert(entry.first.first);
   for (auto &entry: map)
     addDependency(Node::Kind::nominals,
                   nullptr,
