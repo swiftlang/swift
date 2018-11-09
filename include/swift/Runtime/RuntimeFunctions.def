@@ -650,6 +650,23 @@ FUNCTION(GetAssociatedTypeWitness, swift_getAssociatedTypeWitness, SwiftCC,
               ProtocolRequirementStructTy->getPointerTo()),
          ATTRS(NoUnwind, ReadNone))
 
+// SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+// const WitnessTable *swift_getAssociatedConformanceWitness(
+//                                 WitnessTable *wtable,
+//                                 const Metadata *conformingType,
+//                                 const Metadata *assocType,
+//                                 const ProtocolRequirement *reqBase,
+//                                 const ProtocolRequirement *assocConformance);
+FUNCTION(GetAssociatedConformanceWitness,
+         swift_getAssociatedConformanceWitness, SwiftCC,
+         RETURNS(WitnessTablePtrTy),
+         ARGS(WitnessTablePtrTy,
+              TypeMetadataPtrTy,
+              TypeMetadataPtrTy,
+              ProtocolRequirementStructTy->getPointerTo(),
+              ProtocolRequirementStructTy->getPointerTo()),
+         ATTRS(NoUnwind, ReadNone))
+
 // Metadata *swift_getMetatypeMetadata(Metadata *instanceTy);
 FUNCTION(GetMetatypeMetadata, swift_getMetatypeMetadata, C_CC,
          RETURNS(TypeMetadataPtrTy),
