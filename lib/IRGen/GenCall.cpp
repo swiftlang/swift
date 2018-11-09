@@ -2700,8 +2700,6 @@ void CallEmission::setArgs(Explosion &original, bool isOutlined,
   case SILFunctionTypeRepresentation::Block:
     adjusted.add(getCallee().getBlockObject());
     LLVM_FALLTHROUGH;
-  // SWIFT_ENABLE_TENSORFLOW
-  case SILFunctionTypeRepresentation::TensorFlow:
   case SILFunctionTypeRepresentation::CFunctionPointer:
     externalizeArguments(IGF, getCallee(), original, adjusted,
                          Temporaries, isOutlined);
@@ -2719,6 +2717,8 @@ void CallEmission::setArgs(Explosion &original, bool isOutlined,
 
   case SILFunctionTypeRepresentation::Closure:
   case SILFunctionTypeRepresentation::Method:
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILFunctionTypeRepresentation::TensorFlow:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Thick: {
     // Check for value arguments that need to be passed indirectly.
