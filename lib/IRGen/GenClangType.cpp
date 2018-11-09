@@ -318,7 +318,9 @@ ClangTypeConverter::reverseBuiltinTypeMapping(IRGenModule &IGM,
   // On 64-bit Windows, no C type is imported as an Int or UInt; CLong is
   // imported as an Int32 and CLongLong as an Int64. Therefore, manually
   // add mappings to C for Int and UInt.
-  if (IGM.Triple.isOSWindows() && IGM.Triple.isArch64Bit()) {
+  // On 64-bit Cygwin, no manual mapping is required.
+  if (IGM.Triple.isOSWindows() && !IGM.Triple.isWindowsCygwinEnvironment() &&
+      IGM.Triple.isArch64Bit()) {
     // Map UInt to uintptr_t
     auto swiftUIntType = getNamedSwiftType(stdlib, "UInt");
     auto clangUIntPtrType = ctx.getCanonicalType(ctx.getUIntPtrType());
