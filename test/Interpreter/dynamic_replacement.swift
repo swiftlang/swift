@@ -90,11 +90,19 @@ func checkExpectedResults(forOriginalLibrary useOrig: Bool) {
 }
 
 DynamicallyReplaceable.test("DynamicallyReplaceable") {
+  var executablePath = CommandLine.arguments[0]
+  executablePath.removeLast(4)
+
   // First, test with only the original module.
 	checkExpectedResults(forOriginalLibrary: true)
 
   // Now, test with the module containing the replacements.
+
+#if os(Linux)
 	_ = dlopen("libModule2."+dylibSuffix, RTLD_NOW)
+#else
+	_ = dlopen(executablePath+"libModule2."+dylibSuffix, RTLD_NOW)
+#endif
 	checkExpectedResults(forOriginalLibrary: false)
 }
 

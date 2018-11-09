@@ -4445,12 +4445,18 @@ swift::getInheritedForPrinting(const Decl *decl,
     inherited = ed->getInherited();
   }
 
-  // Collect explicit inheritted types.
+  // Collect explicit inherited types.
   for (auto TL: inherited) {
-    if (auto Ty = TL.getType()) {
-      if (auto NTD = Ty->getAnyNominal())
-        if (!shouldPrint(NTD))
-          continue;
+    if (auto ty = TL.getType()) {
+      bool foundUnprintable = ty.findIf([shouldPrint](Type subTy) {
+        if (auto aliasTy = dyn_cast<NameAliasType>(subTy.getPointer()))
+          return !shouldPrint(aliasTy->getDecl());
+        if (auto NTD = subTy->getAnyNominal())
+          return !shouldPrint(NTD);
+        return false;
+      });
+      if (foundUnprintable)
+        continue;
     }
     Results.push_back(TL);
   }

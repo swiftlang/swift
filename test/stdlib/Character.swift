@@ -106,6 +106,7 @@ testCharacters += [
 ]
 
 // Only run it on recent enough versions of ICU
+#if _runtime(_ObjC)
 if #available(iOS 11.0, macOS 10.13, tvOS 11.0, watchOS 4.0, *) {
   testCharacters += [
     "\u{00a9}\u{0300}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 12 bytes
@@ -116,6 +117,7 @@ if #available(iOS 11.0, macOS 10.13, tvOS 11.0, watchOS 4.0, *) {
     "👩‍👩‍👦‍👦", // UTF-8: 25 bytes
   ]
 }
+#endif
 
 func randomGraphemeCluster(_ minSize: Int, _ maxSize: Int) -> String {
   let n = Int.random(in: (minSize + 1) ..< maxSize)

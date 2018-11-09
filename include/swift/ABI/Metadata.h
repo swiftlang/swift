@@ -2502,137 +2502,13 @@ struct TargetGenericContextDescriptorHeader {
 using GenericContextDescriptorHeader =
   TargetGenericContextDescriptorHeader<InProcess>;
 
-/// A reference to a generic parameter that is the subject of a requirement.
-/// This can refer either directly to a generic parameter or to a path to an
-/// associated type.
-template<typename Runtime>
-class TargetGenericParamRef {
-  union {
-    /// The word of storage, whose low bit indicates whether there is an
-    /// associated type path stored out-of-line and whose upper bits describe
-    /// the generic parameter at root of the path.
-    uint32_t Word;
-
-    /// This is the associated type path stored out-of-line. The \c bool
-    /// is used for masking purposes and is otherwise unused; instead, check
-    /// the low bit of \c Word.
-    RelativeDirectPointerIntPair<const void, bool> AssociatedTypePath;
-  };
-
-public:
-  /// Index of the parameter being referenced. 0 is the first generic parameter
-  /// of the root of the context hierarchy, and subsequent parameters are
-  /// numbered breadth-first from there.
-  unsigned getRootParamIndex() const {
-    // If there is no path, retrieve the index directly.
-    if ((Word & 0x01) == 0) return Word >> 1;
-
-    // Otherwise, the index is at the start of the associated type path.
-    return *reinterpret_cast<const unsigned *>(AssociatedTypePath.getPointer());
-  }
-  
-  /// A reference to an associated type along the reference path.
-  struct AssociatedTypeRef {
-    /// The protocol the associated type belongs to.
-    RelativeIndirectablePointer<TargetProtocolDescriptor<Runtime>,
-                                /*nullable*/ false> Protocol;
-    /// A reference to the associated type descriptor within the protocol.
-    RelativeIndirectablePointer<TargetProtocolRequirement<Runtime>,
-                                /*nullable*/ false> Requirement;
-  };
-  
-  /// A forward iterator that walks through the associated type path, which is
-  /// a zero-terminated array of AssociatedTypeRefs.
-  class AssociatedTypeIterator {
-    const void *addr;
-    
-    explicit AssociatedTypeIterator(const void *startAddr) : addr(startAddr) {}
-    
-    bool isEnd() const {
-      if (addr == nullptr)
-        return true;
-      unsigned word;
-      memcpy(&word, addr, sizeof(unsigned));
-      if (word == 0)
-        return true;
-      return false;
-    }
-
-    template <class> friend class TargetGenericParamRef;
-
-  public:
-    AssociatedTypeIterator() : addr(nullptr) {}
-
-    using iterator_category = std::forward_iterator_tag;
-    using value_type = AssociatedTypeRef;
-    using difference_type = std::ptrdiff_t;
-    using pointer = const AssociatedTypeRef *;
-    using reference = const AssociatedTypeRef &;
-    
-    bool operator==(AssociatedTypeIterator i) const {
-      // Iterators are same if they both point at the same place, or are both
-      // at the end (either by being initialized as an end iterator with a
-      // null address, or by being advanced to the null terminator of an
-      // associated type list).
-      if (addr == i.addr)
-        return true;
-      
-      if (isEnd() && i.isEnd())
-        return true;
-      
-      return false;
-    }
-    
-    bool operator!=(AssociatedTypeIterator i) const {
-      return !(*this == i);
-    }
-    
-    reference operator*() const {
-      return *reinterpret_cast<pointer>(addr);
-    }
-    pointer operator->() const {
-      return reinterpret_cast<pointer>(addr);
-    }
-    
-    AssociatedTypeIterator &operator++() {
-      addr = reinterpret_cast<const char*>(addr) + sizeof(AssociatedTypeRef);
-      return *this;
-    }
-    
-    AssociatedTypeIterator operator++(int) {
-      auto copy = *this;
-      ++*this;
-      return copy;
-    }
-  };
-  
-  /// Iterators for going through the associated type path from the root param.
-  AssociatedTypeIterator begin() const {
-    if (Word & 0x01) {
-      // The associated types start after the first word, which holds the
-      // root param index.
-      return AssociatedTypeIterator(
-        reinterpret_cast<const char*>(AssociatedTypePath.getPointer()) +
-                                        sizeof(unsigned));
-    } else {
-      // This is a direct param reference, so there are no associated types.
-      return end();
-    }
-  }
-  
-  AssociatedTypeIterator end() const {
-    return AssociatedTypeIterator{};
-  }
-};
-
-using GenericParamRef = TargetGenericParamRef<InProcess>;
-
 template<typename Runtime>
 class TargetGenericRequirementDescriptor {
 public:
   GenericRequirementFlags Flags;
-  /// The generic parameter or associated type that's constrained.
-  TargetGenericParamRef<Runtime> Param;
+
+  /// The type that's constrained, described as a mangled name.
+  RelativeDirectPointer<const char, /*nullable*/ false> Param;
 
 private:
   union {
@@ -2668,9 +2544,10 @@ public:
     return getFlags().getKind();
   }
 
-  /// Retrieve the generic parameter that is the subject of this requirement.
-  const TargetGenericParamRef<Runtime> &getParam() const {
-    return Param;
+  /// Retrieve the generic parameter that is the subject of this requirement,
+  /// as a mangled type name.
+  StringRef getParam() const {
+    return swift::Demangle::makeSymbolicMangledNameStringRef(Param.get());
   }
 
   /// Retrieve the protocol for a Protocol requirement.

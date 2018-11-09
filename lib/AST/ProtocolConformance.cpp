@@ -387,6 +387,23 @@ bool NormalProtocolConformance::isSynthesizedNonUnique() const {
   return isa<ClangModuleUnit>(getDeclContext()->getModuleScopeContext());
 }
 
+bool NormalProtocolConformance::isResilient() const {
+  // If the type is non-resilient or the module we're in is non-resilient, the
+  // conformance is non-resilient.
+  // FIXME: Looking at the type is not the right long-term solution. We need an
+  // explicit mechanism for declaring conformances as 'fragile', or even
+  // individual witnesses.
+  if (!getType()->getAnyNominal()->isResilient())
+    return false;
+
+  switch (getDeclContext()->getParentModule()->getResilienceStrategy()) {
+  case ResilienceStrategy::Resilient:
+    return true;
+  case ResilienceStrategy::Default:
+    return false;
+  }
+}
+
 Optional<ArrayRef<Requirement>>
 ProtocolConformance::getConditionalRequirementsIfAvailable() const {
   CONFORMANCE_SUBCLASS_DISPATCH(getConditionalRequirementsIfAvailable, ());

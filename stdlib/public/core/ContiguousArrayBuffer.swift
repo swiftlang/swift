@@ -551,6 +551,7 @@ extension _ContiguousArrayBuffer : RandomAccessCollection {
     return count
   }
 
+  @usableFromInline
   internal typealias Indices = Range<Int>
 }
 
