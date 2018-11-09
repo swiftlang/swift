@@ -953,6 +953,7 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   void visitGradientInst(GradientInst *i);
+  void visitAutoDiffFunctionInst(AutoDiffFunctionInst *i);
   void visitGraphOperationInst(GraphOperationInst *i);
 
   void visitFunctionRefInst(FunctionRefInst *i);
@@ -1981,6 +1982,10 @@ void IRGenSILFunction::visitGradientInst(GradientInst *i) {
     setLoweredExplosion(result, e);
   }
   return;
+}
+
+void IRGenSILFunction::visitAutoDiffFunctionInst(AutoDiffFunctionInst *i) {
+  llvm_unreachable("FIXME: handle this");
 }
 
 // The code structure resembles

@@ -1152,6 +1152,31 @@ public:
     *this << getIDAndType(GI->getOriginal());
   }
 
+  void visitAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
+    if (adfi->isLegacyReverseMode())
+      *this << "[legacy_reverse] ";
+    if (adfi->getParameterIndices().any()) {
+      *this << "[wrt";
+      for (auto i : adfi->getParameterIndices().set_bits())
+        *this << ' ' << i;
+      *this << "] ";
+    }
+    *this << "[order " << adfi->getDifferentiationOrder() << "] ";
+    *this << getIDAndType(adfi->getOriginalFunction());
+    if (!adfi->getAssociatedFunctions().empty()) {
+      *this << " with ";
+      interleave(range(1, adfi->getDifferentiationOrder() + 1),
+                 [&](unsigned order) {
+                   auto list = adfi->getAssociatedFunctionList(order);
+                   *this << '{';
+                   interleave(list, [&](const Operand &op) {
+                     *this << getIDAndType(op.get());
+                   }, [this] { *this << ", "; });
+                   *this << '}';
+                 }, [this] { *this << ", "; });
+    }
+  }
+
   void visitFunctionRefInst(FunctionRefInst *FRI) {
     FRI->getReferencedFunction()->printName(PrintState.OS);
     *this << " : " << FRI->getType();

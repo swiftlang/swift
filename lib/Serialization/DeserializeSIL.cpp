@@ -1483,6 +1483,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createGradient(Loc, Val, config);
     break;
   }
+  case SILInstructionKind::AutoDiffFunctionInst: {
+    llvm_unreachable("FIXME: Unhandled");
+  }
   case SILInstructionKind::GraphOperationInst: {
     // TODO(SR-8848): Deserialize attributes.
     auto EndOfArgValues = 3 * NumArguments;

@@ -609,6 +609,44 @@ GradientInst::create(SILModule &M, SILDebugLocation debugLoc,
   return ::new (buffer) GradientInst(M, debugLoc, original, config);
 }
 
+SILType
+AutoDiffFunctionInst::getAutoDiffType(SILValue originalFunction,
+                                      unsigned differentiationOrder,
+                                      const SmallBitVector &parameterIndices) {
+  auto fnTy = originalFunction->getType().castTo<SILFunctionType>();
+  auto diffTy =
+      fnTy->getWithDifferentiability(differentiationOrder, parameterIndices);
+  return SILType::getPrimitiveObjectType(diffTy);
+}
+
+AutoDiffFunctionInst::AutoDiffFunctionInst(
+    SILModule &module, SILDebugLocation debugLoc, bool isLegacyReverseMode,
+    const SmallBitVector &parameterIndices, unsigned differentiationOrder,
+    SILValue originalFunction, ArrayRef<SILValue> associatedFunctions)
+    : InstructionBaseWithTrailingOperands(originalFunction, associatedFunctions,
+          debugLoc, getAutoDiffType(originalFunction, differentiationOrder,
+                                    parameterIndices)),
+      legacyReverseModeFlag(isLegacyReverseMode),
+      parameterIndices(parameterIndices),
+      differentiationOrder(differentiationOrder),
+      numOperands(1 + associatedFunctions.size()) {
+}
+
+AutoDiffFunctionInst *AutoDiffFunctionInst::create(
+    SILModule &module, SILDebugLocation debugLoc,
+    bool isLegacyReverseAD, const SmallBitVector &parameterIndices,
+    unsigned differentiationOrder, SILValue originalFunction,
+    ArrayRef<SILValue> associatedFunctions) {
+  size_t size = totalSizeToAlloc<Operand>(associatedFunctions.size() + 1);
+  void *buffer = module.allocateInst(size, alignof(AutoDiffFunctionInst));
+  return ::new (buffer) AutoDiffFunctionInst(module, debugLoc,
+                                             isLegacyReverseAD,
+                                             parameterIndices,
+                                             differentiationOrder,
+                                             originalFunction,
+                                             associatedFunctions);
+}
+
 FunctionRefInst::FunctionRefInst(SILDebugLocation Loc, SILFunction *F)
     : InstructionBase(Loc, F->getLoweredType()),
       Function(F) {

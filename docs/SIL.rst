@@ -5431,8 +5431,8 @@ gradient
 ::
 
   sil-instruction ::= 'gradient' sil-autodiff-param-indices?
-                      sil-autodiff-seedable? sil-autodiff-preserving-result?
-                      sil-value ':' sil-type
+                       sil-autodiff-seedable? sil-autodiff-preserving-result?
+                       sil-value ':' sil-type
   sil-autodiff-param-indices ::= '[' 'wrt' [0-9]+ (',' [0-9]+)* ']'
   sil-autodiff-seedable ::= '[' 'seedable' ']'
   sil-autodiff-preserving-result ::= '[' 'preserving_result' ']'
@@ -5448,6 +5448,58 @@ automatic differentiation.
 
 This instruction is only valid in raw SIL and is rewritten by the automatic
 differentiation pass.
+
+.. SWIFT_ENABLE_TENSORFLOW
+
+autodiff_function
+`````````````````
+
+::
+
+  sil-instruction ::= 'autodiff_function'
+                      sil-autodiff-function-legacy-reverse-mode?
+                      sil-autodiff-function-parameter-indices?
+                      sil-autodiff-function-order?
+                      sil-value ':' sil-type
+                      sil-autodiff-associated-functions-clause?
+                      
+  sil-autodiff-function-legacy-reverse-mode ::= '[' 'legacy_reverse' ']'
+  sil-autodiff-function-parameter-indices ::= '[' 'wrt' [0-9]+ (',', [0-9]+)* ']'
+  sil-autodiff-function-order ::= '[' 'order' [0-9]+ ']'
+  sil-autodiff-associated-functions-clause ::= 'with' sil-autodiff-associated-function-list
+                                               (',' sil-autodiff-associated-function-list)*
+  sil-autodiff-associated-function-list ::= '{' sil-value (',' sil-value)* '}'
+
+
+  autodiff_function [wrt 0] [order 1] %0 : $(T) -> T \
+    with {%1 : $(T) -> (T) -> T, %2 : $(T, @box {...}) -> T, \
+      %3 : $(T) -> (T) -> T, %4 : $(T, @box {...}) -> T}
+  autodiff_function [legacy_reverse] [wrt 0] [order 1] %0 : $(T) -> T \
+    with {%1 : $(T) -> (..., T), %2 : $(T, ..., T, T) -> T}
+
+Bundles a function with its associated differentiation functions up to a
+specified differentiation order into an ``@autodiff`` function. Normally, there
+are 4 associated functions per differentiation order: a Jacobian-vector products
+(JVP) function, a thick differential function that acts as the JVP function's
+result, vector-Jacobian products (VJP) function, and a thick pullback function
+that acts as the VJP function's result. When ``[legacy_reverse]`` is specified,
+only first-order reverse-mode differentiation is legal, and only two functions
+are being bundled: the primal function and the adjoint function.
+
+``[parameters ...]`` specifies parameter indices that the original function is
+differentiable with respect to. When not specified, it defaults to all
+parameters.
+
+``[order ...]`` specifies the maximum differentiation order for the resulting
+function. The number of lists of associated functions is equal to the order.
+
+A ``with`` clause specifies the differentiation functions associated
+with the original function. When a ``with`` clause is not specified, the first
+operand will be differentiated to produce associated functions, and a ``with``
+clause will be added to the instruction.
+
+In raw SIL, it is optional to provide a ``with`` clause. In canonical SIL, a
+``with`` clause is mandatory.
 
 .. SWIFT_ENABLE_TENSORFLOW
 

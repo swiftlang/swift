@@ -2923,8 +2923,115 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (parseSILDebugLocation(InstLoc, B))
       return true;
     SILAutoDiffConfig config(
-      {sourceIndex, paramIndices}, existingOptions);
+        {sourceIndex, paramIndices}, existingOptions);
     ResultVal = B.createGradient(InstLoc, original, config);
+    break;
+  }
+
+  case SILInstructionKind::AutoDiffFunctionInst: {
+    // e.g. autodiff_function [wrt 0 1 2] [order 2] %0 : $T
+    //
+    // e.g. autodiff_function [wrt 0 1 2] [order 2] %0 : $T with
+    //      { %1 : $T, %2 : $T, %3 : $T, %4 : $T },
+    //      { %5 : $T, %6 : $T, %7 : $T, %8 : $T }
+    // //      ^ vjp    ^ df     ^ jvp    ^ pullback
+    //
+    // e.g. autodiff_function [legacy_reverse] [wrt 0 1 2] %0 : $T with
+    //      { %1 : $T,    %2 : $T }
+    // //      ^ primal    ^ adjoint
+    SourceLoc lastLoc;
+    bool isLegacyReverseMode;
+    SmallBitVector parameterIndices(32);
+    unsigned order = 1;
+    // Parse optional `[legacy_reverse]`
+    if (P.Tok.is(tok::l_square) &&
+        P.peekToken().is(tok::identifier) &&
+        P.peekToken().getText() == "legacy_reverse") {
+      P.consumeToken(tok::l_square);
+      P.consumeToken(tok::identifier);
+      isLegacyReverseMode = true;
+      if (P.parseToken(tok::r_square,
+                       diag::sil_inst_autodiff_attr_expected_rsquare,
+                       "legacy reverse mode indicator"))
+        return true;
+    }
+    // Parse optional `[wrt <integer_literal>...]`
+    if (P.Tok.is(tok::l_square) &&
+        P.peekToken().is(tok::identifier) &&
+        P.peekToken().getText() == "wrt") {
+      P.consumeToken(tok::l_square);
+      P.consumeToken(tok::identifier);
+      // Parse indices.
+      unsigned size = parameterIndices.size();
+      while (P.Tok.is(tok::integer_literal)) {
+        unsigned index;
+        if (P.parseUnsignedInteger(index, lastLoc,
+              diag::sil_reverse_autodiff_expected_parameter_index))
+          return true;
+        if (index >= size)
+          parameterIndices.resize((size *= 2));
+        parameterIndices.set(index);
+      }
+      if (P.parseToken(tok::r_square,
+                       diag::sil_inst_autodiff_attr_expected_rsquare,
+                       "parameter index list"))
+        return true;
+    }
+    // Parse optional `[order <integer_literal>]`.
+    if (P.Tok.is(tok::l_square) &&
+        P.peekToken().is(tok::identifier) &&
+        P.peekToken().getText() == "order") {
+      P.consumeToken(tok::l_square);
+      P.consumeToken(tok::identifier);
+      // Parse an order.
+      if (P.parseUnsignedInteger(order, lastLoc,
+                                 diag::sil_inst_autodiff_expected_order) ||
+          P.parseToken(tok::r_square,
+                       diag::sil_inst_autodiff_attr_expected_rsquare,
+                       "differentiation order"))
+        return true;
+    }
+    // Parse the original function value.
+    SILValue original;
+    if (parseTypedValueRef(original, B))
+      return true;
+    SmallVector<SILValue, 16> associatedFunctions;
+    /*
+    // Parse optional operand lists `with { <operand>... }, ...`.
+    if (P.Tok.is(tok::identifier) && P.Tok.getText() == "with") {
+      P.consumeToken(tok::identifier);
+      // Parse associated function values as operand lists. There are as many
+      // operand lists as the differentiation order.
+      auto numFnsPerOrder = autodiff::
+          getNumAutoDiffAssociatedFunctionsPerOrder(isLegacyReverseMode);
+      associatedFunctions.reserve(numFnsPerOrder * order);
+      for (unsigned listIdx = 0; listIdx < order; ++listIdx) {
+        if (P.parseToken(tok::l_brace,
+                         diag::sil_inst_autodiff_operand_list_expected_lbrace))
+          return true;
+        for (unsigned fnIdx : range(numFnsPerOrder)) {
+          if (fnIdx != 0)
+            if (P.parseToken(tok::comma,
+                  diag::sil_inst_autodiff_operand_list_expected_comma))
+              return true;
+          SILValue newAssocFn;
+          if (parseTypedValueRef(newAssocFn, B))
+            return true;
+          associatedFunctions.push_back(newAssocFn);
+        }
+      }
+      if (P.Tok.is(tok::l_brace)) {
+        P.diagnose(P.Tok,
+                   diag::sil_inst_autodiff_num_operand_list_order_mismatch);
+        return true;
+      }
+    }
+     */
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createAutoDiffFunction(InstLoc, isLegacyReverseMode,
+                                         parameterIndices, order, original,
+                                         associatedFunctions);
     break;
   }
 

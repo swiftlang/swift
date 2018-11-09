@@ -1253,6 +1253,10 @@ public:
     }
   }
 
+  void checkAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
+    // TODO: Handle this.
+  }
+
   void verifyLLVMIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID) {
     // Certain llvm intrinsic require constant values as their operands.
     // Consequently, these must not be phi nodes (aka. basic block arguments).

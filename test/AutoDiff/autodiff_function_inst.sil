@@ -1,0 +1,27 @@
+// RUN: %target-sil-opt -sil-print-all %s | %FileCheck %s
+
+sil_stage raw
+
+import Swift
+
+sil hidden @foo_adj : $@convention(thin) (Float, Float, Float) -> Float {
+bb0(%0 : @trivial $Float, %1 : @trivial $Float, %2 : @trivial $Float):
+  return %2 : $Float
+}
+
+sil hidden [reverse_differentiable source 0 wrt 0 primal @foo adjoint @foo_adj primitive] @foo : $@convention(thin) (Float) -> Float {
+bb0(%0 : @trivial $Float):
+  return %0 : $Float
+}
+
+sil @make_diff_func : $@convention(thin) () -> @autodiff @convention(thin) (Float) -> Float {
+bb0:
+  %0 = function_ref @foo : $@convention(thin) (Float) -> Float
+  %1 = autodiff_function [legacy_reverse] [wrt 0 1] [order 1] %0 : $@convention(thin) (Float) -> Float
+  return %0 : $@convention(thin) (Float) -> Float
+}
+
+// CHECK-LABEL: @make_diff_func
+// CHECK: %0 = function_ref @foo : $@convention(thin) (Float) -> Float
+// CHECK: %1 = autodiff_function [legacy_reverse] [wrt 0 1] [order 1] %0 : $@convention(thin) (Float) -> Float
+// CHECK: return %1 : $@autodiff @convention(thin) (Float) -> Float
