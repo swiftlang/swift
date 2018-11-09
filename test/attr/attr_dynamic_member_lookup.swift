@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift
+
 var global = 42
 
 @dynamicMemberLookup
@@ -33,30 +34,25 @@ struct NonMutSettable {
   }
 }
 
-func test_function(b: Settable) {
-  var bm = b
-  bm.flavor = global
-}
-
 func test(a: Gettable, b: Settable, c: MutGettable, d: NonMutSettable) {
   global = a.wyverns
-  a.flavor = global    // expected-error {{cannot assign to property: 'a' is a 'let' constant}}
-  
+  a.flavor = global // expected-error {{cannot assign to property: 'a' is a 'let' constant}}
+
   global = b.flavor
   b.universal = global // expected-error {{cannot assign to property: 'b' is a 'let' constant}}
-  b.thing += 1         // expected-error {{left side of mutating operator isn't mutable: 'b' is a 'let' constant}}
+  b.thing += 1 // expected-error {{left side of mutating operator isn't mutable: 'b' is a 'let' constant}}
 
   var bm = b
   global = bm.flavor
   bm.universal = global
   bm.thing += 1
-  
+
   var cm = c
-  global = c.dragons  // expected-error {{cannot use mutating getter on immutable value: 'c' is a 'let' constant}}
+  global = c.dragons // expected-error {{cannot use mutating getter on immutable value: 'c' is a 'let' constant}}
   global = c[dynamicMember: "dragons"] // expected-error {{cannot use mutating getter on immutable value: 'c' is a 'let' constant}}
   global = cm.dragons
   c.woof = global // expected-error {{cannot use mutating getter on immutable value: 'c' is a 'let' constant}}
-  
+
   var dm = d
   global = d.dragons  // ok
   global = dm.dragons // ok
@@ -64,16 +60,15 @@ func test(a: Gettable, b: Settable, c: MutGettable, d: NonMutSettable) {
   dm.woof = global    // ok
 }
 
-
-func test_iuo(a : Gettable!, b : Settable!) {
+func testIUO(a: Gettable!, b: Settable!) {
   global = a.wyverns
-  a.flavor = global  // expected-error {{cannot assign through dynamic lookup property: 'a' is a 'let' constant}}
-  
+  a.flavor = global // expected-error {{cannot assign through dynamic lookup property: 'a' is a 'let' constant}}
+
   global = b.flavor
   b.universal = global // expected-error {{cannot assign through dynamic lookup property: 'b' is a 'let' constant}}
-  
-  var bm : Settable! = b
-  
+
+  var bm: Settable! = b
+
   global = bm.flavor
   bm.universal = global
 }
@@ -84,37 +79,16 @@ func test_iuo(a : Gettable!, b : Settable!) {
 
 @dynamicMemberLookup
 struct FnTest {
-  subscript(dynamicMember member: StaticString) -> (_ a : Int)->() {
-    return { a in () }
+  subscript(dynamicMember member: StaticString) -> (Int) -> () {
+    return { x in () }
   }
 }
-func test_function(x : FnTest) {
+func testFunction(x: FnTest) {
   x.phunky(12)
 }
-func test_function_iuo(x : FnTest!) {
+func testFunctionIUO(x: FnTest!) {
   x.flavor(12)
 }
-
-//===----------------------------------------------------------------------===//
-// Existential Cases
-//===----------------------------------------------------------------------===//
-
-
-@dynamicMemberLookup
-protocol ProtoExt { }
-extension ProtoExt {
-  subscript(dynamicMember member: String) -> String {
-    get {}
-  }
-}
-
-extension String: ProtoExt { }
-
-func testProtoExt() -> String {
-  let str = "test"
-  return str.sdfsdfsdf
-}
-
 
 //===----------------------------------------------------------------------===//
 // Explicitly declared members take precedence
@@ -123,7 +97,7 @@ func testProtoExt() -> String {
 @dynamicMemberLookup
 struct Dog {
   public var name = "Kaylee"
-  
+
   subscript(dynamicMember member: String) -> String {
     return "Zoey"
   }
@@ -138,27 +112,26 @@ func testDog(person: Dog) -> String {
 //===----------------------------------------------------------------------===//
 
 @dynamicMemberLookup
-struct IUOResultTest {
+struct IUOResult {
   subscript(dynamicMember member: StaticString) -> Int! {
     get { return 42 }
     nonmutating set {}
   }
 }
 
-func test_iuo_result(x : IUOResultTest) {
-  x.foo?.negate()   // Test mutating writeback.
-  
-  let _ : Int = x.bar  // Test implicitly forced optional
+func testIUOResult(x: IUOResult) {
+  x.foo?.negate() // Test mutating writeback.
+
+  let _: Int = x.bar // Test implicitly forced optional
   let b = x.bar
   // expected-note@-1{{short-circuit}}
   // expected-note@-2{{coalesce}}
   // expected-note@-3{{force-unwrap}}
 
-  let _ : Int = b // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  let _: Int = b // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
   // expected-note@-1{{coalesce}}
   // expected-note@-2{{force-unwrap}}
 }
-
 
 //===----------------------------------------------------------------------===//
 // Error cases
@@ -194,12 +167,11 @@ struct Ambiguity {
   }
 }
 
-func testAmbiguity(a : Ambiguity) {
-  let _ : Int = a.flexibility
-  let _ : Float = a.dynamism
-  _ = a.dynamism  // expected-error {{ambiguous use of 'subscript(dynamicMember:)'}}
+func testAmbiguity(a: Ambiguity) {
+  let _: Int = a.flexibility
+  let _: Float = a.dynamism
+  _ = a.dynamism // expected-error {{ambiguous use of 'subscript(dynamicMember:)'}}
 }
-
 
 // expected-error @+1 {{'@dynamicMemberLookup' attribute cannot be applied to this declaration}}
 @dynamicMemberLookup
@@ -209,10 +181,9 @@ extension Int {
   }
 }
 
-@dynamicMemberLookup  // expected-error {{'@dynamicMemberLookup' attribute cannot be applied to this declaration}}
-func NotAllowedOnFunc() {
-}
-
+// expected-error @+1 {{'@dynamicMemberLookup' attribute cannot be applied to this declaration}}
+@dynamicMemberLookup
+func NotAllowedOnFunc() {}
 
 // @dynamicMemberLookup cannot be declared on a base class and fulfilled with a
 // derived class.
@@ -226,44 +197,57 @@ class InvalidDerived : InvalidBase { subscript(dynamicMember: String) -> Int { g
 // expected-error @+1 {{value of type 'InvalidDerived' has no member 'dynamicallyLookedUp'}}
 _ = InvalidDerived().dynamicallyLookedUp
 
-
 //===----------------------------------------------------------------------===//
-// Test Existential
+// Existentials
 //===----------------------------------------------------------------------===//
 
 @dynamicMemberLookup
-protocol PyVal {
-  subscript(dynamicMember member: StaticString) -> PyVal { get nonmutating set }
-}
-extension PyVal {
-  subscript(dynamicMember member: StaticString) -> PyVal {
-    get { fatalError() } nonmutating set {}
+protocol DynamicProtocol {
+  subscript(dynamicMember member: StaticString) -> DynamicProtocol {
+    get nonmutating set
   }
 }
 
-struct MyType : PyVal {
+struct MyDynamicStruct : DynamicProtocol {
+  subscript(dynamicMember member: StaticString) -> DynamicProtocol {
+    get { fatalError() }
+    nonmutating set {}
+  }
 }
 
-
-func testMutableExistential(a : PyVal, b : MyType) -> PyVal {
+func testMutableExistential(a: DynamicProtocol,
+                            b: MyDynamicStruct) -> DynamicProtocol {
   a.x.y = b
   b.x.y = b
   return a.foo.bar.baz
 }
 
+// Verify protocol compositions and protocol refinements work.
+protocol SubDynamicProtocol : DynamicProtocol {}
+typealias ProtocolComp = AnyObject & DynamicProtocol
 
-// Verify the protocol compositions and protocol refinements work.
-protocol SubPyVal : PyVal { }
-
-typealias ProtocolComp = AnyObject & PyVal
-
-func testMutableExistential2(a : AnyObject & PyVal, b : SubPyVal,
-                             c : ProtocolComp & AnyObject)  {
+func testMutableExistential2(a: AnyObject & DynamicProtocol,
+                             b: SubDynamicProtocol,
+                             c: ProtocolComp & AnyObject) {
   a.x.y = b
   b.x.y = b
   c.x.y = b
 }
 
+@dynamicMemberLookup
+protocol ProtoExt {}
+extension ProtoExt {
+  subscript(dynamicMember member: String) -> String {
+    get {}
+  }
+}
+
+extension String: ProtoExt {}
+
+func testProtoExt() -> String {
+  let str = "test"
+  return str.sdfsdfsdf
+}
 
 //===----------------------------------------------------------------------===//
 // JSON example
@@ -276,7 +260,7 @@ enum JSON {
   case ArrayValue(Array<JSON>)
   case DictionaryValue(Dictionary<String, JSON>)
 
-  var stringValue : String? {
+  var stringValue: String? {
     if case .StringValue(let str) = self {
       return str
     }
@@ -294,7 +278,7 @@ enum JSON {
     }
     return nil
   }
-  
+
   subscript(dynamicMember member: String) -> JSON? {
     if case .DictionaryValue(let dict) = self {
       return dict[member]
@@ -302,13 +286,13 @@ enum JSON {
     return nil
   }
 }
-func test_json_example(x : JSON) -> String? {
+func testJsonExample(x: JSON) -> String? {
   _ = x.name?.first
   return x.name?.first?.stringValue
 }
 
 //===----------------------------------------------------------------------===//
-// Derived Class Example
+// Class inheritance tests
 //===----------------------------------------------------------------------===//
 
 @dynamicMemberLookup
@@ -317,27 +301,24 @@ class BaseClass {
     return 42
   }
 }
-class DerivedClass : BaseClass {
-}
+class DerivedClass : BaseClass {}
 
-func testDerivedClass(x : BaseClass, y : DerivedClass) -> Int {
+func testDerivedClass(x: BaseClass, y: DerivedClass) -> Int {
   return x.life - y.the + x.universe - y.and + x.everything
 }
-
 
 // Test that derived classes can add a setter.
 class DerivedClassWithSetter : BaseClass {
   override subscript(dynamicMember member: String) -> Int {
     get { return super[dynamicMember: member] }
-    set { }
+    set {}
   }
 }
 
-func testOverrideSubscript(a : BaseClass, b: DerivedClassWithSetter) {
+func testOverrideSubscript(a: BaseClass, b: DerivedClassWithSetter) {
   let x = a.frotz + b.garbalaz
   b.baranozo = x
-  
-  a.balboza = 12  // expected-error {{cannot assign to property}}
+  a.balboza = 12 // expected-error {{cannot assign to property}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -352,12 +333,12 @@ struct SettableGeneric1<T> {
   }
 }
 
-func testGenericType<T>(a : SettableGeneric1<T>, b : T) -> T? {
+func testGenericType<T>(a: SettableGeneric1<T>, b: T) -> T? {
   a.dfasdf = b
   return a.dfsdffff
 }
 
-func testConcreteGenericType(a : SettableGeneric1<Int>) -> Int? {
+func testConcreteGenericType(a: SettableGeneric1<Int>) -> Int? {
   a.dfasdf = 42
   return a.dfsdffff
 }
@@ -370,15 +351,40 @@ struct SettableGeneric2<T> {
   }
 }
 
-func testGenericType2<T>(a : SettableGeneric2<T>, b : T) -> T? {
+func testGenericType2<T>(a: SettableGeneric2<T>, b: T) -> T? {
   a[dynamicMember: "fasdf"] = b
   a.dfasdf = b
   return a.dfsdffff
 }
 
-func testConcreteGenericType2(a : SettableGeneric2<Int>) -> Int? {
+func testConcreteGenericType2(a: SettableGeneric2<Int>) -> Int? {
   a.dfasdf = 42
   return a.dfsdffff
+}
+
+// SR-8077 test case.
+// `subscript(dynamicMember:)` works as a `@dynamicMemberLookup` protocol
+// requirement.
+@dynamicMemberLookup
+protocol GenericProtocol {
+  associatedtype S: ExpressibleByStringLiteral
+  associatedtype T
+  subscript(dynamicMember member: S) -> T { get }
+}
+
+@dynamicMemberLookup
+class GenericClass<S: ExpressibleByStringLiteral, T> {
+  let t: T
+  init(_ t: T) { self.t = t }
+  subscript(dynamicMember member: S) -> T { return t }
+}
+
+func testGenerics<S, T, P: GenericProtocol>(
+  a: P,
+  b: AnyObject & GenericClass<S, T>
+) where P.S == S, P.T == T {
+  let _: T = a.wew
+  let _: T = b.lad
 }
 
 //===----------------------------------------------------------------------===//

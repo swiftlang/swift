@@ -3083,26 +3083,45 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
 /// particularly fast in the face of deep class hierarchies or lots of protocol
 /// conformances, but this is fine because it doesn't get invoked in the normal
 /// name lookup path (only when lookup is about to fail).
-static bool hasDynamicMemberLookupAttribute(CanType ty,
+static bool hasDynamicMemberLookupAttribute(Type type,
                     llvm::DenseMap<CanType, bool> &DynamicMemberLookupCache) {
-  auto it = DynamicMemberLookupCache.find(ty);
+  auto canType = type->getCanonicalType();
+  auto it = DynamicMemberLookupCache.find(canType);
   if (it != DynamicMemberLookupCache.end()) return it->second;
-  
-  auto calculate = [&]()-> bool {
-    // If this is a protocol composition, check to see if any of the protocols
-    // have the attribute on them.
-    if (auto protocolComp = ty->getAs<ProtocolCompositionType>()) {
-      for (auto p : protocolComp->getMembers())
-        if (hasDynamicMemberLookupAttribute(p->getCanonicalType(),
-                                            DynamicMemberLookupCache))
-          return true;
-      return false;
+
+  // Calculate @dynamicMemberLookup attribute for composite types with multiple
+  // components (protocol composition types and archetypes).
+  auto calculateForComponentTypes =
+      [&](ArrayRef<Type> componentTypes) -> bool {
+    for (auto componentType : componentTypes)
+      if (hasDynamicMemberLookupAttribute(componentType,
+                                          DynamicMemberLookupCache))
+        return true;
+    return false;
+  };
+
+  auto calculate = [&]() -> bool {
+    // If this is an archetype type, check if any types it conforms to
+    // (superclass or protocols) have the attribute.
+    if (auto archetype = dyn_cast<ArchetypeType>(canType)) {
+      SmallVector<Type, 2> componentTypes;
+      for (auto protocolDecl : archetype->getConformsTo())
+        componentTypes.push_back(protocolDecl->getDeclaredType());
+      if (auto superclass = archetype->getSuperclass())
+        componentTypes.push_back(superclass);
+      return calculateForComponentTypes(componentTypes);
     }
-    
-    // Otherwise this has to be a nominal type.
-    auto nominal = ty->getAnyNominal();
-    if (!nominal) return false;  // Dynamic lookups don't exist on tuples, etc.
-    
+
+    // If this is a protocol composition, check if any of its members have the
+    // attribute.
+    if (auto protocolComp = dyn_cast<ProtocolCompositionType>(canType))
+      return calculateForComponentTypes(protocolComp->getMembers());
+
+    // Otherwise, this must be a nominal type.
+    // Dynamic member lookup doesn't work for tuples, etc.
+    auto nominal = canType->getAnyNominal();
+    if (!nominal) return false;
+
     // If this type conforms to a protocol with the attribute, then return true.
     for (auto p : nominal->getAllProtocols())
       if (p->getAttrs().hasAttribute<DynamicMemberLookupAttr>())
@@ -3132,11 +3151,9 @@ static bool hasDynamicMemberLookupAttribute(CanType ty,
   };
   
   auto result = calculate();
-  
-  // Cache this if we can.
-  if (!ty->hasTypeVariable())
-    DynamicMemberLookupCache[ty] = result;
-  
+  // Cache the result if the type does not contain type variables.
+  if (!type->hasTypeVariable())
+    DynamicMemberLookupCache[canType] = result;
   return result;
 }
 
@@ -3552,8 +3569,8 @@ retry_after_fail:
       constraintKind == ConstraintKind::ValueMember &&
       memberName.isSimpleName() && !memberName.isSpecial()) {
     auto name = memberName.getBaseIdentifier();
-    if (hasDynamicMemberLookupAttribute(instanceTy->getCanonicalType(),
-                                        DynamicMemberLookupCache)) {
+    // TC.extract
+    if (hasDynamicMemberLookupAttribute(instanceTy, DynamicMemberLookupCache)) {
       auto &ctx = getASTContext();
 
       // Recursively look up `subscript(dynamicMember:)` methods in this type.
@@ -4680,7 +4697,11 @@ getDynamicCallableMethods(Type type, ConstraintSystem &CS,
     }
   };
 
-  return CS.DynamicCallableCache[canType] = calculate();
+  auto result = calculate();
+  // Cache the result if the type does not contain type variables.
+  if (!type->hasTypeVariable())
+    CS.DynamicCallableCache[canType] = result;
+  return result;
 }
 
 ConstraintSystem::SolutionKind

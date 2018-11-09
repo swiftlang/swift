@@ -1074,18 +1074,12 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   auto decl = cast<NominalTypeDecl>(D);
   auto type = decl->getDeclaredType();
   
-  // Lookup our subscript.
-  auto subscriptName =
-    DeclName(TC.Context, DeclBaseName::createSubscript(),
-             TC.Context.Id_dynamicMember);
+  // Look up `subscript(dynamicMember:)` candidates.
+  auto subscriptName = DeclName(TC.Context, DeclBaseName::createSubscript(),
+                                TC.Context.Id_dynamicMember);
+  auto candidates = TC.lookupMember(decl, type, subscriptName);
   
-  auto lookupOptions = defaultMemberTypeLookupOptions;
-  lookupOptions -= NameLookupFlags::PerformConformanceCheck;
-  
-  // Lookup the implementations of our subscript.
-  auto candidates = TC.lookupMember(decl, type, subscriptName, lookupOptions);
-  
-  // If we have none, then the attribute is invalid.
+  // If there are no candidates, then the attribute is invalid.
   if (candidates.empty()) {
     TC.diagnose(attr->getLocation(), diag::invalid_dynamic_member_lookup_type,
                 type);
@@ -1093,7 +1087,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
     return;
   }
 
-  // If none of the ones we find are acceptable, then reject one.
+  // If no candidates are valid, then reject one.
   auto oneCandidate = candidates.front();
   candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
     auto cand = cast<SubscriptDecl>(entry.getValueDecl());
