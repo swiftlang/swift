@@ -110,7 +110,7 @@ SendsRecvsTests.testAllBackends("testSendsInALoopWithNoResultTensor",
 // If we ever need it in other test cases, can move this helper function to
 // Utilities.swift in TensorFlow stdlib.
 @inline(__always)
-func _scalarTensorWithShapeOnCPU<T: AccelerableByTensorFlow>(_ x: Tensor<T>)
+func _scalarTensorWithShapeOnCPU<T: TensorFlowScalar>(_ x: Tensor<T>)
     -> Tensor<T> {
   let ret: TensorHandle<T> = #tfop(
     "Identity", x, T$dtype:T.tensorFlowDataType, __shapes: [TensorShape()],

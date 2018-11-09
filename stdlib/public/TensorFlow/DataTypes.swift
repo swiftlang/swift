@@ -10,19 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the AccelerableByTensorFlow and related helpers.
+// This file defines the TensorFlowScalar and related helpers.
 //
 // TODO:
 // - Many ops that support int32 and int64 don't support int8 and int16.
 //   Consider removing Int8's and Int16's conformance to
-//   AccelerableByTensorFlow.
+//   TensorFlowScalar.
 //
 //===----------------------------------------------------------------------===//
 
 import CTensorFlow
 
 /// A TensorFlow dynamic type value. Can be created from types that conform to
-/// `AccelerableByTensorFlow`.
+/// `TensorFlowScalar`.
 // This simply wraps TF_DataTypes, which allows user code to handle TF_DataTypes
 // without importing CTensorFlow, which would import a bunch of distracting
 // declarations from the TF C API.
@@ -37,11 +37,8 @@ public struct TensorDataType {
   }
 }
 
-/// A scalar data type compatible with TensorFlow.
-///
-/// Types that conform to `AccelerableByTensorFlow` can be used as the `Scalar`
-/// associated type of `Tensor`, `Tensor1D`, `Tensor2D`, etc.
-public protocol AccelerableByTensorFlow {
+/// A data type compatible with TensorFlow.
+public protocol _TensorFlowDataTypeCompatible {
   /// The underlying TensorFlow data type.
   @inlinable
   static var tensorFlowDataType: TensorDataType { get }
@@ -58,16 +55,18 @@ public protocol AccelerableByTensorFlow {
   /// otherwise.  Users should call the _TFGetScalar wrapper function.
   static func _getScalar(_ handle: TensorHandle<Self>) -> Self?
 
-  /// This converts a scalar to a 0d TensorHandle that contains the value.
-  /// Users should call the _TFMakeScalarTensor wrapper function.
-  static func _makeScalarTensor(_ scalar: Self) -> TensorHandle<Self>
-
   /// This indicates that it is safe to hoist the specified computation that
   /// creates a tensor to being a parameter that is passed in from outside of
   /// the tensor program.
   static func _hoistableClosure(_ fn: () -> TensorHandle<Self>)
     -> TensorHandle<Self>
 }
+
+/// A scalar data type compatible with TensorFlow.
+///
+/// Types that conform to `TensorFlowScalar` can be used as the `Scalar`
+/// associated type of `Tensor`.
+public protocol TensorFlowScalar : _TensorFlowDataTypeCompatible {}
 
 // This is the implementation of the _getScalarOrDie requirement for each
 // concrete type below.  We use this round-about approach to implement the
@@ -91,7 +90,7 @@ private func _TFGetScalarImpl<Scalar>(
   return handle.makeHostCopy().scalar
 }
 
-extension Bool : AccelerableByTensorFlow {
+extension Bool : TensorFlowScalar {
   @inlinable
   public static var tensorFlowDataType: TensorDataType {
     return TensorDataType(TF_BOOL)
@@ -104,10 +103,6 @@ extension Bool : AccelerableByTensorFlow {
   public static func _getScalar(_ handle: TensorHandle<Bool>) -> Bool? {
     return _TFGetScalarImpl(handle)
   }
-  @inlinable @inline(__always)
-  public static func _makeScalarTensor(_ scalar: Bool) -> TensorHandle<Bool> {
-    return _TFTensorFromScalar(scalar)
-  }
   @_silgen_name("__tf_hoistable_Bool") @_optimize(none) @inline(never)
   public static func _hoistableClosure(_ fn: () -> TensorHandle<Bool>)
     -> TensorHandle<Bool> {
@@ -115,7 +110,7 @@ extension Bool : AccelerableByTensorFlow {
   }
 }
 
-extension Int8 : AccelerableByTensorFlow {
+extension Int8 : TensorFlowScalar {
   @inlinable
   public static var tensorFlowDataType: TensorDataType {
     return TensorDataType(TF_INT8)
@@ -128,10 +123,6 @@ extension Int8 : AccelerableByTensorFlow {
   public static func _getScalar(_ handle: TensorHandle<Int8>) -> Int8? {
     return _TFGetScalarImpl(handle)
   }
-  @inlinable @inline(__always)
-  public static func _makeScalarTensor(_ scalar: Int8) -> TensorHandle<Int8> {
-    return _TFTensorFromScalar(scalar)
-  }
   @_silgen_name("__tf_hoistable_Int8") @_optimize(none) @inline(never)
   public static func _hoistableClosure(_ fn: () -> TensorHandle<Int8>)
     -> TensorHandle<Int8> {
@@ -139,7 +130,7 @@ extension Int8 : AccelerableByTensorFlow {
   }
 }
 
-extension UInt8 : AccelerableByTensorFlow {
+extension UInt8 : TensorFlowScalar {
   @inlinable
   public static var tensorFlowDataType: TensorDataType {
     return TensorDataType(TF_UINT8)
@@ -152,10 +143,6 @@ extension UInt8 : AccelerableByTensorFlow {
   public static func _getScalar(_ handle: TensorHandle<UInt8>) -> UInt8? {
     return _TFGetScalarImpl(handle)
   }
-  @inlinable @inline(__always)
-  public static func _makeScalarTensor(_ scalar: UInt8) -> TensorHandle<UInt8> {
-    return _TFTensorFromScalar(scalar)
-  }
   @_silgen_name("__tf_hoistable_UInt8") @_optimize(none) @inline(never)
   public static func _hoistableClosure(_ fn: () -> TensorHandle<UInt8>)
     -> TensorHandle<UInt8> {
@@ -163,7 +150,7 @@ extension UInt8 : AccelerableByTensorFlow {
   }
 }
 
-extension Int16 : AccelerableByTensorFlow {
+extension Int16 : TensorFlowScalar {
   @inlinable
   public static var tensorFlowDataType: TensorDataType {
     return TensorDataType(TF_INT16)
@@ -176,10 +163,6 @@ extension Int16 : AccelerableByTensorFlow {
   public static func _getScalar(_ handle: TensorHandle<Int16>) -> Int16? {
     return _TFGetScalarImpl(handle)
   }
-  @inlinable @inline(__always)
-  public static func _makeScalarTensor(_ scalar: Int16) -> TensorHandle<Int16> {
-    return _TFTensorFromScalar(scalar)
-  }
   @_silgen_name("__tf_hoistable_Int16") @_optimize(none) @inline(never)
   public static func _hoistableClosure(_ fn: () -> TensorHandle<Int16>)
     -> TensorHandle<Int16> {
@@ -187,7 +170,7 @@ extension Int16 : AccelerableByTensorFlow {
   }
 }
 
-extension UInt16 : AccelerableByTensorFlow {
+extension UInt16 : TensorFlowScalar {
   @inlinable
   public static var tensorFlowDataType: TensorDataType {
     return TensorDataType(TF_UINT16)
@@ -200,11 +183,6 @@ extension UInt16 : AccelerableByTensorFlow {
   public static func _getScalar(_ handle: TensorHandle<UInt16>) -> UInt16? {
     return _TFGetScalarImpl(handle)
   }
-  @inlinable @inline(__always)
-  public static func _makeScalarTensor(_ scalar: UInt16)
-  -> TensorHandle<UInt16> {
-    return _TFTensorFromScalar(scalar)
-  }
   @_silgen_name("__tf_hoistable_UInt16") @_optimize(none) @inline(never)
   public static func _hoistableClosure(_ fn: () -> TensorHandle<UInt16>)
     -> TensorHandle<UInt16> {
@@ -212,7 +190,7 @@ extension UInt16 : AccelerableByTensorFlow {
   }
 }
 
-extension Int32 : AccelerableByTensorFlow {
+extension Int32 : TensorFlowScalar {
   @inlinable
   public static var tensorFlowDataType: TensorDataType {
     return TensorDataType(TF_INT32)
@@ -225,10 +203,6 @@ extension Int32 : AccelerableByTensorFlow {
   public static func _getScalar(_ handle: TensorHandle<Int32>) -> Int32? {
     return _TFGetScalarImpl(handle)
   }
-  @inlinable @inline(__always)
-  public static func _makeScalarTensor(_ scalar: Int32) -> TensorHandle<Int32> {
-    return _TFTensorFromScalar(scalar)
-  }
   @_silgen_name("__tf_hoistable_Int32") @_optimize(none) @inline(never)
   public static func _hoistableClosure(_ fn: () -> TensorHandle<Int32>)
     -> TensorHandle<Int32> {
@@ -236,7 +210,7 @@ extension Int32 : AccelerableByTensorFlow {
   }
 }
 
-extension UInt32 : AccelerableByTensorFlow {
+extension UInt32 : TensorFlowScalar {
   @inlinable
   public static var tensorFlowDataType: TensorDataType {
     return TensorDataType(TF_UINT32)
@@ -249,11 +223,6 @@ extension UInt32 : AccelerableByTensorFlow {
   public static func _getScalar(_ handle: TensorHandle<UInt32>) -> UInt32? {
     return _TFGetScalarImpl(handle)
   }
-  @inlinable @inline(__always)
-  public static func _makeScalarTensor(_ scalar: UInt32)
-    -> TensorHandle<UInt32> {
-    return _TFTensorFromScalar(scalar)
-  }
   @_silgen_name("__tf_hoistable_UInt32") @_optimize(none) @inline(never)
   public static func _hoistableClosure(_ fn: () -> TensorHandle<UInt32>)
     -> TensorHandle<UInt32> {
@@ -261,7 +230,7 @@ extension UInt32 : AccelerableByTensorFlow {
   }
 }
 
-extension Int64 : AccelerableByTensorFlow {
+extension Int64 : TensorFlowScalar {
   @inlinable
   public static var tensorFlowDataType: TensorDataType {
     return TensorDataType(TF_INT64)
@@ -274,10 +243,6 @@ extension Int64 : AccelerableByTensorFlow {
   public static func _getScalar(_ handle: TensorHandle<Int64>) -> Int64? {
     return _TFGetScalarImpl(handle)
   }
-  @inlinable @inline(__always)
-  public static func _makeScalarTensor(_ scalar: Int64) -> TensorHandle<Int64> {
-    return _TFTensorFromScalar(scalar)
-  }
   @_silgen_name("__tf_hoistable_Int64") @_optimize(none) @inline(never)
   public static func _hoistableClosure(_ fn: () -> TensorHandle<Int64>)
     -> TensorHandle<Int64> {
@@ -285,7 +250,7 @@ extension Int64 : AccelerableByTensorFlow {
   }
 }
 
-extension UInt64 : AccelerableByTensorFlow {
+extension UInt64 : TensorFlowScalar {
   @inlinable
   public static var tensorFlowDataType: TensorDataType {
     return TensorDataType(TF_UINT64)
@@ -297,11 +262,6 @@ extension UInt64 : AccelerableByTensorFlow {
   @_silgen_name("__tf_get_scalar_UInt64") @inline(never)
   public static func _getScalar(_ handle: TensorHandle<UInt64>) -> UInt64? {
     return _TFGetScalarImpl(handle)
-  }
-  @inlinable @inline(__always)
-  public static func _makeScalarTensor(_ scalar: UInt64)
-    -> TensorHandle<UInt64> {
-    return _TFTensorFromScalar(scalar)
   }
   @_silgen_name("__tf_hoistable_UInt64") @_optimize(none) @inline(never)
   public static func _hoistableClosure(_ fn: () -> TensorHandle<UInt64>)
@@ -316,7 +276,7 @@ public struct BFloat16 {
   private init() {}
 }
 
-extension BFloat16 : AccelerableByTensorFlow {
+extension BFloat16 : TensorFlowScalar {
   @inlinable
   public static var tensorFlowDataType: TensorDataType {
     return TensorDataType(TF_BFLOAT16)
@@ -331,12 +291,6 @@ extension BFloat16 : AccelerableByTensorFlow {
   public static func _getScalar(_ handle: TensorHandle<BFloat16>) -> BFloat16? {
     return _TFGetScalarImpl(handle)
   }
-  @inlinable @inline(__always)
-  public static func _makeScalarTensor(
-    _ scalar: BFloat16
-  ) -> TensorHandle<BFloat16> {
-    return _TFTensorFromScalar(scalar)
-  }
   @_silgen_name("__tf_hoistable_BFloat16") @_optimize(none) @inline(never)
   public static func _hoistableClosure(
     _ fn: () -> TensorHandle<BFloat16>
@@ -345,7 +299,7 @@ extension BFloat16 : AccelerableByTensorFlow {
   }
 }
 
-extension Float : AccelerableByTensorFlow {
+extension Float : TensorFlowScalar {
   @inlinable
   public static var tensorFlowDataType: TensorDataType {
     return TensorDataType(TF_FLOAT)
@@ -358,10 +312,6 @@ extension Float : AccelerableByTensorFlow {
   public static func _getScalar(_ handle: TensorHandle<Float>) -> Float? {
     return _TFGetScalarImpl(handle)
   }
-  @inlinable @inline(__always)
-  public static func _makeScalarTensor(_ scalar: Float) -> TensorHandle<Float> {
-    return _TFTensorFromScalar(scalar)
-  }
   @_silgen_name("__tf_hoistable_Float") @_optimize(none) @inline(never)
   public static func _hoistableClosure(_ fn: () -> TensorHandle<Float>)
     -> TensorHandle<Float> {
@@ -369,7 +319,7 @@ extension Float : AccelerableByTensorFlow {
   }
 }
 
-extension Double : AccelerableByTensorFlow {
+extension Double : TensorFlowScalar {
   @inlinable
   public static var tensorFlowDataType: TensorDataType {
     return TensorDataType(TF_DOUBLE)
@@ -382,11 +332,6 @@ extension Double : AccelerableByTensorFlow {
   public static func _getScalar(_ handle: TensorHandle<Double>) -> Double? {
     return _TFGetScalarImpl(handle)
   }
-  @inlinable @inline(__always)
-  public static func _makeScalarTensor(_ scalar: Double)
-    -> TensorHandle<Double> {
-    return _TFTensorFromScalar(scalar)
-  }
   @_silgen_name("__tf_hoistable_Double") @_optimize(none) @inline(never)
   public static func _hoistableClosure(_ fn: () -> TensorHandle<Double>)
     -> TensorHandle<Double> {
@@ -394,7 +339,7 @@ extension Double : AccelerableByTensorFlow {
   }
 }
 
-extension String : AccelerableByTensorFlow {
+extension String : _TensorFlowDataTypeCompatible {
   @inlinable
   public static var tensorFlowDataType: TensorDataType {
     return TensorDataType(TF_STRING)
@@ -406,11 +351,6 @@ extension String : AccelerableByTensorFlow {
   @_silgen_name("__tf_get_scalar_String") @inline(never)
   public static func _getScalar(_ handle: TensorHandle<String>) -> String? {
     return _TFGetScalarImpl(handle)
-  }
-  @inlinable @inline(__always)
-  public static func _makeScalarTensor(_ scalar: String)
-    -> TensorHandle<String> {
-    return _TFTensorFromScalar(scalar)
   }
   @_silgen_name("__tf_hoistable_String") @_optimize(none) @inline(never)
   public static func _hoistableClosure(_ fn: () -> TensorHandle<String>)

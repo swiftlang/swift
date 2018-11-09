@@ -482,7 +482,7 @@ fileprivate extension _ExecutionContext {
 }
 
 @usableFromInline
-internal func dumpTensorContent<Scalar : AccelerableByTensorFlow>(
+internal func dumpTensorContent<Scalar : _TensorFlowDataTypeCompatible>(
   _ inputTensor: CTensorHandle, _: Scalar.Type
 ) {
   let array = ShapedArray<Scalar>(cTensorHandle: inputTensor)
@@ -1129,9 +1129,9 @@ public func _TFCTerminateTensorComputation(_ computation: _TensorComputation) {
 ///   - value: The scalar value.
 ///   - dtype: The TF data type of the tensor handle to create.
 /// - Returns: A new CTensorHandle representing the scalar.
-/// - Precondition: T must conform to AccelerableByTensorFlow and 'dtype' must
-///   be equal to T's corresponding data type.
-/// - TODO(rxwei): Constrain T to AccelerableByTensorFlow and remove the
+/// - Precondition: T must conform to _TensorFlowDataTypeCompatible and 'dtype'
+///   must be equal to T's corresponding data type.
+/// - TODO(rxwei): Constrain T to _TensorFlowDataTypeCompatible and remove the
 ///   precondition. This requires the compiler to emit a call to the generic
 ///   function.
 @inlinable

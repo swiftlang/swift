@@ -32,7 +32,7 @@ bool tf::isTensorFlowDType(Type ty) {
     return false;
   auto &ctx = ty->getASTContext();
   auto tensorProto =
-      ctx.getProtocol(KnownProtocolKind::AccelerableByTensorFlow);
+      ctx.getProtocol(KnownProtocolKind::TensorFlowDataTypeCompatible);
   if (!tensorProto)
     return false;
   SmallVector<ProtocolConformance *, 2> conformances;

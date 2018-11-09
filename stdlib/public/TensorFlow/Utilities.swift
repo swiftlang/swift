@@ -158,7 +158,7 @@ public func _hostOp<Scalar>(_ x: Tensor<Scalar>) {
 }
 
 @inline(never)
-public func _hostOp<Scalar>(_ x: TensorHandle<Scalar>) {
+public func _hostOp<Scalar : TensorFlowScalar>(_ x: TensorHandle<Scalar>) {
   print(Tensor(handle: x))
 }
 

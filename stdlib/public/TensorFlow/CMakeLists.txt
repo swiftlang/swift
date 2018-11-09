@@ -44,6 +44,8 @@ set(SOURCES
   Parameterized.swift
   Random.swift
   ShapedArray.swift
+  StringOps.swift
+  StringTensor.swift
   Tensor.swift
   TensorGroup.swift
   TensorHandle.swift

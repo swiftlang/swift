@@ -151,7 +151,7 @@ public extension Tensor {
   // This is a theoretical operation that takes a generic scalar value as an
   // attribute.
   @inlinable @inline(__always)
-  func genericAttr<T : AccelerableByTensorFlow>(axis: T) -> Tensor {
+  func genericAttr<T : TensorFlowScalar>(axis: T) -> Tensor {
     // expected-error @+1 {{op named 'ExampleOp' is not registered in TensorFlow}}
     let ret: TensorHandle<Scalar> = #tfop("ExampleOp", handle, axis: axis, axisType$dtype: T.tensorFlowDataType)
     return Tensor<Scalar>(handle: ret)

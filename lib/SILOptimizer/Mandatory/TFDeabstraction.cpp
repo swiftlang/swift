@@ -87,7 +87,10 @@ static bool isDecodableApply(ApplyInst *apply) {
   auto name = fn->getName();
   return name == "__tf_tensor_from_scalar" ||
          name == "__tf_tensor_from_scalars" ||
-         name == "__tf_tensor_from_scalars_1d";
+         name == "__tf_tensor_from_scalars_1d" ||
+         name == "__tf_string_tensor_from_scalar" ||
+         name == "__tf_string_tensor_from_scalars" ||
+         name == "__tf_string_tensor_from_scalars_1d";
 }
 
 
@@ -1808,12 +1811,16 @@ transformTensorFromScalar(ApplyInst *apply,
     // We use int32 as the element type of the zero-d shape array.
     auto int32Ty =
         ctx.getInt32Decl()->getDeclaredType()->getCanonicalType();
-    assert(it->second.getKind() == SymbolicValue::Address);
 
-    SmallVector<unsigned, 4> accessPath;
-    auto *scalarMemoryObject = it->second.getAddressValue(accessPath);
-    assert(accessPath.empty());
-    auto scalarValue = scalarMemoryObject->getValue();
+    SymbolicValue scalarValue;
+    if (it->second.getKind() == SymbolicValue::Address) {
+      SmallVector<unsigned, 4> accessPath;
+      auto *scalarMemoryObject = it->second.getAddressValue(accessPath);
+      assert(accessPath.empty());
+      scalarValue = scalarMemoryObject->getValue();
+    } else {
+      scalarValue = it->second;
+    }
     assert(scalarValue.isConstant());
     scalarValue = scalarValue.lookThroughSingleElementAggregates();
     LLVM_DEBUG(llvm::dbgs()
@@ -2010,18 +2017,22 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
       LLVM_DEBUG(llvm::dbgs() << "processing apply inst with func name "
                               << callee->getName() << "\n");
 
-      if (callee && callee->getName() == "__tf_tensor_from_scalar") {
+      if (callee && (callee->getName() == "__tf_tensor_from_scalar" ||
+                     callee->getName() == "__tf_string_tensor_from_scalar")) {
           inst = transformTensorFromScalar(apply, constants, deviceInfo);
           assert(inst);
         continue;
       }
-      if (callee && callee->getName() == "__tf_tensor_from_scalars") {
+      if (callee && (callee->getName() == "__tf_tensor_from_scalars" ||
+                     callee->getName() == "__tf_string_tensor_from_scalars")) {
         if (auto result =
                 tryToPromoteTensorFromScalars(apply, constants, deviceInfo))
           inst = result;
         continue;
       }
-      if (callee && callee->getName() == "__tf_tensor_from_scalars_1d") {
+      if (callee && (callee->getName() == "__tf_tensor_from_scalars_1d" ||
+                     callee->getName() ==
+                         "__tf_string_tensor_from_scalars_1d")) {
         if (auto result =
                 tryToPromoteTensorFromScalars1D(apply, constants, deviceInfo))
           inst = result;

@@ -33,7 +33,7 @@ func first<T: TensorGroup>(_ dataset: VariantHandle) -> T {
 /// with generic return type T.
 /// T is address-only because it is generic.
 @inline(never)
-func pack<T: TensorGroup, Scalar: AccelerableByTensorFlow>(
+func pack<T: TensorGroup, Scalar: TensorFlowScalar>(
     _ t: T
 ) -> Tensor<Scalar> {
   return #tfop("Pack", t, T$dtype: Scalar.tensorFlowDataType)
@@ -43,7 +43,7 @@ func pack<T: TensorGroup, Scalar: AccelerableByTensorFlow>(
 /// with generic return type T.
 /// T is address-only because it is generic.
 @inline(never)
-func unpack<T: TensorGroup, Scalar: AccelerableByTensorFlow>(
+func unpack<T: TensorGroup, Scalar: TensorFlowScalar>(
     _ tensor: Tensor<Scalar>
 ) -> T {
   return #tfop("Unpack", tensor, num: Int64(T._tensorHandleCount),
