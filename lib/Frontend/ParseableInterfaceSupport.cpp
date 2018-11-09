@@ -228,9 +228,9 @@ collectDepsForSerialization(clang::vfs::FileSystem &FS,
   InitialDepNames.push_back(InPath);
   llvm::StringSet<> AllDepNames;
   for (auto const &DepName : InitialDepNames) {
-    AllDepNames.insert(DepName);
-    if (OuterTracker)
-      OuterTracker->addDependency(DepName, /*IsSystem=*/false);
+    if (AllDepNames.insert(DepName).second && OuterTracker) {
+        OuterTracker->addDependency(DepName, /*IsSystem=*/false);
+    }
     auto DepBuf = getBufferOfDependency(FS, InPath, DepName, Diags);
     if (!DepBuf) {
       return true;
@@ -258,8 +258,7 @@ collectDepsForSerialization(clang::vfs::FileSystem &FS,
         return true;
       }
       for (auto const &SubDep : SubDeps) {
-        if (AllDepNames.count(SubDep.Path) == 0) {
-          AllDepNames.insert(SubDep.Path);
+        if (AllDepNames.insert(SubDep.Path).second) {
           Deps.push_back(SubDep);
           if (OuterTracker)
             OuterTracker->addDependency(SubDep.Path, /*IsSystem=*/false);
