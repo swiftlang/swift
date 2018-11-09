@@ -198,7 +198,7 @@ private:
   
   
   template <typename DeclT>
-  void createNodes(CPVec<DeclT> &decls, DeclNode::Kind kind, std::string(*nameFn)(const DeclT *)) {
+  void createDeclNodes(CPVec<DeclT> &decls, DeclNode::Kind kind, std::string(*nameFn)(const DeclT *)) {
     for (const auto* D: decls) {
       auto *context = D->getDeclContext();
       auto *containingDecl = context ? context->getAsDecl() : nullptr;
@@ -265,25 +265,24 @@ private:
 void GraphConstructor::constructProvidesNodes() {
   SourceFileDeclDemux demux(SF);
   
-  createNodes<PrecedenceGroupDecl>(demux.precedenceGroups, DeclNode::Kind::topLevel, getName);
-  createNodes<FuncDecl>(demux.memberOperatorDecls, DeclNode::Kind::topLevel, getName);
-  createNodes<OperatorDecl>(demux.operators, DeclNode::Kind::topLevel, getName);
-  createNodes<NominalTypeDecl>(demux.topNominals, DeclNode::Kind::topLevel, getName);
-  createNodes<ValueDecl>(demux.topValues, DeclNode::Kind::topLevel, getBaseName);
+  createDeclNodes<PrecedenceGroupDecl>(demux.precedenceGroups, DeclNode::Kind::topLevel, getName);
+  createDeclNodes<FuncDecl>(demux.memberOperatorDecls, DeclNode::Kind::topLevel, getName);
+  createDeclNodes<OperatorDecl>(demux.operators, DeclNode::Kind::topLevel, getName);
+  createDeclNodes<NominalTypeDecl>(demux.topNominals, DeclNode::Kind::topLevel, getName);
+  createDeclNodes<ValueDecl>(demux.topValues, DeclNode::Kind::topLevel, getBaseName);
   
-  createNodes<NominalTypeDecl>(demux.allNominals, DeclNode::Kind::nominals, mangleTypeAsContext);
-  createNodes<NominalTypeDecl>(demux.allNominals, DeclNode::Kind::blankMembers, mangleTypeAsContext); // TODO: fix someday
+  createDeclNodes<NominalTypeDecl>(demux.allNominals, DeclNode::Kind::nominals, mangleTypeAsContext);
+  createDeclNodes<NominalTypeDecl>(demux.allNominals, DeclNode::Kind::blankMembers, mangleTypeAsContext); // TODO: fix someday
   
-  createNodes<ValueDecl>(demux.valuesInExtensions, DeclNode::Kind::member, getBaseName);
+  createDeclNodes<ValueDecl>(demux.valuesInExtensions, DeclNode::Kind::member, getBaseName);
   
   // could optimize by uniqueing by name, but then what of container?
-  createNodes<ValueDecl>(demux.classMembers, DeclNode::Kind::dynamicLookup, getBaseName);
+  createDeclNodes<ValueDecl>(demux.classMembers, DeclNode::Kind::dynamicLookup, getBaseName);
 }
 
 void GraphConstructor::constructDependArcs() {
   convertSetOfDeclBaseNames(SF->getReferencedNameTracker()->getTopLevelNames(), Node::Kind::topLevel);
   convertSetOfMemberPairsForNominals(SF->getReferencedNameTracker()->getUsedMembers());
-#error blankmembers??
   convertSetOfMemberPairsForMembers(SF->getReferencedNameTracker()->getUsedMembers());
   convertSetOfDeclBaseNames(SF->getReferencedNameTracker()->getDynamicLookupNames(), Node::Kind::dynamicLookup);
   convertFilenames(depTracker.getDependencies());
@@ -317,11 +316,13 @@ void GraphConstructor::convertSetOfMemberPairsForNominals(
 void GraphConstructor::convertSetOfMemberPairsForMembers(
                                                          const llvm::DenseMap<std::pair<const NominalTypeDecl *, DeclBaseName>,
                                                          bool> &map) {
-  for (auto &entry: map)
-    addDependency(Node::Kind::member,
+  for (auto &entry: map) {
+    const bool isMemberBlank = entry.first.second.empty();
+    addDependency(isMemberBlank ? Node::Kind::blankMembers : Node::Kind::member,
                   entry.first.first,
-                  entry.first.second.empty() ? "" : entry.first.second.userFacingName(),
+                  isMemberBlank ? "" : entry.first.second.userFacingName(),
                   entry.second);
+  }
 }
 
 void GraphConstructor::addDependency(Node::Kind kind,
