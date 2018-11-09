@@ -12,17 +12,40 @@ func loadable(readonly: A, writable: inout A,
               kp: KeyPath<A, B>,
               wkp: WritableKeyPath<A, B>,
               rkp: ReferenceWritableKeyPath<A, B>) {
-  // CHECK: [[ROOT_TMP:%.*]] = alloc_stack $A
   // CHECK: [[ROOT_COPY:%.*]] = copy_value %0
-  // CHECK: store [[ROOT_COPY]] to [init] [[ROOT_TMP]]
   // CHECK: [[KP_COPY:%.*]] = copy_value %3
+  // CHECK: [[ROOT_TMP:%.*]] = alloc_stack $A
+  // CHECK: store [[ROOT_COPY]] to [init] [[ROOT_TMP]]
   // CHECK: [[PROJECT:%.*]] = function_ref @{{.*}}_projectKeyPathReadOnly
   // CHECK: [[RESULT_TMP:%.*]] = alloc_stack $B
   // CHECK: apply [[PROJECT]]<A, B>([[RESULT_TMP]], [[ROOT_TMP]], [[KP_COPY]])
   // CHECK: [[RESULT:%.*]] = load [take] [[RESULT_TMP]]
   // CHECK: destroy_value [[RESULT]]
   _ = readonly[keyPath: kp]
+
+  // CHECK: [[ACCESS:%.*]] = begin_access [read] [unknown] %1
+  // CHECK: [[ROOT_COPY:%.*]] = load [copy] [[ACCESS]]
+  // CHECK: end_access [[ACCESS]]
+  // CHECK: [[KP_COPY:%.*]] = copy_value %3
+  // CHECK: [[ROOT_TMP:%.*]] = alloc_stack $A
+  // CHECK: store [[ROOT_COPY]] to [init] [[ROOT_TMP]]
+  // CHECK: [[PROJECT:%.*]] = function_ref @{{.*}}_projectKeyPathReadOnly
+  // CHECK: [[RESULT_TMP:%.*]] = alloc_stack $B
+  // CHECK: apply [[PROJECT]]<A, B>([[RESULT_TMP]], [[ROOT_TMP]], [[KP_COPY]])
+  // CHECK: [[RESULT:%.*]] = load [take] [[RESULT_TMP]]
+  // CHECK: destroy_value [[RESULT]]
   _ = writable[keyPath: kp]
+
+  // CHECK: [[ROOT_COPY:%.*]] = copy_value %0
+  // CHECK: [[KP_COPY:%.*]] = copy_value %4
+  // CHECK: [[KP_UPCAST:%.*]] = upcast [[KP_COPY]] : $WritableKeyPath<A, B> to $KeyPath<A, B>
+  // CHECK: [[ROOT_TMP:%.*]] = alloc_stack $A
+  // CHECK: store [[ROOT_COPY]] to [init] [[ROOT_TMP]]
+  // CHECK: [[PROJECT:%.*]] = function_ref @{{.*}}_projectKeyPathReadOnly
+  // CHECK: [[RESULT_TMP:%.*]] = alloc_stack $B
+  // CHECK: apply [[PROJECT]]<A, B>([[RESULT_TMP]], [[ROOT_TMP]], [[KP_UPCAST]])
+  // CHECK: [[RESULT:%.*]] = load [take] [[RESULT_TMP]]
+  // CHECK: destroy_value [[RESULT]]
   _ = readonly[keyPath: wkp]
 
   // CHECK: function_ref @{{.*}}_projectKeyPathReadOnly

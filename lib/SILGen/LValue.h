@@ -106,7 +106,7 @@ public:
     AddressorKind,              // var/subscript addressor
     CoroutineAccessorKind,      // coroutine accessor
     ValueKind,                  // random base pointer as an lvalue
-    KeyPathApplicationKind,     // applying a key path
+    PhysicalKeyPathApplicationKind, // applying a key path
 
     // Logical LValue kinds
     GetterSetterKind,           // property or subscript getter/setter
@@ -115,6 +115,7 @@ public:
     AutoreleasingWritebackKind, // autorelease pointer on set
     WritebackPseudoKind,        // a fake component to customize writeback
     OpenNonOpaqueExistentialKind,  // opened class or metatype existential
+    LogicalKeyPathApplicationKind, // applying a key path
     // Translation LValue kinds (a subtype of logical)
     OrigToSubstKind,            // generic type substitution
     SubstToOrigKind,            // generic type substitution
