@@ -2702,7 +2702,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
                                                         index);
 
     // Always create GenericTypeParamDecls in the associated module;
-    // maybeReadGenericParams() will reparent them.
+    // the real context will reparent them.
     auto DC = getAssociatedModule();
     auto genericParam = createDecl<GenericTypeParamDecl>(DC,
                                                          getIdentifier(nameID),
@@ -3964,9 +3964,12 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     // Generic parameter lists are written from outermost to innermost.
     // Keep reading until we run out of generic parameter lists.
     GenericParamList *outerParams = nullptr;
-    while (auto *genericParams = maybeReadGenericParams(DC, outerParams))
+    while (auto *genericParams = maybeReadGenericParams(DC, outerParams)) {
+      // We do this repeatedly to set up the correct DeclContexts for the
+      // GenericTypeParamDecls in the list.
+      extension->setGenericParams(genericParams);
       outerParams = genericParams;
-    extension->setGenericParams(outerParams);
+    }
 
     configureGenericEnvironment(extension, genericEnvID);
 
