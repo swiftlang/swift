@@ -131,6 +131,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::GetObjCTypeEncoding:
     case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
     case BuiltinValueKind::WillThrow:
+    case BuiltinValueKind::PoundAssert:
       return false;
 
     // Handle some rare builtins that may be sensitive to object lifetime

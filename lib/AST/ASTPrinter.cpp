@@ -3057,6 +3057,11 @@ void PrintAST::visitThrowStmt(ThrowStmt *stmt) {
   // FIXME: print expression.
 }
 
+void PrintAST::visitPoundAssertStmt(PoundAssertStmt *stmt) {
+  Printer << tok::pound_assert << " ";
+  // FIXME: print expression.
+}
+
 void PrintAST::visitDeferStmt(DeferStmt *stmt) {
   Printer << tok::kw_defer << " ";
   visit(stmt->getBodyAsWritten());

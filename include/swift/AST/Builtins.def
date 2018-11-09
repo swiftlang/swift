@@ -536,6 +536,9 @@ BUILTIN_MISC_OPERATION(Swift3ImplicitObjCEntrypoint, "swift3ImplicitObjCEntrypoi
 /// willThrow: Error -> ()
 BUILTIN_MISC_OPERATION(WillThrow, "willThrow", "", Special)
 
+/// poundAssert has type (Builtin.Int1, Builtin.RawPointer) -> ().
+BUILTIN_MISC_OPERATION(PoundAssert, "poundAssert", "", Special)
+
 #undef BUILTIN_MISC_OPERATION
 
 /// Builtins for instrumentation added by sanitizers during SILGen.
