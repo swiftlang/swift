@@ -75,3 +75,6 @@ Class _StringStorage is now without @_fixed_layout
 Class _SharedStringStorage has removed conformance to _NSStringCore
 Class _StringStorage has removed conformance to _NSStringCore
 Protocol _NSStringCore has been removed
+
+Constructor ManagedBuffer.init(_doNotCallMe:) has been removed
+Func _makeAnyHashableUpcastingToHashableBaseType(_:storingResultInto:) has been removed
