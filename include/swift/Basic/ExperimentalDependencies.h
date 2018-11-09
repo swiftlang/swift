@@ -78,6 +78,13 @@ namespace experimental_dependencies {
     ~DeclNode() = default;
   };
   
+/// A decl node referenced from here that exists elsewhere
+  class ForeignDeclNode: public Node {
+  public:
+    ForeignDeclNode(Kind kind, StringRef nameForDependencies) :
+    Node(kind, nullptr, {}, "", nameForDependencies) {}
+  };
+  
   
   class Arc {
   public:
