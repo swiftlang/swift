@@ -88,9 +88,9 @@ static bool isDecodableApply(ApplyInst *apply) {
   return name == "__tf_tensor_from_scalar" ||
          name == "__tf_tensor_from_scalars" ||
          name == "__tf_tensor_from_scalars_1d" ||
-         name == "__tf_string_tensor_from_scalar" ||
-         name == "__tf_string_tensor_from_scalars" ||
-         name == "__tf_string_tensor_from_scalars_1d";
+         name == "__tf_string_tensor_from_string" ||
+         name == "__tf_string_tensor_from_strings" ||
+         name == "__tf_string_tensor_from_strings_1d";
 }
 
 
@@ -1704,7 +1704,7 @@ void TFDeabstraction::propagateSSAValues() {
 }
 
 /// If all the operands to a call to __tf_tensor_from_scalars or a call to
-/// __tf_string_tensor_from_scalars are constants, we can promote this to a
+/// __tf_string_tensor_from_strings are constants, we can promote this to a
 /// 'Const' node with an attached TF_Tensor attribute.  It takes a 1D array of
 /// scalars and a shape as a 1D array of integers.
 ///
@@ -1715,7 +1715,7 @@ static GraphOperationInst *tryToPromoteTensorFromScalars(
     GraphFunctionDeviceInfo &deviceInfo) {
   assert(inst->getNumOperands() == 3 && isTensorHandle(inst->getType()) &&
          ("Unexpected type signature for __tf_tensor_from_scalars / " +
-          "__tf_string_tensor_from_scalars"));
+          "__tf_string_tensor_from_strings"));
 
   auto scalarsValue = inst->getOperand(1);
   auto shapeValue = inst->getOperand(2);
@@ -1777,7 +1777,7 @@ static GraphOperationInst *tryToPromoteTensorFromScalars(
 }
 
 /// This function transforms the apply of the "__tf_tensor_from_scalar" and
-/// "__tf_string_tensor_from_scalar" functions to a graph node (graph_op inst).
+/// "__tf_string_tensor_from_string" functions to a graph node (graph_op inst).
 ///
 /// Similar to tryToPromoteTensorFromScalars(), the resulting graph node can be
 /// a "const", if its input scalar operand is a compile-time constant.
@@ -1823,7 +1823,7 @@ transformTensorFromScalar(ApplyInst *apply,
       assert(accessPath.empty());
       scalarValue = scalarMemoryObject->getValue();
     } else {
-      // In the "__tf_string_tensor_from_scalar" case, the argument is a value
+      // In the "__tf_string_tensor_from_string" case, the argument is a value
       // because it has concrete (String) type.
       scalarValue = it->second;
     }
@@ -1887,9 +1887,9 @@ transformTensorFromScalar(ApplyInst *apply,
 }
 
 /// If all the operands to a call to __tf_tensor_from_scalars_1d or a call to
-/// _tf_string_tensor_from_scalars_1d are constants, we can promote this to a
+/// _tf_string_tensor_from_strings_1d are constants, we can promote this to a
 /// 'Const' node with an attached TF_Tensor attribute.  This is a specialized
-/// form of __tf_tensor_from_scalars/__tf_string_tensor_from_scalars, because
+/// form of __tf_tensor_from_scalars/__tf_string_tensor_from_strings, because
 /// the later is defined in terms of a shape of "[scalars.count]" but the
 /// performance optimizer is not reliably constant propagating this.
 ///
@@ -1904,7 +1904,7 @@ static GraphOperationInst *tryToPromoteTensorFromScalars1D(
     GraphFunctionDeviceInfo &deviceInfo) {
   assert(inst->getNumOperands() == 2 && isTensorHandle(inst->getType()) &&
          ("Unexpected type signature for __tf_tensor_from_scalars_1d / " +
-          "__tf_string_tensor_from_scalars_1d"));
+          "__tf_string_tensor_from_strings_1d"));
 
   auto arrayValue = inst->getOperand(1);
 
@@ -2026,13 +2026,13 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
                               << callee->getName() << "\n");
 
       if (callee && (callee->getName() == "__tf_tensor_from_scalar" ||
-                     callee->getName() == "__tf_string_tensor_from_scalar")) {
+                     callee->getName() == "__tf_string_tensor_from_string")) {
           inst = transformTensorFromScalar(apply, constants, deviceInfo);
           assert(inst);
         continue;
       }
       if (callee && (callee->getName() == "__tf_tensor_from_scalars" ||
-                     callee->getName() == "__tf_string_tensor_from_scalars")) {
+                     callee->getName() == "__tf_string_tensor_from_strings")) {
         if (auto result =
                 tryToPromoteTensorFromScalars(apply, constants, deviceInfo))
           inst = result;
@@ -2040,7 +2040,7 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
       }
       if (callee && (callee->getName() == "__tf_tensor_from_scalars_1d" ||
                      callee->getName() ==
-                         "__tf_string_tensor_from_scalars_1d")) {
+                         "__tf_string_tensor_from_strings_1d")) {
         if (auto result =
                 tryToPromoteTensorFromScalars1D(apply, constants, deviceInfo))
           inst = result;

@@ -42,8 +42,8 @@ public struct StringTensor {
 /// and promotes calls to it to being in graph when it can. This signature was
 /// designed to align with the requirements of the `Const` TensorFlow operation.
 @usableFromInline @inline(never)
-@_silgen_name("__tf_string_tensor_from_scalars")
-func _TFStringTensorFromScalars(
+@_silgen_name("__tf_string_tensor_from_strings")
+func _TFStringTensorFromStrings(
   _ scalars: [String], shape: [Int32]
 ) -> TensorHandle<String> {
   let contiguousSize = shape.map(Int.init).reduce(1, *)
@@ -102,15 +102,15 @@ func _TFStringTensorFromScalars(
 }
 
 @usableFromInline @inline(never)
-@_silgen_name("__tf_string_tensor_from_scalar")
-func _TFStringTensorFromScalar(_ scalar: String) -> TensorHandle<String> {
-  return _TFStringTensorFromScalars([scalar], shape: [])
+@_silgen_name("__tf_string_tensor_from_string")
+func _TFStringTensorFromString(_ scalar: String) -> TensorHandle<String> {
+  return _TFStringTensorFromStrings([scalar], shape: [])
 }
 
 @usableFromInline @inline(never)
-@_silgen_name("__tf_string_tensor_from_scalars_1d")
-func _TFStringTensorFromScalars1D(_ scalars: [String]) -> TensorHandle<String> {
-  return _TFStringTensorFromScalars(scalars, shape: [Int32(scalars.count)])
+@_silgen_name("__tf_string_tensor_from_strings_1d")
+func _TFStringTensorFromStrings1D(_ scalars: [String]) -> TensorHandle<String> {
+  return _TFStringTensorFromStrings(scalars, shape: [Int32(scalars.count)])
 }
 
 //===----------------------------------------------------------------------===//
@@ -121,7 +121,7 @@ public extension StringTensor {
   /// Creates a tensor from a scalar value.
   @inlinable @inline(__always)
   init(_ value: String) {
-    self.init(handle: _TFStringTensorFromScalar(value))
+    self.init(handle: _TFStringTensorFromString(value))
   }
 
   /// Creates a 1D tensor in from contiguous scalars.
@@ -131,7 +131,7 @@ public extension StringTensor {
   ///
   @inlinable @inline(__always)
   init(_ vector: [String]) {
-    self.init(handle: _TFStringTensorFromScalars1D(vector))
+    self.init(handle: _TFStringTensorFromStrings1D(vector))
   }
 }
 
