@@ -4728,6 +4728,7 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   auto loc = getConstraintLocator(locator);
   auto tv = createTypeVariable(loc, TVO_CanBindToLValue);
 
+  // Record the 'dynamicallyCall` method overload set.
   SmallVector<OverloadChoice, 4> choices;
   for (auto candidate : candidates) {
     TC.validateDecl(candidate);
@@ -4736,8 +4737,6 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
       OverloadChoice(type2, candidate, FunctionRefKind::SingleApply));
   }
   if (choices.empty()) return SolutionKind::Error;
-
-  // Record the 'dynamicallyCall` method overload set.
   addOverloadSet(tv, choices, DC, loc);
 
   // Create a type variable for the argument to the `dynamicallyCall` method.
@@ -4751,7 +4750,7 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   Type argumentType;
   if (!useKwargsMethod) {
     auto arrayLitProto =
-    ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
+      ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
     addConstraint(ConstraintKind::ConformsTo, tvParam,
                   arrayLitProto->getDeclaredType(), locator);
     auto elementAssocType = cast<AssociatedTypeDecl>(
@@ -4759,7 +4758,7 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
     argumentType = DependentMemberType::get(tvParam, elementAssocType);
   } else {
     auto dictLitProto =
-    ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
+      ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
     addConstraint(ConstraintKind::ConformsTo, tvParam,
                   dictLitProto->getDeclaredType(), locator);
     auto valueAssocType = cast<AssociatedTypeDecl>(
@@ -4770,6 +4769,7 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   // Argument type can default to `Any`.
   addConstraint(ConstraintKind::Defaultable, argumentType,
                 ctx.TheAnyType, locator);
+
   // All dynamic call parameter types must be convertible to the argument type.
   for (auto i : indices(func1->getParams())) {
     auto param = func1->getParams()[i];
