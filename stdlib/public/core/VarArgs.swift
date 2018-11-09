@@ -402,7 +402,9 @@ extension Float80 : CVarArg, _CVarArgAligned {
 }
 #endif
 
-#if arch(x86_64) || arch(s390x)
+// Windows 64-bit passes variadic arguments as a `char *` rather than typed
+// structure as per the System V ABI.
+#if (arch(x86_64) && !os(Windows)) || arch(s390x)
 
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`.

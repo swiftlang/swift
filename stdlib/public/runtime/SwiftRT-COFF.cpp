@@ -24,6 +24,14 @@
 
 #define PRAGMA(pragma) _Pragma(#pragma)
 
+#if defined(__CYGWIN__) || defined(__MINGW32__)
+#define DECLARE_SWIFT_SECTION(name)                                            \
+  __attribute__((section("." #name "$A")))                                     \
+  static uintptr_t __start_##name = 0;                                         \
+                                                                               \
+  __attribute__((section("." #name "$C")))                                     \
+  static uintptr_t __stop_##name = 0;
+#else
 #define DECLARE_SWIFT_SECTION(name)                                            \
   PRAGMA(section("." #name "$A", long, read))                                  \
   __declspec(allocate("." #name "$A"))                                         \
@@ -32,6 +40,7 @@
   PRAGMA(section("." #name "$C", long, read))                                  \
   __declspec(allocate("." #name "$C"))                                         \
   static uintptr_t __stop_##name = 0;
+#endif
 
 extern "C" {
 DECLARE_SWIFT_SECTION(sw5prt)
@@ -49,6 +58,9 @@ namespace {
 static swift::MetadataSections sections{};
 }
 
+#if defined(__CYGWIN__) || defined(__MINGW32__)
+__attribute__((__constructor__))
+#endif
 static void swift_image_constructor() {
 #define SWIFT_SECTION_RANGE(name)                                              \
   { reinterpret_cast<uintptr_t>(&__start_##name) + sizeof(__start_##name),     \
@@ -77,9 +89,12 @@ static void swift_image_constructor() {
   swift_addNewDSOImage(&sections);
 }
 
+#if defined(__CYGWIN__) || defined(__MINGW32__)
+#else
 #pragma section(".CRT$XCIS", long, read)
 
 __declspec(allocate(".CRT$XCIS"))
 extern "C" void (*pSwiftImageConstructor)(void) = &swift_image_constructor;
 #pragma comment(linker, "/include:" STRING(C_LABEL(pSwiftImageConstructor)))
+#endif
 

@@ -81,6 +81,8 @@ public typealias CLongDouble = Double
 #if arch(x86_64) || arch(i386)
 public typealias CLongDouble = Float80
 #endif
+#elseif os(Cygwin)
+public typealias CLongDouble = Float80
 // TODO: Fill in definitions for other OSes.
 #if arch(s390x)
 // On s390x '-mlong-double-64' option with size of 64-bits makes the

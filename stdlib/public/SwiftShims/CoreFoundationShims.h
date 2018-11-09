@@ -27,7 +27,7 @@ namespace swift { extern "C" {
 #endif
 
 #ifdef __OBJC2__
-#if __LLP64__
+#if __LLP64__ || _GLIBCXX_LLP64
 typedef unsigned long long _swift_shims_CFTypeID;
 typedef unsigned long long _swift_shims_CFOptionFlags;
 typedef unsigned long long _swift_shims_CFHashCode;

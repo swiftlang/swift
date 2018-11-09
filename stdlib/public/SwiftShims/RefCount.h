@@ -571,7 +571,15 @@ class RefCountBitsT {
 
 typedef RefCountBitsT<RefCountIsInline> InlineRefCountBits;
 
-class SideTableRefCountBits : public RefCountBitsT<RefCountNotInline>
+// FIXME: When atomic<SideTableRefCountBits>::load() is called, an area for
+// SideTableRefCountBits is allocated in the stack and its pointer is passed to
+// the function __atomic_load(). When __atomic_load() accepts 16 bytes object,
+// it should be aligned 16 bytes or will crash. It seems that GCC align the
+// object to 16 bytes when pass it to the function __atomic_load(). In MinGW and
+// Cygwin, we force SideTableRefCountBits object align to 16 bytes and prevent
+// crash.
+class alignas(16) SideTableRefCountBits
+    : public RefCountBitsT<RefCountNotInline>
 {
   uint32_t weakBits;
 

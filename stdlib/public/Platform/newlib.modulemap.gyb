@@ -1,0 +1,450 @@
+//===--- newlib.modulemap.gyb ----------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+/// This is a semi-complete modulemap that maps newlib's headers in a roughly
+/// similar way to the Darwin SDK modulemap. We do not take care to list every
+/// single header which may be included by a particular submodule, so there can
+/// still be issues if imported into the same context as one in which someone
+/// included those headers directly.
+///
+/// It's not named just Newlib so that it doesn't conflict in the event of a
+/// future official newlib modulemap.
+module SwiftNewlib [system] {
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN"]:
+  link "pthread"
+  // FIXME: util contains rarely used functions and not usually needed. Unfortunately
+  // link directive doesn't work in the submodule yet.
+  link "util"
+% end
+
+% if CMAKE_SDK != "FREEBSD":
+  link "dl"
+% end
+
+  // C standard library
+  module C {
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN"]:
+    module complex {
+      header "${NEWLIB_INCLUDE_PATH}/complex.h"
+      export *
+    }
+% end
+% if CMAKE_SDK in ["LINUX", "CYGWIN"]:
+    module pty {
+      header "${NEWLIB_INCLUDE_PATH}/pty.h"
+      export *
+    }
+    module utmp {
+      header "${NEWLIB_INCLUDE_PATH}/utmp.h"
+      export *
+    }
+% end
+% if CMAKE_SDK == "FREEBSD":
+    module pty {
+      header "${NEWLIB_INCLUDE_PATH}/libutil.h"
+      export *
+    }
+    module utmp {
+      header "${NEWLIB_INCLUDE_PATH}/utmpx.h"
+      export *
+    }
+% end
+
+% if CMAKE_SDK in ["LINUX", "ANDROID", "CYGWIN"]:
+    module features {
+      header "${NEWLIB_INCLUDE_PATH}/features.h"
+      export *
+    }
+% end
+
+    module ctype {
+      header "${NEWLIB_INCLUDE_PATH}/ctype.h"
+      export *
+    }
+    module errno {
+      header "${NEWLIB_INCLUDE_PATH}/errno.h"
+      export *
+    }
+
+    module fenv {
+      header "${NEWLIB_INCLUDE_PATH}/fenv.h"
+      export *
+    }
+
+    // note: supplied by compiler
+    // module float {
+    //   header "${NEWLIB_INCLUDE_PATH}/float.h"
+    //   export *
+    // }
+
+    module inttypes {
+      header "${NEWLIB_INCLUDE_PATH}/inttypes.h"
+      export *
+    }
+
+    // note: potentially supplied by compiler
+    // module iso646 {
+    //   header "${NEWLIB_INCLUDE_PATH}/iso646.h"
+    //   export *
+    // }
+    // module limits {
+    //   header "${NEWLIB_INCLUDE_PATH}/limits.h"
+    //   export *
+    // }
+
+    module locale {
+      header "${NEWLIB_INCLUDE_PATH}/locale.h"
+      export *
+    }
+    module math {
+      header "${NEWLIB_INCLUDE_PATH}/math.h"
+      export *
+    }
+    module setjmp {
+      header "${NEWLIB_INCLUDE_PATH}/setjmp.h"
+      export *
+    }
+    module signal {
+      header "${NEWLIB_INCLUDE_PATH}/signal.h"
+      export *
+    }
+
+    // note: supplied by the compiler
+    // module stdarg {
+    //   header "${NEWLIB_INCLUDE_PATH}/stdarg.h"
+    //   export *
+    // }
+    // module stdbool {
+    //   header "${NEWLIB_INCLUDE_PATH}/stdbool.h"
+    //   export *
+    // }
+    // module stddef {
+    //   header "${NEWLIB_INCLUDE_PATH}/stddef.h"
+    //   export *
+    // }
+    // module stdint {
+    //   header "${NEWLIB_INCLUDE_PATH}/stdint.h"
+    //   export *
+    // }
+
+    module stdio {
+      header "${NEWLIB_INCLUDE_PATH}/stdio.h"
+      export *
+    }
+    module stdlib {
+      header "${NEWLIB_INCLUDE_PATH}/stdlib.h"
+      export *
+      export stddef
+    }
+    module string {
+      header "${NEWLIB_INCLUDE_PATH}/string.h"
+      export *
+    }
+
+    // note: supplied by the compiler
+    // explicit module tgmath {
+    //   header "${NEWLIB_INCLUDE_PATH}/tgmath.h"
+    //   export *
+    // }
+
+    module time {
+      header "${NEWLIB_INCLUDE_PATH}/time.h"
+      export *
+    }
+  }
+
+  // POSIX
+  module POSIX {
+% if CMAKE_SDK in ["LINUX", "CYGWIN"]:
+    module wait {
+      header "${NEWLIB_INCLUDE_PATH}/wait.h"
+      export *
+    }
+% end
+
+% if CMAKE_SDK in ["LINUX", "FREEBSD"]:
+    module aio {
+      header "${NEWLIB_INCLUDE_PATH}/aio.h"
+      export *
+    }
+    module cpio {
+      header "${NEWLIB_INCLUDE_PATH}/cpio.h"
+      export *
+    }
+    module fmtmsg {
+      header "${NEWLIB_INCLUDE_PATH}/fmtmsg.h"
+      export *
+    }
+    module nl_types {
+      header "${NEWLIB_INCLUDE_PATH}/nl_types.h"
+      export *
+    }
+    module ulimit {
+      header "${NEWLIB_INCLUDE_PATH}/ulimit.h"
+      export *
+    }
+% end
+
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN"]:
+    module ftw {
+      header "${NEWLIB_INCLUDE_PATH}/ftw.h"
+      export *
+    }
+    module glob {
+      header "${NEWLIB_INCLUDE_PATH}/glob.h"
+      export *
+    }
+    module iconv {
+      header "${NEWLIB_INCLUDE_PATH}/iconv.h"
+      export *
+    }
+    module langinfo {
+      header "${NEWLIB_INCLUDE_PATH}/langinfo.h"
+      export *
+    }
+    module monetary {
+      header "${NEWLIB_INCLUDE_PATH}/monetary.h"
+      export *
+    }
+    module netdb {
+      header "${NEWLIB_INCLUDE_PATH}/netdb.h"
+      export *
+    }
+    module ifaddrs {
+      header "${NEWLIB_INCLUDE_PATH}/ifaddrs.h"
+      export *
+    }
+    module search {
+      header "${NEWLIB_INCLUDE_PATH}/search.h"
+      export *
+    }
+    module spawn {
+      header "${NEWLIB_INCLUDE_PATH}/spawn.h"
+      export *
+    }
+    module syslog {
+      header "${NEWLIB_INCLUDE_PATH}/syslog.h"
+      export *
+    }
+    module tar {
+      header "${NEWLIB_INCLUDE_PATH}/tar.h"
+      export *
+    }
+    module utmpx {
+      header "${NEWLIB_INCLUDE_PATH}/utmpx.h"
+      export *
+    }
+    module wordexp {
+      header "${NEWLIB_INCLUDE_PATH}/wordexp.h"
+      export *
+    }
+% end
+
+    module arpa {
+      module inet {
+        header "${NEWLIB_INCLUDE_PATH}/arpa/inet.h"
+        export *
+      }
+      export *
+    }
+    module dirent {
+      header "${NEWLIB_INCLUDE_PATH}/dirent.h"
+      export *
+    }
+    module dlfcn {
+      header "${NEWLIB_INCLUDE_PATH}/dlfcn.h"
+      export *
+    }
+    module fcntl {
+      header "${NEWLIB_INCLUDE_PATH}/fcntl.h"
+      export *
+    }
+    module fnmatch {
+      header "${NEWLIB_INCLUDE_PATH}/fnmatch.h"
+      export *
+    }
+    module grp {
+      header "${NEWLIB_INCLUDE_PATH}/grp.h"
+      export *
+    }
+    module ioctl {
+      header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/ioctl.h"
+      export *
+    }
+    module libgen {
+      header "${NEWLIB_INCLUDE_PATH}/libgen.h"
+      export *
+    }
+    module net {
+      module if {
+        header "${NEWLIB_INCLUDE_PATH}/net/if.h"
+        export *
+      }
+    }
+    module netinet {
+      module in {
+        header "${NEWLIB_INCLUDE_PATH}/netinet/in.h"
+        export *
+
+        exclude header "${NEWLIB_INCLUDE_PATH}/netinet6/in6.h"
+      }
+      module tcp {
+        header "${NEWLIB_INCLUDE_PATH}/netinet/tcp.h"
+        export *
+      }
+    }
+    module poll {
+      header "${NEWLIB_INCLUDE_PATH}/poll.h"
+      export *
+    }
+    module pthread {
+      header "${NEWLIB_INCLUDE_PATH}/pthread.h"
+      export *
+    }
+    module pwd {
+      header "${NEWLIB_INCLUDE_PATH}/pwd.h"
+      export *
+    }
+    module regex {
+      header "${NEWLIB_INCLUDE_PATH}/regex.h"
+      export *
+    }
+    module sched {
+      header "${NEWLIB_INCLUDE_PATH}/sched.h"
+      export *
+    }
+    module semaphore {
+      header "${NEWLIB_INCLUDE_PATH}/semaphore.h"
+      export *
+    }
+    module strings {
+      header "${NEWLIB_INCLUDE_PATH}/strings.h"
+      export *
+    }
+
+    module sys {
+      export *
+
+% if CMAKE_SDK in ["LINUX", "FREEBSD", "CYGWIN"]:
+      module file {
+        header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/file.h"
+        export *
+      }
+      module sem {
+        header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/sem.h"
+        export *
+      }
+      module shm {
+        header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/shm.h"
+        export *
+      }
+      module statvfs {
+        header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/statvfs.h"
+        export *
+      }
+% end
+
+      module ipc {
+        header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/ipc.h"
+        export *
+      }
+      module mman {
+        header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/mman.h"
+        export *
+      }
+      module msg {
+        header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/msg.h"
+        export *
+      }
+      module resource {
+        header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/resource.h"
+        export *
+      }
+      module select {
+        header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/select.h"
+        export *
+      }
+% if CMAKE_SDK == "LINUX":
+      module sendfile {
+        header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/sendfile.h"
+        export *
+      }
+% end
+      module socket {
+        header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/socket.h"
+        export *
+      }
+      module stat {
+        header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/stat.h"
+        export *
+      }
+      module time {
+        header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/time.h"
+        export *
+      }
+      module times {
+        header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/times.h"
+        export *
+      }
+      module types {
+        header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/types.h"
+        export *
+      }
+% if CMAKE_SDK in ["FREEBSD"]:
+      module event {
+        header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/event.h"
+        export *
+      }
+% end
+      module uio {
+        header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/uio.h"
+        export *
+      }
+      module un {
+        header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/un.h"
+        export *
+      }
+% if CMAKE_SDK in ["LINUX"]:
+      module user {
+        header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/user.h"
+        export *
+      }
+% end
+      module utsname {
+        header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/utsname.h"
+        export *
+      }
+      module wait {
+        header "${NEWLIB_ARCH_INCLUDE_PATH}/sys/wait.h"
+        export *
+      }
+    }
+    module termios {
+      header "${NEWLIB_INCLUDE_PATH}/termios.h"
+      export *
+    }
+    module unistd {
+      header "${NEWLIB_INCLUDE_PATH}/unistd.h"
+      export *
+    }
+    module utime {
+      header "${NEWLIB_INCLUDE_PATH}/utime.h"
+      export *
+    }
+  }
+}
+
+module CUUID [system] {
+  header "${NEWLIB_INCLUDE_PATH}/uuid/uuid.h"
+  link "uuid"
+  export *
+}

@@ -333,7 +333,7 @@ swift::swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
 #endif
 }
 
-#if defined(__CYGWIN__) || defined(_WIN32)
+#if defined(_WIN32)
   #define strcasecmp _stricmp
 #endif
 
