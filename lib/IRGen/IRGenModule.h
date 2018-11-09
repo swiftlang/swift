@@ -1065,6 +1065,9 @@ public:
   llvm::SetVector<const StructDecl *> ImportedStructs;
 
   llvm::Constant *getTypeRef(CanType type, MangledTypeRefRole role);
+  llvm::Constant *getMangledAssociatedConformance(
+                                  const NormalProtocolConformance *conformance,
+                                  const AssociatedConformance &requirement);
   llvm::Constant *getAddrOfStringForTypeRef(StringRef mangling,
                                             MangledTypeRefRole role);
   llvm::Constant *getAddrOfStringForTypeRef(const SymbolicMangling &mangling,
