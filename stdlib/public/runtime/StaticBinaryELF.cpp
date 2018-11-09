@@ -177,15 +177,28 @@ public:
     if (symbolTable.hasValue()) {
       auto searchAddr = reinterpret_cast<Elf_Addr>(addr);
       auto symbols = symbolTable->data<Elf_Sym>();
+      const Elf_Sym *bestMatch = nullptr;
+      unsigned long bestDistance = ULONG_MAX;
 
       for (size_t idx = 0; idx < symbols.size(); idx++) {
         auto symbol = &symbols[idx];
         if (ELF_ST_TYPE(symbol->st_info) == STT_FUNC
-            && searchAddr >= symbol->st_value
-            && searchAddr < (symbol->st_value + symbol->st_size)) {
-          return symbol;
+            && searchAddr >= symbol->st_value) {
+
+          auto tmpDistance = searchAddr - symbol->st_value;
+          if (tmpDistance < symbol->st_size) {
+            return symbol;
+          }
+          // The searchAddress is past the end of this symbol's region, keep
+          // track of which symbol end address the searchAddress is closest to.
+          tmpDistance -= symbol->st_size;
+          if (tmpDistance < bestDistance) {
+            bestMatch = symbol;
+            tmpDistance = bestDistance;
+          }
         }
       }
+      return bestMatch;
     }
     return nullptr;
   }
@@ -334,7 +347,7 @@ swift::lookupSymbol(const void *address, SymbolInfo *info) {
   auto symbol = binary.findSymbol(address);
   if (symbol != nullptr) {
     info->symbolAddress = reinterpret_cast<void *>(symbol->st_value);
-    info->symbolName = binary.symbolName(symbol);
+    info->symbolName.reset(binary.symbolName(symbol));
   } else {
     info->symbolAddress = nullptr;
     info->symbolName = nullptr;
