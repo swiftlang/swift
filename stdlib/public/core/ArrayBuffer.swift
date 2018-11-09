@@ -504,6 +504,7 @@ extension _ArrayBuffer {
     return count
   }
 
+  @usableFromInline
   internal typealias Indices = Range<Int>
 
   //===--- private --------------------------------------------------------===//

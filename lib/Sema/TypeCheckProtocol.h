@@ -18,6 +18,8 @@
 #ifndef SWIFT_SEMA_PROTOCOL_H
 #define SWIFT_SEMA_PROTOCOL_H
 
+#include "TypeChecker.h"
+#include "swift/AST/AccessScope.h"
 #include "swift/AST/RequirementEnvironment.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -475,10 +477,23 @@ protected:
 
   RequirementEnvironmentCache ReqEnvironmentCache;
 
+  Optional<std::pair<AccessScope, bool>> RequiredAccessScopeAndUsableFromInline;
+
   WitnessChecker(TypeChecker &tc, ProtocolDecl *proto,
                  Type adoptee, DeclContext *dc);
 
   bool isMemberOperator(FuncDecl *decl, Type type);
+
+  AccessScope getRequiredAccessScope();
+
+  bool isUsableFromInlineRequired() {
+    if (!TC.getLangOpts().EnableAccessControl)
+      return false;
+
+    assert(RequiredAccessScopeAndUsableFromInline.hasValue() &&
+           "must check access first using getRequiredAccessScope");
+    return RequiredAccessScopeAndUsableFromInline.getValue().second;
+  }
 
   /// Gather the value witnesses for the given requirement.
   ///
@@ -501,8 +516,7 @@ protected:
                        unsigned &bestIdx,
                        bool &doNotDiagnoseMatches);
 
-  bool checkWitnessAccess(AccessScope &requiredAccessScope,
-                          ValueDecl *requirement,
+  bool checkWitnessAccess(ValueDecl *requirement,
                           ValueDecl *witness,
                           bool *isSetter);
 
@@ -510,8 +524,7 @@ protected:
                                 ValueDecl *witness,
                                 AvailabilityContext *requirementInfo);
 
-  RequirementCheck checkWitness(AccessScope requiredAccessScope,
-                                ValueDecl *requirement,
+  RequirementCheck checkWitness(ValueDecl *requirement,
                                 const RequirementMatch &match);
 };
 
