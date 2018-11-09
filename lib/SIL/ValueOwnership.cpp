@@ -46,11 +46,6 @@ public:
 #define CONSTANT_OWNERSHIP_INST(OWNERSHIP, INST)                               \
   ValueOwnershipKind ValueOwnershipKindClassifier::visit##INST##Inst(          \
       INST##Inst *Arg) {                                                       \
-    if (ValueOwnershipKind::OWNERSHIP == ValueOwnershipKind::Trivial) {        \
-      assert((Arg->getType().isAddress() ||                                    \
-              Arg->getType().isTrivial(Arg->getModule())) &&                   \
-             "Trivial ownership requires a trivial type or an address");       \
-    }                                                                          \
     return ValueOwnershipKind::OWNERSHIP;                                      \
   }
 
@@ -259,7 +254,7 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *I,
 #define FORWARDING_OWNERSHIP_INST(INST)                                        \
   ValueOwnershipKind ValueOwnershipKindClassifier::visit##INST##Inst(          \
       INST##Inst *I) {                                                         \
-    return visitForwardingInst(I);                                             \
+    return I->getOwnershipKind();                                              \
   }
 FORWARDING_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARDING_OWNERSHIP_INST(ConvertFunction)
@@ -275,27 +270,14 @@ FORWARDING_OWNERSHIP_INST(UnconditionalCheckedCast)
 FORWARDING_OWNERSHIP_INST(Upcast)
 FORWARDING_OWNERSHIP_INST(MarkUninitialized)
 FORWARDING_OWNERSHIP_INST(UncheckedEnumData)
+FORWARDING_OWNERSHIP_INST(SelectEnum)
+FORWARDING_OWNERSHIP_INST(Enum)
 #undef FORWARDING_OWNERSHIP_INST
-
-ValueOwnershipKind
-ValueOwnershipKindClassifier::visitSelectEnumInst(SelectEnumInst *SEI) {
-  // We handle this specially, since a select enum forwards only its case
-  // values. We drop the first element since that is the condition element.
-  return visitForwardingInst(SEI, SEI->getAllOperands().drop_front());
-}
 
 ValueOwnershipKind
 ValueOwnershipKindClassifier::visitUncheckedOwnershipConversionInst(
     UncheckedOwnershipConversionInst *I) {
   return I->getConversionOwnershipKind();
-}
-
-// An enum without payload is trivial. One with non-trivial payload is
-// forwarding.
-ValueOwnershipKind ValueOwnershipKindClassifier::visitEnumInst(EnumInst *EI) {
-  if (!EI->hasOperand())
-    return ValueOwnershipKind::Trivial;
-  return visitForwardingInst(EI);
 }
 
 ValueOwnershipKind ValueOwnershipKindClassifier::visitSILUndef(SILUndef *Arg) {
@@ -396,8 +378,6 @@ struct ValueOwnershipKindBuiltinVisitor
                                         llvm::Intrinsic::ID ID) {
     // LLVM intrinsics do not traffic in ownership, so if we have a result, it
     // must be trivial.
-    assert(BI->getType().isTrivial(BI->getModule()) &&
-           "LLVM intrinsics should always be trivial");
     return ValueOwnershipKind::Trivial;
   }
 
@@ -411,13 +391,6 @@ struct ValueOwnershipKindBuiltinVisitor
 #define CONSTANT_OWNERSHIP_BUILTIN(OWNERSHIP, ID)                              \
   ValueOwnershipKind ValueOwnershipKindBuiltinVisitor::visit##ID(              \
       BuiltinInst *BI, StringRef Attr) {                                       \
-    if (ValueOwnershipKind::OWNERSHIP == ValueOwnershipKind::Trivial) {        \
-      assert(BI->getType().isTrivial(BI->getModule()) &&                       \
-             "Only trivial types can have trivial ownership");                 \
-    } else {                                                                   \
-      assert(!BI->getType().isTrivial(BI->getModule()) &&                      \
-             "Only non trivial types can have non trivial ownership");         \
-    }                                                                          \
     return ValueOwnershipKind::OWNERSHIP;                                      \
   }
 // This returns a value at +1 that is destroyed strictly /after/ the

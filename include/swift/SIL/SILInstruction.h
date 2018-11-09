@@ -35,6 +35,7 @@
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILSuccessor.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SIL/ValueUtils.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
@@ -780,6 +781,25 @@ inline SingleValueInstruction *SILNode::castToSingleValueInstruction() {
     return inst->getKind() >= SILInstructionKind::First_##ID && \
            inst->getKind() <= SILInstructionKind::Last_##ID;    \
   }
+
+/// A single value inst that also forwards either owned or guaranteed ownership.
+///
+/// The specific forwarded ownership is static since it is set upon
+/// construction. After that point the instruction can not have a different form
+/// of ownership.
+class OwnershipForwardingSingleValueInst : public SingleValueInstruction {
+  ValueOwnershipKind ownershipKind;
+
+protected:
+  OwnershipForwardingSingleValueInst(SILInstructionKind kind,
+                                     SILDebugLocation debugLoc, SILType ty,
+                                     ValueOwnershipKind ownershipKind)
+      : SingleValueInstruction(kind, debugLoc, ty),
+        ownershipKind(ownershipKind) {}
+
+public:
+  ValueOwnershipKind getOwnershipKind() const { return ownershipKind; }
+};
 
 /// A value base result of a multiple value instruction.
 ///
@@ -3599,14 +3619,12 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
 
-/// Abstract base class for instructions that mark storage as uninitialized.
-
-/// Indicates that a memory location is uninitialized at
-/// this point and needs to be initialized by the end of the function and before
-/// any escape point for this instruction.  This is only valid in Raw SIL.
+/// Indicates that a memory location is uninitialized at this point and needs to
+/// be initialized by the end of the function and before any escape point for
+/// this instruction. This is only valid in Raw SIL.
 class MarkUninitializedInst
     : public UnaryInstructionBase<SILInstructionKind::MarkUninitializedInst,
-                                  SingleValueInstruction> {
+                                  OwnershipForwardingSingleValueInst> {
   friend SILBuilder;
 
 public:
@@ -3640,8 +3658,9 @@ public:
 private:
   Kind ThisKind;
 
-  MarkUninitializedInst(SILDebugLocation DebugLoc, SILValue Address, Kind K)
-      : UnaryInstructionBase(DebugLoc, Address, Address->getType()),
+  MarkUninitializedInst(SILDebugLocation DebugLoc, SILValue Value, Kind K)
+      : UnaryInstructionBase(DebugLoc, Value, Value->getType(),
+                             Value.getOwnershipKind()),
         ThisKind(K) {}
 
 public:
@@ -4023,19 +4042,35 @@ public:
   DEFINE_ABSTRACT_SINGLE_VALUE_INST_BOILERPLATE(ConversionInst)
 };
 
+/// A conversion inst that produces a static OwnershipKind set upon the
+/// instruction's construction.
+class OwnershipForwardingConversionInst : public ConversionInst {
+  ValueOwnershipKind ownershipKind;
+
+protected:
+  OwnershipForwardingConversionInst(SILInstructionKind kind,
+                                    SILDebugLocation debugLoc, SILType ty,
+                                    ValueOwnershipKind ownershipKind)
+      : ConversionInst(kind, debugLoc, ty), ownershipKind(ownershipKind) {}
+
+public:
+  ValueOwnershipKind getOwnershipKind() const { return ownershipKind; }
+};
+
 /// ConvertFunctionInst - Change the type of a function value without
 /// affecting how it will codegen.
 class ConvertFunctionInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
-          SILInstructionKind::ConvertFunctionInst,
-          ConvertFunctionInst, ConversionInst> {
+          SILInstructionKind::ConvertFunctionInst, ConvertFunctionInst,
+          OwnershipForwardingConversionInst> {
   friend SILBuilder;
 
   ConvertFunctionInst(SILDebugLocation DebugLoc, SILValue Operand,
                       ArrayRef<SILValue> TypeDependentOperands, SILType Ty,
                       bool WithoutActuallyEscaping)
       : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Operand, TypeDependentOperands, Ty) {
+            DebugLoc, Operand, TypeDependentOperands, Ty,
+            Operand.getOwnershipKind()) {
     SILInstruction::Bits.ConvertFunctionInst.WithoutActuallyEscaping =
         WithoutActuallyEscaping;
     assert((Operand->getType().castTo<SILFunctionType>()->isNoEscape() ==
@@ -4140,18 +4175,16 @@ class PointerToThinFunctionInst final
 };
 
 /// UpcastInst - Perform a conversion of a class instance to a supertype.
-class UpcastInst final
-    : public UnaryInstructionWithTypeDependentOperandsBase<
-                             SILInstructionKind::UpcastInst,
-                             UpcastInst, ConversionInst>
-
-{
+class UpcastInst final : public UnaryInstructionWithTypeDependentOperandsBase<
+                             SILInstructionKind::UpcastInst, UpcastInst,
+                             OwnershipForwardingConversionInst> {
   friend SILBuilder;
 
   UpcastInst(SILDebugLocation DebugLoc, SILValue Operand,
              ArrayRef<SILValue> TypeDependentOperands, SILType Ty)
       : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Operand, TypeDependentOperands, Ty) {}
+            DebugLoc, Operand, TypeDependentOperands, Ty,
+            Operand.getOwnershipKind()) {}
 
   static UpcastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
@@ -4201,17 +4234,16 @@ public:
 /// Convert a heap object reference to a different type without any runtime
 /// checks.
 class UncheckedRefCastInst final
-  : public UnaryInstructionWithTypeDependentOperandsBase<
-                                SILInstructionKind::UncheckedRefCastInst,
-                                UncheckedRefCastInst,
-                                ConversionInst>
-{
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::UncheckedRefCastInst, UncheckedRefCastInst,
+          OwnershipForwardingConversionInst> {
   friend SILBuilder;
 
   UncheckedRefCastInst(SILDebugLocation DebugLoc, SILValue Operand,
                        ArrayRef<SILValue> TypeDependentOperands, SILType Ty)
-      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
-                                               TypeDependentOperands, Ty) {}
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            DebugLoc, Operand, TypeDependentOperands, Ty,
+            Operand.getOwnershipKind()) {}
   static UncheckedRefCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
@@ -4313,13 +4345,14 @@ class UncheckedBitwiseCastInst final
 /// in bits from a word.
 class RefToBridgeObjectInst
     : public InstructionBase<SILInstructionKind::RefToBridgeObjectInst,
-                             ConversionInst> {
+                             OwnershipForwardingConversionInst> {
   friend SILBuilder;
 
   FixedOperandList<2> Operands;
   RefToBridgeObjectInst(SILDebugLocation DebugLoc, SILValue ConvertedValue,
                         SILValue MaskValue, SILType BridgeObjectTy)
-      : InstructionBase(DebugLoc, BridgeObjectTy),
+      : InstructionBase(DebugLoc, BridgeObjectTy,
+                        ConvertedValue.getOwnershipKind()),
         Operands(this, ConvertedValue, MaskValue) {}
 
 public:
@@ -4343,14 +4376,13 @@ class ClassifyBridgeObjectInst
 
 /// Extract the heap object reference from a BridgeObject.
 class BridgeObjectToRefInst
-  : public UnaryInstructionBase<SILInstructionKind::BridgeObjectToRefInst,
-                                ConversionInst>
-{
+    : public UnaryInstructionBase<SILInstructionKind::BridgeObjectToRefInst,
+                                  OwnershipForwardingConversionInst> {
   friend SILBuilder;
 
-  BridgeObjectToRefInst(SILDebugLocation DebugLoc, SILValue Operand,
-                        SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
+  BridgeObjectToRefInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
+      : UnaryInstructionBase(DebugLoc, Operand, Ty,
+                             Operand.getOwnershipKind()) {}
 };
 
 /// Sets the BridgeObject to a tagged pointer representation holding its
@@ -4516,19 +4548,17 @@ public:
 
 /// Perform an unconditional checked cast that aborts if the cast fails.
 class UnconditionalCheckedCastInst final
-  : public UnaryInstructionWithTypeDependentOperandsBase<
-                                SILInstructionKind::UnconditionalCheckedCastInst,
-                                UnconditionalCheckedCastInst,
-                                ConversionInst>
-{
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::UnconditionalCheckedCastInst,
+          UnconditionalCheckedCastInst, OwnershipForwardingConversionInst> {
   friend SILBuilder;
 
   UnconditionalCheckedCastInst(SILDebugLocation DebugLoc, SILValue Operand,
                                ArrayRef<SILValue> TypeDependentOperands,
                                SILType DestTy)
-      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
-                                               TypeDependentOperands,
-                                               DestTy) {}
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            DebugLoc, Operand, TypeDependentOperands, DestTy,
+            Operand.getOwnershipKind()) {}
 
   static UnconditionalCheckedCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy,
@@ -4603,19 +4633,20 @@ class UnconditionalCheckedCastValueInst final
 };
 
 /// StructInst - Represents a constructed loadable struct.
-class StructInst final
-    : public InstructionBaseWithTrailingOperands<SILInstructionKind::StructInst,
-                                           StructInst, SingleValueInstruction> {
+class StructInst final : public InstructionBaseWithTrailingOperands<
+                             SILInstructionKind::StructInst, StructInst,
+                             OwnershipForwardingSingleValueInst> {
   friend SILBuilder;
 
   /// Because of the storage requirements of StructInst, object
   /// creation goes through 'create()'.
-  StructInst(SILDebugLocation DebugLoc, SILType Ty,
-             ArrayRef<SILValue> Elements);
+  StructInst(SILDebugLocation DebugLoc, SILType Ty, ArrayRef<SILValue> Elements,
+             bool HasOwnership);
 
   /// Construct a StructInst.
   static StructInst *create(SILDebugLocation DebugLoc, SILType Ty,
-                            ArrayRef<SILValue> Elements, SILModule &M);
+                            ArrayRef<SILValue> Elements, SILModule &M,
+                            bool HasOwnership);
 
 public:
   /// The elements referenced by this StructInst.
@@ -4856,24 +4887,27 @@ class SetDeallocatingInst
 ///
 /// This instruction can only appear at the end of a gobal variable's
 /// static initializer list.
-class ObjectInst final
-    : public InstructionBaseWithTrailingOperands<SILInstructionKind::ObjectInst,
-                                                 ObjectInst,
-                                                 SingleValueInstruction> {
+class ObjectInst final : public InstructionBaseWithTrailingOperands<
+                             SILInstructionKind::ObjectInst, ObjectInst,
+                             OwnershipForwardingSingleValueInst> {
   friend SILBuilder;
 
   /// Because of the storage requirements of ObjectInst, object
   /// creation goes through 'create()'.
-  ObjectInst(SILDebugLocation DebugLoc, SILType Ty,
-            ArrayRef<SILValue> Elements, unsigned NumBaseElements)
-    : InstructionBaseWithTrailingOperands(Elements, DebugLoc, Ty) {
-      SILInstruction::Bits.ObjectInst.NumBaseElements = NumBaseElements;
+  ObjectInst(SILDebugLocation DebugLoc, SILType Ty, ArrayRef<SILValue> Elements,
+             unsigned NumBaseElements, bool HasOwnership)
+      : InstructionBaseWithTrailingOperands(
+            Elements, DebugLoc, Ty,
+            HasOwnership ? *mergeSILValueOwnership(Elements)
+                         : ValueOwnershipKind(ValueOwnershipKind::Any)) {
+    SILInstruction::Bits.ObjectInst.NumBaseElements = NumBaseElements;
   }
 
   /// Construct an ObjectInst.
   static ObjectInst *create(SILDebugLocation DebugLoc, SILType Ty,
                             ArrayRef<SILValue> Elements,
-                            unsigned NumBaseElements, SILModule &M);
+                            unsigned NumBaseElements, SILModule &M,
+                            bool HasOwnership);
 
 public:
   /// All elements referenced by this ObjectInst.
@@ -4900,20 +4934,24 @@ public:
 };
 
 /// TupleInst - Represents a constructed loadable tuple.
-class TupleInst final
-    : public InstructionBaseWithTrailingOperands<SILInstructionKind::TupleInst,
-                                                  TupleInst,
-                                                  SingleValueInstruction> {
+class TupleInst final : public InstructionBaseWithTrailingOperands<
+                            SILInstructionKind::TupleInst, TupleInst,
+                            OwnershipForwardingSingleValueInst> {
   friend SILBuilder;
 
   /// Because of the storage requirements of TupleInst, object
   /// creation goes through 'create()'.
-  TupleInst(SILDebugLocation DebugLoc, SILType Ty, ArrayRef<SILValue> Elems)
-    : InstructionBaseWithTrailingOperands(Elems, DebugLoc, Ty) {}
+  TupleInst(SILDebugLocation DebugLoc, SILType Ty, ArrayRef<SILValue> Elems,
+            bool HasOwnership)
+      : InstructionBaseWithTrailingOperands(
+            Elems, DebugLoc, Ty,
+            HasOwnership ? *mergeSILValueOwnership(Elems)
+                         : ValueOwnershipKind(ValueOwnershipKind::Any)) {}
 
   /// Construct a TupleInst.
   static TupleInst *create(SILDebugLocation DebugLoc, SILType Ty,
-                           ArrayRef<SILValue> Elements, SILModule &M);
+                           ArrayRef<SILValue> Elements, SILModule &M,
+                           bool HasOwnership);
 
 public:
   /// The elements referenced by this TupleInst.
@@ -4973,9 +5011,8 @@ public:
 
 /// Represents a loadable enum constructed from one of its
 /// elements.
-class EnumInst
-    : public InstructionBase<SILInstructionKind::EnumInst,
-                             SingleValueInstruction> {
+class EnumInst : public InstructionBase<SILInstructionKind::EnumInst,
+                                        OwnershipForwardingSingleValueInst> {
   friend SILBuilder;
 
   Optional<FixedOperandList<1>> OptionalOperand;
@@ -4983,7 +5020,10 @@ class EnumInst
 
   EnumInst(SILDebugLocation DebugLoc, SILValue Operand,
            EnumElementDecl *Element, SILType ResultTy)
-      : InstructionBase(DebugLoc, ResultTy),
+      : InstructionBase(DebugLoc, ResultTy,
+                        Operand
+                            ? Operand.getOwnershipKind()
+                            : ValueOwnershipKind(ValueOwnershipKind::Trivial)),
         Element(Element) {
     if (Operand) {
       OptionalOperand.emplace(this, Operand);
@@ -5011,16 +5051,17 @@ public:
 /// Unsafely project the data for an enum case out of an enum without checking
 /// the tag.
 class UncheckedEnumDataInst
-  : public UnaryInstructionBase<SILInstructionKind::UncheckedEnumDataInst,
-                                SingleValueInstruction>
-{
+    : public UnaryInstructionBase<SILInstructionKind::UncheckedEnumDataInst,
+                                  OwnershipForwardingSingleValueInst> {
   friend SILBuilder;
 
   EnumElementDecl *Element;
 
   UncheckedEnumDataInst(SILDebugLocation DebugLoc, SILValue Operand,
                         EnumElementDecl *Element, SILType ResultTy)
-      : UnaryInstructionBase(DebugLoc, Operand, ResultTy), Element(Element) {}
+      : UnaryInstructionBase(DebugLoc, Operand, ResultTy,
+                             Operand.getOwnershipKind()),
+        Element(Element) {}
 
 public:
   EnumElementDecl *getElement() const { return Element; }
@@ -5123,11 +5164,13 @@ public:
 // Subclasses must provide tail allocated storage.
 // The first operand is the operand of select_xxx instruction. The rest of
 // the operands are the case values and results of a select instruction.
-template <class Derived, class T>
-class SelectInstBase : public SingleValueInstruction {
+template <class Derived, class T, class Base = SingleValueInstruction>
+class SelectInstBase : public Base {
 public:
-  SelectInstBase(SILInstructionKind kind, SILDebugLocation Loc, SILType type)
-      : SingleValueInstruction(kind, Loc, type) {}
+  template <typename... Args>
+  SelectInstBase(SILInstructionKind kind, SILDebugLocation Loc, SILType type,
+                 Args &&... otherArgs)
+      : Base(kind, Loc, type, std::forward<Args>(otherArgs)...) {}
 
   SILValue getOperand() const { return getAllOperands()[0].get(); }
 
@@ -5181,9 +5224,8 @@ protected:
   createSelectEnum(SILDebugLocation DebugLoc, SILValue Enum, SILType Type,
                    SILValue DefaultValue,
                    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-                   SILFunction &F,
-                   Optional<ArrayRef<ProfileCounter>> CaseCounts,
-                   ProfileCounter DefaultCount);
+                   SILModule &M, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+                   ProfileCounter DefaultCount, bool HasOwnership);
 
 public:
   ArrayRef<Operand> getAllOperands() const;
@@ -5234,27 +5276,45 @@ public:
   /// not to need this.
   NullablePtr<EnumElementDecl> getSingleTrueElement() const;
 };
-  
+
+/// A select enum inst that produces a static OwnershipKind set upon the
+/// instruction's construction.
+class OwnershipForwardingSelectEnumInstBase : public SelectEnumInstBase {
+  ValueOwnershipKind ownershipKind;
+
+protected:
+  OwnershipForwardingSelectEnumInstBase(
+      SILInstructionKind kind, SILDebugLocation debugLoc, SILType type,
+      bool defaultValue, Optional<ArrayRef<ProfileCounter>> caseCounts,
+      ProfileCounter defaultCount, ValueOwnershipKind ownershipKind)
+      : SelectEnumInstBase(kind, debugLoc, type, defaultValue, caseCounts,
+                           defaultCount),
+        ownershipKind(ownershipKind) {}
+
+public:
+  ValueOwnershipKind getOwnershipKind() const { return ownershipKind; }
+};
+
 /// Select one of a set of values based on the case of an enum.
 class SelectEnumInst final
     : public InstructionBaseWithTrailingOperands<
-                                        SILInstructionKind::SelectEnumInst,
-                                        SelectEnumInst,
-                                        SelectEnumInstBase, EnumElementDecl *> {
+          SILInstructionKind::SelectEnumInst, SelectEnumInst,
+          OwnershipForwardingSelectEnumInstBase, EnumElementDecl *> {
   friend SILBuilder;
 
 private:
   friend SelectEnumInstBase;
 
   SelectEnumInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
-                 bool DefaultValue,
-                 ArrayRef<SILValue> CaseValues,
+                 bool DefaultValue, ArrayRef<SILValue> CaseValues,
                  ArrayRef<EnumElementDecl *> CaseDecls,
                  Optional<ArrayRef<ProfileCounter>> CaseCounts,
-                 ProfileCounter DefaultCount)
-      : InstructionBaseWithTrailingOperands(Operand, CaseValues, DebugLoc, Type,
-                                            bool(DefaultValue), CaseCounts,
-                                            DefaultCount) {
+                 ProfileCounter DefaultCount, bool HasOwnership)
+      : InstructionBaseWithTrailingOperands(
+            Operand, CaseValues, DebugLoc, Type, bool(DefaultValue), CaseCounts,
+            DefaultCount,
+            HasOwnership ? *mergeSILValueOwnership(CaseValues)
+                         : ValueOwnershipKind(ValueOwnershipKind::Any)) {
     assert(CaseValues.size() - DefaultValue == CaseDecls.size());
     std::uninitialized_copy(CaseDecls.begin(), CaseDecls.end(),
                             getTrailingObjects<EnumElementDecl *>());
@@ -5263,8 +5323,8 @@ private:
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
          SILValue DefaultValue,
          ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-         SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
-         ProfileCounter DefaultCount);
+         SILModule &M, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+         ProfileCounter DefaultCount, bool HasOwnership);
 };
 
 /// Select one of a set of values based on the case of an enum.
@@ -5276,16 +5336,15 @@ class SelectEnumAddrInst final
   friend SILBuilder;
   friend SelectEnumInstBase;
 
-  SelectEnumAddrInst(
-      SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
-      bool DefaultValue,
-      ArrayRef<SILValue> CaseValues,
-      ArrayRef<EnumElementDecl *> CaseDecls,
-      Optional<ArrayRef<ProfileCounter>> CaseCounts,
-      ProfileCounter DefaultCount)
+  SelectEnumAddrInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
+                     bool DefaultValue, ArrayRef<SILValue> CaseValues,
+                     ArrayRef<EnumElementDecl *> CaseDecls,
+                     Optional<ArrayRef<ProfileCounter>> CaseCounts,
+                     ProfileCounter DefaultCount, bool HasOwnership)
       : InstructionBaseWithTrailingOperands(Operand, CaseValues, DebugLoc, Type,
                                             bool(DefaultValue), CaseCounts,
                                             DefaultCount) {
+    (void)HasOwnership;
     assert(CaseValues.size() - DefaultValue == CaseDecls.size());
     std::uninitialized_copy(CaseDecls.begin(), CaseDecls.end(),
                             getTrailingObjects<EnumElementDecl *>());
@@ -5294,7 +5353,7 @@ class SelectEnumAddrInst final
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
          SILValue DefaultValue,
          ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
-         SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
+         SILModule &M, Optional<ArrayRef<ProfileCounter>> CaseCounts,
          ProfileCounter DefaultCount);
 };
 
@@ -5304,21 +5363,20 @@ class SelectEnumAddrInst final
 /// followed by an optional default operand.
 class SelectValueInst final
     : public InstructionBaseWithTrailingOperands<
-                                    SILInstructionKind::SelectValueInst,
-                                    SelectValueInst,
-                                    SelectInstBase<SelectValueInst, SILValue>> {
+          SILInstructionKind::SelectValueInst, SelectValueInst,
+          SelectInstBase<SelectValueInst, SILValue,
+                         OwnershipForwardingSingleValueInst>> {
   friend SILBuilder;
 
   SelectValueInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
                   SILValue DefaultResult,
-                  ArrayRef<SILValue> CaseValuesAndResults)
-      : InstructionBaseWithTrailingOperands(Operand, CaseValuesAndResults,
-                                            DebugLoc, Type) {}
+                  ArrayRef<SILValue> CaseValuesAndResults, bool HasOwnership);
 
   static SelectValueInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
          SILValue DefaultValue,
-         ArrayRef<std::pair<SILValue, SILValue>> CaseValues, SILFunction &F);
+         ArrayRef<std::pair<SILValue, SILValue>> CaseValues, SILModule &M,
+         bool HasOwnership);
 
 public:
   std::pair<SILValue, SILValue>
@@ -5757,13 +5815,12 @@ class OpenExistentialValueInst
 /// existential by returning a pointer to a fresh archetype T, which also
 /// captures the (dynamic) conformances.
 class OpenExistentialRefInst
-  : public UnaryInstructionBase<SILInstructionKind::OpenExistentialRefInst,
-                                SingleValueInstruction>
-{
+    : public UnaryInstructionBase<SILInstructionKind::OpenExistentialRefInst,
+                                  OwnershipForwardingSingleValueInst> {
   friend SILBuilder;
 
   OpenExistentialRefInst(SILDebugLocation DebugLoc, SILValue Operand,
-                         SILType Ty);
+                         SILType Ty, bool HasOwnership);
 };
 
 /// Given an existential metatype,
@@ -5888,11 +5945,9 @@ public:
 /// conformances, creates a class existential value referencing the
 /// class instance.
 class InitExistentialRefInst final
-  : public UnaryInstructionWithTypeDependentOperandsBase<
-                                SILInstructionKind::InitExistentialRefInst,
-                                InitExistentialRefInst,
-                                SingleValueInstruction>
-{
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::InitExistentialRefInst, InitExistentialRefInst,
+          OwnershipForwardingSingleValueInst> {
   friend SILBuilder;
 
   CanType ConcreteType;
@@ -5902,9 +5957,9 @@ class InitExistentialRefInst final
                          CanType FormalConcreteType, SILValue Instance,
                          ArrayRef<SILValue> TypeDependentOperands,
                          ArrayRef<ProtocolConformanceRef> Conformances)
-      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Instance,
-                                               TypeDependentOperands,
-                                               ExistentialType),
+      : UnaryInstructionWithTypeDependentOperandsBase(
+            DebugLoc, Instance, TypeDependentOperands, ExistentialType,
+            Instance.getOwnershipKind()),
         ConcreteType(FormalConcreteType), Conformances(Conformances) {}
 
   static InitExistentialRefInst *
