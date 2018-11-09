@@ -558,6 +558,40 @@ private:
   }
 };
 
+/// Intended to diagnose any possible contextual failure
+/// e.g. argument/parameter, closure result, conversions etc.
+class ContextualFailure final : public FailureDiagnostic {
+  Type FromType, ToType;
+
+public:
+  ContextualFailure(Expr *root, ConstraintSystem &cs, Type lhs, Type rhs,
+                    ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), FromType(resolve(lhs)),
+        ToType(resolve(rhs)) {}
+
+  bool diagnoseAsError() override;
+
+  // If we're trying to convert something of type "() -> T" to T,
+  // then we probably meant to call the value.
+  bool diagnoseMissingFunctionCall() const;
+
+  /// Try to add a fix-it when converting between a collection and its slice
+  /// type, such as String <-> Substring or (eventually) Array <-> ArraySlice
+  static bool trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
+                                           ConstraintSystem &CS, Type fromType,
+                                           Type toType, Expr *expr);
+
+private:
+  Type resolve(Type rawType) {
+    auto type = resolveType(rawType)->getWithoutSpecifierType();
+    if (auto *BGT = type->getAs<BoundGenericType>()) {
+      if (BGT->hasUnresolvedType())
+        return BGT->getDecl()->getDeclaredInterfaceType();
+    }
+    return type;
+  }
+};
+
 } // end namespace constraints
 } // end namespace swift
 

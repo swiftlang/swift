@@ -1106,3 +1106,90 @@ Diag<StringRef> AssignmentFailure::findDeclDiagonstic(ASTContext &ctx,
 
   return diag::assignment_lhs_is_immutable_variable;
 }
+
+bool ContextualFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+  auto path = getLocator()->getPath();
+
+  assert(!path.empty());
+
+  if (diagnoseMissingFunctionCall())
+    return true;
+
+  Diag<Type, Type> diagnostic;
+  switch (path.back().getKind()) {
+  case ConstraintLocator::ClosureResult: {
+    diagnostic = diag::cannot_convert_closure_result;
+    break;
+  }
+
+  default:
+    return false;
+  }
+
+  auto diag = emitDiagnostic(anchor->getLoc(), diagnostic, FromType, ToType);
+  diag.highlight(anchor->getSourceRange());
+
+  (void)trySequenceSubsequenceFixIts(diag, getConstraintSystem(), FromType,
+                                     ToType, anchor);
+  return true;
+}
+
+bool ContextualFailure::diagnoseMissingFunctionCall() const {
+  auto &TC = getTypeChecker();
+
+  auto *srcFT = FromType->getAs<FunctionType>();
+  if (!srcFT || !srcFT->getParams().empty())
+    return false;
+
+  if (ToType->is<AnyFunctionType>() ||
+      !TC.isConvertibleTo(srcFT->getResult(), ToType, getDC()))
+    return false;
+
+  auto *anchor = getAnchor();
+  emitDiagnostic(anchor->getLoc(), diag::missing_nullary_call,
+                 srcFT->getResult())
+      .highlight(anchor->getSourceRange())
+      .fixItInsertAfter(anchor->getEndLoc(), "()");
+  return true;
+}
+
+bool ContextualFailure::trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
+                                                     ConstraintSystem &CS,
+                                                     Type fromType, Type toType,
+                                                     Expr *expr) {
+  if (!CS.TC.Context.getStdlibModule())
+    return false;
+
+  auto String = CS.TC.getStringType(CS.DC);
+  auto Substring = CS.TC.getSubstringType(CS.DC);
+
+  if (!String || !Substring)
+    return false;
+
+  /// FIXME: Remove this flag when void subscripts are implemented.
+  /// Make this unconditional and remove the if statement.
+  if (CS.TC.getLangOpts().FixStringToSubstringConversions) {
+    // String -> Substring conversion
+    // Add '[]' void subscript call to turn the whole String into a Substring
+    if (fromType->isEqual(String)) {
+      if (toType->isEqual(Substring)) {
+        diag.fixItInsertAfter(expr->getEndLoc(), "[]");
+        return true;
+      }
+    }
+  }
+
+  // Substring -> String conversion
+  // Wrap in String.init
+  if (fromType->isEqual(Substring)) {
+    if (toType->isEqual(String)) {
+      auto range = expr->getSourceRange();
+      diag.fixItInsert(range.Start, "String(");
+      diag.fixItInsertAfter(range.End, ")");
+      return true;
+    }
+  }
+
+  return false;
+}

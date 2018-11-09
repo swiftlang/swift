@@ -1573,21 +1573,42 @@ ConstraintSystem::matchTypesBindTypeVar(
   return getTypeMatchSuccess();
 }
 
-static void attemptToFixRequirementFailure(
-    ConstraintSystem &cs, Type type1, Type type2,
-    SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
-    ConstraintLocatorBuilder locator) {
-  using LocatorPathEltKind = ConstraintLocator::PathElementKind;
-
+static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
+                                            Type type2, Expr *anchor,
+                                            LocatorPathElt &req) {
   // Can't fix not yet properly resolved types.
   if (type1->hasTypeVariable() || type2->hasTypeVariable())
-    return;
+    return nullptr;
 
   // If dependent members are present here it's because
   // base doesn't conform to associated type's protocol.
   if (type1->hasDependentMember() || type2->hasDependentMember())
-    return;
+    return nullptr;
 
+  // Build simplified locator which only contains anchor and requirement info.
+  ConstraintLocatorBuilder requirement(cs.getConstraintLocator(anchor));
+  auto *reqLoc = cs.getConstraintLocator(requirement.withPathElement(req));
+
+  auto reqKind = static_cast<RequirementKind>(req.getValue2());
+  switch (reqKind) {
+  case RequirementKind::SameType: {
+    return SkipSameTypeRequirement::create(cs, type1, type2, reqLoc);
+  }
+
+  case RequirementKind::Superclass: {
+    return SkipSuperclassRequirement::create(cs, type1, type2, reqLoc);
+  }
+
+  case RequirementKind::Conformance:
+  case RequirementKind::Layout:
+    llvm_unreachable("conformance requirements are handled elsewhere");
+  }
+}
+
+static void
+repairFailures(ConstraintSystem &cs, Type lhs, Type rhs,
+               SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
+               ConstraintLocatorBuilder locator) {
   SmallVector<LocatorPathElt, 4> path;
   auto *anchor = locator.getLocatorParts(path);
 
@@ -1595,30 +1616,22 @@ static void attemptToFixRequirementFailure(
     return;
 
   auto &elt = path.back();
-  if (elt.getKind() != LocatorPathEltKind::TypeParameterRequirement)
-    return;
-
-  // Build simplified locator which only contains anchor and requirement info.
-  ConstraintLocatorBuilder requirement(cs.getConstraintLocator(anchor));
-  auto *reqLoc = cs.getConstraintLocator(requirement.withPathElement(elt));
-
-  auto reqKind = static_cast<RequirementKind>(elt.getValue2());
-  switch (reqKind) {
-  case RequirementKind::SameType: {
-    auto *fix = SkipSameTypeRequirement::create(cs, type1, type2, reqLoc);
-    conversionsOrFixes.push_back(fix);
-    return;
+  switch (elt.getKind()) {
+  case ConstraintLocator::TypeParameterRequirement: {
+    if (auto *fix = fixRequirementFailure(cs, lhs, rhs, anchor, elt))
+      conversionsOrFixes.push_back(fix);
+    break;
   }
 
-  case RequirementKind::Superclass: {
-    auto *fix = SkipSuperclassRequirement::create(cs, type1, type2, reqLoc);
+  case ConstraintLocator::ClosureResult: {
+    auto *fix = ContextualMismatch::create(cs, lhs, rhs,
+                                           cs.getConstraintLocator(locator));
     conversionsOrFixes.push_back(fix);
-    return;
+    break;
   }
 
-  case RequirementKind::Conformance:
-  case RequirementKind::Layout:
-    llvm_unreachable("conformance requirements are handled elsewhere");
+  default:
+    return;
   }
 }
 
@@ -2407,9 +2420,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
   }
 
+  // Attempt to repair any failures identifiable at this point.
   if (attemptFixes)
-    attemptToFixRequirementFailure(*this, type1, type2, conversionsOrFixes,
-                                   locator);
+    repairFailures(*this, type1, type2, conversionsOrFixes, locator);
 
   if (conversionsOrFixes.empty()) {
     // If one of the types is a type variable or member thereof, we leave this
@@ -5047,7 +5060,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   }
 
   case FixKind::SkipSameTypeRequirement:
-  case FixKind::SkipSuperclassRequirement: {
+  case FixKind::SkipSuperclassRequirement:
+  case FixKind::ContextualMismatch: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
