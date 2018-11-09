@@ -79,6 +79,9 @@ Protocol _NSStringCore has been removed
 Constructor ManagedBuffer.init(_doNotCallMe:) has been removed
 Func _makeAnyHashableUpcastingToHashableBaseType(_:storingResultInto:) has been removed
 
+Func RandomNumberGenerator._fill(bytes:) has been removed
+Func SystemRandomNumberGenerator._fill(bytes:) has been removed
+
 Protocol Numeric has generic signature change from <τ_0_0 : Equatable, τ_0_0 : ExpressibleByIntegerLiteral, τ_0_0.Magnitude : Comparable, τ_0_0.Magnitude : Numeric> to <τ_0_0 : AdditiveArithmetic, τ_0_0 : ExpressibleByIntegerLiteral, τ_0_0.Magnitude : Comparable, τ_0_0.Magnitude : Numeric>
 Func Numeric.+(_:) has been removed
 Func Numeric.+(_:_:) has been removed

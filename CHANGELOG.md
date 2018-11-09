@@ -7259,6 +7259,7 @@ Swift 1.0
 [SE-0224]: <https://github.com/apple/swift-evolution/blob/master/proposals/0224-ifswift-lessthan-operator.md>
 [SE-0225]: <https://github.com/apple/swift-evolution/blob/master/proposals/0225-binaryinteger-iseven-isodd-ismultiple.md>
 [SE-0226]: <https://github.com/apple/swift-evolution/blob/master/proposals/0226-package-manager-target-based-dep-resolution.md>
+[SE-0227]: <https://github.com/apple/swift-evolution/blob/master/proposals/0227-identity-keypath.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>
