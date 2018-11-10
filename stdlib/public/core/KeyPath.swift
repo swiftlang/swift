@@ -2439,11 +2439,6 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
                      leafAccessor: leafAccessor,
                      kvcCompatibilityString: kvcString)
 
-  let bufferPtr = pattern.advanced(by: keyPathPatternHeaderSize)
-  let bufferHeader = bufferPtr.load(as: KeyPathBuffer.Header.self)
-  var buffer = UnsafeRawBufferPointer(start: bufferPtr + 4,
-                                      count: bufferHeader.size)
-
   func visitStored(header: RawKeyPathComponent.Header,
                    componentBuffer: inout UnsafeRawBufferPointer) {
     // Decode a stored property. A small offset may be stored inline in the
@@ -2458,7 +2453,7 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
       offset = .unresolvedFieldOffset(_pop(from: &componentBuffer,
                                            as: UInt32.self))
     case RawKeyPathComponent.Header.unresolvedIndirectOffsetPayload:
-      let base = buffer.baseAddress.unsafelyUnwrapped
+      let base = componentBuffer.baseAddress.unsafelyUnwrapped
       let relativeOffset = _pop(from: &componentBuffer,
                                 as: Int32.self)
       let ptr = _resolveRelativeIndirectableAddress(base, relativeOffset)
@@ -2531,6 +2526,13 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
       return nil
     }
   }
+
+  // We declare this down here to avoid the temptation to use it within
+  // the functions above.
+  let bufferPtr = pattern.advanced(by: keyPathPatternHeaderSize)
+  let bufferHeader = bufferPtr.load(as: KeyPathBuffer.Header.self)
+  var buffer = UnsafeRawBufferPointer(start: bufferPtr + 4,
+                                      count: bufferHeader.size)
 
   while !buffer.isEmpty {
     let header = _pop(from: &buffer,
