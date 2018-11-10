@@ -6685,7 +6685,12 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
                                            : defaultUnqualifiedLookupOptions),
                                corrections);
 
-      if (currentType)
+      if (currentType->getKind() == TypeKind::Tuple) {
+        TC.diagnose(KPE->getLoc(), diag::expr_swift_keypath_unimplemented_tuple);
+        isInvalid = true;
+        break;
+      }
+      else if (currentType)
         TC.diagnose(componentNameLoc, diag::could_not_find_type_member,
                     currentType, componentName);
       else
