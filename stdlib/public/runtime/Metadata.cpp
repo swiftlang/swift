@@ -3712,6 +3712,13 @@ template <> OpaqueValue *Metadata::allocateBufferIn(ValueBuffer *buffer) const {
   return reinterpret_cast<OpaqueValue *>(ptr);
 }
 
+template <> OpaqueValue *Metadata::projectBufferFrom(ValueBuffer *buffer) const{
+  auto *vwt = getValueWitnesses();
+  if (vwt->isValueInline())
+    return reinterpret_cast<OpaqueValue *>(buffer);
+  return reinterpret_cast<OpaqueValue *>(buffer->PrivateData[0]);
+}
+
 template <> void Metadata::deallocateBufferIn(ValueBuffer *buffer) const {
   auto *vwt = getValueWitnesses();
   if (vwt->isValueInline())

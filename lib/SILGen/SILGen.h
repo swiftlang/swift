@@ -407,6 +407,9 @@ public:
   /// Retrieve the conformance of NSError to the Error protocol.
   ProtocolConformance *getNSErrorConformanceToError();
 
+  SILFunction *getKeyPathProjectionCoroutine(bool isReadAccess,
+                                             KeyPathTypeKind typeKind);
+
   /// Report a diagnostic.
   template<typename...T, typename...U>
   InFlightDiagnostic diagnose(SourceLoc loc, Diag<T...> diag,

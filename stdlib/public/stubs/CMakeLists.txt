@@ -2,7 +2,6 @@ set(swift_stubs_sources
     Assert.cpp
     CommandLine.cpp
     GlobalObjects.cpp
-    KeyPaths.cpp
     LibcShims.cpp
     Random.cpp
     Stubs.cpp

@@ -3659,25 +3659,6 @@ getWitnessFunctionRef(SILGenFunction &SGF,
   llvm_unreachable("Unhandled WitnessDispatchKind in switch.");
 }
 
-namespace {
-  class EmitAbortApply : public Cleanup {
-    SILValue Token;
-  public:
-    EmitAbortApply(SILValue token) : Token(token) {}
-    void emit(SILGenFunction &SGF, CleanupLocation loc,
-              ForUnwind_t forUnwind) override {
-      SGF.B.createAbortApply(loc, Token);
-    }
-    void dump(SILGenFunction &SGF) const override {
-#ifndef NDEBUG
-      llvm::errs() << "EmitAbortApply\n"
-                   << "State:" << getState() << "\n"
-                   << "Token:" << Token << "\n";
-#endif
-    }
-  };
-}
-
 void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
                                          CanAnyFunctionType reqtSubstTy,
                                          SILDeclRef requirement,
@@ -3793,13 +3774,9 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
 
   case SILCoroutineKind::YieldOnce: {
     SmallVector<SILValue, 4> witnessYields;
-    auto token =
+    auto tokenAndCleanup =
       emitBeginApplyWithRethrow(loc, witnessFnRef, witnessSILTy, witnessSubs,
                                 args, witnessYields);
-
-    // Push a cleanup to abort the inner coroutine.
-    Cleanups.pushCleanup<EmitAbortApply>(token);
-    auto abortCleanup = Cleanups.getTopCleanup();
 
     YieldInfo witnessYieldInfo(SGM, witness, witnessFTy, witnessSubs);
     YieldInfo reqtYieldInfo(SGM, requirement, thunkTy,
@@ -3808,10 +3785,10 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
     translateYields(*this, loc, witnessYields, witnessYieldInfo, reqtYieldInfo);
 
     // Kill the abort cleanup without emitting it.
-    Cleanups.setCleanupState(abortCleanup, CleanupState::Dead);
+    Cleanups.setCleanupState(tokenAndCleanup.second, CleanupState::Dead);
 
     // End the inner coroutine normally.
-    emitEndApplyWithRethrow(loc, token);
+    emitEndApplyWithRethrow(loc, tokenAndCleanup.first);
 
     reqtResultValue = B.createTuple(loc, {});
     break;

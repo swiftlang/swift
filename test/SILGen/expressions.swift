@@ -637,7 +637,7 @@ func evaluateIgnoredKeyPathExpr(_ s: inout NonTrivialStruct, _ kp: WritableKeyPa
 // CHECK-NEXT: [[S_TEMP:%[0-9]+]] = alloc_stack $NonTrivialStruct
 // CHECK-NEXT: copy_addr [[S_READ]] to [initialization] [[S_TEMP]]
 // CHECK-NEXT: // function_ref
-// CHECK-NEXT: [[PROJECT_FN:%[0-9]+]] = function_ref @$ss23_projectKeyPathReadOnly{{[_0-9a-zA-Z]*}}F
+// CHECK-NEXT: [[PROJECT_FN:%[0-9]+]] = function_ref @swift_getAtKeyPath :
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = alloc_stack $Int
 // CHECK-NEXT: apply [[PROJECT_FN]]<NonTrivialStruct, Int>([[RESULT]], [[S_TEMP]], [[KP]])
 // CHECK-NEXT: load [trivial] [[RESULT]]
