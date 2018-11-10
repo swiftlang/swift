@@ -157,7 +157,6 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
 ///   the boxed value, but is otherwise opaque.
 ///
 // COMPILER_INTRINSIC
-@inlinable
 public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return unsafeBitCast(x, to: AnyObject.self)
@@ -176,7 +175,6 @@ func _bridgeAnythingNonVerbatimToObjectiveC<T>(_ x: __owned T) -> AnyObject
 /// a nil `AnyObject?`-inside-an-`Any`.
 ///
 // COMPILER_INTRINSIC
-@inlinable
 public func _bridgeAnyObjectToAny(_ possiblyNullObject: AnyObject?) -> Any {
   if let nonnullObject = possiblyNullObject {
     return nonnullObject // AnyObject-in-Any
@@ -195,7 +193,6 @@ public func _bridgeAnyObjectToAny(_ possiblyNullObject: AnyObject?) -> Any {
 ///     or a subclass of it, trap;
 ///   + otherwise, returns the result of `T._forceBridgeFromObjectiveC(x)`;
 /// - otherwise, trap.
-@inlinable
 public func _forceBridgeFromObjectiveC<T>(_ x: AnyObject, _: T.Type) -> T {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return x as! T
@@ -209,7 +206,6 @@ public func _forceBridgeFromObjectiveC<T>(_ x: AnyObject, _: T.Type) -> T {
 /// Convert `x` from its Objective-C representation to its Swift
 /// representation.
 // COMPILER_INTRINSIC
-@inlinable
 public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable> (
   _ x: T._ObjectiveCType,
   _: T.Type
@@ -231,7 +227,6 @@ public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable> (
 ///   + otherwise, returns the result of
 ///     `T._conditionallyBridgeFromObjectiveC(x)`;
 /// - otherwise, the result is empty.
-@inlinable
 public func _conditionallyBridgeFromObjectiveC<T>(
   _ x: AnyObject,
   _: T.Type
@@ -248,7 +243,6 @@ public func _conditionallyBridgeFromObjectiveC<T>(
 /// Attempt to convert `x` from its Objective-C representation to its Swift
 /// representation.
 // COMPILER_INTRINSIC
-@inlinable
 public func _conditionallyBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>(
   _ x: T._ObjectiveCType,
   _: T.Type
@@ -318,13 +312,11 @@ public func _isBridgedNonVerbatimToObjectiveC<T>(_: T.Type) -> Bool
 /// `_ObjectiveCBridgeable`, and can have its bits reinterpreted as an
 /// `AnyObject`.  When this function returns true, the storage of an
 /// `Array<T>` can be `unsafeBitCast` as an array of `AnyObject`.
-@inlinable // FIXME(sil-serialize-all)
 public func _isBridgedVerbatimToObjectiveC<T>(_: T.Type) -> Bool {
   return _isClassOrObjCExistential(T.self)
 }
 
 /// Retrieve the Objective-C type to which the given type is bridged.
-@inlinable // FIXME(sil-serialize-all)
 public func _getBridgedObjectiveCType<T>(_: T.Type) -> Any.Type? {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return T.self
