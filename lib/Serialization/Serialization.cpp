@@ -2691,8 +2691,7 @@ void Serializer::writeDecl(const Decl *D) {
           if (auto *SF = dyn_cast<SourceFile>(enclosingFile)) {
             return llvm::sys::path::filename(SF->getFilename());
           } else if (auto *LF = dyn_cast<LoadedFile>(enclosingFile)) {
-            return llvm::sys::path::filename(
-                (LF->getFilenameForPrivateDecl(decl)));
+            return LF->getFilenameForPrivateDecl(decl);
           }
           return StringRef();
         };

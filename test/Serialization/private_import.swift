@@ -44,6 +44,8 @@
   Base().foo()
   // This should not be ambigious.
   Base().bar()
-
+  // This should not conflict with the second declaration in
+  // private_import_other_2.swift.
+  Value().foo()
   unreleated()
 #endif
