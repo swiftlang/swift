@@ -2608,7 +2608,7 @@ static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
   EditConsumer.accept(SM, targetLocation, "}\n");
 }
   
-static SourceLoc collectMembersForInit(ResolvedCursorInfo CursorInfo,
+static SourceLoc getAllMembersOfClass(ResolvedCursorInfo CursorInfo,
                            SmallVectorImpl<std::string>& memberNameVector,
                            SmallVectorImpl<std::string>& memberTypeVector) {
   
@@ -2662,7 +2662,7 @@ isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
   SmallVector<std::string, 8> memberNameVector;
   SmallVector<std::string, 8> memberTypeVector;
   
-  return collectMembersForInit(Tok, memberNameVector,
+  return getAllMembersOfClass(Tok, memberNameVector,
                                memberTypeVector).isValid();
 }
     
@@ -2671,7 +2671,7 @@ bool RefactoringActionMemberwiseInitLocalRefactoring::performChange() {
   SmallVector<std::string, 8> memberNameVector;
   SmallVector<std::string, 8> memberTypeVector;
   
-  SourceLoc targetLocation = collectMembersForInit(CursorInfo, memberNameVector,
+  SourceLoc targetLocation = getAllMembersOfClass(CursorInfo, memberNameVector,
                                          memberTypeVector);
   if (targetLocation.isInvalid())
     return true;
@@ -2684,10 +2684,30 @@ bool RefactoringActionMemberwiseInitLocalRefactoring::performChange() {
   
 bool RefactoringActionCustomizeEquatableConformance::
 isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
-  return true;
+  
+  SmallVector<std::string, 8> memberNameVector;
+  SmallVector<std::string, 8> memberTypeVector;
+  
+  return getAllMembersOfClass(Tok, memberNameVector,
+                              memberTypeVector).isValid();
 }
 
 bool RefactoringActionCustomizeEquatableConformance::performChange() {
+  
+  SmallVector<std::string, 8> memberNameVector;
+  SmallVector<std::string, 8> memberTypeVector;
+  
+  SourceLoc targetLocation = getAllMembersOfClass(CursorInfo, memberNameVector,
+                                                  memberTypeVector);
+  if (targetLocation.isInvalid())
+    return true;
+  
+  SourceLoc equatableProtocolDeclLocation = targetLocation.getAdvancedLoc(-2);
+  //Before doing this, we have to check if the class already conforms to
+  //1. The Equatable protocol
+  //2. Other protocols
+  EditConsumer.accept(SM, equatableProtocolDeclLocation, ":Equatable\n");
+  //Logic for creating the ==() goes here...
   return false;
 }
 
