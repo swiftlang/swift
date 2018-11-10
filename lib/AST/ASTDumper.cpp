@@ -982,6 +982,9 @@ namespace {
       if (P->isVariadic())
         OS << " variadic";
 
+      if (P->isAutoClosure())
+        OS << " autoclosure";
+
       if (P->getDefaultArgumentKind() != DefaultArgumentKind::None)
         printField("default_arg",
                    getDefaultArgumentKindString(P->getDefaultArgumentKind()));
@@ -3436,7 +3439,6 @@ namespace {
         printField("representation",
                    getSILFunctionTypeRepresentationString(representation));
 
-      printFlag(T->isAutoClosure(), "autoclosure");
       printFlag(!T->isNoEscape(), "escaping");
       printFlag(T->throws(), "throws");
 

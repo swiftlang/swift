@@ -229,7 +229,7 @@ protected:
   void appendAnyGenericType(const GenericTypeDecl *decl);
 
   void appendFunction(AnyFunctionType *fn, bool isFunctionMangling = false);
-  void appendFunctionType(AnyFunctionType *fn);
+  void appendFunctionType(AnyFunctionType *fn, bool isAutoClosure = false);
 
   void appendFunctionSignature(AnyFunctionType *fn);
 

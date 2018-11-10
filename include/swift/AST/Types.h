@@ -276,7 +276,7 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 7 };
+  enum { NumAFTExtInfoBits = 6 };
   enum { NumSILExtInfoBits = 6 };
   union { uint64_t OpaqueBits;
 
@@ -1743,7 +1743,8 @@ public:
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
-  fromParameterType(Type paramTy, bool isVariadic, ValueOwnership ownership);
+  fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
+                    ValueOwnership ownership);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -2835,15 +2836,14 @@ public:
     // If bits are added or removed, then TypeBase::AnyFunctionTypeBits
     // and NumMaskBits must be updated, and they must match.
     //
-    //   |representation|isAutoClosure|noEscape|throws|
-    //   |    0 .. 3    |      4      |    5   |   6  |
+    //   |representation|noEscape|throws|
+    //   |    0 .. 3    |    4   |   5  |
     //
     enum : unsigned {
       RepresentationMask     = 0xF << 0,
-      AutoClosureMask        = 1 << 4,
-      NoEscapeMask           = 1 << 5,
-      ThrowsMask             = 1 << 6,
-      NumMaskBits            = 7
+      NoEscapeMask           = 1 << 4,
+      ThrowsMask             = 1 << 5,
+      NumMaskBits            = 6
     };
 
     unsigned Bits; // Naturally sized for speed.
@@ -2865,14 +2865,12 @@ public:
 
     // Constructor with no defaults.
     ExtInfo(Representation Rep,
-            bool IsAutoClosure, bool IsNoEscape,
+            bool IsNoEscape,
             bool Throws)
       : ExtInfo(Rep, Throws) {
-      Bits |= (IsAutoClosure ? AutoClosureMask : 0);
       Bits |= (IsNoEscape ? NoEscapeMask : 0);
     }
 
-    bool isAutoClosure() const { return Bits & AutoClosureMask; }
     bool isNoEscape() const { return Bits & NoEscapeMask; }
     bool throws() const { return Bits & ThrowsMask; }
     Representation getRepresentation() const {
@@ -2923,13 +2921,6 @@ public:
     ExtInfo withRepresentation(Representation Rep) const {
       return ExtInfo((Bits & ~RepresentationMask)
                      | (unsigned)Rep);
-    }
-    LLVM_NODISCARD
-    ExtInfo withIsAutoClosure(bool IsAutoClosure = true) const {
-      if (IsAutoClosure)
-        return ExtInfo(Bits | AutoClosureMask);
-      else
-        return ExtInfo(Bits & ~AutoClosureMask);
     }
     LLVM_NODISCARD
     ExtInfo withNoEscape(bool NoEscape = true) const {
@@ -3027,12 +3018,6 @@ public:
   /// \brief Get the representation of the function type.
   Representation getRepresentation() const {
     return getExtInfo().getRepresentation();
-  }
-  
-  /// \brief True if this type allows an implicit conversion from a function
-  /// argument expression of type T to a function of type () -> T.
-  bool isAutoClosure() const {
-    return getExtInfo().isAutoClosure();
   }
 
   /// \brief True if the parameter declaration it is attached to is guaranteed
@@ -5325,9 +5310,8 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 /// Create one from what's present in the parameter decl and type
 inline ParameterTypeFlags
 ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
+                                      bool isAutoClosure,
                                       ValueOwnership ownership) {
-  bool autoclosure = paramTy->is<AnyFunctionType>() &&
-                     paramTy->castTo<AnyFunctionType>()->isAutoClosure();
   bool escaping = paramTy->is<AnyFunctionType>() &&
                   !paramTy->castTo<AnyFunctionType>()->isNoEscape();
   // FIXME(Remove InOut): The last caller that needs this is argument
@@ -5339,7 +5323,7 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
            ownership == ValueOwnership::InOut);
     ownership = ValueOwnership::InOut;
   }
-  return {isVariadic, autoclosure, escaping, ownership};
+  return {isVariadic, isAutoClosure, escaping, ownership};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {
