@@ -510,7 +510,7 @@ ERROR(expr_string_interpolation_outside_string,none,
       "string interpolation can only appear inside a string literal", ())
 ERROR(unsupported_keypath_tuple_element_reference,none,
       "key path cannot reference tuple elements", ())
-ERROR(expr_swift_keypath_unimplemented_tuple,none,
+ERROR(expr_keypath_unimplemented_tuple,none,
       "key path support for tuples is not implemented", ())
 ERROR(expr_keypath_subscript_index_not_hashable, none,
       "subscript index of type %0 in a key path must be Hashable", (Type))
