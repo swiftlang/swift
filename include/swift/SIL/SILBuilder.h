@@ -487,7 +487,7 @@ public:
 
   /// SWIFT_ENABLE_TENSORFLOW
   GradientInst *createGradient(SILLocation loc, SILValue original,
-                               const SILReverseAutoDiffConfig &config) {
+                               const SILAutoDiffConfig &config) {
     return insert(GradientInst::create(getModule(), getSILDebugLocation(loc),
                                        original, config));
   }

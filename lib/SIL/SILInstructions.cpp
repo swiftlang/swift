@@ -582,14 +582,14 @@ TryApplyInst *TryApplyInst::create(
 /// SWIFT_ENABLE_TENSORFLOW
 GradientInst::GradientInst(SILModule &module, SILDebugLocation debugLoc,
                            SILValue original,
-                           const SILReverseAutoDiffConfig &config)
+                           const SILAutoDiffConfig &config)
   : InstructionBase(debugLoc,
                     getGradientSILType(module, original, config)),
     Config(config), Operands(this, original) {}
 
 SILType GradientInst::getGradientSILType(
     SILModule &module, SILValue original,
-    const SILReverseAutoDiffConfig &config) {
+    const SILAutoDiffConfig &config) {
   // If parameter indices are empty, return an invalid type (empty tuple type).
   // An "empty parameter indices" will be produced during verification.
   if (config.indices.parameters.none()) {
@@ -604,7 +604,7 @@ SILType GradientInst::getGradientSILType(
 GradientInst *
 GradientInst::create(SILModule &M, SILDebugLocation debugLoc,
                      SILValue original,
-                     const SILReverseAutoDiffConfig &config) {
+                     const SILAutoDiffConfig &config) {
   void *buffer = M.allocateInst(sizeof(GradientInst), alignof(GradientInst));
   return ::new (buffer) GradientInst(M, debugLoc, original, config);
 }

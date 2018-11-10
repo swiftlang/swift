@@ -2,7 +2,7 @@ add_swift_unittest(SwiftASTTests
   ArithmeticEvaluator.cpp
   DiagnosticConsumerTests.cpp
   # SWIFT_ENABLE_TENSORFLOW
-  SILReverseAutoDiffIndices.cpp
+  SILAutoDiffIndices.cpp
   SourceLocTests.cpp
   TestContext.cpp
   TypeMatchTests.cpp

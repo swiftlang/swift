@@ -1,4 +1,4 @@
-//===--- SILReverseAutoDiffIndices.cpp - Tests SILReverseAutoDiffIndices --===//
+//===--- SILAutoDiffIndices.cpp - Tests SILAutoDiffIndices ----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -16,12 +16,12 @@
 
 using namespace swift;
 
-TEST(SILReverseAutoDiffIndices, EqualityAndHash) {
-  using IndicesDenseMapInfo = llvm::DenseMapInfo<SILReverseAutoDiffIndices>;
+TEST(SILAutoDiffIndices, EqualityAndHash) {
+  using IndicesDenseMapInfo = llvm::DenseMapInfo<SILAutoDiffIndices>;
 
   std::array<unsigned, 0> empty;
   // Each example is distinct.
-  SILReverseAutoDiffIndices examples[] = {
+  SILAutoDiffIndices examples[] = {
     {0, empty},
     {1, empty},
     {0, {0}},

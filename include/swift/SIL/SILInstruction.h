@@ -7516,26 +7516,26 @@ class GradientInst final
                            SingleValueInstruction> {
 private:
   friend SILBuilder;
-  /// The reverse-mode AD configuration.
-  SILReverseAutoDiffConfig Config;
+  /// The AD configuration.
+  SILAutoDiffConfig Config;
   /// Space for 1 operand: the original function to be differentiated.
   FixedOperandList<1> Operands;
 
   GradientInst(SILModule &module, SILDebugLocation debugLoc, SILValue original,
-               const SILReverseAutoDiffConfig &config);
+               const SILAutoDiffConfig &config);
 
   /// A utility function for computing the SIL type of the gradient of a
   /// function, given the specified differentiation configuration options.
   static SILType getGradientSILType(
       SILModule &module, SILValue original,
-      const SILReverseAutoDiffConfig &config);
+      const SILAutoDiffConfig &config);
 
 public:
   ~GradientInst() {};
 
   static GradientInst *create(SILModule &M, SILDebugLocation debugLoc,
                               SILValue original,
-                              const SILReverseAutoDiffConfig &config);
+                              const SILAutoDiffConfig &config);
 
   SILValue getOriginal() const { return Operands[0].get(); }
 
@@ -7543,11 +7543,11 @@ public:
     return getOriginal()->getType().getAs<SILFunctionType>();
   }
 
-  const SILReverseAutoDiffConfig &getConfig() const {
+  const SILAutoDiffConfig &getConfig() const {
     return Config;
   }
 
-  const SILReverseAutoDiffIndices &getIndices() const {
+  const SILAutoDiffIndices &getIndices() const {
     return Config.indices;
   }
 

@@ -116,20 +116,20 @@ class SILReverseDifferentiableAttr final {
 
 private:
   /// The AD indices.
-  SILReverseAutoDiffIndices indices;
+  SILAutoDiffIndices indices;
   /// The primal and adjoint function names.
   StringRef PrimalName, AdjointName;
   /// Whether the adjoint is primitive.
   bool AdjointIsPrimitive;
 
-  SILReverseDifferentiableAttr(const SILReverseAutoDiffIndices &indices,
+  SILReverseDifferentiableAttr(const SILAutoDiffIndices &indices,
                                StringRef primalName,
                                StringRef adjointName,
                                bool adjointIsPrimitive);
 
 public:
   static SILReverseDifferentiableAttr *create(
-      SILModule &M, const SILReverseAutoDiffIndices &indices,
+      SILModule &M, const SILAutoDiffIndices &indices,
       StringRef primalName = StringRef(), StringRef adjointName = StringRef(),
       bool adjointIsPrimitive = false);
 
@@ -145,7 +145,7 @@ public:
     AdjointIsPrimitive = primitive;
   }
 
-  const SILReverseAutoDiffIndices &getIndices() const { return indices; }
+  const SILAutoDiffIndices &getIndices() const { return indices; }
 
   void print(llvm::raw_ostream &OS) const;
 };

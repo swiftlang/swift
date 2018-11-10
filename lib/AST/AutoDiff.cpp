@@ -17,7 +17,7 @@
 
 using namespace swift;
 
-SILReverseAutoDiffIndices::SILReverseAutoDiffIndices(
+SILAutoDiffIndices::SILAutoDiffIndices(
     unsigned source, ArrayRef<unsigned> parameters) : source(source) {
   if (parameters.empty())
     return;
@@ -32,8 +32,8 @@ SILReverseAutoDiffIndices::SILReverseAutoDiffIndices(
   }
 }
 
-bool SILReverseAutoDiffIndices::operator==(
-    const SILReverseAutoDiffIndices &other) const {
+bool SILAutoDiffIndices::operator==(
+    const SILAutoDiffIndices &other) const {
   if (source != other.source)
     return false;
 

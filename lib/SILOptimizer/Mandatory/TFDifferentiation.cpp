@@ -68,7 +68,7 @@ template <typename T> static inline void debugDump(T &v) {
 }
 
 /// Given a set of AD indices, mangles it into a textual form.
-static std::string mangleADIndices(const SILReverseAutoDiffIndices &indices) {
+static std::string mangleADIndices(const SILAutoDiffIndices &indices) {
   std::string result = "src_" + llvm::utostr(indices.source) + "_wrt_";
   interleave(indices.parameters.set_bits(),
              [&](unsigned idx) { result += llvm::utostr(idx); },
@@ -82,7 +82,7 @@ static std::string mangleADIndices(const SILReverseAutoDiffIndices &indices) {
 ///   "_s" : seedable
 ///   "_p" : preserving_result
 ///   "_d" : delayed
-static std::string mangleADConfig(const SILReverseAutoDiffConfig &config) {
+static std::string mangleADConfig(const SILAutoDiffConfig &config) {
   std::string result = "grad_" + mangleADIndices(config.indices);
   if (config.isSeedable())
     result += "_s";
@@ -715,7 +715,7 @@ public:
     primalInfo = std::unique_ptr<PrimalInfo>(new PrimalInfo(pvStruct, module));
   }
 
-  const SILReverseAutoDiffIndices &getIndices() const {
+  const SILAutoDiffIndices &getIndices() const {
     return attr->getIndices();
   }
 
@@ -742,8 +742,8 @@ public:
     return original == other.original && attr == other.attr;
   }
 
-  SILReverseAutoDiffConfig getMasterConfig() const {
-    return SILReverseAutoDiffConfig::getMaster(getIndices());
+  SILAutoDiffConfig getMasterConfig() const {
+    return SILAutoDiffConfig::getMaster(getIndices());
   }
 
   void print(llvm::raw_ostream &os) const;
@@ -808,7 +808,7 @@ struct FunctionSynthesisItem {
   SILFunction *target;
 
   /// The indices of reverse automatic differentiation.
-  SILReverseAutoDiffIndices indices;
+  SILAutoDiffIndices indices;
 
   /// The parent differentiation task. This will be used for diagnostics.
   DifferentiationTask *task;
@@ -828,7 +828,7 @@ enum class PrimalValueKind {
   TapeCheckpoint
 };
 
-using GradientLookUpKey = std::pair<SILFunction *, SILReverseAutoDiffConfig>;
+using GradientLookUpKey = std::pair<SILFunction *, SILAutoDiffConfig>;
 
 //===----------------------------------------------------------------------===//
 // ADContext - Per-module contextual information for the Differentiation pass.
@@ -861,7 +861,7 @@ private:
   SmallVector<std::unique_ptr<DifferentiationTask>, 32> differentiationTasks;
   /// Mapping from enqueued differentiation tasks to their indices in
   /// `differentiationTasks`.
-  SmallDenseMap<std::pair<SILFunction *, SILReverseAutoDiffIndices>, unsigned>
+  SmallDenseMap<std::pair<SILFunction *, SILAutoDiffIndices>, unsigned>
       enqueuedTaskIndices;
 
   /// The SIL loader owned by the module.
@@ -969,7 +969,7 @@ public:
   /// hashing on SILFunction's side or maintaining a dictionary in ADContext.
   /// In any case, this is not performance-critical.
   SILReverseDifferentiableAttr *lookUpReverseDifferentiableAttr(
-      SILFunction *original, const SILReverseAutoDiffIndices &indices) const {
+      SILFunction *original, const SILAutoDiffIndices &indices) const {
     for (auto *attr : original->getReverseDifferentiableAttrs())
       if (attr->getIndices() == indices)
         return attr;
@@ -977,7 +977,7 @@ public:
   }
 
   SILReverseDifferentiableAttr *createReverseDifferentiableAttr(
-      SILFunction *original, const SILReverseAutoDiffIndices &indices) const {
+      SILFunction *original, const SILAutoDiffIndices &indices) const {
     assert(!lookUpReverseDifferentiableAttr(original, indices));
     auto *attr =
         SILReverseDifferentiableAttr::create(getModule(), indices,
@@ -991,7 +991,7 @@ public:
   /// Finds or creates a `[reverse_differentiable]` attribute on the specified
   /// original function corresponding to the specified parameter indices.
   SILReverseDifferentiableAttr *getOrCreateReverseDifferentiableAttr(
-      SILFunction *original, const SILReverseAutoDiffIndices &indices) {
+      SILFunction *original, const SILAutoDiffIndices &indices) {
     if (auto *attr = lookUpReverseDifferentiableAttr(original, indices))
       return attr;
     return createReverseDifferentiableAttr(original, indices);
@@ -1001,7 +1001,7 @@ public:
   /// adjoints for the specified indices.
   DifferentiationTask *
   lookUpDifferentiationTask(SILFunction *original,
-                            const SILReverseAutoDiffIndices &indices) {
+                            const SILAutoDiffIndices &indices) {
     auto existing = enqueuedTaskIndices.find({original, indices});
     if (existing == enqueuedTaskIndices.end())
       return nullptr;
@@ -1015,7 +1015,7 @@ public:
   /// primitive adjoint function.
   DifferentiationTask *
   lookUpMinimalDifferentiationTask(SILFunction *original,
-                                   const SILReverseAutoDiffIndices &indices) {
+                                   const SILAutoDiffIndices &indices) {
     auto supersetParamIndices = llvm::SmallBitVector();
     const auto &indexSet = indices.parameters;
     for (auto *rda : original->getReverseDifferentiableAttrs()) {
@@ -1044,7 +1044,7 @@ public:
   /// The function must either be a definition or be serialized.
   DifferentiationTask *
   registerDifferentiationTask(SILFunction *original,
-                              const SILReverseAutoDiffIndices &indices,
+                              const SILAutoDiffIndices &indices,
                               DifferentiationInvoker invoker) {
     // Make sure this pair of original and indices is unique.
     assert(!lookUpDifferentiationTask(original, indices));
@@ -1068,7 +1068,7 @@ public:
 
   DifferentiationTask *
   lookUpOrRegisterDifferentiationTask(SILFunction *original,
-                                      const SILReverseAutoDiffIndices &indices,
+                                      const SILAutoDiffIndices &indices,
                                       DifferentiationInvoker invoker) {
     if (auto *existingTask = lookUpMinimalDifferentiationTask(original, indices))
       return existingTask;
@@ -1301,19 +1301,19 @@ public:
   explicit DifferentiableActivityInfo(SILFunction &f);
 
   bool isIndependent(SILValue value,
-                     const SILReverseAutoDiffIndices &indices) const;
+                     const SILAutoDiffIndices &indices) const;
   bool isDependent(SILValue value,
-                   const SILReverseAutoDiffIndices &indices) const;
+                   const SILAutoDiffIndices &indices) const;
   bool isVaried(SILValue value, unsigned independentVariableIndex) const;
   bool isUseful(SILValue value, unsigned dependentVariableIndex) const;
   bool isVaried(SILValue value,
                 const llvm::SmallBitVector &parameterIndices) const;
-  bool isActive(SILValue value, const SILReverseAutoDiffIndices &indices) const;
+  bool isActive(SILValue value, const SILAutoDiffIndices &indices) const;
 
   Activity getActivity(SILValue value,
-                       const SILReverseAutoDiffIndices &indices) const;
+                       const SILAutoDiffIndices &indices) const;
   Activity getActivity(SILInstruction *inst,
-                       const SILReverseAutoDiffIndices &indices) const;
+                       const SILAutoDiffIndices &indices) const;
 };
 } // end anonymous namespace
 
@@ -1425,7 +1425,7 @@ void DifferentiableActivityInfo::analyze() {
 }
 
 bool DifferentiableActivityInfo::isIndependent(
-    SILValue value, const SILReverseAutoDiffIndices &indices) const {
+    SILValue value, const SILAutoDiffIndices &indices) const {
   for (auto paramIdx : indices.parameters.set_bits())
     if (inputValues[paramIdx] == value)
       return true;
@@ -1433,7 +1433,7 @@ bool DifferentiableActivityInfo::isIndependent(
 }
 
 bool DifferentiableActivityInfo::isDependent(
-    SILValue value, const SILReverseAutoDiffIndices &indices) const {
+    SILValue value, const SILAutoDiffIndices &indices) const {
   return inputValues[indices.source] == value;
 }
 
@@ -1458,12 +1458,12 @@ bool DifferentiableActivityInfo::isUseful(
 }
 
 bool DifferentiableActivityInfo::isActive(
-    SILValue value, const SILReverseAutoDiffIndices &indices) const {
+    SILValue value, const SILAutoDiffIndices &indices) const {
   return isVaried(value, indices.parameters) && isUseful(value, indices.source);
 }
 
 Activity DifferentiableActivityInfo::getActivity(
-    SILValue value, const SILReverseAutoDiffIndices &indices) const {
+    SILValue value, const SILAutoDiffIndices &indices) const {
   Activity activity;
   if (isVaried(value, indices.parameters))
     activity |= ActivityFlags::Varied;
@@ -1473,7 +1473,7 @@ Activity DifferentiableActivityInfo::getActivity(
 }
 
 Activity DifferentiableActivityInfo::getActivity(
-    SILInstruction *inst, const SILReverseAutoDiffIndices &indices) const {
+    SILInstruction *inst, const SILAutoDiffIndices &indices) const {
   Activity activity;
   for (auto result : inst->getResults())
     activity |= getActivity(result, indices);
@@ -1481,7 +1481,7 @@ Activity DifferentiableActivityInfo::getActivity(
 }
 
 static void dumpActivityInfo(SILValue value,
-                             const SILReverseAutoDiffIndices &indices,
+                             const SILAutoDiffIndices &indices,
                              const DifferentiableActivityInfo &activityInfo,
                              llvm::raw_ostream &s = llvm::dbgs()) {
   s << '[';
@@ -1496,7 +1496,7 @@ static void dumpActivityInfo(SILValue value,
 }
 
 static void dumpActivityInfo(SILFunction &fn,
-                             const SILReverseAutoDiffIndices &indices,
+                             const SILAutoDiffIndices &indices,
                              DifferentiableActivityInfo &activityInfo,
                              llvm::raw_ostream &s = llvm::dbgs()) {
   s << "Activity info for " << fn.getName() << " at " << indices << '\n';
@@ -2030,7 +2030,7 @@ static bool isDifferentiationParameter(SILArgument *argument,
 /// differentiation path, compute the set of minimal indices for differentiating
 /// this function as required by the data flow.
 static void collectMinimalIndicesForFunctionCall(
-    ApplyInst *ai, const SILReverseAutoDiffIndices &parentIndices,
+    ApplyInst *ai, const SILAutoDiffIndices &parentIndices,
     const DifferentiableActivityInfo &activityInfo,
     SmallVectorImpl<unsigned> &paramIndices,
     SmallVectorImpl<unsigned> &resultIndices) {
@@ -2394,7 +2394,7 @@ public:
       return;
     }
     // Form expected indices by assuming there's only one result.
-    SILReverseAutoDiffIndices indices(activeResultIndices.front(),
+    SILAutoDiffIndices indices(activeResultIndices.front(),
                                       activeParamIndices);
     // Retrieve the original function being called before conversion.
     auto calleeOrigin = ai->getCalleeOrigin();
@@ -4126,7 +4126,7 @@ static SILFunction *lookUpOrSynthesizeGradient(ADContext &context,
   auto &config = gradInst->getConfig();
 
   // Creates a gradient function based on the configuration.
-  auto createGradFunction = [&](const SILReverseAutoDiffConfig &config) {
+  auto createGradFunction = [&](const SILAutoDiffConfig &config) {
     auto gradType = origTy->getGradientType(config, module);
     std::string gradName =
         "AD__" + original->getName().str() + "__" + mangleADConfig(config);
@@ -4273,7 +4273,7 @@ static SILFunction *lookUpOrSynthesizeGradient(ADContext &context,
 /// config to extract the ones we want.
 static void fillCanonicalGradient(SILFunction &canGrad,
                                   const DifferentiationTask *task,
-                                  const SILReverseAutoDiffConfig &config,
+                                  const SILAutoDiffConfig &config,
                                   ADContext &context) {
   assert(canGrad.empty() && "The gradient function must be empty");
   auto &module = context.getModule();

@@ -2922,7 +2922,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     SILValue original = getLocalValue(originalName, originalTy, InstLoc, B);
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    SILReverseAutoDiffConfig config(
+    SILAutoDiffConfig config(
       {sourceIndex, paramIndices}, existingOptions);
     ResultVal = B.createGradient(InstLoc, original, config);
     break;

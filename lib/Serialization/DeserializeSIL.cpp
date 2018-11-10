@@ -641,7 +641,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     llvm::SmallBitVector parametersBitVector(parameters.size());
     for (unsigned i = 0; i < parameters.size(); i++)
       parametersBitVector[i] = parameters[i];
-    SILReverseAutoDiffIndices indices(source, parametersBitVector);
+    SILAutoDiffIndices indices(source, parametersBitVector);
 
     auto *attr = SILReverseDifferentiableAttr::create(SILMod, indices,
                                                       primalName, adjointName,
@@ -1478,8 +1478,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     llvm::SmallBitVector paramIndices(ListOfValues.size());
     for (auto i : indices(ListOfValues))
       paramIndices[i] = ListOfValues[i];
-    SILReverseAutoDiffIndices indices(GradResultIndex, paramIndices);
-    SILReverseAutoDiffConfig config(indices, GradOpts);
+    SILAutoDiffIndices indices(GradResultIndex, paramIndices);
+    SILAutoDiffConfig config(indices, GradOpts);
     ResultVal = Builder.createGradient(Loc, Val, config);
     break;
   }
