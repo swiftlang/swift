@@ -3228,6 +3228,7 @@ void Serializer::writeDecl(const Decl *D) {
         getRawStableVarDeclSpecifier(param->getSpecifier()),
         addTypeRef(interfaceType),
         param->isVariadic(),
+        param->isAutoClosure(),
         getRawStableDefaultArgumentKind(param->getDefaultArgumentKind()),
         defaultArgumentText);
 
@@ -3842,11 +3843,9 @@ void Serializer::writeType(Type ty) {
       FunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
              addTypeRef(fnTy->getResult()),
              getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-             fnTy->isAutoClosure(),
              fnTy->isNoEscape(),
              fnTy->throws());
     } else {
-      assert(!fnTy->isAutoClosure());
       assert(!fnTy->isNoEscape());
 
       auto *genericSig = cast<GenericFunctionType>(fnTy)->getGenericSignature();

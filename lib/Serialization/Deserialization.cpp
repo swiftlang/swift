@@ -3029,12 +3029,13 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     unsigned rawSpecifier;
     TypeID interfaceTypeID;
     bool isVariadic;
+    bool isAutoClosure;
     uint8_t rawDefaultArg;
 
     decls_block::ParamLayout::readRecord(scratch, argNameID, paramNameID,
                                          contextID, rawSpecifier,
                                          interfaceTypeID, isVariadic,
-                                         rawDefaultArg);
+                                         isAutoClosure, rawDefaultArg);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -3065,6 +3066,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     param->setInterfaceType(paramTy);
     param->setVariadic(isVariadic);
+    param->setAutoClosure(isAutoClosure);
 
     // Decode the default argument kind.
     // FIXME: Default argument expression, if available.
@@ -4405,13 +4407,12 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   case decls_block::GENERIC_FUNCTION_TYPE: {
     TypeID resultID;
     uint8_t rawRepresentation;
-    bool autoClosure = false, noescape = false, throws;
+    bool noescape = false, throws;
     GenericSignature *genericSig = nullptr;
 
     if (recordID == decls_block::FUNCTION_TYPE) {
       decls_block::FunctionTypeLayout::readRecord(scratch, resultID,
                                                   rawRepresentation,
-                                                  autoClosure,
                                                   noescape,
                                                   throws);
     } else {
@@ -4430,8 +4431,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       return nullptr;
     }
     
-    auto info = FunctionType::ExtInfo(*representation, autoClosure, noescape,
-                                      throws);
+    auto info = FunctionType::ExtInfo(*representation, noescape, throws);
 
     auto resultTy = getTypeChecked(resultID);
     if (!resultTy)

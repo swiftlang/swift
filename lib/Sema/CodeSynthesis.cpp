@@ -485,6 +485,16 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
       ref = new (ctx) InOutExpr(SourceLoc(), ref, Type(), /*isImplicit=*/true);
     else if (param->isVariadic())
       ref = new (ctx) VarargExpansionExpr(ref, /*implicit*/ true);
+    else if (param->isAutoClosure()) {
+      // If parameter is marked as `@autoclosure` it means
+      // that it has to be called.
+      auto arg = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
+                                        /*implicit=*/true);
+      ref = CallExpr::create(ctx, ref, arg, {}, {},
+                             /*hasTrailingClosure=*/false,
+                             /*implicit=*/true);
+    }
+
     args.push_back(ref);
     
     labels.push_back(param->getArgumentName());

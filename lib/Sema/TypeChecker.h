@@ -1082,6 +1082,10 @@ public:
 
   bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
 
+  Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
+                                 Type paramType, bool isAutoClosure = false,
+                                 bool canFail = true);
+
   void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
   void processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
@@ -1902,6 +1906,11 @@ public:
   Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
                      DeclNameLoc NameLoc, bool Implicit,
                      FunctionRefKind functionRefKind);
+
+  /// Build implicit autoclosure expression wrapping a given expression.
+  /// Given expression represents computed result of the closure.
+  Expr *buildAutoClosureExpr(DeclContext *DC, Expr *expr,
+                             FunctionType *closureType);
   /// @}
 
   /// \brief Retrieve a specific, known protocol.

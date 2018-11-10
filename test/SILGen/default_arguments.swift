@@ -60,10 +60,10 @@ func autocloseFile(x: @autoclosure () -> String = #file,
                    y: @autoclosure () -> Int = #line) { }
 // CHECK-LABEL: sil hidden @$s17default_arguments17testAutocloseFileyyF
 func testAutocloseFile() {
-  // CHECK-LABEL: sil private [transparent] @$s17default_arguments17testAutocloseFileyyFSSyXKfu_ : $@convention(thin) () -> @owned String
+  // CHECK-LABEL: sil private [transparent] @$s17default_arguments17testAutocloseFileyyFSSyXEfu_ : $@convention(thin) () -> @owned String
   // CHECK: string_literal utf8{{.*}}default_arguments.swift
 
-  // CHECK-LABEL: sil private [transparent] @$s17default_arguments17testAutocloseFileyyFSiyXKfu0_ : $@convention(thin) () -> Int
+  // CHECK-LABEL: sil private [transparent] @$s17default_arguments17testAutocloseFileyyFSiyXEfu0_ : $@convention(thin) () -> Int
   // CHECK: integer_literal $Builtin.IntLiteral, [[@LINE+1]]
   autocloseFile()
 }
@@ -92,7 +92,7 @@ func autoclosure(_: @autoclosure () -> ()) {}
 // CHECK:         string_literal utf8 "testCallWithMagicLiterals()"
 // CHECK-LABEL: sil private @$s17default_arguments25testCallWithMagicLiteralsyyFyyXEfU_
 // CHECK:         string_literal utf8 "testCallWithMagicLiterals()"
-// CHECK-LABEL: sil private [transparent] @$s17default_arguments25testCallWithMagicLiteralsyyFyyXKfu_
+// CHECK-LABEL: sil private [transparent] @$s17default_arguments25testCallWithMagicLiteralsyyFyyXEfu_
 // CHECK:         string_literal utf8 "testCallWithMagicLiterals()"
 func testCallWithMagicLiterals() {
   testMagicLiterals()
