@@ -1707,22 +1707,22 @@ internal struct KeyPathBuffer {
 
 // MARK: Library intrinsics for projecting key paths.
 
-@inlinable
+@_silgen_name("swift_getAtPartialKeyPath")
 public // COMPILER_INTRINSIC
-func _projectKeyPathPartial<Root>(
+func _getAtPartialKeyPath<Root>(
   root: Root,
   keyPath: PartialKeyPath<Root>
 ) -> Any {
   func open<Value>(_: Value.Type) -> Any {
-    return _projectKeyPathReadOnly(root: root,
+    return _getAtKeyPath(root: root,
       keyPath: unsafeDowncast(keyPath, to: KeyPath<Root, Value>.self))
   }
   return _openExistential(type(of: keyPath).valueType, do: open)
 }
 
-@inlinable
+@_silgen_name("swift_getAtAnyKeyPath")
 public // COMPILER_INTRINSIC
-func _projectKeyPathAny<RootValue>(
+func _getAtAnyKeyPath<RootValue>(
   root: RootValue,
   keyPath: AnyKeyPath
 ) -> Any? {
@@ -1732,7 +1732,7 @@ func _projectKeyPathAny<RootValue>(
       return nil
     }
     func openValue<Value>(_: Value.Type) -> Any {
-      return _projectKeyPathReadOnly(root: rootForKeyPath,
+      return _getAtKeyPath(root: rootForKeyPath,
         keyPath: unsafeDowncast(keyPath, to: KeyPath<KeyPathRoot, Value>.self))
     }
     return _openExistential(keyPathValue, do: openValue)
@@ -1740,39 +1740,57 @@ func _projectKeyPathAny<RootValue>(
   return _openExistential(keyPathRoot, do: openRoot)
 }
 
-@inlinable
+@_silgen_name("swift_getAtKeyPath")
 public // COMPILER_INTRINSIC
-func _projectKeyPathReadOnly<Root, Value>(
+func _getAtKeyPath<Root, Value>(
   root: Root,
   keyPath: KeyPath<Root, Value>
 ) -> Value {
   return keyPath._projectReadOnly(from: root)
 }
 
-// The compiler can't tell which calls might begin an access.
-// That means it can't eliminate dominated checks even when it can prove
-// that the dominated scope has no internal nested conflicts.
-// We use the @_semantics("keypath.entry") annotation:
-// This doesn't solve the deinit ending a scope problem,
-// but it solves the much more important half of the problem:
-// identifying the beginning of an access scope -
-// would allow dominance based optimization:
-@_semantics("keypath.entry")
-public // COMPILER_INTRINSIC
-func _projectKeyPathWritable<Root, Value>(
-  root: UnsafeMutablePointer<Root>,
+@_silgen_name("_swift_modifyAtWritableKeyPath_impl")
+public // runtime entrypoint
+func _modifyAtWritableKeyPath_impl<Root, Value>(
+  root: inout Root,
   keyPath: WritableKeyPath<Root, Value>
 ) -> (UnsafeMutablePointer<Value>, AnyObject?) {
-  return keyPath._projectMutableAddress(from: root)
+  return keyPath._projectMutableAddress(from: &root)
 }
 
-@_semantics("keypath.entry")
-public // COMPILER_INTRINSIC
-func _projectKeyPathReferenceWritable<Root, Value>(
+@_silgen_name("_swift_modifyAtReferenceWritableKeyPath_impl")
+public // runtime entrypoint
+func _modifyAtReferenceWritableKeyPath_impl<Root, Value>(
   root: Root,
   keyPath: ReferenceWritableKeyPath<Root, Value>
 ) -> (UnsafeMutablePointer<Value>, AnyObject?) {
   return keyPath._projectMutableAddress(from: root)
+}
+
+@_silgen_name("swift_setAtWritableKeyPath")
+public // COMPILER_INTRINSIC
+func _setAtWritableKeyPath<Root, Value>(
+  root: inout Root,
+  keyPath: WritableKeyPath<Root, Value>,
+  value: __owned Value
+) {
+  // TODO: we should be able to do this more efficiently than projecting.
+  let (addr, owner) = keyPath._projectMutableAddress(from: &root)
+  addr.pointee = value
+  _fixLifetime(owner)
+}
+
+@_silgen_name("swift_setAtReferenceWritableKeyPath")
+public // COMPILER_INTRINSIC
+func _setAtReferenceWritableKeyPath<Root, Value>(
+  root: Root,
+  keyPath: ReferenceWritableKeyPath<Root, Value>,
+  value: __owned Value
+) {
+  // TODO: we should be able to do this more efficiently than projecting.
+  let (addr, owner) = keyPath._projectMutableAddress(from: root)
+  addr.pointee = value
+  _fixLifetime(owner)
 }
 
 // MARK: Appending type system
