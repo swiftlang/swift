@@ -5,3 +5,7 @@ private struct Base {
 
 private struct Other {
 }
+
+extension Value {
+  fileprivate func foo() {}
+}
