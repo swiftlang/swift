@@ -52,62 +52,110 @@ template <typename T> using CPVec = std::vector<const T*>;
 template <typename T1 = std::string, typename T2 = std::string> using PairVec = std::vector<std::pair<T1, T2>>;
 template <typename T1, typename T2> using CPPairVec = std::vector<std::pair<const T1*, const T2*>>;
 
-static std::string mangleTypeAsContext(const NominalTypeDecl * NTD) {
-  Mangle::ASTMangler Mangler;
-  return Mangler.mangleTypeAsContextUSR(NTD);
+using MemoizedNodeKey = std::tuple<std::string, std::string, Node::Kind>;
+template <>
+struct std::hash<Node::Kind> : public unary_function<Node::Kind, size_t> {
+  size_t operator()(const Node::Kind k) const { return (size_t)(k); }
+};
+static MemoizedNodeKey createMemoizedKey(Node::Kind kind,
+                                         std::string nameForDependencies,
+                                         std::string nameForHolderOfMember) {
+  return std::make_tuple(nameForHolderOfMember, nameForDependencies, kind);
 }
+
+template <>
+struct std::hash<MemoizedNodeKey>
+: public unary_function<MemoizedNodeKey, size_t>
+{
+  size_t operator()(const MemoizedNodeKey key) const {
+    return std::hash<std::string>()(std::get<0>(key)) ^
+    std::hash<std::string>()(std::get<1>(key)) ^
+    std::hash<Node::Kind>()(std::get<2>(key));
+  }
+};
+
+
 
 namespace {
-  template <typename DeclT, Node::Kind kind2>
-  class DeclNode: public Node {
-    DeclT *decl;
+  /// Memoize nodes serving as heads of dependency arcs:
+  /// Could be a definition in another file that a lookup here depends upon,
+  /// or could be definition in this file that a lookup here depends upon.
+  
+  class MemoizedNode: public Node {
+    static std::unordered_map<MemoizedNodeKey, MemoizedNode*> cache;
+
+    MemoizedNode(Kind kind,
+                 std::string nameForDependencies,
+                 std::string nameForHolderOfMember) :
+    Node(kind, nameForDependencies, nameForHolderOfMember) {}
+
   public:
-    DeclNode( const DeclT *decl,
-             Node* containerIfKnown) :
-    Node(kind2, computeNameForDependencies(kind2, decl), containerIfKnown),
-    decl(decl) {}
-    ~DeclNode() = default;
+    MemoizedNodeKey memoizedKey() const {
+      return createMemoizedKey(getKind(), getNameForDependencies(), getNameForHolderOfMember());
+    }
+    static MemoizedNode *create(Kind kind,
+                                std::string nameForDependencies,
+                                std::string nameForHolderOfMember) {
+      auto key = createMemoizedKey(kind, nameForDependencies, nameForHolderOfMember);
+      auto iter = cache.find(key);
+      if (iter != cache.end())
+        return iter->second;
+      auto node = new MemoizedNode(kind, nameForDependencies, nameForHolderOfMember);
+      cache.insert(std::make_pair(key, node));
+      return node;
+    }
     
-    Decl *getDecl() const { return decl; }
-    
+    template <typename DeclT>
+    static MemoizedNode *create(Kind kind, const DeclT* decl) {
+      return create(kind,
+                    computeNameForDependencies(kind, decl),
+                    computeNameForHolderOfMember(kind, decl)
+                    );
+    }
   private:
-    static std::string computeNameForDependencies(const DeclT *decl);
+    template <typename DeclT, Node::Kind kind>
+    static std::string computeNameForDependencies(const DeclT *decl) {
+      return getName(decl);
+    }
     
-    /// name converters
-    static std::string getBaseName(const DeclT *decl) { return decl->getBaseName().userFacingName(); }
-    static std::string getName(const DeclT *decl) { return DeclBaseName(decl->getName()).userFacingName(); }
-    
+    template <typename DeclT, Node::Kind kind>
+    static std::string computeNameForHolderOfMember(const DeclT *decl) {
+      return "";
+    }
   };
-  template <> class DeclNode<PrecedenceGroupDecl, Node::Kind::topLevel> {
-    static std::string computeNameForDependencies(const DeclT *decl) { return getName(decl);}
-  };
-  template <> class DeclNode<FuncDecl, Node::Kind::topLevel> {
-    static std::string computeNameForDependencies(const DeclT *decl) { return getName(decl);}
-  };
-  template <> class DeclNode<OperatorDecl, Node::Kind::topLevel> {
-    static std::string computeNameForDependencies(const DeclT *decl) { return getName(decl);}
-  };
-  template <> class DeclNode<NominalTypeDecl, Node::Kind::topLevel> {
-    static std::string computeNameForDependencies(const DeclT *decl) { return getName(decl);}
-  };
-  template <> class DeclNode<ValueDecl, Node::Kind::topLevel> {
-    static std::string computeNameForDependencies(const DeclT *decl) { return getBaseName(decl);}
-  };
-  template <> class DeclNode<NominalTypeDecl, Node::Kind::nominals> {
-    static std::string computeNameForDependencies(const DeclT *decl) { return mangleTypeAsContext(decl);}
-  };
-  template <> class DeclNode<NominalTypeDecl, Node::Kind::blankMembers> {
-    static std::string computeNameForDependencies(const DeclT *decl) { return xxx}
-  };
-  template <> class DeclNode<ValueDecl, Node::Kind::member> {
-    static std::string computeNameForDependencies(const DeclT *decl) { return getBaseName(decl);}
-  };
-  template <> class DeclNode<ValueDecl, Node::Kind::dynamicLookup> {
-    static std::string computeNameForDependencies(const DeclT *decl) { return getName(decl);}
-  };
+  std::unordered_map<MemoizedNodeKey, MemoizedNode*> MemoizedNode::cache{};
+  
+  /// name converters
+  template <typename DeclT>
+  static std::string getBaseName(const DeclT *decl) { return decl->getBaseName().userFacingName(); }
 
+  template <typename DeclT>
+  static std::string getName(const DeclT *decl) { return DeclBaseName(decl->getName()).userFacingName(); }
+  
+  static std::string mangleTypeAsContext(const NominalTypeDecl * NTD) {
+    Mangle::ASTMangler Mangler;
+    return Mangler.mangleTypeAsContextUSR(NTD);
+  }
+
+  
+  template <>
+  std::string MemoizedNode::computeNameForDependencies<ValueDecl, Node::Kind::topLevel> (const ValueDecl *decl) { return getBaseName(decl);}
+  
+  template <>
+  std::string MemoizedNode::computeNameForDependencies<NominalTypeDecl, Node::Kind::nominals>(const NominalTypeDecl *decl) { return mangleTypeAsContext(decl);}
+  
+  template <>
+  std::string MemoizedNode::computeNameForDependencies<NominalTypeDecl, Node::Kind::blankMembers>(const NominalTypeDecl *decl) { return getBaseName(decl);}
+  
+  template <>
+  std::string MemoizedNode::computeNameForDependencies<ValueDecl, Node::Kind::member>(const ValueDecl *decl) { return getBaseName(decl);}
+  
+  template<>
+  std::string MemoizedNode::computeNameForHolderOfMember<ValueDecl, Node::Kind::member>(const ValueDecl* VD) {
+    return mangleTypeAsContext(cast<NominalTypeDecl>(VD->getDeclContext()->getAsDecl()));
+  }
 }
-
+//UP TO HERE
 
 namespace {
   /// Takes all the Decls in a SourceFile, and collects them into buckets by groups of DeclKinds.
@@ -197,52 +245,15 @@ namespace {
 
 
 ////////////
-using LocalOrForeignNodesKey = std::tuple<std::string, std::string, Node::Kind>;
 
-template <>
-struct std::hash<Node::Kind>
-: public unary_function<Node::Kind, size_t>
-{
-  size_t operator()(const Node::Kind k) const {
-    return (size_t)(k);
-  }
-};
 
-template <>
-struct std::hash<LocalOrForeignNodesKey>
-: public unary_function<LocalOrForeignNodesKey, size_t>
-{
-  size_t operator()(const LocalOrForeignNodesKey key) const {
-    return std::hash<std::string>()(std::get<0>(key)) ^
-    std::hash<std::string>()(std::get<1>(key)) ^
-    std::hash<Node::Kind>()(std::get<2>(key));
-  }
-};
 
-/// Memoize nodes serving as heads of dependency arcs:
-/// Could be a definition in another file that a lookup here depends upon,
-/// or could be definition in this file that a lookup here depends upon.
-
-class NodeCache {
-   std::unordered_map<LocalOrForeignNodesKey, Node*> localOrForeignNodes{};
-public:
-  Node* memoize(Node *n) {
-    auto key = std::make_tuple(n->getContainerName(), n->getName(), n->getKind());
-    auto iter = localOrForeignNodes.find(key);
-    if (iter == localOrForeignNodes.end()) {
-      *iter = n;
-      return n;
-    }
-    delete n;
-    return *iter;
-  }
-};
 
 class GraphConstructor {
   SourceFile *SF;
   const DependencyTracker &depTracker;
   StringRef outputPath;
-  DeclNode *sourceFileNode;
+  MemoizedNode *sourceFileNode;
   
   GraphConstructor(
                    SourceFile *SF,
@@ -252,7 +263,7 @@ class GraphConstructor {
   Graph g;
   void construct() {
     //TODO storage mgmt
-    sourceFileNode = new DeclNode(DeclNode::Kind::sourceFileProvide, SF->getAsDecl(), nullptr, getInterfaceHash(), outputPath);
+    sourceFileNode = MemoizedNode::create(Node:Kind::sourceFileProvide, outputPath, "");
     g.addNode(sourceFileNode);
     
     constructProvidesNodes();
@@ -260,11 +271,6 @@ class GraphConstructor {
   }
   
 private:
-  NodeCache nodeCache;
-  std::unordered_map<const Decl*, Node*> nodesByDecl;
-  
- 
-  
   std::string getInterfaceHash() const {
     llvm::SmallString<32> interfaceHash;
     SF->getInterfaceHash(interfaceHash);
@@ -274,36 +280,28 @@ private:
   void constructProvidesNodes();
   void constructDependArcs();
   
-  
-  
-  
-  
-  
-  
   template <typename DeclT>
-  void createDeclNodes(CPVec<DeclT> &decls, DeclNode::Kind kind, std::string(*nameFn)(const DeclT *)) {
+  void createProvidesNodes(CPVec<DeclT> &decls, Node::Kind kind, std::string(*nameFn)(const DeclT *)) {
     for (const auto* D: decls) {
-      auto *context = D->getDeclContext();
-      auto *containingDecl = context ? context->getAsDecl() : nullptr;
-      auto iter = nodesByDecl.find(containingDecl);
-      assert(iter != nodesByDecl.end() && "missing container");
-      Node *containingNode = iter->second;
-      // wants Decl, not name, but containingNode may not be DeclNode
-      getOrCreateMemoizedNode(kind, containingNode->D, (*nameFn)(D),
-                              [&]()->Node* {
-                                return addDeclNode(D, new DeclNode(kind, D, containingNode, "", (*nameFn)(D)));
-                              });
-    }
+      std::string nameForHolderOfMember{};
+      if (kind == Node::Kind::member) {
+        auto *context = D->getDeclContext();
+        auto *containingDecl = context ? context->getAsDecl() : nullptr;
+        const auto * NTD = dyn_cast<NominalTypeDecl>(containingDecl);
+        nameForHolderOfMember = mangleTypeAsContext(NTD);
+      }
+      MemoizedNode::create(kind, (*nameFn)(D), nameForHolderOfMember);
   }
   
   Node* addDeclNode(const Decl* D, DeclNode *node) {
     bool inserted = nodesByDecl.insert(std::make_pair(D, node)).second;
     assert(inserted && "dup node?");
-    LocalOrForeignNodesKey key = std::make_tuple<xxx, node->nameForDependencies, node->kind>;
+    MemoizedNodeKey key = std::make_tuple<xxx, node->nameForDependencies, node->kind>;
     inserted = localOrForeignNodes.insert(std::make_pair(key, node)).second;
     assert(inserted && "dup node??");
     g.addNode(node);
     return node;
+
   }
   
   Node* getOrCreateMemoizedNode(const Node::Kind kind, const NominalTypeDecl *holderIfKnown,
@@ -349,19 +347,19 @@ private:
 void GraphConstructor::constructProvidesNodes() {
   SourceFileDeclDemux demux(SF);
   
-  createDeclNodes<PrecedenceGroupDecl>(demux.precedenceGroups, DeclNode::Kind::topLevel, getName);
-  createDeclNodes<FuncDecl>(demux.memberOperatorDecls, DeclNode::Kind::topLevel, getName);
-  createDeclNodes<OperatorDecl>(demux.operators, DeclNode::Kind::topLevel, getName);
-  createDeclNodes<NominalTypeDecl>(demux.topNominals, DeclNode::Kind::topLevel, getName);
-  createDeclNodes<ValueDecl>(demux.topValues, DeclNode::Kind::topLevel, getBaseName);
+  createProvidesNodes<PrecedenceGroupDecl>(demux.precedenceGroups, DeclNode::Kind::topLevel, getName);
+  createProvidesNodes<FuncDecl>(demux.memberOperatorDecls, DeclNode::Kind::topLevel, getName);
+  createProvidesNodes<OperatorDecl>(demux.operators, DeclNode::Kind::topLevel, getName);
+  createProvidesNodes<NominalTypeDecl>(demux.topNominals, DeclNode::Kind::topLevel, getName);
+  createProvidesNodes<ValueDecl>(demux.topValues, DeclNode::Kind::topLevel, getBaseName);
   
-  createDeclNodes<NominalTypeDecl>(demux.allNominals, DeclNode::Kind::nominals, mangleTypeAsContext);
-  createDeclNodes<NominalTypeDecl>(demux.allNominals, DeclNode::Kind::blankMembers, mangleTypeAsContext); // TODO: fix someday
+  createProvidesNodes<NominalTypeDecl>(demux.allNominals, DeclNode::Kind::nominals, mangleTypeAsContext);
+  createProvidesNodes<NominalTypeDecl>(demux.allNominals, DeclNode::Kind::blankMembers, mangleTypeAsContext); // TODO: fix someday
   
-  createDeclNodes<ValueDecl>(demux.valuesInExtensions, DeclNode::Kind::member, getBaseName);
+  createProvidesNodes<ValueDecl>(demux.valuesInExtensions, DeclNode::Kind::member, getBaseName);
   
   // could optimize by uniqueing by name, but then what of container?
-  createDeclNodes<ValueDecl>(demux.classMembers, DeclNode::Kind::dynamicLookup, getBaseName);
+  createProvidesNodes<ValueDecl>(demux.classMembers, DeclNode::Kind::dynamicLookup, getBaseName);
 }
 
 void GraphConstructor::constructDependArcs() {

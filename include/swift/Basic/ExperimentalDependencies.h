@@ -42,7 +42,7 @@ namespace experimental_dependencies {
   private:
     Kind kind;
     std::string nameForDependencies;
-    Node* containerIfKnown;
+    std::string nameForHolderOfMember;
     
     friend class Graph;
     uint sequenceNumberInGraph;
@@ -51,14 +51,18 @@ namespace experimental_dependencies {
   Node(
        Kind kind,
        std::string nameForDependencies,
-       Node* containerIfKnown = nullptr) :
-    kind(kind), nameForDependencies(nameForDependencies)
-    {}
+       std::string nameForHolderOfMember) :
+    kind(kind),
+    nameForDependencies(nameForDependencies),
+    nameForHolderOfMember(nameForHolderOfMember)
+    {
+      assert((kind == Kind::member) == !nameForHolderOfMember.empty() && "only member nodes have the holder name");
+    }
     
     virtual ~Node() = default;
     Kind getKind() const { return kind; }
-    std::string getNameForDependencies() const { return nameForDependencies; }
-    Node* getContainerIfKnown() const { return containerIfKnown; }
+    StringRef getNameForDependencies() const { return nameForDependencies; }
+    StringRef getNameForHolderOfMember() const { return nameForHolderOfMember; }
   };
   
  
