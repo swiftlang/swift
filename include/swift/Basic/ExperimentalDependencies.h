@@ -43,6 +43,7 @@ namespace experimental_dependencies {
     Kind kind;
     std::string nameForDependencies;
     std::string nameForHolderOfMember;
+    std::string fingerprint;
     
     friend class Graph;
     uint sequenceNumberInGraph;
@@ -51,12 +52,15 @@ namespace experimental_dependencies {
   Node(
        Kind kind,
        std::string nameForDependencies,
-       std::string nameForHolderOfMember) :
+       std::string nameForHolderOfMember,
+       std::string fingerprint) :
     kind(kind),
     nameForDependencies(nameForDependencies),
-    nameForHolderOfMember(nameForHolderOfMember)
+    nameForHolderOfMember(nameForHolderOfMember),
+    fingerprint(fingerprint)
     {
       assert((kind == Kind::member) == !nameForHolderOfMember.empty() && "only member nodes have the holder name");
+      assert(kind != Kind::sourceFileProvide || !fingerprint.empty() && "source files must have fingerprint (old interfaceHash");
     }
     
     virtual ~Node() = default;

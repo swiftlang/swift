@@ -86,8 +86,9 @@ namespace {
     
     MemoizedNode(Kind kind,
                  std::string nameForDependencies,
-                 std::string nameForHolderOfMember) :
-    Node(kind, nameForDependencies, nameForHolderOfMember) {}
+                 std::string nameForHolderOfMember,
+                 std::string fingerprint) :
+    Node(kind, nameForDependencies, nameForHolderOfMember, fingerprint) {}
     
   public:
     MemoizedNodeKey memoizedKey() const {
@@ -95,12 +96,13 @@ namespace {
     }
     static MemoizedNode *create(Kind kind,
                                 std::string nameForDependencies,
-                                std::string nameForHolderOfMember) {
+                                std::string nameForHolderOfMember,
+                                std::string fingerprint) {
       auto key = createMemoizedKey(kind, nameForDependencies, nameForHolderOfMember);
       auto iter = cache.find(key);
       if (iter != cache.end())
         return iter->second;
-      auto node = new MemoizedNode(kind, nameForDependencies, nameForHolderOfMember);
+      auto node = new MemoizedNode(kind, nameForDependencies, nameForHolderOfMember, fingerprint);
       cache.insert(std::make_pair(key, node));
       return node;
     }
@@ -214,7 +216,7 @@ namespace {
     Graph g;
     void construct() {
       //TODO storage mgmt
-      sourceFileNode = MemoizedNode::create(Node::Kind::sourceFileProvide, outputPath, "");
+      sourceFileNode = MemoizedNode::create(Node::Kind::sourceFileProvide, outputPath, "", getInterfaceHash());
       g.addNode(sourceFileNode);
       
       addProviderNodesToGraph(); // must preceed dependencies for cascades
@@ -226,7 +228,6 @@ namespace {
       llvm::SmallString<32> interfaceHash;
       SF->getInterfaceHash(interfaceHash);
       return interfaceHash.str().str();
-#error where to add this? source file node fingerprint
     }
     
     void addProviderNodesToGraph();
@@ -244,7 +245,7 @@ namespace {
     void addOneTypeOfProviderNodesToGraph(CPVec<DeclT> &decls, Node::Kind kind, std::string(*nameFn)(const DeclT *)) {
       for (const auto* D: decls) {
         std::string nameForHolderOfMember{};
-        MemoizedNode::create(kind, (*nameFn)(D), kind == Node::Kind::member ? computeContextNameOfMember(D) : "");
+        MemoizedNode::create(kind, (*nameFn)(D), kind == Node::Kind::member ? computeContextNameOfMember(D) : "", "");
       }
     }
     /// name converters
@@ -335,7 +336,7 @@ void GraphConstructor::addToGraphThatThisWholeFileDependsUpon(Node::Kind kind,
                                                               const std::string &nameForHolderOfMember,
                                                               const std::string &dependedUponNameIfNotEmpty,
                                                               bool cascades) {
-  MemoizedNode *whatIsDependedUpon = MemoizedNode::create(kind, dependedUponNameIfNotEmpty, nameForHolderOfMember);
+  MemoizedNode *whatIsDependedUpon = MemoizedNode::create(kind, dependedUponNameIfNotEmpty, nameForHolderOfMember, "");
   if (!cascades)
     g.addArc(Arc{sourceFileNode, whatIsDependedUpon});
   else
