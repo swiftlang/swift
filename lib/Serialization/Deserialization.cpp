@@ -2027,22 +2027,6 @@ getActualOptionalTypeKind(uint8_t raw) {
   return None;
 }
 
-static Optional<swift::AddressorKind>
-getActualAddressorKind(uint8_t raw) {
-  switch (serialization::AddressorKind(raw)) {
-  case serialization::AddressorKind::NotAddressor:
-    return swift::AddressorKind::NotAddressor;
-  case serialization::AddressorKind::Unsafe:
-    return swift::AddressorKind::Unsafe;
-  case serialization::AddressorKind::Owning:
-    return swift::AddressorKind::Owning;
-  case serialization::AddressorKind::NativeOwning:
-    return swift::AddressorKind::NativeOwning;
-  }
-
-  return None;
-}
-
 static Optional<swift::SelfAccessKind>
 getActualSelfAccessKind(uint8_t raw) {
   switch (serialization::SelfAccessKind(raw)) {
@@ -3100,7 +3084,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     bool isImplicit;
     bool isStatic;
     uint8_t rawStaticSpelling, rawAccessLevel, rawMutModifier;
-    uint8_t rawAccessorKind, rawAddressorKind;
+    uint8_t rawAccessorKind;
     bool isObjC, hasDynamicSelf, hasForcedStaticDispatch, throws;
     unsigned numNameComponentsBiased;
     GenericEnvironmentID genericEnvID;
@@ -3134,7 +3118,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
                                           resultInterfaceTypeID,
                                           overriddenID,
                                           accessorStorageDeclID,
-                                          rawAccessorKind, rawAddressorKind,
+                                          rawAccessorKind,
                                           rawAccessLevel,
                                           needsNewVTableEntry,
                                           rawDefaultArgumentResilienceExpansion,
@@ -3148,7 +3132,6 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     // Parse the accessor-specific fields.
     AbstractStorageDecl *storage = nullptr;
     AccessorKind accessorKind;
-    AddressorKind addressorKind;
     if (isAccessor) {
       auto storageResult = getDeclChecked(accessorStorageDeclID);
       if (!storageResult ||
@@ -3161,13 +3144,6 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
       if (auto accessorKindResult = getActualAccessorKind(rawAccessorKind)) {
         accessorKind = *accessorKindResult;
-      } else {
-        error();
-        return nullptr;
-      }
-
-      if (auto addressorKindResult = getActualAddressorKind(rawAddressorKind)) {
-        addressorKind = *addressorKindResult;
       } else {
         error();
         return nullptr;
@@ -3244,7 +3220,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     } else {
       fn = AccessorDecl::createDeserialized(
         ctx, /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
-        accessorKind, addressorKind, storage,
+        accessorKind, storage,
         /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
         /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
         genericParams, DC);

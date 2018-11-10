@@ -214,8 +214,8 @@ class Klass {
   }
 
   // CHECK: (subscript_decl {{.*}} "subscript(_:)" {{.*}} access=internal dynamic readImpl=addressor writeImpl=mutable_addressor readWriteImpl=mutable_addressor
-  // CHECK: (accessor_decl {{.*}} access=internal dynamic address_for=subscript(_:)
-  // CHECK: (accessor_decl {{.*}} access=internal dynamic mutableAddress_for=subscript(_:)
+  // CHECK: (accessor_decl {{.*}} access=internal dynamic unsafeAddress_for=subscript(_:)
+  // CHECK: (accessor_decl {{.*}} access=internal dynamic unsafeMutableAddress_for=subscript(_:)
   // CHECK: (accessor_decl {{.*}} access=internal get_for=subscript(_:)
   // CHECK: (accessor_decl {{.*}} access=internal set_for=subscript(_:)
   dynamic subscript(_ index: Int) -> Int {
@@ -229,7 +229,7 @@ class Klass {
 
   // CHECK: (subscript_decl {{.*}} "subscript(_:)" {{.*}} access=internal dynamic readImpl=getter writeImpl=mutable_addressor readWriteImpl=mutable_addressor
   // CHECK: (accessor_decl {{.*}} access=internal dynamic get_for=subscript(_:)
-  // CHECK: (accessor_decl {{.*}} access=internal dynamic mutableAddress_for=subscript(_:)
+  // CHECK: (accessor_decl {{.*}} access=internal dynamic unsafeMutableAddress_for=subscript(_:)
   // CHECK: (accessor_decl {{.*}} access=internal set_for=subscript(_:)
   // CHECK: (accessor_decl {{.*}} access=internal _modify_for=subscript(_:)
   dynamic subscript(_ index: Float) -> Int {
@@ -243,7 +243,7 @@ class Klass {
 
   // CHECK: (subscript_decl {{.*}} "subscript(_:)" {{.*}} access=internal dynamic readImpl=read_coroutine writeImpl=mutable_addressor readWriteImpl=mutable_addressor
   // CHECK: (accessor_decl {{.*}} access=internal dynamic _read_for=subscript(_:)
-  // CHECK: (accessor_decl {{.*}} access=internal dynamic mutableAddress_for=subscript(_:)
+  // CHECK: (accessor_decl {{.*}} access=internal dynamic unsafeMutableAddress_for=subscript(_:)
   // CHECK: (accessor_decl {{.*}} access=internal get_for=subscript(_:)
   // CHECK: (accessor_decl {{.*}} access=internal set_for=subscript(_:)
   // CHECK: (accessor_decl {{.*}} access=internal _modify_for=subscript(_:)
@@ -256,7 +256,7 @@ class Klass {
   }
 
   // CHECK: (subscript_decl {{.*}} "subscript(_:)" {{.*}} access=internal dynamic readImpl=addressor writeImpl=setter readWriteImpl=materialize_to_temporary
-  // CHECK: (accessor_decl {{.*}} access=internal dynamic address_for=subscript(_:)
+  // CHECK: (accessor_decl {{.*}} access=internal dynamic unsafeAddress_for=subscript(_:)
   // CHECK: (accessor_decl {{.*}} access=internal dynamic set_for=subscript(_:)
   // CHECK: (accessor_decl {{.*}} access=internal get_for=subscript(_:)
   // CHECK: (accessor_decl {{.*}} access=internal _modify_for=subscript(_:)
@@ -269,7 +269,7 @@ class Klass {
   }
 
   // CHECK: (subscript_decl {{.*}} "subscript(_:)" {{.*}} access=internal dynamic readImpl=addressor writeImpl=modify_coroutine readWriteImpl=modify_coroutine
-  // CHECK: (accessor_decl {{.*}} access=internal dynamic address_for=subscript(_:)
+  // CHECK: (accessor_decl {{.*}} access=internal dynamic unsafeAddress_for=subscript(_:)
   // CHECK: (accessor_decl {{.*}} access=internal dynamic _modify_for=subscript(_:)
   // CHECK: (accessor_decl {{.*}} access=internal get_for=subscript(_:)
   // CHECK: (accessor_decl {{.*}} access=internal set_for=subscript(_:)

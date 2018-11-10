@@ -316,8 +316,6 @@ static StringRef getAccessorKindString(AccessorKind value) {
 #define SINGLETON_ACCESSOR(ID, KEYWORD) \
   case AccessorKind::ID: return #KEYWORD;
 #include "swift/AST/AccessorKinds.def"
-  case AccessorKind::Address: return "address";
-  case AccessorKind::MutableAddress: return "mutableAddress";
   }
 
   llvm_unreachable("Unhandled AccessorKind in switch.");

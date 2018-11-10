@@ -290,7 +290,7 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   
   auto getterDecl = AccessorDecl::create(C,
     /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
-    AccessorKind::Get, AddressorKind::NotAddressor, property,
+    AccessorKind::Get, property,
     /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
     /*GenericParams=*/nullptr, params,

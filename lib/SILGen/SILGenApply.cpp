@@ -6071,10 +6071,8 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
 
 /// Emit a call to an addressor.
 ///
-/// The first return value is the address, which will always be an
-/// l-value managed value.  The second return value is the owner
-/// pointer, if applicable.
-std::pair<ManagedValue, ManagedValue> SILGenFunction::emitAddressorAccessor(
+/// Returns an l-value managed value.
+ManagedValue SILGenFunction::emitAddressorAccessor(
     SILLocation loc, SILDeclRef addressor, SubstitutionMap substitutions,
     ArgumentSource &&selfValue, bool isSuper, bool isDirectUse,
     PreparedArguments &&subscriptIndices, SILType addressType,
@@ -6108,23 +6106,8 @@ std::pair<ManagedValue, ManagedValue> SILGenFunction::emitAddressorAccessor(
   SmallVector<ManagedValue, 2> results;
   emission.apply().getAll(results);
 
-  SILValue pointer;
-  ManagedValue owner;
-  switch (cast<AccessorDecl>(addressor.getDecl())->getAddressorKind()) {
-  case AddressorKind::NotAddressor:
-    llvm_unreachable("not an addressor!");
-  case AddressorKind::Unsafe:
-    assert(results.size() == 1);
-    pointer = results[0].getUnmanagedValue();
-    owner = ManagedValue();
-    break;
-  case AddressorKind::Owning:
-  case AddressorKind::NativeOwning:
-    assert(results.size() == 2);
-    pointer = results[0].getUnmanagedValue();
-    owner = results[1];
-    break;
-  }
+  assert(results.size() == 1);
+  auto pointer = results[0].getUnmanagedValue();
 
   // Drill down to the raw pointer using intrinsic knowledge of those types.
   auto pointerType =
@@ -6141,20 +6124,7 @@ std::pair<ManagedValue, ManagedValue> SILGenFunction::emitAddressorAccessor(
                                               /*isStrict*/ true,
                                               /*isInvariant*/ false);
 
-  // Mark dependence as necessary.
-  switch (cast<AccessorDecl>(addressor.getDecl())->getAddressorKind()) {
-  case AddressorKind::NotAddressor:
-    llvm_unreachable("not an addressor!");
-  case AddressorKind::Unsafe:
-    // TODO: we should probably mark dependence on the base.
-    break;
-  case AddressorKind::Owning:
-  case AddressorKind::NativeOwning:
-    address = B.createMarkDependence(loc, address, owner.getValue());
-    break;
-  }
-
-  return { ManagedValue::forLValue(address), owner };
+  return ManagedValue::forLValue(address);
 }
 
 CleanupHandle
