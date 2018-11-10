@@ -24,6 +24,20 @@ CHANGELOG
 Swift 5.0
 ---------
 
+* [SR-7139][]:
+
+  Exclusive memory access is now enforced at runtime by default in
+  optimized (`-O`/`-Osize`) builds. Programs that violate exclusivity will
+  trap at runtime with an "overlapping access" diagnostic
+  message. This can be disabled via a command line flag:
+  `-enforce-exclusivity=unchecked`, but doing do may result in undefined
+  behavior.
+
+  Run-time violations of exclusivity typically result from
+  simultaneous access of class properties, global variables (including
+  variables in top-level code), or variables captured by escaping
+  closures.
+
 * [SR-7251][]:
 
   In Swift 5 mode, attempting to declare a static property with the same name as a
@@ -7271,4 +7285,5 @@ Swift 1.0
 [SR-2394]: <https://bugs.swift.org/browse/SR-2394>
 [SR-2608]: <https://bugs.swift.org/browse/SR-2608>
 [SR-4248]: <https://bugs.swift.org/browse/SR-4248>
+[SR-7139]: <https://bugs.swift.org/browse/SR-7139>
 [SR-7251]: <https://bugs.swift.org/browse/SR-7251>
