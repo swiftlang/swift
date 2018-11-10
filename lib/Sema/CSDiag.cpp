@@ -6686,7 +6686,7 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
                                corrections);
 
       if (currentType)
-        if (currentType->is<TupleType>()) {
+        if (isa<TupleType>(currentType.getPointer())) {
           TC.diagnose(KPE->getLoc(), diag::expr_keypath_unimplemented_tuple);
           isInvalid = true;
           break;
