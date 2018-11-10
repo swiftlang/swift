@@ -1238,6 +1238,11 @@
         },
         {
           "kind": "Conformance",
+          "name": "AdditiveArithmetic",
+          "printedName": "AdditiveArithmetic"
+        },
+        {
+          "kind": "Conformance",
           "name": "ExpressibleByIntegerLiteral",
           "printedName": "ExpressibleByIntegerLiteral",
           "children": [
