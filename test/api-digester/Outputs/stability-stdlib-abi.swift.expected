@@ -53,6 +53,71 @@ Func _swift_stdlib_atomicStoreInt64(object:desired:) has been removed
 Func _swift_stdlib_atomicStoreUInt32(object:desired:) has been removed
 Func _swift_stdlib_atomicStoreUInt64(object:desired:) has been removed
 
+Var _FixedArray16._count has been removed
+Var _FixedArray16.capacity has been removed
+Var _FixedArray16.count has been removed
+Var _FixedArray16.endIndex has been removed
+Var _FixedArray16.startIndex has been removed
+Var _FixedArray16.storage has been removed
+Var _FixedArray2._count has been removed
+Var _FixedArray2.capacity has been removed
+Var _FixedArray2.count has been removed
+Var _FixedArray2.endIndex has been removed
+Var _FixedArray2.startIndex has been removed
+Var _FixedArray2.storage has been removed
+Var _FixedArray4._count has been removed
+Var _FixedArray4.capacity has been removed
+Var _FixedArray4.count has been removed
+Var _FixedArray4.endIndex has been removed
+Var _FixedArray4.startIndex has been removed
+Var _FixedArray4.storage has been removed
+Var _FixedArray8._count has been removed
+Var _FixedArray8.capacity has been removed
+Var _FixedArray8.count has been removed
+Var _FixedArray8.endIndex has been removed
+Var _FixedArray8.startIndex has been removed
+Var _FixedArray8.storage has been removed
+Subscript _FixedArray16.subscript(_:) has been removed
+Subscript _FixedArray2.subscript(_:) has been removed
+Subscript _FixedArray4.subscript(_:) has been removed
+Subscript _FixedArray8.subscript(_:) has been removed
+Struct _FixedArray16 is now without @_fixed_layout
+Struct _FixedArray2 is now without @_fixed_layout
+Struct _FixedArray4 is now without @_fixed_layout
+Struct _FixedArray8 is now without @_fixed_layout
+Func _FixedArray16.append(_:) has been removed
+Func _FixedArray16.index(after:) has been removed
+Func _FixedArray16.index(before:) has been removed
+Func _FixedArray16.withUnsafeBufferPointer(_:) has been removed
+Func _FixedArray16.withUnsafeMutableBufferPointer(_:) has been removed
+Func _FixedArray2.append(_:) has been removed
+Func _FixedArray2.index(after:) has been removed
+Func _FixedArray2.index(before:) has been removed
+Func _FixedArray2.withUnsafeBufferPointer(_:) has been removed
+Func _FixedArray2.withUnsafeMutableBufferPointer(_:) has been removed
+Func _FixedArray4.append(_:) has been removed
+Func _FixedArray4.index(after:) has been removed
+Func _FixedArray4.index(before:) has been removed
+Func _FixedArray4.withUnsafeBufferPointer(_:) has been removed
+Func _FixedArray4.withUnsafeMutableBufferPointer(_:) has been removed
+Func _FixedArray8.append(_:) has been removed
+Func _FixedArray8.index(after:) has been removed
+Func _FixedArray8.index(before:) has been removed
+Func _FixedArray8.withUnsafeBufferPointer(_:) has been removed
+Func _FixedArray8.withUnsafeMutableBufferPointer(_:) has been removed
+Constructor _FixedArray16.init() has been removed
+Constructor _FixedArray16.init(allZeros:) has been removed
+Constructor _FixedArray16.init(count:) has been removed
+Constructor _FixedArray2.init() has been removed
+Constructor _FixedArray2.init(allZeros:) has been removed
+Constructor _FixedArray2.init(count:) has been removed
+Constructor _FixedArray4.init() has been removed
+Constructor _FixedArray4.init(allZeros:) has been removed
+Constructor _FixedArray4.init(count:) has been removed
+Constructor _FixedArray8.init() has been removed
+Constructor _FixedArray8.init(allZeros:) has been removed
+Constructor _FixedArray8.init(count:) has been removed
+
 Struct Hasher._Core has removed conformance to _HasherCore
 Protocol _HasherCore has been removed
 Struct _BufferingHasher has been removed
