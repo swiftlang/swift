@@ -139,7 +139,7 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
 
 //===--- Bridging facilities written in Objective-C -----------------------===//
 // Functions that must discover and possibly use an arbitrary type's
-// conformance to a given protocol.  See ../runtime/Metadata.cpp for
+// conformance to a given protocol.  See ../runtime/Casting.cpp for
 // implementations.
 //===----------------------------------------------------------------------===//
 
@@ -156,8 +156,8 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
 ///   that is `id`-compatible and dynamically castable back to the type of
 ///   the boxed value, but is otherwise opaque.
 ///
-/// COMPILER_INTRINSIC
-@inlinable // FIXME(sil-serialize-all)
+// COMPILER_INTRINSIC
+@inlinable
 public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return unsafeBitCast(x, to: AnyObject.self)
@@ -166,7 +166,8 @@ public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
 }
 
 @_silgen_name("")
-public func _bridgeAnythingNonVerbatimToObjectiveC<T>(_ x: __owned T) -> AnyObject
+public // @testable
+func _bridgeAnythingNonVerbatimToObjectiveC<T>(_ x: __owned T) -> AnyObject
 
 /// Convert a purportedly-nonnull `id` value from Objective-C into an Any.
 ///
@@ -174,8 +175,7 @@ public func _bridgeAnythingNonVerbatimToObjectiveC<T>(_ x: __owned T) -> AnyObje
 /// this includes a failsafe against nil `AnyObject`s, wrapping them up as
 /// a nil `AnyObject?`-inside-an-`Any`.
 ///
-/// COMPILER_INTRINSIC
-@inlinable // FIXME(sil-serialize-all)
+// COMPILER_INTRINSIC
 public func _bridgeAnyObjectToAny(_ possiblyNullObject: AnyObject?) -> Any {
   if let nonnullObject = possiblyNullObject {
     return nonnullObject // AnyObject-in-Any
@@ -194,7 +194,7 @@ public func _bridgeAnyObjectToAny(_ possiblyNullObject: AnyObject?) -> Any {
 ///     or a subclass of it, trap;
 ///   + otherwise, returns the result of `T._forceBridgeFromObjectiveC(x)`;
 /// - otherwise, trap.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 public func _forceBridgeFromObjectiveC<T>(_ x: AnyObject, _: T.Type) -> T {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return x as! T
@@ -207,8 +207,8 @@ public func _forceBridgeFromObjectiveC<T>(_ x: AnyObject, _: T.Type) -> T {
 
 /// Convert `x` from its Objective-C representation to its Swift
 /// representation.
-/// COMPILER_INTRINSIC
-@inlinable // FIXME(sil-serialize-all)
+// COMPILER_INTRINSIC
+@inlinable
 public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable> (
   _ x: T._ObjectiveCType,
   _: T.Type
@@ -230,7 +230,7 @@ public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable> (
 ///   + otherwise, returns the result of
 ///     `T._conditionallyBridgeFromObjectiveC(x)`;
 /// - otherwise, the result is empty.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 public func _conditionallyBridgeFromObjectiveC<T>(
   _ x: AnyObject,
   _: T.Type
@@ -246,8 +246,8 @@ public func _conditionallyBridgeFromObjectiveC<T>(
 
 /// Attempt to convert `x` from its Objective-C representation to its Swift
 /// representation.
-/// COMPILER_INTRINSIC
-@inlinable // FIXME(sil-serialize-all)
+// COMPILER_INTRINSIC
+@inlinable
 public func _conditionallyBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>(
   _ x: T._ObjectiveCType,
   _: T.Type
@@ -258,7 +258,8 @@ public func _conditionallyBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeabl
 }
 
 @_silgen_name("")
-public func _bridgeNonVerbatimFromObjectiveC<T>(
+@usableFromInline
+internal func _bridgeNonVerbatimFromObjectiveC<T>(
   _ x: AnyObject,
   _ nativeType: T.Type,
   _ result: inout T?
@@ -558,8 +559,8 @@ public func _getObjCTypeEncoding<T>(_ type: T.Type) -> UnsafePointer<Int8> {
 
 /// Convert `x` from its Objective-C representation to its Swift
 /// representation.
-/// COMPILER_INTRINSIC
-@inlinable // FIXME(sil-serialize-all)
+// COMPILER_INTRINSIC
+@inlinable
 public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable> (
   _ x: T._ObjectiveCType,
   _: T.Type
@@ -571,8 +572,8 @@ public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable> (
 
 /// Attempt to convert `x` from its Objective-C representation to its Swift
 /// representation.
-/// COMPILER_INTRINSIC
-@inlinable // FIXME(sil-serialize-all)
+// COMPILER_INTRINSIC
+@inlinable
 public func _conditionallyBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>(
   _ x: T._ObjectiveCType,
   _: T.Type
@@ -692,7 +693,7 @@ func _makeSwiftValue(_ value: Any) -> AnyObject {
 ///   that is `id`-compatible and dynamically castable back to the type of
 ///   the boxed value, but is otherwise opaque.
 ///
-/// COMPILER_INTRINSIC
+// COMPILER_INTRINSIC
 public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   var done = false
   var result: AnyObject!
