@@ -18,3 +18,16 @@ public func testOpaque() -> Int {
 public func testResilient() -> Int {
   return testGeneric(ResilientStructImpl.self)
 }
+
+
+func testOptionalGeneric<T: OptionalReqs>(_ obj: T) -> Bool {
+  return obj.method?() != nil
+}
+
+public func testOptionalPresent(_ obj: OptionalReqsPresent) -> Bool {
+  return testOptionalGeneric(obj)
+}
+
+public func testOptionalAbsent(_ obj: OptionalReqsAbsent) -> Bool {
+  return testOptionalGeneric(obj)
+}
