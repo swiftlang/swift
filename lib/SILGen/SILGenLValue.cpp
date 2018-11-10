@@ -1602,6 +1602,26 @@ namespace {
                              IndexExprForDiagnostics};
     }
   };
+}
+
+static void pushEndApplyWriteback(SILGenFunction &SGF, SILLocation loc,
+                                  CleanupHandle endApplyHandle,
+                                  LValueTypeData typeData,
+                                  ManagedValue base = ManagedValue(),
+                                  AbstractStorageDecl *storage = nullptr,
+                                  bool isSuper = false,
+                                  PreparedArguments &&indices
+                                    = PreparedArguments(),
+                                  Expr *indexExprForDiagnostics = nullptr) {
+  std::unique_ptr<LogicalPathComponent>
+    component(new EndApplyPseudoComponent(typeData, endApplyHandle,
+                                          storage, isSuper, std::move(indices),
+                                          indexExprForDiagnostics));
+  pushWriteback(SGF, loc, std::move(component), /*for diagnostics*/ base,
+                MaterializedLValue());
+}
+
+namespace {
 
   /// A physical component which involves calling coroutine accessors.
   class CoroutineAccessorComponent
@@ -1638,13 +1658,9 @@ namespace {
           IsOnSelfParameter);
 
       // Push a writeback that ends the access.
-      std::unique_ptr<LogicalPathComponent>
-        component(new EndApplyPseudoComponent(getTypeData(), endApplyHandle,
-                                              Storage, IsSuper,
-                                              std::move(peekedIndices),
-                                              IndexExprForDiagnostics));
-      pushWriteback(SGF, loc, std::move(component), /*for diagnostics*/ base,
-                    MaterializedLValue());
+      pushEndApplyWriteback(SGF, loc, endApplyHandle, getTypeData(),
+                            base, Storage, IsSuper, std::move(peekedIndices),
+                            IndexExprForDiagnostics);
 
       auto decl = cast<AccessorDecl>(Accessor.getFuncDecl());
 
