@@ -83,12 +83,12 @@ namespace {
   
   class MemoizedNode: public Node {
     static std::unordered_map<MemoizedNodeKey, MemoizedNode*> cache;
-
+    
     MemoizedNode(Kind kind,
                  std::string nameForDependencies,
                  std::string nameForHolderOfMember) :
     Node(kind, nameForDependencies, nameForHolderOfMember) {}
-
+    
   public:
     MemoizedNodeKey memoizedKey() const {
       return createMemoizedKey(getKind(), getNameForDependencies(), getNameForHolderOfMember());
@@ -104,58 +104,10 @@ namespace {
       cache.insert(std::make_pair(key, node));
       return node;
     }
-    
-    template <typename DeclT>
-    static MemoizedNode *create(Kind kind, const DeclT* decl) {
-      return create(kind,
-                    computeNameForDependencies(kind, decl),
-                    computeNameForHolderOfMember(kind, decl)
-                    );
-    }
-  private:
-    template <typename DeclT, Node::Kind kind>
-    static std::string computeNameForDependencies(const DeclT *decl) {
-      return getName(decl);
-    }
-    
-    template <typename DeclT, Node::Kind kind>
-    static std::string computeNameForHolderOfMember(const DeclT *decl) {
-      return "";
-    }
+    static decltype(cache)::const_iterator begin() { return cache.cbegin(); }
+    static decltype(cache)::const_iterator end()   { return cache.cend(); }
   };
-  std::unordered_map<MemoizedNodeKey, MemoizedNode*> MemoizedNode::cache{};
-  
-  /// name converters
-  template <typename DeclT>
-  static std::string getBaseName(const DeclT *decl) { return decl->getBaseName().userFacingName(); }
-
-  template <typename DeclT>
-  static std::string getName(const DeclT *decl) { return DeclBaseName(decl->getName()).userFacingName(); }
-  
-  static std::string mangleTypeAsContext(const NominalTypeDecl * NTD) {
-    Mangle::ASTMangler Mangler;
-    return Mangler.mangleTypeAsContextUSR(NTD);
-  }
-
-  
-  template <>
-  std::string MemoizedNode::computeNameForDependencies<ValueDecl, Node::Kind::topLevel> (const ValueDecl *decl) { return getBaseName(decl);}
-  
-  template <>
-  std::string MemoizedNode::computeNameForDependencies<NominalTypeDecl, Node::Kind::nominals>(const NominalTypeDecl *decl) { return mangleTypeAsContext(decl);}
-  
-  template <>
-  std::string MemoizedNode::computeNameForDependencies<NominalTypeDecl, Node::Kind::blankMembers>(const NominalTypeDecl *decl) { return getBaseName(decl);}
-  
-  template <>
-  std::string MemoizedNode::computeNameForDependencies<ValueDecl, Node::Kind::member>(const ValueDecl *decl) { return getBaseName(decl);}
-  
-  template<>
-  std::string MemoizedNode::computeNameForHolderOfMember<ValueDecl, Node::Kind::member>(const ValueDecl* VD) {
-    return mangleTypeAsContext(cast<NominalTypeDecl>(VD->getDeclContext()->getAsDecl()));
-  }
 }
-//UP TO HERE
 
 namespace {
   /// Takes all the Decls in a SourceFile, and collects them into buckets by groups of DeclKinds.
@@ -238,7 +190,6 @@ namespace {
       SF->lookupClassMembers({}, collector);
     }
   };
-
 }
 
 
@@ -248,183 +199,150 @@ namespace {
 
 
 
-
-class GraphConstructor {
-  SourceFile *SF;
-  const DependencyTracker &depTracker;
-  StringRef outputPath;
-  MemoizedNode *sourceFileNode;
-  
-  GraphConstructor(
-                   SourceFile *SF,
-                   const DependencyTracker &depTracker,
-                   StringRef outputPath) : SF(SF), depTracker(depTracker), outputPath(outputPath) {}
-  
-  Graph g;
-  void construct() {
-    //TODO storage mgmt
-    sourceFileNode = MemoizedNode::create(Node:Kind::sourceFileProvide, outputPath, "");
-    g.addNode(sourceFileNode);
+namespace {
+  class GraphConstructor {
+    SourceFile *SF;
+    const DependencyTracker &depTracker;
+    StringRef outputPath;
+    MemoizedNode *sourceFileNode;
     
-    constructProvidesNodes();
-    constructDependArcs();
-  }
-  
-private:
-  std::string getInterfaceHash() const {
-    llvm::SmallString<32> interfaceHash;
-    SF->getInterfaceHash(interfaceHash);
-    return interfaceHash.str().str();
-  }
-  
-  void constructProvidesNodes();
-  void constructDependArcs();
-  
-  template <typename DeclT>
-  void createProvidesNodes(CPVec<DeclT> &decls, Node::Kind kind, std::string(*nameFn)(const DeclT *)) {
-    for (const auto* D: decls) {
-      std::string nameForHolderOfMember{};
-      if (kind == Node::Kind::member) {
-        auto *context = D->getDeclContext();
-        auto *containingDecl = context ? context->getAsDecl() : nullptr;
-        const auto * NTD = dyn_cast<NominalTypeDecl>(containingDecl);
-        nameForHolderOfMember = mangleTypeAsContext(NTD);
+    GraphConstructor(
+                     SourceFile *SF,
+                     const DependencyTracker &depTracker,
+                     StringRef outputPath) : SF(SF), depTracker(depTracker), outputPath(outputPath) {}
+    
+    Graph g;
+    void construct() {
+      //TODO storage mgmt
+      sourceFileNode = MemoizedNode::create(Node::Kind::sourceFileProvide, outputPath, "");
+      g.addNode(sourceFileNode);
+      
+      addProviderNodesToGraph(); // must preceed dependencies for cascades
+      addDependencyArcsToGraph();
+    }
+    
+  private:
+    std::string getInterfaceHash() const {
+      llvm::SmallString<32> interfaceHash;
+      SF->getInterfaceHash(interfaceHash);
+      return interfaceHash.str().str();
+#error where to add this? source file node fingerprint
+    }
+    
+    void addProviderNodesToGraph();
+    void addDependencyArcsToGraph();
+    
+    template <typename DeclT>
+    static std::string computeContextNameOfMember(const DeclT *member) {
+      auto *context = member->getDeclContext();
+      auto *containingDecl = context ? context->getAsDecl() : nullptr;
+      const auto * NTD = dyn_cast<NominalTypeDecl>(containingDecl);
+      return mangleTypeAsContext(NTD);
+    }
+    
+    template <typename DeclT>
+    void addOneTypeOfProviderNodesToGraph(CPVec<DeclT> &decls, Node::Kind kind, std::string(*nameFn)(const DeclT *)) {
+      for (const auto* D: decls) {
+        std::string nameForHolderOfMember{};
+        MemoizedNode::create(kind, (*nameFn)(D), kind == Node::Kind::member ? computeContextNameOfMember(D) : "");
       }
-      MemoizedNode::create(kind, (*nameFn)(D), nameForHolderOfMember);
-  }
-  
-  Node* addDeclNode(const Decl* D, DeclNode *node) {
-    bool inserted = nodesByDecl.insert(std::make_pair(D, node)).second;
-    assert(inserted && "dup node?");
-    MemoizedNodeKey key = std::make_tuple<xxx, node->nameForDependencies, node->kind>;
-    inserted = localOrForeignNodes.insert(std::make_pair(key, node)).second;
-    assert(inserted && "dup node??");
-    g.addNode(node);
-    return node;
-
-  }
-  
-  Node* getOrCreateMemoizedNode(const Node::Kind kind, const NominalTypeDecl *holderIfKnown,
-                                const std::string &dependedUponNameIfNotEmpty,
-                                std::function<Node* ()> createNode) {
-    std::string holderNameIfKnown = holderIfKnown ? mangleTypeAsContext(holderIfKnown) : ""; // FACTOR ME FIXME
-    auto key = std::make_tuple(holderNameIfKnown, dependedUponNameIfNotEmpty,kind);
+    }
+    /// name converters
+    template <typename DeclT>
+    static std::string getBaseName(const DeclT *decl) { return decl->getBaseName().userFacingName(); }
     
-    auto iter = localOrForeignNodes.find(key);
-    if (iter != localOrForeignNodes.end())
-      return iter->second;
-    Node* newNode = createNode(); // TIGHT CONTRACT FIXME
-    localOrForeignNodes.insert(std::make_pair(key, newNode));
-    return newNode;
-  }
-  
-  Node* getOrCreateDependedUponNode(const Node::Kind kind,
-                                    const NominalTypeDecl *holderIfKnown,
-                                    const std::string &dependedUponNameIfNotEmpty ) {
-    const std::string holderNameIfKnown = holderIfKnown ? mangleTypeAsContext(holderIfKnown) : ""; //FIXME FACTOR ME
-    return getOrCreateMemoizedNode(kind,
-                                   holderIfKnown,
-                                   dependedUponNameIfNotEmpty,
-                                   [&]()->Node* { return new ForeignDeclNode(kind, holderNameIfKnown, dependedUponNameIfNotEmpty);});
+    template <typename DeclT>
+    static std::string getName(const DeclT *decl) { return DeclBaseName(decl->getName()).userFacingName(); }
     
-  }
-  
-  void convertSetOfDeclBaseNames(const llvm::DenseMap<DeclBaseName, bool>&, Node::Kind);
-  void convertSetOfMemberPairsForNominals(
-                                          const llvm::DenseMap<
-                                          std::pair<const NominalTypeDecl *, DeclBaseName>,
-                                          bool> &);
-  void convertSetOfMemberPairsForMembers(const llvm::DenseMap<std::pair<const NominalTypeDecl *, DeclBaseName>,
-                                         bool>&);
-  void convertFilenames(ArrayRef<std::string>);
-  void everyOneOfMyDeclsDependsOn(Node* dependedUpon);
-  void addDependency(Node::Kind,
-                     const NominalTypeDecl *holderIfKnown,
-                     const std::string &dependedUponNameIfNotEmpty,
-                     bool cascades);
+    static std::string mangleTypeAsContext(const NominalTypeDecl * NTD) {
+      Mangle::ASTMangler Mangler;
+      return Mangler.mangleTypeAsContextUSR(NTD);
+    }
+    
+    template<Node::Kind kind>
+    void addOneTypeOfDependencyToGraph(const llvm::DenseMap<DeclBaseName, bool>& map) {
+      for (const auto &p: map)
+        addToGraphThatThisWholeFileDependsUpon(kind, "", p.first.userFacingName(), p.second);
+    }
+    
+    void addOneTypeOfDependencyToGraph(
+                                       const llvm::DenseMap<
+                                       std::pair<const NominalTypeDecl *, DeclBaseName>,
+                                       bool> &);
+    
+    void addOneTypeOfDependencyToGraph(ArrayRef<std::string> externals) {
+      for (const auto &s: externals)
+        addToGraphThatThisWholeFileDependsUpon(Node::Kind::externalDepend, "", s, true);
+    }
+    
+    void addToGraphThatThisWholeFileDependsUpon(Node::Kind,
+                                                const std::string &nameForHolderOfMember,
+                                                const std::string &dependedUponNameIfNotEmpty,
+                                                bool cascades);
   };
+}
 
-void GraphConstructor::constructProvidesNodes() {
+void GraphConstructor::addProviderNodesToGraph() {
   SourceFileDeclDemux demux(SF);
   
-  createProvidesNodes<PrecedenceGroupDecl>(demux.precedenceGroups, DeclNode::Kind::topLevel, getName);
-  createProvidesNodes<FuncDecl>(demux.memberOperatorDecls, DeclNode::Kind::topLevel, getName);
-  createProvidesNodes<OperatorDecl>(demux.operators, DeclNode::Kind::topLevel, getName);
-  createProvidesNodes<NominalTypeDecl>(demux.topNominals, DeclNode::Kind::topLevel, getName);
-  createProvidesNodes<ValueDecl>(demux.topValues, DeclNode::Kind::topLevel, getBaseName);
+  addOneTypeOfProviderNodesToGraph<PrecedenceGroupDecl>(demux.precedenceGroups, Node::Kind::topLevel, getName);
+  addOneTypeOfProviderNodesToGraph<FuncDecl>(demux.memberOperatorDecls, Node::Kind::topLevel, getName);
+  addOneTypeOfProviderNodesToGraph<OperatorDecl>(demux.operators, Node::Kind::topLevel, getName);
+  addOneTypeOfProviderNodesToGraph<NominalTypeDecl>(demux.topNominals, Node::Kind::topLevel, getName);
+  addOneTypeOfProviderNodesToGraph<ValueDecl>(demux.topValues, Node::Kind::topLevel, getBaseName);
   
-  createProvidesNodes<NominalTypeDecl>(demux.allNominals, DeclNode::Kind::nominals, mangleTypeAsContext);
-  createProvidesNodes<NominalTypeDecl>(demux.allNominals, DeclNode::Kind::blankMembers, mangleTypeAsContext); // TODO: fix someday
+  addOneTypeOfProviderNodesToGraph<NominalTypeDecl>(demux.allNominals, Node::Kind::nominals, mangleTypeAsContext);
+  addOneTypeOfProviderNodesToGraph<NominalTypeDecl>(demux.allNominals, Node::Kind::blankMembers, mangleTypeAsContext); // TODO: fix someday
   
-  createProvidesNodes<ValueDecl>(demux.valuesInExtensions, DeclNode::Kind::member, getBaseName);
+  addOneTypeOfProviderNodesToGraph<ValueDecl>(demux.valuesInExtensions, Node::Kind::member, getBaseName);
   
   // could optimize by uniqueing by name, but then what of container?
-  createProvidesNodes<ValueDecl>(demux.classMembers, DeclNode::Kind::dynamicLookup, getBaseName);
+  addOneTypeOfProviderNodesToGraph<ValueDecl>(demux.classMembers, Node::Kind::dynamicLookup, getBaseName);
 }
 
-void GraphConstructor::constructDependArcs() {
-  convertSetOfDeclBaseNames(SF->getReferencedNameTracker()->getTopLevelNames(), Node::Kind::topLevel);
-  convertSetOfMemberPairsForNominals(SF->getReferencedNameTracker()->getUsedMembers());
-  convertSetOfMemberPairsForMembers(SF->getReferencedNameTracker()->getUsedMembers());
-  convertSetOfDeclBaseNames(SF->getReferencedNameTracker()->getDynamicLookupNames(), Node::Kind::dynamicLookup);
-  convertFilenames(depTracker.getDependencies());
-}
-
-void GraphConstructor::convertSetOfDeclBaseNames(const llvm::DenseMap<DeclBaseName, bool> &map, const Node::Kind kind) {
-  for (const auto &p: map)
-    addDependency(kind, nullptr, p.first.userFacingName(), p.second);
-}
-
-void GraphConstructor::everyOneOfMyDeclsDependsOn(Node* dependedUpon) {
-  for (auto &entry: nodesByDecl)
-    g.addArc(Arc{entry.second, dependedUpon});
-}
-
-void GraphConstructor::convertSetOfMemberPairsForNominals(
-                                                          const llvm::DenseMap<
-                                                          std::pair<const NominalTypeDecl *, DeclBaseName>,
-                                                          bool> &map) {
+void GraphConstructor::addOneTypeOfDependencyToGraph(
+                                                     const llvm::DenseMap<std::pair<const NominalTypeDecl *, DeclBaseName>,
+                                                     bool> &map) {
   std::unordered_set<const NominalTypeDecl*> holdersOfCascadingMembers;
   for (auto &entry: map)
     if (entry.second)
       holdersOfCascadingMembers.insert(entry.first.first);
-  for (auto &entry: map)
-    addDependency(Node::Kind::nominals,
-                  nullptr,
-                  mangleTypeAsContext(entry.first.first),
-                  holdersOfCascadingMembers.count(entry.first.first) != 0);
-}
-
-void GraphConstructor::convertSetOfMemberPairsForMembers(
-                                                         const llvm::DenseMap<std::pair<const NominalTypeDecl *, DeclBaseName>,
-                                                         bool> &map) {
   for (auto &entry: map) {
+    const std::string mangledTypeAsContext = mangleTypeAsContext(entry.first.first);
+    addToGraphThatThisWholeFileDependsUpon(Node::Kind::nominals,
+                                           "", // nominal name IS the holder
+                                           mangledTypeAsContext,
+                                           holdersOfCascadingMembers.count(entry.first.first) != 0);
     const bool isMemberBlank = entry.first.second.empty();
-    addDependency(isMemberBlank ? Node::Kind::blankMembers : Node::Kind::member,
-                  entry.first.first,
+    addToGraphThatThisWholeFileDependsUpon(isMemberBlank ? Node::Kind::blankMembers : Node::Kind::member,
+                  mangledTypeAsContext,
                   isMemberBlank ? "" : entry.first.second.userFacingName(),
                   entry.second);
   }
 }
 
-void GraphConstructor::addDependency(Node::Kind kind,
-                                     const NominalTypeDecl *holderIfKnown,
-                                     const std::string &dependedUponNameIfNotEmpty,
-                                     bool cascades) {
-  Node* dependedUpon = getOrCreateDependedUponNode(kind,
-                                                   holderIfKnown,
-                                                   dependedUponNameIfNotEmpty);
-  g.addArc(Arc{sourceFileNode, dependedUpon});
-  if (cascades)
-    everyOneOfMyDeclsDependsOn(dependedUpon);
+
+  // TODO: express the multiple provides and depends streams with variadic templates
+
+void GraphConstructor::addDependencyArcsToGraph() {
+  addOneTypeOfDependencyToGraph<Node::Kind::topLevel>(SF->getReferencedNameTracker()->getTopLevelNames());
+  addOneTypeOfDependencyToGraph(SF->getReferencedNameTracker()->getUsedMembers());
+  addOneTypeOfDependencyToGraph<Node::Kind::dynamicLookup>(SF->getReferencedNameTracker()->getDynamicLookupNames());
+  addOneTypeOfDependencyToGraph(depTracker.getDependencies());
 }
 
-void GraphConstructor::convertFilenames(ArrayRef<std::string> filenames) {
-  for (const auto s: filenames)
-    addDependency(Node::Kind::externalDepend,
-                  nullptr,
-                  s,
-                  true);
+void GraphConstructor::addToGraphThatThisWholeFileDependsUpon(Node::Kind kind,
+                                                              const std::string &nameForHolderOfMember,
+                                                              const std::string &dependedUponNameIfNotEmpty,
+                                                              bool cascades) {
+  MemoizedNode *whatIsDependedUpon = MemoizedNode::create(kind, dependedUponNameIfNotEmpty, nameForHolderOfMember);
+  if (!cascades)
+    g.addArc(Arc{sourceFileNode, whatIsDependedUpon});
+  else
+    std::for_each(MemoizedNode::begin(), MemoizedNode::end(),
+                  [&](MemoizedNode *providingNode) {
+                    g.addArc(Arc{providingNode, whatIsDependedUpon});
+                  });
 }
 
 
