@@ -52,7 +52,61 @@ template <typename T> using CPVec = std::vector<const T*>;
 template <typename T1 = std::string, typename T2 = std::string> using PairVec = std::vector<std::pair<T1, T2>>;
 template <typename T1, typename T2> using CPPairVec = std::vector<std::pair<const T1*, const T2*>>;
 
+static std::string mangleTypeAsContext(const NominalTypeDecl * NTD) {
+  Mangle::ASTMangler Mangler;
+  return Mangler.mangleTypeAsContextUSR(NTD);
+}
 
+namespace {
+  template <typename DeclT, Node::Kind kind2>
+  class DeclNode: public Node {
+    DeclT *decl;
+  public:
+    DeclNode( const DeclT *decl,
+             Node* containerIfKnown) :
+    Node(kind2, computeNameForDependencies(kind2, decl), containerIfKnown),
+    decl(decl) {}
+    ~DeclNode() = default;
+    
+    Decl *getDecl() const { return decl; }
+    
+  private:
+    static std::string computeNameForDependencies(const DeclT *decl);
+    
+    /// name converters
+    static std::string getBaseName(const DeclT *decl) { return decl->getBaseName().userFacingName(); }
+    static std::string getName(const DeclT *decl) { return DeclBaseName(decl->getName()).userFacingName(); }
+    
+  };
+  template <> class DeclNode<PrecedenceGroupDecl, Node::Kind::topLevel> {
+    static std::string computeNameForDependencies(const DeclT *decl) { return getName(decl);}
+  };
+  template <> class DeclNode<FuncDecl, Node::Kind::topLevel> {
+    static std::string computeNameForDependencies(const DeclT *decl) { return getName(decl);}
+  };
+  template <> class DeclNode<OperatorDecl, Node::Kind::topLevel> {
+    static std::string computeNameForDependencies(const DeclT *decl) { return getName(decl);}
+  };
+  template <> class DeclNode<NominalTypeDecl, Node::Kind::topLevel> {
+    static std::string computeNameForDependencies(const DeclT *decl) { return getName(decl);}
+  };
+  template <> class DeclNode<ValueDecl, Node::Kind::topLevel> {
+    static std::string computeNameForDependencies(const DeclT *decl) { return getBaseName(decl);}
+  };
+  template <> class DeclNode<NominalTypeDecl, Node::Kind::nominals> {
+    static std::string computeNameForDependencies(const DeclT *decl) { return mangleTypeAsContext(decl);}
+  };
+  template <> class DeclNode<NominalTypeDecl, Node::Kind::blankMembers> {
+    static std::string computeNameForDependencies(const DeclT *decl) { return xxx}
+  };
+  template <> class DeclNode<ValueDecl, Node::Kind::member> {
+    static std::string computeNameForDependencies(const DeclT *decl) { return getBaseName(decl);}
+  };
+  template <> class DeclNode<ValueDecl, Node::Kind::dynamicLookup> {
+    static std::string computeNameForDependencies(const DeclT *decl) { return getName(decl);}
+  };
+
+}
 
 
 namespace {
@@ -139,10 +193,7 @@ namespace {
 
 }
 
-static std::string mangleTypeAsContext(const NominalTypeDecl * NTD) {
-  Mangle::ASTMangler Mangler;
-  return Mangler.mangleTypeAsContextUSR(NTD);
-}
+
 
 
 ////////////
@@ -226,12 +277,6 @@ private:
   
   
   
-  /// name converters
-  template <typename DeclT>
-  static std::string getBaseName(DeclT const* D) { return D->getBaseName().userFacingName(); }
-  
-  template <typename DeclT>
-  static std::string getName(DeclT const* D) { return DeclBaseName(D->getName()).userFacingName(); }
   
   
   

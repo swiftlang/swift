@@ -63,30 +63,7 @@ namespace experimental_dependencies {
   
  
 
-  template <typename DeclT, Node::Kind kind2>
-  class DeclNode: public Node {
-    DeclT *decl;
-  public:
-    DeclNode( const DeclT *decl,
-              Node* containerIfKnown) :
-    Node(kind2, computeNameForDependencies(kind2, decl), containerIfKnown),
-    decl(decl) {}
-    ~DeclNode() = default;
-    
-    Decl *getDecl() const { return decl; }
-    
-  private:
-    static std::string computeNameForDependencies(const DeclT *decl);
-  };
-  template <> DeclNode<NominalTypeDecl, Node::Kind::topLevel>
-  class {
-    static std::string computeNameForDependencies() { return "";}
-  };
-  
-/// A decl node referenced from here that exists elsewhere
-  class ForeignDeclNode: public Node {
-  public:
-  };
+ 
   
   
   class Arc {
