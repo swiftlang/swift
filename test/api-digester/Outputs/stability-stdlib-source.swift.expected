@@ -1,5 +1,6 @@
 
 /* Generic Signature Changes */
+Protocol Numeric has generic signature change from <Self : Equatable, Self : ExpressibleByIntegerLiteral, Self.Magnitude : Comparable, Self.Magnitude : Numeric> to <Self : AdditiveArithmetic, Self : ExpressibleByIntegerLiteral, Self.Magnitude : Comparable, Self.Magnitude : Numeric>
 Protocol StringProtocol has generic signature change from <Self : BidirectionalCollection, Self : Comparable, Self : ExpressibleByStringLiteral, Self : Hashable, Self : LosslessStringConvertible, Self : TextOutputStream, Self : TextOutputStreamable, Self.Element == Character, Self.Index == String.Index, Self.SubSequence : StringProtocol, Self.UTF16View : BidirectionalCollection, Self.UTF8View : Collection, Self.UnicodeScalarView : BidirectionalCollection, Self.UTF16View.Element == UInt16, Self.UTF16View.Index == String.Index, Self.UTF8View.Element == UInt8, Self.UTF8View.Index == String.Index, Self.UnicodeScalarView.Element == Unicode.Scalar, Self.UnicodeScalarView.Index == String.Index, Self.SubSequence.UTF16View.Index == String.Index, Self.SubSequence.UTF8View.Index == String.Index, Self.SubSequence.UnicodeScalarView.Index == String.Index> to <Self : BidirectionalCollection, Self : Comparable, Self : ExpressibleByStringInterpolation, Self : Hashable, Self : LosslessStringConvertible, Self : TextOutputStream, Self : TextOutputStreamable, Self.Element == Character, Self.Index == String.Index, Self.StringInterpolation == DefaultStringInterpolation, Self.SubSequence : StringProtocol, Self.UTF16View : BidirectionalCollection, Self.UTF8View : Collection, Self.UnicodeScalarView : BidirectionalCollection, Self.UTF16View.Element == UInt16, Self.UTF16View.Index == String.Index, Self.UTF8View.Element == UInt8, Self.UTF8View.Index == String.Index, Self.UnicodeScalarView.Element == Unicode.Scalar, Self.UnicodeScalarView.Index == String.Index, Self.SubSequence.UTF16View.Index == String.Index, Self.SubSequence.UTF8View.Index == String.Index, Self.SubSequence.UnicodeScalarView.Index == String.Index>
 
 /* RawRepresentable Changes */
@@ -9,6 +10,11 @@ Constructor String.init(stringInterpolationSegment:) has been removed
 Func Collection.prefix(through:) has been removed
 Func Collection.prefix(upTo:) has been removed
 Func Collection.suffix(from:) has been removed
+Func Numeric.+(_:) has been removed
+Func Numeric.+(_:_:) has been removed
+Func Numeric.+=(_:_:) has been removed
+Func Numeric.-(_:_:) has been removed
+Func Numeric.-=(_:_:) has been removed
 Func Sequence.filter(_:) has been removed
 Func Sequence.forEach(_:) has been removed
 Func Sequence.map(_:) has been removed
@@ -36,8 +42,16 @@ Var Set.first has been removed
 
 /* Type Changes */
 Constructor String.init(stringInterpolation:) has parameter 0 type change from [String] to DefaultStringInterpolation
+Protocol BinaryFloatingPoint has added inherited protocol AdditiveArithmetic
+Protocol BinaryInteger has added inherited protocol AdditiveArithmetic
+Protocol FixedWidthInteger has added inherited protocol AdditiveArithmetic
+Protocol FloatingPoint has added inherited protocol AdditiveArithmetic
+Protocol Numeric has added inherited protocol AdditiveArithmetic
+Protocol SignedInteger has added inherited protocol AdditiveArithmetic
+Protocol SignedNumeric has added inherited protocol AdditiveArithmetic
 
 /* Decl Attribute changes */
 
 /* Protocol Requirement Changes */
 Protocol StringProtocol has added inherited protocol ExpressibleByStringInterpolation
+Protocol UnsignedInteger has added inherited protocol AdditiveArithmetic
