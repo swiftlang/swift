@@ -4006,7 +4006,6 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                     SourceLoc StaticLoc,
                                     Parser::ParseDeclOptions Flags,
                                     AccessorKind Kind,
-                                    AddressorKind addressorKind,
                                     AbstractStorageDecl *storage,
                                     Parser *P, SourceLoc AccessorKeywordLoc) {
   // First task, set up the value argument list.  This is the "newValue" name
@@ -4070,7 +4069,7 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
   auto *D = AccessorDecl::create(P->Context,
                                  /*FIXME FuncLoc=*/DeclLoc,
                                  AccessorKeywordLoc,
-                                 Kind, addressorKind, storage,
+                                 Kind, storage,
                                  StaticLoc, StaticSpellingKind::None,
                                  /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                                  (GenericParams
@@ -4197,7 +4196,6 @@ static unsigned skipBracedBlock(Parser &P,
 
 /// Returns a descriptive name for the given accessor/addressor kind.
 static StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind,
-                                              AddressorKind addressorKind,
                                               bool article) {
   switch (accessorKind) {
   case AccessorKind::Get:
@@ -4223,13 +4221,11 @@ static StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind,
 static StringRef getAccessorNameForDiagnostic(AccessorDecl *accessor,
                                               bool article) {
   return getAccessorNameForDiagnostic(accessor->getAccessorKind(),
-                                      accessor->getAddressorKind(),
                                       article);
 }
 
 static void diagnoseRedundantAccessors(Parser &P, SourceLoc loc,
                                        AccessorKind accessorKind,
-                                       AddressorKind addressorKind,
                                        bool isSubscript,
                                        AccessorDecl *previous) {
   assert(accessorKind == previous->getAccessorKind());
@@ -4304,7 +4300,6 @@ struct Parser::ParsedAccessors {
 static bool parseAccessorIntroducer(Parser &P,
                                     DeclAttributes &Attributes,
                                     AccessorKind &Kind,
-                                    AddressorKind &addressorKind,
                                     SourceLoc &Loc) {
   assert(Attributes.isEmpty());
   bool FoundCCToken;
@@ -4334,11 +4329,6 @@ static bool parseAccessorIntroducer(Parser &P,
 #define SINGLETON_ACCESSOR(ID, KEYWORD)                                        \
   else if (P.Tok.getRawText() == #KEYWORD) {                                   \
     Kind = AccessorKind::ID;                                                   \
-  }
-#define ANY_ADDRESSOR(ID, ADDRESSOR_ID, KEYWORD)                               \
-  else if (P.Tok.getRawText() == #KEYWORD) {                                   \
-    Kind = AccessorKind::ID;                                                   \
-    addressorKind = AddressorKind::ADDRESSOR_ID;                               \
   }
 #include "swift/AST/AccessorKinds.def"
   else {
@@ -4392,8 +4382,8 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
     auto getter =
         createAccessorFunc(Tok.getLoc(), /*ValueNamePattern*/ nullptr,
                            GenericParams, Indices, ElementTy, StaticLoc, Flags,
-                           AccessorKind::Get, AddressorKind::NotAddressor,
-                           storage, this, /*AccessorKeywordLoc*/ SourceLoc());
+                           AccessorKind::Get, storage, this,
+                           /*AccessorKeywordLoc*/ SourceLoc());
     accessors.add(getter);
     parseAbstractFunctionBody(getter);
     accessors.RBLoc = getter->getEndLoc();
@@ -4414,10 +4404,9 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
     // Parse introducer if possible.
     DeclAttributes Attributes;
     AccessorKind Kind = AccessorKind::Get;
-    AddressorKind addressorKind = AddressorKind::NotAddressor;
     SourceLoc Loc;
     bool NotAccessor = parseAccessorIntroducer(
-        *this, Attributes, Kind, addressorKind, Loc);
+        *this, Attributes, Kind, Loc);
     if (NotAccessor) {
       AccessorCtx->setTransparent();
       AccessorCtx.reset();
@@ -4431,8 +4420,7 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
             auto getter = createAccessorFunc(
                 accessors.LBLoc, /*ValueNamePattern*/ nullptr, GenericParams,
                 Indices, ElementTy, StaticLoc, Flags, AccessorKind::Get,
-                AddressorKind::NotAddressor, storage, this,
-                /*AccessorKeywordLoc*/ SourceLoc());
+                storage, this, /*AccessorKeywordLoc*/ SourceLoc());
             accessors.add(getter);
             CodeCompletion->setParsedDecl(getter);
           } else {
@@ -4489,12 +4477,12 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
     // Set up a function declaration.
     auto accessor = createAccessorFunc(Loc, ValueNamePattern, GenericParams,
                                        Indices, ElementTy, StaticLoc, Flags,
-                                       Kind, addressorKind, storage, this, Loc);
+                                       Kind, storage, this, Loc);
     accessor->getAttrs() = Attributes;
 
     // Collect this accessor and detect conflicts.
     if (auto existingAccessor = accessors.add(accessor)) {
-      diagnoseRedundantAccessors(*this, Loc, Kind, addressorKind,
+      diagnoseRedundantAccessors(*this, Loc, Kind,
                                  /*subscript*/Indices != nullptr,
                                  existingAccessor);
     }
@@ -4804,7 +4792,6 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
     // We never use this to create addressors.
     assert(kind != AccessorKind::Address &&
            kind != AccessorKind::MutableAddress);
-    auto addressorKind = AddressorKind::NotAddressor;
 
     // Create the paramter list for a setter.
     ParameterList *argList = nullptr;
@@ -4819,7 +4806,7 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
 
     auto accessor = createAccessorFunc(SourceLoc(), argList,
                                        genericParams, indices, elementTy,
-                                       staticLoc, flags, kind, addressorKind,
+                                       staticLoc, flags, kind,
                                        storage, &P, SourceLoc());
     accessor->setImplicit();
     add(accessor);

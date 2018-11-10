@@ -291,7 +291,7 @@ bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
 
   Mangle::ASTMangler NewMangler;
   std::string Mangled = NewMangler.mangleAccessorEntityAsUSR(AccKind,
-                          AddressorKind::NotAddressor, SD, getUSRSpacePrefix());
+                          SD, getUSRSpacePrefix());
 
   OS << Mangled;
 

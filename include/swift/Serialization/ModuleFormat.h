@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 464; // Last change: simplify GenericParamLists
+const uint16_t SWIFTMODULE_VERSION_MINOR = 465; // Last change: Remove owning addressors
 
 using DeclIDField = BCFixed<31>;
 
@@ -287,13 +287,6 @@ enum MetatypeRepresentation : uint8_t {
 };
 using MetatypeRepresentationField = BCFixed<2>;
 
-// These IDs must \em not be renumbered or reordered without incrementing
-// the module version.
-enum class AddressorKind : uint8_t {
-  NotAddressor, Unsafe, Owning, NativeOwning
-};
-using AddressorKindField = BCFixed<3>;
- 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum class SelfAccessKind : uint8_t {
@@ -1082,7 +1075,6 @@ namespace decls_block {
     DeclIDField,  // overridden function
     DeclIDField,  // AccessorStorageDecl
     AccessorKindField, // accessor kind
-    AddressorKindField, // addressor kind
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
     BCFixed<1>,   // default argument resilience expansion
