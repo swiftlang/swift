@@ -207,20 +207,24 @@ namespace {
     const DependencyTracker &depTracker;
     StringRef outputPath;
     MemoizedNode *sourceFileNode;
-    
+  public:
     GraphConstructor(
                      SourceFile *SF,
                      const DependencyTracker &depTracker,
                      StringRef outputPath) : SF(SF), depTracker(depTracker), outputPath(outputPath) {}
-    
+  private:
     Graph g;
-    void construct() {
+    
+  public:
+    Graph construct() {
       //TODO storage mgmt
       sourceFileNode = MemoizedNode::create(Node::Kind::sourceFileProvide, outputPath, "", getInterfaceHash());
       g.addNode(sourceFileNode);
       
       addProviderNodesToGraph(); // must preceed dependencies for cascades
       addDependencyArcsToGraph();
+      
+      return g;
     }
     
   private:
@@ -285,20 +289,20 @@ namespace {
 
 void GraphConstructor::addProviderNodesToGraph() {
   SourceFileDeclDemux demux(SF);
+   // TODO: express the multiple provides and depends streams with variadic templates
+  addOneTypeOfProviderNodesToGraph(demux.precedenceGroups, Node::Kind::topLevel, getName);
+  addOneTypeOfProviderNodesToGraph(demux.memberOperatorDecls, Node::Kind::topLevel, getName);
+  addOneTypeOfProviderNodesToGraph(demux.operators, Node::Kind::topLevel, getName);
+  addOneTypeOfProviderNodesToGraph(demux.topNominals, Node::Kind::topLevel, getName);
+  addOneTypeOfProviderNodesToGraph(demux.topValues, Node::Kind::topLevel, getBaseName);
   
-  addOneTypeOfProviderNodesToGraph<PrecedenceGroupDecl>(demux.precedenceGroups, Node::Kind::topLevel, getName);
-  addOneTypeOfProviderNodesToGraph<FuncDecl>(demux.memberOperatorDecls, Node::Kind::topLevel, getName);
-  addOneTypeOfProviderNodesToGraph<OperatorDecl>(demux.operators, Node::Kind::topLevel, getName);
-  addOneTypeOfProviderNodesToGraph<NominalTypeDecl>(demux.topNominals, Node::Kind::topLevel, getName);
-  addOneTypeOfProviderNodesToGraph<ValueDecl>(demux.topValues, Node::Kind::topLevel, getBaseName);
+  addOneTypeOfProviderNodesToGraph(demux.allNominals, Node::Kind::nominals, mangleTypeAsContext);
+  addOneTypeOfProviderNodesToGraph(demux.allNominals, Node::Kind::blankMembers, mangleTypeAsContext); // TODO: fix someday
   
-  addOneTypeOfProviderNodesToGraph<NominalTypeDecl>(demux.allNominals, Node::Kind::nominals, mangleTypeAsContext);
-  addOneTypeOfProviderNodesToGraph<NominalTypeDecl>(demux.allNominals, Node::Kind::blankMembers, mangleTypeAsContext); // TODO: fix someday
-  
-  addOneTypeOfProviderNodesToGraph<ValueDecl>(demux.valuesInExtensions, Node::Kind::member, getBaseName);
+  addOneTypeOfProviderNodesToGraph(demux.valuesInExtensions, Node::Kind::member, getBaseName);
   
   // could optimize by uniqueing by name, but then what of container?
-  addOneTypeOfProviderNodesToGraph<ValueDecl>(demux.classMembers, Node::Kind::dynamicLookup, getBaseName);
+  addOneTypeOfProviderNodesToGraph(demux.classMembers, Node::Kind::dynamicLookup, getBaseName);
 }
 
 void GraphConstructor::addOneTypeOfDependencyToGraph(
@@ -379,50 +383,29 @@ public:
       n.emit(this);
   }
 };
-  
-
-
-  
-
-
-
-// move filter etc into wherever
-// do depend decls
-// do output
-
-
-////////////////////////
-
-
-namespace {
-  class FileRenamerAndWriter {
-    DiagnosticEngine &diags;
-    std::string outputPath;
-    
-  public:
-    FileRenamerAndWriter(DiagnosticEngine &diags, StringRef outputPath) :diags(diags), outputPath(outputPath.str())
-     {}
-    
-    /// Returns true on error
-    bool operator() (ArrayRef<std::string> strings) {
-      // Before writing to the dependencies file path, preserve any previous file
-      // that may have been there. No error handling -- this is just a nicety, it
-      // doesn't matter if it fails.
-      llvm::sys::fs::rename(outputPath, outputPath + "~");
-      return withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
-        for (auto s: strings) out << s;
-        return false;
-      } );
-    }
-    
-  };
-}
 
 
 //////////////////////////
+namespace {
 
-
-
+  template <typename Emitter>
+  class GraphEmitter {
+  private:
+    const Graph g;
+    Emitter emitter;
+  public:
+    GraphEmitter(const Graph g, llvm::raw_ostream &out) : g(g), emitter(Emitter(out)) {}
+  public:
+    void emit() {
+      std::for_each(g.nodesBegin(), g.nodesEnd(), [&](const Node* n) {emitNode(n); });
+    }
+    void emitNode(const Node*);
+  };
+}
+template <>
+void GraphEmitter<YAMLEmitter>::emitNode(const Node*) {
+  xxx;
+}
 
 
 
@@ -438,7 +421,9 @@ bool swift::experimental_dependencies::emitReferenceDependencies(
   // doesn't matter if it fails.
   llvm::sys::fs::rename(outputPath, outputPath + "~");
   return withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out)  {
-    abort();
+    GraphConstructor gc(SF, depTracker, outputPath);
+    Graph g = gc.construct();
+    GraphEmitter<YAMLEmitter>(g, out).emit();
     return false;
   });
 

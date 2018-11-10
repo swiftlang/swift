@@ -46,7 +46,9 @@ namespace experimental_dependencies {
     std::string fingerprint;
     
     friend class Graph;
+    friend class Arc;
     uint sequenceNumberInGraph;
+    std::vector<uint> departures, arrivals;
 
   public:
   Node(
@@ -91,6 +93,12 @@ namespace experimental_dependencies {
     void addArc(const Arc arc) {
       allNodes[arc.tailSeqNo]->departures.push_back(arc.headSeqNo);
       allNodes[arc.headSeqNo]->arrivals  .push_back(arc.tailSeqNo);
+    }
+    decltype(allNodes)::const_iterator nodesBegin() { return allNodes.cbegin(); }
+    decltype(allNodes)::const_iterator nodesEnd() { return allNodes.cend(); }
+    
+    ~Graph() {
+      for (Node* n: allNodes) { delete n; }
     }
   };
   
