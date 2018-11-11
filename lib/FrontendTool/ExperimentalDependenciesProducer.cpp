@@ -82,7 +82,8 @@ namespace {
   /// or could be definition in this file that a lookup here depends upon.
   
   class MemoizedNode: public Node {
-    static std::unordered_map<MemoizedNodeKey, MemoizedNode*> cache;
+  public:
+    using Cache = typename std::unordered_map<MemoizedNodeKey, MemoizedNode*>;
     
     MemoizedNode(Kind kind,
                  std::string nameForDependencies,
@@ -97,7 +98,8 @@ namespace {
     static MemoizedNode *create(Kind kind,
                                 std::string nameForDependencies,
                                 std::string nameForHolderOfMember,
-                                std::string fingerprint) {
+                                std::string fingerprint,
+                                Cache &cache) {
       auto key = createMemoizedKey(kind, nameForDependencies, nameForHolderOfMember);
       auto iter = cache.find(key);
       if (iter != cache.end())
@@ -106,8 +108,6 @@ namespace {
       cache.insert(std::make_pair(key, node));
       return node;
     }
-    static decltype(cache)::const_iterator begin() { return cache.cbegin(); }
-    static decltype(cache)::const_iterator end()   { return cache.cend(); }
   };
 }
 
@@ -207,8 +207,10 @@ namespace {
     const DependencyTracker &depTracker;
     StringRef outputPath;
     MemoizedNode *sourceFileNode;
+    MemoizedNode::Cache cache{};
+ 
   public:
-    GraphConstructor(
+     GraphConstructor(
                      SourceFile *SF,
                      const DependencyTracker &depTracker,
                      StringRef outputPath) : SF(SF), depTracker(depTracker), outputPath(outputPath) {}
@@ -218,7 +220,7 @@ namespace {
   public:
     Graph construct() {
       //TODO storage mgmt
-      sourceFileNode = MemoizedNode::create(Node::Kind::sourceFileProvide, outputPath, "", getInterfaceHash());
+      sourceFileNode = MemoizedNode::create(Node::Kind::sourceFileProvide, outputPath, "", getInterfaceHash(), cache);
       g.addNode(sourceFileNode);
       
       addProviderNodesToGraph(); // must preceed dependencies for cascades
@@ -249,7 +251,7 @@ namespace {
     void addOneTypeOfProviderNodesToGraph(CPVec<DeclT> &decls, Node::Kind kind, std::string(*nameFn)(const DeclT *)) {
       for (const auto* D: decls) {
         std::string nameForHolderOfMember{};
-        MemoizedNode::create(kind, (*nameFn)(D), kind == Node::Kind::member ? computeContextNameOfMember(D) : "", "");
+        MemoizedNode::create(kind, (*nameFn)(D), kind == Node::Kind::member ? computeContextNameOfMember(D) : "", "", cache);
       }
     }
     /// name converters
@@ -340,13 +342,13 @@ void GraphConstructor::addToGraphThatThisWholeFileDependsUpon(Node::Kind kind,
                                                               const std::string &nameForHolderOfMember,
                                                               const std::string &dependedUponNameIfNotEmpty,
                                                               bool cascades) {
-  MemoizedNode *whatIsDependedUpon = MemoizedNode::create(kind, dependedUponNameIfNotEmpty, nameForHolderOfMember, "");
+  MemoizedNode *whatIsDependedUpon = MemoizedNode::create(kind, dependedUponNameIfNotEmpty, nameForHolderOfMember, "", cache);
   if (!cascades)
     g.addArc(Arc{sourceFileNode, whatIsDependedUpon});
   else
-    std::for_each(MemoizedNode::begin(), MemoizedNode::end(),
-                  [&](MemoizedNode *providingNode) {
-                    g.addArc(Arc{providingNode, whatIsDependedUpon});
+    std::for_each(cache.begin(), cache.end(),
+                  [&](std::pair<MemoizedNodeKey, MemoizedNode *> entry) {
+                    g.addArc(Arc{entry.second, whatIsDependedUpon});
                   });
 }
 
@@ -362,27 +364,25 @@ private:
 public:
   YAMLEmitter(llvm::raw_ostream &out) : out(out) {}
   
-  void emitSectionStart(StringRef section) const {
-    out << reference_dependency_keys::providesMember << ":\n";
-  }
-  void emitName(StringRef name) const {
-    out << "- \"" << llvm::yaml::escape(name) << "\"\n";
-  }
-  void emitSingleValueSection(StringRef section, StringRef value) const {
-    out << section << ": \"" << llvm::yaml::escape(value) << "\"\n";
-  }
-  void emitDoubleNameLine(StringRef name1, StringRef name2) const {
-    out << "- [\"" << llvm::yaml::escape(name1) << "\", \""
-    << (name2.empty() ? std::string() : llvm::yaml::escape(name2))
-    << "\"]\n";
-  }
+  void newNode() const { out << "-\n"; }
   
-  template <typename NodeT>
-  void emitNodes(ArrayRef<NodeT> nodes) {
-    for (auto &n: nodes)
-      n.emit(this);
+  template <typename T>
+  void entry(StringRef(key), T value) const {
+    out << " " << key << ": " << value << "\n";
+  }
+  void entry(StringRef(key), StringRef value) const {
+    out << " " << key << ": " << "\"" << llvm::yaml::escape(value) << "\"\n";
+  }
+  void entry(StringRef(key), const std::string &value) const {
+    entry(key, StringRef(value));
+  }
+  void entry(StringRef(key), ArrayRef<uint> numbers) const {
+    out << " " << key << ": \n";
+    for (auto i: numbers)
+      out << "  " << i << "\n";
   }
 };
+
 
 
 //////////////////////////
@@ -396,15 +396,22 @@ namespace {
   public:
     GraphEmitter(const Graph g, llvm::raw_ostream &out) : g(g), emitter(Emitter(out)) {}
   public:
-    void emit() {
+    void emit() const {
       std::for_each(g.nodesBegin(), g.nodesEnd(), [&](const Node* n) {emitNode(n); });
     }
-    void emitNode(const Node*);
+    void emitNode(const Node*) const;
   };
 }
 template <>
-void GraphEmitter<YAMLEmitter>::emitNode(const Node*) {
-  xxx;
+void GraphEmitter<YAMLEmitter>::emitNode(const Node* n) const {
+  emitter.newNode();
+  emitter.entry("kind", uint(n->getKind()));
+  emitter.entry("nameForDependencies", n->getNameForDependencies());
+  emitter.entry("nameForHolderOfMember", n->getNameForHolderOfMember());
+  emitter.entry("fingerprint", n->getFingerprint());
+  emitter.entry("sequenceNumber", n->getSequenceNumber());
+  emitter.entry("departures", n->getDepartures());
+  emitter.entry("arrivals", n->getArrivals());
 }
 
 

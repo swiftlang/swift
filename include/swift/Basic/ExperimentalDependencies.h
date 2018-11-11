@@ -34,11 +34,14 @@ namespace experimental_dependencies {
   
   class Node {
   public:
-    enum class Kind { topLevel,
+    enum class Kind {
+      topLevel,
       nominals,
       blankMembers,
-      member, dynamicLookup, externalDepend,
-      sourceFileProvide, end };
+      member, dynamicLookup,
+      externalDepend,
+      sourceFileProvide,
+      end };
   private:
     Kind kind;
     std::string nameForDependencies;
@@ -69,6 +72,10 @@ namespace experimental_dependencies {
     Kind getKind() const { return kind; }
     StringRef getNameForDependencies() const { return nameForDependencies; }
     StringRef getNameForHolderOfMember() const { return nameForHolderOfMember; }
+    StringRef getFingerprint() const { return fingerprint; }
+    uint getSequenceNumber() const { return sequenceNumberInGraph; }
+    ArrayRef<uint> getDepartures() const { return departures; }
+    ArrayRef<uint> getArrivals() const { return arrivals; }
   };
   
  
@@ -94,8 +101,8 @@ namespace experimental_dependencies {
       allNodes[arc.tailSeqNo]->departures.push_back(arc.headSeqNo);
       allNodes[arc.headSeqNo]->arrivals  .push_back(arc.tailSeqNo);
     }
-    decltype(allNodes)::const_iterator nodesBegin() { return allNodes.cbegin(); }
-    decltype(allNodes)::const_iterator nodesEnd() { return allNodes.cend(); }
+    decltype(allNodes)::const_iterator nodesBegin() const { return allNodes.cbegin(); }
+    decltype(allNodes)::const_iterator nodesEnd() const { return allNodes.cend(); }
     
     ~Graph() {
       for (Node* n: allNodes) { delete n; }
