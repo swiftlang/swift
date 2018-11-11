@@ -181,12 +181,12 @@ extension S1 {
 // ----------------------------------------------------------------------------
 
 protocol Foo {}
-extension Foo where Self: Foo {} // expected-warning {{redundant requirement in extension}}
+extension Foo where Self: Foo {} // expected-warning {{redundant requirement in extension 'Foo'. The requirement 'Self: Foo' is redundant as 'Foo' and 'Foo' have the same types}}
 
 protocol Bar {}
 protocol Baz {}
 extension Bar where Self: Baz {} // ok
-extension Bar where Self: Bar, Self: Baz {} // expected-warning {{redundant requirement in extension}}
+extension Bar where Self: Bar, Self: Baz {} // expected-warning {{redundant requirement in extension 'Bar'. The requirement 'Self: Bar' is redundant as 'Bar' and 'Bar' have the same types}}
 
 // ----------------------------------------------------------------------------
 // Protocol extensions with additional requirements

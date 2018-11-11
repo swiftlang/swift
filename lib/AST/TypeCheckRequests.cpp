@@ -335,18 +335,18 @@ bool RequirementRequest::visitRequirements(
     auto req = evaluator(RequirementRequest{owner, index, stage});
     if (req) {
       
-      // If we're in an extension declaration and if we are adding a
-      // redundant requirement (for example, `extension Foo where Self: Foo`)
-      // then emit a diagnostic.
+      // If we're extending a protocol and adding a redundant requirement,
+      // for example, `extension Foo where Self: Foo`, then emit a
+      // diagnostic.
       
       // FIXME: Leads to duplicate diagnostic emissions
       if (auto extDecl = dyn_cast<ExtensionDecl>(owner.dc->getAsDecl())) {
         auto ownerType = extDecl->getExtendedType();
         auto reqType = req->getSecondType();
         
-        if (reqType->isEqual(ownerType)) {
+        if (ownerType->isExistentialType() && reqType->isEqual(ownerType)) {
           auto &ctx = extDecl->getASTContext();
-          ctx.Diags.diagnose(extDecl->getLoc(), diag::extension_redundant_requirement);
+          ctx.Diags.diagnose(extDecl->getLoc(), diag::protocol_extension_redundant_requirement, ownerType->getString(), req->getFirstType()->getString(), reqType->getString());
         }
       }
       
