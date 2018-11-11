@@ -211,15 +211,15 @@ namespace driver {
     /// Jobs in the initial set with Condition::Always, or lacking existing
     /// .swiftdeps files.
     SmallVector<const Job *, 16> InitialOutOfDateCommands;
-
+  public:
     /// Dependency graph for deciding which jobs are dirty (need running)
     /// or clean (can be skipped).
     using DependencyGraph = DependencyGraph<const Job *>;
-    DependencyGraph DepGraph;
+    DependencyGraph StandardDepGraph;
 
     /// Experimental Dependency graph for finer-grained dependencies
     Optional<experimental_dependencies::DependencyGraph> ExpDepGraph;
-
+  private:
     /// Helper for tracing the propagation of marks in the graph.
     DependencyGraph::MarkTracer ActualIncrementalTracer;
     DependencyGraph::MarkTracer *IncrementalTracer = nullptr;
@@ -391,10 +391,11 @@ namespace driver {
     /// exits, and re-run transitive marking to ensure everything is properly
     /// invalidated by any new dependency edges introduced by it. If reloading
     /// fails, this can cause deferred jobs to be immediately scheduled.
-    template <unsigned N>
+    template <unsigned N, typename DependencyGraphT>
     void reloadAndRemarkDeps(const Job *FinishedCmd,
                              int ReturnCode,
-                             SmallVector<const Job *, N> &Dependents) {
+                             SmallVector<const Job *, N> &Dependents,
+                             DependencyGraphT &DepGraph) {
       const CommandOutput &Output = FinishedCmd->getOutput();
       StringRef DependenciesFile =
           Output.getAdditionalOutputForType(file_types::TY_SwiftDeps);
@@ -410,84 +411,62 @@ namespace driver {
       } else {
         // If we have a dependency file /and/ the frontend task exited normally,
         // we can be discerning about what downstream files to rebuild.
-        if (Comp.getEnableExperimentalDependencies())
-          reloadAndUpdateExpDeps(FinishedCmd, ReturnCode, DependenciesFile,
-                                 Dependents);
-        else
-          reloadAndUpdateDeps(FinishedCmd, ReturnCode, DependenciesFile,
-                              Dependents);
-      }
-    }
+        if (ReturnCode == EXIT_SUCCESS || ReturnCode == EXIT_FAILURE) {
+          bool wasCascading = DepGraph.isMarked(FinishedCmd);
 
-    template <unsigned N>
-    void reloadAndUpdateDeps(const Job *FinishedCmd, const int ReturnCode,
-                             StringRef DependenciesFile,
-                             SmallVector<const Job *, N> &Dependents) {
-      // If we have a dependency file /and/ the frontend task exited normally,
-      // we can be discerning about what downstream files to rebuild.
-      if (ReturnCode == EXIT_SUCCESS || ReturnCode == EXIT_FAILURE) {
-        bool wasCascading = DepGraph.isMarked(FinishedCmd);
-
-        switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
-        case DependencyGraphImpl::LoadResult::HadError:
-          if (ReturnCode == EXIT_SUCCESS) {
-            dependencyLoadFailed(DependenciesFile);
-            Dependents.clear();
-          } // else, let the next build handle it.
-          break;
-        case DependencyGraphImpl::LoadResult::UpToDate:
-          if (!wasCascading)
+          switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
+          case DependencyGraphImpl::LoadResult::HadError:
+            if (ReturnCode == EXIT_SUCCESS) {
+              dependencyLoadFailed(DependenciesFile);
+              Dependents.clear();
+            } // else, let the next build handle it.
             break;
-          LLVM_FALLTHROUGH;
-        case DependencyGraphImpl::LoadResult::AffectsDownstream:
-          DepGraph.markTransitive(Dependents, FinishedCmd, IncrementalTracer);
-          break;
-        }
-      } else {
-        // If there's an abnormal exit (a crash), assume the worst.
-        switch (FinishedCmd->getCondition()) {
-        case Job::Condition::NewlyAdded:
-          // The job won't be treated as newly added next time. Conservatively
-          // mark it as affecting other jobs, because some of them may have
-          // completed already.
-          DepGraph.markTransitive(Dependents, FinishedCmd, IncrementalTracer);
-          break;
-        case Job::Condition::Always:
-          // Any incremental task that shows up here has already been marked;
-          // we didn't need to wait for it to finish to start downstream
-          // tasks.
-          assert(DepGraph.isMarked(FinishedCmd));
-          break;
-        case Job::Condition::RunWithoutCascading:
-          // If this file changed, it might have been a non-cascading change
-          // and it might not. Unfortunately, the interface hash has been
-          // updated or compromised, so we don't actually know anymore; we
-          // have to conservatively assume the changes could affect other
-          // files.
-          DepGraph.markTransitive(Dependents, FinishedCmd, IncrementalTracer);
-          break;
-        case Job::Condition::CheckDependencies:
-          // If the only reason we're running this is because something else
-          // changed, then we can trust the dependency graph as to whether
-          // it's a cascading or non-cascading change. That is, if whatever
-          // /caused/ the error isn't supposed to affect other files, and
-          // whatever /fixes/ the error isn't supposed to affect other files,
-          // then there's no need to recompile any other inputs. If either of
-          // those are false, we /do/ need to recompile other inputs.
-          break;
+          case DependencyGraphImpl::LoadResult::UpToDate:
+            if (!wasCascading)
+              break;
+            LLVM_FALLTHROUGH;
+          case DependencyGraphImpl::LoadResult::AffectsDownstream:
+            DepGraph.markTransitive(Dependents, FinishedCmd,
+                                    IncrementalTracer);
+            break;
+          }
+        } else {
+          // If there's an abnormal exit (a crash), assume the worst.
+          switch (FinishedCmd->getCondition()) {
+          case Job::Condition::NewlyAdded:
+            // The job won't be treated as newly added next time. Conservatively
+            // mark it as affecting other jobs, because some of them may have
+            // completed already.
+            DepGraph.markTransitive(Dependents, FinishedCmd,
+                                    IncrementalTracer);
+            break;
+          case Job::Condition::Always:
+            // Any incremental task that shows up here has already been marked;
+            // we didn't need to wait for it to finish to start downstream
+            // tasks.
+            assert(DepGraph.isMarked(FinishedCmd));
+            break;
+          case Job::Condition::RunWithoutCascading:
+            // If this file changed, it might have been a non-cascading change
+            // and it might not. Unfortunately, the interface hash has been
+            // updated or compromised, so we don't actually know anymore; we
+            // have to conservatively assume the changes could affect other
+            // files.
+            DepGraph.markTransitive(Dependents, FinishedCmd,
+                                    IncrementalTracer);
+            break;
+          case Job::Condition::CheckDependencies:
+            // If the only reason we're running this is because something else
+            // changed, then we can trust the dependency graph as to whether
+            // it's a cascading or non-cascading change. That is, if whatever
+            // /caused/ the error isn't supposed to affect other files, and
+            // whatever /fixes/ the error isn't supposed to affect other files,
+            // then there's no need to recompile any other inputs. If either of
+            // those are false, we /do/ need to recompile other inputs.
+            break;
+          }
         }
       }
-    }
-
-    /// Helper that attmepts to reload a job's .swiftdeps file after the job
-    /// exits, and re-run transitive marking to ensure everything is properly
-    /// invalidated by any new dependency edges introduced by it. If reloading
-    /// fails, this can cause deferred jobs to be immediately scheduled.
-    template <unsigned N>
-    void reloadAndUpdateExpDeps(const Job *FinishedCmd, const int ReturnCode,
-                                StringRef DependenciesFile,
-                                SmallVector<const Job *, N> &Dependents) {
-      abort();
     }
 
     /// Check to see if a job produced a zero-length serialized diagnostics
@@ -608,7 +587,10 @@ namespace driver {
       // Do this whether or not the build succeeded.
       SmallVector<const Job *, 16> Dependents;
       if (Comp.getIncrementalBuildEnabled()) {
-        reloadAndRemarkDeps(FinishedCmd, ReturnCode, Dependents);
+        if (Comp.getEnableExperimentalDependencies())
+          reloadAndRemarkDeps(FinishedCmd, ReturnCode, Dependents, ExpDepGraph.getValue());
+        else
+          reloadAndRemarkDeps(FinishedCmd, ReturnCode, Dependents, StandardDepGraph);
       }
 
       if (ReturnCode != EXIT_SUCCESS) {
@@ -704,16 +686,11 @@ namespace driver {
       if (Comp.getShowIncrementalBuildDecisions() || Comp.getStatsReporter())
         IncrementalTracer = &ActualIncrementalTracer;
     }
-    
-    template<typename DependencyGraphT, DependencyGraphT DepGraph>
-    Job::Condition snort(const Job *Cmd,
-                         StringRef DependenciesFile) {
-      return Job::Condition::Always;
-    }
 
     
     /// Schedule all jobs we can from the initial list provided by Compilation.
-    void scheduleInitialJobs() {
+    template<typename DependencyGraphT>
+    void scheduleInitialJobs(DependencyGraphT &DepGraph) {
       for (const Job *Cmd : Comp.getJobs()) {
         if (!Comp.getIncrementalBuildEnabled()) {
           scheduleCommandIfNecessaryAndPossible(Cmd);
@@ -725,24 +702,32 @@ namespace driver {
         // there should be one but it's not present or can't be loaded, we have to
         // run all the jobs.
         // FIXME: We can probably do better here!
+        Job::Condition Condition = Job::Condition::Always;
         StringRef DependenciesFile =
             Cmd->getOutput().getAdditionalOutputForType(
                 file_types::TY_SwiftDeps);
-        const Job::Condition Condition =
-        DependenciesFile.empty()
-        ? Job::Condition::Always
-        : Comp.getEnableExperimentalDependencies()
-        ? loadDependenciesFile<decltype(ExpDepGraph)>(Cmd, DependenciesFile, ExpDepGraph)
-        : loadDependenciesFile<decltype(   DepGraph)>(Cmd, DependenciesFile, DepGraph);
-        
+        if (!DependenciesFile.empty()) {
+          if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
+            DepGraph.addIndependentNode(Cmd);
+          } else {
+            switch (DepGraph.loadFromPath(Cmd, DependenciesFile)) {
+            case DependencyGraphImpl::LoadResult::HadError:
+              dependencyLoadFailed(DependenciesFile, /*Warn=*/false);
+              break;
+            case DependencyGraphImpl::LoadResult::UpToDate:
+              Condition = Cmd->getCondition();
+              break;
+            case DependencyGraphImpl::LoadResult::AffectsDownstream:
+              llvm_unreachable("we haven't marked anything in this graph yet");
+            }
+          }
+        }
+
         switch (Condition) {
         case Job::Condition::Always:
           if (Comp.getIncrementalBuildEnabled() && !DependenciesFile.empty()) {
             InitialOutOfDateCommands.push_back(Cmd);
-            if (Comp.getEnableExperimentalDependencies())
-              ExpDepGraph->registerCmdForReevaluation(Cmd);
-            else
-              DepGraph.markIntransitive(Cmd);
+            DepGraph.markIntransitive(Cmd);
           }
           LLVM_FALLTHROUGH;
         case Job::Condition::RunWithoutCascading:
@@ -757,72 +742,50 @@ namespace driver {
         }
       }
     }
- 
+
+    /// Schedule transitive closure of initial jobs, and external jobs.
     template<typename DependencyGraphT>
-    Job::Condition loadDependenciesFile(const Job *Cmd,
-                                        StringRef DependenciesFile,
-                                        DependencyGraphT &DepGraph) {
-      // Try to load the dependencies file for this job. If there isn't one, we
-      // always have to run the job, but it doesn't affect any other jobs. If
-      // there should be one but it's not present or can't be loaded, we have to
-      // run all the jobs.
-      // FIXME: We can probably do better here!
-      Job::Condition Condition = Job::Condition::Always;
-      if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
-        DepGraph.addIndependentNode(Cmd);
-      } else {
-        switch (DepGraph.loadFromPath(Cmd, DependenciesFile)) {
-        case DependencyGraphImpl::LoadResult::HadError:
-          dependencyLoadFailed(DependenciesFile, /*Warn=*/false);
-          break;
-        case DependencyGraphImpl::LoadResult::UpToDate:
-          Condition = Cmd->getCondition();
-          break;
-        case DependencyGraphImpl::LoadResult::AffectsDownstream:
-          llvm_unreachable("we haven't marked anything in this graph yet");
-                }
-      }
-      return Condition;
-    }
+    void scheduleAdditionalJobs(DependencyGraphT &DepGraph) {
+      if (Comp.getIncrementalBuildEnabled()) {
+        SmallVector<const Job *, 16> AdditionalOutOfDateCommands;
 
-    template <unsigned N>
-    void computeAdditionalOutOfDateCommands(
-        SmallVector<const Job *, N> &AdditionalOutOfDateCommands) {
-      // We scheduled all of the files that have actually changed. Now add the
-      // files that haven't changed, so that they'll get built in parallel if
-      // possible and after the first set of files if it's not.
-      for (auto *Cmd : InitialOutOfDateCommands) {
-        DepGraph.markTransitive(AdditionalOutOfDateCommands, Cmd,
-                                IncrementalTracer);
-      }
+        // We scheduled all of the files that have actually changed. Now add the
+        // files that haven't changed, so that they'll get built in parallel if
+        // possible and after the first set of files if it's not.
+        for (auto *Cmd : InitialOutOfDateCommands) {
+          DepGraph.markTransitive(AdditionalOutOfDateCommands, Cmd,
+                                  IncrementalTracer);
+        }
 
-      for (auto *transitiveCmd : AdditionalOutOfDateCommands)
-        noteBuilding(transitiveCmd, "because of the initial set");
-      size_t firstSize = AdditionalOutOfDateCommands.size();
+        for (auto *transitiveCmd : AdditionalOutOfDateCommands)
+          noteBuilding(transitiveCmd, "because of the initial set");
+        size_t firstSize = AdditionalOutOfDateCommands.size();
 
-      // Check all cross-module dependencies as well.
-      for (StringRef dependency : DepGraph.getExternalDependencies()) {
-        llvm::sys::fs::file_status depStatus;
-        if (!llvm::sys::fs::status(dependency, depStatus))
-          if (depStatus.getLastModificationTime() < Comp.getLastBuildTime())
+        // Check all cross-module dependencies as well.
+        for (StringRef dependency : DepGraph.getExternalDependencies()) {
+          llvm::sys::fs::file_status depStatus;
+          if (!llvm::sys::fs::status(dependency, depStatus))
+            if (depStatus.getLastModificationTime() < Comp.getLastBuildTime())
+              continue;
+
+          // If the dependency has been modified since the oldest built file,
+          // or if we can't stat it for some reason (perhaps it's been deleted?),
+          // trigger rebuilds through the dependency graph.
+          DepGraph.markExternal(AdditionalOutOfDateCommands, dependency);
+        }
+
+        for (auto *externalCmd :
+               llvm::makeArrayRef(AdditionalOutOfDateCommands).slice(firstSize)) {
+          noteBuilding(externalCmd, "because of external dependencies");
+        }
+
+        for (auto *AdditionalCmd : AdditionalOutOfDateCommands) {
+          if (!DeferredCommands.count(AdditionalCmd))
             continue;
-
-        // If the dependency has been modified since the oldest built file,
-        // or if we can't stat it for some reason (perhaps it's been deleted?),
-        // trigger rebuilds through the dependency graph.
-        DepGraph.markExternal(AdditionalOutOfDateCommands, dependency);
+          scheduleCommandIfNecessaryAndPossible(AdditionalCmd);
+          DeferredCommands.erase(AdditionalCmd);
+        }
       }
-
-      for (auto *externalCmd :
-           llvm::makeArrayRef(AdditionalOutOfDateCommands).slice(firstSize)) {
-        noteBuilding(externalCmd, "because of external dependencies");
-      }
-    }
-
-    template <unsigned N>
-    void computeAdditionalOutOfDataCommandsWithExperimentalDependencies(
-        SmallVector<const Job *, N> &AdditionalOutOfDateCommands) {
-      abort();
     }
 
     /// Insert all jobs in \p Cmds (of descriptive name \p Kind) to the \c
@@ -1148,7 +1111,8 @@ namespace driver {
       } while (Result == 0 && TQ->hasRemainingTasks());
     }
 
-    void checkUnfinishedJobs() {
+    template <typename DependencyGraphT>
+    void checkUnfinishedJobs(DependencyGraphT &DepGraph) {
       if (Result == 0) {
         assert(BlockingCommands.empty() &&
                "some blocking commands never finished properly");
@@ -1387,11 +1351,21 @@ int Compilation::performJobsImpl(bool &abnormalExit,
                                  std::unique_ptr<TaskQueue> &&TQ) {
   PerformJobsState State(*this, std::move(TQ));
 
-  State.scheduleInitialJobs();
-  State.scheduleAdditionalJobs();
-  State.formBatchJobsAndAddPendingJobsToTaskQueue();
-  State.runTaskQueueToCompletion();
-  State.checkUnfinishedJobs();
+  if (getEnableExperimentalDependencies()) {
+    auto &ExpDepGraph = State.ExpDepGraph.getValue();
+    State.scheduleInitialJobs(ExpDepGraph);
+    State.scheduleAdditionalJobs(ExpDepGraph);
+    State.formBatchJobsAndAddPendingJobsToTaskQueue();
+    State.runTaskQueueToCompletion();
+    State.checkUnfinishedJobs(ExpDepGraph);
+  }
+  else {
+    State.scheduleInitialJobs(State.StandardDepGraph);
+    State.scheduleAdditionalJobs(State.StandardDepGraph);
+    State.formBatchJobsAndAddPendingJobsToTaskQueue();
+    State.runTaskQueueToCompletion();
+    State.checkUnfinishedJobs(State.StandardDepGraph);
+  }
 
   if (!CompilationRecordPath.empty()) {
     InputInfoMap InputInfo;

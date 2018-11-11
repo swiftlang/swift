@@ -43,13 +43,16 @@ namespace swift {
       public:
         DependencyGraph();
         
-        void registerCmdForReevaluation(const Job* Cmd);
         static Job::Condition loadFromFile(const Job* Cmd, StringRef filename);
+        DependencyGraphImpl::LoadResult loadFromPath(const Job* Cmd, StringRef filename);
+        
+        bool isMarked(const Job* Cmd) const;//XXX
         
         void addNode(Node*);
 //        void addArc(Arc*);
         
       private:
+        void registerCmdForReevaluation(const Job* Cmd);
         static std::string depsFileForCmd(const Job* Cmd);
         void registerDepsFileForReevaluation(std::string depsFile); // XXX
       };
