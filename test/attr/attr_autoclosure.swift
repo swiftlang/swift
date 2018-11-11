@@ -175,3 +175,38 @@ func passNonThrowingToThrowingAC(_ fn: @autoclosure () -> Int) {
 func passThrowingToThrowingAC(_ fn: @autoclosure () throws -> Int) {
   takesThrowingAutoclosure(fn)
 }
+
+// rdar://problem/20591571 - Various type inference problems with @autoclosure
+func rdar_20591571() {
+  func foo(_ g: @autoclosure () -> Int) {
+    typealias G = ()->Int
+    let _ = unsafeBitCast(g, to: G.self) // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
+  }
+
+  func id<T>(_: T) -> T {}
+  func same<T>(_: T, _: T) {}
+
+  func takesAnAutoclosure(_ fn: @autoclosure () -> Int, _ efn: @escaping @autoclosure () -> Int) {
+  // expected-note@-1 2{{parameter 'fn' is implicitly non-escaping}}
+
+    var _ = fn // expected-error {{non-escaping parameter 'fn' may only be called}}
+    let _ = fn // expected-error {{non-escaping parameter 'fn' may only be called}}
+
+    var _ = efn
+    let _ = efn
+
+    _ = id(fn)          // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
+    _ = same(fn, { 3 }) // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
+    _ = same({ 3 }, fn) // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
+
+    withoutActuallyEscaping(fn) { _ in }              // Ok
+    withoutActuallyEscaping(fn) { (_: () -> Int) in } // Ok
+  }
+}
+
+// rdar://problem/30906031 - [SR-4188]: withoutActuallyEscaping doesn't accept an @autoclosure argument
+func rdar_30906031(in arr: [Int], fn: @autoclosure () -> Int) -> Bool {
+  return withoutActuallyEscaping(fn) { escapableF in // Ok
+    arr.lazy.filter { $0 >= escapableF() }.isEmpty
+  }
+}
