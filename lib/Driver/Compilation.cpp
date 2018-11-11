@@ -775,7 +775,7 @@ namespace driver {
     Job::Condition
     loadExperimentalDependenciesFile(const Job *Cmd,
                                      StringRef DependenciesFile) {
-      abort();
+      return Job::Condition::Always;
     }
 
     /// Schedule transitive closure of initial jobs, and external jobs.

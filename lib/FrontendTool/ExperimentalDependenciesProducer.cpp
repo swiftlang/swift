@@ -99,13 +99,15 @@ namespace {
                                 std::string nameForDependencies,
                                 std::string nameForHolderOfMember,
                                 std::string fingerprint,
-                                Cache &cache) {
+                                Cache &cache,
+                                Graph &g) {
       auto key = createMemoizedKey(kind, nameForDependencies, nameForHolderOfMember);
       auto iter = cache.find(key);
       if (iter != cache.end())
         return iter->second;
       auto node = new MemoizedNode(kind, nameForDependencies, nameForHolderOfMember, fingerprint);
       cache.insert(std::make_pair(key, node));
+      g.addNode(node);
       return node;
     }
   };
@@ -220,13 +222,12 @@ namespace {
   public:
     Graph construct() {
       //TODO storage mgmt
-      sourceFileNode = MemoizedNode::create(Node::Kind::sourceFileProvide, outputPath, "", getInterfaceHash(), cache);
-      g.addNode(sourceFileNode);
+      sourceFileNode = MemoizedNode::create(Node::Kind::sourceFileProvide, outputPath, "", getInterfaceHash(), cache, g);
       
       addProviderNodesToGraph(); // must preceed dependencies for cascades
       addDependencyArcsToGraph();
       
-      return g;
+      return std::move(g);
     }
     
   private:
@@ -251,7 +252,7 @@ namespace {
     void addOneTypeOfProviderNodesToGraph(CPVec<DeclT> &decls, Node::Kind kind, std::string(*nameFn)(const DeclT *)) {
       for (const auto* D: decls) {
         std::string nameForHolderOfMember{};
-        MemoizedNode::create(kind, (*nameFn)(D), kind == Node::Kind::member ? computeContextNameOfMember(D) : "", "", cache);
+        MemoizedNode::create(kind, (*nameFn)(D), kind == Node::Kind::member ? computeContextNameOfMember(D) : "", "", cache, g);
       }
     }
     /// name converters
@@ -342,7 +343,7 @@ void GraphConstructor::addToGraphThatThisWholeFileDependsUpon(Node::Kind kind,
                                                               const std::string &nameForHolderOfMember,
                                                               const std::string &dependedUponNameIfNotEmpty,
                                                               bool cascades) {
-  MemoizedNode *whatIsDependedUpon = MemoizedNode::create(kind, dependedUponNameIfNotEmpty, nameForHolderOfMember, "", cache);
+  MemoizedNode *whatIsDependedUpon = MemoizedNode::create(kind, dependedUponNameIfNotEmpty, nameForHolderOfMember, "", cache, g);
   if (!cascades)
     g.addArc(Arc{sourceFileNode, whatIsDependedUpon});
   else
@@ -391,10 +392,10 @@ namespace {
   template <typename Emitter>
   class GraphEmitter {
   private:
-    const Graph g;
+    const Graph &g;
     Emitter emitter;
   public:
-    GraphEmitter(const Graph g, llvm::raw_ostream &out) : g(g), emitter(Emitter(out)) {}
+    GraphEmitter(const Graph& g, llvm::raw_ostream &out) : g(g), emitter(Emitter(out)) {}
   public:
     void emit() const {
       std::for_each(g.nodesBegin(), g.nodesEnd(), [&](const Node* n) {emitNode(n); });

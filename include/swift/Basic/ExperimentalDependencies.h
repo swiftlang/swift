@@ -98,14 +98,22 @@ namespace experimental_dependencies {
       allNodes.push_back(n);
     }
     void addArc(const Arc arc) {
+      if (arc.headSeqNo == arc.tailSeqNo)
+        return; // no point
       allNodes[arc.tailSeqNo]->departures.push_back(arc.headSeqNo);
       allNodes[arc.headSeqNo]->arrivals  .push_back(arc.tailSeqNo);
     }
     decltype(allNodes)::const_iterator nodesBegin() const { return allNodes.cbegin(); }
     decltype(allNodes)::const_iterator nodesEnd() const { return allNodes.cend(); }
     
+    Graph() = default;
+    Graph(const Graph& g) = delete;
+    Graph(Graph&& g) = default;
+    
     ~Graph() {
-      for (Node* n: allNodes) { delete n; }
+      for (Node* n: allNodes) {
+        delete n;
+      }
     }
   };
   
