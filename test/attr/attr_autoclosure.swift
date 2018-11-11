@@ -203,3 +203,10 @@ func rdar_20591571() {
     withoutActuallyEscaping(fn) { (_: () -> Int) in } // Ok
   }
 }
+
+// rdar://problem/30906031 - [SR-4188]: withoutActuallyEscaping doesn't accept an @autoclosure argument
+func rdar_30906031(in arr: [Int], fn: @autoclosure () -> Int) -> Bool {
+  return withoutActuallyEscaping(fn) { escapableF in // Ok
+    arr.lazy.filter { $0 >= escapableF() }.isEmpty
+  }
+}
