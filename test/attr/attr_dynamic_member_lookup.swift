@@ -167,7 +167,7 @@ func test_iuo_result(x : IUOResultTest) {
 // Subscript index must be ExpressibleByStringLiteral.
 @dynamicMemberLookup
 struct Invalid1 {
-  // expected-error @+1 {{@dynamicMemberLookup attribute requires 'Invalid1' to have a 'subscript(dynamicMember:)' method with an 'ExpressibleByStringLiteral' argument}}
+  // expected-error @+1 {{@dynamicMemberLookup attribute requires 'Invalid1' to have a 'subscript(dynamicMember:)' method with an 'ExpressibleByStringLiteral' parameter}}
   subscript(dynamicMember member: Int) -> Int {
     return 42
   }
@@ -176,7 +176,7 @@ struct Invalid1 {
 // Subscript may not be variadic.
 @dynamicMemberLookup
 struct Invalid2 {
-  // expected-error @+1 {{@dynamicMemberLookup attribute requires 'Invalid2' to have a 'subscript(dynamicMember:)' method with an 'ExpressibleByStringLiteral' argument}}
+  // expected-error @+1 {{@dynamicMemberLookup attribute requires 'Invalid2' to have a 'subscript(dynamicMember:)' method with an 'ExpressibleByStringLiteral' parameter}}
   subscript(dynamicMember member: String...) -> Int {
     return 42
   }
@@ -217,7 +217,7 @@ func NotAllowedOnFunc() {
 // @dynamicMemberLookup cannot be declared on a base class and fulfilled with a
 // derived class.
 
-// expected-error @+1 {{@dynamicMemberLookup attribute requires 'InvalidBase' to have a 'subscript(dynamicMember:)' method with an 'ExpressibleByStringLiteral' argument}}
+// expected-error @+1 {{@dynamicMemberLookup attribute requires 'InvalidBase' to have a 'subscript(dynamicMember:)' method with an 'ExpressibleByStringLiteral' parameter}}
 @dynamicMemberLookup
 class InvalidBase {}
 

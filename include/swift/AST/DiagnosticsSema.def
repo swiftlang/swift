@@ -1057,7 +1057,7 @@ ERROR(missing_dynamic_callable_kwargs_method,none,
 ERROR(invalid_dynamic_member_lookup_type,none,
       "@dynamicMemberLookup attribute requires %0 to have a "
       "'subscript(dynamicMember:)' method with an "
-      "'ExpressibleByStringLiteral' argument", (Type))
+      "'ExpressibleByStringLiteral' parameter", (Type))
 
 ERROR(string_index_not_integer,none,
       "String must not be indexed with %0, it has variable size elements",
