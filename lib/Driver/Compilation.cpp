@@ -25,6 +25,7 @@
 #include "swift/Driver/Action.h"
 #include "swift/Driver/DependencyGraph.h"
 #include "swift/Driver/Driver.h"
+#include "swift/Driver/ExperimentalDependencyGraph.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/ParseableOutput.h"
 #include "swift/Driver/ToolChain.h"
@@ -217,7 +218,7 @@ namespace driver {
     DependencyGraph DepGraph;
 
     /// Experimental Dependency graph for finer-grained dependencies
-    Optional<experimental_dependencies::Graph> ExpDepGraph;
+    Optional<experimental_dependencies::DependencyGraph> ExpDepGraph;
 
     /// Helper for tracing the propagation of marks in the graph.
     DependencyGraph::MarkTracer ActualIncrementalTracer;
@@ -703,7 +704,14 @@ namespace driver {
       if (Comp.getShowIncrementalBuildDecisions() || Comp.getStatsReporter())
         IncrementalTracer = &ActualIncrementalTracer;
     }
+    
+    template<typename DependencyGraphT, DependencyGraphT DepGraph>
+    Job::Condition snort(const Job *Cmd,
+                         StringRef DependenciesFile) {
+      return Job::Condition::Always;
+    }
 
+    
     /// Schedule all jobs we can from the initial list provided by Compilation.
     void scheduleInitialJobs() {
       for (const Job *Cmd : Comp.getJobs()) {
@@ -721,17 +729,20 @@ namespace driver {
             Cmd->getOutput().getAdditionalOutputForType(
                 file_types::TY_SwiftDeps);
         const Job::Condition Condition =
-            DependenciesFile.empty()
-                ? Job::Condition::Always
-                : Comp.getEnableExperimentalDependencies()
-                      ? loadExperimentalDependenciesFile(Cmd, DependenciesFile)
-                      : loadDependenciesFile(Cmd, DependenciesFile);
-
+        DependenciesFile.empty()
+        ? Job::Condition::Always
+        : Comp.getEnableExperimentalDependencies()
+        ? loadDependenciesFile<decltype(ExpDepGraph)>(Cmd, DependenciesFile, ExpDepGraph)
+        : loadDependenciesFile<decltype(   DepGraph)>(Cmd, DependenciesFile, DepGraph);
+        
         switch (Condition) {
         case Job::Condition::Always:
           if (Comp.getIncrementalBuildEnabled() && !DependenciesFile.empty()) {
             InitialOutOfDateCommands.push_back(Cmd);
-            DepGraph.markIntransitive(Cmd);
+            if (Comp.getEnableExperimentalDependencies())
+              ExpDepGraph->registerCmdForReevaluation(Cmd);
+            else
+              DepGraph.markIntransitive(Cmd);
           }
           LLVM_FALLTHROUGH;
         case Job::Condition::RunWithoutCascading:
@@ -746,9 +757,11 @@ namespace driver {
         }
       }
     }
-
+ 
+    template<typename DependencyGraphT>
     Job::Condition loadDependenciesFile(const Job *Cmd,
-                                        StringRef DependenciesFile) {
+                                        StringRef DependenciesFile,
+                                        DependencyGraphT &DepGraph) {
       // Try to load the dependencies file for this job. If there isn't one, we
       // always have to run the job, but it doesn't affect any other jobs. If
       // there should be one but it's not present or can't be loaded, we have to
@@ -770,31 +783,6 @@ namespace driver {
                 }
       }
       return Condition;
-    }
-    
-    Job::Condition
-    loadExperimentalDependenciesFile(const Job *Cmd,
-                                     StringRef DependenciesFile) {
-      return Job::Condition::Always;
-    }
-
-    /// Schedule transitive closure of initial jobs, and external jobs.
-    void scheduleAdditionalJobs() {
-      if (Comp.getIncrementalBuildEnabled()) {
-        SmallVector<const Job *, 16> AdditionalOutOfDateCommands;
-        if (Comp.getEnableExperimentalDependencies())
-          computeAdditionalOutOfDataCommandsWithExperimentalDependencies(
-              AdditionalOutOfDateCommands);
-        else
-          computeAdditionalOutOfDateCommands(AdditionalOutOfDateCommands);
-
-        for (auto *AdditionalCmd : AdditionalOutOfDateCommands) {
-          if (!DeferredCommands.count(AdditionalCmd))
-            continue;
-          scheduleCommandIfNecessaryAndPossible(AdditionalCmd);
-          DeferredCommands.erase(AdditionalCmd);
-        }
-      }
     }
 
     template <unsigned N>
