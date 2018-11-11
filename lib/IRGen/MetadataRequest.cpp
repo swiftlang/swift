@@ -222,10 +222,19 @@ llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
     StringRef symbolName,
     bool shouldSetLowBit,
     llvm::function_ref<ConstantInitFuture (ConstantInitBuilder &)> body) {
+  // Call this to form the return value.
+  auto returnValue = [&](llvm::Constant *addr) {
+    if (!shouldSetLowBit)
+      return addr;
+
+    auto bitConstant = llvm::ConstantInt::get(IntPtrTy, 1);
+    return llvm::ConstantExpr::getGetElementPtr(nullptr, addr, bitConstant);
+  };
+
   // Check whether we already have an entry with this name.
   auto &entry = StringsForTypeRef[symbolName];
   if (entry.second) {
-    return entry.second;
+    return returnValue(entry.second);
   }
 
   // Construct the initializer.
@@ -250,16 +259,9 @@ llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
 
   // Drill down to the i8* at the beginning of the constant.
   auto addr = llvm::ConstantExpr::getBitCast(var, Int8PtrTy);
-
-  // If requested, set the low bit.
-  if (shouldSetLowBit) {
-    auto bitConstant = llvm::ConstantInt::get(IntPtrTy, 1);
-    addr = llvm::ConstantExpr::getGetElementPtr(nullptr, addr, bitConstant);
-  }
-
   StringsForTypeRef[symbolName] = { var, addr };
 
-  return addr;
+  return returnValue(addr);
 }
 
 llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef str,

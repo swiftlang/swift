@@ -706,8 +706,14 @@ emitMetadataGeneratorForKeyPath(IRGenModule &IGM,
                                 CanType type,
                                 GenericEnvironment *genericEnv,
                                 ArrayRef<GenericRequirement> requirements) {
-  // TODO: Use a mangled name when we can.
+  // If we have a non-dependent type, use a normal mangled type name.
+  if (!type->hasTypeParameter()) {
+    auto constant = IGM.getTypeRef(type, MangledTypeRefRole::Metadata);
+    auto bitConstant = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
+    return llvm::ConstantExpr::getGetElementPtr(nullptr, constant, bitConstant);
+  }
 
+  // Otherwise, create an accessor.
   CanGenericSignature genericSig;
   if (genericEnv)
     genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();

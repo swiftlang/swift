@@ -2378,6 +2378,24 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
 // A reference to metadata, which is a pointer to a mangled name.
 internal typealias MetadataReference = UnsafeRawPointer
 
+// Determine the length of the given mangled name.
+internal func _getSymbolicMangledNameLength(_ base: UnsafeRawPointer) -> Int {
+  var end = base
+  while let current = Optional(end.load(as: UInt8.self)), current != 0 {
+    // Skip the current character
+    end = end + 1
+
+    // Skip over a symbolic reference
+    if current >= 0x1 && current <= 0x17 {
+      end += 4
+    } else if current >= 0x18 && current <= 0x1F {
+      end += MemoryLayout<Int>.size
+    }
+  }
+
+  return end - base
+}
+
 // Resolve the given generic argument reference to a generic argument.
 internal func _resolveKeyPathGenericArgReference(_ reference: UnsafeRawPointer,
                                                  arguments: UnsafeRawPointer)
@@ -2405,7 +2423,23 @@ internal func _resolveKeyPathGenericArgReference(_ reference: UnsafeRawPointer,
     return accessor(arguments)
   }
 
-  fatalError("unhandled keypath metadata reference")
+  let nameLength = _getSymbolicMangledNameLength(referenceStart)
+  let namePtr = referenceStart.bindMemory(to: UInt8.self,
+                                          capacity: nameLength + 1)
+  // FIXME: Could extract this information from the mangled name.
+  let parametersPerLevel: [UInt] = []
+  let substitutions: [Any.Type] = []
+  guard let result = _getTypeByMangledName(namePtr, UInt(nameLength), 0,
+                                           parametersPerLevel, substitutions)
+    else {
+      let nameStr = String._fromUTF8Repairing(
+        UnsafeBufferPointer(start: namePtr, count: nameLength)
+      ).0
+
+      fatalError("could not demangle keypath type from '\(nameStr)'")
+    }
+
+  return unsafeBitCast(result, to: UnsafeRawPointer.self)
 }
 
 // Resolve the given metadata reference to (type) metadata.

@@ -47,8 +47,8 @@ sil_vtable C2 {}
 // -- %a: S.x
 // CHECK: [[KP_A:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: [[WORD]]* @keypath_once
-// CHECK-SAME: @"keypath_get_type 8keypaths1SV
-// CHECK-SAME: @"keypath_get_type Si
+// CHECK-SAME: @"symbolic 8keypaths1SV"
+// CHECK-SAME: @"symbolic Si
 //               -- instantiable in-line, size 4
 // CHECK-SAME: <i32 0x8000_0004>,
 // -- offset of S.x, mutable
@@ -57,8 +57,8 @@ sil_vtable C2 {}
 // -- %b: S.y
 // CHECK: [[KP_B:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: [[WORD]]* @keypath_once
-// CHECK-SAME: @"keypath_get_type 8keypaths1SV
-// CHECK-SAME: @"keypath_get_type SS
+// CHECK-SAME: @"symbolic 8keypaths1SV
+// CHECK-SAME: @"symbolic SS
 //               -- instantiable in-line, size 4
 // CHECK-SAME: <i32 0x8000_0004>,
 // -- offset of S.y, immutable
@@ -68,8 +68,8 @@ sil_vtable C2 {}
 // -- %c: S.z
 // CHECK: [[KP_C:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: [[WORD]]* @keypath_once
-// CHECK-SAME: @"keypath_get_type 8keypaths1SV
-// CHECK-SAME: @"keypath_get_type 8keypaths1CC
+// CHECK-SAME: @"symbolic 8keypaths1SV
+// CHECK-SAME: @"symbolic 8keypaths1CC
 //               -- instantiable in-line, size 4
 // CHECK-SAME: <i32 0x8000_0004>,
 // -- offset of S.z, mutable
@@ -79,8 +79,8 @@ sil_vtable C2 {}
 // -- %d: C.x
 // CHECK: [[KP_D:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: [[WORD]]* @keypath_once
-// CHECK-SAME: @"keypath_get_type
-// CHECK-SAME: @"keypath_get_type
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
 //               -- instantiable in-line, size 4
 // CHECK-SAME: <i32 0x8000_0004>,
 // -- 0x0300_0000 (class) + mutable + offset of C.x
@@ -90,8 +90,8 @@ sil_vtable C2 {}
 // -- %e: C.y
 // CHECK: [[KP_E:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: [[WORD]]* @keypath_once
-// CHECK-SAME: @"keypath_get_type
-// CHECK-SAME: @"keypath_get_type
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
 //               -- instantiable in-line, size 4
 // CHECK-SAME: <i32 0x8000_0004>,
 // -- 0x0300_0000 (class) + immutable + offset of C.y
@@ -101,8 +101,8 @@ sil_vtable C2 {}
 // -- %f: C.z
 // CHECK: [[KP_F:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: [[WORD]]* @keypath_once
-// CHECK-SAME: @"keypath_get_type
-// CHECK-SAME: @"keypath_get_type
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
 //               -- instantiable in-line, size 4
 // CHECK-SAME: <i32 0x8000_0004>,
 // -- 0x0300_0000 (class) + mutable offset of C.z
@@ -112,14 +112,14 @@ sil_vtable C2 {}
 // -- %g: S.z.x
 // CHECK: [[KP_G:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: [[WORD]]* @keypath_once
-// CHECK-SAME: @"keypath_get_type
-// CHECK-SAME: @"keypath_get_type
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
 //                  -- instantiable in-line, size 12
 // CHECK-SAME: <i32 0x8000_000c>,
 // -- offset of S.z
 // CHECK-32-SAME: <i32 0x0180_0010>,
 // CHECK-64-SAME: <i32 0x0180_0018>,
-// CHECK: @"keypath_get_type
+// CHECK: @"symbolic
 // -- 0x0300_0000 (class) + offset of C.x
 // CHECK-32-SAME: <i32 0x0380_0008> }>
 // CHECK-64-SAME: <i32 0x0380_0010> }>
@@ -127,21 +127,21 @@ sil_vtable C2 {}
 // -- %h: C.z.x
 // CHECK: [[KP_H:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: [[WORD]]* @keypath_once
-// CHECK-SAME: @"keypath_get_type
-// CHECK-SAME: @"keypath_get_type
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
 // CHECK-SAME: <i32 0x8000_000c>,
 // -- 0x0300_0000 (class) + offset of C.z
 // CHECK-32-SAME: <i32 0x0380_0018>,
 // CHECK-64-SAME: <i32 0x0380_0028>,
-// CHECK: @"keypath_get_type
+// CHECK: @"symbolic
 // -- offset of S.x
 // CHECK-SAME: <i32 0x0180_0000> }>
 
 // -- %k: computed
 // CHECK: [[KP_K:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: [[WORD]]* @keypath_once
-// CHECK-SAME: @"keypath_get_type
-// CHECK-SAME: @"keypath_get_type
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
 //              -- instantiable in-line, size 12
 // CHECK-SAME: <i32 0x8000_000c>,
 // -- computed, get-only, identified by (indirected) function pointer, no args
@@ -152,8 +152,8 @@ sil_vtable C2 {}
 // -- %l: computed
 // CHECK: [[KP_L:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: [[WORD]]* @keypath_once
-// CHECK-SAME: @"keypath_get_type
-// CHECK-SAME: @"keypath_get_type
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
 //              -- instantiable in-line, size 16
 // CHECK-SAME: <i32 0x8000_0010>,
 // -- computed, settable, nonmutating, identified by indirect pointer, no args
@@ -165,8 +165,8 @@ sil_vtable C2 {}
 // -- %m: computed
 // CHECK: [[KP_M:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: [[WORD]]* @keypath_once
-// CHECK-SAME: @"keypath_get_type
-// CHECK-SAME: @"keypath_get_type
+// CHECK-SAME: @"symbolic
+// CHECK-SAME: @"symbolic
 //              -- instantiable in-line, size 16
 // CHECK-SAME: <i32 0x8000_0010>,
 // -- computed, settable, nonmutating, identified by property offset, no args
