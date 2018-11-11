@@ -334,6 +334,22 @@ bool RequirementRequest::visitRequirements(
     // Resolve to a requirement.
     auto req = evaluator(RequirementRequest{owner, index, stage});
     if (req) {
+      
+      // If we're in an extension declaration and if we are adding a
+      // redundant requirement (for example, `extension Foo where Self: Foo`)
+      // then emit a diagnostic.
+      
+      // FIXME: Leads to duplicate diagnostic emissions
+      if (auto extDecl = dyn_cast<ExtensionDecl>(owner.dc->getAsDecl())) {
+        auto ownerType = extDecl->getExtendedType();
+        auto reqType = req->getSecondType();
+        
+        if (reqType->isEqual(ownerType)) {
+          auto &ctx = extDecl->getASTContext();
+          ctx.Diags.diagnose(extDecl->getLoc(), diag::extension_redundant_requirement);
+        }
+      }
+      
       // Invoke the callback. If it returns true, we're done.
       if (callback(*req, &requirements[index]))
         return true;

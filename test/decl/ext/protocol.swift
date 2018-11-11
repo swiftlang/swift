@@ -177,6 +177,18 @@ extension S1 {
 }
 
 // ----------------------------------------------------------------------------
+// Protocol extensions with redundant requirements
+// ----------------------------------------------------------------------------
+
+protocol Foo {}
+extension Foo where Self: Foo {} // expected-warning {{redundant requirement in extension}}
+
+protocol Bar {}
+protocol Baz {}
+extension Bar where Self: Baz {} // ok
+extension Bar where Self: Bar, Self: Baz {} // expected-warning {{redundant requirement in extension}}
+
+// ----------------------------------------------------------------------------
 // Protocol extensions with additional requirements
 // ----------------------------------------------------------------------------
 extension P4 where Self.AssocP4 : P1 {
