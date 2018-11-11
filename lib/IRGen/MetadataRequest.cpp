@@ -218,6 +218,50 @@ MetadataDependency MetadataDependencyCollector::finish(IRGenFunction &IGF) {
 }
 
 
+llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
+    StringRef symbolName,
+    bool shouldSetLowBit,
+    llvm::function_ref<ConstantInitFuture (ConstantInitBuilder &)> body) {
+  // Check whether we already have an entry with this name.
+  auto &entry = StringsForTypeRef[symbolName];
+  if (entry.second) {
+    return entry.second;
+  }
+
+  // Construct the initializer.
+  ConstantInitBuilder builder(*this);
+  auto finished = body(builder);
+
+  auto var = new llvm::GlobalVariable(Module, finished.getType(),
+                                      /*constant*/ true,
+                                      llvm::GlobalValue::LinkOnceODRLinkage,
+                                      nullptr,
+                                      symbolName);
+
+  ApplyIRLinkage({llvm::GlobalValue::LinkOnceODRLinkage,
+    llvm::GlobalValue::HiddenVisibility,
+    llvm::GlobalValue::DefaultStorageClass})
+  .to(var);
+  var->setAlignment(2);
+  setTrueConstGlobal(var);
+  var->setSection(getReflectionTypeRefSectionName());
+
+  finished.installInGlobal(var);
+
+  // Drill down to the i8* at the beginning of the constant.
+  auto addr = llvm::ConstantExpr::getBitCast(var, Int8PtrTy);
+
+  // If requested, set the low bit.
+  if (shouldSetLowBit) {
+    auto bitConstant = llvm::ConstantInt::get(IntPtrTy, 1);
+    addr = llvm::ConstantExpr::getGetElementPtr(nullptr, addr, bitConstant);
+  }
+
+  StringsForTypeRef[symbolName] = { var, addr };
+
+  return addr;
+}
+
 llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef str,
                                                        MangledTypeRefRole role){
   return getAddrOfStringForTypeRef(SymbolicMangling{str, {}}, role);
