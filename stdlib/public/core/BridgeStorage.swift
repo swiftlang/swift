@@ -13,7 +13,7 @@
 //  Types that are bridged to Objective-C need to manage an object
 //  that may be either some native class or the @objc Cocoa
 //  equivalent.  _BridgeStorage discriminates between these two
-//  possibilities and stores a few extra bits when the stored type is
+//  possibilities and stores a single extra bit when the stored type is
 //  native.  It is assumed that the @objc class instance may in fact
 //  be a tagged pointer, and thus no extra bits may be available.
 //
@@ -22,15 +22,12 @@ import SwiftShims
 
 @_fixed_layout
 @usableFromInline
-internal struct _BridgeStorage<
-  NativeClass: AnyObject,
-  ObjCClass: AnyObject
-> {
+internal struct _BridgeStorage<NativeClass: AnyObject> {
   @usableFromInline
   internal typealias Native = NativeClass
 
   @usableFromInline
-  internal typealias ObjC = ObjCClass
+  internal typealias ObjC = AnyObject
 
   // rawValue is passed inout to _isUnique.  Although its value
   // is unchanged, it must appear mutable to the optimizer.

@@ -116,10 +116,10 @@ var unTaggedNSString : NSString {
 }
 
 allTests.test("_BridgeStorage") {
-  typealias B = _BridgeStorage<C, NSString>
+  typealias B = _BridgeStorage<C>
 
   let oy: NSString = "oy"
-  expectTrue(B(objC: oy).objCInstance == oy)
+  expectTrue(B(objC: oy).objCInstance === oy)
 
   for flag in [false, true] {
     do {

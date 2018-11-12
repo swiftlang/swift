@@ -55,7 +55,7 @@ bb0:
   %1 = struct_element_addr %0 : $*ReversedCollection<Array<Int>>, #ReversedCollection._base
   %2 = struct_element_addr %1 : $*Array<Int>, #Array._buffer
   %3 = struct_element_addr %2 : $*_ArrayBuffer<Int>, #_ArrayBuffer._storage
-  %4 = struct_element_addr %3 : $*_BridgeStorage<__ContiguousArrayStorageBase, AnyObject>, #_BridgeStorage.rawValue
+  %4 = struct_element_addr %3 : $*_BridgeStorage<__ContiguousArrayStorageBase>, #_BridgeStorage.rawValue
   %5 = load %4 : $*Builtin.BridgeObject
   %6 = unchecked_ref_cast %5 : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
   %7 = ref_element_addr %6 : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
@@ -140,7 +140,7 @@ bb0:
   %1 = struct_element_addr %0 : $*ReversedCollection<Array<Int>>, #ReversedCollection._base
   %2 = struct_element_addr %1 : $*Array<Int>, #Array._buffer
   %3 = struct_element_addr %2 : $*_ArrayBuffer<Int>, #_ArrayBuffer._storage
-  %4 = struct_element_addr %3 : $*_BridgeStorage<__ContiguousArrayStorageBase, AnyObject>, #_BridgeStorage.rawValue
+  %4 = struct_element_addr %3 : $*_BridgeStorage<__ContiguousArrayStorageBase>, #_BridgeStorage.rawValue
   %5 = load %4 : $*Builtin.BridgeObject
   %6 = unchecked_ref_cast %5 : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
   %7 = ref_element_addr %6 : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity

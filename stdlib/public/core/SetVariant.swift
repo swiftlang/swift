@@ -31,7 +31,7 @@ extension Set {
   @_fixed_layout
   internal struct _Variant {
     @usableFromInline
-    internal var object: _BridgeStorage<_RawSetStorage, AnyObject>
+    internal var object: _BridgeStorage<_RawSetStorage>
 
     @inlinable
     @inline(__always)

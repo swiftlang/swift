@@ -20,7 +20,7 @@ import SwiftShims
 
 @usableFromInline
 internal typealias _ArrayBridgeStorage
-  = _BridgeStorage<__ContiguousArrayStorageBase, AnyObject>
+  = _BridgeStorage<__ContiguousArrayStorageBase>
 
 @usableFromInline
 @_fixed_layout

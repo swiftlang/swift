@@ -35,7 +35,7 @@ extension Dictionary {
   @_fixed_layout
   internal struct _Variant {
     @usableFromInline
-    internal var object: _BridgeStorage<_RawDictionaryStorage, AnyObject>
+    internal var object: _BridgeStorage<_RawDictionaryStorage>
 
     @inlinable
     @inline(__always)
