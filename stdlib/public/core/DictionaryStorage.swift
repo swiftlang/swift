@@ -192,7 +192,6 @@ extension _RawDictionaryStorage {
   }
 }
 
-@_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 final internal class _DictionaryStorage<Key: Hashable, Value>
   : _RawDictionaryStorage, _NSDictionaryCore {
