@@ -1,0 +1,88 @@
+// This example tests the canonicalization and lowering of a graph with SharedSESERegion.
+// RUN: %target-sil-opt -tf-lower-graph -tf-dump-intermediates -tf-dump-graph -assume-parsing-unqualified-ownership-sil %s -o /dev/null | %FileCheck %s
+import Builtin
+import Swift
+import TensorFlow
+
+sil @$funcWithSharedSESE :  $@convention(thin) (TensorHandle<Float>, TensorHandle<Float>, TensorHandle<Bool>) -> TensorHandle<Float> {
+bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $TensorHandle<Bool>):
+  %3 = graph_op "tf_tensor_to_i1"(%2 : $TensorHandle<Bool>) {__device: "ALL_DEVICES"} : $Builtin.Int1
+	cond_br %3, bb1, bb2
+
+bb1:
+  %4 = graph_op "tf_tensor_to_i1"(%2 : $TensorHandle<Bool>)  {__device: "ALL_DEVICES"} : $Builtin.Int1
+	cond_br %4, bb3, bb4
+
+bb2:
+  %5 = graph_op "tf_tensor_to_i1"(%2 : $TensorHandle<Bool>)  {__device: "ALL_DEVICES"} : $Builtin.Int1
+	cond_br %5, bb5, bb6
+
+bb3:
+  br bb8(%0 : $TensorHandle<Float>)
+
+bb4:
+  br bb7(%0: $TensorHandle<Float>)
+
+bb5:
+  br bb7(%1: $TensorHandle<Float>)
+
+bb6:
+  br bb8(%1 : $TensorHandle<Float>)
+
+bb7(%8: $TensorHandle<Float>):
+  %6 = graph_op "Add"(%0 : $TensorHandle<Float>, %8 : $TensorHandle<Float>) {__device: "ALL_DEVICES"} : $TensorHandle<Float> 
+  br bb8(%6 : $TensorHandle<Float>)
+
+bb8(%7: $TensorHandle<Float>):
+  return %7 : $TensorHandle<Float>
+}			 
+
+// CHECK-LABEL:--- XLA CFG Canonicalize: {{.*}}funcWithSharedSESE{{.*}}
+// CHECK:[sequence
+// CHECK:  {condition Header: bb0
+// CHECK:    {condition Header: bb1
+// CHECK:      block bb3
+// CHECK:      [sequence
+// CHECK:        block bb4
+// CHECK:        {shared
+// CHECK:          block bb7
+// CHECK:        }]}
+// CHECK:    {condition Header: bb2
+// CHECK:      [sequence
+// CHECK:        block bb5
+// CHECK:        {shared
+// CHECK:          block bb7
+// CHECK:        }]
+// CHECK:      block bb6}}
+// CHECK:  block bb8]
+// CHECK:--- XLA CFG Canonicalize end
+
+// Check that the shared block `bb7` consisting of "Add" is lowered twice.
+// CHECK-LABEL:--- TFPartition GraphDef Proto: {{.*}}funcWithSharedSESE{{.*}}
+// CHECK:library {
+// CHECK:  function {
+// CHECK:    signature {
+// CHECK:    node_def {
+// CHECK:      name: "op/{{.*}}"
+// CHECK:      op: "Add"
+// CHECK:      device: "/job:localhost/replica:0/task:0/device:CPU:0"
+// CHECK:      attr {
+// CHECK:        key: "T"
+// CHECK:        value {
+// CHECK:          type: DT_FLOAT
+// CHECK:        }
+// CHECK:      }
+// CHECK:    }
+// CHECK:    node_def {
+// CHECK:      name: "op/{{.*}}"
+// CHECK:      op: "Add"
+// CHECK:      device: "/job:localhost/replica:0/task:0/device:CPU:0"
+// CHECK:      attr {
+// CHECK:        key: "T"
+// CHECK:        value {
+// CHECK:          type: DT_FLOAT
+// CHECK:        }
+// CHECK:      }
+// CHECK:    }
+// CHECK:  }
+// CHECK:}
