@@ -280,3 +280,14 @@ Func _BidirectionalCollectionBox.__preprocessingPass(_:) has been removed
 Func _CollectionBox.__preprocessingPass(_:) has been removed
 Func _RandomAccessCollectionBox.__preprocessingPass(_:) has been removed
 Func _SequenceBox.__preprocessingPass(_:) has been removed
+
+Class _DictionaryStorage has removed conformance to _NSDictionaryCore
+Class _EmptyDictionarySingleton has removed conformance to _NSDictionaryCore
+Constructor Dictionary.init(_immutableCocoaDictionary:) has parameter 0 type change from _NSDictionary to AnyObject
+Constructor _CocoaDictionary.init(_:) has parameter 0 type change from _NSDictionary to AnyObject
+Func Dictionary._bridgeToObjectiveCImpl() has return type change from _NSDictionaryCore to AnyObject
+Func _NativeDictionary.bridged() has return type change from _NSDictionary to AnyObject
+Protocol _NSDictionary has been removed
+Protocol _NSDictionaryCore has been removed
+Var Dictionary._Variant.object has declared type change from _BridgeStorage<_RawDictionaryStorage, _NSDictionary> to _BridgeStorage<_RawDictionaryStorage, AnyObject>
+Var _CocoaDictionary.object has declared type change from _NSDictionary to AnyObject

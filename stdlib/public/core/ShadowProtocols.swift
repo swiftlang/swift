@@ -80,9 +80,7 @@ public protocol _NSArrayCore :
 /// Covers a set of operations everyone needs to implement in order to
 /// be a useful `NSDictionary` subclass.
 @objc
-public protocol _NSDictionaryCore :
-    _NSCopying, _NSFastEnumeration {
-
+internal protocol _NSDictionaryCore: _NSCopying, _NSFastEnumeration {
   // The following methods should be overridden when implementing an
   // NSDictionary subclass.
 
@@ -126,7 +124,7 @@ public protocol _NSDictionaryCore :
 /// forced to implement operations that `NSDictionary` already
 /// supplies.
 @unsafe_no_objc_tagged_pointer @objc
-public protocol _NSDictionary : _NSDictionaryCore {
+internal protocol _NSDictionary: _NSDictionaryCore {
   // Note! This API's type is different from what is imported by the clang
   // importer.
   override func getObjects(
@@ -191,7 +189,6 @@ public protocol _NSNumber {
 #else
 
 public protocol _NSArrayCore {}
-public protocol _NSDictionaryCore {}
 public protocol _NSSetCore {}
 
 #endif
