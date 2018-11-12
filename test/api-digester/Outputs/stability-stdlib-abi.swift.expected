@@ -305,3 +305,25 @@ Var Set._Variant.object has declared type change from _BridgeStorage<_RawSetStor
 Var _CocoaSet.object has declared type change from _NSSet to AnyObject
 
 Protocol _NSNumber has been removed
+
+Class _ContiguousArrayStorage has removed conformance to _NSArrayCore
+Class __ContiguousArrayStorageBase has removed conformance to _NSArrayCore
+Class __EmptyArrayStorage has removed conformance to _NSArrayCore
+Class __SwiftDeferredNSArray has removed conformance to _NSArrayCore
+Class __SwiftNativeNSArrayWithContiguousStorage has removed conformance to _NSArrayCore
+Constructor Array.init(_immutableCocoaArray:) has parameter 0 type change from _NSArrayCore to AnyObject
+Constructor _ArrayBuffer.init(nsArray:) has parameter 0 type change from _NSArrayCore to AnyObject
+Constructor _ArrayBuffer.init(storage:) has parameter 0 type change from _BridgeStorage<__ContiguousArrayStorageBase, _NSArrayCore> to _BridgeStorage<__ContiguousArrayStorageBase, AnyObject>
+Constructor _CocoaArrayWrapper.init(_:) has parameter 0 type change from _NSArrayCore to AnyObject
+Func _ArrayBuffer._asCocoaArray() has return type change from _NSArrayCore to AnyObject
+Func _CocoaArrayWrapper.contiguousStorage(_:) has been removed
+Func _ContiguousArrayBuffer._asCocoaArray() has return type change from _NSArrayCore to AnyObject
+Func _bridgeCocoaArray(_:) has parameter 0 type change from _NSArrayCore to AnyObject
+Protocol _NSArrayCore has been removed
+Struct _CocoaArrayWrapper has type witness type for BidirectionalCollection.SubSequence changing from Slice<_CocoaArrayWrapper> to _SliceBuffer<AnyObject>
+Struct _CocoaArrayWrapper has type witness type for Collection.SubSequence changing from Slice<_CocoaArrayWrapper> to _SliceBuffer<AnyObject>
+Struct _CocoaArrayWrapper has type witness type for RandomAccessCollection.SubSequence changing from Slice<_CocoaArrayWrapper> to _SliceBuffer<AnyObject>
+Struct _CocoaArrayWrapper has type witness type for Sequence.SubSequence changing from Slice<_CocoaArrayWrapper> to _SliceBuffer<AnyObject>
+Var _ArrayBuffer._nonNative has declared type change from _NSArrayCore to _CocoaArrayWrapper
+Var _ArrayBuffer._storage has declared type change from _BridgeStorage<__ContiguousArrayStorageBase, _NSArrayCore> to _BridgeStorage<__ContiguousArrayStorageBase, AnyObject>
+Var _CocoaArrayWrapper.buffer has declared type change from _NSArrayCore to AnyObject

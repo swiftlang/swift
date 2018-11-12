@@ -58,8 +58,7 @@ public protocol _NSCopying : _ShadowProtocol {
 /// Covers a set of operations everyone needs to implement in order to
 /// be a useful `NSArray` subclass.
 @unsafe_no_objc_tagged_pointer @objc
-public protocol _NSArrayCore :
-    _NSCopying, _NSFastEnumeration {
+internal protocol _NSArrayCore: _NSCopying, _NSFastEnumeration {
 
   @objc(objectAtIndex:)
   func objectAt(_ index: Int) -> AnyObject
@@ -184,9 +183,5 @@ internal protocol _NSNumber {
   var longLongValue: Int64 { get }
   var objCType: UnsafePointer<Int8> { get }
 }
-
-#else
-
-public protocol _NSArrayCore {}
 
 #endif
