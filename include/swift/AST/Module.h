@@ -990,7 +990,18 @@ public:
 
   void addImports(ArrayRef<ImportedModuleDesc> IM);
 
-  bool hasTestableOrPrivateImport(AccessLevel accessLevel, const ValueDecl *ofDecl) const;
+  enum ImportQueryKind {
+    /// Return the resuls for testable or private imports.
+    TestableAndPrivate,
+    /// Return the results only for testable imports.
+    TestableOnly,
+    /// Return the results only for private imports.
+    PrivateOnly
+  };
+
+  bool
+  hasTestableOrPrivateImport(AccessLevel accessLevel, const ValueDecl *ofDecl,
+                             ImportQueryKind kind = TestableAndPrivate) const;
 
   void clearLookupCache();
 
