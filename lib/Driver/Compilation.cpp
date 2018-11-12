@@ -686,8 +686,18 @@ namespace driver {
       if (Comp.getShowIncrementalBuildDecisions() || Comp.getStatsReporter())
         IncrementalTracer = &ActualIncrementalTracer;
     }
-
     
+    /// Schedule and run initial, additional, and batch jobs.
+    template <typename DependencyGraphT>
+    void runJobs(DependencyGraphT &DepGraph) {
+      scheduleInitialJobs(DepGraph);
+      scheduleAdditionalJobs(DepGraph);
+      formBatchJobsAndAddPendingJobsToTaskQueue();
+      runTaskQueueToCompletion();
+      checkUnfinishedJobs(DepGraph);
+    }
+
+  private:
     /// Schedule all jobs we can from the initial list provided by Compilation.
     template<typename DependencyGraphT>
     void scheduleInitialJobs(DependencyGraphT &DepGraph) {
@@ -1139,7 +1149,7 @@ namespace driver {
         }
       }
     }
-
+  public:
     void populateInputInfoMap(InputInfoMap &inputs) const {
       for (auto &entry : UnfinishedCommands) {
         for (auto *action : entry.first->getSource().getInputs()) {
@@ -1351,21 +1361,10 @@ int Compilation::performJobsImpl(bool &abnormalExit,
                                  std::unique_ptr<TaskQueue> &&TQ) {
   PerformJobsState State(*this, std::move(TQ));
 
-  if (getEnableExperimentalDependencies()) {
-    auto &ExpDepGraph = State.ExpDepGraph.getValue();
-    State.scheduleInitialJobs(ExpDepGraph);
-    State.scheduleAdditionalJobs(ExpDepGraph);
-    State.formBatchJobsAndAddPendingJobsToTaskQueue();
-    State.runTaskQueueToCompletion();
-    State.checkUnfinishedJobs(ExpDepGraph);
-  }
-  else {
-    State.scheduleInitialJobs(State.StandardDepGraph);
-    State.scheduleAdditionalJobs(State.StandardDepGraph);
-    State.formBatchJobsAndAddPendingJobsToTaskQueue();
-    State.runTaskQueueToCompletion();
-    State.checkUnfinishedJobs(State.StandardDepGraph);
-  }
+  if (getEnableExperimentalDependencies())
+    State.runJobs(State.ExpDepGraph.getValue());
+  else
+    State.runJobs(State.StandardDepGraph);
 
   if (!CompilationRecordPath.empty()) {
     InputInfoMap InputInfo;
