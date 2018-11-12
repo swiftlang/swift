@@ -1250,32 +1250,37 @@ do {
 
   % for Traversal in 'Forward', 'Bidirectional':
   %   TraversalCollection = collectionForTraversal(Traversal)
-    tests.test("FlattenCollection/${Traversal}/\(data)") {
-      let base = Minimal${TraversalCollection}(
-        elements: data.map { Minimal${TraversalCollection}(elements: $0) })
 
-      let flattened = base.joined()
-      check${Traversal}Collection(expected, flattened, resiliencyChecks: .none)
+    // re-enable commented out test case below as well when this is fixed 
+    // (find FIXME: rdar45956357)
+    if #available(macOS 10.14, iOS 12.0, watchOS 5.0, tvOS 12.0, *) {
+      tests.test("FlattenCollection/${Traversal}/\(data)") {
+        let base = Minimal${TraversalCollection}(
+          elements: data.map { Minimal${TraversalCollection}(elements: $0) })
 
-      // Checking that flatten doesn't introduce laziness
-      var calls = 0
-      _ = flattened.map { _ in calls += 1 }
-      expectLE(
-        expected.count, calls,
-        "unexpected laziness in \(type(of: flattened))")
-    }
+        let flattened = base.joined()
+        check${Traversal}Collection(expected, flattened, resiliencyChecks: .none)
 
-    tests.test("FlattenCollection/${Traversal}/Lazy\(data)") {
-      // Checking that flatten doesn't remove laziness
-      let base = Minimal${TraversalCollection}(
-        elements: data.map { Minimal${TraversalCollection}(elements: $0) }
-      ).lazy.map { $0 }
+        // Checking that flatten doesn't introduce laziness
+        var calls = 0
+        _ = flattened.map { _ in calls += 1 }
+        expectLE(
+          expected.count, calls,
+          "unexpected laziness in \(type(of: flattened))")
+      }
 
-      let flattened = base.joined()
+      tests.test("FlattenCollection/${Traversal}/Lazy\(data)") {
+        // Checking that flatten doesn't remove laziness
+        let base = Minimal${TraversalCollection}(
+          elements: data.map { Minimal${TraversalCollection}(elements: $0) }
+        ).lazy.map { $0 }
 
-      var calls = 0
-      _ = flattened.map { _ in calls += 1 }
-      expectEqual(0, calls, "unexpected eagerness in \(type(of: flattened))")
+        let flattened = base.joined()
+
+        var calls = 0
+        _ = flattened.map { _ in calls += 1 }
+        expectEqual(0, calls, "unexpected eagerness in \(type(of: flattened))")
+      }
     }
   % end
   }
@@ -1288,19 +1293,40 @@ struct TryFlattenIndex<C: Collection> where C.Element: Collection {
 
 //===--- LazyPrefixWhile --------------------------------------------------===//
 
-let prefixDropWhileTests: [(data: [Int], value: Int, pivot: Int)] = [
-  ([],                       0,     0),
-  ([0],                      0,     0),
-  ([0],                     99,     1),
-  ([0, 10],                  0,     0),
-  ([0, 10],                 10,     1),
-  ([0, 10],                 99,     2),
-  ([0, 10, 20, 30, 40],      0,     0),
-  ([0, 10, 20, 30, 40],     10,     1),
-  ([0, 10, 20, 30, 40],     20,     2),
-  ([0, 10, 20, 30, 40],     30,     3),
-  ([0, 10, 20, 30, 40],     40,     4),
-  ([0, 10, 20, 30, 40],     99,     5) ]
+let prefixDropWhileTests: [(data: [Int], value: Int, pivot: Int)]
+
+// FIXME: rdar45956357
+if #available(macOS 10.14, iOS 12.0, watchOS 5.0, tvOS 12.0, *) {
+  prefixDropWhileTests = [
+    ([],                       0,     0),
+    ([0],                      0,     0),
+    ([0],                     99,     1),
+    ([0, 10],                  0,     0),
+    ([0, 10],                 10,     1),
+    ([0, 10],                 99,     2),
+    ([0, 10, 20, 30, 40],      0,     0),
+    ([0, 10, 20, 30, 40],     10,     1),
+    ([0, 10, 20, 30, 40],     20,     2),
+    ([0, 10, 20, 30, 40],     30,     3),
+    ([0, 10, 20, 30, 40],     40,     4),
+    ([0, 10, 20, 30, 40],     99,     5) 
+  ]
+} else {
+  prefixDropWhileTests = [
+    ([],                       0,     0),
+    ([0],                      0,     0),
+    // ([0],                     99,     1),
+    ([0, 10],                  0,     0),
+    // ([0, 10],                 10,     1),
+    // ([0, 10],                 99,     2),
+    // ([0, 10, 20, 30, 40],      0,     0),
+    // ([0, 10, 20, 30, 40],     10,     1),
+    // ([0, 10, 20, 30, 40],     20,     2),
+    // ([0, 10, 20, 30, 40],     30,     3),
+    // ([0, 10, 20, 30, 40],     40,     4),
+    // ([0, 10, 20, 30, 40],     99,     5)
+  ]
+}
 
 % for Kind in 'Sequence', 'Forward', 'Bidirectional':
 %   Self = 'Sequence' if Kind == 'Sequence' else collectionForTraversal(Kind)
