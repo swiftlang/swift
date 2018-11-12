@@ -518,9 +518,6 @@ def create_argument_parser():
     option(['--swiftsyntax'], store_true('build_swiftsyntax'),
            help='build swiftSyntax')
 
-    option(['--skstresstester'], store_true('build_skstresstester'),
-           help='build the SourceKit stress tester')
-
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
 
@@ -988,8 +985,6 @@ SWIFT_SOURCE_ROOT: a directory containing the source for LLVM, Clang, Swift.
                      /llbuild                    (optional)
                      /swiftpm                    (optional, requires llbuild)
                      /swift-syntax               (optional, requires swiftpm)
-                     /swift-stress-tester        (optional,
-                                                   requires swift-syntax)
                      /compiler-rt                (optional)
                      /swift-corelibs-xctest      (optional)
                      /swift-corelibs-foundation  (optional)
