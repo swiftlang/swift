@@ -18,10 +18,14 @@ sil @make_diff_func : $@convention(thin) () -> @autodiff @convention(thin) (Floa
 bb0:
   %0 = function_ref @foo : $@convention(thin) (Float) -> Float
   %1 = autodiff_function [legacy_reverse] [wrt 0 1] [order 1] %0 : $@convention(thin) (Float) -> Float
+  %2 = function_ref @foo_adj : $@convention(thin) (Float, Float, Float) -> Float
+  %3 = autodiff_function [legacy_reverse] [wrt 0 1] [order 1] %0 : $@convention(thin) (Float) -> Float with {%0 : $@convention(thin) (Float) -> Float, %2 : $@convention(thin) (Float, Float, Float) -> Float}
   return %1 : $@autodiff @convention(thin) (Float) -> Float
 }
 
 // CHECK-LABEL: @make_diff_func
 // CHECK: %0 = function_ref @foo : $@convention(thin) (Float) -> Float
 // CHECK: %1 = autodiff_function [legacy_reverse] [wrt 0 1] [order 1] %0 : $@convention(thin) (Float) -> Float
+// CHECK: %2 = function_ref @foo_adj : $@convention(thin) (Float, Float, Float) -> Float
+// CHECK: %3 = autodiff_function [legacy_reverse] [wrt 0 1] [order 1] %0 : $@convention(thin) (Float) -> Float with {%0 : $@convention(thin) (Float) -> Float, %2 : $@convention(thin) (Float, Float, Float) -> Float}
 // CHECK: return %1 : $@autodiff @convention(thin) (Float) -> Float

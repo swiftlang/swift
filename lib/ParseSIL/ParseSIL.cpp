@@ -2940,7 +2940,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     //      { %1 : $T,    %2 : $T }
     // //      ^ primal    ^ adjoint
     SourceLoc lastLoc;
-    bool isLegacyReverseMode;
+    bool isLegacyReverseMode = false;
     SmallBitVector parameterIndices(32);
     unsigned order = 1;
     // Parse optional `[legacy_reverse]`
@@ -3014,10 +3014,15 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
                   diag::sil_inst_autodiff_operand_list_expected_comma))
               return true;
           SILValue newAssocFn;
+          // FIXME(rxwei): Change this to *not* require a type signature once
+          // we can infer AD associated function types.
           if (parseTypedValueRef(newAssocFn, B))
             return true;
           associatedFunctions.push_back(newAssocFn);
         }
+        if (P.parseToken(tok::r_brace,
+                         diag::sil_inst_autodiff_operand_list_expected_rbrace))
+          return true;
       }
       if (P.Tok.is(tok::l_brace)) {
         P.diagnose(P.Tok,

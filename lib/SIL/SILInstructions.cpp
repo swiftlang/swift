@@ -647,6 +647,27 @@ AutoDiffFunctionInst *AutoDiffFunctionInst::create(
                                              associatedFunctions);
 }
 
+
+ArrayRef<Operand> AutoDiffFunctionInst::
+getAssociatedFunctionList(unsigned differentiationOrder) const {
+  assert(differentiationOrder > 0 &&
+         differentiationOrder <= this->differentiationOrder);
+  auto numAssocFns = autodiff::
+      getNumAutoDiffAssociatedFunctionsPerOrder(isLegacyReverseMode());
+  auto offset = (differentiationOrder - 1) * numAssocFns;
+  return getAssociatedFunctions().slice(offset, numAssocFns);
+}
+
+SILValue AutoDiffFunctionInst::
+getAssociatedFunction(unsigned differentiationOrder,
+                      SILAutoDiffAssociatedFunctionKind kind) const {
+  assert(differentiationOrder > 0 &&
+         differentiationOrder <= this->differentiationOrder);
+  auto offset = autodiff::getOffsetForAutoDiffAssociatedFunction(
+      differentiationOrder, kind);
+  return getAssociatedFunctions()[offset].get();
+}
+
 FunctionRefInst::FunctionRefInst(SILDebugLocation Loc, SILFunction *F)
     : InstructionBase(Loc, F->getLoweredType()),
       Function(F) {

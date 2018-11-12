@@ -7639,23 +7639,10 @@ public:
   }
 
   ArrayRef<Operand>
-  getAssociatedFunctionList(unsigned differentiationOrder) const {
-    assert(differentiationOrder > 0 &&
-           differentiationOrder <= this->differentiationOrder);
-    auto numAssocFns = autodiff::
-        getNumAutoDiffAssociatedFunctionsPerOrder(isLegacyReverseMode());
-    auto offset = (differentiationOrder - 1) * numAssocFns;
-    return getAssociatedFunctions().slice(offset + 1, numAssocFns);
-  }
+  getAssociatedFunctionList(unsigned differentiationOrder) const;
 
   SILValue getAssociatedFunction(unsigned differentiationOrder,
-                                 SILAutoDiffAssociatedFunctionKind kind) const {
-    assert(differentiationOrder > 0 &&
-           differentiationOrder <= this->differentiationOrder);
-    auto offset = autodiff::getOffsetForAutoDiffAssociatedFunction(
-        differentiationOrder, kind);
-    return getAssociatedFunctions()[offset].get();
-  }
+                                 SILAutoDiffAssociatedFunctionKind kind) const;
 
   static bool classof(const SILNode *N) {
     return N->getKind() == SILNodeKind::AutoDiffFunctionInst;
