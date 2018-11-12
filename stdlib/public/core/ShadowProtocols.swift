@@ -184,4 +184,9 @@ internal protocol _NSNumber {
   var objCType: UnsafePointer<Int8> { get }
 }
 
+#else
+
+internal protocol _NSSetCore {}
+internal protocol _NSDictionaryCore {}
+
 #endif
