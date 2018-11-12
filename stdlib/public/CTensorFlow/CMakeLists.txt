@@ -90,7 +90,7 @@ foreach(sdk ${TARGET_SDKS})
 endforeach()
 add_custom_target(ctensorflow_modulemap DEPENDS ${ctensorflow_modulemap_target_list})
 
-add_swift_library(swiftCTensorFlow OBJECT_LIBRARY TARGET_LIBRARY
+add_swift_target_library(swiftCTensorFlow OBJECT_LIBRARY TARGET_LIBRARY
   ctensorflow_init.cpp
   DEPENDS ctensorflow_modulemap
   TARGET_SDKS OSX LINUX

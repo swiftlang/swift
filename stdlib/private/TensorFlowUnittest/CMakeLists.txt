@@ -1,6 +1,6 @@
 find_package(TensorFlow REQUIRED)
 
-add_swift_library(swiftTensorFlowUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+add_swift_target_library(swiftTensorFlowUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   TensorFlowUnittest.swift
 
   SWIFT_MODULE_DEPENDS Python StdlibUnittest TensorFlow
