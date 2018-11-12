@@ -54,3 +54,31 @@ void ExpDependencyGraph::addNode(Node* n) {
 //void ExpDependencyGraph::addArc(Arc* a) {
 //  Graph::addArc(a);
 //}
+
+driver::experimental_dependencies::DependencyGraphImpl::LoadResult ExpDependencyGraph::loadFromPath(const Job* Cmd, StringRef filename) {
+  abort();
+}
+bool ExpDependencyGraph::isMarked(const Job* Cmd) const {
+  abort();
+}
+template <unsigned N>
+void ExpDependencyGraph::markTransitive(SmallVector<const Job*, N> &visited, const Job* node,
+                                        DependencyGraph<const Job*>::MarkTracer *tracer) {
+  abort();
+}
+template void ExpDependencyGraph::markTransitive<16u>(SmallVector<const Job*, 16> &visited, const Job* node,
+                                                      DependencyGraph<const Job*>::MarkTracer *tracer);
+
+bool ExpDependencyGraph::markIntransitive(const Job* node) {
+  abort();
+}
+void ExpDependencyGraph::addIndependentNode(const Job* node) {
+  abort();
+}
+std::vector<std::string> ExpDependencyGraph::getExternalDependencies() const {
+  abort();
+}
+void ExpDependencyGraph::markExternal(SmallVectorImpl<const Job *> &visited,
+                                      StringRef externalDependency) {
+  abort();
+}
