@@ -5431,8 +5431,8 @@ gradient
 ::
 
   sil-instruction ::= 'gradient' sil-autodiff-param-indices?
-                       sil-autodiff-seedable? sil-autodiff-preserving-result?
-                       sil-value ':' sil-type
+                      sil-autodiff-seedable? sil-autodiff-preserving-result?
+                      sil-value ':' sil-type
   sil-autodiff-param-indices ::= '[' 'wrt' [0-9]+ (',' [0-9]+)* ']'
   sil-autodiff-seedable ::= '[' 'seedable' ']'
   sil-autodiff-preserving-result ::= '[' 'preserving_result' ']'
