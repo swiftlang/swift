@@ -643,7 +643,10 @@ public:
   DominanceInfo &DI;
   BlocksReachingTensorCode tensorCodeBlocks;
 
-  /// These are all the tensor ops found in the initial scan over the function.
+  /// These are the tensor ops to be executed in the extracted graph function.
+  // They are found in the initial scan over the function.
+  // Note when a graphOp inst is marked to run out-of-graph
+  // (graphOp->getRunOutOfGraph() is true), it will not be included here.
   SmallPtrSet<SILInstruction *, 8> tensorOpsSet;
 
   /// This keeps track of the set of blocks that are marked as needing to be
@@ -2029,6 +2032,10 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
       if (!graphOp)
         continue;
       logInput();
+
+      if (graphOp->getRunOutOfGraph())
+        continue;
+
       tensorOps.push_back(inst);
       tensorOpsSet.insert(inst);
 

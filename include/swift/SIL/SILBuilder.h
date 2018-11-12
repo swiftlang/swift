@@ -1378,12 +1378,14 @@ public:
       SILLocation Loc, SILValue Operand,
       llvm::SmallVectorImpl<SILValue> &Result);
 
-  GraphOperationInst *createGraphOperation(
-      SILLocation loc, Identifier name, ArrayRef<SILValue> operands,
-      ArrayRef<GraphOperationAttribute> attrs, ArrayRef<SILType> resultTypes) {
+  GraphOperationInst *
+  createGraphOperation(SILLocation loc, Identifier name,
+                       ArrayRef<SILValue> operands,
+                       ArrayRef<GraphOperationAttribute> attrs,
+                       bool runOutOfGraph, ArrayRef<SILType> resultTypes) {
     return insert(GraphOperationInst::create(
         getModule(), getSILDebugLocation(loc), name, operands, attrs,
-        resultTypes));
+        runOutOfGraph, resultTypes));
   }
 
   ClassMethodInst *createClassMethod(SILLocation Loc, SILValue Operand,

@@ -2279,6 +2279,7 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
   };
 
   GraphOperationBuilder opBuilder(opInfo.getOperationName());
+  bool runOutOfGraph = false;
 
   // Find the device attribute specified for the instruction if present.
   StringRef opDevice;
@@ -2400,21 +2401,21 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
                       "' " + message.str());
     };
 
-    // Ok, we have an attribute argument, we should have been able to fold it
-    // through our constexpr evaluation logic.
+    // Ok, we have an attribute argument, try const-folding it through our
+    // constexpr evaluation logic, so that we can run it in the graph. If this
+    // fails, we will run it out-of-graph (via eager op dispatch).
+    auto attrIdentifier =
+        context.getIdentifier(argument.getArgumentNameWithSuffix());
     auto it = constants.find(argumentValue);
     if (it == constants.end() || !it->second.isConstant()) {
-      // TODO: improve the diagnostic to talk about the parameter label in
-      // the user code, not the internal op attribute.  The bookkeeping for
-      // this isn't obvious though.
-      diagnoseInvalidAttr("requires a constant argument");
-
-      // If we have more specific information about what went wrong, emit
-      // notes.
-      if (it != constants.end() &&
-          it->second.getKind() == SymbolicValue::Unknown)
-        it->second.emitUnknownDiagnosticNotes(origInstLoc);
-      return;
+      LLVM_DEBUG(llvm::dbgs() << "  graph_op " << *origInst
+                              << " has a dynamic attr: " << argumentValue
+                              << " and will be evaluated out-of-graph.\n");
+      runOutOfGraph = true;
+      opBuilder.addArgument(
+          argumentValue,
+          attrIdentifier.str() /*std::get<0>(argumentNameAndLowering)*/);
+      continue;
     }
 
     // Get the constant, ignoring struct wrappers.
@@ -2423,7 +2424,6 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
     // Clone it out of the ConstExpr pool into the global SILModule pool.
     constValue = constValue.cloneInto(allocator);
 
-    auto attrIdentifier = context.getIdentifier(argument.getArgumentNameWithSuffix());
     opBuilder.addAttribute({ attrIdentifier, constValue });
 
     // FIXME: Do we detect and reject duplicate attribute names already?
@@ -2661,6 +2661,7 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
         return SILType::getPrimitiveObjectType(ty->getCanonicalType()); });
 
     auto op = opBuilder.build(B, context, loc, resultSILTypes);
+    op->setRunOutOfGraph(runOutOfGraph);
 
     // Recursively pack results to a value with the user-specified aggregate type.
     auto resultIt = op->getResults().begin();
@@ -2698,6 +2699,7 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
       assert(isTensorFlowValue(resultType) &&
              "when there are multiple results, they should be tf types");
     auto op = opBuilder.build(B, context, loc, origResultTypes);
+    op->setRunOutOfGraph(runOutOfGraph);
     origInst->replaceAllUsesPairwiseWith(op);
   }
 

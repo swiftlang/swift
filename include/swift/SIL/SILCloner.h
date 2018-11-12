@@ -1776,10 +1776,10 @@ void SILCloner<ImplClass>::visitGraphOperationInst(GraphOperationInst *Inst) {
   SmallVector<SILType, 4> resultTypes;
   for (auto result : Inst->getResults())
     resultTypes.push_back(getOpType(result->getType()));
-  recordClonedInstruction(Inst,
-      getBuilder().createGraphOperation(getOpLocation(Inst->getLoc()),
-                                        Inst->getName(), arguments,
-                                        Inst->getAttributes(), resultTypes));
+  recordClonedInstruction(
+      Inst, getBuilder().createGraphOperation(
+                getOpLocation(Inst->getLoc()), Inst->getName(), arguments,
+                Inst->getAttributes(), Inst->getRunOutOfGraph(), resultTypes));
 }
 
 template <typename ImplClass>

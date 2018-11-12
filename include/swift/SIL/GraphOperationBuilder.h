@@ -55,9 +55,8 @@ public:
   ArrayRef<GraphOperationAttribute> getAttributes() const { return Attributes; }
 
   /// Build the GraphOperationInst.
-  GraphOperationInst* build(
-      SILBuilder &B, ASTContext &C, SILLocation loc,
-      llvm::ArrayRef<SILType> resultSILTypes) const;
+  GraphOperationInst *build(SILBuilder &B, ASTContext &C, SILLocation loc,
+                            llvm::ArrayRef<SILType> resultSILTypes) const;
 };
 
 } // end namespace tf

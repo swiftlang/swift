@@ -7771,11 +7771,14 @@ class GraphOperationInst final
   unsigned NumOperands;
   /// The attributes of the graph operation.
   MutableArrayRef<GraphOperationAttribute> Attributes;
+  /// Whether this instruction is to be executed out of graph (via eager op
+  /// dispatch). For an op with dynamic attribute(s), it must run out of graph.
+  bool RunOutOfGraph;
 
   GraphOperationInst(SILModule &M, SILDebugLocation loc, Identifier name,
                      ArrayRef<SILValue> arguments,
                      ArrayRef<GraphOperationAttribute> attrs,
-                     ArrayRef<SILType> resultTypes,
+                     bool runOutOfGraph, ArrayRef<SILType> resultTypes,
                      ArrayRef<ValueOwnershipKind> resultOwnerships);
 
 public:
@@ -7783,11 +7786,10 @@ public:
   using MultipleValueInstructionTrailingObjects::totalSizeToAlloc;
 
   ~GraphOperationInst();
-  static GraphOperationInst *create(SILModule &M, SILDebugLocation loc,
-                                    Identifier name,
-                                    ArrayRef<SILValue> arguments,
-                                    ArrayRef<GraphOperationAttribute> attrs,
-                                    ArrayRef<SILType> resultTypes);
+  static GraphOperationInst *
+  create(SILModule &M, SILDebugLocation loc, Identifier name,
+         ArrayRef<SILValue> arguments, ArrayRef<GraphOperationAttribute> attrs,
+         bool runOutOfGraph, ArrayRef<SILType> resultTypes);
 
   Identifier getName() const { return Name; }
   unsigned getNumOperands() const { return NumOperands; }
@@ -7819,6 +7821,11 @@ public:
   }
 
   Optional<SymbolicValue> getAttributeNamed(StringRef name);
+
+  void setRunOutOfGraph(bool RunOutOfGraph) {
+    this->RunOutOfGraph = RunOutOfGraph;
+  }
+  bool getRunOutOfGraph() const { return RunOutOfGraph; }
 
   static bool classof(const SILNode *N) {
     return N->getKind() == SILNodeKind::GraphOperationInst;

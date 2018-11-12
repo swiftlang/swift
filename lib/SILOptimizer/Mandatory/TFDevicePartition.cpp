@@ -227,8 +227,9 @@ void DevicePartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
   for (auto r : inst->getResults())
     resultTypes.push_back(r->getType());
 
-  auto newOp = B.createGraphOperation(loc, inst->getName(), args,
-                                      inst->getAttributes(), resultTypes);
+  auto newOp =
+      B.createGraphOperation(loc, inst->getName(), args, inst->getAttributes(),
+                             /*runOutOfGraph*/ false, resultTypes);
 
   for (unsigned i = 0, e = inst->getNumResults(); i != e; ++i)
     ValueMap[inst->getResult(i)] = newOp->getResult(i);
