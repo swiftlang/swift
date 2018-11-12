@@ -431,12 +431,9 @@ protected:
     SelfAccess : 2
   );
 
-  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4+3,
+  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4,
     /// The kind of accessor this is.
-    AccessorKind : 4,
-
-    /// The kind of addressor this is.
-    AddressorKind : 3
+    AccessorKind : 4
   );
 
   SWIFT_INLINE_BITFIELD(ConstructorDecl, AbstractFunctionDecl, 3+2+2+1,
@@ -4852,7 +4849,10 @@ class ParamDecl : public VarDecl {
 
   /// The default value, if any, along with whether this is varargs.
   llvm::PointerIntPair<StoredDefaultArgument *, 1> DefaultValueAndIsVariadic;
-  
+
+  /// `@autoclosure` flag associated with this parameter.
+  bool IsAutoClosure = false;
+
 public:
   ParamDecl(VarDecl::Specifier specifier,
             SourceLoc specifierLoc, SourceLoc argumentNameLoc,
@@ -4936,7 +4936,11 @@ public:
   /// Whether or not this parameter is varargs.
   bool isVariadic() const { return DefaultValueAndIsVariadic.getInt(); }
   void setVariadic(bool value = true) {DefaultValueAndIsVariadic.setInt(value);}
-  
+
+  /// Whether or not this parameter is marked with `@autoclosure`.
+  bool isAutoClosure() const { return IsAutoClosure; }
+  void setAutoClosure(bool value = true) { IsAutoClosure = value; }
+
   /// Remove the type of this varargs element designator, without the array
   /// type wrapping it.  A parameter like "Int..." will have formal parameter
   /// type of "[Int]" and this returns "Int".
@@ -5694,8 +5698,7 @@ class AccessorDecl final : public FuncDecl {
   AbstractStorageDecl *Storage;
 
   AccessorDecl(SourceLoc declLoc, SourceLoc accessorKeywordLoc,
-               AccessorKind accessorKind, AddressorKind addressorKind,
-               AbstractStorageDecl *storage,
+               AccessorKind accessorKind, AbstractStorageDecl *storage,
                SourceLoc staticLoc, StaticSpellingKind staticSpelling,
                bool throws, SourceLoc throwsLoc,
                unsigned numParameterLists, GenericParamList *genericParams,
@@ -5707,14 +5710,12 @@ class AccessorDecl final : public FuncDecl {
       AccessorKeywordLoc(accessorKeywordLoc),
       Storage(storage) {
     Bits.AccessorDecl.AccessorKind = unsigned(accessorKind);
-    Bits.AccessorDecl.AddressorKind = unsigned(addressorKind);
   }
 
   static AccessorDecl *createImpl(ASTContext &ctx,
                                   SourceLoc declLoc,
                                   SourceLoc accessorKeywordLoc,
                                   AccessorKind accessorKind,
-                                  AddressorKind addressorKind,
                                   AbstractStorageDecl *storage,
                                   SourceLoc staticLoc,
                                   StaticSpellingKind staticSpelling,
@@ -5728,7 +5729,6 @@ public:
                               SourceLoc declLoc,
                               SourceLoc accessorKeywordLoc,
                               AccessorKind accessorKind,
-                              AddressorKind addressorKind,
                               AbstractStorageDecl *storage,
                               SourceLoc staticLoc,
                               StaticSpellingKind staticSpelling,
@@ -5739,7 +5739,6 @@ public:
   static AccessorDecl *create(ASTContext &ctx, SourceLoc declLoc,
                               SourceLoc accessorKeywordLoc,
                               AccessorKind accessorKind,
-                              AddressorKind addressorKind,
                               AbstractStorageDecl *storage,
                               SourceLoc staticLoc,
                               StaticSpellingKind staticSpelling,
@@ -5757,10 +5756,6 @@ public:
 
   AccessorKind getAccessorKind() const {
     return AccessorKind(Bits.AccessorDecl.AccessorKind);
-  }
-
-  AddressorKind getAddressorKind() const {
-    return AddressorKind(Bits.AccessorDecl.AddressorKind);
   }
 
   bool isGetter() const { return getAccessorKind() == AccessorKind::Get; }
@@ -6847,16 +6842,8 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
   return result;
 }
 
-/// Determine the default argument kind and type for the given argument index
-/// in this declaration, which must be a function or constructor.
-///
-/// \param Index The index of the argument for which we are querying the
-/// default argument.
-///
-/// \returns the default argument kind and, if there is a default argument,
-/// the type of the corresponding parameter.
-std::pair<DefaultArgumentKind, Type>
-getDefaultArgumentInfo(ValueDecl *source, unsigned Index);
+/// Retrieve parameter declaration from the given source at given index.
+const ParamDecl *getParameterAt(ValueDecl *source, unsigned index);
 
 /// Display Decl subclasses.
 void simple_display(llvm::raw_ostream &out, const Decl *decl);

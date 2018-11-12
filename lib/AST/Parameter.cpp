@@ -106,7 +106,9 @@ void ParameterList::getParams(
       type = ParamDecl::getVarargBaseTy(type);
 
     auto label = P->getArgumentName();
-    auto flags = ParameterTypeFlags::fromParameterType(type, P->isVariadic(),
+    auto flags = ParameterTypeFlags::fromParameterType(type,
+                                                       P->isVariadic(),
+                                                       P->isAutoClosure(),
                                                        P->getValueOwnership());
     params.emplace_back(type, label, flags);
   }

@@ -1211,9 +1211,7 @@ protocol NonmutatingProtocol {
 }
 
 // sil hidden @$s10properties19overlappingLoadExpr1cyAA13ReferenceTypeCz_tF : $@convention(thin) (@inout ReferenceType) -> () {
-// CHECK:        [[RESULT:%.*]] = alloc_stack $Int
-// CHECK-NEXT:   [[UNINIT:%.*]] = mark_uninitialized [var] [[RESULT]] : $*Int
-// CHECK-NEXT:   [[C_INOUT:%.*]] = begin_access [read] [unknown] %0 : $*ReferenceType
+// CHECK:        [[C_INOUT:%.*]] = begin_access [read] [unknown] %0 : $*ReferenceType
 // CHECK-NEXT:   [[C:%.*]] = load [copy] [[C_INOUT:%.*]] : $*ReferenceType
 // CHECK-NEXT:   end_access [[C_INOUT]] : $*ReferenceType
 // CHECK-NEXT:   [[C_BORROW:%.*]] = begin_borrow [[C]]
@@ -1231,13 +1229,11 @@ protocol NonmutatingProtocol {
 // CHECK-NEXT:   [[GETTER:%.*]] = witness_method $@opened("{{.*}}") NonmutatingProtocol, #NonmutatingProtocol.x!getter.1 : <Self where Self : NonmutatingProtocol> (Self) -> () -> Int, [[C_FIELD_PAYLOAD]] : $*@opened("{{.*}}") NonmutatingProtocol : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK-NEXT:   [[RESULT_VALUE:%.*]] = apply [[GETTER]]<@opened("{{.*}}") NonmutatingProtocol>([[C_FIELD_BORROW]]) : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK-NEXT:   destroy_addr [[C_FIELD_BORROW]]
-// CHECK-NEXT:   assign [[RESULT_VALUE]] to [[UNINIT]] : $*Int
 // CHECK-NEXT:   destroy_addr [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   dealloc_stack [[C_FIELD_BORROW]]
 // CHECK-NEXT:   dealloc_stack [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   destroy_addr [[C_FIELD_BOX]] : $*NonmutatingProtocol
 // CHECK-NEXT:   dealloc_stack [[C_FIELD_BOX]] : $*NonmutatingProtocol
-// CHECK-NEXT:   dealloc_stack [[RESULT]] : $*Int
 // CHECK-NEXT:   tuple ()
 // CHECK-NEXT:   return
 

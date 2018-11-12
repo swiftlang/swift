@@ -1156,20 +1156,6 @@ static uint8_t getRawStableMetatypeRepresentation(AnyMetatypeType *metatype) {
   llvm_unreachable("bad representation");
 }
 
-static uint8_t getRawStableAddressorKind(swift::AddressorKind kind) {
-  switch (kind) {
-  case swift::AddressorKind::NotAddressor:
-    return uint8_t(serialization::AddressorKind::NotAddressor);
-  case swift::AddressorKind::Unsafe:
-    return uint8_t(serialization::AddressorKind::Unsafe);
-  case swift::AddressorKind::Owning:
-    return uint8_t(serialization::AddressorKind::Owning);
-  case swift::AddressorKind::NativeOwning:
-    return uint8_t(serialization::AddressorKind::NativeOwning);
-  }
-  llvm_unreachable("bad addressor kind");
-}
-
 static uint8_t getRawStableResilienceExpansion(swift::ResilienceExpansion e) {
   switch (e) {
   case swift::ResilienceExpansion::Minimal:
@@ -2691,8 +2677,7 @@ void Serializer::writeDecl(const Decl *D) {
           if (auto *SF = dyn_cast<SourceFile>(enclosingFile)) {
             return llvm::sys::path::filename(SF->getFilename());
           } else if (auto *LF = dyn_cast<LoadedFile>(enclosingFile)) {
-            return llvm::sys::path::filename(
-                (LF->getFilenameForPrivateDecl(decl)));
+            return LF->getFilenameForPrivateDecl(decl);
           }
           return StringRef();
         };
@@ -3243,6 +3228,7 @@ void Serializer::writeDecl(const Decl *D) {
         getRawStableVarDeclSpecifier(param->getSpecifier()),
         addTypeRef(interfaceType),
         param->isVariadic(),
+        param->isAutoClosure(),
         getRawStableDefaultArgumentKind(param->getDefaultArgumentKind()),
         defaultArgumentText);
 
@@ -3324,8 +3310,6 @@ void Serializer::writeDecl(const Decl *D) {
     uint8_t rawAccessLevel = getRawStableAccessLevel(fn->getFormalAccess());
     uint8_t rawAccessorKind =
       uint8_t(getStableAccessorKind(fn->getAccessorKind()));
-    uint8_t rawAddressorKind =
-      getRawStableAddressorKind(fn->getAddressorKind());
     uint8_t rawDefaultArgumentResilienceExpansion =
       getRawStableResilienceExpansion(
           fn->getDefaultArgumentResilienceExpansion());
@@ -3353,7 +3337,6 @@ void Serializer::writeDecl(const Decl *D) {
                                addDeclRef(fn->getOverriddenDecl()),
                                addDeclRef(fn->getStorage()),
                                rawAccessorKind,
-                               rawAddressorKind,
                                rawAccessLevel,
                                fn->needsNewVTableEntry(),
                                rawDefaultArgumentResilienceExpansion,
@@ -3860,11 +3843,9 @@ void Serializer::writeType(Type ty) {
       FunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
              addTypeRef(fnTy->getResult()),
              getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-             fnTy->isAutoClosure(),
              fnTy->isNoEscape(),
              fnTy->throws());
     } else {
-      assert(!fnTy->isAutoClosure());
       assert(!fnTy->isNoEscape());
 
       auto *genericSig = cast<GenericFunctionType>(fnTy)->getGenericSignature();

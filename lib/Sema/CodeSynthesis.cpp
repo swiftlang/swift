@@ -222,7 +222,7 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
 
   auto getter = AccessorDecl::create(
       TC.Context, loc, /*AccessorKeywordLoc*/ loc,
-      AccessorKind::Get, AddressorKind::NotAddressor, storage,
+      AccessorKind::Get, storage,
       staticLoc, StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       genericParams,
@@ -287,7 +287,7 @@ static AccessorDecl *createSetterPrototype(TypeChecker &TC,
   Type setterRetTy = TupleType::getEmpty(TC.Context);
   auto setter = AccessorDecl::create(
       TC.Context, loc, /*AccessorKeywordLoc*/ SourceLoc(),
-      AccessorKind::Set, AddressorKind::NotAddressor, storage,
+      AccessorKind::Set, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       genericParams, params,
@@ -400,7 +400,7 @@ createCoroutineAccessorPrototype(TypeChecker &TC,
 
   auto *accessor = AccessorDecl::create(
       ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(),
-      kind, AddressorKind::NotAddressor, storage,
+      kind, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       genericParams, params, TypeLoc::withoutLoc(retTy), dc);
@@ -485,6 +485,16 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
       ref = new (ctx) InOutExpr(SourceLoc(), ref, Type(), /*isImplicit=*/true);
     else if (param->isVariadic())
       ref = new (ctx) VarargExpansionExpr(ref, /*implicit*/ true);
+    else if (param->isAutoClosure()) {
+      // If parameter is marked as `@autoclosure` it means
+      // that it has to be called.
+      auto arg = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
+                                        /*implicit=*/true);
+      ref = CallExpr::create(ctx, ref, arg, {}, {},
+                             /*hasTrailingClosure=*/false,
+                             /*implicit=*/true);
+    }
+
     args.push_back(ref);
     
     labels.push_back(param->getArgumentName());

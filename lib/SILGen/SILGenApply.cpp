@@ -4344,10 +4344,21 @@ CallEmission::applyCoroutine(SmallVectorImpl<ManagedValue> &yields) {
 
   auto fnValue = callee.getFnValue(SGF, isCurried, borrowedSelf);
 
-  // Emit the uncurried call.
+  return SGF.emitBeginApply(uncurriedLoc.getValue(), fnValue,
+                            callee.getSubstitutions(), uncurriedArgs,
+                            calleeTypeInfo.substFnType, options, yields);
+}
+
+CleanupHandle
+SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
+                               SubstitutionMap subs,
+                               ArrayRef<ManagedValue> args,
+                               CanSILFunctionType substFnType,
+                               ApplyOptions options,
+                               SmallVectorImpl<ManagedValue> &yields) {
+  // Emit the call.
   SmallVector<SILValue, 4> rawResults;
-  emitRawApply(SGF, uncurriedLoc.getValue(), fnValue, callee.getSubstitutions(),
-               uncurriedArgs, calleeTypeInfo.substFnType, options,
+  emitRawApply(*this, loc, fn, subs, args, substFnType, options,
                /*indirect results*/ {}, rawResults);
 
   auto token = rawResults.pop_back_val();
@@ -4355,11 +4366,11 @@ CallEmission::applyCoroutine(SmallVectorImpl<ManagedValue> &yields) {
 
   // Push a cleanup to end the application.
   // TODO: destroy all the arguments at exactly this point?
-  SGF.Cleanups.pushCleanup<EndCoroutineApply>(token);
-  auto endApplyHandle = SGF.getTopCleanup();
+  Cleanups.pushCleanup<EndCoroutineApply>(token);
+  auto endApplyHandle = getTopCleanup();
 
   // Manage all the yielded values.
-  auto yieldInfos = calleeTypeInfo.substFnType->getYields();
+  auto yieldInfos = substFnType->getYields();
   assert(yieldValues.size() == yieldInfos.size());
   for (auto i : indices(yieldValues)) {
     auto value = yieldValues[i];
@@ -4367,7 +4378,7 @@ CallEmission::applyCoroutine(SmallVectorImpl<ManagedValue> &yields) {
     if (info.isIndirectInOut()) {
       yields.push_back(ManagedValue::forLValue(value));
     } else if (info.isConsumed()) {
-      yields.push_back(SGF.emitManagedRValueWithCleanup(value));
+      yields.push_back(emitManagedRValueWithCleanup(value));
     } else if (info.isDirectGuaranteed()) {
       yields.push_back(ManagedValue::forBorrowedRValue(value));
     } else {
@@ -5115,11 +5126,12 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   return normalBB->createPhiArgument(resultType, ValueOwnershipKind::Owned);
 }
 
-SILValue SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
-                                                   SILType substFnType,
-                                                   SubstitutionMap subs,
-                                                   ArrayRef<SILValue> args,
-                                            SmallVectorImpl<SILValue> &yields) {
+std::pair<SILValue, CleanupHandle>
+SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
+                                          SILType substFnType,
+                                          SubstitutionMap subs,
+                                          ArrayRef<SILValue> args,
+                                          SmallVectorImpl<SILValue> &yields) {
   // TODO: adjust this to create try_begin_apply when appropriate.
   assert(!substFnType.castTo<SILFunctionType>()->hasErrorResult());
 
@@ -5128,7 +5140,12 @@ SILValue SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
   auto yieldResults = beginApply->getYieldedValues();
   yields.append(yieldResults.begin(), yieldResults.end());
 
-  return beginApply->getTokenResult();
+  auto token = beginApply->getTokenResult();
+
+  Cleanups.pushCleanup<EndCoroutineApply>(token);
+  auto abortCleanup = Cleanups.getTopCleanup();
+
+  return { token, abortCleanup };
 }
 
 void SILGenFunction::emitEndApplyWithRethrow(SILLocation loc, SILValue token) {
@@ -6071,10 +6088,8 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
 
 /// Emit a call to an addressor.
 ///
-/// The first return value is the address, which will always be an
-/// l-value managed value.  The second return value is the owner
-/// pointer, if applicable.
-std::pair<ManagedValue, ManagedValue> SILGenFunction::emitAddressorAccessor(
+/// Returns an l-value managed value.
+ManagedValue SILGenFunction::emitAddressorAccessor(
     SILLocation loc, SILDeclRef addressor, SubstitutionMap substitutions,
     ArgumentSource &&selfValue, bool isSuper, bool isDirectUse,
     PreparedArguments &&subscriptIndices, SILType addressType,
@@ -6108,23 +6123,8 @@ std::pair<ManagedValue, ManagedValue> SILGenFunction::emitAddressorAccessor(
   SmallVector<ManagedValue, 2> results;
   emission.apply().getAll(results);
 
-  SILValue pointer;
-  ManagedValue owner;
-  switch (cast<AccessorDecl>(addressor.getDecl())->getAddressorKind()) {
-  case AddressorKind::NotAddressor:
-    llvm_unreachable("not an addressor!");
-  case AddressorKind::Unsafe:
-    assert(results.size() == 1);
-    pointer = results[0].getUnmanagedValue();
-    owner = ManagedValue();
-    break;
-  case AddressorKind::Owning:
-  case AddressorKind::NativeOwning:
-    assert(results.size() == 2);
-    pointer = results[0].getUnmanagedValue();
-    owner = results[1];
-    break;
-  }
+  assert(results.size() == 1);
+  auto pointer = results[0].getUnmanagedValue();
 
   // Drill down to the raw pointer using intrinsic knowledge of those types.
   auto pointerType =
@@ -6141,20 +6141,7 @@ std::pair<ManagedValue, ManagedValue> SILGenFunction::emitAddressorAccessor(
                                               /*isStrict*/ true,
                                               /*isInvariant*/ false);
 
-  // Mark dependence as necessary.
-  switch (cast<AccessorDecl>(addressor.getDecl())->getAddressorKind()) {
-  case AddressorKind::NotAddressor:
-    llvm_unreachable("not an addressor!");
-  case AddressorKind::Unsafe:
-    // TODO: we should probably mark dependence on the base.
-    break;
-  case AddressorKind::Owning:
-  case AddressorKind::NativeOwning:
-    address = B.createMarkDependence(loc, address, owner.getValue());
-    break;
-  }
-
-  return { ManagedValue::forLValue(address), owner };
+  return ManagedValue::forLValue(address);
 }
 
 CleanupHandle

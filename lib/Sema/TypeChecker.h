@@ -1082,6 +1082,10 @@ public:
 
   bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
 
+  Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
+                                 Type paramType, bool isAutoClosure = false,
+                                 bool canFail = true);
+
   void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
   void processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
@@ -1902,6 +1906,11 @@ public:
   Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
                      DeclNameLoc NameLoc, bool Implicit,
                      FunctionRefKind functionRefKind);
+
+  /// Build implicit autoclosure expression wrapping a given expression.
+  /// Given expression represents computed result of the closure.
+  Expr *buildAutoClosureExpr(DeclContext *DC, Expr *expr,
+                             FunctionType *closureType);
   /// @}
 
   /// \brief Retrieve a specific, known protocol.
@@ -2158,19 +2167,18 @@ public:
   const StringRef Message;
 };
 
-/// Returns true if a method is an valid implementation of a @dynamicCallable
-/// attribute requirement. The method is given to be defined as one of the
-/// following: `dynamicallyCall(withArguments:)` or
+/// Returns true if the given method is an valid implementation of a
+/// @dynamicCallable attribute requirement. The method is given to be defined
+/// as one of the following: `dynamicallyCall(withArguments:)` or
 /// `dynamicallyCall(withKeywordArguments:)`.
-bool isValidDynamicCallableMethod(FuncDecl *funcDecl, DeclContext *DC,
+bool isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
                                   TypeChecker &TC, bool hasKeywordArguments);
 
-/// Given a subscript defined as "subscript(dynamicMember:)->T", return true if
-/// it is an acceptable implementation of the @dynamicMemberLookup attribute's
-/// requirement.
-bool isAcceptableDynamicMemberLookupSubscript(SubscriptDecl *decl,
-                                              DeclContext *DC,
-                                              TypeChecker &TC);
+/// Returns true if the given subscript method is an valid implementation of
+/// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
+/// The method is given to be defined as `subscript(dynamicMember:)`.
+bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, DeclContext *DC,
+                                         TypeChecker &TC);
 
 /// Whether an overriding declaration requires the 'override' keyword.
 enum class OverrideRequiresKeyword {

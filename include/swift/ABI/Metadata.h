@@ -625,10 +625,26 @@ public:
     getValueWitnesses()->_asEVWT()->destructiveInjectEnumTag(value, tag, this);
   }
 
+  size_t vw_size() const {
+    return getValueWitnesses()->getSize();
+  }
+
+  size_t vw_alignment() const {
+    return getValueWitnesses()->getAlignment();
+  }
+
+  size_t vw_stride() const {
+    return getValueWitnesses()->getStride();
+  }
+
   /// Allocate an out-of-line buffer if values of this type don't fit in the
   /// ValueBuffer.
   /// NOTE: This is not a box for copy-on-write existentials.
   OpaqueValue *allocateBufferIn(ValueBuffer *buffer) const;
+
+  /// Get the address of the memory previously allocated in the ValueBuffer.
+  /// NOTE: This is not a box for copy-on-write existentials.
+  OpaqueValue *projectBufferFrom(ValueBuffer *buffer) const;
 
   /// Deallocate an out-of-line buffer stored in 'buffer' if values of this type
   /// are not stored inline in the ValueBuffer.

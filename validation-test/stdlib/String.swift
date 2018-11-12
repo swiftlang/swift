@@ -126,7 +126,7 @@ StringTests.test("AssociatedTypes-UTF16View") {
   typealias View = String.UTF16View
   expectCollectionAssociatedTypes(
     collectionType: View.self,
-    iteratorType: IndexingIterator<View>.self,
+    iteratorType: View.Iterator.self,
     subSequenceType: Substring.UTF16View.self,
     indexType: View.Index.self,
     indicesType: View.Indices.self)
@@ -145,7 +145,7 @@ StringTests.test("AssociatedTypes-UnicodeScalarView") {
 StringTests.test("AssociatedTypes-CharacterView") {
   expectCollectionAssociatedTypes(
     collectionType: String.self,
-    iteratorType: IndexingIterator<String>.self,
+    iteratorType: String.Iterator.self,
     subSequenceType: Substring.self,
     indexType: String.Index.self,
     indicesType: DefaultIndices<String>.self)

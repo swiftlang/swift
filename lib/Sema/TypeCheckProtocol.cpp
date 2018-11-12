@@ -1271,18 +1271,13 @@ bool WitnessChecker::checkWitnessAccess(ValueDecl *requirement,
     // That is, if '@testable' allows us to see the witness here, it should
     // allow us to see it anywhere, because any other client could also add
     // their own `@testable import`.
+    // Same with @_private(sourceFile:) import.
     if (auto parentFile = dyn_cast<SourceFile>(DC->getModuleScopeContext())) {
       const ModuleDecl *witnessModule = witness->getModuleContext();
       if (parentFile->getParentModule() != witnessModule &&
-          parentFile->hasTestableOrPrivateImport(AccessLevel::Internal,
-                                                 witnessModule) &&
+          parentFile->hasTestableOrPrivateImport(witness->getFormalAccess(),
+                                                 witness) &&
           witness->isAccessibleFrom(parentFile)) {
-        actualScopeToCheck = parentFile;
-      // Same with @_private(sourceFile:) import.
-      } else if (parentFile->getParentModule() != witnessModule &&
-                 parentFile->hasTestableOrPrivateImport(
-                     witness->getFormalAccess(), witness) &&
-                 witness->isAccessibleFrom(parentFile)) {
         actualScopeToCheck = parentFile;
       }
     }

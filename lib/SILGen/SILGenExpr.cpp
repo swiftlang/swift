@@ -4314,6 +4314,19 @@ static void emitSimpleAssignment(SILGenFunction &SGF, SILLocation loc,
     // also prevents us from getting into that case.
     if (dest->getType()->isEqual(srcLoad->getSubExpr()->getType())) {
       assert(!dest->getType()->is<TupleType>());
+
+      dest = dest->getSemanticsProvidingExpr();
+      if (isa<DiscardAssignmentExpr>(dest)) {
+        // The logical thing to do here would be emitIgnoredExpr, but that
+        // changed some test results in a way I wanted to avoid, so instead
+        // we're doing this.
+        FormalEvaluationScope writeback(SGF);
+        auto srcLV = SGF.emitLValue(srcLoad->getSubExpr(),
+                                    SGFAccessKind::IgnoredRead);
+        (void) SGF.emitLoadOfLValue(loc, std::move(srcLV), SGFContext());
+        return;
+      }
+
       FormalEvaluationScope writeback(SGF);
       auto destLV = SGF.emitLValue(dest, SGFAccessKind::Write);
       auto srcLV = SGF.emitLValue(srcLoad->getSubExpr(),

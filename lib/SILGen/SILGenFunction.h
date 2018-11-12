@@ -1252,7 +1252,7 @@ public:
                                        AccessorDecl *witness,
                                        SubstitutionMap witnessSubs);
 
-  std::pair<ManagedValue, ManagedValue> emitAddressorAccessor(
+  ManagedValue emitAddressorAccessor(
       SILLocation loc, SILDeclRef addressor, SubstitutionMap substitutions,
       ArgumentSource &&optionalSelfValue, bool isSuper,
       bool isDirectAccessorUse, PreparedArguments &&optionalSubscripts,
@@ -1471,16 +1471,21 @@ public:
                                      ArrayRef<ManagedValue> args,
                                      SGFContext ctx);
 
+  CleanupHandle emitBeginApply(SILLocation loc, ManagedValue fn,
+                               SubstitutionMap subs, ArrayRef<ManagedValue> args,
+                               CanSILFunctionType substFnType,
+                               ApplyOptions options,
+                               SmallVectorImpl<ManagedValue> &yields);
+
   SILValue emitApplyWithRethrow(SILLocation loc, SILValue fn,
                                 SILType substFnType,
                                 SubstitutionMap subs,
                                 ArrayRef<SILValue> args);
 
-  SILValue emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
-                                     SILType substFnType,
-                                     SubstitutionMap subs,
-                                     ArrayRef<SILValue> args,
-                                     SmallVectorImpl<SILValue> &yields);
+  std::pair<SILValue, CleanupHandle>
+  emitBeginApplyWithRethrow(SILLocation loc, SILValue fn, SILType substFnType,
+                            SubstitutionMap subs, ArrayRef<SILValue> args,
+                            SmallVectorImpl<SILValue> &yields);
   void emitEndApplyWithRethrow(SILLocation loc, SILValue token);
 
   /// Emit a literal that applies the various initializers.

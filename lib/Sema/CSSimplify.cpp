@@ -835,7 +835,42 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   ConstraintKind subKind = (isOperator
                             ? ConstraintKind::OperatorArgumentConversion
                             : ConstraintKind::ArgumentConversion);
-  
+
+  // Check whether argument of the call at given position refers to
+  // parameter marked as `@autoclosure`. This function is used to
+  // maintain source compatibility with Swift versions < 5,
+  // previously examples like following used to type-check:
+  //
+  // func foo(_ x: @autoclosure () -> Int) {}
+  // func bar(_ y: @autoclosure () -> Int) {
+  //   foo(y)
+  // }
+  auto isAutoClosureArg = [&](Expr *anchor, unsigned argIdx) -> bool {
+    assert(anchor);
+
+    auto *call = dyn_cast<ApplyExpr>(anchor);
+    if (!call)
+      return false;
+
+    Expr *argExpr = nullptr;
+    if (auto *PE = dyn_cast<ParenExpr>(call->getArg())) {
+      assert(argsWithLabels.size() == 1);
+      argExpr = PE->getSubExpr();
+    } else if (auto *TE = dyn_cast<TupleExpr>(call->getArg())) {
+      argExpr = TE->getElement(argIdx);
+    }
+
+    if (!argExpr)
+      return false;
+
+    if (auto *DRE = dyn_cast<DeclRefExpr>(argExpr)) {
+      if (auto *param = dyn_cast<ParamDecl>(DRE->getDecl()))
+        return param->isAutoClosure();
+    }
+
+    return false;
+  };
+
   for (unsigned paramIdx = 0, numParams = parameterBindings.size();
        paramIdx != numParams; ++paramIdx){
     // Skip unfulfilled parameters. There's nothing to do for them.
@@ -846,13 +881,39 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     const auto &param = params[paramIdx];
     auto paramTy = param.getOldType();
 
+    if (param.isAutoClosure())
+      paramTy = paramTy->castTo<FunctionType>()->getResult();
+
     // Compare each of the bound arguments for this parameter.
     for (auto argIdx : parameterBindings[paramIdx]) {
       auto loc = locator.withPathElement(LocatorPathElt::
                                             getApplyArgToParam(argIdx,
                                                                paramIdx));
       auto argTy = argsWithLabels[argIdx].getOldType();
-      cs.addConstraint(subKind, argTy, paramTy, loc, /*isFavored=*/false);
+
+      // If parameter was marked as `@autoclosure` and argument
+      // is itself `@autoclosure` function type in Swift < 5,
+      // let's fix that up by making it look like argument is
+      // called implicitly.
+      if (!cs.getASTContext().isSwiftVersionAtLeast(5)) {
+        if (param.isAutoClosure() &&
+            isAutoClosureArg(locator.getAnchor(), argIdx)) {
+          argTy = argTy->castTo<FunctionType>()->getResult();
+          cs.increaseScore(SK_FunctionConversion);
+        }
+      }
+
+      // If argument comes for declaration it should loose
+      // `@autoclosure` flag, because in context it's used
+      // as a function type represented by autoclosure.
+      assert(!argsWithLabels[argIdx].isAutoClosure());
+
+      cs.addConstraint(
+          subKind, argTy, paramTy,
+          param.isAutoClosure()
+              ? loc.withPathElement(ConstraintLocator::AutoclosureResult)
+              : loc,
+          /*isFavored=*/false);
     }
   }
 
@@ -1042,19 +1103,6 @@ ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator) {
-  // An @autoclosure function type can be a subtype of a
-  // non-@autoclosure function type.
-  if (func1->isAutoClosure() != func2->isAutoClosure()) {
-    // If the 2nd type is an autoclosure, then the first type needs wrapping in a
-    // closure despite already being a function type.
-    if (func2->isAutoClosure())
-      return getTypeMatchFailure(locator);
-    if (kind < ConstraintKind::Subtype)
-      return getTypeMatchFailure(locator);
-
-    increaseScore(SK_FunctionConversion);
-  }
-  
   // A non-throwing function can be a subtype of a throwing function.
   if (func1->throws() != func2->throws()) {
     // Cannot drop 'throws'.
@@ -1941,14 +1989,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::Function: {
       auto func1 = cast<FunctionType>(desugar1);
       auto func2 = cast<FunctionType>(desugar2);
-
-      // If the 2nd type is an autoclosure, then we don't actually want to
-      // treat these as parallel. The first type needs wrapping in a closure
-      // despite already being a function type.
-      if (!func1->isAutoClosure() && func2->isAutoClosure()) {
-        increaseScore(SK_FunctionConversion);
-        break;
-      }
       return matchFunctionTypes(func1, func2, kind, flags, locator);
     }
 
@@ -2160,15 +2200,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     if (type1->is<LValueType>() && !type2->is<InOutType>())
       conversionsOrFixes.push_back(
         ConversionRestrictionKind::LValueToRValue);
-
-    // An expression can be converted to an auto-closure function type, creating
-    // an implicit closure.
-    if (auto function2 = type2->getAs<FunctionType>()) {
-      if (function2->isAutoClosure())
-        return matchTypes(
-            type1, function2->getResult(), kind, subflags,
-            locator.withPathElement(ConstraintLocator::AutoclosureResult));
-    }
 
     // It is never legal to form an autoclosure that results in these
     // implicit conversions to pointer types.
@@ -3053,9 +3084,9 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
 /// conformances, but this is fine because it doesn't get invoked in the normal
 /// name lookup path (only when lookup is about to fail).
 static bool hasDynamicMemberLookupAttribute(CanType ty,
-                    llvm::DenseMap<CanType, bool> &IsDynamicMemberLookupCache) {
-  auto it = IsDynamicMemberLookupCache.find(ty);
-  if (it != IsDynamicMemberLookupCache.end()) return it->second;
+                    llvm::DenseMap<CanType, bool> &DynamicMemberLookupCache) {
+  auto it = DynamicMemberLookupCache.find(ty);
+  if (it != DynamicMemberLookupCache.end()) return it->second;
   
   auto calculate = [&]()-> bool {
     // If this is a protocol composition, check to see if any of the protocols
@@ -3063,7 +3094,7 @@ static bool hasDynamicMemberLookupAttribute(CanType ty,
     if (auto protocolComp = ty->getAs<ProtocolCompositionType>()) {
       for (auto p : protocolComp->getMembers())
         if (hasDynamicMemberLookupAttribute(p->getCanonicalType(),
-                                            IsDynamicMemberLookupCache))
+                                            DynamicMemberLookupCache))
           return true;
       return false;
     }
@@ -3072,8 +3103,7 @@ static bool hasDynamicMemberLookupAttribute(CanType ty,
     auto nominal = ty->getAnyNominal();
     if (!nominal) return false;  // Dynamic lookups don't exist on tuples, etc.
     
-    // If any of the protocols this type conforms to has the attribute, then
-    // yes.
+    // If this type conforms to a protocol with the attribute, then return true.
     for (auto p : nominal->getAllProtocols())
       if (p->getAttrs().hasAttribute<DynamicMemberLookupAttr>())
         return true;
@@ -3105,7 +3135,7 @@ static bool hasDynamicMemberLookupAttribute(CanType ty,
   
   // Cache this if we can.
   if (!ty->hasTypeVariable())
-    IsDynamicMemberLookupCache[ty] = result;
+    DynamicMemberLookupCache[ty] = result;
   
   return result;
 }
@@ -3515,32 +3545,32 @@ retry_after_fail:
   }
   
   // If we're about to fail lookup, but we are looking for members in a type
-  // that has the @dynamicMemberLookup attribute, then we resolve the reference
-  // to the subscript(dynamicMember:) member, and pass the member name as a
-  // string.
+  // with the @dynamicMemberLookup attribute, then we resolve a reference
+  // to a `subscript(dynamicMember:)` method and pass the member name as a
+  // string parameter.
   if (result.ViableCandidates.empty() &&
       constraintKind == ConstraintKind::ValueMember &&
       memberName.isSimpleName() && !memberName.isSpecial()) {
     auto name = memberName.getBaseIdentifier();
     if (hasDynamicMemberLookupAttribute(instanceTy->getCanonicalType(),
-                                        IsDynamicMemberLookupCache)) {
+                                        DynamicMemberLookupCache)) {
       auto &ctx = getASTContext();
-      // Recursively look up the subscript(dynamicMember:)'s in this type.
+
+      // Recursively look up `subscript(dynamicMember:)` methods in this type.
       auto subscriptName =
         DeclName(ctx, DeclBaseName::createSubscript(), ctx.Id_dynamicMember);
-
       auto subscripts = performMemberLookup(constraintKind,
                                             subscriptName,
                                             baseTy, functionRefKind,
                                             memberLocator,
                                             includeInaccessibleMembers);
         
-      // Reflect the candidates found as DynamicMemberLookup results.
+      // Reflect the candidates found as `DynamicMemberLookup` results.
       for (auto candidate : subscripts.ViableCandidates) {
         auto decl = cast<SubscriptDecl>(candidate.getDecl());
-        if (isAcceptableDynamicMemberLookupSubscript(decl, DC, TC))
-          result.addViable(OverloadChoice::getDynamicMemberLookup(baseTy,
-                                                                  decl, name));
+        if (isValidDynamicMemberLookupSubscript(decl, DC, TC))
+          result.addViable(
+            OverloadChoice::getDynamicMemberLookup(baseTy, decl, name));
       }
       for (auto candidate : subscripts.UnviableCandidates) {
         auto decl = candidate.first.getDecl();

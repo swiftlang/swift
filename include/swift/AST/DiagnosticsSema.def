@@ -510,6 +510,8 @@ ERROR(expr_string_interpolation_outside_string,none,
       "string interpolation can only appear inside a string literal", ())
 ERROR(unsupported_keypath_tuple_element_reference,none,
       "key path cannot reference tuple elements", ())
+ERROR(expr_keypath_unimplemented_tuple,none,
+      "key path support for tuples is not implemented", ())
 ERROR(expr_keypath_subscript_index_not_hashable, none,
       "subscript index of type %0 in a key path must be Hashable", (Type))
 ERROR(expr_smart_keypath_application_type_mismatch,none,
@@ -1054,9 +1056,10 @@ ERROR(missing_dynamic_callable_kwargs_method,none,
       "@dynamicCallable type %0 cannot be applied with keyword arguments; "
       "missing 'dynamicCall(withKeywordArguments:)' method", (Type))
 
-ERROR(type_invalid_dml,none,
+ERROR(invalid_dynamic_member_lookup_type,none,
       "@dynamicMemberLookup attribute requires %0 to have a "
-      "'subscript(dynamicMember:)' member with a string index", (Type))
+      "'subscript(dynamicMember:)' method with an "
+      "'ExpressibleByStringLiteral' parameter", (Type))
 
 ERROR(string_index_not_integer,none,
       "String must not be indexed with %0, it has variable size elements",

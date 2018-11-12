@@ -1560,7 +1560,6 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     FunctionType::Param arg(escapeClosure);
     auto bodyClosure = FunctionType::get(arg, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                              /*autoclosure*/ false,
                               /*noescape*/ true,
                               /*throws*/ true));
     FunctionType::Param args[] = {
@@ -1570,7 +1569,6 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     
     refType = FunctionType::get(args, result,
       FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                            /*autoclosure*/ false,
                             /*noescape*/ false,
                             /*throws*/ true));
     openedFullType = refType;
@@ -1591,7 +1589,6 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     FunctionType::Param bodyArgs[] = {FunctionType::Param(openedTy)};
     auto bodyClosure = FunctionType::get(bodyArgs, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                              /*autoclosure*/ false,
                               /*noescape*/ true,
                               /*throws*/ true));
     FunctionType::Param args[] = {
@@ -1600,7 +1597,6 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     };
     refType = FunctionType::get(args, result,
       FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                            /*autoclosure*/ false,
                             /*noescape*/ false,
                             /*throws*/ true));
     openedFullType = refType;

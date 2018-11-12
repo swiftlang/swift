@@ -215,7 +215,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
 // Check that we directly delegate buffer witnesses to a single dynamic field:
 
 //   initializeBufferWithCopyOfBuffer
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$s15generic_structs13SingleDynamicVwCP"([24 x i8]* noalias %dest, [24 x i8]* noalias %src, %swift.type* %"SingleDynamic<T>") {{.*}} {
+// CHECK-LABEL: define internal %swift.opaque* @"$s15generic_structs13SingleDynamicVwCP"([24 x i8]* noalias %dest, [24 x i8]* noalias %src, %swift.type* %"SingleDynamic<T>") {{.*}} {
 // CHECK:      %T = load %swift.type*,
 // CHECK:      [[T0:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1

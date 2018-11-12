@@ -393,20 +393,20 @@ diagnoseInvalidDynamicConstructorReferences(ConstraintSystem &cs,
 }
 
 /// Form a type checked expression for the index of a @dynamicMemberLookup
-/// subscript index expression.  This will have tuple type of (dynamicMember:T).
-static Expr *getDMLIndexExpr(StringRef name, Type ty, SourceLoc loc,
-                             DeclContext *dc, ConstraintSystem &cs) {
+/// subscript index parameter.
+/// The index expression will have a tuple type of `(dynamicMember: T)`.
+static Expr *buildDynamicMemberLookupIndexExpr(StringRef name, Type ty,
+                                               SourceLoc loc, DeclContext *dc,
+                                               ConstraintSystem &cs) {
   auto &ctx = cs.TC.Context;
   
   // Build and type check the string literal index value to the specific
   // string type expected by the subscript.
-  Expr *nameExpr = new (ctx)
-    StringLiteralExpr(name, loc, /*implicit*/true);
-  
-  
-  // Build a tuple so that argument has a label.
-  Expr *tuple = TupleExpr::create(ctx, loc, nameExpr, ctx.Id_dynamicMember, loc,
-                                  loc, /*hasTrailingClosure*/false,
+  Expr *nameExpr = new (ctx) StringLiteralExpr(name, loc, /*implicit*/true);
+
+  // Build a tuple so that the argument has a label.
+  Expr *tuple = TupleExpr::create(ctx, loc, nameExpr, ctx.Id_dynamicMember,
+                                  loc, loc, /*hasTrailingClosure*/false,
                                   /*implicit*/true);
   (void)cs.TC.typeCheckExpression(tuple, dc, TypeLoc::withoutLoc(ty),
                                   CTP_CallArgument);
@@ -1524,8 +1524,7 @@ namespace {
       // Check whether the base is 'super'.
       bool isSuper = base->isSuperExpr();
 
-      // Use the correct kind of locator depending on how this subscript came
-      // to be.
+      // Use the correct locator kind based on the subscript kind.
       auto locatorKind = ConstraintLocator::SubscriptMember;
       if (choice.getKind() == OverloadChoiceKind::DynamicMemberLookup)
         locatorKind = ConstraintLocator::Member;
@@ -2769,7 +2768,8 @@ namespace {
         // Build and type check the string literal index value to the specific
         // string type expected by the subscript.
         auto fieldName = selected.choice.getName().getBaseIdentifier().str();
-        auto index = getDMLIndexExpr(fieldName, tupleTy, loc, dc, cs);
+        auto index =
+          buildDynamicMemberLookupIndexExpr(fieldName, tupleTy, loc, dc, cs);
 
         // Build and return a subscript that uses this string as the index.
         return buildSubscript(base, index, ctx.Id_dynamicMember,
@@ -4370,11 +4370,6 @@ namespace {
 
           auto dc = subscript->getInnermostDeclContext();
 
-          // FIXME: It's not correct to turn the subscript's parameter list
-          // into a single type here. Further down we pass it to coerceToType(),
-          // but the rules for argument list conversions are different than
-          // tuple conversions, and coerceToType() doesn't handle varargs or
-          // default arguments.
           auto indexType = AnyFunctionType::composeInput(
             cs.TC.Context,
             subscript->getInterfaceType()
@@ -4393,35 +4388,35 @@ namespace {
           // through the subscript(dynamicMember:) member, restore the
           // openedType and origComponent to its full reference as if the user
           // wrote out the subscript manually.
-          if (foundDecl->choice.getKind()
-                                  == OverloadChoiceKind::DynamicMemberLookup) {
+          if (foundDecl->choice.getKind() ==
+              OverloadChoiceKind::DynamicMemberLookup) {
             foundDecl->openedType = foundDecl->openedFullType
-                  ->castTo<AnyFunctionType>()->getResult();
+                ->castTo<AnyFunctionType>()->getResult();
 
             auto &ctx = cs.TC.Context;
             auto loc = origComponent.getLoc();
             auto fieldName =
                 foundDecl->choice.getName().getBaseIdentifier().str();
-            auto index = getDMLIndexExpr(fieldName, indexType, loc, dc, cs);
+            auto index = buildDynamicMemberLookupIndexExpr(fieldName, indexType,
+                                                           loc, dc, cs);
             
             origComponent = KeyPathExpr::Component::
               forUnresolvedSubscript(ctx, loc, index, {}, loc, loc,
                                      /*trailingClosure*/nullptr);
             cs.setType(origComponent.getIndexExpr(), index->getType());
           }
-          
-          auto resolvedTy = foundDecl->openedType->castTo<AnyFunctionType>()
-            ->getResult();
-          
-          resolvedTy = simplifyType(resolvedTy);
-          
+
+          auto subscriptType =
+              simplifyType(foundDecl->openedType)->castTo<AnyFunctionType>();
+          auto resolvedTy = subscriptType->getResult();
           auto ref = ConcreteDeclRef(subscript, subs);
-          
+
           // Coerce the indices to the type the subscript expects.
-          auto indexExpr = coerceToType(origComponent.getIndexExpr(),
-                                        indexType,
-                                        locator);
-          
+          auto indexExpr = coerceCallArguments(
+              origComponent.getIndexExpr(), subscriptType,
+              /*applyExpr*/ nullptr, origComponent.getSubscriptLabels(),
+              /* hasTrailingClosure */ false, locator);
+
           component = KeyPathExpr::Component
             ::forSubscriptWithPrebuiltIndexExpr(ref, indexExpr,
                                             origComponent.getSubscriptLabels(),
@@ -4927,14 +4922,14 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
                     unsigned index) {
   auto &tc = cs.getTypeChecker();
 
-  auto defArg = getDefaultArgumentInfo(cast<ValueDecl>(owner.getDecl()), index);
+  const auto *param = getParameterAt(cast<ValueDecl>(owner.getDecl()), index);
   Expr *init = nullptr;
-  switch (defArg.first) {
+  switch (param->getDefaultArgumentKind()) {
   case DefaultArgumentKind::None:
     llvm_unreachable("No default argument here?");
 
   case DefaultArgumentKind::Normal:
-    return {nullptr, defArg.first};
+    return {nullptr, param->getDefaultArgumentKind()};
 
   case DefaultArgumentKind::Inherited:
     // Update the owner to reflect inheritance here.
@@ -4987,16 +4982,18 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
   }
 
   // Convert the literal to the appropriate type.
-  auto defArgType = owner.getDecl()->getDeclContext()
-                       ->mapTypeIntoContext(defArg.second);
-  auto resultTy = tc.typeCheckExpression(
-      init, dc, TypeLoc::withoutLoc(defArgType), CTP_CannotFail);
+  auto defArgType = owner.getDecl()->getDeclContext()->mapTypeIntoContext(
+      param->getInterfaceType());
+  auto resultTy =
+      tc.typeCheckParameterDefault(init, dc, defArgType,
+                                   /*isAutoClosure=*/param->isAutoClosure(),
+                                   /*canFail=*/false);
   assert(resultTy && "Conversion cannot fail");
   (void)resultTy;
 
   cs.cacheExprTypes(init);
 
-  return {init, defArg.first};
+  return {init, param->getDefaultArgumentKind()};
 }
 
 static Expr *lookThroughIdentityExprs(Expr *expr) {
@@ -5643,9 +5640,37 @@ Expr *ExprRewriter::coerceCallArguments(
       continue;
     }
 
-    // Convert the argument.
-    auto convertedArg = coerceToType(arg, paramType,
-                                     getArgLocator(argIdx, paramIdx));
+    auto isAutoClosureArg = [](Expr *arg) -> bool {
+      if (auto *DRE = dyn_cast<DeclRefExpr>(arg)) {
+        if (auto *PD = dyn_cast<ParamDecl>(DRE->getDecl()))
+          return PD->isAutoClosure();
+      }
+      return false;
+    };
+
+    Expr *convertedArg = nullptr;
+    // Since it was allowed to pass function types to @autoclosure
+    // parameters in Swift versions < 5, it has to be handled as
+    // a regular function coversion by `coerceToType`.
+    if (param.isAutoClosure() && (!argType->is<FunctionType>() ||
+                                  !isAutoClosureArg(arg))) {
+      // If parameter is an autoclosure, we need to make sure that:
+      //   - argument type is coerced to parameter result type
+      //   - impilict autoclosure is created to wrap argument expression
+      //   - new types are propagated to constraint system
+      auto *closureType = param.getPlainType()->castTo<FunctionType>();
+
+      arg = coerceToType(
+          arg, closureType->getResult(),
+          locator.withPathElement(ConstraintLocator::AutoclosureResult));
+
+      convertedArg = cs.TC.buildAutoClosureExpr(dc, arg, closureType);
+      cs.cacheExprTypes(convertedArg);
+    } else {
+      convertedArg =
+          coerceToType(arg, paramType, getArgLocator(argIdx, paramIdx));
+    }
+
     if (!convertedArg)
       return nullptr;
 
@@ -6534,59 +6559,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       isInDefaultArgumentContext = (initalizerCtx->getInitializerKind() ==
                                     InitializerKind::DefaultArgument);
     auto toEI = toFunc->getExtInfo();
-
-    auto fromFunc = fromType->getAs<FunctionType>();
-
-    // Coercion to an autoclosure type produces an implicit closure.
-    // The constraint solver only performs this conversion when the source
-    // type is not an autoclosure function type.  That's a weird rule in
-    // some rules, but it's easy to follow here.  Really we just shouldn't
-    // represent autoclosures as a bit on function types.
-    // FIXME: The type checker is more lenient, and allows @autoclosures to
-    // be subtypes of non-@autoclosures, which is bogus.
-    if (toFunc->isAutoClosure() &&
-        (!fromFunc || !fromFunc->isAutoClosure())) {
-      // The function type without @noescape if we are in the default argument
-      // context.
-      auto newToFuncType = toFunc;
-
-      // Remove the noescape attribute so that we can apply a separate function
-      // conversion instruction if we are in a default argument context.
-      if (isInDefaultArgumentContext && toEI.isNoEscape())
-        newToFuncType = toFunc->withExtInfo(toEI.withNoEscape(false))
-                            ->castTo<FunctionType>();
-
-      // Convert the value to the expected result type of the function.
-      expr = coerceToType(
-          expr, toFunc->getResult(),
-          locator.withPathElement(ConstraintLocator::AutoclosureResult));
-
-      // We'll set discriminator values on all the autoclosures in a
-      // later pass.
-      auto discriminator = AutoClosureExpr::InvalidDiscriminator;
-      auto closure = cs.cacheType(new (tc.Context) AutoClosureExpr(
-          expr, newToFuncType, discriminator, dc));
-      closure->setParameterList(ParameterList::createEmpty(tc.Context));
-
-      // Compute the capture list, now that we have analyzed the expression.
-      tc.ClosuresWithUncomputedCaptures.push_back(closure);
-
-      // Apply the noescape conversion.
-      if (!newToFuncType->isEqual(toFunc)) {
-        assert(isInDefaultArgumentContext);
-        assert(newToFuncType
-                   ->withExtInfo(newToFuncType->getExtInfo().withNoEscape(true))
-                   ->isEqual(toFunc));
-        return cs.cacheType(new (tc.Context)
-                                FunctionConversionExpr(closure, toFunc));
-      }
-
-      return closure;
-    }
-
     // Coercion from one function type to another, this produces a
     // FunctionConversionExpr in its full generality.
-    if (fromFunc) {
+    if (auto fromFunc = fromType->getAs<FunctionType>()) {
+      assert(toType->is<FunctionType>());
       // If we have a ClosureExpr, then we can safely propagate the 'no escape'
       // bit to the closure without invalidating prior analysis.
       auto fromEI = fromFunc->getExtInfo();

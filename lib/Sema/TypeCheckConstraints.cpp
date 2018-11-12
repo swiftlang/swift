@@ -1974,12 +1974,11 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
          "Purpose for conversion type was not specified");
 
   // Take a look at the conversion type to check to make sure it is sensible.
-  if (convertType.getType()) {
+  if (auto type = convertType.getType()) {
     // If we're asked to convert to an UnresolvedType, then ignore the request.
     // This happens when CSDiags nukes a type.
-    if (convertType.getType()->is<UnresolvedType>() ||
-        (convertType.getType()->is<MetatypeType>() &&
-         convertType.getType()->hasUnresolvedType())) {
+    if (type->is<UnresolvedType>() ||
+        (type->is<MetatypeType>() && type->hasUnresolvedType())) {
       convertType = TypeLoc();
       convertTypePurpose = CTP_Unused;
     }
@@ -2070,6 +2069,41 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
   expr = result;
   return cs.getType(expr);
+}
+
+Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
+                                            DeclContext *DC, Type paramType,
+                                            bool isAutoClosure, bool canFail) {
+  assert(paramType && !paramType->hasError());
+
+  if (isAutoClosure) {
+    class AutoClosureListener : public ExprTypeCheckListener {
+      DeclContext *DC;
+      FunctionType *ParamType;
+
+    public:
+      AutoClosureListener(DeclContext *DC, FunctionType *paramType)
+          : DC(DC), ParamType(paramType) {}
+
+      Expr *appliedSolution(constraints::Solution &solution,
+                            Expr *expr) override {
+        auto &cs = solution.getConstraintSystem();
+        auto *closure = cs.TC.buildAutoClosureExpr(DC, expr, ParamType);
+        cs.cacheExprTypes(closure);
+        return closure;
+      }
+    };
+
+    auto *fnType = paramType->castTo<FunctionType>();
+    AutoClosureListener listener(DC, fnType);
+    return typeCheckExpression(defaultValue, DC,
+                               TypeLoc::withoutLoc(fnType->getResult()),
+                               canFail ? CTP_DefaultParameter : CTP_CannotFail,
+                               TypeCheckExprOptions(), &listener);
+  }
+
+  return typeCheckExpression(defaultValue, DC, TypeLoc::withoutLoc(paramType),
+                             canFail ? CTP_DefaultParameter : CTP_CannotFail);
 }
 
 Type TypeChecker::

@@ -197,16 +197,8 @@ extension String: BidirectionalCollection {
 
       let i = _guts.scalarAlign(i)
       let distance = _characterStride(startingAt: i)
-
-      if _fastPath(_guts.isFastUTF8) {
-        let start = i.encodedOffset
-        let end = start + distance
-        return _guts.withFastUTF8(range: start..<end) { utf8 in
-          return Character(unchecked: String._uncheckedFromUTF8(utf8))
-        }
-      }
-
-      return _foreignSubscript(position: i, distance: distance)
+      return _guts.errorCorrectedCharacter(
+        startingAt: i.encodedOffset, endingAt: i.encodedOffset &+ distance)
     }
   }
 
@@ -228,40 +220,40 @@ extension String: BidirectionalCollection {
   }
 }
 
-// Foreign string support
 extension String {
-  @usableFromInline @inline(never)
-  @_effects(releasenone)
-  internal func _foreignSubscript(position: Index, distance: Int) -> Character {
-#if _runtime(_ObjC)
-    _sanityCheck(_guts.isForeign)
+  @_fixed_layout
+  public struct Iterator: IteratorProtocol {
+    @usableFromInline
+    internal var _guts: _StringGuts
 
-    // Both a fast-path for single-code-unit graphemes and validation:
-    //   ICU treats isolated surrogates as isolated graphemes
-    if distance == 1 {
-      return Character(
-        String(_guts.foreignErrorCorrectedScalar(startingAt: position).0))
+    @usableFromInline
+    internal var _position: Int = 0
+
+    @usableFromInline
+    internal var _end: Int
+
+    @inlinable
+    internal init(_ guts: _StringGuts) {
+      self._guts = guts
+      self._end = guts.count
     }
 
-    let start = position.encodedOffset
-    let end = start + distance
-    let count = end - start
+    @inlinable
+    public mutating func next() -> Character? {
+      guard _fastPath(_position < _end) else { return nil }
 
-    // TODO(String performance): Stack buffer if small enough
+      let len = _guts._opaqueCharacterStride(startingAt: _position)
+      let nextPosition = _position &+ len
+      let result = _guts.errorCorrectedCharacter(
+        startingAt: _position, endingAt: nextPosition)
+      _position = nextPosition
+      return result
+    }
+  }
 
-    var cus = Array<UInt16>(repeating: 0, count: count)
-    cus.withUnsafeMutableBufferPointer {
-      _cocoaStringCopyCharacters(
-        from: _guts._object.cocoaObject,
-        range: start..<end,
-        into: $0.baseAddress._unsafelyUnwrappedUnchecked)
-    }
-    return cus.withUnsafeBufferPointer {
-      return Character(String._uncheckedFromUTF16($0))
-    }
-#else
-    fatalError("No foreign strings on Linux in this version of Swift")
-#endif
+  @inlinable
+  public __consuming func makeIterator() -> Iterator {
+    return Iterator(_guts)
   }
 }
 

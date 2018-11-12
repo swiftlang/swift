@@ -637,7 +637,7 @@ void AccessConflictAndMergeAnalysis::visitBeginAccess(
 
       auto &outerAccessInfo = result.getAccessInfo(outerBeginAccess);
       // If there is no potential conflict, leave the outer access mapped.
-      if (!outerAccessInfo.isDistinctFrom(beginAccessInfo))
+      if (outerAccessInfo.isDistinctFrom(beginAccessInfo))
         continue;
 
       LLVM_DEBUG(beginAccessInfo.dump();
