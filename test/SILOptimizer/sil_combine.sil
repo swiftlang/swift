@@ -2352,10 +2352,8 @@ bb0:
 
 // CHECK-LABEL:   sil @remove_dead_code_after_unreachable
 // CHECK-NEXT:      bb0
-// CHECK-NOT:       integer_literal $Builtin.Int32, -2
 // CHECK-NEXT:      unreachable
-// CHECK-NOT:       integer_literal $Builtin.Int32, -2
-// CHECK-NEXT:      }
+// CHECK-NEXT:      } // end sil function 'remove_dead_code_after_unreachable'
 sil @remove_dead_code_after_unreachable : $@convention(thin) () -> (Int32) {
 bb0:
   unreachable
