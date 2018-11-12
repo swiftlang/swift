@@ -2101,8 +2101,9 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
                        LPLoc);
   }
   // Handle @autodiff(...).
-  // autodiff-attr = '@autodiff'
+  // autodiff-attr = '@autodiff' detailed-differentiability?
   else if (attr == TAK_autodiff) {
+    // FIXME(rxwei): Handle detailed differentiability.
     // Look ahead for detailed differentiability. This is necessary because we
     // should be able to parse `@autodiff(reverse) -> T` as a function type
     // where `reverse` is a type name.

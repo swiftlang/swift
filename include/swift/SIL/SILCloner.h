@@ -875,6 +875,23 @@ SILCloner<ImplClass>::visitGradientInst(GradientInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitAutoDiffFunctionInst(AutoDiffFunctionInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  SmallVector<SILValue, 16> mappedAssocFns;
+  mappedAssocFns.reserve(Inst->getNumAssociatedFunctions());
+  for (auto &fn : Inst->getAssociatedFunctions())
+    mappedAssocFns.push_back(getOpValue(fn.get()));
+  recordClonedInstruction(Inst,
+    getBuilder().createAutoDiffFunction(getOpLocation(Inst->getLoc()),
+                                        Inst->isLegacyReverseMode(),
+                                        Inst->getParameterIndices(),
+                                        Inst->getDifferentiationOrder(),
+                                        getOpValue(Inst->getOriginalFunction()),
+                                        mappedAssocFns));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitFunctionRefInst(FunctionRefInst *Inst) {
   SILFunction *OpFunction = getOpFunction(Inst->getReferencedFunction());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));

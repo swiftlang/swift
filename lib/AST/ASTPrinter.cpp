@@ -2329,6 +2329,9 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
     printer << "@autoclosure ";
   if (!options.excludeAttrKind(TAK_escaping) && flags.isEscaping())
     printer << "@escaping ";
+  // SWIFT_ENABLE_TENSORFLOW
+  if (!options.excludeAttrKind(TAK_nondiff) && flags.isNonDifferentiable())
+    printer << "@nondiff";
 
   switch (flags.getValueOwnership()) {
   case ValueOwnership::Default:
@@ -3607,6 +3610,11 @@ public:
     if (Options.SkipAttributes)
       return;
 
+    // SWIFT_ENABLE_TENSORFLOW
+    if (!Options.excludeAttrKind(TAK_autodiff) && info.isDifferentiable()) {
+      // FIXME(rxwei): Print differentiation order.
+      Printer << "@autodiff ";
+    }
 
     if (Options.PrintFunctionRepresentationAttrs &&
         !Options.excludeAttrKind(TAK_convention) &&
@@ -3655,6 +3663,12 @@ public:
       Optional<ProtocolConformanceRef> witnessMethodConformance) {
     if (Options.SkipAttributes)
       return;
+
+    // SWIFT_ENABLE_TENSORFLOW
+    if (!Options.excludeAttrKind(TAK_autodiff) && info.isDifferentiable()) {
+      // FIXME(rxwei): Print differentiation order.
+      Printer << "@autodiff ";
+    }
 
     if (Options.PrintFunctionRepresentationAttrs &&
         !Options.excludeAttrKind(TAK_convention) &&

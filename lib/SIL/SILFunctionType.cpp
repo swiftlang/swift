@@ -201,6 +201,15 @@ SILFunctionType::getGradientType(
                               getWitnessMethodConformanceOrNone());
 }
 
+CanSILFunctionType SILFunctionType::getWithDifferentiability(
+    unsigned differentiationOrder,
+    const SmallBitVector &parameterIndices) {
+  // FIXME(rxwei): Handle differentiation order.
+  // FIXME(rxwei): Handle parameter indices.
+  return getWithExtInfo(
+      getExtInfo().withDifferentiability(Differentiability::Bidirectional));
+}
+
 ProtocolDecl *
 SILFunctionType::getDefaultWitnessMethodProtocol() const {
   assert(getRepresentation() == SILFunctionTypeRepresentation::WitnessMethod);

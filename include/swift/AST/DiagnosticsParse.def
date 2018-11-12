@@ -1464,65 +1464,60 @@ ERROR(attr_implements_expected_member_name,PointsToFirstBadToken,
 // differentiable
 ERROR(attr_differentiable_expected_function_name,PointsToFirstBadToken,
       "expected a qualified %0 function", (StringRef))
-
 ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
       "expected a list of parameters to differentiate with respect to, e.g. (.0, w, b)", ())
-
 ERROR(attr_differentiable_expected_parameter,PointsToFirstBadToken,
       "expected a parameter, which can be the index of a function parameter with a leading dot (e.g. '.0'), or 'self'", ())
-
 ERROR(attr_differentiable_parameter_index_must_be_positive_integer,PointsToFirstBadToken,
       "parameter index must be a positive integer", ())
-
 ERROR(attr_differentiable_nondifferentiable_function,none,
       "function '%0' is not differentiable", (StringRef))
-
 ERROR(attr_differentiable_duplicate_config_option,PointsToFirstBadToken,
       "duplicated gradient configuration option '%0'", (StringRef))
-
 ERROR(attr_differentiable_expected_mode,PointsToFirstBadToken,
       "expected a differentiation mode ('forward' or 'reverse')", ())
-
 ERROR(attr_differentiable_missing_label,PointsToFirstBadToken,
       "missing label '%0:' in '@differentiable' attribute", (StringRef))
-
 ERROR(attr_differentiable_expected_colon_after_label,PointsToFirstBadToken,
       "expected a colon ':' after '%0'", (StringRef))
-
 ERROR(attr_differentiable_expected_config_after_comma,none,
       "expected a configuration, e.g. 'wrt:', 'primal:' or 'adjoint:'", ())
 
 // [differentiable ...] (sil-decl attr)
 ERROR(sil_attr_differentiable_expected_keyword,PointsToFirstBadToken,
       "expected '%0' in 'differentiable' attribute", (StringRef))
-
 ERROR(sil_attr_differentiable_expected_adjoint_identifier,PointsToFirstBadToken,
       "expected the identifier of an adjoint function", ())
-
 ERROR(sil_attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
       "expected an comma-separated list of parameter indices, e.g. (0, 1)", ())
-
 ERROR(sil_attr_differentiable_expected_rsquare,PointsToFirstBadToken,
       "expected ']' to end 'differentiable' attribute", ())
 
 // SIL autodiff
 ERROR(sil_reverse_autodiff_expected_source_index,PointsToFirstBadToken,
       "expected the index of an original result to differentiate from", ())
-
 ERROR(sil_reverse_autodiff_expected_parameter_index,PointsToFirstBadToken,
       "expected the index of a parameter to differentiate with respect to", ())
-
 ERROR(sil_reverse_autodiff_expected_option,PointsToFirstBadToken,
       "expected a gradient option: 'seedable', 'preserving_result' or 'delayed'", ())
-
 ERROR(sil_reverse_autodiff_duplicate_option,PointsToFirstBadToken,
       "duplicate gradient option", ())
-
 ERROR(sil_gradient_invalid_seed_type,PointsToFirstBadToken,
       "expected seed '%0' to have type %1", (StringRef, Type))
-
 ERROR(sil_gradient_expected_source_index,PointsToFirstBadToken,
       "expected the index of the result to specify the differentiation source", ())
+ERROR(sil_inst_autodiff_attr_expected_rsquare,PointsToFirstBadToken,
+      "expected ']' to complete the %0", (StringRef))
+ERROR(sil_inst_autodiff_expected_order,PointsToFirstBadToken,
+      "expected an unsigned integer indicating the differentiation order", ())
+ERROR(sil_inst_autodiff_operand_list_expected_lbrace,PointsToFirstBadToken,
+      "expected '{' to start an associated function list", ())
+ERROR(sil_inst_autodiff_operand_list_expected_comma,PointsToFirstBadToken,
+      "expected ',' between operands in an associated function list", ())
+ERROR(sil_inst_autodiff_operand_list_expected_rbrace,PointsToFirstBadToken,
+      "expected '}' to start an associated function list", ())
+ERROR(sil_inst_autodiff_num_operand_list_order_mismatch,PointsToFirstBadToken,
+      "the number of operand lists does not match the order", ())
 
 // SWIFT_ENABLE_TENSORFLOW
 ERROR(pound_assert_expected,PointsToFirstBadToken,

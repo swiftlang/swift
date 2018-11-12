@@ -620,6 +620,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   // Automatic differentiation
   SINGLE_VALUE_INST(GradientInst, gradient,
                     SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(AutoDiffFunctionInst, autodiff_function,
+                    SingleValueInstruction, None, DoesNotRelease)
 
   // Key paths
   // TODO: The only "side effect" is potentially retaining the returned key path

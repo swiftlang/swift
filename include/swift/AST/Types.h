@@ -4072,7 +4072,10 @@ public:
 
   /// SWIFT_ENABLE_TENSORFLOW
   CanSILFunctionType getGradientType(
-    const SILAutoDiffConfig &config, SILModule &M);
+      const SILAutoDiffConfig &config, SILModule &M);
+
+  CanSILFunctionType getWithDifferentiability(
+      unsigned differentiationOrder, const SmallBitVector &parameterIndices);
 
   /// If this is a @convention(witness_method) function with a protocol
   /// constrained self parameter, return the protocol constraint for
