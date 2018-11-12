@@ -2996,7 +2996,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (parseTypedValueRef(original, B))
       return true;
     SmallVector<SILValue, 16> associatedFunctions;
-    /*
     // Parse optional operand lists `with { <operand>... }, ...`.
     if (P.Tok.is(tok::identifier) && P.Tok.getText() == "with") {
       P.consumeToken(tok::identifier);
@@ -3026,7 +3025,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         return true;
       }
     }
-     */
     if (parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createAutoDiffFunction(InstLoc, isLegacyReverseMode,

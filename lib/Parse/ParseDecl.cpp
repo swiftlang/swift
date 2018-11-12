@@ -2280,6 +2280,9 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   // SWIFT_ENABLE_TENSORFLOW
   // @autodiff(...) attribute.
   case TAK_autodiff:
+    Attributes.differentiabilityAndOrder = {
+      differentiabilityName, differentiationOrder
+    };
     break;
   }
 

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-all %s | %FileCheck %s
+// RUN: %target-sil-opt %s | %FileCheck %s
 
 sil_stage raw
 
@@ -18,7 +18,7 @@ sil @make_diff_func : $@convention(thin) () -> @autodiff @convention(thin) (Floa
 bb0:
   %0 = function_ref @foo : $@convention(thin) (Float) -> Float
   %1 = autodiff_function [legacy_reverse] [wrt 0 1] [order 1] %0 : $@convention(thin) (Float) -> Float
-  return %0 : $@convention(thin) (Float) -> Float
+  return %1 : $@autodiff @convention(thin) (Float) -> Float
 }
 
 // CHECK-LABEL: @make_diff_func
