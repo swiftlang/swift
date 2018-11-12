@@ -941,12 +941,11 @@ class infer_instanceVar1 {
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   var var_PlainEnum: PlainEnum
-  // expected-error@-1 {{stored property 'var_PlainEnum' cannot have enum type 'PlainEnum' with no cases}}
+// CHECK-LABEL: {{^}} var var_PlainEnum: PlainEnum
 
   @objc var var_PlainEnum_: PlainEnum
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{non-'@objc' enums cannot be represented in Objective-C}}
-  // expected-error@-3 {{stored property 'var_PlainEnum_' cannot have enum type 'PlainEnum' with no cases}}
 
   var var_PlainProtocol: PlainProtocol
 // CHECK-LABEL: {{^}}  var var_PlainProtocol: PlainProtocol
@@ -1272,7 +1271,6 @@ class infer_instanceVar1 {
   // expected-error@-1 {{'unowned' may only be applied to class and class-bound protocol types, not 'PlainStruct'}}
   unowned var var_Unowned_bad3: PlainEnum
   // expected-error@-1 {{'unowned' may only be applied to class and class-bound protocol types, not 'PlainEnum'}}
-  // expected-error@-2 {{stored property 'var_Unowned_bad3' cannot have enum type 'PlainEnum' with no cases}}
   unowned var var_Unowned_bad4: String
   // expected-error@-1 {{'unowned' may only be applied to class and class-bound protocol types, not 'String'}}
 // CHECK-NOT: @objc{{.*}}Unowned_fail
