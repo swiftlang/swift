@@ -649,17 +649,6 @@ public func _extractDynamicValue<T>(_ value: T) -> AnyObject?
 @_silgen_name("_swift_bridgeToObjectiveCUsingProtocolIfPossible")
 public func _bridgeToObjectiveCUsingProtocolIfPossible<T>(_ value: T) -> AnyObject?
 
-@usableFromInline
-protocol _Unwrappable {
-  func unwrap() -> Any?
-}
-
-extension Optional: _Unwrappable {
-  func unwrap() -> Any? {
-    return self
-  }
-}
-
 private let _foundationSwiftValueType = _typeByName("Foundation.__SwiftValue") as? _NSSwiftValue.Type
 
 @usableFromInline
