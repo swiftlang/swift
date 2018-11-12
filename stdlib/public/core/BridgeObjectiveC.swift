@@ -649,13 +649,12 @@ public func _extractDynamicValue<T>(_ value: T) -> AnyObject?
 @_silgen_name("_swift_bridgeToObjectiveCUsingProtocolIfPossible")
 public func _bridgeToObjectiveCUsingProtocolIfPossible<T>(_ value: T) -> AnyObject?
 
-@usableFromInline
-protocol _Unwrappable {
-  func unwrap() -> Any?
+internal protocol _Unwrappable {
+  func _unwrap() -> Any?
 }
 
 extension Optional: _Unwrappable {
-  func unwrap() -> Any? {
+  internal func _unwrap() -> Any? {
     return self
   }
 }
@@ -706,7 +705,7 @@ public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   }
   
   if !done, let wrapper = source as? _Unwrappable {
-    if let value = wrapper.unwrap() {
+    if let value = wrapper._unwrap() {
       result = value as AnyObject
     } else {
       result = _nullPlaceholder
