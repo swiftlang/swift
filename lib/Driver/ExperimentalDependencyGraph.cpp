@@ -25,34 +25,32 @@
 #include "llvm/Support/YAMLParser.h"
 
 using namespace swift;
-using namespace driver;
 
 using namespace swift::experimental_dependencies;
+using namespace swift::driver;
 using namespace swift::driver::experimental_dependencies;
 
-DependencyGraph::DependencyGraph()
-{}
 
-void DependencyGraph::registerCmdForReevaluation(const Job* Cmd) {
+void ExpDependencyGraph::registerCmdForReevaluation(const Job* Cmd) {
   registerDepsFileForReevaluation(depsFileForCmd(Cmd));
 }
 
-Job::Condition DependencyGraph::loadFromFile(const Job* Cmd, StringRef filename) {
+Job::Condition ExpDependencyGraph::loadFromFile(const Job* Cmd, StringRef filename) {
   return Job::Condition::Always;
 }
 
-std::string DependencyGraph::depsFileForCmd(const Job* Cmd) {
+std::string ExpDependencyGraph::depsFileForCmd(const Job* Cmd) {
   return Cmd->getOutput().getAdditionalOutputForType(file_types::TY_SwiftDeps);
 }
-void DependencyGraph::registerDepsFileForReevaluation(std::string depsFile) {
+void ExpDependencyGraph::registerDepsFileForReevaluation(std::string depsFile) {
   abort();
 }
 
-void DependencyGraph::addNode(Node* n) {
+void ExpDependencyGraph::addNode(Node* n) {
   nodesByNameForDependencies.insert(std::make_pair(n->getNameForDependencies(), n));
   Graph::addNode(n);
 }
 
-//void DependencyGraph::addArc(Arc* a) {
+//void ExpDependencyGraph::addArc(Arc* a) {
 //  Graph::addArc(a);
 //}

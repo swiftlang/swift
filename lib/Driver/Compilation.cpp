@@ -218,7 +218,7 @@ namespace driver {
     DependencyGraph StandardDepGraph;
 
     /// Experimental Dependency graph for finer-grained dependencies
-    Optional<experimental_dependencies::DependencyGraph> ExpDepGraph;
+    Optional<experimental_dependencies::ExpDependencyGraph> ExpDepGraph;
   private:
     /// Helper for tracing the propagation of marks in the graph.
     DependencyGraph::MarkTracer ActualIncrementalTracer;
