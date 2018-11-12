@@ -50,7 +50,7 @@ namespace swift {
         ExpDependencyGraph(ExpDependencyGraph &&other) = default;
         
         static Job::Condition loadFromFile(const Job* Cmd, StringRef filename);
-        DependencyGraphImpl::LoadResult loadFromPath(const Job* Cmd, StringRef filename);
+        DependencyGraphImpl::LoadResult loadFromPath(const Job* Cmd, StringRef path);
         
         bool isMarked(const Job* Cmd) const;//XXX
         
@@ -67,6 +67,15 @@ namespace swift {
                           StringRef externalDependency);
         
       private:
+        DependencyGraphImpl::LoadResult loadFromBuffer(const void *node,
+                                                       llvm::MemoryBuffer &buffer);
+        using NodeCallbackTy = void(const Node*);
+        using ErrorCallbackTy = void();
+        static void
+        parseDependencyFile(llvm::MemoryBuffer &buffer,
+                            llvm::function_ref<NodeCallbackTy> nodeCallback,
+                            llvm::function_ref<ErrorCallbackTy> errorCallback);
+
         void registerCmdForReevaluation(const Job* Cmd);
         static std::string depsFileForCmd(const Job* Cmd);
         void registerDepsFileForReevaluation(std::string depsFile); // XXX
