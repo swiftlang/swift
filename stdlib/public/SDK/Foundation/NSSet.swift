@@ -29,7 +29,7 @@ extension Set {
     //
     // The bug is fixed in: OS X 10.11.0, iOS 9.0, all versions of tvOS
     // and watchOS.
-    self = Set(_immutableCocoaSet: _cocoaSet.copy(with: nil))
+    self = Set(_immutableCocoaSet: _cocoaSet.copy(with: nil) as AnyObject)
   }
 }
 

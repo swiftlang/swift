@@ -24,11 +24,11 @@
 import SwiftShims
 
 @objc
-public protocol _ShadowProtocol {}
+internal protocol _ShadowProtocol {}
 
 /// A shadow for the `NSFastEnumeration` protocol.
 @objc
-public protocol _NSFastEnumeration : _ShadowProtocol {
+internal protocol _NSFastEnumeration: _ShadowProtocol {
   @objc(countByEnumeratingWithState:objects:count:)
   func countByEnumerating(
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
@@ -38,17 +38,17 @@ public protocol _NSFastEnumeration : _ShadowProtocol {
 
 /// A shadow for the `NSEnumerator` class.
 @objc
-public protocol _NSEnumerator : _ShadowProtocol {
+internal protocol _NSEnumerator: _ShadowProtocol {
   init()
   func nextObject() -> AnyObject?
 }
 
 /// A token that can be used for `NSZone*`.
-public typealias _SwiftNSZone = OpaquePointer
+internal typealias _SwiftNSZone = OpaquePointer
 
 /// A shadow for the `NSCopying` protocol.
 @objc
-public protocol _NSCopying : _ShadowProtocol {
+internal protocol _NSCopying: _ShadowProtocol {
   @objc(copyWithZone:)
   func copy(with zone: _SwiftNSZone?) -> AnyObject
 }

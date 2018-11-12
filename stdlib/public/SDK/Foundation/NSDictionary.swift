@@ -49,7 +49,7 @@ extension Dictionary {
     // The bug is fixed in: OS X 10.11.0, iOS 9.0, all versions of tvOS
     // and watchOS.
     self = Dictionary(
-      _immutableCocoaDictionary: _cocoaDictionary.copy(with: nil))
+      _immutableCocoaDictionary: _cocoaDictionary.copy(with: nil) as AnyObject)
   }
 }
 

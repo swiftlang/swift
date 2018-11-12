@@ -344,3 +344,39 @@ Func _BridgeStorage.isUniquelyReferencedNative() has generic signature change fr
 Func _BridgeStorage.isUniquelyReferencedUnflaggedNative() has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : AnyObject, τ_0_1 : AnyObject> to <τ_0_0 where τ_0_0 : AnyObject>
 Struct _BridgeStorage has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : AnyObject, τ_0_1 : AnyObject> to <τ_0_0 where τ_0_0 : AnyObject>
 Var _BridgeStorage.objCInstance has declared type change from τ_0_1 to AnyObject
+
+Class _ContiguousArrayStorage has removed conformance to _NSCopying
+Class _ContiguousArrayStorage has removed conformance to _NSFastEnumeration
+Class _ContiguousArrayStorage has removed conformance to _ShadowProtocol
+Class _DictionaryStorage has removed conformance to _NSCopying
+Class _DictionaryStorage has removed conformance to _NSFastEnumeration
+Class _DictionaryStorage has removed conformance to _ShadowProtocol
+Class _EmptyDictionarySingleton has removed conformance to _NSCopying
+Class _EmptyDictionarySingleton has removed conformance to _NSFastEnumeration
+Class _EmptyDictionarySingleton has removed conformance to _ShadowProtocol
+Class _EmptySetSingleton has removed conformance to _NSCopying
+Class _EmptySetSingleton has removed conformance to _NSFastEnumeration
+Class _EmptySetSingleton has removed conformance to _ShadowProtocol
+Class _SetStorage has removed conformance to _NSCopying
+Class _SetStorage has removed conformance to _NSFastEnumeration
+Class _SetStorage has removed conformance to _ShadowProtocol
+Class _SharedStringStorage has removed conformance to _NSCopying
+Class _SharedStringStorage has removed conformance to _ShadowProtocol
+Class _StringStorage has removed conformance to _NSCopying
+Class _StringStorage has removed conformance to _ShadowProtocol
+Class __ContiguousArrayStorageBase has removed conformance to _NSCopying
+Class __ContiguousArrayStorageBase has removed conformance to _NSFastEnumeration
+Class __ContiguousArrayStorageBase has removed conformance to _ShadowProtocol
+Class __EmptyArrayStorage has removed conformance to _NSCopying
+Class __EmptyArrayStorage has removed conformance to _NSFastEnumeration
+Class __EmptyArrayStorage has removed conformance to _ShadowProtocol
+Class __SwiftDeferredNSArray has removed conformance to _NSCopying
+Class __SwiftDeferredNSArray has removed conformance to _NSFastEnumeration
+Class __SwiftDeferredNSArray has removed conformance to _ShadowProtocol
+Class __SwiftNativeNSArrayWithContiguousStorage has removed conformance to _NSCopying
+Class __SwiftNativeNSArrayWithContiguousStorage has removed conformance to _NSFastEnumeration
+Class __SwiftNativeNSArrayWithContiguousStorage has removed conformance to _ShadowProtocol
+Protocol _NSCopying has been removed
+Protocol _NSEnumerator has been removed
+Protocol _NSFastEnumeration has been removed
+Protocol _ShadowProtocol has been removed
