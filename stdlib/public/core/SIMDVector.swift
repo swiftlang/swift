@@ -21,14 +21,24 @@ public protocol SIMDVectorStorage {
   /// The type of scalars in the vector space.
   associatedtype Scalar : Hashable
   
-  /// The number of elements in the vector.
-  var elementCount: Int { get }
+  /// The number of scalars/elements in the vector.
+  var scalarCount: Int { get }
   
   /// A vector with zero in all lanes.
   init()
   
   /// Element access to the vector.
   subscript(index: Int) -> Scalar { get set }
+}
+
+public protocol SIMDVectorizable {
+  associatedtype MaskElement : SIMDVectorizable & FixedWidthInteger & SignedInteger
+  associatedtype Vector2Storage : SIMDVectorStorage where Vector2Storage.Scalar == Self
+  associatedtype Vector4Storage : SIMDVectorStorage where Vector4Storage.Scalar == Self
+  associatedtype Vector8Storage : SIMDVectorStorage where Vector8Storage.Scalar == Self
+  associatedtype Vector16Storage : SIMDVectorStorage where Vector16Storage.Scalar == Self
+  associatedtype Vector32Storage : SIMDVectorStorage where Vector32Storage.Scalar == Self
+  associatedtype Vector64Storage : SIMDVectorStorage where Vector64Storage.Scalar == Self
 }
 
 public protocol SIMDVector : SIMDVectorStorage,
@@ -45,7 +55,7 @@ public protocol SIMDMaskVector : SIMDVector where Scalar == Bool, Mask == Self {
 public extension SIMDVector {
   /// The valid indices for subscripting the vector.
   @_transparent
-  var indices: Range<Int> { return 0 ..< elementCount }
+  var indices: Range<Int> { return 0 ..< scalarCount }
   
   /// A vector with value in all lanes.
   @_transparent
@@ -91,20 +101,24 @@ public extension SIMDVector {
   }
   
   @inlinable
-  init(arrayLiteral elements: Scalar...) {
-    self.init(elements)
+  init(arrayLiteral scalars: Scalar...) {
+    self.init(scalars)
   }
   
   @inlinable
-  init<S: Sequence>(_ elements: S) where S.Element == Scalar {
+  init<S: Sequence>(_ scalars: S) where S.Element == Scalar {
     self.init()
     var index = 0
-    for element in elements {
-      if index == elementCount { _preconditionFailure("Too many elements in sequence.") }
-      self[index] = element
+    for scalar in scalars {
+      if index == scalarCount {
+        _preconditionFailure("Too many elements in sequence.")
+      }
+      self[index] = scalar
       index += 1
     }
-    if index < elementCount { _preconditionFailure("Not enough elements in sequence.") }
+    if index < scalarCount {
+      _preconditionFailure("Not enough elements in sequence.")
+    }
   }
 }
 
@@ -553,16 +567,6 @@ where Scalar : BinaryFloatingPoint, Scalar.RawSignificand : FixedWidthInteger {
   }
 }
 
-public protocol SIMDVectorizable {
-  associatedtype _MaskElement : SIMDVectorizable & FixedWidthInteger & SignedInteger
-  associatedtype _Vector2 : SIMDVectorStorage where _Vector2.Scalar == Self
-  associatedtype _Vector4 : SIMDVectorStorage where _Vector4.Scalar == Self
-  associatedtype _Vector8 : SIMDVectorStorage where _Vector8.Scalar == Self
-  associatedtype _Vector16 : SIMDVectorStorage where _Vector16.Scalar == Self
-  associatedtype _Vector32 : SIMDVectorStorage where _Vector32.Scalar == Self
-  associatedtype _Vector64 : SIMDVectorStorage where _Vector64.Scalar == Self
-}
-
 @_fixed_layout
 public struct SIMDMask<Storage> : SIMDMaskVector
   where Storage : SIMDVector,
@@ -575,8 +579,8 @@ public struct SIMDMask<Storage> : SIMDMaskVector
   public typealias Scalar = Bool
   
   @_transparent
-  public var elementCount: Int {
-    return _storage.elementCount
+  public var scalarCount: Int {
+    return _storage.scalarCount
   }
   
   @_transparent

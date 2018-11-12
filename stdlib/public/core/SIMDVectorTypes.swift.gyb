@@ -1,27 +1,27 @@
 %{
 from SwiftIntTypes import all_integer_types
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
-storageElementCounts = [2,4,8,16,32,64]
-vectorElementCounts = storageElementCounts + [3]
+storagescalarCounts = [2,4,8,16,32,64]
+vectorscalarCounts = storagescalarCounts + [3]
 }%
 
-%for n in vectorElementCounts:
+%for n in vectorscalarCounts:
 % storageN = 4 if n == 3 else n
 @_fixed_layout
 public struct Vector${n}<Scalar> : SIMDVector where Scalar: SIMDVectorizable {
 
-  public var _storage: Scalar._Vector${storageN}
+  public var _storage: Scalar.Vector${storageN}Storage
 
-  public typealias Mask = SIMDMask<Vector${n}<Scalar._MaskElement>>
+  public typealias Mask = SIMDMask<Vector${n}<Scalar.MaskElement>>
 
   @_transparent
-  public var elementCount: Int {
+  public var scalarCount: Int {
     return ${n}
   }
 
   @_transparent
   public init() {
-    _storage = Scalar._Vector${storageN}()
+    _storage = Scalar.Vector${storageN}Storage()
   }
 
   public subscript(index: Int) -> Scalar {
@@ -134,15 +134,15 @@ public extension Vector${n} where Scalar : BinaryFloatingPoint {
 % Mask = Self if self_type.is_signed else self_type.get_opposite_signedness().stdlib_name
 extension ${Self} : SIMDVectorizable {
 
-  public typealias _MaskElement = ${Mask}
+  public typealias MaskElement = ${Mask}
 
-% for n in storageElementCounts:
-  @_fixed_layout public struct _Vector${n} : SIMDVectorStorage {
+% for n in storagescalarCounts:
+  @_fixed_layout public struct Vector${n}Storage : SIMDVectorStorage {
 
     public var _value: Builtin.Vec${n}x${BuiltinName}
 
     @_transparent
-    public var elementCount: Int {
+    public var scalarCount: Int {
       return ${n}
     }
 
@@ -175,15 +175,15 @@ extension ${Self} : SIMDVectorizable {
 %for (Self, bits) in [('Float',32), ('Double',64)]:
 extension ${Self} : SIMDVectorizable {
 
-  public typealias _MaskElement = Int${bits}
+  public typealias MaskElement = Int${bits}
 
-% for n in storageElementCounts:
-  @_fixed_layout public struct _Vector${n} : SIMDVectorStorage {
+% for n in storagescalarCounts:
+  @_fixed_layout public struct Vector${n}Storage : SIMDVectorStorage {
 
     public var _value: Builtin.Vec${n}xFPIEEE${bits}
 
     @_transparent
-    public var elementCount: Int {
+    public var scalarCount: Int {
       return ${n}
     }
 
