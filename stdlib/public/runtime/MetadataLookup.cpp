@@ -1565,6 +1565,13 @@ void DynamicReplacementDescriptor::enableReplacement() const {
     }
   }
 
+  // Unlink the previous entry if we are not chaining.
+  if (!shouldChain() && chainRoot->next) {
+    auto *previous = chainRoot->next;
+    chainRoot->next = previous->next;
+    chainRoot->implementationFunction = previous->implementationFunction;
+  }
+
   // First populate the current replacement's chain entry.
   auto *currentEntry =
       const_cast<DynamicReplacementChainEntry *>(chainEntry.get());

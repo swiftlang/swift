@@ -1288,7 +1288,7 @@ void IRGenerator::emitDynamicReplacements() {
   //     RelativeIndirectablePointer<KeyEntry, false> replacedFunctionKey;
   //     RelativeDirectPointer<void> newFunction;
   //     RelativeDirectPointer<LinkEntry> replacement;
-  //     uint32_t flags; // unused.
+  //     uint32_t flags; // shouldChain.
   //   }[0]
   // };
   ConstantInitBuilder builder(IGM);
@@ -1315,7 +1315,8 @@ void IRGenerator::emitDynamicReplacements() {
     replacement.addRelativeAddress(newFnPtr); // direct relative reference.
     replacement.addRelativeAddress(
         replacementLinkEntry); // direct relative reference.
-    replacement.addInt32(0); // unused flags.
+    replacement.addInt32(
+        Opts.EnableDynamicReplacementChaining ? 1 : 0);
     replacement.finishAndAddTo(replacementsArray);
   }
   replacementsArray.finishAndAddTo(replacementScope);

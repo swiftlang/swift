@@ -989,6 +989,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
 
+  Opts.EnableDynamicReplacementChaining |=
+      Args.hasArg(OPT_enable_dynamic_replacement_chaining);
+
   Opts.UseSwiftCall = Args.hasArg(OPT_enable_swiftcall);
 
   // This is set to true by default.
