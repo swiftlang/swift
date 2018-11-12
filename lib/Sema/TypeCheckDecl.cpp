@@ -3278,6 +3278,17 @@ public:
       // Record the body.
       TC.definedFunctions.push_back(FD);
     }
+    
+    // If any of the function's parameters contain an uninhabited type
+    // then emit a diagnostic on the func decl, as the function can never
+    // be called.
+    auto params = FD->getParameters()->getArray();
+    for (auto &&index: indices(params)) {
+      auto param = params[index];
+      if (param->hasInterfaceType() && param->getType()->isStructurallyUninhabited()) {
+        TC.diagnose(FD->getLoc(), diag::function_parameter_type_uninhabited, FD->getName(), param->getName());
+      }
+    }
 
     if (FD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
       TC.checkDynamicReplacementAttribute(FD);

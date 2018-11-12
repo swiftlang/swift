@@ -3559,6 +3559,8 @@ ERROR(unsupported_convention,none,
       "convention '%0' not supported", (StringRef))
 ERROR(unreferenced_generic_parameter,none,
       "generic parameter '%0' is not used in function signature", (StringRef))
+WARNING(function_parameter_type_uninhabited,none,
+      "%0 can never be called as %1 is uninhabited", (Identifier, Identifier))
 
 // SIL
 ERROR(opened_non_protocol,none,
