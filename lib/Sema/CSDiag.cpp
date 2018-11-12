@@ -6697,8 +6697,8 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
                                            : defaultUnqualifiedLookupOptions),
                                corrections);
 
-      if (currentType)
-        if (isa<TupleType>(currentType.getPointer())) {
+      if (currentType) {
+        if (currentType->is<TupleType>()) {
           TC.diagnose(KPE->getLoc(), diag::expr_keypath_unimplemented_tuple);
           isInvalid = true;
           break;
@@ -6706,7 +6706,7 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
         else
           TC.diagnose(componentNameLoc, diag::could_not_find_type_member,
                       currentType, componentName);
-      else
+      } else
         TC.diagnose(componentNameLoc, diag::use_unresolved_identifier,
                     componentName, false);
 
