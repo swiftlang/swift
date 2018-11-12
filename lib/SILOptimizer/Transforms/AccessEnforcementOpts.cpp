@@ -241,6 +241,13 @@ public:
     /// Map each begin access to its AccessInfo with index, data, and flags.
     /// Iterating over this map is nondeterministic. If it is necessary to order
     /// the accesses, then AccessInfo::getAccessIndex() can be used.
+    /// This maps contains every dynamic begin_access instruction,
+    /// even those with invalid storage:
+    /// We would like to keep track of unrecognized or invalid storage locations
+    /// Because they affect our decisions for recognized locations,
+    /// be it nested conflict or merging out of scope accesses.
+    /// The access map is just a “cache” of accesses.
+    /// Keeping those invalid ones just makes the lookup faster
     AccessMap accessMap;
 
     /// Instruction pairs we can merge the scope of
@@ -536,8 +543,6 @@ void AccessConflictAndMergeAnalysis::identifyBeginAccesses() {
       // here as an invalid `storage` value.
       const AccessedStorage &storage =
           findAccessedStorageNonNested(beginAccess->getSource());
-      if (!storage)
-        continue;
 
       auto iterAndSuccess = result.accessMap.try_emplace(
           beginAccess, static_cast<const AccessInfo &>(storage));
