@@ -285,7 +285,7 @@ public:
   void visitAccessControlAttr(AccessControlAttr *attr);
   void visitSetterAccessAttr(SetterAccessAttr *attr);
   bool visitAbstractAccessControlAttr(AbstractAccessControlAttr *attr);
-  void visitSILStoredAttr(SILStoredAttr *attr);
+  void visitHasStorageAttr(HasStorageAttr *attr);
   void visitObjCMembersAttr(ObjCMembersAttr *attr);
 };
 } // end anonymous namespace
@@ -428,7 +428,7 @@ void AttributeEarlyChecker::visitGKInspectableAttr(GKInspectableAttr *attr) {
                                  attr->getAttrName());
 }
 
-void AttributeEarlyChecker::visitSILStoredAttr(SILStoredAttr *attr) {
+void AttributeEarlyChecker::visitHasStorageAttr(HasStorageAttr *attr) {
   auto *VD = cast<VarDecl>(D);
   if (VD->getDeclContext()->getSelfClassDecl())
     return;
@@ -819,6 +819,7 @@ public:
     IGNORED_ATTR(Exported)
     IGNORED_ATTR(ForbidSerializingReference)
     IGNORED_ATTR(GKInspectable)
+    IGNORED_ATTR(HasStorage)
     IGNORED_ATTR(IBDesignable)
     IGNORED_ATTR(IBInspectable)
     IGNORED_ATTR(IBOutlet) // checked early.
@@ -846,7 +847,6 @@ public:
     IGNORED_ATTR(Semantics)
     IGNORED_ATTR(ShowInInterface)
     IGNORED_ATTR(SILGenName)
-    IGNORED_ATTR(SILStored)
     IGNORED_ATTR(StaticInitializeObjCMetadata)
     IGNORED_ATTR(SynthesizedProtocol)
     IGNORED_ATTR(Testable)

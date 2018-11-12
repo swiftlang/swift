@@ -9,7 +9,7 @@ import Foundation
 
 class C: NSObject {
   @objc dynamic var x: NSString { get }
-  @sil_stored final var stored: Int
+  @_hasStorage final var stored: Int
   override init()
 }
 
