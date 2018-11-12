@@ -536,8 +536,6 @@ void AccessConflictAndMergeAnalysis::identifyBeginAccesses() {
       // here as an invalid `storage` value.
       const AccessedStorage &storage =
           findAccessedStorageNonNested(beginAccess->getSource());
-      if (!storage)
-        continue;
 
       auto iterAndSuccess = result.accessMap.try_emplace(
           beginAccess, static_cast<const AccessInfo &>(storage));
