@@ -24,21 +24,30 @@
 
 
 // Check a.swift's AST
-// A-AST: (source_file "{{.*}}a.swift"
+// A-AST: (source_file
+// A-AST-SAME: a.swift
+
 // A-AST-NEXT: (func_decl
-// A-AST-SAME: "a()"
+// A-AST-SAME: a()
+
 
 // Check b.swift's AST
-// B-AST: (source_file "{{[^)]*}}b.swift"
+// B-AST: (source_file
+// B-AST-SAME: b.swift
+
 // B-AST-NEXT: (func_decl
-// B-AST-SAME: "b()"
+// B-AST-SAME: b()
+
 
 // Check main.swift's AST
-// MAIN-AST: (source_file "{{.*}}main.swift"
-// MAIN-AST-NEXT: (func_decl {{[^)]*}} "main()" interface type='() -> ()' access=public
+// MAIN-AST: (source_file
+// MAIN-AST-SAME: main.swift
+
+// MAIN-AST: (func_decl
+// MAIN-AST-SAME: main()
+
 // MAIN-AST: (call_expr
-// MAIN-AST-NEXT: decl=main.(file).a()@{{.*}}a.swift
-// MAIN-AST-NEXT: (tuple_expr type='()'
+// MAIN-AST-NEXT: a()
+
 // MAIN-AST: (call_expr
-// MAIN-AST-NEXT: decl=main.(file).b()@{{.*}}b.swift
-// MAIN-AST-NEXT: (tuple_expr type='()'
+// MAIN-AST-NEXT: b()
