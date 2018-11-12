@@ -96,7 +96,7 @@ ERROR(generic_signature_not_minimal,none,
       "generic requirement '%0' is redundant in %1", (StringRef, StringRef))
 
 WARNING(protocol_extension_redundant_requirement,none,
-      "requirement of '%1': '%2' is redundant in an extension of '%0'",
+      "requirement of '%1' to '%2' is redundant in an extension of '%0'",
       (StringRef, StringRef, StringRef))
 
 ERROR(attr_only_on_parameters, none,
