@@ -19,6 +19,7 @@
 /// Note: Global variables are lazy, so the following declaration won't produce
 // a Python import error until it is first used.
 private let np = Python.import("numpy")
+private let ctypes = Python.import("ctypes")
 
 /// A type that can be initialized from a `numpy.ndarray` instance represented
 /// as a `PythonObject`.
@@ -31,50 +32,63 @@ public protocol NumpyScalarCompatible {
   /// The NumPy scalar types that this type is bitwise compatible with. Must
   /// be nonempty.
   static var numpyScalarTypes: [PythonObject] { get }
+  /// The Python `ctypes` scalar type corresponding to this type.
+  static var ctype: PythonObject { get }
 }
 
 extension Bool : NumpyScalarCompatible {
   public static let numpyScalarTypes = [np.bool_, Python.bool]
+  public static var ctype: PythonObject { return ctypes.c_bool }
 }
 
 extension UInt8 : NumpyScalarCompatible {
   public static let numpyScalarTypes = [np.uint8]
+  public static var ctype: PythonObject { return ctypes.c_uint8 }
 }
 
 extension Int8 : NumpyScalarCompatible {
   public static let numpyScalarTypes = [np.int8]
+  public static var ctype: PythonObject { return ctypes.c_int8 }
 }
 
 extension UInt16 : NumpyScalarCompatible {
   public static let numpyScalarTypes = [np.uint16]
+  public static var ctype: PythonObject { return ctypes.c_uint16 }
 }
 
 extension Int16 : NumpyScalarCompatible {
   public static let numpyScalarTypes = [np.int16]
+  public static var ctype: PythonObject { return ctypes.c_int16 }
 }
 
 extension UInt32 : NumpyScalarCompatible {
   public static let numpyScalarTypes = [np.uint32]
+  public static var ctype: PythonObject { return ctypes.c_uint32 }
 }
 
 extension Int32 : NumpyScalarCompatible {
   public static let numpyScalarTypes = [np.int32]
+  public static var ctype: PythonObject { return ctypes.c_int32 }
 }
 
 extension UInt64 : NumpyScalarCompatible {
   public static let numpyScalarTypes = [np.uint64]
+  public static var ctype: PythonObject { return ctypes.c_uint64 }
 }
 
 extension Int64 : NumpyScalarCompatible {
   public static let numpyScalarTypes = [np.int64]
+  public static var ctype: PythonObject { return ctypes.c_int64 }
 }
 
 extension Float : NumpyScalarCompatible {
   public static let numpyScalarTypes = [np.float32]
+  public static var ctype: PythonObject { return ctypes.c_float }
 }
 
 extension Double : NumpyScalarCompatible {
   public static let numpyScalarTypes = [np.float64]
+  public static var ctype: PythonObject { return ctypes.c_double }
 }
 
 extension Array : ConvertibleFromNumpyArray
@@ -117,6 +131,17 @@ extension Array : ConvertibleFromNumpyArray
     dummyPointer.deallocate()
     withUnsafeMutableBufferPointer { buffPtr in
       buffPtr.baseAddress!.assign(from: ptr, count: scalarCount)
+    }
+  }
+}
+
+public extension Array where Element : NumpyScalarCompatible {
+  func makeNumpyArray() -> PythonObject {
+    return withUnsafeBytes { bytes in
+      let data = ctypes.cast(Int(bitPattern: bytes.baseAddress),
+                             ctypes.POINTER(Element.ctype))
+      let ndarray = np.ctypeslib.as_array(data, shape: PythonObject(tupleOf: count))
+      return np.copy(ndarray)
     }
   }
 }
