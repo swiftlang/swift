@@ -21,6 +21,36 @@ internal struct _SliceBuffer<Element>
   @usableFromInline
   internal typealias NativeBuffer = _ContiguousArrayBuffer<Element>
 
+  /// An object that keeps the elements stored in this buffer alive.
+  @usableFromInline
+  internal var owner: AnyObject
+
+  @usableFromInline
+  internal let subscriptBaseAddress: UnsafeMutablePointer<Element>
+
+  /// The position of the first element in a non-empty collection.
+  ///
+  /// In an empty collection, `startIndex == endIndex`.
+  @usableFromInline
+  internal var startIndex: Int
+
+  /// [63:1: 63-bit index][0: has a native buffer]
+  @usableFromInline
+  internal var endIndexAndFlags: UInt
+
+  @inlinable
+  internal init(
+    owner: AnyObject,
+    subscriptBaseAddress: UnsafeMutablePointer<Element>,
+    startIndex: Int,
+    endIndexAndFlags: UInt
+  ) {
+    self.owner = owner
+    self.subscriptBaseAddress = subscriptBaseAddress
+    self.startIndex = startIndex
+    self.endIndexAndFlags = endIndexAndFlags
+  }
+
   @inlinable
   internal init(
     owner: AnyObject, subscriptBaseAddress: UnsafeMutablePointer<Element>,
@@ -130,12 +160,6 @@ internal struct _SliceBuffer<Element>
     return UnsafeRawPointer(firstElementAddress)
   }
 
-  /// An object that keeps the elements stored in this buffer alive.
-  @usableFromInline
-  internal var owner: AnyObject
-  @usableFromInline
-  internal let subscriptBaseAddress: UnsafeMutablePointer<Element>
-
   @inlinable
   internal var firstElementAddress: UnsafeMutablePointer<Element> {
     return subscriptBaseAddress + startIndex
@@ -145,10 +169,6 @@ internal struct _SliceBuffer<Element>
   internal var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
     return firstElementAddress
   }
-
-  /// [63:1: 63-bit index][0: has a native buffer]
-  @usableFromInline
-  internal var endIndexAndFlags: UInt
 
   //===--- Non-essential bits ---------------------------------------------===//
 
@@ -323,11 +343,6 @@ internal struct _SliceBuffer<Element>
   }
 
   //===--- Collection conformance -------------------------------------===//
-  /// The position of the first element in a non-empty collection.
-  ///
-  /// In an empty collection, `startIndex == endIndex`.
-  @usableFromInline
-  internal var startIndex: Int
 
   /// The collection's "past the end" position---that is, the position one
   /// greater than the last valid subscript argument.
@@ -368,6 +383,18 @@ internal struct _SliceBuffer<Element>
     defer { _fixLifetime(self) }
     return try body(
       UnsafeMutableBufferPointer(start: firstElementAddress, count: count))
+  }
+
+  @inlinable
+  internal func unsafeCastElements<T>(to type: T.Type) -> _SliceBuffer<T> {
+    _sanityCheck(_isClassOrObjCExistential(T.self))
+    let baseAddress = UnsafeMutableRawPointer(self.subscriptBaseAddress)
+      .assumingMemoryBound(to: T.self)
+    return _SliceBuffer<T>(
+      owner: self.owner,
+      subscriptBaseAddress: baseAddress,
+      startIndex: self.startIndex,
+      endIndexAndFlags: self.endIndexAndFlags)
   }
 }
 

@@ -327,3 +327,6 @@ Struct _CocoaArrayWrapper has type witness type for Sequence.SubSequence changin
 Var _ArrayBuffer._nonNative has declared type change from _NSArrayCore to _CocoaArrayWrapper
 Var _ArrayBuffer._storage has declared type change from _BridgeStorage<__ContiguousArrayStorageBase, _NSArrayCore> to _BridgeStorage<__ContiguousArrayStorageBase, AnyObject>
 Var _CocoaArrayWrapper.buffer has declared type change from _NSArrayCore to AnyObject
+
+Var _SliceBuffer.endIndexAndFlags in a non-resilient type changes position from 2 to 3
+Var _SliceBuffer.startIndex in a non-resilient type changes position from 3 to 2
