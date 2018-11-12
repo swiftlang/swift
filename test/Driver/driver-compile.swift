@@ -9,7 +9,11 @@
 
 // RUN: %swiftc_driver -driver-print-jobs -dump-ast -target x86_64-apple-macosx10.9 %s 2>&1 > %t.ast.txt
 // RUN: %FileCheck %s < %t.ast.txt
-// RUN: %FileCheck -check-prefix AST %s < %t.ast.txt
+// RUN: %FileCheck -check-prefix AST-STDOUT %s < %t.ast.txt
+
+// RUN: %swiftc_driver -driver-print-jobs -dump-ast -target x86_64-apple-macosx10.9 %s -o output.ast > %t.ast.txt
+// RUN: %FileCheck %s < %t.ast.txt
+// RUN: %FileCheck -check-prefix AST-O %s < %t.ast.txt
 
 // RUN: %swiftc_driver -driver-print-jobs -emit-silgen -target x86_64-apple-macosx10.9 %s 2>&1 > %t.silgen.txt
 // RUN: %FileCheck %s < %t.silgen.txt
@@ -78,9 +82,13 @@
 // COMPLEX: -o {{.+}}.o
 
 
-// AST: bin/swift
-// AST: -dump-ast
-// AST: -o -
+// AST-STDOUT: bin/swift
+// AST-STDOUT: -dump-ast
+// AST-STDOUT: -o -
+
+// AST-O: bin/swift
+// AST-O: -dump-ast
+// AST-O: -o output.ast
 
 // SILGEN: bin/swift
 // SILGEN: -emit-silgen
