@@ -65,7 +65,7 @@ GraphOperationInst* GraphOperationBuilder::build(
     SILBuilder &B, ASTContext &C, SILLocation loc,
     ArrayRef<SILType> resultSILTypes) const {
   return B.createGraphOperation(loc, C.getIdentifier(MangledName), Operands,
-                                Attributes, /*runOutOfGraph*/ false,
+                                Attributes, /*noClustering*/ false,
                                 resultSILTypes);
 }
 

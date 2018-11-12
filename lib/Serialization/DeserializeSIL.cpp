@@ -1501,10 +1501,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                            (SILValueCategory)(unsigned)ListOfValues[i+1]);
       ResultSILTypes.push_back(Ty);
     }
-    // TODO: deserialize `runOutOfGraph`.
+    // TODO: deserialize `noClustering`.
     ResultVal =
         Builder.createGraphOperation(Loc, MangledName, Args, {},
-                                     /*runOutOfGraph*/ false, ResultSILTypes);
+                                     /*noClustering*/ false, ResultSILTypes);
     break;
   }
   case SILInstructionKind::AllocGlobalInst: {

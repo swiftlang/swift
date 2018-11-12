@@ -1779,7 +1779,7 @@ void SILCloner<ImplClass>::visitGraphOperationInst(GraphOperationInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createGraphOperation(
                 getOpLocation(Inst->getLoc()), Inst->getName(), arguments,
-                Inst->getAttributes(), Inst->getRunOutOfGraph(), resultTypes));
+                Inst->getAttributes(), Inst->getNoClustering(), resultTypes));
 }
 
 template <typename ImplClass>

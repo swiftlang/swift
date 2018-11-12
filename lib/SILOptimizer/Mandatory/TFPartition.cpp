@@ -2033,7 +2033,9 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
         continue;
       logInput();
 
-      if (graphOp->getRunOutOfGraph())
+      // If we need to run this op out-of-graph (e.g. because it has a dynamic
+      // attribute), do not add it to `tensorOps`.
+      if (graphOp->getNoClustering())
         continue;
 
       tensorOps.push_back(inst);

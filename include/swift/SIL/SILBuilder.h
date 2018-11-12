@@ -1382,10 +1382,10 @@ public:
   createGraphOperation(SILLocation loc, Identifier name,
                        ArrayRef<SILValue> operands,
                        ArrayRef<GraphOperationAttribute> attrs,
-                       bool runOutOfGraph, ArrayRef<SILType> resultTypes) {
-    return insert(GraphOperationInst::create(
-        getModule(), getSILDebugLocation(loc), name, operands, attrs,
-        runOutOfGraph, resultTypes));
+                       bool noClustering, ArrayRef<SILType> resultTypes) {
+    return insert(
+        GraphOperationInst::create(getModule(), getSILDebugLocation(loc), name,
+                                   operands, attrs, noClustering, resultTypes));
   }
 
   ClassMethodInst *createClassMethod(SILLocation Loc, SILValue Operand,

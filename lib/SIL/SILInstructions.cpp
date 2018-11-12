@@ -2427,11 +2427,11 @@ DestructureTupleInst *DestructureTupleInst::create(SILModule &M,
 GraphOperationInst::GraphOperationInst(
     SILModule &M, SILDebugLocation loc, Identifier name,
     ArrayRef<SILValue> arguments, ArrayRef<GraphOperationAttribute> attrs,
-    bool runOutOfGraph, ArrayRef<SILType> resultTypes,
+    bool noClustering, ArrayRef<SILType> resultTypes,
     ArrayRef<ValueOwnershipKind> resultOwnerships)
     : InstructionBase(loc), MultipleValueInstructionTrailingObjects(
                                 this, resultTypes, resultOwnerships),
-      Name(name), NumOperands(arguments.size()), RunOutOfGraph(runOutOfGraph) {
+      Name(name), NumOperands(arguments.size()), NoClustering(noClustering) {
   auto allOperands = getAllOperands();
   for (unsigned i : indices(arguments))
     new (&allOperands[i]) Operand(this, arguments[i]);
@@ -2451,7 +2451,7 @@ GraphOperationInst *
 GraphOperationInst::create(SILModule &M, SILDebugLocation loc, Identifier name,
                            ArrayRef<SILValue> arguments,
                            ArrayRef<GraphOperationAttribute> attributes,
-                           bool runOutOfGraph, ArrayRef<SILType> resultTypes) {
+                           bool noClustering, ArrayRef<SILType> resultTypes) {
   llvm::SmallVector<ValueOwnershipKind, 4> resultOwnerships;
   for (auto resultType : resultTypes) {
     auto ownership = resultType.isTrivial(M)
@@ -2464,7 +2464,7 @@ GraphOperationInst::create(SILModule &M, SILDebugLocation loc, Identifier name,
       1, resultTypes.size(), arguments.size());
   void *buffer = M.allocateInst(size, alignof(GraphOperationInst));
   return ::new (buffer)
-      GraphOperationInst(M, loc, name, arguments, attributes, runOutOfGraph,
+      GraphOperationInst(M, loc, name, arguments, attributes, noClustering,
                          resultTypes, resultOwnerships);
 }
 
