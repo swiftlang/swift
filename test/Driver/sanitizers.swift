@@ -98,7 +98,7 @@
 // UBSAN_watchOS_SIM: lib/swift/clang/lib/darwin/libclang_rt.ubsan_watchossim_dynamic.dylib
 // UBSAN_watchOS: lib/swift/clang/lib/darwin/libclang_rt.ubsan_watchos_dynamic.dylib
 // UBSAN_LINUX: lib/swift/clang/lib/linux/libclang_rt.ubsan-x86_64.a
-// UBSAN_WINDOWS: lib/swift/clang/lib/windows/clang_rt.ubsan_standalone-x86_64.lib
+// UBSAN_WINDOWS: lib/swift/clang/lib/windows/clang_rt.ubsan-x86_64.lib
 
 // UBSAN: -rpath @executable_path
 
