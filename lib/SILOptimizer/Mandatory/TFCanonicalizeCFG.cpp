@@ -166,8 +166,7 @@ namespace {
     /// block of the shared region. The value is a pair consiting of the
     /// SESERegionTree for the shared region and the exit block for the function
     /// region.
-    llvm::DenseMap<SILBasicBlock *,
-                   std::pair<std::shared_ptr<SESERegionTree>, SILBasicBlock *>>
+    llvm::DenseMap<SILBasicBlock *, std::shared_ptr<SESERegionTree>>
         sharedRegions;
 
   public:
@@ -221,8 +220,9 @@ namespace {
     /// consisting of the SESERegionTree for the shared region and the exit
     /// block.  If the shared region has no exit blocks (e.g., ends with a
     /// return instruction), the exit block is set to nullptr.
-    std::pair<std::shared_ptr<SESERegionTree>, SILBasicBlock *>
-    createSharedRegion(SILBasicBlock *startBB);
+    std::shared_ptr<SESERegionTree>
+    createSharedRegionExcludingEnd(SILBasicBlock *startBB,
+                                   SILBasicBlock *endBB);
 
     // Dump top-level loop information for debugging purposes.
     void dumpTopLevelLoopInfo(llvm::raw_ostream* outs, const char* stage) {
@@ -267,29 +267,14 @@ SESERegionBuilder::processAcyclicRegion(SILBasicBlock *startBB,
   return std::unique_ptr<SESERegionTree>(result);
 }
 
-std::pair<std::shared_ptr<SESERegionTree>, SILBasicBlock *>
-SESERegionBuilder::createSharedRegion(SILBasicBlock *startBB) {
+std::shared_ptr<SESERegionTree>
+SESERegionBuilder::createSharedRegionExcludingEnd(SILBasicBlock *startBB, SILBasicBlock *endBB) {
   auto iter = sharedRegions.find(startBB);
   if (iter == sharedRegions.end()) {
     // Create and cache the function region.
-    llvm::SmallVector<SILBasicBlock *, 32> descendants;
-    DI.getDescendants(startBB, descendants);
-    SILBasicBlock *subRegionEndBB = startBB;
-    for (SILBasicBlock *otherBB : descendants) {
-      subRegionEndBB = PDI.findNearestCommonDominator(subRegionEndBB, otherBB);
-    }
     std::shared_ptr<SESERegionTree> subSESERegion(
-        processAcyclicRegion(startBB, subRegionEndBB).release());
-    SILBasicBlock *exitBB = nullptr;
-    if (subRegionEndBB->getTerminator()->getNumSuccessors() == 0) {
-      exitBB = nullptr;
-    } else {
-      exitBB = subRegionEndBB->getSingleSuccessorBlock();
-      assert(exitBB &&
-             "Shared region should end with an unconditional branch");
-    }
-    auto emplace_result = sharedRegions.try_emplace(
-        startBB, std::make_pair(subSESERegion, exitBB));
+        processAcyclicRegionExcludingEnd(startBB, endBB).release());
+    auto emplace_result = sharedRegions.try_emplace(startBB, subSESERegion);
     iter = emplace_result.first;
   }
   return iter->second;
@@ -318,11 +303,10 @@ SESERegionBuilder::processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
     if (!DI.dominates(startBB, currentBB)) {
       // We need to create a new SESE Region so that this can be marked
       // as a shared SharedSESERegion.
-      std::shared_ptr<SESERegionTree> sharedRegionTree;
-      SILBasicBlock *exitBB;
-      std::tie(sharedRegionTree, exitBB) = createSharedRegion(currentBB);
+      std::shared_ptr<SESERegionTree> sharedRegionTree =
+          createSharedRegionExcludingEnd(currentBB, endBB);
       results.push_back(llvm::make_unique<SharedSESERegion>(sharedRegionTree));
-      currentBB = (exitBB == nullptr) ? endBB : exitBB;
+      currentBB = endBB;
       continue;
     }
     // If this ends with a loop, it will already have been processed and
