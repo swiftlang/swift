@@ -138,8 +138,7 @@ internal protocol _NSDictionary: _NSDictionaryCore {
 /// Covers a set of operations everyone needs to implement in order to
 /// be a useful `NSSet` subclass.
 @objc
-public protocol _NSSetCore :
-    _NSCopying, _NSFastEnumeration {
+internal protocol _NSSetCore: _NSCopying, _NSFastEnumeration {
 
   // The following methods should be overridden when implementing an
   // NSSet subclass.
@@ -172,7 +171,7 @@ public protocol _NSSetCore :
 /// forced to implement operations that `NSSet` already
 /// supplies.
 @unsafe_no_objc_tagged_pointer @objc
-public protocol _NSSet : _NSSetCore {
+internal protocol _NSSet: _NSSetCore {
 }
 
 /// A shadow for the API of NSNumber we will use in the core
@@ -189,6 +188,5 @@ public protocol _NSNumber {
 #else
 
 public protocol _NSArrayCore {}
-public protocol _NSSetCore {}
 
 #endif

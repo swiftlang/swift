@@ -30,13 +30,8 @@ extension Set {
   @usableFromInline
   @_fixed_layout
   internal struct _Variant {
-#if _runtime(_ObjC)
-    @usableFromInline
-    internal var object: _BridgeStorage<_RawSetStorage, _NSSet>
-#else
     @usableFromInline
     internal var object: _BridgeStorage<_RawSetStorage, AnyObject>
-#endif
 
     @inlinable
     @inline(__always)

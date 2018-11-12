@@ -291,3 +291,15 @@ Protocol _NSDictionary has been removed
 Protocol _NSDictionaryCore has been removed
 Var Dictionary._Variant.object has declared type change from _BridgeStorage<_RawDictionaryStorage, _NSDictionary> to _BridgeStorage<_RawDictionaryStorage, AnyObject>
 Var _CocoaDictionary.object has declared type change from _NSDictionary to AnyObject
+
+Class _EmptySetSingleton has removed conformance to _NSSetCore
+Class _SetStorage has removed conformance to _NSSetCore
+Constructor Set.init(_immutableCocoaSet:) has parameter 0 type change from _NSSet to AnyObject
+Constructor _CocoaSet.init(_:) has parameter 0 type change from _NSSet to AnyObject
+Func Set._bridgeToObjectiveCImpl() has return type change from _NSSetCore to AnyObject
+Func _NativeSet.bridged() has return type change from _NSSet to AnyObject
+Func _stdlib_CFSetGetValues(_:_:) has been removed
+Protocol _NSSet has been removed
+Protocol _NSSetCore has been removed
+Var Set._Variant.object has declared type change from _BridgeStorage<_RawSetStorage, _NSSet> to _BridgeStorage<_RawSetStorage, AnyObject>
+Var _CocoaSet.object has declared type change from _NSSet to AnyObject

@@ -17,7 +17,7 @@ extension Set {
   ///
   /// The provided `NSSet` will be copied to ensure that the copy can
   /// not be mutated by other code.
-  fileprivate init(_cocoaSet: __shared _NSSet) {
+  fileprivate init(_cocoaSet: __shared AnyObject) {
     assert(_isBridgedVerbatimToObjectiveC(Element.self),
       "Set can be backed by NSSet _variantStorage only when the member type can be bridged verbatim to Objective-C")
     // FIXME: We would like to call CFSetCreateCopy() to avoid doing an
@@ -29,9 +29,7 @@ extension Set {
     //
     // The bug is fixed in: OS X 10.11.0, iOS 9.0, all versions of tvOS
     // and watchOS.
-    self = Set(
-      _immutableCocoaSet:
-        unsafeBitCast(_cocoaSet.copy(with: nil) as AnyObject, to: _NSSet.self))
+    self = Set(_immutableCocoaSet: _cocoaSet.copy(with: nil))
   }
 }
 
@@ -69,7 +67,7 @@ extension Set : _ObjectiveCBridgeable {
     }
 
     if _isBridgedVerbatimToObjectiveC(Element.self) {
-      result = Set<Element>(_cocoaSet: unsafeBitCast(s, to: _NSSet.self))
+      result = Set<Element>(_cocoaSet: s)
       return
     }
 
