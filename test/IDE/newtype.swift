@@ -238,19 +238,19 @@ func testFixit() {
 func testNonEphemeralInitParams(x: OpaquePointer) {
   var x = x
 
-  _ = TRefRef(&x) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutablePointer<OpaquePointer>' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
+  _ = TRefRef(&x) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'init(_:)'}}
   // expected-note@-1 {{implicit argument conversion from 'OpaquePointer' to 'UnsafeMutablePointer<OpaquePointer>' produces a pointer valid only for the duration of the call}}
   // expected-note@-2 {{use 'withUnsafeMutablePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 
-  _ = TRefRef(rawValue: &x) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutablePointer<OpaquePointer>' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
+  _ = TRefRef(rawValue: &x) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'init(rawValue:)'}}
   // expected-note@-1 {{implicit argument conversion from 'OpaquePointer' to 'UnsafeMutablePointer<OpaquePointer>' produces a pointer valid only for the duration of the call}}
   // expected-note@-2 {{use 'withUnsafeMutablePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 
-  _ = ConstTRefRef(&x) // expected-warning {{passing temporary pointer argument of type 'UnsafePointer<OpaquePointer>' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
+  _ = ConstTRefRef(&x) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'init(_:)'}}
   // expected-note@-1 {{implicit argument conversion from 'OpaquePointer' to 'UnsafePointer<OpaquePointer>' produces a pointer valid only for the duration of the call}}
   // expected-note@-2 {{use 'withUnsafePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 
-  _ = ConstTRefRef(rawValue: &x) // expected-warning {{passing temporary pointer argument of type 'UnsafePointer<OpaquePointer>' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
+  _ = ConstTRefRef(rawValue: &x) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'init(rawValue:)'}}
   // expected-note@-1 {{implicit argument conversion from 'OpaquePointer' to 'UnsafePointer<OpaquePointer>' produces a pointer valid only for the duration of the call}}
   // expected-note@-2 {{use 'withUnsafePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 }

@@ -3790,10 +3790,11 @@ bool diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
 ///
 /// \param ctx The AST context.
 /// \param conversion The type of ephemeral conversion being performed.
+/// \param argIdx The index of the argument in the application.
 /// \param argExpr The argument expression.
 /// \param argType The type of the argument expression prior to the solution
 /// being fully applied. For example, for an array-to-pointer conversion,
-/// this should be of array type.
+/// this should be of (potentially optional) array type.
 /// \param paramType The type of the parameter.
 /// \param callee The callee to which the conversion is occuring.
 /// \param fnType The type of the function being called.
@@ -3802,8 +3803,9 @@ bool diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
 /// \param downgradeToWarning Whether to downgrade the diagnostic to a warning.
 void diagnoseIllegalEphemeralConversion(
     ASTContext &ctx, constraints::ConversionRestrictionKind conversion,
-    const Expr *argExpr, Type argType, Type paramType, const ValueDecl *callee,
-    AnyFunctionType *fnType, const Expr *anchor, bool downgradeToWarning);
+    unsigned argIdx, const Expr *argExpr, Type argType, Type paramType,
+    const ValueDecl *callee, AnyFunctionType *fnType, const Expr *anchor,
+    bool downgradeToWarning);
 
 // Return true if, when replacing "<expr>" with "<expr> ?? T", parentheses need
 // to be added around <expr> first in order to maintain the correct precedence.

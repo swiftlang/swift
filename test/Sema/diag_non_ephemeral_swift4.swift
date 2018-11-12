@@ -21,46 +21,46 @@ var optionalArr: [Int8]?
 // We cannot use array-to-pointer and string-to-pointer conversions with
 // non-ephemeral parameters.
 
-takesMutableRaw(&arr, 5) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+takesMutableRaw(&arr, 5) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesMutableRaw'}}
+// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw'}}
 // expected-note@-2 {{use the 'withUnsafeMutableBytes' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesConst(str, 5) // expected-warning {{passing temporary pointer argument of type 'UnsafePointer<Int8>' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call}}
+takesConst(str, 5) // expected-warning {{passing 'String' to parameter, but argument #1 should be a pointer that outlives the call to 'takesConst'}}
+// expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'takesConst'}}
 // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 
-takesConst(arr, 5) // expected-warning {{passing temporary pointer argument of type 'UnsafePointer<Int8>' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call}}
+takesConst(arr, 5) // expected-warning {{passing '[Int8]' to parameter, but argument #1 should be a pointer that outlives the call to 'takesConst'}}
+// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'takesConst'}}
 // expected-note@-2 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesRaw(&arr) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+takesRaw(&arr) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
 // expected-note@-2 {{use the 'withUnsafeBytes' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesMutable(&arr) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutablePointer<Int8>' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeMutablePointer<Int8>' produces a pointer valid only for the duration of the call}}
+takesMutable(&arr) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesMutable'}}
+// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeMutablePointer<Int8>' produces a pointer valid only for the duration of the call to 'takesMutable'}}
 // expected-note@-2 {{use the 'withUnsafeMutableBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesOptMutableRaw(&arr) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer?' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeMutableRawPointer?' produces a pointer valid only for the duration of the call}}
+takesOptMutableRaw(&arr) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesOptMutableRaw'}}
+// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeMutableRawPointer?' produces a pointer valid only for the duration of the call to 'takesOptMutableRaw'}}
 // expected-note@-2 {{use the 'withUnsafeMutableBytes' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
 // FIXME(SR-9100): This currently uses inout-to-pointer instead of array-to-pointer.
 takesOptMutableRaw(&optionalArr)
 
-takesOptConst(arr) // expected-warning {{passing temporary pointer argument of type 'UnsafePointer<Int8>?' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafePointer<Int8>?' produces a pointer valid only for the duration of the call}}
+takesOptConst(arr) // expected-warning {{passing '[Int8]' to parameter, but argument #1 should be a pointer that outlives the call to 'takesOptConst'}}
+// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafePointer<Int8>?' produces a pointer valid only for the duration of the call to 'takesOptConst'}}
 // expected-note@-2 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesOptConst(optionalArr) // expected-warning {{passing temporary pointer argument of type 'UnsafePointer<Int8>?' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from '[Int8]?' to 'UnsafePointer<Int8>?' produces a pointer valid only for the duration of the call}}
+takesOptConst(optionalArr) // expected-warning {{passing '[Int8]?' to parameter, but argument #1 should be a pointer that outlives the call to 'takesOptConst'}}
+// expected-note@-1 {{implicit argument conversion from '[Int8]?' to 'UnsafePointer<Int8>?' produces a pointer valid only for the duration of the call to 'takesOptConst'}}
 
-takesOptConst(str) // expected-warning {{passing temporary pointer argument of type 'UnsafePointer<Int8>?' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>?' produces a pointer valid only for the duration of the call}}
+takesOptConst(str) // expected-warning {{passing 'String' to parameter, but argument #1 should be a pointer that outlives the call to 'takesOptConst'}}
+// expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>?' produces a pointer valid only for the duration of the call to 'takesOptConst'}}
 // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 
-takesOptConst(optionalStr) // expected-warning {{passing temporary pointer argument of type 'UnsafePointer<Int8>?' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'String?' to 'UnsafePointer<Int8>?' produces a pointer valid only for the duration of the call}}
+takesOptConst(optionalStr) // expected-warning {{passing 'String?' to parameter, but argument #1 should be a pointer that outlives the call to 'takesOptConst'}}
+// expected-note@-1 {{implicit argument conversion from 'String?' to 'UnsafePointer<Int8>?' produces a pointer valid only for the duration of the call to 'takesOptConst'}}
 
 struct S {
   static var staticStoredProperty: Int8 = 0
@@ -172,108 +172,108 @@ takesRaw(&topLevelOptOfResilientS!)
 // But we cannot do the same for:
 //   - Non-final class bases
 
-takesMutableRaw(&topLevelC.storedProperty, 5) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+takesMutableRaw(&topLevelC.storedProperty, 5) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesMutableRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw'}}
 // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
 //   - Resilient global or static variables
 
-takesMutableRaw(&globalResilient, 5) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+takesMutableRaw(&globalResilient, 5) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesMutableRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw'}}
 // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesMutableRaw(&ResilientStruct.staticStoredProperty, 5) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+takesMutableRaw(&ResilientStruct.staticStoredProperty, 5) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesMutableRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw'}}
 // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesMutableRaw(&type(of: topLevelResilientS).staticStoredProperty, 5) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+takesMutableRaw(&type(of: topLevelResilientS).staticStoredProperty, 5) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesMutableRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw'}}
 // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
 //   - Resilient struct or class bases
 
-takesMutableRaw(&topLevelResilientS.storedProperty, 5) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+takesMutableRaw(&topLevelResilientS.storedProperty, 5) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesMutableRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw'}}
 // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesMutableRaw(&topLevelResilientFinalC.storedProperty, 5) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+takesMutableRaw(&topLevelResilientFinalC.storedProperty, 5) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesMutableRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw'}}
 // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesMutableRaw(&topLevelOptOfResilientS!.storedProperty, 5) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+takesMutableRaw(&topLevelOptOfResilientS!.storedProperty, 5) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesMutableRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw'}}
 // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
 //   - Protocol bases
 
-takesRaw(&topLevelP.property) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+takesRaw(&topLevelP.property) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
 // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesRaw(&type(of: topLevelP).staticProperty) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+takesRaw(&type(of: topLevelP).staticProperty) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
 // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesRaw(&topLevelP[]) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+takesRaw(&topLevelP[]) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
 // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
 //   - Properties with observers
 
-takesRaw(&topLevelWithObservers) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+takesRaw(&topLevelWithObservers) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
 // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesRaw(&topLevelS.storedPropertyWithObservers) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+takesRaw(&topLevelS.storedPropertyWithObservers) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
 // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesRaw(&topLevelOptOfS!.storedPropertyWithObservers) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+takesRaw(&topLevelOptOfS!.storedPropertyWithObservers) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
 // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesRaw(&topLevelC.storedPropertyWithObservers) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+takesRaw(&topLevelC.storedPropertyWithObservers) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
 // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesRaw(&topLevelFinalC.storedPropertyWithObservers) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+takesRaw(&topLevelFinalC.storedPropertyWithObservers) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
 // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesRaw(&topLevelTupleOfS.0.storedPropertyWithObservers) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+takesRaw(&topLevelTupleOfS.0.storedPropertyWithObservers) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
 // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
 //   - Computed properties
 
-takesRaw(&topLevelOptOfS!.computedProperty) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+takesRaw(&topLevelOptOfS!.computedProperty) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
 // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesRaw(&topLevelC.computedProperty) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+takesRaw(&topLevelC.computedProperty) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
 // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesRaw(&topLevelFinalC.computedProperty) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+takesRaw(&topLevelFinalC.computedProperty) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
 // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesRaw(&topLevelTupleOfS.0.computedProperty) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+takesRaw(&topLevelTupleOfS.0.computedProperty) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
 // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
 //   - Subscripts
 
-takesRaw(&topLevelS[]) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+takesRaw(&topLevelS[]) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
 // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesRaw(&topLevelC[]) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+takesRaw(&topLevelC[]) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
 // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-takesRaw(&topLevelFinalC[]) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+takesRaw(&topLevelFinalC[]) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
 // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
 //   - Local variables
@@ -281,16 +281,16 @@ takesRaw(&topLevelFinalC[]) // expected-warning {{passing temporary pointer argu
 func testInoutToPointerOfLocal() {
   var local: Int8 = 0
 
-  takesMutableRaw(&local, 5) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-  // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+  takesMutableRaw(&local, 5) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesMutableRaw'}}
+  // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw'}}
   // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-  takesRaw(&local) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-  // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+  takesRaw(&local) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+  // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
   // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-  takesMutable(&local) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutablePointer<Int8>' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-  // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutablePointer<Int8>' produces a pointer valid only for the duration of the call}}
+  takesMutable(&local) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesMutable'}}
+  // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutablePointer<Int8>' produces a pointer valid only for the duration of the call to 'takesMutable'}}
   // expected-note@-2 {{use 'withUnsafeMutablePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 }
 
@@ -299,12 +299,12 @@ func testInoutToPointerOfLocal() {
 struct S1 {
   var property: Int8 = 0
   mutating func foo() {
-    takesRaw(&property) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-    // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+    takesRaw(&property) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+    // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
     // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-    takesRaw(&self.property) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-    // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+    takesRaw(&self.property) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+    // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
     // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
   }
 }
@@ -312,35 +312,35 @@ struct S1 {
 final class C1 {
   var property: Int8 = 0
   func foo() {
-    takesRaw(&property) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-    // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+    takesRaw(&property) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+    // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
     // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-    takesRaw(&self.property) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-    // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+    takesRaw(&self.property) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesRaw'}}
+    // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'takesRaw'}}
     // expected-note@-2 {{use 'withUnsafeBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
   }
 }
 
 // Check that @_non_ephemeral is preserved through type inference.
 let f1 = takesMutableRaw
-f1(&arr, 5) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+f1(&arr, 5) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'f1'}}
+// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'f1'}}
 // expected-note@-2 {{use the 'withUnsafeMutableBytes' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
 let f2 = takesConst
-f2(arr, 5) // expected-warning {{passing temporary pointer argument of type 'UnsafePointer<Int8>' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call}}
+f2(arr, 5) // expected-warning {{passing '[Int8]' to parameter, but argument #1 should be a pointer that outlives the call to 'f2'}}
+// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'f2'}}
 // expected-note@-2 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
 let f3 = takesRaw
-f3(&arr) // expected-warning {{passing temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
+f3(&arr) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'f3'}}
+// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call to 'f3'}}
 // expected-note@-2 {{use the 'withUnsafeBytes' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
 let f4 = takesMutable
-f4(&arr) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutablePointer<Int8>' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeMutablePointer<Int8>' produces a pointer valid only for the duration of the call}}
+f4(&arr) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'f4'}}
+// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeMutablePointer<Int8>' produces a pointer valid only for the duration of the call to 'f4'}}
 // expected-note@-2 {{use the 'withUnsafeMutableBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
 struct S2 {
@@ -356,30 +356,30 @@ struct S2 {
 func testNonEphemeralInMembers() {
   var local = 0
 
-  let _: S2 = .takesConstStaticAndReturns([1, 2, 3]) // expected-warning {{passing temporary pointer argument of type 'UnsafePointer<Int>' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call}}
+  let _: S2 = .takesConstStaticAndReturns([1, 2, 3]) // expected-warning {{passing '[Int]' to parameter, but argument #1 should be a pointer that outlives the call to 'takesConstStaticAndReturns'}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call to 'takesConstStaticAndReturns'}}
   // expected-note@-2 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-  S2.takesMutableRawStatic(ptr: &local) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+  S2.takesMutableRawStatic(ptr: &local) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesMutableRawStatic(_:ptr:)'}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRawStatic(_:ptr:)'}}
   // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-  S2.takesMutableRawStatic("", ptr: &local) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+  S2.takesMutableRawStatic("", ptr: &local) // expected-warning {{inout expression creates a temporary pointer, but argument #2 should be a pointer that outlives the call to 'takesMutableRawStatic(_:ptr:)'}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRawStatic(_:ptr:)'}}
   // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   var s2 = S2()
   s2.takesMutableRaw() // okay.
-  s2.takesMutableRaw(ptr: &local) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+  s2.takesMutableRaw(ptr: &local) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesMutableRaw(ptr:)'}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw(ptr:)'}}
   // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-  _ = s2[takesConstInt8: ""] // expected-warning {{passing temporary pointer argument of type 'UnsafePointer<Int8>' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-  // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call}}
+  _ = s2[takesConstInt8: ""] // expected-warning {{passing 'String' to parameter, but argument #1 should be a pointer that outlives the call to 'subscript(takesConstInt8:)'}}
+  // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'subscript(takesConstInt8:)'}}
   // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 
-  s2[takesConstInt8: ""] += 1 // expected-warning {{passing temporary pointer argument of type 'UnsafePointer<Int8>' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-  // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call}}
+  s2[takesConstInt8: ""] += 1 // expected-warning {{passing 'String' to parameter, but argument #1 should be a pointer that outlives the call to 'subscript(takesConstInt8:)'}}
+  // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'subscript(takesConstInt8:)'}}
   // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 }
 
@@ -391,8 +391,8 @@ func testNonEphemeralInOperators() {
 
   &value ^^^ 1
 
-  &local ^^^ 1 // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+  &local ^^^ 1 // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to '^^^'}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to '^^^'}}
   // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 }
 
@@ -401,8 +401,8 @@ func testNonEphemeralInClosures() {
 
   let fn: (@_nonEphemeral UnsafeMutableRawPointer) -> Void = { _ in }
   fn(&value)
-  fn(&local) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+  fn(&local) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'fn'}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'fn'}}
   // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 }
 
@@ -419,23 +419,30 @@ enum E {
 func testNonEphemeralInMemberwiseInits() {
   var local = 0
 
-  _ = S3(ptr1: &topLevelS, ptr2: &local) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer?' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer?' produces a pointer valid only for the duration of the call}}
+  _ = S3(ptr1: &topLevelS, ptr2: &local) // expected-warning {{inout expression creates a temporary pointer, but argument #2 should be a pointer that outlives the call to 'init(ptr1:ptr2:)'}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer?' produces a pointer valid only for the duration of the call to 'init(ptr1:ptr2:)'}}
   // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-  _ = S3(ptr1: &local, ptr2: &topLevelS) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+  _ = S3(ptr1: &local, ptr2: &topLevelS) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'init(ptr1:ptr2:)'}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'init(ptr1:ptr2:)'}}
   // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-  _ = E.mutableRaw(&local) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+  _ = E.mutableRaw(&local) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'mutableRaw'}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'mutableRaw'}}
   // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-  _ = E.const([1, 2, 3]) // expected-warning {{passing temporary pointer argument of type 'UnsafePointer<Int8>' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-  // expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call}}
+  _ = E.const([1, 2, 3]) // expected-warning {{passing '[Int8]' to parameter, but argument #1 should be a pointer that outlives the call to 'const'}}
+  // expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'const'}}
   // expected-note@-2 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-  _ = E.const("hello") // expected-warning {{passing temporary pointer argument of type 'UnsafePointer<Int8>' to parameter expecting pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
-  // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call}}
+  _ = E.const("hello") // expected-warning {{passing 'String' to parameter, but argument #1 should be a pointer that outlives the call to 'const'}}
+  // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'const'}}
   // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
+}
+
+func testHigherOrderNonEphemeralReturn() {
+  func foo() -> (@_nonEphemeral UnsafePointer<Int>) -> Void {}
+  foo()([1, 2, 3]) // expected-warning {{passing '[Int]' to parameter, but argument #1 should be a pointer that outlives the call}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call}}
+  // expected-note@-2 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 }

@@ -4853,10 +4853,15 @@ findCalleeDeclRef(ConstraintSystem &cs, const Solution &solution,
     newPath.append(locator->getPath().begin(), locator->getPath().end()-1);
 
     unsigned newFlags = locator->getSummaryFlags();
-    newPath.push_back(ConstraintLocator::ApplyFunction);
 
-    assert(newPath.back().getNewSummaryFlags() == 0 &&
-           "added element that changes the flags?");
+    // Add an ApplyFunction path element to the locator, unless we're dealing
+    // with a subscript, which don't have function exprs.
+    if (!isa<SubscriptExpr>(locator->getAnchor())) {
+      newPath.push_back(ConstraintLocator::ApplyFunction);
+
+      assert(newPath.back().getNewSummaryFlags() == 0 &&
+             "added element that changes the flags?");
+    }
     locator = cs.getConstraintLocator(locator->getAnchor(), newPath, newFlags);
   }
 
@@ -5458,11 +5463,13 @@ static void checkNonEphemeralArgumentConversion(
   if (!param.isNonEphemeral())
     return;
 
-  // Look through optional evaluation expressions – these can occur when we
-  // have an optional-to-optional conversion followed by a pointer conversion.
   auto *subExpr = argExpr;
+  Optional<ConversionRestrictionKind> conversion;
   while (true) {
     subExpr = subExpr->getValueProvidingExpr();
+
+    // Look through optional evaluation expressions – these can occur when we
+    // have an optional-to-optional conversion followed by a pointer conversion.
     if (auto *oee = dyn_cast<OptionalEvaluationExpr>(subExpr)) {
       subExpr = oee->getSubExpr();
       continue;
@@ -5475,22 +5482,31 @@ static void checkNonEphemeralArgumentConversion(
       subExpr = boe->getSubExpr();
       continue;
     }
+
+    // If we found the appropriate conversion expr, note it.
+    if (auto *iotpe = dyn_cast<InOutToPointerExpr>(subExpr)) {
+      subExpr = iotpe->getSubExpr()->getValueProvidingExpr();
+      conversion = ConversionRestrictionKind::InoutToPointer;
+    } else if (auto *atpe = dyn_cast<ArrayToPointerExpr>(subExpr)) {
+      subExpr = atpe->getSubExpr()->getValueProvidingExpr();
+      conversion = ConversionRestrictionKind::ArrayToPointer;
+    } else if (auto *stpe = dyn_cast<StringToPointerExpr>(subExpr)) {
+      subExpr = stpe->getSubExpr()->getValueProvidingExpr();
+      conversion = ConversionRestrictionKind::StringToPointer;
+    }
     break;
   }
 
-  Optional<ConversionRestrictionKind> conversion;
-  if (isa<InOutToPointerExpr>(subExpr))
-    conversion = ConversionRestrictionKind::InoutToPointer;
-  else if (isa<ArrayToPointerExpr>(subExpr))
-    conversion = ConversionRestrictionKind::ArrayToPointer;
-  else if (isa<StringToPointerExpr>(subExpr))
-    conversion = ConversionRestrictionKind::StringToPointer;
-
-  if (conversion && !cs.isConversionNonEphemeral(*conversion, argLocator))
+  if (conversion && !cs.isConversionNonEphemeral(*conversion, argLocator)) {
+    auto lastPathElt = argLocator.last();
+    assert(lastPathElt &&
+           lastPathElt->getKind() == ConstraintLocator::ApplyArgToParam);
+    auto argIdx = lastPathElt->getValue();
     diagnoseIllegalEphemeralConversion(
-        cs.getASTContext(), *conversion, argExpr, argType, param.getPlainType(),
-        callee, fnType, argLocator.getAnchor(),
+        cs.getASTContext(), *conversion, argIdx, subExpr, argType,
+        param.getPlainType(), callee, fnType, argLocator.getAnchor(),
         /*downgradeToWarning*/ true);
+  }
 }
 
 Expr *ExprRewriter::coerceCallArguments(

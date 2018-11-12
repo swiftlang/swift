@@ -365,13 +365,19 @@ ERROR(cannot_convert_argument_value_generic,none,
       "cannot convert value of type %0 (%1) to expected argument type %2 (%3)",
       (Type, StringRef, Type, StringRef))
 
-ERROR(cannot_convert_non_ephemeral,none,
-      "temporary pointer argument of type %0 cannot be passed to parameter "
-      "expecting pointer that outlives the duration of the call", (Type))
-WARNING(cannot_convert_non_ephemeral_warning,none,
-        "passing temporary pointer argument of type %0 to parameter expecting "
-        "pointer that outlives the duration of the call leads to undefined "
-        "behaviour; this will be an error in a future release", (Type))
+ERROR(cannot_pass_type_to_non_ephemeral,none,
+      "cannot pass %0 to parameter; argument #%1 must be a pointer that "
+      "outlives the call%select{| to %3}2", (Type, unsigned, bool, DeclName))
+WARNING(cannot_pass_type_to_non_ephemeral_warning,none,
+        "passing %0 to parameter, but argument #%1 should be a pointer that "
+        "outlives the call%select{| to %3}2", (Type, unsigned, bool, DeclName))
+ERROR(cannot_use_inout_non_ephemeral,none,
+      "cannot use inout expression here; argument #%0 must be a pointer that "
+      "outlives the call%select{| to %2}1", (unsigned, bool, DeclName))
+WARNING(cannot_use_inout_non_ephemeral_warning,none,
+        "inout expression creates a temporary pointer, but argument #%0 should "
+        "be a pointer that outlives the call%select{| to %2}1",
+        (unsigned, bool, DeclName))
 ERROR(cannot_construct_dangling_pointer,none,
       "initialization of %0 results in a dangling %select{|buffer }1pointer",
       (Type, unsigned))
@@ -381,7 +387,8 @@ WARNING(cannot_construct_dangling_pointer_warning,none,
         (Type, unsigned))
 NOTE(ephemeral_pointer_argument_conversion_note,none,
      "implicit argument conversion from %0 to %1 produces a pointer valid only "
-     "for the duration of the call", (Type, Type))
+     "for the duration of the call%select{| to %3}2",
+     (Type, Type, bool, DeclName))
 NOTE(ephemeral_use_with_unsafe_pointer,none,
      "use 'withUnsafe%select{Bytes|MutableBytes|Pointer|MutablePointer}0' in "
      "order to explicitly convert argument to %select{buffer |buffer ||}0"

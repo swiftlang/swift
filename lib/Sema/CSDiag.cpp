@@ -8417,7 +8417,8 @@ bool swift::diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
 /// valid for the duration of the call, and suggests an alternative to use.
 static void emitIllegalEphemeralConversionNotes(
     DiagnosticEngine &diags, ConversionRestrictionKind conversion,
-    const Expr *argExpr, Type argType, Type paramType) {
+    const Expr *argExpr, Type argType, Type paramType,
+    const ValueDecl *callee) {
   auto getPointerKind = [](Type ty) -> PointerTypeKind {
     auto unwrappedType = ty;
     if (auto objectType = ty->getOptionalObjectType())
@@ -8454,9 +8455,11 @@ static void emitIllegalEphemeralConversionNotes(
 
   // First emit a note about the implicit conversion only lasting for the
   // duration of the call.
+  auto calleeName = callee ? callee->getFullName() : DeclName();
   diags.diagnose(argExpr->getLoc(),
                  diag::ephemeral_pointer_argument_conversion_note,
-                 argType->getWithoutSpecifierType(), paramType)
+                 argType->getWithoutSpecifierType(), paramType, callee,
+                 calleeName)
       .highlight(argExpr->getSourceRange());
 
   // Then try to find a suitable alternative.
@@ -8527,8 +8530,8 @@ static void emitIllegalEphemeralConversionNotes(
 }
 
 void swift::diagnoseIllegalEphemeralConversion(
-    ASTContext &ctx, ConversionRestrictionKind conversion, const Expr *argExpr,
-    Type argType, Type paramType, const ValueDecl *callee,
+    ASTContext &ctx, ConversionRestrictionKind conversion, unsigned argIdx,
+    const Expr *argExpr, Type argType, Type paramType, const ValueDecl *callee,
     AnyFunctionType *fnType, const Expr *anchor, bool downgradeToWarning) {
   auto &diags = ctx.Diags;
 
@@ -8584,19 +8587,31 @@ void swift::diagnoseIllegalEphemeralConversion(
         .highlight(anchor->getSourceRange());
 
     emitIllegalEphemeralConversionNotes(diags, conversion, argExpr, argType,
-                                        paramType);
+                                        paramType, callee);
     return true;
   };
 
   if (diagnosePointerInit())
     return;
 
-  auto diagID = downgradeToWarning ? diag::cannot_convert_non_ephemeral_warning
-                                   : diag::cannot_convert_non_ephemeral;
+  // Otherwise, emit a more general diagnostic.
+  auto calleeName = callee ? callee->getFullName() : DeclName();
+  if (isa<InOutExpr>(argExpr)) {
+    auto diagID = downgradeToWarning
+                      ? diag::cannot_use_inout_non_ephemeral_warning
+                      : diag::cannot_use_inout_non_ephemeral;
 
-  diags.diagnose(argExpr->getLoc(), diagID, paramType)
-      .highlight(argExpr->getSourceRange());
+    diags.diagnose(argExpr->getLoc(), diagID, argIdx + 1, callee, calleeName)
+        .highlight(argExpr->getSourceRange());
+  } else {
+    auto diagID = downgradeToWarning
+                      ? diag::cannot_pass_type_to_non_ephemeral_warning
+                      : diag::cannot_pass_type_to_non_ephemeral;
 
+    diags.diagnose(argExpr->getLoc(), diagID, argType, argIdx + 1, callee,
+                   calleeName)
+        .highlight(argExpr->getSourceRange());
+  }
   emitIllegalEphemeralConversionNotes(diags, conversion, argExpr, argType,
-                                      paramType);
+                                      paramType, callee);
 }
