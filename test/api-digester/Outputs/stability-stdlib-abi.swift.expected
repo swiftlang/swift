@@ -303,3 +303,5 @@ Protocol _NSSet has been removed
 Protocol _NSSetCore has been removed
 Var Set._Variant.object has declared type change from _BridgeStorage<_RawSetStorage, _NSSet> to _BridgeStorage<_RawSetStorage, AnyObject>
 Var _CocoaSet.object has declared type change from _NSSet to AnyObject
+
+Protocol _NSNumber has been removed

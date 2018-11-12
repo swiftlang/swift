@@ -177,7 +177,7 @@ internal protocol _NSSet: _NSSetCore {
 /// A shadow for the API of NSNumber we will use in the core
 /// stdlib.
 @objc
-public protocol _NSNumber {
+internal protocol _NSNumber {
   var doubleValue: Double { get }
   var floatValue: Float { get }
   var unsignedLongLongValue: UInt64 { get }
