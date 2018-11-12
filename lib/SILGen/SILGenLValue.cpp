@@ -895,9 +895,11 @@ namespace {
       auto refType = base.getType().getObjectType();
       auto &TL = SGF.getTypeLowering(refType);
 
-      // Load the original value.
-      auto result = SGF.emitLoad(loc, base.getValue(), TL,
-                                 SGFContext(), IsNotTake);
+      // Load the original value if necessary.
+      auto result = base.getType().isAddress()
+                      ? SGF.emitLoad(loc, base.getValue(), TL,
+                                     SGFContext(), IsNotTake)
+                      : base;
 
       assert(refType.isAnyExistentialType() &&
              "base for open existential component must be an existential");
