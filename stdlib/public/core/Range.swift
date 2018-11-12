@@ -405,14 +405,16 @@ extension Range: Hashable where Bound: Hashable {
   }
 }
 
-extension Range: Codable where Bound: Codable {
+extension Range: Decodable where Bound: Decodable {
   public init(from decoder: Decoder) throws {
     var container = try decoder.unkeyedContainer()
     let lowerBound = try container.decode(Bound.self)
     let upperBound = try container.decode(Bound.self)
     self = lowerBound..<upperBound
   }
+}
 
+extension Range: Encodable where Bound: Encodable {
   public func encode(to encoder: Encoder) throws {
     var container = encoder.unkeyedContainer()
     try container.encode(self.lowerBound)
@@ -462,12 +464,14 @@ extension PartialRangeUpTo: RangeExpression {
   }
 }
 
-extension PartialRangeUpTo: Codable where Bound: Codable {
+extension PartialRangeUpTo: Decodable where Bound: Decodable {
   public init(from decoder: Decoder) throws {
     var container = try decoder.unkeyedContainer()
     self = try (..<container.decode(Bound.self))
   }
+}
 
+extension PartialRangeUpTo: Encodable where Bound: Encodable {
   public func encode(to encoder: Encoder) throws {
     var container = encoder.unkeyedContainer()
     try container.encode(self.upperBound)
@@ -515,12 +519,14 @@ extension PartialRangeThrough: RangeExpression {
   }
 }
 
-extension PartialRangeThrough: Codable where Bound: Codable {
+extension PartialRangeThrough: Decodable where Bound: Decodable {
   public init(from decoder: Decoder) throws {
     var container = try decoder.unkeyedContainer()
     self = try (...container.decode(Bound.self))
   }
+}
 
+extension PartialRangeThrough: Encodable where Bound: Encodable {
   public func encode(to encoder: Encoder) throws {
     var container = encoder.unkeyedContainer()
     try container.encode(self.upperBound)
@@ -663,12 +669,14 @@ extension PartialRangeFrom: Sequence
   }
 }
 
-extension PartialRangeFrom: Codable where Bound: Codable {
+extension PartialRangeFrom: Decodable where Bound: Decodable {
   public init(from decoder: Decoder) throws {
     var container = try decoder.unkeyedContainer()
     self = try container.decode(Bound.self)...
   }
+}
 
+extension PartialRangeFrom: Encodable where Bound: Encodable {
   public func encode(to encoder: Encoder) throws {
     var container = encoder.unkeyedContainer()
     try container.encode(self.lowerBound)

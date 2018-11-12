@@ -489,14 +489,16 @@ extension ClosedRange {
 public typealias CountableClosedRange<Bound: Strideable> = ClosedRange<Bound>
   where Bound.Stride : SignedInteger
 
-extension ClosedRange: Codable where Bound: Codable {
+extension ClosedRange: Decodable where Bound: Decodable {
   public init(from decoder: Decoder) throws {
     var container = try decoder.unkeyedContainer()
     let lowerBound = try container.decode(Bound.self)
     let upperBound = try container.decode(Bound.self)
     self = lowerBound...upperBound
   }
+}
 
+extension ClosedRange: Encodable where Bound: Encodable {
   public func encode(to encoder: Encoder) throws {
     var container = encoder.unkeyedContainer()
     try container.encode(self.lowerBound)
