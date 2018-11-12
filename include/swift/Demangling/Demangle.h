@@ -33,6 +33,8 @@ namespace llvm {
 namespace swift {
 namespace Demangle {
 
+enum class SymbolicReferenceKind : uint8_t;
+
 struct DemangleOptions {
   bool SynthesizeSugarOnTypes = false;
   bool DisplayDebuggerGeneratedModule = true;
@@ -473,7 +475,9 @@ void mangleIdentifier(const char *data, size_t length,
 /// This should always round-trip perfectly with demangleSymbolAsNode.
 std::string mangleNode(const NodePointer &root);
 
-using SymbolicResolver = llvm::function_ref<Demangle::NodePointer (const void *)>;
+using SymbolicResolver =
+  llvm::function_ref<Demangle::NodePointer (SymbolicReferenceKind,
+                                            const void *)>;
 
 /// \brief Remangle a demangled parse tree, using a callback to resolve
 /// symbolic references.
@@ -537,6 +541,8 @@ public:
     return std::move(*this << std::forward<T>(x));
   }
   
+  DemanglerPrinter &writeHex(unsigned long long n) &;
+ 
   std::string &&str() && { return std::move(Stream); }
 
   llvm::StringRef getStringRef() const { return Stream; }

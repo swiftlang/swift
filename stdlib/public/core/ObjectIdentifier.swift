@@ -14,9 +14,9 @@
 ///
 /// In Swift, only class instances and metatypes have unique identities. There
 /// is no notion of identity for structs, enums, functions, or tuples.
-@_fixed_layout // FIXME(sil-serialize-all)
+@_fixed_layout // trivial-implementation
 public struct ObjectIdentifier {
-  @usableFromInline // FIXME(sil-serialize-all)
+  @usableFromInline // trivial-implementation
   internal let _value: Builtin.RawPointer
 
   /// Creates an instance that uniquely identifies the given class instance.
@@ -47,7 +47,7 @@ public struct ObjectIdentifier {
   ///     // Prints "false"
   ///
   /// - Parameter x: An instance of a class.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // trivial-implementation
   public init(_ x: AnyObject) {
     self._value = Builtin.bridgeToRawPointer(x)
   }
@@ -55,7 +55,7 @@ public struct ObjectIdentifier {
   /// Creates an instance that uniquely identifies the given metatype.
   ///
   /// - Parameter: A metatype.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // trivial-implementation
   public init(_ x: Any.Type) {
     self._value = unsafeBitCast(x, to: Builtin.RawPointer.self)
   }
@@ -69,14 +69,14 @@ extension ObjectIdentifier : CustomDebugStringConvertible {
 }
 
 extension ObjectIdentifier: Equatable {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // trivial-implementation
   public static func == (x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
     return Bool(Builtin.cmp_eq_RawPointer(x._value, y._value))
   }
 }
 
 extension ObjectIdentifier: Comparable {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // trivial-implementation
   public static func < (lhs: ObjectIdentifier, rhs: ObjectIdentifier) -> Bool {
     return UInt(bitPattern: lhs) < UInt(bitPattern: rhs)
   }
@@ -97,7 +97,7 @@ extension ObjectIdentifier: Hashable {
 extension UInt {
   /// Creates an integer that captures the full value of the given object
   /// identifier.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // trivial-implementation
   public init(bitPattern objectID: ObjectIdentifier) {
     self.init(Builtin.ptrtoint_Word(objectID._value))
   }
@@ -106,7 +106,7 @@ extension UInt {
 extension Int {
   /// Creates an integer that captures the full value of the given object
   /// identifier.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // trivial-implementation
   public init(bitPattern objectID: ObjectIdentifier) {
     self.init(bitPattern: UInt(bitPattern: objectID))
   }

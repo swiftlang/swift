@@ -559,10 +559,8 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  [[OPTIONAL:%.*]] = unchecked_ref_cast [[BRIDGED]]
   // CHECK-NEXT:  // function_ref
   // CHECK-NEXT:  [[BRIDGE_TO_ANY:%.*]] = function_ref [[BRIDGE_TO_ANY_FUNC:@.*]] :
-  // CHECK-NEXT:  [[BORROWED_OPTIONAL:%.*]] = begin_borrow [[OPTIONAL]]
-  // CHECK-NEXT:  [[RESULT_VAL:%.*]] = apply [[BRIDGE_TO_ANY]]([[ANY_ADDR]], [[BORROWED_OPTIONAL]])
+  // CHECK-NEXT:  [[RESULT_VAL:%.*]] = apply [[BRIDGE_TO_ANY]]([[ANY_ADDR]], [[OPTIONAL]])
   // CHECK-NEXT:  [[EMPTY:%.*]] = tuple ()
-  // CHECK-NEXT:  end_borrow [[BORROWED_OPTIONAL]]
   // CHECK-NEXT:  destroy_value [[OPTIONAL]]
   // CHECK-NEXT:  return [[EMPTY]]
 

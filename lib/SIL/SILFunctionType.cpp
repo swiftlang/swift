@@ -1983,7 +1983,9 @@ public:
       break;
     }
 
-    auto type = tl.getLoweredType().getASTType();
+    // Get the underlying AST type, potentially stripping off one level of
+    // optionality while we do it.
+    CanType type = tl.getLoweredType().unwrapOptionalType().getASTType();
     if (type->hasRetainablePointerRepresentation()
         || (type->getSwiftNewtypeUnderlyingType() && !tl.isTrivial()))
       return ResultConvention::Autoreleased;

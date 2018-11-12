@@ -273,6 +273,12 @@ public:
     llvm_unreachable("unhandled kind");
   }
 
+  bool isUniquelyIdentifiedOrClass() const {
+    if (isUniquelyIdentified())
+      return true;
+    return (getKind() == Class);
+  }
+
   bool isDistinctFrom(const AccessedStorage &other) const {
     if (isUniquelyIdentified() && other.isUniquelyIdentified()) {
       return !hasIdenticalBase(other);

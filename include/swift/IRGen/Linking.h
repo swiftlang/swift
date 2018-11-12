@@ -32,6 +32,7 @@ class Triple;
 namespace swift {
 namespace irgen {
 class IRGenModule;
+class Alignment;
 
 /// Determine if the triple uses the DLL storage.
 bool useDllStorage(const llvm::Triple &triple);
@@ -150,6 +151,11 @@ class LinkEntity {
     /// A swift metaclass-stub reference.  The pointer is a ClassDecl*.
     SwiftMetaclassStub,
 
+    /// A callback used by newer Objective-C runtimes to initialize class
+    /// metadata for classes where doesClassMetadataRequireUpdate() is true
+    /// but doesClassMetadataRequireInitialization() is false.
+    ObjCMetadataUpdateFunction,
+
     /// A class metadata base offset global variable.  This stores the offset
     /// of the immediate members of a class (generic parameters, field offsets,
     /// vtable offsets) in the class's metadata.  The immediate members begin
@@ -242,14 +248,6 @@ class LinkEntity {
     /// A protocol witness table pattern. The secondary pointer is a
     /// ProtocolConformance*.
     ProtocolWitnessTablePattern,
-
-    /// A witness accessor function. The secondary pointer is a
-    /// ProtocolConformance*.
-    ProtocolWitnessTableAccessFunction,
-
-    /// A generic protocol witness table cache.  The secondary pointer is a
-    /// ProtocolConformance*.
-    GenericProtocolWitnessTableCache,
 
     /// The instantiation function for a generic protocol witness table.
     /// The secondary pointer is a ProtocolConformance*.
@@ -572,6 +570,12 @@ public:
     return entity;
   }
 
+  static LinkEntity forObjCMetadataUpdateFunction(ClassDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::ObjCMetadataUpdateFunction, decl);
+    return entity;
+  }
+
   static LinkEntity forTypeMetadata(CanType concreteType,
                                     TypeMetadataAddress addr) {
     LinkEntity entity;
@@ -727,21 +731,6 @@ public:
   forProtocolWitnessTablePattern(const ProtocolConformance *C) {
     LinkEntity entity;
     entity.setForProtocolConformance(Kind::ProtocolWitnessTablePattern, C);
-    return entity;
-  }
-
-  static LinkEntity
-  forProtocolWitnessTableAccessFunction(const ProtocolConformance *C) {
-    LinkEntity entity;
-    entity.setForProtocolConformance(Kind::ProtocolWitnessTableAccessFunction,
-                                     C);
-    return entity;
-  }
-
-  static LinkEntity
-  forGenericProtocolWitnessTableCache(const ProtocolConformance *C) {
-    LinkEntity entity;
-    entity.setForProtocolConformance(Kind::GenericProtocolWitnessTableCache, C);
     return entity;
   }
 
@@ -930,23 +919,18 @@ public:
   }
 
   /// Determine whether this entity will be weak-imported.
-  bool isWeakImported(ModuleDecl *module) const {
-    if (getKind() == Kind::SILGlobalVariable &&
-        getSILGlobalVariable()->getDecl())
-      return getSILGlobalVariable()->getDecl()->isWeakImported(module);
-
-    if (getKind() == Kind::SILFunction) {
-      if (auto clangOwner = getSILFunction()->getClangNodeOwner())
-        return clangOwner->isWeakImported(module);
-      if (getSILFunction()->isWeakLinked())
-        return getSILFunction()->isAvailableExternally();
-    }
-
-    if (!isDeclKind(getKind()))
-      return false;
-
-    return getDecl()->isWeakImported(module);
-  }
+  bool isWeakImported(ModuleDecl *module) const;
+  
+  /// Return the source file whose codegen should trigger emission of this
+  /// link entity, if one can be identified.
+  const SourceFile *getSourceFileForEmission() const;
+  
+  /// Get the preferred alignment for the definition of this entity.
+  Alignment getAlignment(IRGenModule &IGM) const;
+  
+  /// Get the default LLVM type to use for forward declarations of this
+  /// entity.
+  llvm::Type *getDefaultDeclarationType(IRGenModule &IGM) const;
 #undef LINKENTITY_GET_FIELD
 #undef LINKENTITY_SET_FIELD
 };
@@ -1005,7 +989,8 @@ StringRef encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,
 }
 
 /// Allow LinkEntity to be used as a key for a DenseMap.
-template <> struct llvm::DenseMapInfo<swift::irgen::LinkEntity> {
+namespace llvm {
+template <> struct DenseMapInfo<swift::irgen::LinkEntity> {
   using LinkEntity = swift::irgen::LinkEntity;
   static LinkEntity getEmptyKey() {
     LinkEntity entity;
@@ -1031,4 +1016,5 @@ template <> struct llvm::DenseMapInfo<swift::irgen::LinkEntity> {
            LHS.SecondaryPointer == RHS.SecondaryPointer && LHS.Data == RHS.Data;
   }
 };
+}
 #endif

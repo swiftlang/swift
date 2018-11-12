@@ -141,6 +141,8 @@ internal final class _DataStorage {
                 return d.bytes.advanced(by: -_offset)
             case .customMutableReference(let d):
                 return d.bytes.advanced(by: -_offset)
+            @unknown default:
+                fatalError("Unknown Data backing type")
             }
         }
     }
@@ -267,6 +269,8 @@ internal final class _DataStorage {
                 return data.mutableBytes.advanced(by: -_offset)
             case .customMutableReference(let d):
                 return d.mutableBytes.advanced(by: -_offset)
+            @unknown default:
+                fatalError("Unknown Data backing type")
             }
         }
     }
@@ -287,6 +291,8 @@ internal final class _DataStorage {
                 return d.length
             case .customMutableReference(let d):
                 return d.length
+            @unknown default:
+                fatalError("Unknown Data backing type")
             }
         }
         @inlinable
@@ -447,6 +453,8 @@ internal final class _DataStorage {
             _backing = .customMutableReference(data)
         case .customMutableReference(let d):
             d.length = length
+        @unknown default:
+            fatalError("Unknown Data backing type")
         }
     }
     
@@ -478,6 +486,8 @@ internal final class _DataStorage {
             _backing = .customMutableReference(data)
         case .customMutableReference(let d):
             d.append(bytes, length: length)
+        @unknown default:
+            fatalError("Unknown Data backing type")
         }
         
     }
@@ -528,6 +538,8 @@ internal final class _DataStorage {
             _backing = .customReference(data)
         case .customMutableReference(let d):
             d.increaseLength(by: extraLength)
+        @unknown default:
+            fatalError("Unknown Data backing type")
         }
         
     }
@@ -614,6 +626,8 @@ internal final class _DataStorage {
             _backing = .customMutableReference(data)
         case .customMutableReference(let d):
             d.replaceBytes(in: NSRange(location: range.location - _offset, length: range.length), withBytes: bytes!)
+        @unknown default:
+            fatalError("Unknown Data backing type")
         }
     }
     
@@ -664,6 +678,8 @@ internal final class _DataStorage {
             _backing = .customMutableReference(data)
         case .customMutableReference(let d):
             d.replaceBytes(in: range, withBytes: replacementBytes, length: replacementLength)
+        @unknown default:
+            fatalError("Unknown Data backing type")
         }
     }
     
@@ -697,6 +713,8 @@ internal final class _DataStorage {
             _backing = .customMutableReference(data)
         case .customMutableReference(let d):
             d.resetBytes(in: range)
+        @unknown default:
+            fatalError("Unknown Data backing type")
         }
         
     }
@@ -887,6 +905,8 @@ internal final class _DataStorage {
             } else {
                 return _DataStorage(mutableReference: d.subdata(with: NSRange(location: range.lowerBound, length: range.count))._bridgeToObjectiveC().mutableCopy() as! NSMutableData, offset: range.lowerBound)
             }
+        @unknown default:
+            fatalError("Unknown Data backing type")
         }
     }
     

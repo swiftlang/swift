@@ -548,6 +548,11 @@ private:
   /// Returns false if there was an error.
   bool readCommentBlock(llvm::BitstreamCursor &cursor);
 
+  /// Loads data from #ModuleDocInputBuffer.
+  ///
+  /// Returns false if there was an error.
+  bool readModuleDocIfPresent();
+
   /// Recursively reads a pattern from \c DeclTypeCursor.
   llvm::Expected<Pattern *> readPattern(DeclContext *owningDC);
 
@@ -626,6 +631,9 @@ public:
     theModule.reset(new ModuleFile(std::move(moduleInputBuffer),
                                    std::move(moduleDocInputBuffer),
                                    isFramework, info, extInfo));
+    assert(info.status == Status::Valid ||
+           info.status == theModule->getStatus());
+    info.status = theModule->getStatus();
     return info;
   }
 

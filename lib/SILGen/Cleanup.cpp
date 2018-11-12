@@ -13,11 +13,36 @@
 #include "Cleanup.h"
 #include "ManagedValue.h"
 #include "RValue.h"
+#include "Scope.h"
 #include "SILGenBuilder.h"
 #include "SILGenFunction.h"
 
 using namespace swift;
 using namespace Lowering;
+
+//===----------------------------------------------------------------------===//
+//                                CleanupState
+//===----------------------------------------------------------------------===//
+
+llvm::raw_ostream &Lowering::operator<<(llvm::raw_ostream &os,
+                                        CleanupState state) {
+  switch (state) {
+  case CleanupState::Dormant:
+    return os << "Dormant";
+  case CleanupState::Dead:
+    return os << "Dead";
+  case CleanupState::Active:
+    return os << "Active";
+  case CleanupState::PersistentlyActive:
+    return os << "PersistentlyActive";
+  }
+
+  llvm_unreachable("Unhandled CleanupState in switch.");
+}
+
+//===----------------------------------------------------------------------===//
+//                               CleanupManager
+//===----------------------------------------------------------------------===//
 
 /// Are there any active cleanups in the given range?
 static bool hasAnyActiveCleanups(DiverseStackImpl<Cleanup>::iterator begin,
@@ -46,7 +71,9 @@ namespace {
   };
 } // end anonymous namespace
 
-void CleanupManager::popTopDeadCleanups(CleanupsDepth end) {
+void CleanupManager::popTopDeadCleanups() {
+  auto end = (innermostScope ? innermostScope->depth : stack.stable_end());
+  assert(end.isValid());
   stack.checkIterator(end);
 
   while (stack.stable_begin() != end && stack.begin()->isDead()) {
@@ -177,13 +204,28 @@ Cleanup &CleanupManager::initCleanup(Cleanup &cleanup,
   return cleanup;
 }
 
+#ifndef NDEBUG
+static void checkCleanupDeactivation(SILGenFunction &SGF,
+                                     CleanupsDepth handle,
+                                     CleanupState state) {
+  if (state != CleanupState::Dead) return;
+  SGF.FormalEvalContext.checkCleanupDeactivation(handle);
+}
+#endif
+
 void CleanupManager::setCleanupState(CleanupsDepth depth, CleanupState state) {
   auto iter = stack.find(depth);
   assert(iter != stack.end() && "can't change end of cleanups stack");
   setCleanupState(*iter, state);
 
+#ifndef NDEBUG
+  // This must be done after setting the state because setting the state can
+  // itself finish a formal evaluation in some cases.
+  checkCleanupDeactivation(SGF, depth, state);
+#endif
+
   if (state == CleanupState::Dead && iter == stack.begin())
-    popTopDeadCleanups(innermostScope);
+    popTopDeadCleanups();
 }
 
 void CleanupManager::forwardCleanup(CleanupsDepth handle) {
@@ -197,8 +239,14 @@ void CleanupManager::forwardCleanup(CleanupsDepth handle) {
                              : CleanupState::Dormant);
   setCleanupState(cleanup, newState);
 
+#ifndef NDEBUG
+  // This must be done after setting the state because setting the state can
+  // itself finish a formal evaluation in some cases.
+  checkCleanupDeactivation(SGF, handle, newState);
+#endif
+
   if (newState == CleanupState::Dead && iter == stack.begin())
-    popTopDeadCleanups(innermostScope);
+    popTopDeadCleanups();
 }
 
 void CleanupManager::setCleanupState(Cleanup &cleanup, CleanupState state) {
@@ -217,6 +265,38 @@ void CleanupManager::setCleanupState(Cleanup &cleanup, CleanupState state) {
   // cleanup emissions between various branches, doesn't require any
   // code to be emitted at transition points.
 }
+
+void CleanupManager::dump() const {
+#ifndef NDEBUG
+  auto begin = stack.stable_begin();
+  auto end = stack.stable_end();
+  while (begin != end) {
+    auto iter = stack.find(begin);
+    const Cleanup &stackCleanup = *iter;
+    llvm::errs() << "CLEANUP DEPTH: " << begin.getDepth() << "\n";
+    stackCleanup.dump(SGF);
+    begin = stack.stabilize(++iter);
+    stack.checkIterator(begin);
+  }
+#endif
+}
+
+void CleanupManager::dump(CleanupHandle handle) const {
+  auto iter = stack.find(handle);
+  const Cleanup &stackCleanup = *iter;
+  llvm::errs() << "CLEANUP DEPTH: " << handle.getDepth() << "\n";
+  stackCleanup.dump(SGF);
+}
+
+void CleanupManager::checkIterator(CleanupHandle handle) const {
+#ifndef NDEBUG
+  stack.checkIterator(handle);
+#endif
+}
+
+//===----------------------------------------------------------------------===//
+//                        CleanupStateRestorationScope
+//===----------------------------------------------------------------------===//
 
 void CleanupStateRestorationScope::pushCleanupState(CleanupHandle handle,
                                                     CleanupState newState) {
@@ -266,50 +346,6 @@ void CleanupStateRestorationScope::popImpl() {
 }
 
 void CleanupStateRestorationScope::pop() && { popImpl(); }
-
-llvm::raw_ostream &Lowering::operator<<(llvm::raw_ostream &os,
-                                        CleanupState state) {
-  switch (state) {
-  case CleanupState::Dormant:
-    return os << "Dormant";
-  case CleanupState::Dead:
-    return os << "Dead";
-  case CleanupState::Active:
-    return os << "Active";
-  case CleanupState::PersistentlyActive:
-    return os << "PersistentlyActive";
-  }
-
-  llvm_unreachable("Unhandled CleanupState in switch.");
-}
-
-void CleanupManager::dump() const {
-#ifndef NDEBUG
-  auto begin = stack.stable_begin();
-  auto end = stack.stable_end();
-  while (begin != end) {
-    auto iter = stack.find(begin);
-    const Cleanup &stackCleanup = *iter;
-    llvm::errs() << "CLEANUP DEPTH: " << begin.getDepth() << "\n";
-    stackCleanup.dump(SGF);
-    begin = stack.stabilize(++iter);
-    stack.checkIterator(begin);
-  }
-#endif
-}
-
-void CleanupManager::dump(CleanupHandle handle) const {
-  auto iter = stack.find(handle);
-  const Cleanup &stackCleanup = *iter;
-  llvm::errs() << "CLEANUP DEPTH: " << handle.getDepth() << "\n";
-  stackCleanup.dump(SGF);
-}
-
-void CleanupManager::checkIterator(CleanupHandle handle) const {
-#ifndef NDEBUG
-  stack.checkIterator(handle);
-#endif
-}
 
 //===----------------------------------------------------------------------===//
 //                               Cleanup Cloner

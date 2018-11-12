@@ -103,3 +103,15 @@ public enum GenericE<T> {}
 
 @_weakLinked
 open class GenericC<T> {}
+
+public protocol OtherProtocol {}
+public struct ConcreteType : OtherProtocol {}
+
+public protocol ProtocolWithWeakMembers {
+  @_weakLinked associatedtype T : OtherProtocol = ConcreteType
+  @_weakLinked func f()
+}
+
+extension ProtocolWithWeakMembers {
+  @_weakLinked public func f() {}
+}

@@ -348,7 +348,7 @@
 ///
 /// Note that in this example, `imagePaths` is subscripted using a dictionary
 /// index. Unlike the key-based subscript, the index-based subscript returns
-/// the corresponding key-value pair as a nonoptional tuple.
+/// the corresponding key-value pair as a non-optional tuple.
 ///
 ///     print(imagePaths[glyphIndex!])
 ///     // Prints "("star", "/glyphs/star.png")"
@@ -728,19 +728,6 @@ extension Dictionary: Collection {
   public var isEmpty: Bool {
     return count == 0
   }
-
-  /// The first element of the dictionary.
-  ///
-  /// The first element of the dictionary is not necessarily the first element
-  /// added to the dictionary. Don't expect any particular ordering of
-  /// dictionary elements.
-  ///
-  /// If the dictionary is empty, the value of this property is `nil`.
-  @inlinable
-  public var first: Element? {
-    var it = makeIterator()
-    return it.next()
-  }
 }
 
 extension Dictionary {
@@ -813,31 +800,32 @@ extension Dictionary {
       // Move the old value (if any) out of storage, wrapping it into an
       // optional before yielding it.
       let native = _variant.asNative
-      var value: Value?
       if found {
-        value = (native._values + bucket.offset).move()
+        var value: Value? = (native._values + bucket.offset).move()
+        yield &value
+        if let value = value {
+          // **Mutation**
+          //
+          // Initialize storage to new value.
+          (native._values + bucket.offset).initialize(to: value)
+        } else {
+          // **Removal**
+          //
+          // We've already deinitialized the value; deinitialize the key too and
+          // register the removal.
+          (native._keys + bucket.offset).deinitialize(count: 1)
+          native._delete(at: bucket)
+        }
       } else {
-        value = nil
-      }
-      yield &value
-
-      // Value is now potentially different. Check which one of the four
-      // possible cases apply.
-      switch (value, found) {
-      case (let value?, true): // Mutation
-        // Initialize storage to new value.
-        (native._values + bucket.offset).initialize(to: value)
-      case (let value?, false): // Insertion
-        // Insert the new entry at the correct place.
-        // We've already ensured we have enough capacity.
-        native._insert(at: bucket, key: key, value: value)
-      case (nil, true): // Removal
-        // We've already removed the value; deinitialize and remove the key too.
-        (native._values + bucket.offset).deinitialize(count: 1)
-        native._delete(at: bucket)
-      case (nil, false): // Noop
-        // Easy!
-        break
+        var value: Value? = nil
+        yield &value
+        if let value = value {
+          // **Insertion**
+          //
+          // Insert the new entry at the correct place.  Note that
+          // `mutatingFind` already ensured that we have enough capacity.
+          native._insert(at: bucket, key: key, value: value)
+        }
       }
       _fixLifetime(self)
     }
@@ -967,7 +955,7 @@ extension Dictionary {
   /// Returns a new dictionary containing only the key-value pairs that have
   /// non-`nil` values as the result from the transform by the given closure.
   ///
-  /// Use this method to receive a dictionary of nonoptional values when your
+  /// Use this method to receive a dictionary of non-optional values when your
   /// transformation can produce an optional value.
   ///
   /// In this example, note the difference in the result of using `mapValues`
@@ -1942,7 +1930,7 @@ extension Dictionary.Index: Hashable {
 #if _runtime(_ObjC)
     guard _isNative else {
       hasher.combine(1 as UInt8)
-      hasher.combine(_asCocoa.storage.currentKeyIndex)
+      hasher.combine(_asCocoa._offset)
       return
     }
     hasher.combine(0 as UInt8)

@@ -543,22 +543,11 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(llvm::function_ref<Type(const Expr *)> getType,
-                llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc)
-          const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(raw_ostream &OS, llvm::function_ref<Type(const Expr *)> getType,
-                llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc)
-          const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
-
-  void dump(raw_ostream &OS) const;
-  void print(raw_ostream &OS, unsigned Indent = 0) const;
-  void print(raw_ostream &OS, llvm::function_ref<Type(const Expr *)> getType,
-             llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
-             unsigned Indent = 0) const;
+  void dump(raw_ostream &OS, unsigned Indent = 0) const;
+  void dump(raw_ostream &OS, llvm::function_ref<Type(const Expr *)> getType,
+            llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
+            unsigned Indent = 0) const;
+  
   void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
 
   // Only allow allocation of Exprs using the allocator in ASTContext
@@ -807,10 +796,12 @@ public:
   static IntegerLiteralExpr *
   createFromUnsigned(ASTContext &C, unsigned value);
 
+  /// Returns the value of the literal, appropriately constructed in the
+  /// target type.
   APInt getValue() const;
-  static APInt getValue(StringRef Text, unsigned BitWidth, bool Negative);
 
-  APInt getRawMagnitude() const;
+  /// Returns the raw value of the literal without any truncation.
+  APInt getRawValue() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::IntegerLiteral;

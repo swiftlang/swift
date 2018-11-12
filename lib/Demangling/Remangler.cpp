@@ -681,6 +681,8 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
     Buffer << 'p';
   } else if (text == BUILTIN_TYPE_NAME_SILTOKEN) {
     Buffer << 't';
+  } else if (text == BUILTIN_TYPE_NAME_INTLITERAL) {
+    Buffer << 'I';
   } else if (text == BUILTIN_TYPE_NAME_WORD) {
     Buffer << 'w';
   } else if (text.consume_front(BUILTIN_TYPE_NAME_INT)) {
@@ -948,7 +950,8 @@ void Remangler::mangleExtension(Node *node) {
 void Remangler::mangleAnonymousContext(Node *node) {
   mangleChildNode(node, 1);
   mangleChildNode(node, 0);
-  mangleTypeList(node->getChild(2));
+  if (node->getNumChildren() >= 3)
+    mangleTypeList(node->getChild(2));
   Buffer << "XZ";
 }
 
@@ -1961,6 +1964,11 @@ void Remangler::mangleMethodLookupFunction(Node *node) {
   Buffer << "Mu";
 }
 
+void Remangler::mangleObjCMetadataUpdateFunction(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "MU";
+}
+
 void Remangler::mangleThrowsAnnotation(Node *node) {
   Buffer << 'K';
 }
@@ -2115,23 +2123,21 @@ void Remangler::mangleAssociatedTypeGenericParamRef(Node *node) {
   Buffer << "MXA";
 }
   
-void Remangler::mangleUnresolvedSymbolicReference(Node *node) {
-  Buffer << "$";
-  char bytes[4];
-  uint32_t value = node->getIndex();
-  memcpy(bytes, &value, 4);
-  Buffer << StringRef(bytes, 4);
+void Remangler::mangleTypeSymbolicReference(Node *node) {
+  return mangle(Resolver(SymbolicReferenceKind::Context,
+                         (const void *)node->getIndex()));
 }
 
-void Remangler::mangleSymbolicReference(Node *node) {
-  return mangle(Resolver((const void *)node->getIndex()));
+void Remangler::mangleProtocolSymbolicReference(Node *node) {
+  return mangle(Resolver(SymbolicReferenceKind::Context,
+                         (const void *)node->getIndex()));
 }
 
 } // anonymous namespace
 
 /// The top-level interface to the remangler.
 std::string Demangle::mangleNode(const NodePointer &node) {
-  return mangleNode(node, [](const void *) -> NodePointer {
+  return mangleNode(node, [](SymbolicReferenceKind, const void *) -> NodePointer {
     unreachable("should not try to mangle a symbolic reference; "
                 "resolve it to a non-symbolic demangling tree instead");
   });

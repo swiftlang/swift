@@ -428,16 +428,6 @@ public protocol _BridgedStoredNSError :
   init(_nsError error: NSError)
 }
 
-/// TODO: Better way to do this?
-internal func _stringDictToAnyHashableDict(_ input: [String : Any])
-    -> [AnyHashable : Any] {
-  var result = [AnyHashable : Any](minimumCapacity: input.count)
-  for (k, v) in input {
-    result[k] = v
-  }
-  return result
-}
-
 /// Various helper implementations for _BridgedStoredNSError
 extension _BridgedStoredNSError {
   public var code: Code {
@@ -449,7 +439,7 @@ extension _BridgedStoredNSError {
   public init(_ code: Code, userInfo: [String : Any] = [:]) {
     self.init(_nsError: NSError(domain: Self.errorDomain,
                                 code: unsafeBinaryIntegerToInt(code.rawValue),
-                                userInfo: _stringDictToAnyHashableDict(userInfo)))
+                                userInfo: userInfo))
   }
 
   /// The user-info dictionary for an error that was bridged from
@@ -483,8 +473,7 @@ public extension _BridgedStoredNSError {
   var errorUserInfo: [String : Any] {
     var result: [String : Any] = [:]
     for (key, value) in _nsError.userInfo {
-      guard let stringKey = key.base as? String else { continue }
-      result[stringKey] = value
+      result[key] = value
     }
     return result
   }
@@ -615,7 +604,7 @@ public extension CocoaError {
 
 extension CocoaError {
     public static func error(_ code: CocoaError.Code, userInfo: [AnyHashable : Any]? = nil, url: URL? = nil) -> Error {
-        var info: [AnyHashable : Any] = userInfo ?? [:]
+        var info: [String : Any] = userInfo as? [String : Any] ?? [:]
         if let url = url {
             info[NSURLErrorKey] = url
         }

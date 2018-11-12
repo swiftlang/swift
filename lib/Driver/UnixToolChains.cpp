@@ -111,6 +111,7 @@ std::string toolchains::GenericUnix::getDefaultLinker() const {
     // final executables, as such, unless specified, we default to gold
     // linker.
     return "gold";
+  case llvm::Triple::x86:
   case llvm::Triple::x86_64:
   case llvm::Triple::ppc64:
   case llvm::Triple::ppc64le:

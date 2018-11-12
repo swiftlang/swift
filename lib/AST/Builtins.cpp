@@ -93,6 +93,9 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   if (Name == "Word")
     return BuiltinIntegerType::getWordType(Context);
 
+  if (Name == "IntLiteral")
+    return Context.TheIntegerLiteralType;
+
   // Handle 'int8' and friends.
   if (Name.substr(0, 3) == "Int") {
     unsigned BitWidth;
@@ -348,7 +351,7 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
         !CheckOutput->is<BuiltinIntegerType>())
       return nullptr;
     break;
-      
+
   case BuiltinValueKind::UIToFP:
   case BuiltinValueKind::SIToFP:
     if (CheckOutput.isNull() || !CheckInput->is<BuiltinIntegerType>() ||
@@ -1156,16 +1159,20 @@ static ValueDecl *getStaticReportOperation(ASTContext &Context, Identifier Id) {
   return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
-static ValueDecl *getCheckedTruncOperation(ASTContext &Context,
-                                                Identifier Id,
-                                                Type InputTy,
-                                                Type OutputTy) {
-  auto InTy = InputTy->getAs<BuiltinIntegerType>();
+static ValueDecl *getCheckedTruncOperation(ASTContext &Context, Identifier Id,
+                                           Type InputTy, Type OutputTy,
+                                           bool AllowLiteral) {
+  auto InTy = InputTy->getAs<AnyBuiltinIntegerType>();
   auto OutTy = OutputTy->getAs<BuiltinIntegerType>();
   if (!InTy || !OutTy)
     return nullptr;
-  if (InTy->getLeastWidth() < OutTy->getGreatestWidth())
+  if (isa<BuiltinIntegerLiteralType>(InTy)) {
+    if (!AllowLiteral)
+      return nullptr;
+  } else if (cast<BuiltinIntegerType>(InTy)->getLeastWidth()
+               < OutTy->getGreatestWidth()) {
     return nullptr;
+  }
 
   Type OverflowBitTy = BuiltinIntegerType::get(1, Context);
   TupleTypeElt ResultElts[] = { Type(OutTy), OverflowBitTy };
@@ -1189,7 +1196,7 @@ static ValueDecl *getCheckedConversionOperation(ASTContext &Context,
 static ValueDecl *getIntToFPWithOverflowOperation(ASTContext &Context,
                                                   Identifier Id, Type InputTy,
                                                   Type OutputTy) {
-  auto InTy = InputTy->getAs<BuiltinIntegerType>();
+  auto InTy = InputTy->getAs<BuiltinIntegerLiteralType>();
   auto OutTy = OutputTy->getAs<BuiltinFloatType>();
   if (!InTy || !OutTy)
     return nullptr;
@@ -1910,12 +1917,15 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!Types.empty()) return nullptr;
     return getStaticReportOperation(Context, Id);
 
-  case BuiltinValueKind::UToSCheckedTrunc:
   case BuiltinValueKind::SToSCheckedTrunc:
   case BuiltinValueKind::SToUCheckedTrunc:
+    if (Types.size() != 2) return nullptr;
+    return getCheckedTruncOperation(Context, Id, Types[0], Types[1], true);
+
+  case BuiltinValueKind::UToSCheckedTrunc:
   case BuiltinValueKind::UToUCheckedTrunc:
     if (Types.size() != 2) return nullptr;
-    return getCheckedTruncOperation(Context, Id, Types[0], Types[1]);
+    return getCheckedTruncOperation(Context, Id, Types[0], Types[1], false);
 
   case BuiltinValueKind::SUCheckedConversion:
   case BuiltinValueKind::USCheckedConversion:

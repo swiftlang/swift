@@ -391,18 +391,6 @@ extension Set: Collection {
   public var isEmpty: Bool {
     return count == 0
   }
-
-  /// The first element of the set.
-  ///
-  /// The first element of the set is not necessarily the first element added
-  /// to the set. Don't expect any particular ordering of set elements.
-  ///
-  /// If the set is empty, the value of this property is `nil`.
-  @inlinable
-  public var first: Element? {
-    var iterator = makeIterator()
-    return iterator.next()
-  }
 }
 
 // FIXME: rdar://problem/23549059 (Optimize == for Set)
@@ -1437,7 +1425,7 @@ extension Set.Index: Hashable {
 #if _runtime(_ObjC)
     guard _isNative else {
       hasher.combine(1 as UInt8)
-      hasher.combine(_asCocoa.storage.currentKeyIndex)
+      hasher.combine(_asCocoa._offset)
       return
     }
     hasher.combine(0 as UInt8)

@@ -3875,6 +3875,12 @@ static Type resolveDependentMemberTypes(GenericSignatureBuilder &builder,
       if (equivClass->recursiveConcreteType)
         return ErrorType::get(Type(type));
 
+      // Prevent recursive substitution.
+      equivClass->recursiveConcreteType = true;
+      SWIFT_DEFER {
+        equivClass->recursiveConcreteType = false;
+      };
+
       return resolveDependentMemberTypes(builder, equivClass->concreteType);
     }
 

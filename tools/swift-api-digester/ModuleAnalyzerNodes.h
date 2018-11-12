@@ -37,6 +37,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/ColorUtils.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/LLVMInitialize.h"
@@ -224,7 +225,6 @@ class SDKNode {
   typedef std::vector<SDKNode*>::iterator ChildIt;
 protected:
   SDKContext &Ctx;
-private:
   StringRef Name;
   StringRef PrintedName;
   unsigned TheKind : 4;
@@ -264,7 +264,8 @@ public:
   StringRef getAnnotateComment(NodeAnnotation Anno) const;
   bool isAnnotatedAs(NodeAnnotation Anno) const;
   void addChild(SDKNode *Child);
-  ArrayRef<SDKNode*> getChildren() const;
+  NodeVector& getChildren() { return Children; }
+  ArrayRef<SDKNode*> getChildren() const { return Children; }
   bool hasSameChildren(const SDKNode &Other) const;
   unsigned getChildIndex(const SDKNode *Child) const;
   SDKNode* getOnlyChild() const;
@@ -319,7 +320,6 @@ public:
   DeclKind getDeclKind() const { return DKind; }
   void printFullyQualifiedName(llvm::raw_ostream &OS) const;
   StringRef getFullyQualifiedName() const;
-  bool isSDKPrivate() const;
   bool isDeprecated() const { return IsDeprecated; };
   bool isProtocolRequirement() const { return IsProtocolReq; }
   bool hasDeclAttribute(DeclAttrKind DAKind) const;
@@ -440,17 +440,19 @@ public:
 class SDKNodeDeclType: public SDKNodeDecl {
   StringRef SuperclassUsr;
   std::vector<StringRef> SuperclassNames;
-  std::vector<StringRef> ConformingProtocols;
+  std::vector<SDKNode*> Conformances;
   StringRef EnumRawTypeName;
 public:
   SDKNodeDeclType(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
   StringRef getSuperClassUsr() const { return SuperclassUsr; }
   ArrayRef<StringRef> getClassInheritanceChain() const { return SuperclassNames; }
+  void addConformance(SDKNode *Conf);
+  ArrayRef<SDKNode*> getConformances() const { return Conformances; }
+  NodeVector getConformances() { return Conformances; }
   StringRef getSuperClassName() const {
     return SuperclassNames.empty() ? StringRef() : SuperclassNames.front();
   };
-  ArrayRef<StringRef> getAllProtocols() const { return ConformingProtocols; }
 
 #define NOMINAL_TYPE_DECL(ID, PARENT) \
   bool is##ID() const { return getDeclKind() == DeclKind::ID; }
@@ -471,6 +473,34 @@ public:
   bool isConformingTo(KnownProtocolKind Kind) const;
   void jsonize(json::Output &out) override;
   void diagnose(SDKNode *Right) override;
+};
+
+/// Keeps track of a conformance; the children of this node are
+/// SDKNodeTypeWitness. The conformance node should have no parent since
+/// they are stored as an additional property in SDKNodeDeclType.
+/// The SDKNode part of the conformance node is constructed using the protocol
+/// in the conformance, thus getName() will give us the name of the protocol.
+class SDKNodeConformance: public SDKNode {
+  SDKNodeDeclType *TypeDecl;
+  friend class SDKNodeDeclType;
+public:
+  SDKNodeConformance(SDKNodeInitInfo Info);
+  ArrayRef<SDKNode*> getTypeWitnesses() const { return Children; }
+  SDKNodeDeclType *getNominalTypeDecl() const { return TypeDecl; }
+  static bool classof(const SDKNode *N);
+};
+
+/// Keep track of a type witness of an associated type requirement. These nodes
+/// only appear as children of SDKNodeConformance.
+/// The SDKNode part of this node is constructed using the associated type decl;
+/// thus getName() will give us the name of the associated type. The only child
+/// of this node is a type node witnessing the associated type requirement.
+class SDKNodeTypeWitness: public SDKNode {
+public:
+  SDKNodeTypeWitness(SDKNodeInitInfo Info);
+  StringRef getWitnessedTypeName() const;
+  SDKNodeType *getUnderlyingType() const;
+  static bool classof(const SDKNode *N);
 };
 
 class SDKNodeDeclOperator : public SDKNodeDecl {
@@ -617,7 +647,11 @@ public:
 
   void printTopLevelNames();
 
+  void addConformancesToTypeDecl(SDKNodeDeclType *Root, NominalTypeDecl* NTD);
   void addMembersToRoot(SDKNode *Root, IterableDeclContext *Context);
+
+  SDKNode *constructTypeWitnessNode(AssociatedTypeDecl *Assoc, Type Ty);
+  SDKNode *constructConformanceNode(ProtocolConformance *Conform);
   SDKNode *constructSubscriptDeclNode(SubscriptDecl *SD);
   SDKNode *constructAssociatedTypeNode(AssociatedTypeDecl *ATD);
   SDKNode *constructTypeAliasNode(TypeAliasDecl *TAD);
@@ -655,8 +689,8 @@ int deserializeSDKDump(StringRef dumpPath, StringRef OutputPath,
 
 int findDeclUsr(StringRef dumpPath, CheckerOptions Opts);
 
-void stringSetDifference(ArrayRef<StringRef> Left, ArrayRef<StringRef> Right,
-  std::vector<StringRef> &LeftMinusRight, std::vector<StringRef> &RightMinusLeft);
+void nodeSetDifference(ArrayRef<SDKNode*> Left, ArrayRef<SDKNode*> Right,
+  NodeVector &LeftMinusRight, NodeVector &RightMinusLeft);
 
 } // end of abi namespace
 } // end of ide namespace

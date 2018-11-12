@@ -1,4 +1,4 @@
-add_swift_library(swiftDemangle
+add_swift_host_library(swiftDemangle
                   SHARED
                     SwiftDemangle.cpp
                     MangleHack.cpp

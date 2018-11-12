@@ -58,7 +58,7 @@ func _stdlib_atomicCompareExchangeStrongPtr(
 ///   shared memory); and
 ///
 /// - the shared memory that you are accessing is located inside a heap
-///   allocation (a class instance property, a `_HeapBuffer`, a pointer to
+///   allocation (a class instance property, a `_BridgingBuffer`, a pointer to
 ///   an `Array` element etc.)
 ///
 /// If the conditions above are not met, the code will still compile, but the
@@ -374,7 +374,6 @@ internal struct _Buffer72 {
 #if !os(Windows) && (arch(i386) || arch(x86_64))
 % end
 
-@usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_float${bits}ToString")
 internal func _float${bits}ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
@@ -382,7 +381,6 @@ internal func _float${bits}ToStringImpl(
   _ debug: Bool
 ) -> UInt
 
-@inlinable // FIXME(sil-serialize-all)
 internal func _float${bits}ToString(
   _ value: Float${bits}, debug: Bool
 ) -> String {

@@ -241,13 +241,6 @@ private:
   /// \see EntryPointInfoTy
   EntryPointInfoTy EntryPointInfo;
 
-  struct {
-    unsigned TestingEnabled : 1;
-    unsigned FailedToLoad : 1;
-    unsigned ResilienceStrategy : 1;
-    unsigned HasResolvedImports : 1;
-  } Flags;
-
   ModuleDecl(Identifier name, ASTContext &ctx);
 
 public:
@@ -284,32 +277,32 @@ public:
 
   /// Returns true if this module was or is being compiled for testing.
   bool isTestingEnabled() const {
-    return Flags.TestingEnabled;
+    return Bits.ModuleDecl.TestingEnabled;
   }
   void setTestingEnabled(bool enabled = true) {
-    Flags.TestingEnabled = enabled;
+    Bits.ModuleDecl.TestingEnabled = enabled;
   }
 
   /// Returns true if there was an error trying to load this module.
   bool failedToLoad() const {
-    return Flags.FailedToLoad;
+    return Bits.ModuleDecl.FailedToLoad;
   }
   void setFailedToLoad(bool failed = true) {
-    Flags.FailedToLoad = failed;
+    Bits.ModuleDecl.FailedToLoad = failed;
   }
 
   bool hasResolvedImports() const {
-    return Flags.HasResolvedImports;
+    return Bits.ModuleDecl.HasResolvedImports;
   }
   void setHasResolvedImports() {
-    Flags.HasResolvedImports = true;
+    Bits.ModuleDecl.HasResolvedImports = true;
   }
 
   ResilienceStrategy getResilienceStrategy() const {
-    return ResilienceStrategy(Flags.ResilienceStrategy);
+    return ResilienceStrategy(Bits.ModuleDecl.RawResilienceStrategy);
   }
   void setResilienceStrategy(ResilienceStrategy strategy) {
-    Flags.ResilienceStrategy = unsigned(strategy);
+    Bits.ModuleDecl.RawResilienceStrategy = unsigned(strategy);
   }
 
   /// Look up a (possibly overloaded) value set at top-level scope

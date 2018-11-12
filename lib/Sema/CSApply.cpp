@@ -1828,7 +1828,7 @@ namespace {
     Expr *handleIntegerLiteralExpr(LiteralExpr *expr) {
       // If the literal has been assigned a builtin integer type,
       // don't mess with it.
-      if (cs.getType(expr)->is<BuiltinIntegerType>())
+      if (cs.getType(expr)->is<AnyBuiltinIntegerType>())
         return expr;
 
       auto &tc = cs.getTypeChecker();
@@ -1868,9 +1868,7 @@ namespace {
                tc.Context.Id_IntegerLiteralType,
                initName,
                builtinProtocol,
-               // Note that 'MaxIntegerType' is guaranteed to be available.
-               // Otherwise it would be caught by CSGen::visitLiteralExpr
-               tc.getMaxIntegerType(dc),
+               tc.Context.TheIntegerLiteralType,
                builtinInitName,
                nullptr,
                diag::integer_literal_broken_proto,
@@ -3681,6 +3679,7 @@ namespace {
 
         literalInit->setImplicit(false);
 
+        cs.setType(expr, toType);
         // Keep the coercion around, because it contains the source range
         // for the original constructor call.
         return expr;

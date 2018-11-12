@@ -600,24 +600,9 @@ class ConformanceFlags {
 public:
   typedef uint32_t int_type;
 
-  enum class ConformanceKind {
-    /// A direct reference to a protocol witness table.
-    WitnessTable,
-    /// A function pointer that can be called to access the protocol witness
-    /// table.
-    WitnessTableAccessor,
-    /// A function pointer that can be called to access the protocol witness
-    /// table whose conformance is conditional on additional requirements that
-    /// must first be evaluated and then provided to the accessor function.
-    ConditionalWitnessTableAccessor,
-
-    First_Kind = WitnessTable,
-    Last_Kind = ConditionalWitnessTableAccessor,
-  };
-
 private:
   enum : int_type {
-    ConformanceKindMask = 0x07,      // 8 conformance kinds
+    UnusedLowBits = 0x07,      // historical conformance kind
 
     TypeMetadataKindMask = 0x7 << 3, // 8 type reference kinds
     TypeMetadataKindShift = 3,
@@ -629,16 +614,13 @@ private:
     NumConditionalRequirementsShift = 8,
 
     HasResilientWitnessesMask = 0x01 << 16,
+    HasGenericWitnessTableMask = 0x01 << 17,
   };
 
   int_type Value;
 
 public:
   ConformanceFlags(int_type value = 0) : Value(value) {}
-
-  ConformanceFlags withConformanceKind(ConformanceKind kind) const {
-    return ConformanceFlags((Value & ~ConformanceKindMask) | int_type(kind));
-  }
 
   ConformanceFlags withTypeReferenceKind(TypeReferenceKind kind) const {
     return ConformanceFlags((Value & ~TypeMetadataKindMask)
@@ -668,9 +650,12 @@ public:
                                                     : 0));
   }
 
-  /// Retrieve the conformance kind.
-  ConformanceKind getConformanceKind() const {
-    return ConformanceKind(Value & ConformanceKindMask);
+  ConformanceFlags withHasGenericWitnessTable(
+                                           bool hasGenericWitnessTable) const {
+    return ConformanceFlags((Value & ~HasGenericWitnessTableMask)
+                            | (hasGenericWitnessTable
+                                 ? HasGenericWitnessTableMask
+                                 : 0));
   }
 
   /// Retrieve the type reference kind kind.
@@ -707,6 +692,12 @@ public:
   /// Whether this conformance has any resilient witnesses.
   bool hasResilientWitnesses() const {
     return Value & HasResilientWitnessesMask;
+  }
+
+  /// Whether this conformance has a generic witness table that may need to
+  /// be instantiated.
+  bool hasGenericWitnessTable() const {
+    return Value & HasGenericWitnessTableMask;
   }
 
   int_type getIntValue() const { return Value; }
@@ -892,11 +883,12 @@ using FunctionTypeFlags = TargetFunctionTypeFlags<size_t>;
 
 template <typename int_type>
 class TargetParameterTypeFlags {
-  // SWIFT_ENABLE_TENSORFLOW
   enum : int_type {
-    ValueOwnershipMask = 0x7F,
-    VariadicMask = 0x80,
-    NonDifferentiableMask = 0x100
+    // SWIFT_ENABLE_TENSORFLOW
+    ValueOwnershipMask    = 0x7F,
+    VariadicMask          = 0x80,
+    AutoClosureMask       = 0x100,
+    NonDifferentiableMask = 0x200
   };
   int_type Data;
 
@@ -917,10 +909,17 @@ public:
                                               (isVariadic ? VariadicMask : 0));
   }
 
+  constexpr TargetParameterTypeFlags<int_type>
+  withAutoClosure(bool isAutoClosure) const {
+    return TargetParameterTypeFlags<int_type>(
+        (Data & ~AutoClosureMask) | (isAutoClosure ? AutoClosureMask : 0));
+  }
+
   bool isNone() const { return Data == 0; }
   bool isVariadic() const { return Data & VariadicMask; }
+  bool isAutoClosure() const { return Data & AutoClosureMask; }
   // SWIFT_ENABLE_TENSORFLOW
-  bool isNonDifferentiable() const { return Data &NonDifferentiableMask; }
+  bool isNonDifferentiable() const { return Data & NonDifferentiableMask; }
 
   ValueOwnership getValueOwnership() const {
     return (ValueOwnership)(Data & ValueOwnershipMask);
@@ -1703,6 +1702,40 @@ public:
   /// Is this request satisfied by a metadata that's in the given state?
   bool isSatisfiedBy(MetadataState state) const {
     return isAtLeast(state, getState());
+  }
+};
+
+/// Flags for Builtin.IntegerLiteral values.
+class IntegerLiteralFlags {
+public:
+  enum : size_t {
+    IsNegativeFlag = 0x1,
+
+    // Save some space for other flags.
+
+    BitWidthShift = 8,
+  };
+
+private:
+  size_t Data;
+
+  explicit IntegerLiteralFlags(size_t data) : Data(data) {}
+
+public:
+  constexpr IntegerLiteralFlags(size_t bitWidth, bool isNegative)
+    : Data((bitWidth << BitWidthShift)
+           | (isNegative ? IsNegativeFlag : 0)) {}
+
+  /// Return true if the value is negative.
+  bool isNegative() const { return Data & IsNegativeFlag; }
+
+  /// Return the minimum number of bits necessary to store the value in
+  /// two's complement, including a leading sign bit.
+  unsigned getBitWidth() const { return Data >> BitWidthShift; }
+
+  size_t getOpaqueValue() const { return Data; }
+  static IntegerLiteralFlags getFromOpaqueValue(size_t value) {
+    return IntegerLiteralFlags(value);
   }
 };
 

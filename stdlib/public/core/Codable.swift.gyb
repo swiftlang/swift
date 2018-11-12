@@ -1202,7 +1202,7 @@ public enum DecodingError : Error {
   /// for debugging.
   case typeMismatch(Any.Type, Context)
 
-  /// An indication that a nonoptional value of the given type was expected,
+  /// An indication that a non-optional value of the given type was expected,
   /// but a null value was found.
   ///
   /// As associated values, this case contains the attempted type and context

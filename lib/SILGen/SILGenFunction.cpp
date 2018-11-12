@@ -501,21 +501,18 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                              SILType::getPrimitiveObjectType(mainClassMetaty));
     metaTy = B.createInitExistentialMetatype(mainClass, metaTy,
                           SILType::getPrimitiveObjectType(anyObjectMetaTy), {});
-    SILValue optName = B.createApply(mainClass,
-                               NSStringFromClass,
-                               NSStringFromClass->getType(),
-                               SILType::getPrimitiveObjectType(OptNSStringTy),
-                               {}, metaTy);
+    SILValue optNameValue = B.createApply(
+        mainClass, NSStringFromClass, NSStringFromClass->getType(),
+        SILType::getPrimitiveObjectType(OptNSStringTy), {}, metaTy);
+    ManagedValue optName = emitManagedRValueWithCleanup(optNameValue);
 
     // Fix up the string parameters to have the right type.
     SILType nameArgTy = fnConv.getSILArgumentType(3);
     assert(nameArgTy == fnConv.getSILArgumentType(2));
     (void)nameArgTy;
-    auto managedName = ManagedValue::forUnmanaged(optName);
-    SILValue nilValue;
-    assert(optName->getType() == nameArgTy);
-    nilValue = getOptionalNoneValue(mainClass,
-                                    getTypeLowering(OptNSStringTy));
+    assert(optName.getType() == nameArgTy);
+    SILValue nilValue =
+        getOptionalNoneValue(mainClass, getTypeLowering(OptNSStringTy));
 
     // Fix up argv to have the right type.
     auto argvTy = fnConv.getSILArgumentType(1);
@@ -544,7 +541,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     auto UIApplicationMain = B.createFunctionRef(mainClass, UIApplicationMainFn);
 
     SILValue args[] = {argc, managedArgv.getValue(), nilValue,
-                       managedName.getValue()};
+                       optName.getValue()};
 
     B.createApply(mainClass, UIApplicationMain,
                   UIApplicationMain->getType(),

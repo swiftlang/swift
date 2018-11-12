@@ -13,7 +13,6 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_LOCAL_H
 #define SWIFT_SILOPTIMIZER_UTILS_LOCAL_H
 
-#include "swift/Basic/ArrayRefView.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
@@ -298,157 +297,84 @@ private:
   SILInstruction *findLastUserInBlock(SILBasicBlock *BB);
 };
 
-/// Base class for BB cloners.
-class BaseThreadingCloner : public SILClonerWithScopes<BaseThreadingCloner> {
-  friend class SILInstructionVisitor<BaseThreadingCloner>;
-  friend class SILCloner<BaseThreadingCloner>;
+/// Clone a single basic block and any required successor edges within the same
+/// function.
+class BasicBlockCloner : public SILCloner<BasicBlockCloner> {
+  using SuperTy = SILCloner<BasicBlockCloner>;
+  friend class SILCloner<BasicBlockCloner>;
 
-  protected:
-  SILBasicBlock *FromBB, *DestBB;
+protected:
+  /// The original block to be cloned.
+  SILBasicBlock *origBB;
 
-  public:
-  // A map of old to new available values.
-  SmallVector<std::pair<ValueBase *, SILValue>, 16> AvailVals;
-
-  /// If WithinFunction is true, the debug scopes of the cloned
-  /// instructions will not be updated.
-  BaseThreadingCloner(SILFunction &To, bool WithinFunction)
-      : SILClonerWithScopes(To, WithinFunction), FromBB(nullptr),
-        DestBB(nullptr) {}
-
-  BaseThreadingCloner(SILFunction &To, SILBasicBlock *From, SILBasicBlock *Dest)
-      : SILClonerWithScopes(To, From->getParent() == &To), FromBB(From),
-        DestBB(Dest) {}
-
-  SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
-
-  SILValue remapValue(SILValue Value) {
-    // If this is a use of an instruction in another block, then just use it.
-    if (auto SI = Value->getDefiningInstruction()) {
-      if (SI->getParent() != FromBB)
-        return Value;
-    } else if (auto BBArg = dyn_cast<SILArgument>(Value)) {
-      if (BBArg->getParent() != FromBB)
-        return Value;
-    } else {
-      assert(isa<SILUndef>(Value) && "Unexpected Value kind");
-      return Value;
-    }
-
-    return SILCloner<BaseThreadingCloner>::remapValue(Value);
-  }
-
-  void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
-    SILCloner<BaseThreadingCloner>::postProcess(Orig, Cloned);
-    // A terminator defines no values. Keeping terminators in the AvailVals list
-    // is problematic because terminators get replaced during SSA update.
-    auto results = Orig->getResults();
-    assert(results.size() == Cloned->getResults().size());
-    if (!results.empty()) {
-      auto clonedResults = Cloned->getResults();
-      for (size_t i = 0, e = results.size(); i != e; ++i)
-        AvailVals.push_back(std::make_pair(results[i], clonedResults[i]));
-    }
-  }
-};
-
-/// Clone a basic block to edge \p BI.
-class EdgeThreadingCloner : public BaseThreadingCloner {
 public:
-  EdgeThreadingCloner(BranchInst *BI)
-      : BaseThreadingCloner(*BI->getFunction(),
-                            BI->getDestBB(), nullptr) {
-    createEdgeBlockAndRedirectBranch(BI);
+  /// An ordered list of old to new available value pairs.
+  ///
+  /// updateSSAAfterCloning() expects this public field to hold values that may
+  /// be remapped in the cloned block and live out.
+  SmallVector<std::pair<SILValue, SILValue>, 16> AvailVals;
+
+  // Clone blocks starting at `origBB`, within the same function.
+  BasicBlockCloner(SILBasicBlock *origBB)
+      : SILCloner(*origBB->getParent()), origBB(origBB) {}
+
+  void cloneBlock(SILBasicBlock *insertAfterBB = nullptr) {
+    SmallVector<SILBasicBlock *, 4> successorBBs;
+    successorBBs.reserve(origBB->getSuccessors().size());
+    llvm::copy(origBB->getSuccessors(), std::back_inserter(successorBBs));
+    cloneReachableBlocks(origBB, successorBBs, insertAfterBB);
   }
 
-  void createEdgeBlockAndRedirectBranch(BranchInst *BI) {
-    auto *Fn = BI->getFunction();
-    auto *SrcBB = BI->getParent();
-    auto *EdgeBB = BI->getDestBB();
+  /// Clone the given branch instruction's destination block, splitting
+  /// its successors, and rewrite the branch instruction.
+  void cloneBranchTarget(BranchInst *BI) {
+    assert(origBB == BI->getDestBB());
 
-    this->DestBB = Fn->createBasicBlockAfter(SrcBB);
+    cloneBlock(/*insertAfter*/BI->getParent());
 
-    // Create block arguments.
-    for (unsigned ArgIdx : range(EdgeBB->getNumArguments())) {
-      auto *DestPHIArg = cast<SILPhiArgument>(EdgeBB->getArgument(ArgIdx));
-      assert(BI->getArg(ArgIdx)->getType() == DestPHIArg->getType() &&
-             "Types must match");
-      auto *BlockArg = DestBB->createPhiArgument(
-          DestPHIArg->getType(), DestPHIArg->getOwnershipKind());
-      // Since we don't call any CFG cloning entry point, we can call
-      // `recordFoldedValue` immediately as if cloning has already started. This
-      // simply avoids handling AvailVals during `remap` or defining a custom
-      // visitSILPhiArgument().
-      recordFoldedValue(DestPHIArg, BlockArg);
-      AvailVals.push_back(std::make_pair(DestPHIArg, BlockArg));
-    }
-
-    // Redirect the branch.
-    SILBuilderWithScope(BI).createBranch(BI->getLoc(), DestBB, BI->getArgs());
+    SILBuilderWithScope(BI).createBranch(BI->getLoc(), getNewBB(),
+                                         BI->getArgs());
     BI->eraseFromParent();
   }
 
-  SILBasicBlock *getEdgeBB() {
-    // DestBB really is the edge basic block we created to clone instructions
-    // to.
-    return DestBB;
-  }
-
-  // Clone all instructions in `FromBB` onto the newly created `EdgeBB`.
-  void cloneFrom(SILBasicBlock *FromBB) {
-    getBuilder().setInsertionPoint(DestBB);
-    visitInstructionsInBlock(FromBB);
-    visitTerminator(FromBB);
+  /// Get the newly cloned block corresponding to `origBB`.
+  SILBasicBlock *getNewBB() {
+    return remapBasicBlock(origBB);
   }
 
   /// Call this after processing all instructions to fix the control flow
   /// graph. The branch cloner may have left critical edges.
   bool splitCriticalEdges(DominanceInfo *DT, SILLoopInfo *LI);
+
+protected:
+  // MARK: CRTP overrides.
+
+  /// Override getMappedValue to allow values defined outside the block to be
+  /// cloned to be reused in the newly cloned block.
+  SILValue getMappedValue(SILValue Value) {
+    if (auto SI = Value->getDefiningInstruction()) {
+      if (!isBlockCloned(SI->getParent()))
+        return Value;
+    } else if (auto BBArg = dyn_cast<SILArgument>(Value)) {
+      if (!isBlockCloned(BBArg->getParent()))
+        return Value;
+    } else {
+      assert(isa<SILUndef>(Value) && "Unexpected Value kind");
+      return Value;
+    }
+    // `value` is not defined outside the cloned block, so consult the cloner's
+    // map of cloned values.
+    return SuperTy::getMappedValue(Value);
+  }
+
+  void mapValue(SILValue origValue, SILValue mappedValue) {
+    SuperTy::mapValue(origValue, mappedValue);
+    AvailVals.emplace_back(origValue, mappedValue);
+  }
 };
 
-/// Helper class for cloning of basic blocks.
-class BasicBlockCloner : public BaseThreadingCloner {
-  public:
-    BasicBlockCloner(SILBasicBlock *From, SILBasicBlock *To = nullptr,
-                     bool WithinFunction = true)
-        : BaseThreadingCloner(To ? *To->getParent() : *From->getParent(),
-                              WithinFunction) {
-      FromBB = From;
-      if (To == nullptr) {
-        // Create a new BB that is to be used as a target
-        // for cloning.
-        To = From->getParent()->createBasicBlock();
-        To->cloneArgumentList(From);
-      }
-      DestBB = To;
-
-      // Populate the value map so that uses of the BBArgs in the SrcBB are
-      // replaced with the BBArgs of the DestBB.
-      for (unsigned i = 0, e = FromBB->args_size(); i != e; ++i) {
-        // Since we don't call any CFG cloning entry point, we can call
-        // `recordFoldedValue` immediately as if cloning has already
-        // started. This simply avoids handling AvailVals during `remap` or
-        // defining a custom visitSILPhiArgument().
-        recordFoldedValue(FromBB->getArgument(i), DestBB->getArgument(i));
-        AvailVals.push_back(
-            std::make_pair(FromBB->getArgument(i), DestBB->getArgument(i)));
-      }
-    }
-
-    // Clone all instructions of the FromBB into DestBB
-    void clone() {
-      getBuilder().setInsertionPoint(DestBB);
-      visitInstructionsInBlock(FromBB);
-      visitTerminator(FromBB);
-    }
-
-    SILBasicBlock *getDestBB() { return DestBB; }
-};
-
-/// Helper function to perform SSA updates in case of jump threading. Set
-/// 'NeedToSplitCriticalEdges' to false if all critical edges are split,
-/// otherwise this call will try to split all critical edges.
-void updateSSAAfterCloning(BaseThreadingCloner &Cloner, SILBasicBlock *SrcBB,
+/// Helper function to perform SSA updates in case of jump threading.
+void updateSSAAfterCloning(BasicBlockCloner &Cloner, SILBasicBlock *SrcBB,
                            SILBasicBlock *DestBB);
 
 // Helper class that provides a callback that can be used in

@@ -199,6 +199,7 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addSimplifyCFG();
   // Optimize access markers for better LICM: might merge accesses
   // It will also set the no_nested_conflict for dynamic accesses
+  P.addAccessEnforcementReleaseSinking();
   P.addAccessEnforcementOpts();
   P.addHighLevelLICM();
   // Simplify CFG after LICM that creates new exit blocks
@@ -206,6 +207,7 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   // LICM might have added new merging potential by hoisting
   // we don't want to restart the pipeline - ignore the
   // potential of merging out of two loops
+  P.addAccessEnforcementReleaseSinking();
   P.addAccessEnforcementOpts();
   // Start of loop unrolling passes.
   P.addArrayCountPropagation();
@@ -469,6 +471,7 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   P.addCodeSinking();
   // Optimize access markers for better LICM: might merge accesses
   // It will also set the no_nested_conflict for dynamic accesses
+  P.addAccessEnforcementReleaseSinking();
   P.addAccessEnforcementOpts();
   P.addLICM();
   // Simplify CFG after LICM that creates new exit blocks
@@ -476,6 +479,7 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   // LICM might have added new merging potential by hoisting
   // we don't want to restart the pipeline - ignore the
   // potential of merging out of two loops
+  P.addAccessEnforcementReleaseSinking();
   P.addAccessEnforcementOpts();
 
   // Optimize overflow checks.
@@ -498,8 +502,13 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
 // - don't require IRGen information.
 static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
   // Optimize access markers for improved IRGen after all other optimizations.
+  P.addAccessEnforcementReleaseSinking();
   P.addAccessEnforcementOpts();
   P.addAccessEnforcementWMO();
+  P.addAccessEnforcementDom();
+  // addAccessEnforcementDom might provide potential for LICM:
+  // A loop might have only one dynamic access now, i.e. hoistable
+  P.addLICM();
 
   // Only has an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();

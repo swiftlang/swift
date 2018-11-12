@@ -19,7 +19,7 @@ public protocol AddMethodsProtocol {
   func unimportantOperation() -> Element
 
 #if AFTER
-  func uselessOperation() -> Element
+  @_weakLinked func uselessOperation() -> Element
 #endif
 }
 
@@ -29,7 +29,7 @@ extension AddMethodsProtocol {
   }
 
 #if AFTER
-  public func uselessOperation() -> Element {
+  @_weakLinked public func uselessOperation() -> Element {
     return unimportantOperation().increment()
   }
 #endif
@@ -56,12 +56,12 @@ public protocol AddConstructorsProtocol {
   init(name: String)
 
 #if AFTER
-  init?(nickname: String)
+  @_weakLinked init?(nickname: String)
 #endif
 }
 
 extension AddConstructorsProtocol {
-  public init?(nickname: String) {
+  @_weakLinked public init?(nickname: String) {
     if nickname == "" {
       return nil
     }
@@ -85,15 +85,15 @@ public protocol AddPropertiesProtocol {
   var maxRPM: Int { get set }
 
 #if AFTER
-  var maxSafeSpeed: Int { get set }
-  var minSafeSpeed: Int { get nonmutating set }
-  var redLine: Int { mutating get set }
+  @_weakLinked var maxSafeSpeed: Int { get set }
+  @_weakLinked var minSafeSpeed: Int { get nonmutating set }
+  @_weakLinked var redLine: Int { mutating get set }
 #endif
 }
 
 extension AddPropertiesProtocol {
 #if AFTER
-  public var maxSafeSpeed: Int {
+  @_weakLinked public var maxSafeSpeed: Int {
     get {
       return topSpeed / 2
     }
@@ -102,7 +102,7 @@ extension AddPropertiesProtocol {
     }
   }
 
-  public var minSafeSpeed: Int {
+  @_weakLinked public var minSafeSpeed: Int {
     get {
       return topSpeed / 4
     }
@@ -111,7 +111,7 @@ extension AddPropertiesProtocol {
     }
   }
 
-  public var redLine: Int {
+  @_weakLinked public var redLine: Int {
     get {
       return maxRPM - 2000
     }
@@ -153,12 +153,12 @@ public protocol AddSubscriptProtocol {
   mutating func set(key key: Key, value: Value)
 
 #if AFTER
-  subscript(key: Key) -> Value { get set }
+  @_weakLinked subscript(key: Key) -> Value { get set }
 #endif
 }
 
 extension AddSubscriptProtocol {
-  public subscript(key: Key) -> Value {
+  @_weakLinked public subscript(key: Key) -> Value {
     get {
       return get(key: key)
     }
@@ -188,8 +188,8 @@ public struct Wrapper<T>: SimpleProtocol {
 
 public protocol AddAssocTypesProtocol {
 #if AFTER
-  associatedtype AssocType = Self
-  associatedtype AssocType2: SimpleProtocol = Wrapper<AssocType>
+  @_weakLinked associatedtype AssocType = Self
+  @_weakLinked associatedtype AssocType2: SimpleProtocol = Wrapper<AssocType>
 #endif
 }
 

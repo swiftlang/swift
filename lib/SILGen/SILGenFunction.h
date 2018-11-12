@@ -295,7 +295,9 @@ public:
   bool NeedsReturn = false;
 
   /// \brief Is emission currently within a formal modification?
-  bool InFormalEvaluationScope = false;
+  bool isInFormalEvaluationScope() const {
+    return FormalEvalContext.isInFormalEvaluationScope();
+  }
 
   /// \brief Is emission currently within an inout conversion?
   bool InInOutConversionScope = false;

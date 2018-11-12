@@ -13,13 +13,13 @@
 import SwiftShims
 
 extension _UnmanagedString where CodeUnit == UInt8 {
-  internal func hashASCII(into core: inout Hasher.Core) {
+  internal func hashASCII(into core: inout Hasher._BufferingCore) {
     core.combine(bytes: rawBuffer)
   }
 }
 
 extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
-  internal func hashUTF16(into core: inout Hasher.Core) {
+  internal func hashUTF16(into core: inout Hasher._BufferingCore) {
     for i in self.indices {
       let cu = self[i]
       let cuIsASCII = cu <= 0x7F
@@ -62,7 +62,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
   }
 
   internal func _rawHashValue(seed: Int) -> Int {
-    var core = Hasher.Core(seed: seed)
+    var core = Hasher._BufferingCore(seed: seed)
     self.hashUTF16(into: &core)
     return Int(truncatingIfNeeded: core.finalize())
   }
@@ -75,7 +75,7 @@ extension _UnmanagedOpaqueString {
   }
 
   internal func _rawHashValue(seed: Int) -> Int {
-    var core = Hasher.Core(seed: seed)
+    var core = Hasher._BufferingCore(seed: seed)
     self.hashUTF16(into: &core)
     return Int(truncatingIfNeeded: core.finalize())
   }

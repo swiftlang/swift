@@ -74,7 +74,7 @@ struct TestConfig {
   let numIters: Int?
 
   /// The number of samples we should take of each test.
-  let numSamples: Int
+  let numSamples: Int?
 
   /// Quantiles to report in results.
   let quantile: Int?
@@ -130,7 +130,9 @@ struct TestConfig {
     // Configure the command line argument parser
     let p = ArgumentParser(into: PartialTestConfig())
     p.addArgument("--num-samples", \.numSamples,
-                  help: "number of samples to take per benchmark; default: 1",
+                  help: "number of samples to take per benchmark;\n" +
+                        "default: 1 or auto-scaled to measure for\n" +
+                        "`sample-time` if num-iters is also specified\n",
                   parser: { UInt($0) })
     p.addArgument("--num-iters", \.numIters,
                   help: "number of iterations averaged in the sample;\n" +
@@ -174,7 +176,7 @@ struct TestConfig {
     delim = c.delim ?? ","
     sampleTime = c.sampleTime ?? 1.0
     numIters = c.numIters.map { Int($0) }
-    numSamples = Int(c.numSamples ?? 1)
+    numSamples = c.numSamples.map { Int($0) }
     quantile = c.quantile.map { Int($0) }
     delta = c.delta ?? false
     verbose = c.verbose ?? false
@@ -200,7 +202,7 @@ struct TestConfig {
       let testList = tests.map({ $0.1.name }).joined(separator: ", ")
       print("""
             --- CONFIG ---
-            NumSamples: \(numSamples)
+            NumSamples: \(numSamples ?? 0)
             Verbose: \(verbose)
             LogMemory: \(logMemory)
             SampleTime: \(sampleTime)
@@ -370,7 +372,12 @@ final class TestRunner {
 #endif
 
   private static func getResourceUtilization() -> rusage {
-    var u = rusage(); getrusage(RUSAGE_SELF, &u); return u
+#if canImport(Darwin)
+   let rusageSelf = RUSAGE_SELF
+#else
+   let rusageSelf = RUSAGE_SELF.rawValue
+#endif
+    var u = rusage(); getrusage(rusageSelf, &u); return u
   }
 
   /// Returns maximum resident set size (MAX_RSS) delta in bytes.
@@ -378,11 +385,22 @@ final class TestRunner {
   /// This method of estimating memory usage is valid only for executing single
   /// benchmark. That's why we don't worry about reseting the `baseline` in
   /// `resetMeasurements`.
+  ///
+  /// FIXME: This current implementation doesn't work on Linux. It is disabled
+  /// permanently to avoid linker errors. Feel free to fix.
   func measureMemoryUsage() -> Int? {
+#if os(Linux)
+    return nil
+#else
     guard c.logMemory else { return nil }
     let current = TestRunner.getResourceUtilization()
     let maxRSS = current.ru_maxrss - baseline.ru_maxrss
-    let pages = { maxRSS / sysconf(_SC_PAGESIZE) }
+#if canImport(Darwin)
+    let pageSize = _SC_PAGESIZE
+#else
+    let pageSize = Int32(_SC_PAGESIZE)
+#endif
+    let pages = { maxRSS / sysconf(pageSize) }
     func deltaEquation(_ stat: KeyPath<rusage, Int>) -> String {
       let b = baseline[keyPath: stat], c = current[keyPath: stat]
       return "\(c) - \(b) = \(c - b)"
@@ -394,6 +412,7 @@ final class TestRunner {
             VCS \(deltaEquation(\rusage.ru_nvcsw))
         """)
     return maxRSS
+#endif
   }
 
   private func startMeasurement() {
@@ -453,10 +472,9 @@ final class TestRunner {
       logVerbose("Skipping unsupported benchmark \(test.name)!")
       return nil
     }
-    logVerbose("Running \(test.name) for \(c.numSamples) samples.")
+    logVerbose("Running \(test.name)")
 
     var samples: [Int] = []
-    samples.reserveCapacity(c.numSamples)
 
     func addSample(_ time: Int) {
       logVerbose("    Sample \(samples.count),\(time)")
@@ -464,7 +482,12 @@ final class TestRunner {
     }
 
     resetMeasurements()
-    test.setUpFunction?()
+    if let setUp = test.setUpFunction {
+      setUp()
+      stopMeasurement()
+      logVerbose("    SetUp \(lastSampleTime.microseconds)")
+      resetMeasurements()
+    }
 
     // Determine number of iterations for testFn to run for desired time.
     func iterationsPerSampleTime() -> (numIters: Int, oneIter: Int) {
@@ -477,17 +500,26 @@ final class TestRunner {
       }
     }
 
+    // Determine the scale of measurements. Re-use the calibration result if
+    // it is just one measurement.
+    func calibrateMeasurements() -> Int {
+      let (numIters, oneIter) = iterationsPerSampleTime()
+      if numIters == 1 { addSample(oneIter) }
+      else { resetMeasurements() } // for accurate yielding reports
+      return numIters
+    }
+
     let numIters = min( // Cap to prevent overflow on 32-bit systems when scaled
       Int.max / 10_000, // by the inner loop multiplier inside the `testFn`.
-      c.numIters ?? {
-        let (numIters, oneIter) = iterationsPerSampleTime()
-        if numIters == 1 { addSample(oneIter) }
-        else { resetMeasurements() } // for accurate yielding reports
-        return numIters
-      }())
+      c.numIters ?? calibrateMeasurements())
 
+    let numSamples = c.numSamples ?? min(2000, // Cap the number of samples
+      c.numIters == nil ? 1 : calibrateMeasurements())
+
+    samples.reserveCapacity(numSamples)
+    logVerbose("    Collecting \(numSamples) samples.")
     logVerbose("    Measuring with scale \(numIters).")
-    for _ in samples.count..<c.numSamples {
+    for _ in samples.count..<numSamples {
       addSample(measure(test.name, fn: testFn, numIters: numIters))
     }
 

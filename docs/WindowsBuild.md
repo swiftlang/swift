@@ -89,6 +89,12 @@ set swift_source_dir=path-to-directory-containing-all-cloned-repositories
   (`Debug`, `RelWithDebInfoAssert` or `Release`) to avoid conflicts between the debug and 
   non-debug version of the MSCRT library.
 
+- Set up the `visualc` and `ucrt` modules by copying  `ucrt.modulemap` located at
+  `swift/stdlib/public/Platform/ucrt.modulemap` into
+  `${UniversalCRTSdkDir}/Include/${UCRTVersion}/ucrt` as `module.modulemap` and copying `visualc.modulemap` located at `swift/stdlib/public/Platform/visualc.modulemap` into `${VCToolsInstallDir}/include` as `module.modulemap`
+
+
+
 ### 5. Build CMark
 - This must be done from within a developer command prompt. CMark is a fairly
   small project and should only take a few minutes to build.
@@ -150,9 +156,9 @@ cmake -G "Ninja" "%swift_source_dir%/swift"^
  -DSWIFT_PATH_TO_LLVM_BUILD="%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"^
  -DSWIFT_PATH_TO_CLANG_SOURCE="%swift_source_dir%/llvm/tools/clang"^
  -DSWIFT_PATH_TO_CLANG_BUILD="%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"^
- -DICU_UC_INCLUDE_DIR="%swift_source_dir%/icu/include"^
+ -DICU_UC_INCLUDE_DIRS="%swift_source_dir%/icu/include"^
  -DICU_UC_LIBRARY_DIRS="%swift_source_dir%/icu/lib64"^
- -DICU_I18N_INCLUDE_DIR="%swift_source_dir%/icu/include"^
+ -DICU_I18N_INCLUDE_DIRS="%swift_source_dir%/icu/include"^
  -DICU_I18N_LIBRARY_DIRS="%swift_source_dir%/icu/lib64"^
  -DICU_UC_LIB_NAME="icuuc"^
  -DICU_I18N_LIB_NAME="icuin"^

@@ -44,7 +44,7 @@ STATISTIC(NumNormalProtocolConformancesLoaded,
 STATISTIC(NumNormalProtocolConformancesCompleted,
           "# of normal protocol conformances completed");
 STATISTIC(NumNestedTypeShortcuts,
-          "# of same-module nested types resolved without lookup");
+          "# of nested types resolved without full lookup");
 
 using namespace swift;
 using namespace swift::serialization;
@@ -1444,10 +1444,6 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
         if (!extensionModule)
           extensionModule = baseType->getModuleContext();
 
-        // FIXME: If 'importedFromClang' is true but 'extensionModule' is an
-        // overlay module, the search below will fail and we'll fall back to
-        // the slow path.
-
         // Fault in extensions, then ask every file in the module.
         (void)baseType->getExtensions();
         TypeDecl *nestedType = nullptr;
@@ -1460,10 +1456,16 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
         }
 
         if (nestedType) {
-          values.clear();
-          values.push_back(nestedType);
-          ++NumNestedTypeShortcuts;
-          break;
+          SmallVector<ValueDecl *, 1> singleValueBuffer{nestedType};
+          filterValues(/*expectedTy*/Type(), extensionModule, genericSig,
+                       /*isType*/true, /*inProtocolExt*/false,
+                       importedFromClang, /*isStatic*/false, /*ctorInit*/None,
+                       singleValueBuffer);
+          if (!singleValueBuffer.empty()) {
+            values.assign({nestedType});
+            ++NumNestedTypeShortcuts;
+            break;
+          }
         }
 
         pathTrace.removeLast();
@@ -1620,8 +1622,8 @@ giveUpFastPath:
                                            getXRefDeclNameForError());
       }
 
-      uint32_t paramIndex;
-      XRefGenericParamPathPieceLayout::readRecord(scratch, paramIndex);
+      uint32_t depth, paramIndex;
+      XRefGenericParamPathPieceLayout::readRecord(scratch, depth, paramIndex);
 
       pathTrace.addGenericParam(paramIndex);
 
@@ -1643,7 +1645,7 @@ giveUpFastPath:
           assert(paramList && "Couldn't find constrained extension");
         } else {
           // Simple case: use the nominal type's generic parameters.
-          paramList = nominal->getGenericParams();
+          paramList = nominal->getGenericParamsOfContext();
         }
       } else if (auto alias = dyn_cast<TypeAliasDecl>(base)) {
         paramList = alias->getGenericParams();
@@ -1658,6 +1660,18 @@ giveUpFastPath:
             "cross-reference to generic param for non-generic type",
             pathTrace, getXRefDeclNameForError());
       }
+
+      unsigned currentDepth = paramList->getDepth();
+      if (currentDepth < depth) {
+        return llvm::make_error<XRefError>(
+            "a containing type has been made non-generic",
+            pathTrace, getXRefDeclNameForError());
+      }
+      while (currentDepth > depth) {
+        paramList = paramList->getOuterParameters();
+        --currentDepth;
+      }
+
       if (paramIndex >= paramList->size()) {
         return llvm::make_error<XRefError>(
             "generic argument index out of bounds",

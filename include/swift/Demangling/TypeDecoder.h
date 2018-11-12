@@ -56,6 +56,7 @@ public:
   void setType(BuiltType type) { Type = type; }
 
   void setVariadic() { Flags = Flags.withVariadic(true); }
+  void setAutoClosure() { Flags = Flags.withAutoClosure(true); }
   void setValueOwnership(ValueOwnership ownership) {
     Flags = Flags.withValueOwnership(ownership);
   }
@@ -114,7 +115,7 @@ class TypeDecoder {
     case NodeKind::Enum:
     case NodeKind::Structure:
     case NodeKind::TypeAlias: // This can show up for imported Clang decls.
-    case NodeKind::SymbolicReference:
+    case NodeKind::TypeSymbolicReference:
     {
       BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
       BuiltType parent = BuiltType();
@@ -228,7 +229,8 @@ class TypeDecoder {
                                                    IsClassBound);
     }
 
-    case NodeKind::Protocol: {
+    case NodeKind::Protocol:
+    case NodeKind::ProtocolSymbolicReference: {
       if (auto Proto = decodeMangledProtocolType(Node)) {
         return Builder.createProtocolCompositionType(Proto, BuiltType(),
                                                      /*IsClassBound=*/false);
@@ -252,7 +254,6 @@ class TypeDecoder {
       if (Node->getNumChildren() < 2)
         return BuiltType();
 
-      // FIXME: autoclosure is not represented in function metadata
       FunctionTypeFlags flags;
       if (Node->getKind() == NodeKind::ObjCBlock) {
         flags = flags.withConvention(FunctionMetadataConvention::Block);
@@ -473,14 +474,14 @@ class TypeDecoder {
   }
 
 private:
-  bool decodeMangledNominalType(const Demangle::NodePointer &node,
+  bool decodeMangledNominalType(Demangle::NodePointer node,
                                 BuiltNominalTypeDecl &typeDecl,
                                 BuiltType &parent) {
     if (node->getKind() == NodeKind::Type)
       return decodeMangledNominalType(node->getChild(0), typeDecl, parent);
 
     Demangle::NodePointer nominalNode;
-    if (node->getKind() == NodeKind::SymbolicReference) {
+    if (node->getKind() == NodeKind::TypeSymbolicReference) {
       // A symbolic reference can be directly resolved to a nominal type.
       nominalNode = node;
     } else {
@@ -519,19 +520,19 @@ private:
     return true;
   }
 
-  BuiltProtocolDecl decodeMangledProtocolType(
-                                            const Demangle::NodePointer &node) {
+  BuiltProtocolDecl decodeMangledProtocolType(Demangle::NodePointer node) {
     if (node->getKind() == NodeKind::Type)
       return decodeMangledProtocolType(node->getChild(0));
 
-    if (node->getNumChildren() < 2 || node->getKind() != NodeKind::Protocol)
+    if ((node->getNumChildren() < 2 || node->getKind() != NodeKind::Protocol)
+        && node->getKind() != NodeKind::ProtocolSymbolicReference)
       return BuiltProtocolDecl();
 
     return Builder.createProtocolDecl(node);
   }
 
   bool decodeMangledFunctionInputType(
-      const Demangle::NodePointer &node,
+      Demangle::NodePointer node,
       std::vector<FunctionParam<BuiltType>> &params,
       bool &hasParamFlags) {
     // Look through a couple of sugar nodes.
@@ -542,7 +543,7 @@ private:
     }
 
     auto decodeParamTypeAndFlags =
-        [&](const Demangle::NodePointer &typeNode,
+        [&](Demangle::NodePointer typeNode,
             FunctionParam<BuiltType> &param) -> bool {
       Demangle::NodePointer node = typeNode;
 
@@ -563,6 +564,13 @@ private:
       case NodeKind::Owned:
         setOwnership(ValueOwnership::Owned);
         break;
+
+      case NodeKind::AutoClosureType:
+      case NodeKind::EscapingAutoClosureType: {
+        param.setAutoClosure();
+        hasParamFlags = true;
+        break;
+      }
 
       default:
         break;

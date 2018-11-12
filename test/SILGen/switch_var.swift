@@ -468,9 +468,8 @@ func test_mixed_let_var() {
   // CHECK: [[CASE1]]:
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOX]]
   // CHECK:   [[X:%.*]] = load [copy] [[READ]]
-  // CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
   // CHECK:   [[A:%.*]] = function_ref @$s10switch_var1a1xySS_tF
-  // CHECK:   apply [[A]]([[BORROWED_X]])
+  // CHECK:   apply [[A]]([[X]])
   // CHECK:   destroy_value [[BOX]]
   // CHECK:   br [[CONT:bb[0-9]+]]
     a(x: x)

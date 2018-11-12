@@ -810,7 +810,7 @@ extension Sequence {
   /// Returns an array containing the non-`nil` results of calling the given
   /// transformation with each element of this sequence.
   ///
-  /// Use this method to receive an array of nonoptional values when your
+  /// Use this method to receive an array of non-optional values when your
   /// transformation produces an optional value.
   ///
   /// In this example, note the difference in the result of using `map` and

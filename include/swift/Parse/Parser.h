@@ -1244,6 +1244,8 @@ public:
   ParserResult<Expr> parseExprGradientBody(ExprKind kind);
   ParserResult<Expr> parseExprAdjoint();
 
+  StringRef copyAndStripUnderscores(StringRef text);
+
   ParserStatus parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                                    SmallVectorImpl<Expr*> &Exprs,
                                    Token EntireTok);

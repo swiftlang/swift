@@ -1,4 +1,4 @@
-add_swift_library(swiftImmediate STATIC
+add_swift_host_library(swiftImmediate STATIC
   Immediate.cpp
   REPL.cpp
   LINK_LIBRARIES

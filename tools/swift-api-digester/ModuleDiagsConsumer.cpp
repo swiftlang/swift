@@ -49,6 +49,7 @@ static StringRef getCategoryName(uint32_t ID) {
   case LocalDiagID::decl_type_change:
   case LocalDiagID::func_type_escaping_changed:
   case LocalDiagID::param_ownership_change:
+  case LocalDiagID::type_witness_change:
     return "/* Type Changes */";
   case LocalDiagID::raw_type_change:
     return "/* RawRepresentable Changes */";

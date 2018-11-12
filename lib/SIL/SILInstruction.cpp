@@ -1091,7 +1091,7 @@ namespace {
       Result = Cloned;
       SILCloner<TrivialCloner>::postProcess(Orig, Cloned);
     }
-    SILValue remapValue(SILValue Value) {
+    SILValue getMappedValue(SILValue Value) {
       return Value;
     }
     SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }

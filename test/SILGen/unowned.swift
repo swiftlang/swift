@@ -116,10 +116,8 @@ func test_unowned_let_capture(_ aC : C) {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $@sil_unowned C):
 // CHECK-NEXT:   debug_value %0 : $@sil_unowned C, let, name "bC", argno 1
 // CHECK-NEXT:   [[UNOWNED_ARG:%.*]] = copy_unowned_value [[ARG]] : $@sil_unowned C
-// CHECK-NEXT:   [[BORROWED_UNOWNED_ARG:%.*]] = begin_borrow [[UNOWNED_ARG]]
-// CHECK-NEXT:   [[FUN:%.*]] = class_method [[BORROWED_UNOWNED_ARG]] : $C, #C.f!1 : (C) -> () -> Int, $@convention(method) (@guaranteed C) -> Int
-// CHECK-NEXT:   [[RESULT:%.*]] = apply [[FUN]]([[BORROWED_UNOWNED_ARG]]) : $@convention(method) (@guaranteed C) -> Int
-// CHECK-NEXT:   end_borrow [[BORROWED_UNOWNED_ARG]]
+// CHECK-NEXT:   [[FUN:%.*]] = class_method [[UNOWNED_ARG]] : $C, #C.f!1 : (C) -> () -> Int, $@convention(method) (@guaranteed C) -> Int
+// CHECK-NEXT:   [[RESULT:%.*]] = apply [[FUN]]([[UNOWNED_ARG]]) : $@convention(method) (@guaranteed C) -> Int
 // CHECK-NEXT:   destroy_value [[UNOWNED_ARG]]
 // CHECK-NEXT:   return [[RESULT]] : $Int
 

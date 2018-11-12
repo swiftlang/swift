@@ -585,16 +585,6 @@ FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, SwiftCC,
          ARGS(SizeTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone)) // only writes to runtime-private fields
 
-// WitnessTable *swift_getForeignWitnessTable(
-//                                  const WitnessTable *candidate,
-//                                  const TypeContextDescriptor *forType,
-//                                  const ProtocolDescriptor *forProtocol);
-FUNCTION(GetForeignWitnessTable, swift_getForeignWitnessTable, C_CC,
-         RETURNS(WitnessTablePtrTy),
-         ARGS(WitnessTablePtrTy, TypeContextDescriptorPtrTy,
-              ProtocolDescriptorPtrTy),
-         ATTRS(NoUnwind, ReadNone))
-
 // MetadataResponse swift_getSingletonMetadata(MetadataRequest request,
 //                                             TypeContextDescriptor *type);
 FUNCTION(GetSingletonMetadata, swift_getSingletonMetadata, SwiftCC,
@@ -635,12 +625,12 @@ FUNCTION(CheckMetadataState, swift_checkMetadataState, SwiftCC,
          ATTRS(NoUnwind, ReadOnly))
 
 // const ProtocolWitnessTable *
-// swift_getGenericWitnessTable(GenericProtocolWitnessTable *genericTable,
-//                              const Metadata *type,
-//                              void ** const *instantiationArgs);
-FUNCTION(GetGenericWitnessTable, swift_getGenericWitnessTable, C_CC,
+// swift_getWitnessTable(const ProtocolConformanceDescriptor *conf,
+//                       const Metadata *type,
+//                       const void * const *instantiationArgs);
+FUNCTION(GetWitnessTable, swift_getWitnessTable, C_CC,
          RETURNS(WitnessTablePtrTy),
-         ARGS(getGenericWitnessTableCacheTy()->getPointerTo(),
+         ARGS(ProtocolConformanceDescriptorPtrTy,
               TypeMetadataPtrTy,
               WitnessTablePtrPtrTy),
          ATTRS(NoUnwind, ReadOnly))
@@ -1256,6 +1246,16 @@ FUNCTION(VerifyTypeLayoutAttribute, _swift_debug_verifyTypeLayoutAttribute,
          RETURNS(VoidTy),
          ARGS(TypeMetadataPtrTy, Int8PtrTy, Int8PtrTy, SizeTy, Int8PtrTy),
          ATTRS(NoUnwind))
+
+// float swift_intToFloat32(const size_t *data, IntegerLiteralFlags flags);
+FUNCTION(IntToFloat32, swift_intToFloat32, SwiftCC,
+         RETURNS(FloatTy),
+         ARGS(SizeTy->getPointerTo(), SizeTy),
+         ATTRS(NoUnwind, ReadOnly))
+FUNCTION(IntToFloat64, swift_intToFloat64, SwiftCC,
+         RETURNS(DoubleTy),
+         ARGS(SizeTy->getPointerTo(), SizeTy),
+         ATTRS(NoUnwind, ReadOnly))
 
 // SWIFT_ENABLE_TENSORFLOW
 // OpaqueValue *swift_autodiffCreateTape();

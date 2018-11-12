@@ -188,9 +188,6 @@ extension LazyMapCollection: LazyCollectionProtocol {
   }
 
   @inlinable
-  public var first: Element? { return _base.first.map(_transform) }
-
-  @inlinable
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     return _base.index(i, offsetBy: n)
   }
@@ -223,9 +220,6 @@ extension LazyMapCollection : BidirectionalCollection
   public func formIndex(before i: inout Index) {
     _base.formIndex(before: &i)
   }
-
-  @inlinable
-  public var last: Element? { return _base.last.map(_transform) }
 }
 
 extension LazyMapCollection : RandomAccessCollection

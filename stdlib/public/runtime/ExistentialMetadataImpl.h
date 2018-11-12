@@ -330,15 +330,17 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBox
   static constexpr bool isBitwiseTakable = true;
   static constexpr unsigned numExtraInhabitants =
     swift_getHeapObjectExtraInhabitantCount();
-  
+
   static void storeExtraInhabitant(Container *dest, int index) {
-    swift_storeHeapObjectExtraInhabitant((HeapObject**)&dest->Header.Type,
-                                         index);
+    swift_storeHeapObjectExtraInhabitant(
+        const_cast<HeapObject **>(
+            reinterpret_cast<const HeapObject **>(&dest->Header.Type)),
+        index);
   }
 
   static int getExtraInhabitantIndex(const Container *src) {
-    return swift_getHeapObjectExtraInhabitantIndex(
-                                        (HeapObject* const *)&src->Header.Type);
+    return swift_getHeapObjectExtraInhabitantIndex(const_cast<HeapObject **>(
+        reinterpret_cast<const HeapObject *const *>(&src->Header.Type)));
   }
 };
 
