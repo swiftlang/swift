@@ -685,6 +685,8 @@ namespace driver {
         TQ(std::move(TaskQueue)) {
       if (Comp.getShowIncrementalBuildDecisions() || Comp.getStatsReporter())
         IncrementalTracer = &ActualIncrementalTracer;
+      if (Comp.getEnableExperimentalDependencies())
+        ExpDepGraph.emplace(experimental_dependencies::ExpDependencyGraph());
     }
     
     /// Schedule and run initial, additional, and batch jobs.

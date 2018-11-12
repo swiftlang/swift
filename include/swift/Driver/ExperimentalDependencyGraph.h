@@ -47,6 +47,7 @@ namespace swift {
         
       public:
         ExpDependencyGraph() = default;
+        ExpDependencyGraph(ExpDependencyGraph &&other) = default;
         
         static Job::Condition loadFromFile(const Job* Cmd, StringRef filename);
         DependencyGraphImpl::LoadResult loadFromPath(const Job* Cmd, StringRef filename);
