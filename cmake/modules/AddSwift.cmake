@@ -2078,7 +2078,7 @@ endfunction()
 function(_add_swift_executable_single name)
   # Parse the arguments we were given.
   cmake_parse_arguments(SWIFTEXE_SINGLE
-    "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR"
+    "EXCLUDE_FROM_ALL"
     "SDK;ARCHITECTURE"
     "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_LIBRARIES;LINK_FAT_LIBRARIES;COMPILE_FLAGS"
     ${ARGN})
@@ -2120,10 +2120,6 @@ function(_add_swift_executable_single name)
     ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
     RESULT_VAR_NAME link_flags
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories)
-
-  if(SWIFTEXE_SINGLE_DISABLE_ASLR)
-    list(APPEND link_flags "-Wl,-no_pie")
-  endif()
 
   if(${SWIFTEXE_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
     list(APPEND link_flags
@@ -2205,7 +2201,7 @@ endfunction()
 function(add_swift_target_executable name)
   # Parse the arguments we were given.
   cmake_parse_arguments(SWIFTEXE_TARGET
-    "EXCLUDE_FROM_ALL;DONT_STRIP_NON_MAIN_SYMBOLS;DISABLE_ASLR;BUILD_WITH_STDLIB"
+    "EXCLUDE_FROM_ALL;;BUILD_WITH_STDLIB"
     ""
     "DEPENDS;LLVM_COMPONENT_DEPENDS;LINK_FAT_LIBRARIES"
     ${ARGN})
@@ -2215,12 +2211,6 @@ function(add_swift_target_executable name)
   translate_flag(${SWIFTEXE_TARGET_EXCLUDE_FROM_ALL}
       "EXCLUDE_FROM_ALL"
       SWIFTEXE_TARGET_EXCLUDE_FROM_ALL_FLAG)
-  translate_flag(${SWIFTEXE_TARGET_DONT_STRIP_NON_MAIN_SYMBOLS}
-      "DONT_STRIP_NON_MAIN_SYMBOLS"
-      SWIFTEXE_TARGET_DONT_STRIP_NON_MAIN_SYMBOLS_FLAG)
-  translate_flag(${SWIFTEXE_TARGET_DISABLE_ASLR}
-      "DISABLE_ASLR"
-      SWIFTEXE_DISABLE_ASLR_FLAG)
 
   # All Swift executables depend on the standard library.
   list(APPEND SWIFTEXE_TARGET_LINK_FAT_LIBRARIES swiftCore)
@@ -2263,9 +2253,7 @@ function(add_swift_target_executable name)
           SDK "${sdk}"
           ARCHITECTURE "${arch}"
           LINK_FAT_LIBRARIES ${SWIFTEXE_TARGET_LINK_FAT_LIBRARIES}
-          ${SWIFTEXE_TARGET_EXCLUDE_FROM_ALL_FLAG_CURRENT}
-          ${SWIFTEXE_TARGET_DONT_STRIP_NON_MAIN_SYMBOLS_FLAG}
-          ${SWIFTEXE_DISABLE_ASLR_FLAG})
+          ${SWIFTEXE_TARGET_EXCLUDE_FROM_ALL_FLAG_CURRENT})
 
       if(${sdk} IN_LIST SWIFT_APPLE_PLATFORMS)
         add_custom_command_target(unused_var2
