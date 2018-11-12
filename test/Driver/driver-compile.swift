@@ -7,6 +7,10 @@
 // RUN: %FileCheck %s < %t.complex.txt
 // RUN: %FileCheck -check-prefix COMPLEX %s < %t.complex.txt
 
+// RUN: %swiftc_driver -driver-print-jobs -dump-ast -target x86_64-apple-macosx10.9 %s 2>&1 > %t.ast.txt
+// RUN: %FileCheck %s < %t.ast.txt
+// RUN: %FileCheck -check-prefix AST %s < %t.ast.txt
+
 // RUN: %swiftc_driver -driver-print-jobs -emit-silgen -target x86_64-apple-macosx10.9 %s 2>&1 > %t.silgen.txt
 // RUN: %FileCheck %s < %t.silgen.txt
 // RUN: %FileCheck -check-prefix SILGEN %s < %t.silgen.txt
@@ -73,6 +77,10 @@
 // COMPLEX-DAG: -emit-reference-dependencies-path {{(.*/)?driver-compile[^ /]+}}.swiftdeps
 // COMPLEX: -o {{.+}}.o
 
+
+// AST: bin/swift
+// AST: -dump-ast
+// AST: -o -
 
 // SILGEN: bin/swift
 // SILGEN: -emit-silgen
