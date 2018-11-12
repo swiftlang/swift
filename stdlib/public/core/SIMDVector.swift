@@ -17,7 +17,7 @@ prefix operator .!
 /// This protocol only defines a storage layout and provides elementwise
 /// accesses. Computational operations are defined on SIMDVector, which
 /// refines this protocol, or on the concrete types that conform.
-public protocol SIMDVectorStorage {
+public protocol SIMDStorage {
   /// The type of scalars in the vector space.
   associatedtype Scalar : Hashable
   
@@ -31,28 +31,26 @@ public protocol SIMDVectorStorage {
   subscript(index: Int) -> Scalar { get set }
 }
 
-public protocol SIMDVectorizable {
-  associatedtype MaskElement : SIMDVectorizable & FixedWidthInteger & SignedInteger
-  associatedtype Vector2Storage : SIMDVectorStorage where Vector2Storage.Scalar == Self
-  associatedtype Vector4Storage : SIMDVectorStorage where Vector4Storage.Scalar == Self
-  associatedtype Vector8Storage : SIMDVectorStorage where Vector8Storage.Scalar == Self
-  associatedtype Vector16Storage : SIMDVectorStorage where Vector16Storage.Scalar == Self
-  associatedtype Vector32Storage : SIMDVectorStorage where Vector32Storage.Scalar == Self
-  associatedtype Vector64Storage : SIMDVectorStorage where Vector64Storage.Scalar == Self
+public protocol SIMDScalar {
+  associatedtype SIMDMaskScalar : SIMDScalar & FixedWidthInteger & SignedInteger
+  associatedtype SIMD2Storage : SIMDStorage where SIMD2Storage.Scalar == Self
+  associatedtype SIMD4Storage : SIMDStorage where SIMD4Storage.Scalar == Self
+  associatedtype SIMD8Storage : SIMDStorage where SIMD8Storage.Scalar == Self
+  associatedtype SIMD16Storage : SIMDStorage where SIMD16Storage.Scalar == Self
+  associatedtype SIMD32Storage : SIMDStorage where SIMD32Storage.Scalar == Self
+  associatedtype SIMD64Storage : SIMDStorage where SIMD64Storage.Scalar == Self
 }
 
-public protocol SIMDVector : SIMDVectorStorage,
-                             Hashable,
-                             CustomStringConvertible,
-                             ExpressibleByArrayLiteral {
+public protocol SIMD : SIMDStorage,
+                       Hashable,
+                       CustomStringConvertible,
+                       ExpressibleByArrayLiteral {
   /// The mask type resulting from pointwise comparisons of this vector type.
-  associatedtype Mask : SIMDMaskVector
+  associatedtype MaskStorage : SIMD
+    where MaskStorage.Scalar : FixedWidthInteger & SignedInteger
 }
 
-public protocol SIMDMaskVector : SIMDVector where Scalar == Bool, Mask == Self {
-}
-
-public extension SIMDVector {
+public extension SIMD {
   /// The valid indices for subscripting the vector.
   @_transparent
   var indices: Range<Int> { return 0 ..< scalarCount }
@@ -87,8 +85,8 @@ public extension SIMDVector {
   
   /// Pointwise equality
   @_transparent
-  static func .==(lhs: Self, rhs: Self) -> Mask {
-    var result = Mask()
+  static func .==(lhs: Self, rhs: Self) -> SIMDMask<MaskStorage> {
+    var result = SIMDMask<MaskStorage>()
     for i in result.indices { result[i] = lhs[i] == rhs[i] }
     return result
   }
@@ -96,7 +94,7 @@ public extension SIMDVector {
   /// Replaces elements of this vector with `other` in the lanes where
   /// `mask` is `true`.
   @_transparent
-  mutating func replace(with other: Self, where mask: Mask) {
+  mutating func replace(with other: Self, where mask: SIMDMask<MaskStorage>) {
     for i in indices { self[i] = mask[i] ? other[i] : self[i] }
   }
   
@@ -124,52 +122,34 @@ public extension SIMDVector {
 
 //  Implementations of comparison operations. These should eventually all
 //  be replaced with @_semantics to lower directly to vector IR nodes.
-public extension SIMDVector where Scalar : Comparable {
+public extension SIMD where Scalar : Comparable {
   /// Pointwise less than
   @_transparent
-  static func .<(lhs: Self, rhs: Self) -> Mask {
-    var result = Mask()
+  static func .<(lhs: Self, rhs: Self) -> SIMDMask<MaskStorage> {
+    var result = SIMDMask<MaskStorage>()
     for i in result.indices { result[i] = lhs[i] < rhs[i] }
     return result
   }
   
   /// Pointwise less than or equal to
   @_transparent
-  static func .<=(lhs: Self, rhs: Self) -> Mask {
-    var result = Mask()
+  static func .<=(lhs: Self, rhs: Self) -> SIMDMask<MaskStorage> {
+    var result = SIMDMask<MaskStorage>()
     for i in result.indices { result[i] = lhs[i] <= rhs[i] }
     return result
   }
 }
 
+/*
 //  Implementations of pointwise boolean operations. These should eventually
 //  all be replaced with @_semantics to lower directly to vector IR nodes.
-public extension SIMDMaskVector {
-  @_transparent
-  static func .&(lhs: Self, rhs: Self) -> Self {
-    var result = Self()
-    for i in result.indices { result[i] = lhs[i] && rhs[i] }
-    return result
-  }
-  
-  @_transparent
-  static func .^(lhs: Self, rhs: Self) -> Self {
-    var result = Self()
-    for i in result.indices { result[i] = lhs[i] != rhs[i] }
-    return result
-  }
-  
-  @_transparent
-  static func .|(lhs: Self, rhs: Self) -> Self {
-    var result = Self()
-    for i in result.indices { result[i] = lhs[i] || rhs[i] }
-    return result
-  }
+public extension SIMDMask {
 }
+*/
 
 //  Implementations of integer operations. These should eventually all
 //  be replaced with @_semantics to lower directly to vector IR nodes.
-public extension SIMDVector where Scalar : FixedWidthInteger {
+public extension SIMD where Scalar : FixedWidthInteger {
   @_transparent
   var leadingZeroBitCount: Self {
     var result = Self()
@@ -271,7 +251,7 @@ public extension SIMDVector where Scalar : FixedWidthInteger {
 
 //  Implementations of floating-point operations. These should eventually all
 //  be replaced with @_semantics to lower directly to vector IR nodes.
-public extension SIMDVector where Scalar : FloatingPoint {
+public extension SIMD where Scalar : FloatingPoint {
   @_transparent
   static func +(lhs: Self, rhs: Self) -> Self {
     var result = Self()
@@ -324,79 +304,45 @@ public extension SIMDVector where Scalar : FloatingPoint {
 
 //  These operations should never need @_semantics; they should be trivial
 //  wrappers around the core operations defined above.
-public extension SIMDVector {
-  @_transparent static func .!=(lhs: Self, rhs: Self) -> Mask { return .!(lhs .== rhs) }
-  @_transparent static func .==(lhs: Scalar, rhs: Self) -> Mask { return Self(repeating: lhs) .== rhs }
-  @_transparent static func .!=(lhs: Scalar, rhs: Self) -> Mask { return Self(repeating: lhs) .!= rhs }
-  @_transparent static func .==(lhs: Self, rhs: Scalar) -> Mask { return lhs .== Self(repeating: rhs) }
-  @_transparent static func .!=(lhs: Self, rhs: Scalar) -> Mask { return lhs .!= Self(repeating: rhs) }
+public extension SIMD {
+  @_transparent static func .!=(lhs: Self, rhs: Self) -> SIMDMask<MaskStorage> { return .!(lhs .== rhs) }
+  @_transparent static func .==(lhs: Scalar, rhs: Self) -> SIMDMask<MaskStorage> { return Self(repeating: lhs) .== rhs }
+  @_transparent static func .!=(lhs: Scalar, rhs: Self) -> SIMDMask<MaskStorage> { return Self(repeating: lhs) .!= rhs }
+  @_transparent static func .==(lhs: Self, rhs: Scalar) -> SIMDMask<MaskStorage> { return lhs .== Self(repeating: rhs) }
+  @_transparent static func .!=(lhs: Self, rhs: Scalar) -> SIMDMask<MaskStorage> { return lhs .!= Self(repeating: rhs) }
   
   @_transparent
-  mutating func replace(with other: Scalar, where mask: Mask) {
+  mutating func replace(with other: Scalar, where mask: SIMDMask<MaskStorage>) {
     replace(with: Self(repeating: other), where: mask)
   }
   
   @_transparent
-  func replacing(with other: Self, where mask: Mask) -> Self {
+  func replacing(with other: Self, where mask: SIMDMask<MaskStorage>) -> Self {
     var result = self
     result.replace(with: other, where: mask)
     return result
   }
   
   @_transparent
-  func replacing(with other: Scalar, where mask: Mask) -> Self {
+  func replacing(with other: Scalar, where mask: SIMDMask<MaskStorage>) -> Self {
     return replacing(with: Self(repeating: other), where: mask)
   }
 }
 
-public extension SIMDMaskVector {
-  
-  @_transparent static prefix func .!(rhs: Self) -> Self { return false .== rhs }
-  
-  @_transparent static func .&(lhs: Scalar, rhs: Self) -> Self { return Self(repeating: lhs) .& rhs }
-  @_transparent static func .^(lhs: Scalar, rhs: Self) -> Self { return Self(repeating: lhs) .^ rhs }
-  @_transparent static func .|(lhs: Scalar, rhs: Self) -> Self { return Self(repeating: lhs) .| rhs }
-  
-  @_transparent static func .&(lhs: Self, rhs: Scalar) -> Self { return lhs .& Self(repeating: rhs) }
-  @_transparent static func .^(lhs: Self, rhs: Scalar) -> Self { return lhs .^ Self(repeating: rhs) }
-  @_transparent static func .|(lhs: Self, rhs: Scalar) -> Self { return lhs .| Self(repeating: rhs) }
-  
-  @_transparent static func .&=(lhs: inout Self, rhs: Self) { lhs = lhs .& rhs }
-  @_transparent static func .^=(lhs: inout Self, rhs: Self) { lhs = lhs .^ rhs }
-  @_transparent static func .|=(lhs: inout Self, rhs: Self) { lhs = lhs .| rhs }
-  
-  @_transparent static func .&=(lhs: inout Self, rhs: Scalar) { lhs = lhs .& rhs }
-  @_transparent static func .^=(lhs: inout Self, rhs: Scalar) { lhs = lhs .^ rhs }
-  @_transparent static func .|=(lhs: inout Self, rhs: Scalar) { lhs = lhs .| rhs }
-  
-  @inlinable
-  static func random<T: RandomNumberGenerator>(using generator: inout T) -> Self {
-    var result = Self()
-    for i in result.indices { result[i] = Bool.random(using: &generator) }
-    return result
-  }
-  
-  @inlinable
-  static func random() -> Self {
-    var g = SystemRandomNumberGenerator()
-    return Self.random(using: &g)
-  }
+public extension SIMD where Scalar : Comparable {
+  @_transparent static func .>=(lhs: Self, rhs: Self) -> SIMDMask<MaskStorage> { return rhs .<= lhs }
+  @_transparent static func .>(lhs: Self, rhs: Self) -> SIMDMask<MaskStorage> { return rhs .< lhs }
+  @_transparent static func .<(lhs: Scalar, rhs: Self) -> SIMDMask<MaskStorage> { return Self(repeating: lhs) .< rhs }
+  @_transparent static func .<=(lhs: Scalar, rhs: Self) -> SIMDMask<MaskStorage> { return Self(repeating: lhs) .<= rhs }
+  @_transparent static func .>=(lhs: Scalar, rhs: Self) -> SIMDMask<MaskStorage> { return Self(repeating: lhs) .>= rhs }
+  @_transparent static func .>(lhs: Scalar, rhs: Self) -> SIMDMask<MaskStorage> { return Self(repeating: lhs) .> rhs }
+  @_transparent static func .<(lhs: Self, rhs: Scalar) -> SIMDMask<MaskStorage> { return lhs .< Self(repeating: rhs) }
+  @_transparent static func .<=(lhs: Self, rhs: Scalar) -> SIMDMask<MaskStorage> { return lhs .<= Self(repeating: rhs) }
+  @_transparent static func .>=(lhs: Self, rhs: Scalar) -> SIMDMask<MaskStorage> { return lhs .>= Self(repeating: rhs) }
+  @_transparent static func .>(lhs: Self, rhs: Scalar) -> SIMDMask<MaskStorage> { return lhs .> Self(repeating: rhs) }
 }
 
-public extension SIMDVector where Scalar : Comparable {
-  @_transparent static func .>=(lhs: Self, rhs: Self) -> Mask { return rhs .<= lhs }
-  @_transparent static func .>(lhs: Self, rhs: Self) -> Mask { return rhs .< lhs }
-  @_transparent static func .<(lhs: Scalar, rhs: Self) -> Mask { return Self(repeating: lhs) .< rhs }
-  @_transparent static func .<=(lhs: Scalar, rhs: Self) -> Mask { return Self(repeating: lhs) .<= rhs }
-  @_transparent static func .>=(lhs: Scalar, rhs: Self) -> Mask { return Self(repeating: lhs) .>= rhs }
-  @_transparent static func .>(lhs: Scalar, rhs: Self) -> Mask { return Self(repeating: lhs) .> rhs }
-  @_transparent static func .<(lhs: Self, rhs: Scalar) -> Mask { return lhs .< Self(repeating: rhs) }
-  @_transparent static func .<=(lhs: Self, rhs: Scalar) -> Mask { return lhs .<= Self(repeating: rhs) }
-  @_transparent static func .>=(lhs: Self, rhs: Scalar) -> Mask { return lhs .>= Self(repeating: rhs) }
-  @_transparent static func .>(lhs: Self, rhs: Scalar) -> Mask { return lhs .> Self(repeating: rhs) }
-}
-
-public extension SIMDVector where Scalar : FixedWidthInteger {
+public extension SIMD where Scalar : FixedWidthInteger {
   @_transparent static var zero: Self { return Self() }
   
   @_transparent static func &(lhs: Scalar, rhs: Self) -> Self { return Self(repeating: lhs) & rhs }
@@ -480,7 +426,7 @@ public extension SIMDVector where Scalar : FixedWidthInteger {
   }
 }
 
-public extension SIMDVector where Scalar : FloatingPoint {
+public extension SIMD where Scalar : FloatingPoint {
   @_transparent static var zero: Self { return Self() }
   
   @_transparent static func +(lhs: Scalar, rhs: Self) -> Self { return Self(repeating: lhs) + rhs }
@@ -528,7 +474,7 @@ public extension SIMDVector where Scalar : FloatingPoint {
   }
 }
 
-public extension SIMDVector
+public extension SIMD
 where Scalar : BinaryFloatingPoint, Scalar.RawSignificand : FixedWidthInteger {
   @inlinable
   static func random<T: RandomNumberGenerator>(
@@ -568,13 +514,13 @@ where Scalar : BinaryFloatingPoint, Scalar.RawSignificand : FixedWidthInteger {
 }
 
 @_fixed_layout
-public struct SIMDMask<Storage> : SIMDMaskVector
-  where Storage : SIMDVector,
-        Storage.Scalar : FixedWidthInteger & SignedInteger {
+public struct SIMDMask<Storage> : SIMD
+                  where Storage : SIMD,
+                 Storage.Scalar : FixedWidthInteger & SignedInteger {
   
   public var _storage : Storage
   
-  public typealias Mask = SIMDMask<Storage>
+  public typealias MaskStorage = Storage
   
   public typealias Scalar = Bool
   
@@ -586,6 +532,11 @@ public struct SIMDMask<Storage> : SIMDMaskVector
   @_transparent
   public init() {
     _storage = Storage()
+  }
+  
+  @_transparent
+  public init(_ _storage: Storage) {
+    self._storage = _storage
   }
   
   public subscript(index: Int) -> Bool {
@@ -600,5 +551,58 @@ public struct SIMDMask<Storage> : SIMDMaskVector
       _storage[index] = newValue ? -1 : 0
     }
   }
+}
+
+public extension SIMDMask {
+  @_transparent
+  static prefix func .!(rhs: SIMDMask) -> SIMDMask {
+    return SIMDMask(~rhs._storage)
+  }
   
+  @_transparent
+  static func .&(lhs: SIMDMask, rhs: SIMDMask) -> SIMDMask {
+    return SIMDMask(lhs._storage & rhs._storage)
+  }
+  
+  @_transparent
+  static func .^(lhs: SIMDMask, rhs: SIMDMask) -> SIMDMask {
+    return SIMDMask(lhs._storage ^ rhs._storage)
+  }
+  
+  @_transparent
+  static func .|(lhs: SIMDMask, rhs: SIMDMask) -> SIMDMask {
+    return SIMDMask(lhs._storage | rhs._storage)
+  }
+}
+
+public extension SIMDMask {
+  
+  @_transparent static func .&(lhs: Bool, rhs: SIMDMask) -> SIMDMask { return SIMDMask(repeating: lhs) .& rhs }
+  @_transparent static func .^(lhs: Bool, rhs: SIMDMask) -> SIMDMask { return SIMDMask(repeating: lhs) .^ rhs }
+  @_transparent static func .|(lhs: Bool, rhs: SIMDMask) -> SIMDMask { return SIMDMask(repeating: lhs) .| rhs }
+  
+  @_transparent static func .&(lhs: SIMDMask, rhs: Bool) -> SIMDMask { return lhs .& SIMDMask(repeating: rhs) }
+  @_transparent static func .^(lhs: SIMDMask, rhs: Bool) -> SIMDMask { return lhs .^ SIMDMask(repeating: rhs) }
+  @_transparent static func .|(lhs: SIMDMask, rhs: Bool) -> SIMDMask { return lhs .| SIMDMask(repeating: rhs) }
+  
+  @_transparent static func .&=(lhs: inout SIMDMask, rhs: SIMDMask) { lhs = lhs .& rhs }
+  @_transparent static func .^=(lhs: inout SIMDMask, rhs: SIMDMask) { lhs = lhs .^ rhs }
+  @_transparent static func .|=(lhs: inout SIMDMask, rhs: SIMDMask) { lhs = lhs .| rhs }
+  
+  @_transparent static func .&=(lhs: inout SIMDMask, rhs: Bool) { lhs = lhs .& rhs }
+  @_transparent static func .^=(lhs: inout SIMDMask, rhs: Bool) { lhs = lhs .^ rhs }
+  @_transparent static func .|=(lhs: inout SIMDMask, rhs: Bool) { lhs = lhs .| rhs }
+  
+  @inlinable
+  static func random<T: RandomNumberGenerator>(using generator: inout T) -> SIMDMask {
+    var result = SIMDMask()
+    for i in result.indices { result[i] = Bool.random(using: &generator) }
+    return result
+  }
+  
+  @inlinable
+  static func random() -> SIMDMask {
+    var g = SystemRandomNumberGenerator()
+    return SIMDMask.random(using: &g)
+  }
 }

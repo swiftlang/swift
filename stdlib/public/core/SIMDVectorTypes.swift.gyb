@@ -8,11 +8,11 @@ vectorscalarCounts = storagescalarCounts + [3]
 %for n in vectorscalarCounts:
 % storageN = 4 if n == 3 else n
 @_fixed_layout
-public struct Vector${n}<Scalar> : SIMDVector where Scalar: SIMDVectorizable {
+public struct SIMD${n}<Scalar> : SIMD where Scalar: SIMDScalar {
 
-  public var _storage: Scalar.Vector${storageN}Storage
+  public var _storage: Scalar.SIMD${storageN}Storage
 
-  public typealias Mask = SIMDMask<Vector${n}<Scalar.MaskElement>>
+  public typealias MaskStorage = SIMD${n}<Scalar.SIMDMaskScalar>
 
   @_transparent
   public var scalarCount: Int {
@@ -21,7 +21,7 @@ public struct Vector${n}<Scalar> : SIMDVector where Scalar: SIMDVectorizable {
 
   @_transparent
   public init() {
-    _storage = Scalar.Vector${storageN}Storage()
+    _storage = Scalar.SIMD${storageN}Storage()
   }
 
   public subscript(index: Int) -> Scalar {
@@ -60,16 +60,16 @@ public struct Vector${n}<Scalar> : SIMDVector where Scalar: SIMDVectorizable {
 % end
 % if n >= 4:
   @_transparent
-  public init(lowHalf: Vector${n/2}<Scalar>, highHalf: Vector${n/2}<Scalar>) {
+  public init(lowHalf: SIMD${n/2}<Scalar>, highHalf: SIMD${n/2}<Scalar>) {
     self.init()
     self.lowHalf = lowHalf
     self.highHalf = highHalf
   }
 
 %  for (half,indx) in [('low','i'), ('high',str(n/2)+'+i'), ('even','2*i'), ('odd','2*i+1')]:
-  public var ${half}Half: Vector${n/2}<Scalar> {
+  public var ${half}Half: SIMD${n/2}<Scalar> {
     @inlinable get {
-      var result = Vector${n/2}<Scalar>()
+      var result = SIMD${n/2}<Scalar>()
       for i in result.indices { result[i] = self[${indx}] }
       return result
     }
@@ -82,16 +82,16 @@ public struct Vector${n}<Scalar> : SIMDVector where Scalar: SIMDVectorizable {
 % end
 }
 
-public extension Vector${n} where Scalar : FixedWidthInteger {
+public extension SIMD${n} where Scalar : FixedWidthInteger {
   @inlinable
-  init<Other>(truncatingIfNeeded other: Vector${n}<Other>)
+  init<Other>(truncatingIfNeeded other: SIMD${n}<Other>)
   where Other : FixedWidthInteger {
     self.init()
     for i in indices { self[i] = Scalar(truncatingIfNeeded: other[i]) }
   }
 
   @inlinable
-  init<Other>(clamping other: Vector${n}<Other>)
+  init<Other>(clamping other: SIMD${n}<Other>)
   where Other : FixedWidthInteger {
     self.init()
     for i in indices { self[i] = Scalar(clamping: other[i]) }
@@ -99,7 +99,7 @@ public extension Vector${n} where Scalar : FixedWidthInteger {
 
   @inlinable
   init<Other>(
-    _ other: Vector${n}<Other>,
+    _ other: SIMD${n}<Other>,
     rounding rule: FloatingPointRoundingRule = .towardZero
   )
   where Other : BinaryFloatingPoint {
@@ -110,16 +110,16 @@ public extension Vector${n} where Scalar : FixedWidthInteger {
 }
 
 
-public extension Vector${n} where Scalar : BinaryFloatingPoint {
+public extension SIMD${n} where Scalar : BinaryFloatingPoint {
   @inlinable
-  init<Other>(_ other: Vector${n}<Other>)
+  init<Other>(_ other: SIMD${n}<Other>)
   where Other : FixedWidthInteger {
     self.init()
     for i in indices { self[i] = Scalar(other[i]) }
   }
 
   @inlinable
-  init<Other>(_ other: Vector${n}<Other>)
+  init<Other>(_ other: SIMD${n}<Other>)
   where Other : BinaryFloatingPoint {
     self.init()
     for i in indices { self[i] = Scalar(other[i]) }
@@ -132,12 +132,12 @@ public extension Vector${n} where Scalar : BinaryFloatingPoint {
 % Self = self_type.stdlib_name
 % BuiltinName = self_type.builtin_name
 % Mask = Self if self_type.is_signed else self_type.get_opposite_signedness().stdlib_name
-extension ${Self} : SIMDVectorizable {
+extension ${Self} : SIMDScalar {
 
-  public typealias MaskElement = ${Mask}
+  public typealias SIMDMaskScalar = ${Mask}
 
 % for n in storagescalarCounts:
-  @_fixed_layout public struct Vector${n}Storage : SIMDVectorStorage {
+  @_fixed_layout public struct SIMD${n}Storage : SIMDStorage {
 
     public var _value: Builtin.Vec${n}x${BuiltinName}
 
@@ -173,12 +173,12 @@ extension ${Self} : SIMDVectorizable {
 %end
 
 %for (Self, bits) in [('Float',32), ('Double',64)]:
-extension ${Self} : SIMDVectorizable {
+extension ${Self} : SIMDScalar {
 
-  public typealias MaskElement = Int${bits}
+  public typealias SIMDMaskScalar = Int${bits}
 
 % for n in storagescalarCounts:
-  @_fixed_layout public struct Vector${n}Storage : SIMDVectorStorage {
+  @_fixed_layout public struct SIMD${n}Storage : SIMDStorage {
 
     public var _value: Builtin.Vec${n}xFPIEEE${bits}
 
