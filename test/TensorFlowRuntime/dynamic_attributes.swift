@@ -1,5 +1,5 @@
-// UN: %target-run-dynamic-compilation-swift
 // RUN: %target-run-simple-swift
+// RUN: %target-run-dynamic-compilation-swift
 // REQUIRES: executable_test
 // REQUIRES: tensorflow
 
