@@ -398,6 +398,7 @@ namespace {
     GraphEmitter(const Graph& g, llvm::raw_ostream &out) : g(g), emitter(Emitter(out)) {}
   public:
     void emit() const {
+      // FIXME: emits info for each arc twice
       std::for_each(g.nodesBegin(), g.nodesEnd(), [&](const Node* n) {emitNode(n); });
     }
     void emitNode(const Node*) const;

@@ -41,7 +41,17 @@ namespace experimental_dependencies {
       member, dynamicLookup,
       externalDepend,
       sourceFileProvide,
-      end };
+      kindCount };
+    enum class SerializationKeys {
+      kind,
+      nameForDependencies,
+      nameForHolderOfMember,
+      fingerprint,
+      sequenceNumberInGraph,
+      departures,
+      arrivals,
+      serializationKeyCount
+    };
   private:
     Kind kind;
     std::string nameForDependencies;
@@ -54,15 +64,22 @@ namespace experimental_dependencies {
     std::vector<uint> departures, arrivals;
 
   public:
+  Node() = default;
   Node(
        Kind kind,
        std::string nameForDependencies,
        std::string nameForHolderOfMember,
-       std::string fingerprint) :
+       std::string fingerprint,
+       uint sequenceNumberInGraph = ~0,
+       std::vector<uint>&& departures = {},
+       std::vector<uint>&& arrivals = {}) :
     kind(kind),
     nameForDependencies(nameForDependencies),
     nameForHolderOfMember(nameForHolderOfMember),
-    fingerprint(fingerprint)
+    fingerprint(fingerprint),
+    sequenceNumberInGraph(sequenceNumberInGraph),
+    departures(departures),
+    arrivals(arrivals)
     {
       assert((kind == Kind::member) == !nameForHolderOfMember.empty() && "only member nodes have the holder name");
       assert(kind != Kind::sourceFileProvide || !fingerprint.empty() && "source files must have fingerprint (old interfaceHash");

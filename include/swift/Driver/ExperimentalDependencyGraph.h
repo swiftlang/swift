@@ -75,6 +75,9 @@ namespace swift {
         parseDependencyFile(llvm::MemoryBuffer &buffer,
                             llvm::function_ref<NodeCallbackTy> nodeCallback,
                             llvm::function_ref<ErrorCallbackTy> errorCallback);
+        static void parseNode(llvm::yaml::MappingNode *,
+                              llvm::function_ref<NodeCallbackTy> nodeCallback,
+                              llvm::function_ref<ErrorCallbackTy> errorCallback);
 
         void registerCmdForReevaluation(const Job* Cmd);
         static std::string depsFileForCmd(const Job* Cmd);
