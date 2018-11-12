@@ -78,6 +78,23 @@ void checkGenericParamList(TypeChecker &tc,
     RequirementRequest::visitRequirements(owner, resolution.getStage(),
         [&](const Requirement &req, RequirementRepr *reqRepr) {
           auto source = FloatingRequirementSource::forExplicit(reqRepr);
+          
+          // If we're extending a protocol and adding a redundant requirement,
+          // for example, `extension Foo where Self: Foo`, then emit a
+          // diagnostic.
+          
+          if (auto extDecl = dyn_cast<ExtensionDecl>(owner.dc->getAsDecl())) {
+            auto ownerType = extDecl->getExtendedType();
+            auto selfType = req.getFirstType();
+            auto reqType = req.getSecondType();
+            
+            if (ownerType->isExistentialType() && reqType->isEqual(ownerType)) {
+              auto &ctx = extDecl->getASTContext();
+              ctx.Diags.diagnose(extDecl->getLoc(), diag::protocol_extension_redundant_requirement,
+                                 ownerType->getString(), selfType->getString(), reqType->getString());
+            }
+          }
+          
           builder->addRequirement(req, reqRepr, source, nullptr,
                                   lookupDC->getParentModule());
           return false;
