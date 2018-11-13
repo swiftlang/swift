@@ -287,15 +287,31 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
         return AccessedStorage(address, AccessedStorage::Unidentified);
       return AccessedStorage();
 
-    // A block argument may be a box value projected out of
-    // switch_enum. Address-type block arguments are not allowed.
-    case ValueKind::SILPhiArgument:
+    case ValueKind::SILPhiArgument: {
+      auto *phiArg = cast<SILPhiArgument>(address);
+      bool allValsMatch = true;
+      SmallVector<SILValue, 8> incomingPhis;
+      phiArg->getIncomingPhiValues(incomingPhis);
+      if (!incomingPhis.empty()) {
+        auto firstVal = incomingPhis.front();
+        for (auto val : incomingPhis) {
+          if (val != firstVal) {
+            allValsMatch = false;
+            break;
+          }
+        }
+        if (allValsMatch) {
+          return findAccessedStorage(firstVal);
+        }
+      }
+      // A block argument may be a box value projected out of
+      // switch_enum. Address-type block arguments are not allowed.
       if (address->getType().isAddress())
         return AccessedStorage();
 
       checkSwitchEnumBlockArg(cast<SILPhiArgument>(address));
       return AccessedStorage(address, AccessedStorage::Unidentified);
-
+    }
     // Load a box from an indirect payload of an opaque enum.
     // We must have peeked past the project_box earlier in this loop.
     // (the indirectness makes it a box, the load is for address-only).
