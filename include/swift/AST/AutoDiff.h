@@ -252,7 +252,7 @@ struct SILAutoDiffConfig {
 
 /// The kind of an associated function in the `autodiff_function` and
 /// `autodiff_function_extract` instructions in SIL.
-enum class SILAutoDiffAssociatedFunctionKind {
+enum class SILAutoDiffAssociatedFunctionKind : uint8_t {
   // The primal function in legacy reverse-mode.
   LegacyPrimal,
   // The adjoint function in legacy reverse-mode.

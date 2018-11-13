@@ -3044,39 +3044,26 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
                        "legacy reverse mode indicator"))
         return true;
     }
-    // Parse an associated function kind.
-    Identifier kindId;
-    SourceLoc kindIdLoc;
+    // Parse the rest of the instruction: an associated function kind, a
+    // function operand, an order operand and a debug location.
+    SILAutoDiffAssociatedFunctionKind assocFnKind;
+    StringRef assocFnKindNames[4] = { "primal", "adjoint", "jvp", "vjp" };
+    SILValue functionOperand, orderOperand;
     if (P.parseToken(tok::l_square,
             diag::sil_inst_autodiff_expected_associated_function_kind_attr) ||
-        P.parseIdentifier(kindId, kindIdLoc,
+        parseSILIdentifierSwitch(assocFnKind, assocFnKindNames,
             diag::sil_inst_autodiff_expected_associated_function_kind_attr) ||
         P.parseToken(tok::r_square,
                      diag::sil_inst_autodiff_attr_expected_rsquare,
-                     "associated function kind"))
-      return true;
-    auto assocFnKind = llvm::StringSwitch<
-        Optional<SILAutoDiffAssociatedFunctionKind>>(kindId.str())
-          .Case("primal", SILAutoDiffAssociatedFunctionKind::LegacyPrimal)
-          .Case("adjoint", SILAutoDiffAssociatedFunctionKind::LegacyAdjoint)
-          .Case("jvp", SILAutoDiffAssociatedFunctionKind::JVP)
-          .Case("vjp", SILAutoDiffAssociatedFunctionKind::VJP)
-          .Default(None);
-    if (!assocFnKind) {
-      P.diagnose(kindIdLoc,
-          diag::sil_inst_autodiff_expected_associated_function_kind_attr);
-      return true;
-    }
-    // Parse a function operand, an order operand and a debug location.
-    SILValue functionOperand, orderOperand;
-    if (parseTypedValueRef(functionOperand, B) ||
+                     "associated function kind") ||
+        parseTypedValueRef(functionOperand, B) ||
         P.parseSpecificIdentifier("order",
             diag::sil_inst_autodiff_expected_order_operand) ||
         parseTypedValueRef(orderOperand, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createAutoDiffFunctionExtract(InstLoc, isLegacyReverseMode,
-                                                *assocFnKind, functionOperand,
+                                                assocFnKind, functionOperand,
                                                 orderOperand);
     break;
   }
