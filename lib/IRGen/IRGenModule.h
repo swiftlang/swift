@@ -110,6 +110,7 @@ namespace irgen {
   class ClangTypeConverter;
   class ClassMetadataLayout;
   class ConformanceInfo;
+  class ConstantInitBuilder;
   struct ConstantIntegerLiteral;
   class ConstantIntegerLiteralMap;
   class DebugTypeInfo;
@@ -1072,6 +1073,24 @@ public:
                                             MangledTypeRefRole role);
   llvm::Constant *getAddrOfStringForTypeRef(const SymbolicMangling &mangling,
                                             MangledTypeRefRole role);
+
+  /// Retrieve the address of a mangled string used for some kind of metadata
+  /// reference.
+  ///
+  /// \param symbolName The name of the symbol that describes the metadata
+  /// being referenced.
+  /// \param shouldSetLowBit Whether to set the low bit of the result
+  /// constant, which is used by some clients to indicate that the result is
+  /// a mangled name.
+  /// \param body The body of a function that will create the metadata value
+  /// itself, given a constant building and producing a future for the
+  /// initializer.
+  /// \returns the address of the global variable describing this metadata.
+  llvm::Constant *getAddrOfStringForMetadataRef(
+      StringRef symbolName,
+      bool shouldSetLowBit,
+      llvm::function_ref<ConstantInitFuture(ConstantInitBuilder &)> body);
+
   llvm::Constant *getAddrOfFieldName(StringRef Name);
   llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
                                              CanSILFunctionType origCalleeType,

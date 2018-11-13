@@ -2375,8 +2375,81 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
   return UnsafeRawPointer(Unmanaged.passRetained(instance).toOpaque())
 }
 
-internal typealias MetadataAccessor =
-  @convention(c) (UnsafeRawPointer) -> UnsafeRawPointer
+// A reference to metadata, which is a pointer to a mangled name.
+internal typealias MetadataReference = UnsafeRawPointer
+
+// Determine the length of the given mangled name.
+internal func _getSymbolicMangledNameLength(_ base: UnsafeRawPointer) -> Int {
+  var end = base
+  while let current = Optional(end.load(as: UInt8.self)), current != 0 {
+    // Skip the current character
+    end = end + 1
+
+    // Skip over a symbolic reference
+    if current >= 0x1 && current <= 0x17 {
+      end += 4
+    } else if current >= 0x18 && current <= 0x1F {
+      end += MemoryLayout<Int>.size
+    }
+  }
+
+  return end - base
+}
+
+// Resolve the given generic argument reference to a generic argument.
+internal func _resolveKeyPathGenericArgReference(_ reference: UnsafeRawPointer,
+                                                 arguments: UnsafeRawPointer)
+    -> UnsafeRawPointer {
+  // If the low bit is clear, it's a direct reference to the argument.
+  if (UInt(bitPattern: reference) & 0x01 == 0) {
+    return reference;
+  }
+
+  // Adjust the reference.
+  let referenceStart = reference - 1
+
+  // If we have a symbolic reference to an accessor, call it.
+  let first = referenceStart.load(as: UInt8.self)
+  if first == 9 {
+    typealias MetadataAccessor =
+      @convention(c) (UnsafeRawPointer) -> UnsafeRawPointer
+
+    // Unaligned load of the offset.
+    var offset: Int32 = 0
+    _memcpy(dest: &offset, src: reference, size: 4)
+
+    let accessorPtr = _resolveRelativeAddress(reference, offset)
+    let accessor = unsafeBitCast(accessorPtr, to: MetadataAccessor.self)
+    return accessor(arguments)
+  }
+
+  let nameLength = _getSymbolicMangledNameLength(referenceStart)
+  let namePtr = referenceStart.bindMemory(to: UInt8.self,
+                                          capacity: nameLength + 1)
+  // FIXME: Could extract this information from the mangled name.
+  let parametersPerLevel: [UInt] = []
+  let substitutions: [Any.Type] = []
+  guard let result = _getTypeByMangledName(namePtr, UInt(nameLength), 0,
+                                           parametersPerLevel, substitutions)
+    else {
+      let nameStr = String._fromUTF8Repairing(
+        UnsafeBufferPointer(start: namePtr, count: nameLength)
+      ).0
+
+      fatalError("could not demangle keypath type from '\(nameStr)'")
+    }
+
+  return unsafeBitCast(result, to: UnsafeRawPointer.self)
+}
+
+// Resolve the given metadata reference to (type) metadata.
+internal func _resolveKeyPathMetadataReference(_ reference: UnsafeRawPointer,
+                                               arguments: UnsafeRawPointer)
+    -> Any.Type {
+  return unsafeBitCast(
+           _resolveKeyPathGenericArgReference(reference, arguments: arguments),
+           to: Any.Type.self)
+}
 
 internal enum KeyPathStructOrClass {
   case `struct`, `class`
@@ -2394,8 +2467,8 @@ internal struct KeyPathPatternComputedArguments {
 }
 
 internal protocol KeyPathPatternVisitor {
-  mutating func visitHeader(rootAccessor: MetadataAccessor,
-                            leafAccessor: MetadataAccessor,
+  mutating func visitHeader(rootMetadataRef: MetadataReference,
+                            leafMetadataRef: MetadataReference,
                             kvcCompatibilityString: UnsafeRawPointer)
   mutating func visitStoredComponent(kind: KeyPathStructOrClass,
                                      mutable: Bool,
@@ -2413,7 +2486,7 @@ internal protocol KeyPathPatternVisitor {
   mutating func visitOptionalForceComponent()
   mutating func visitOptionalWrapComponent()
 
-  mutating func visitIntermediateComponentType(accessor: MetadataAccessor)
+  mutating func visitIntermediateComponentType(metadataRef: MetadataReference)
 
   mutating func finish()
 }
@@ -2446,15 +2519,15 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
                                   _ pattern: UnsafeRawPointer,
                                   walker: inout W) {
   // Visit the header.
-  let rootAccessor = _loadRelativeAddress(at: pattern,
-                                          as: MetadataAccessor.self)
-  let leafAccessor = _loadRelativeAddress(at: pattern, fromByteOffset: 4,
-                                          as: MetadataAccessor.self)
+  let rootMetadataRef = _loadRelativeAddress(at: pattern,
+                                             as: MetadataReference.self)
+  let leafMetadataRef = _loadRelativeAddress(at: pattern, fromByteOffset: 4,
+                                             as: MetadataReference.self)
   let kvcString = _loadRelativeAddress(at: pattern, fromByteOffset: 8,
                                        as: UnsafeRawPointer.self)
 
-  walker.visitHeader(rootAccessor: rootAccessor,
-                     leafAccessor: leafAccessor,
+  walker.visitHeader(rootMetadataRef: rootMetadataRef,
+                     leafMetadataRef: leafMetadataRef,
                      kvcCompatibilityString: kvcString)
 
   func visitStored(header: RawKeyPathComponent.Header,
@@ -2704,11 +2777,9 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
     // go around again.
     let componentTypeBase = buffer.baseAddress.unsafelyUnwrapped
     let componentTypeOffset = _pop(from: &buffer, as: Int32.self)
-    let componentTypeAccessorRaw = _resolveRelativeAddress(componentTypeBase,
-                                                         componentTypeOffset)
-    let componentTypeAccessor = unsafeBitCast(componentTypeAccessorRaw,
-                                              to: MetadataAccessor.self)
-    walker.visitIntermediateComponentType(accessor: componentTypeAccessor)
+    let componentTypeRef = _resolveRelativeAddress(componentTypeBase,
+                                                   componentTypeOffset)
+    walker.visitIntermediateComponentType(metadataRef: componentTypeRef)
     _sanityCheck(!buffer.isEmpty)
   }
 
@@ -2734,13 +2805,15 @@ internal struct GetKeyPathClassAndInstanceSizeFromPattern
     size = MemoryLayout<Int>._roundingUpToAlignment(size)
   }
 
-  mutating func visitHeader(rootAccessor: MetadataAccessor,
-                            leafAccessor: MetadataAccessor,
+  mutating func visitHeader(rootMetadataRef: MetadataReference,
+                            leafMetadataRef: MetadataReference,
                             kvcCompatibilityString: UnsafeRawPointer) {
     // Get the root and leaf type metadata so we can form the class type
     // for the entire key path.
-    root = unsafeBitCast(rootAccessor(patternArgs), to: Any.Type.self)
-    leaf = unsafeBitCast(leafAccessor(patternArgs), to: Any.Type.self)
+    root = _resolveKeyPathMetadataReference(rootMetadataRef,
+                                            arguments: patternArgs)
+    leaf = _resolveKeyPathMetadataReference(leafMetadataRef,
+                                            arguments: patternArgs)
   }
 
   mutating func visitStoredComponent(kind: KeyPathStructOrClass,
@@ -2867,7 +2940,8 @@ internal struct GetKeyPathClassAndInstanceSizeFromPattern
     size += 4
   }
 
-  mutating func visitIntermediateComponentType(accessor _: MetadataAccessor) {
+  mutating
+  func visitIntermediateComponentType(metadataRef _: MetadataReference) {
     // The instantiated component type will be stored in the instantiated
     // object.
     roundUpToPointerAlignment()
@@ -2963,8 +3037,8 @@ internal struct InstantiateKeyPathBuffer : KeyPathPatternVisitor {
     return oldValue
   }
 
-  mutating func visitHeader(rootAccessor: MetadataAccessor,
-                            leafAccessor: MetadataAccessor,
+  mutating func visitHeader(rootMetadataRef: MetadataReference,
+                            leafMetadataRef: MetadataReference,
                             kvcCompatibilityString: UnsafeRawPointer) {
   }
 
@@ -3134,9 +3208,9 @@ internal struct InstantiateKeyPathBuffer : KeyPathPatternVisitor {
       for i in externalArgs.indices {
         let base = externalArgs.baseAddress.unsafelyUnwrapped + i
         let offset = base.pointee
-        let accessorPtr = UnsafeRawPointer(base) + Int(offset)
-        let accessor = unsafeBitCast(accessorPtr, to: MetadataAccessor.self)
-        let result = accessor(patternArgs)
+        let metadataRef = UnsafeRawPointer(base) + Int(offset)
+        let result = _resolveKeyPathGenericArgReference(metadataRef,
+                                                       arguments: patternArgs)
         pushDest(result)
       }
     }
@@ -3158,9 +3232,10 @@ internal struct InstantiateKeyPathBuffer : KeyPathPatternVisitor {
     pushDest(header)
   }
 
-  mutating func visitIntermediateComponentType(accessor: MetadataAccessor) {
-    // Call the accessor to get the metadata for the intermediate type.
-    let metadata = unsafeBitCast(accessor(patternArgs), to: Any.Type.self)
+  mutating func visitIntermediateComponentType(metadataRef: MetadataReference) {
+    // Get the metadata for the intermediate type.
+    let metadata = _resolveKeyPathMetadataReference(metadataRef,
+                                                    arguments: patternArgs)
     pushDest(metadata)
     base = metadata
   }
@@ -3188,14 +3263,14 @@ internal struct ValidatingInstantiateKeyPathBuffer: KeyPathPatternVisitor {
     origDest = self.instantiateVisitor.destData.baseAddress.unsafelyUnwrapped
   }
 
-  mutating func visitHeader(rootAccessor: MetadataAccessor,
-                            leafAccessor: MetadataAccessor,
+  mutating func visitHeader(rootMetadataRef: MetadataReference,
+                            leafMetadataRef: MetadataReference,
                             kvcCompatibilityString: UnsafeRawPointer) {
-    sizeVisitor.visitHeader(rootAccessor: rootAccessor,
-                            leafAccessor: leafAccessor,
+    sizeVisitor.visitHeader(rootMetadataRef: rootMetadataRef,
+                            leafMetadataRef: leafMetadataRef,
                             kvcCompatibilityString: kvcCompatibilityString)
-    instantiateVisitor.visitHeader(rootAccessor: rootAccessor,
-                                 leafAccessor: leafAccessor,
+    instantiateVisitor.visitHeader(rootMetadataRef: rootMetadataRef,
+                                 leafMetadataRef: leafMetadataRef,
                                  kvcCompatibilityString: kvcCompatibilityString)
   }
   mutating func visitStoredComponent(kind: KeyPathStructOrClass,
@@ -3251,9 +3326,9 @@ internal struct ValidatingInstantiateKeyPathBuffer: KeyPathPatternVisitor {
     instantiateVisitor.visitOptionalForceComponent()
     checkSizeConsistency()
   }
-  mutating func visitIntermediateComponentType(accessor: MetadataAccessor) {
-    sizeVisitor.visitIntermediateComponentType(accessor: accessor)
-    instantiateVisitor.visitIntermediateComponentType(accessor: accessor)
+  mutating func visitIntermediateComponentType(metadataRef: MetadataReference) {
+    sizeVisitor.visitIntermediateComponentType(metadataRef: metadataRef)
+    instantiateVisitor.visitIntermediateComponentType(metadataRef: metadataRef)
     checkSizeConsistency()
   }
 

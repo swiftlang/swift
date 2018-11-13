@@ -92,6 +92,7 @@ The following symbolic reference kinds are currently implemented:
 
    associated-conformance-acceess-function ::= '\x07' .{4}  // Reference points directly to associated conformance access function relative to the protocol
    associated-conformance-acceess-function ::= '\x08' .{4}  // Reference points directly to associated conformance access function relative to the conforming type
+   keypath-metadata-access-function ::= '\x09' {.4}  // Reference points directly to keypath type metadata access function
 
 Globals
 ~~~~~~~

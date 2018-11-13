@@ -257,3 +257,26 @@ std::string IRGenMangler::mangleSymbolNameForAssociatedConformanceWitness(
   appendProtocolName(proto);
   return finalize();
 }
+
+std::string IRGenMangler::mangleSymbolNameForKeyPathMetadata(
+                                           const char *kind,
+                                           CanGenericSignature genericSig,
+                                           CanType type,
+                                           ProtocolConformanceRef conformance) {
+  beginManglingWithoutPrefix();
+  Buffer << kind << " ";
+
+  if (genericSig)
+    appendGenericSignature(genericSig);
+
+  if (type)
+    appendType(type);
+
+  if (conformance.isConcrete())
+    appendConcreteProtocolConformance(conformance.getConcrete());
+  else if (conformance.isAbstract())
+    appendProtocolName(conformance.getAbstract());
+  else
+    assert(conformance.isInvalid() && "Unknown protocol conformance");
+  return finalize();
+}
