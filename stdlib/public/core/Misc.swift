@@ -98,23 +98,14 @@ internal func _getTypeByMangledName(
 /// up this functionality.
 public  // TEMPORARY
 func _typeByMangledName(_ name: String,
-                        substitutions: [[Any.Type]] = []) -> Any.Type? {
-  // Map the substitutions to a flat representation that's easier to thread
-  // through to the runtime.
-  let numberOfLevels = UInt(substitutions.count)
-  var parametersPerLevel = [UInt]()
-  var flatSubstitutions = [Any.Type]()
-  for level in substitutions {
-    parametersPerLevel.append(UInt(level.count))
-    flatSubstitutions.append(contentsOf: level)
-  }
-
+                        rawSubstitutions: [Any.Type] = []) -> Any.Type? {
   let nameUTF8 = Array(name.utf8)
+  let parametersPerLevel: [UInt] = []
   return nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
     return  _getTypeByMangledName(nameUTF8.baseAddress!,
                                   UInt(nameUTF8.endIndex),
-                                  numberOfLevels,
+                                  0,
                                   parametersPerLevel,
-                                  flatSubstitutions)
+                                  rawSubstitutions)
   }
 }

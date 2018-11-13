@@ -178,12 +178,21 @@ extension S: P4 {
 DemangleToMetadataTests.test("substitutions") {
   // Type parameter substitutions.
   expectEqual(type(of: (1, 3.14159, "Hello")),
-    _typeByMangledName("yyx_q_qd__t",
-      substitutions: [[Int.self, Double.self], [String.self]])!)
+    _typeByMangledName("x_q_qd__tr0__lu",
+      rawSubstitutions: [Int.self, Double.self, String.self])!)
 
   // Associated type substitutions
+  // FIXME: When _typeByMangledName with raw substitutions starts looking at
+  // the witness tables passed along here, this test will fail.
   expectEqual(type(of: (S(), 1, "Hello")),
-    _typeByMangledName("x_6Assoc14main2P4PQz6Assoc24main2P4PQzt", substitutions: [[S.self]])!)
+    _typeByMangledName("x_6Assoc14main2P4PQz6Assoc24main2P4PQztlu",
+      rawSubstitutions: [S.self])!)
+
+  // Same-type constraints.
+  expectEqual(type(of: (1, 3.1415, 17, 2.71 as Float, "hello", "a" as Character, S())),
+    _typeByMangledName("x_q_q0_qd__qd_0_qd_1_qd0__tq0_Rsz6Assoc24main2P4PQyd0__Rsd_0_r1_1__lu",
+      rawSubstitutions: [Int.self, Double.self, Float.self, Character.self, S.self])!)
+  
 }
 
 enum EG<T, U> { case a }

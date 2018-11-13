@@ -1198,12 +1198,9 @@ public:
 
 }
 
-TypeInfo
-swift::_getTypeByMangledName(StringRef typeName,
-                             SubstGenericParameterFn substGenericParam) {
-  auto demangler = getDemanglerForRuntimeTypeResolution();
-  NodePointer node;
-
+/// Demangling the given mangled type name into a node tree.
+static NodePointer _demangleMangledTypeName(StringRef typeName,
+                                           Demangler &demangler) {
   // Check whether this is the convenience syntax "ModuleName.ClassName".
   auto getDotPosForConvenienceSyntax = [&]() -> size_t {
     size_t dotPos = llvm::StringRef::npos;
@@ -1217,7 +1214,7 @@ swift::_getTypeByMangledName(StringRef typeName,
           return llvm::StringRef::npos;
         }
       }
-      
+
       // Should not contain symbolic references.
       if ((unsigned char)typeName[i] <= '\x1F') {
         return llvm::StringRef::npos;
@@ -1237,35 +1234,224 @@ swift::_getTypeByMangledName(StringRef typeName,
     classNode->addChild(moduleNode, demangler);
     classNode->addChild(nameNode, demangler);
 
-    node = classNode;
-  } else {
-    // Demangle the type name.
-    node = demangler.demangleType(typeName);
-    if (!node)
-      return TypeInfo();
+    return classNode;
   }
-  
+
+  // Demangle the type name.
+  return demangler.demangleType(typeName);
+}
+
+/// Look for an associated type witness by querying the runtime.
+static const Metadata *
+_getAssociatedTypeWitness(const Metadata *base, StringRef assocType,
+                          const ProtocolDescriptor *protocol) {
+  // Look for a conformance of the base type to the protocol.
+  auto witnessTable = swift_conformsToProtocol(base, protocol);
+  if (!witnessTable) return nullptr;
+
+  // Look for the named associated type within the protocol.
+  auto assocTypeReq = findAssociatedTypeByName(protocol, assocType);
+  if (!assocTypeReq) return nullptr;
+
+  // Call the associated type access function.
+  return swift_getAssociatedTypeWitness(
+                                 MetadataState::Abstract,
+                                 const_cast<WitnessTable *>(witnessTable),
+                                 base,
+                                 protocol->getRequirementBaseDescriptor(),
+                                 *assocTypeReq).Value;
+}
+
+TypeInfo
+swift::_getTypeByMangledName(StringRef typeName,
+                             SubstGenericParameterFn substGenericParam) {
+  // Produce a demangled tree.
+  auto demangler = getDemanglerForRuntimeTypeResolution();
+  NodePointer node = _demangleMangledTypeName(typeName, demangler);
+  if (!node)
+    return TypeInfo();
+
+
+  // Build metadata.
   DecodedMetadataBuilder builder(demangler, substGenericParam,
-    [](const Metadata *base, StringRef assocType,
-       const ProtocolDescriptor *protocol) -> const Metadata * {
-      // Look for a conformance of the base type to the protocol.
-      auto witnessTable = swift_conformsToProtocol(base, protocol);
-      if (!witnessTable) return nullptr;
-
-      // Look for the named associated type within the protocol.
-      auto assocTypeReq = findAssociatedTypeByName(protocol, assocType);
-      if (!assocTypeReq) return nullptr;
-
-      // Call the associated type access function.
-      return swift_getAssociatedTypeWitness(
-                                     MetadataState::Abstract,
-                                     const_cast<WitnessTable *>(witnessTable),
-                                     base,
-                                     protocol->getRequirementBaseDescriptor(),
-                                     *assocTypeReq).Value;
-    });
-
+                                 &_getAssociatedTypeWitness);
   auto type = Demangle::decodeMangledType(builder, node);
+  return {type, builder.getReferenceOwnership()};
+}
+
+/// Decode the given mangling tree to a generic parameter reference, which
+/// will be returned as (depth, index).
+static Optional<std::pair<unsigned, unsigned>>
+_decodeToGenericParamRef(NodePointer node) {
+  // Find the flat index that the right-hand side refers to.
+  if (node->getKind() == Demangle::Node::Kind::Type)
+    node = node->getChild(0);
+  if (node->getKind() != Demangle::Node::Kind::DependentGenericParamType)
+    return None;
+
+  return std::pair<unsigned, unsigned>(node->getChild(0)->getIndex(),
+                                       node->getChild(1)->getIndex());
+}
+
+namespace {
+  /// Describes a demangled generic signature so that it can be
+  /// used to access the generic arguments corresponding to that signature.
+  class DemangledGenericSignature {
+    Demangler &demangler;
+    std::vector<unsigned> paramCounts;
+    std::vector<NodePointer> genericParamSameTypeReqs;
+    std::vector<std::pair<unsigned, unsigned>> nonKeyGenericParams;
+    std::vector<const Metadata *> allGenericArgs;
+
+  public:
+    /// Process the demangle tree for a generic signature so one can
+    /// access its requirements.
+    DemangledGenericSignature(Demangler &demangler, NodePointer node);
+
+    /// Collect generic arguments from the given array.
+    ///
+    /// \returns the number of key type arguments (which have been
+    /// read from the array).
+    unsigned collectGenericArguments(const Metadata * const *arguments);
+
+    /// Retrieve metadata at the given point.
+    const Metadata *operator()(unsigned depth, unsigned index);
+  };
+}
+
+DemangledGenericSignature::DemangledGenericSignature(Demangler &demangler,
+                                                     NodePointer node)
+    : demangler(demangler) {
+  if (!node)
+    return;
+
+  assert(node->getKind() == Demangle::Node::Kind::DependentGenericSignature);
+  unsigned curParamCount = 0;
+  for (auto genericSigChild : *node) {
+    // If it's a generic parameter count, add to the list of counts.
+    if (genericSigChild->getKind() ==
+          Demangle::Node::Kind::DependentGenericParamCount) {
+      curParamCount += genericSigChild->getIndex();
+      paramCounts.push_back(curParamCount);
+      continue;
+    }
+
+    // If it's a same-type requirement where the left-hand side is a generic
+    // parameter, then we have a non-key generic parameter.
+    if (genericSigChild->getKind() ==
+          Demangle::Node::Kind::DependentGenericSameTypeRequirement) {
+      auto lhsParam = _decodeToGenericParamRef(genericSigChild->getChild(0));
+      if (!lhsParam)
+        continue;
+
+      auto rhsParam = _decodeToGenericParamRef(genericSigChild->getChild(1));
+      nonKeyGenericParams.push_back(rhsParam ? *rhsParam : *lhsParam);
+      genericParamSameTypeReqs.push_back(genericSigChild);
+      continue;
+    }
+  }
+}
+
+unsigned DemangledGenericSignature::collectGenericArguments(
+                                            const Metadata * const *arguments) {
+  // Gather the set of "all" generic arguments from the given arguments
+  // Copy the generic arguments to a flat list, leaving holes for any
+  // non-key generic parameters.
+  unsigned curParamCount = 0;
+  unsigned numKeyParams = 0;
+  for (unsigned depth = 0, lastDepth = paramCounts.size();
+       depth != lastDepth; ++depth) {
+    for (unsigned index = 0, lastIndex = paramCounts[depth] - curParamCount;
+         index != lastIndex; ++index) {
+      // Determine whether we have a key generic parameter.
+      bool isKeyParameter = true;
+      for (const auto &nonKey : nonKeyGenericParams) {
+        if (depth == nonKey.first && index == nonKey.second) {
+          isKeyParameter = false;
+          break;
+        }
+      }
+
+      if (isKeyParameter)
+        ++numKeyParams;
+
+      allGenericArgs.push_back(isKeyParameter ? *arguments++ : nullptr);
+    }
+
+    curParamCount = paramCounts[depth];
+  }
+
+  return numKeyParams;
+}
+
+const Metadata *DemangledGenericSignature::operator()(unsigned depth,
+                                                      unsigned index) {
+  auto flatIndex = _depthIndexToFlatIndex(depth, index, paramCounts);
+  if (!flatIndex)
+    return nullptr;
+
+  if (*flatIndex >= allGenericArgs.size())
+    return nullptr;
+
+  if (auto metadata = allGenericArgs[*flatIndex])
+    return metadata;
+
+  // It's a key parameter. Go find what it instantiates to.
+  for (auto sameTypeReq : genericParamSameTypeReqs) {
+    // If the (depth, index) matches the first generic parameter,
+    // demangle the right-hand side.
+    auto lhsParam = *_decodeToGenericParamRef(sameTypeReq->getChild(0));
+    if (lhsParam.first == depth && lhsParam.second == index) {
+      DecodedMetadataBuilder builder(demangler, std::ref(*this),
+                                     &_getAssociatedTypeWitness);
+      return allGenericArgs[*flatIndex] =
+        Demangle::decodeMangledType(builder, sameTypeReq->getChild(1));
+    }
+
+    auto rhsParam = _decodeToGenericParamRef(sameTypeReq->getChild(1));
+    if (rhsParam && rhsParam->first == depth && rhsParam->second == index) {
+      return allGenericArgs[*flatIndex] =
+        (*this)(lhsParam.first, lhsParam.second);
+    }
+  }
+
+  return nullptr;
+}
+
+/// Compute the type based on a mangled name and a set of instantiation
+/// arguments.
+///
+/// The instantiation arguments can only be interpreted when the type name
+/// itself contains a generic signature, which is used to interpret the
+/// generic arguments.
+static TypeInfo _getTypeByMangledNameGeneric(StringRef typeName,
+                                             const Metadata * const *arguments) {
+  // Produce a demangled tree.
+  auto demangler = getDemanglerForRuntimeTypeResolution();
+  NodePointer node = _demangleMangledTypeName(typeName, demangler);
+  if (!node)
+    return TypeInfo();
+
+  /// If we have a dependent generic type, dig out the generic signature
+  /// and the type within that signature.
+  NodePointer genericSig = nullptr;
+  if (node->getKind() == Demangle::Node::Kind::Type &&
+      node->getChild(0)->getKind() ==
+        Demangle::Node::Kind::DependentGenericType) {
+    genericSig = node->getChild(0)->getChild(0);
+    node = node->getChild(0)->getChild(1);
+  }
+
+  // Process the generic signature and collect any generic arguments we need.
+  DemangledGenericSignature demangledSig(demangler, genericSig);
+  demangledSig.collectGenericArguments(arguments);
+
+  // Demangle the type.
+  DecodedMetadataBuilder builder(demangler, std::ref(demangledSig),
+                                 &_getAssociatedTypeWitness);
+  auto type = Demangle::decodeMangledType(builder, node);
+  if (!type) return TypeInfo();
+
   return {type, builder.getReferenceOwnership()};
 }
 
@@ -1275,21 +1461,23 @@ swift_getTypeByMangledNameImpl(const char *typeNameStart, size_t typeNameLength,
                            size_t *parametersPerLevel,
                            const Metadata * const *flatSubstitutions) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
-  auto metadata = _getTypeByMangledName(typeName,
-    [&](unsigned depth, unsigned index) -> const Metadata * {
-      if (depth >= numberOfLevels)
+  const Metadata *metadata;
+  if (numberOfLevels == 0 && flatSubstitutions) {
+    metadata = _getTypeByMangledNameGeneric(typeName, flatSubstitutions);
+  } else {
+    std::vector<unsigned> paramCounts;
+    for (size_t i = 0; i != numberOfLevels; ++i)
+      paramCounts.push_back(parametersPerLevel[i]);
+
+    metadata = _getTypeByMangledName(typeName,
+      [&](unsigned depth, unsigned index) -> const Metadata * {
+        if (auto flatIndex = _depthIndexToFlatIndex(depth, index, paramCounts)){
+          return flatSubstitutions[*flatIndex];
+        }
+
         return nullptr;
-
-      if (index >= parametersPerLevel[depth])
-        return nullptr;
-
-      unsigned flatIndex = index;
-      for (unsigned i = 0; i < depth; ++i)
-        flatIndex += parametersPerLevel[i];
-
-      return flatSubstitutions[flatIndex];
-    });
-
+      });
+  }
   if (!metadata) return nullptr;
 
   return swift_checkMetadataState(MetadataState::Complete, metadata).Value;
@@ -1427,14 +1615,7 @@ demangleToGenericParamRef(StringRef typeName) {
   if (!node)
     return None;
 
-  // Find the flat index that the right-hand side refers to.
-  if (node->getKind() == Demangle::Node::Kind::Type)
-    node = node->getChild(0);
-  if (node->getKind() != Demangle::Node::Kind::DependentGenericParamType)
-    return None;
-
-  return std::pair<unsigned, unsigned>(node->getChild(0)->getIndex(),
-                                       node->getChild(1)->getIndex());
+  return _decodeToGenericParamRef(node);
 }
 
 void swift::gatherWrittenGenericArgs(

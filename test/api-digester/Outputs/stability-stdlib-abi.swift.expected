@@ -52,7 +52,6 @@ Func _swift_stdlib_atomicStoreInt32(object:desired:) has been removed
 Func _swift_stdlib_atomicStoreInt64(object:desired:) has been removed
 Func _swift_stdlib_atomicStoreUInt32(object:desired:) has been removed
 Func _swift_stdlib_atomicStoreUInt64(object:desired:) has been removed
-
 Var _FixedArray16._count has been removed
 Var _FixedArray16.capacity has been removed
 Var _FixedArray16.count has been removed
@@ -117,7 +116,8 @@ Constructor _FixedArray4.init(count:) has been removed
 Constructor _FixedArray8.init() has been removed
 Constructor _FixedArray8.init(allZeros:) has been removed
 Constructor _FixedArray8.init(count:) has been removed
-
+Func _typeByMangledName(_:substitutions:) has been renamed to Func _typeByMangledName(_:rawSubstitutions:)
+Func _typeByMangledName(_:substitutions:) has parameter 1 type change from Array<Array<Any.Type>> to Array<Any.Type>
 Struct Hasher._Core has removed conformance to _HasherCore
 Protocol _HasherCore has been removed
 Struct _BufferingHasher has been removed
