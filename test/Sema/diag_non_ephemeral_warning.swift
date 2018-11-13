@@ -142,9 +142,11 @@ extension C {
   }
 }
 
-// We can also project stable and, in the case of final classes, semi-stable pointer values
-// from stored instance properties on such global and static stored variables, as long as
-// the base type is a fragile struct, fragile final class, or a tuple.
+// We can also project pointer values from stored instance properties on such
+// global and static stored variables, as long as the base type is a fragile
+// struct, fragile final class, or a tuple. The resulting pointer is stable
+// unless the base is a final class, in which case the pointer is stable until
+// the object is deallocated.
 takesRaw(&C.staticStoredProperty.storedProperty)
 takesRaw(&FinalC.staticStoredProperty.storedProperty)
 takesRaw(&metatypeOfC.staticStoredProperty.storedProperty)
@@ -369,7 +371,7 @@ func testNonEphemeralInMembers() {
   // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   var s2 = S2()
-  s2.takesMutableRaw() // okay.
+  s2.takesMutableRaw()
   s2.takesMutableRaw(ptr: &local) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesMutableRaw(ptr:)'}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw(ptr:)'}}
   // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
@@ -423,7 +425,7 @@ func testNonEphemeralInMemberwiseInits() {
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer?' produces a pointer valid only for the duration of the call to 'init(ptr1:ptr2:)'}}
   // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-  _ = S3(ptr1: &local, ptr2: &topLevelS) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'init(ptr1:ptr2:)'}}
+  _ = S3.init(ptr1: &local, ptr2: &topLevelS) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'init(ptr1:ptr2:)'}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'init(ptr1:ptr2:)'}}
   // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 

@@ -357,6 +357,10 @@ struct Escaping {
 func autoclosure(f: () -> Int) { }
 func autoclosure(f: @autoclosure () -> Int) { }
 
+// @_nonEphemeral
+func nonEphemeral(x: UnsafeMutableRawPointer) {} // expected-note {{'nonEphemeral(x:)' previously declared here}}
+func nonEphemeral(x: @_nonEphemeral UnsafeMutableRawPointer) {} // expected-error {{invalid redeclaration of 'nonEphemeral(x:)'}}
+
 // inout
 func inout2(x: Int) { }
 func inout2(x: inout Int) { }

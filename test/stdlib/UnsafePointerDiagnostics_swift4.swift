@@ -13,9 +13,15 @@ func unsafePointerInitEphemeralConversions() {
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call to 'init(_:)'}}
   // expected-note@-2 {{use 'withUnsafePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 
+  // FIXME(SR-8411): This is currently ambiguous.
+  _ = UnsafePointer.init(&foo) // expected-error {{ambiguous use of 'init(_:)'}}
+
   _ = UnsafePointer<Int8>("") // expected-warning {{initialization of 'UnsafePointer<Int8>' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'init(_:)'}}
   // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
+
+  // FIXME(SR-8411): This is currently ambiguous.
+  _ = UnsafePointer<Int8>.init("") // expected-error {{ambiguous use of 'init(_:)'}}
 
   _ = UnsafePointer<Int8>(str) // expected-warning {{initialization of 'UnsafePointer<Int8>' results in a dangling pointer; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'init(_:)'}}
@@ -129,7 +135,15 @@ func unsafePointerInitEphemeralConversions() {
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafePointer<Int>?' produces a pointer valid only for the duration of the call to 'init(start:count:)'}}
   // expected-note@-2 {{use 'withUnsafePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 
+  _ = UnsafeBufferPointer.init(start: &foo, count: 0) // expected-warning {{initialization of 'UnsafeBufferPointer<Int>' results in a dangling buffer pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafePointer<Int>?' produces a pointer valid only for the duration of the call to 'init(start:count:)'}}
+  // expected-note@-2 {{use 'withUnsafePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
+
   _ = UnsafeBufferPointer<Int8>(start: str, count: 0) // expected-warning {{initialization of 'UnsafeBufferPointer<Int8>' results in a dangling buffer pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>?' produces a pointer valid only for the duration of the call to 'init(start:count:)'}}
+  // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
+
+  _ = UnsafeBufferPointer<Int8>.init(start: str, count: 0) // expected-warning {{initialization of 'UnsafeBufferPointer<Int8>' results in a dangling buffer pointer}}
   // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>?' produces a pointer valid only for the duration of the call to 'init(start:count:)'}}
   // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 
