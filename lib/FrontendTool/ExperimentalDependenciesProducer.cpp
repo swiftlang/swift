@@ -52,66 +52,7 @@ template <typename T> using CPVec = std::vector<const T*>;
 template <typename T1 = std::string, typename T2 = std::string> using PairVec = std::vector<std::pair<T1, T2>>;
 template <typename T1, typename T2> using CPPairVec = std::vector<std::pair<const T1*, const T2*>>;
 
-using MemoizedNodeKey = std::tuple<std::string, std::string, Node::Kind>;
-template <>
-struct std::hash<Node::Kind> : public unary_function<Node::Kind, size_t> {
-  size_t operator()(const Node::Kind k) const { return (size_t)(k); }
-};
-static MemoizedNodeKey createMemoizedKey(Node::Kind kind,
-                                         std::string nameForDependencies,
-                                         std::string nameForHolderOfMember) {
-  return std::make_tuple(nameForHolderOfMember, nameForDependencies, kind);
-}
 
-template <>
-struct std::hash<MemoizedNodeKey>
-: public unary_function<MemoizedNodeKey, size_t>
-{
-  size_t operator()(const MemoizedNodeKey key) const {
-    return std::hash<std::string>()(std::get<0>(key)) ^
-    std::hash<std::string>()(std::get<1>(key)) ^
-    std::hash<Node::Kind>()(std::get<2>(key));
-  }
-};
-
-
-
-namespace {
-  /// Memoize nodes serving as heads of dependency arcs:
-  /// Could be a definition in another file that a lookup here depends upon,
-  /// or could be definition in this file that a lookup here depends upon.
-  
-  class MemoizedNode: public Node {
-  public:
-    using Cache = typename std::unordered_map<MemoizedNodeKey, MemoizedNode*>;
-    
-    MemoizedNode(Kind kind,
-                 std::string nameForDependencies,
-                 std::string nameForHolderOfMember,
-                 std::string fingerprint) :
-    Node(kind, nameForDependencies, nameForHolderOfMember, fingerprint) {}
-    
-  public:
-    MemoizedNodeKey memoizedKey() const {
-      return createMemoizedKey(getKind(), getNameForDependencies(), getNameForHolderOfMember());
-    }
-    static MemoizedNode *create(Kind kind,
-                                std::string nameForDependencies,
-                                std::string nameForHolderOfMember,
-                                std::string fingerprint,
-                                Cache &cache,
-                                Graph &g) {
-      auto key = createMemoizedKey(kind, nameForDependencies, nameForHolderOfMember);
-      auto iter = cache.find(key);
-      if (iter != cache.end())
-        return iter->second;
-      auto node = new MemoizedNode(kind, nameForDependencies, nameForHolderOfMember, fingerprint);
-      cache.insert(std::make_pair(key, node));
-      g.addNode(node);
-      return node;
-    }
-  };
-}
 
 namespace {
   /// Takes all the Decls in a SourceFile, and collects them into buckets by groups of DeclKinds.
@@ -348,7 +289,7 @@ void GraphConstructor::addToGraphThatThisWholeFileDependsUpon(Node::Kind kind,
     g.addArc(Arc{sourceFileNode, whatIsDependedUpon});
   else
     std::for_each(cache.begin(), cache.end(),
-                  [&](std::pair<MemoizedNodeKey, MemoizedNode *> entry) {
+                  [&](std::pair<MemoizedNode::Key, MemoizedNode *> entry) {
                     g.addArc(Arc{entry.second, whatIsDependedUpon});
                   });
 }

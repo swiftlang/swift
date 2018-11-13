@@ -26,6 +26,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/ExperimentalDependencies.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Frontend/FrontendOptions.h"
@@ -45,3 +46,18 @@ namespace {
 
 
 
+MemoizedNode *MemoizedNode::create(Kind kind,
+                                   std::string nameForDependencies,
+                                   std::string nameForHolderOfMember,
+                                   std::string fingerprint,
+                                   Cache &cache,
+                                   Graph &g) {
+  auto key = createMemoizedKey(kind, nameForDependencies, nameForHolderOfMember);
+  auto iter = cache.find(key);
+  if (iter != cache.end())
+    return iter->second;
+  auto node = new MemoizedNode(kind, nameForDependencies, nameForHolderOfMember, fingerprint);
+  cache.insert(std::make_pair(key, node));
+  g.addNode(node);
+  return node;
+}

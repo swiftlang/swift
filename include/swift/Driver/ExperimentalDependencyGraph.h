@@ -41,20 +41,21 @@ namespace swift {
       };
       class ExpDependencyGraph: public swift::experimental_dependencies::Graph {
         using Node = swift::experimental_dependencies::Node;
+        using MemoizedNode = swift::experimental_dependencies::MemoizedNode;
         using Arc = swift::experimental_dependencies::Arc;
 
-        std::unordered_multimap<std::string, Node*> nodesByNameForDependencies{};
+        std::unordered_map<std::string, MemoizedNode::Cache> nodesByDepsFile;
         
       public:
         ExpDependencyGraph() = default;
         ExpDependencyGraph(ExpDependencyGraph &&other) = default;
         
-        static Job::Condition loadFromFile(const Job* Cmd, StringRef filename);
         DependencyGraphImpl::LoadResult loadFromPath(const Job* Cmd, StringRef path);
         
         bool isMarked(const Job* Cmd) const;//XXX
         
-        void addNode(Node*);
+        /// returns address of node IF it has changed or is new
+        MemoizedNode* addNodeForFile(StringRef depsFile, MemoizedNode::Cache&, Node&);
 //        void addArc(Arc*);
         
         template <unsigned N>
@@ -78,13 +79,18 @@ namespace swift {
         static void parseNode(llvm::yaml::MappingNode *,
                               llvm::function_ref<NodeCallbackTy> nodeCallback,
                               llvm::function_ref<ErrorCallbackTy> errorCallback);
-        // TODO: really a union
-        static Optional<std::pair<std::string, Optional<std::vector<uint>>>>
-        parseValue(llvm::yaml::Node *);
-
-        void registerCmdForReevaluation(const Job* Cmd);
-        static std::string depsFileForCmd(const Job* Cmd);
-        void registerDepsFileForReevaluation(std::string depsFile); // XXX
+        static Optional<std::string> parseStringValue(llvm::yaml::Node *);
+        static Optional<std::vector<uint>> parseUIntVectorValue(llvm::yaml::Node *);
+        
+        DependencyGraphImpl::LoadResult integrate(std::vector<Node>);
+        
+        MemoizedNode::Cache &getMemoizedNodesForFile(StringRef depsFileName) {
+          auto iter = nodesByDepsFile.find(depsFileName);
+          if (iter != nodesByDepsFile.end())
+            return iter->second;
+          nodesByDepsFile.insert(std::make_pair(depsFileName, MemoizedNode::Cache()));
+          return getMemoizedNodesForFile(depsFileName);
+        }
       };
     } // experimental_dependencies
   } // driver

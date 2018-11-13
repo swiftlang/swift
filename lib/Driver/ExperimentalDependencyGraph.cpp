@@ -31,24 +31,25 @@ using namespace swift::driver;
 using namespace swift::driver::experimental_dependencies;
 
 
-void ExpDependencyGraph::registerCmdForReevaluation(const Job* Cmd) {
-  registerDepsFileForReevaluation(depsFileForCmd(Cmd));
-}
 
-Job::Condition ExpDependencyGraph::loadFromFile(const Job* Cmd, StringRef filename) {
-  return Job::Condition::Always;
-}
 
-std::string ExpDependencyGraph::depsFileForCmd(const Job* Cmd) {
-  return Cmd->getOutput().getAdditionalOutputForType(file_types::TY_SwiftDeps);
-}
-void ExpDependencyGraph::registerDepsFileForReevaluation(std::string depsFile) {
-  abort();
-}
-
-void ExpDependencyGraph::addNode(Node* n) {
-  nodesByNameForDependencies.insert(std::make_pair(n->getNameForDependencies(), n));
-  Graph::addNode(n);
+MemoizedNode* ExpDependencyGraph::addNodeForFile(StringRef depsFile, MemoizedNode::Cache &cache, Node& n) {
+  auto oldNodeIter = cache.find(
+                            MemoizedNode::createMemoizedKey(n.getKind(), n.getNameForDependencies(), n.getNameForHolderOfMember()));
+  if (oldNodeIter != cache.end()) {
+    auto *oldNode = oldNodeIter->second;
+    if (oldNode->getFingerprint() == n.getFingerprint())
+      return nullptr; // nothing to do
+    oldNode->setFingerprint(n.getFingerprint());
+    return oldNode;
+  }
+  MemoizedNode *newNode = MemoizedNode::create(n.getKind(),
+                                          n.getNameForDependencies(),
+                                          n.getNameForHolderOfMember(),
+                                          n.getFingerprint(),
+                                          cache,
+                                          *this);
+  return newNode;
 }
 
 //void ExpDependencyGraph::addArc(Arc* a) {
@@ -70,12 +71,15 @@ ExpDependencyGraph::loadFromBuffer(const void *node,
   // Init to UpToDate in case the file is empty.
   DependencyGraphImpl::LoadResult result = DependencyGraphImpl::LoadResult::UpToDate;
 
-  auto nodeCallback = [](Node&& n) { abort(); };
+  std::vector<Node> nodesFromFile;
+  auto nodeCallback = [&nodesFromFile](Node&& n) { nodesFromFile.push_back(n); };
   auto errorCallBack = [&result]() { result = LoadResult::HadError; };
   
   
   parseDependencyFile(buffer, nodeCallback, errorCallBack);
-  return result;
+  if (result == LoadResult::HadError)
+    return result;
+  return integrate(std::move(nodesFromFile));
 }
 
 void
@@ -120,17 +124,11 @@ void ExpDependencyGraph::parseNode(llvm::yaml::MappingNode *mappingNodeNode,
   SmallString<64> scratch1, scratch2, scratch3;
 
   for (auto i = mappingNodeNode->begin(), e = mappingNodeNode->end(); i != e; ++i) {
-//    if (isa<yaml::NullNode>(i->getValue()))
-//      continue;
     auto *key = dyn_cast<yaml::ScalarNode>(i->getKey());
     if (!key)
       return errorCallback();
     StringRef keyString = key->getValue(scratch1);
     
-    auto valueUnion = parseValue(i->getValue());
-    if (!valueUnion)
-      return errorCallback();
-
     Keys keyCode = llvm::StringSwitch<Keys>(keyString)
     .Case("kind", Keys::kind)
     .Case("nameForDependencies", Keys::nameForDependencies)
@@ -139,41 +137,61 @@ void ExpDependencyGraph::parseNode(llvm::yaml::MappingNode *mappingNodeNode,
     .Case("sequenceNumber", Keys::sequenceNumber)
     .Case("departures", Keys::departures)
     .Case("arrivals", Keys::arrivals);
+
     uint keyCodeMask = 1 << uint(keyCode);
     if (allKeys & keyCodeMask)
       llvm_unreachable("duplicate key code");
     allKeys |= keyCodeMask;
+
     switch (keyCode) {
       default: llvm_unreachable("bad code");
-      case Keys::kind: {
-        uint k = std::stoi(valueUnion->first);
-        if (k >= uint(Node::Kind::kindCount))
+      case Keys::kind:
+      case Keys::sequenceNumber:
+      case Keys::nameForDependencies:
+      case Keys::nameForHolderOfMember:
+      case Keys::fingerprint: {
+        auto s = parseStringValue(i->getValue());
+        if (!s)
           return errorCallback();
-        kind = Node::Kind(k);
+        switch (keyCode) {
+          default: llvm_unreachable("impossible");
+          case Keys::kind: {
+            uint k = std::stoi(s.getValue());
+            if (k >= uint(Node::Kind::kindCount))
+              return errorCallback();
+            kind = Node::Kind(k);
+            break;
+          }
+          case Keys::sequenceNumber:
+            sequenceNumber = std::stoi(s.getValue());
+            break;
+          case Keys::nameForDependencies:
+            nameForDependencies = s.getValue();
+            break;
+          case Keys::nameForHolderOfMember:
+            nameForHolderOfMember = s.getValue();
+            break;
+          case Keys::fingerprint:
+            fingerprint = s.getValue();
+            break;
+        }
         break;
       }
-      case Keys::nameForDependencies:
-        nameForDependencies = valueUnion->first;
-        break;
-      case Keys::nameForHolderOfMember:
-        nameForHolderOfMember = valueUnion->first;
-        break;
-     case Keys::fingerprint:
-        fingerprint = valueUnion->first;
-        break;
-      case Keys::sequenceNumber:
-        sequenceNumber = std::stoi(valueUnion->first);
-        break;
-      case Keys::departures:
-        if (!valueUnion->second)
-          return errorCallback();
-        deparatures = std::move(valueUnion->second.getValue());
-        break;
       case Keys::arrivals:
-        if (!valueUnion->second)
+      case Keys::departures: {
+        auto v = parseUIntVectorValue(i->getValue());
+        if (!v)
           return errorCallback();
-        arrivals = std::move(valueUnion->second.getValue());
-        break;
+        switch (keyCode) {
+          default: llvm_unreachable("bad keycode");
+          case Keys::arrivals:
+            arrivals = std::move(v.getValue());
+            break;
+          case Keys::departures:
+            deparatures = std::move(v.getValue());
+            break;
+        }
+      }
     }
   }
   if (allKeys != (1u << uint(Keys::serializationKeyCount)) - 1)
@@ -182,30 +200,45 @@ void ExpDependencyGraph::parseNode(llvm::yaml::MappingNode *mappingNodeNode,
                     sequenceNumber, std::move(deparatures), std::move(arrivals)));
 }
 
-Optional<std::pair<std::string, Optional<std::vector<uint>>>>
-ExpDependencyGraph::parseValue(llvm::yaml::Node * n) {
-  Optional<std::vector<uint>> valueIfInts;
-  if (isa<llvm::yaml::NullNode>(n)) // empty vector
-    return std::make_pair( std::string(), Optional<std::vector<uint>>(std::vector<uint>{}));
-  if (auto *value = dyn_cast<llvm::yaml::SequenceNode>(n)) {
-    std::vector<uint> v;
-    for (auto &rawNode : *value) {
-      if (auto *sn = dyn_cast<llvm::yaml::ScalarNode>(&rawNode)) {
-        SmallString<64> scratch;
-        auto s = sn->getValue(scratch);
-        v.push_back(std::stoi(s.str()));
-      }
-      else
-        return None;
-    }
-    return Optional<std::pair<std::string, Optional<std::vector<uint>>>>(std::make_pair( std::string(), std::move(v)));
-  }
+Optional<std::string> ExpDependencyGraph::parseStringValue(llvm::yaml::Node *n) {
   if (auto *value = dyn_cast<llvm::yaml::ScalarNode>(n)) {
     SmallString<64> scratch;
-    return std::make_pair( value->getValue(scratch).str(), Optional<std::vector<uint>>() );
+    return value->getValue(scratch).str();
   }
-  else
+  return None;
+}
+Optional<std::vector<uint>> ExpDependencyGraph::parseUIntVectorValue(llvm::yaml::Node *n) {
+  if (isa<llvm::yaml::NullNode>(n)) // empty vector
+    return std::vector<uint>{};
+  auto *value = dyn_cast<llvm::yaml::SequenceNode>(n);
+  if (!value)
     return None;
+  std::vector<uint> v;
+  for (auto &rawNode : *value) {
+    if (auto *sn = dyn_cast<llvm::yaml::ScalarNode>(&rawNode)) {
+      SmallString<64> scratch;
+      auto s = sn->getValue(scratch);
+      v.push_back(std::stoi(s.str()));
+    }
+    else
+      return None;
+  }
+  return v;
+}
+
+LoadResult ExpDependencyGraph::integrate(std::vector<Node> v) {
+  auto iter = v.begin();
+  auto &sourceFileNode = *iter++;
+  assert(sourceFileNode.getKind() == Node::Kind::sourceFileProvide);
+  std::string depsFileName = sourceFileNode.getNameForDependencies();
+  auto &nodesForFile = getMemoizedNodesForFile(depsFileName);
+  std::vector<MemoizedNode*> changedNodesToPropagate{};
+  for (Node &n: v) {
+    MemoizedNode *nodeIfChanged = addNodeForFile(depsFileName, nodesForFile, n);
+    if (nodeIfChanged)
+      changedNodesToPropagate.push_back(nodeIfChanged);
+  }
+  abort();
 }
 
 bool ExpDependencyGraph::isMarked(const Job* Cmd) const {
