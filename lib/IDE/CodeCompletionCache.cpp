@@ -424,8 +424,7 @@ static std::string getName(StringRef cacheDirectory,
   // name[-dot][-testable][-inits]
   OSS << (K.ResultsHaveLeadingDot ? "-dot" : "")
       << (K.ForTestableLookup ? "-testable" : "")
-      << (K.ForPrivateLookup ? "-private" : "")
-      << (K.CodeCompleteInitsInPostfixExpr ? "-inits" : "");
+      << (K.ForPrivateImportLookup ? "-private" : "")
       << (K.CodeCompleteInitsInPostfixExpr ? "-inits" : "");
 
   // name[-access-path-components]
