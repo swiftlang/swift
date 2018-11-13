@@ -22,3 +22,14 @@ let _: KeyPath<TupleKeypath, Int> = \TupleKeypath.labeled.foo // expected-error 
 let _: KeyPath<TupleKeypath, String> = \TupleKeypath.labeled.bar // expected-error {{key path support for tuples is not implemented}}
 let _: KeyPath<TupleKeypath, Int> = \TupleKeypath.unlabeled.0 // expected-error {{key path support for tuples is not implemented}}
 let _: KeyPath<TupleKeypath, String> = \TupleKeypath.unlabeled.1 // expected-error {{key path support for tuples is not implemented}}
+
+struct S {
+  typealias X = (lhs: Int, rhs: Int)
+  typealias Y = (Int, Int)
+
+  let x: X
+  let y: Y
+}
+
+let _: KeyPath<S, Int> = \S.x.lhs // expected-error {{key path support for tuples is not implemented}}
+let _: KeyPath<S, Int> = \S.y.0   // expected-error {{key path support for tuples is not implemented}}

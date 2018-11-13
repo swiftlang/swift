@@ -3,11 +3,6 @@
 // UNSUPPORTED: OS=watchos
 // REQUIRES: objc_interop
 
-// Currently crashes on iphonesimulator.
-// rdar://35490456
-// UNSUPPORTED: OS=ios
-// UNSUPPORTED: OS=tvos
-
 import StdlibUnittest
 
 import Foundation
