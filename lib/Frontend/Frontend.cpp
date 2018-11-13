@@ -348,25 +348,53 @@ static bool shouldTreatSingleInputAsMain(InputFileKind inputKind) {
 }
 
 bool CompilerInstance::setUpInputs() {
-  // Adds to InputSourceCodeBufferIDs, so may need to happen before the
-  // per-input setup.
-  const Optional<unsigned> codeCompletionBufferID = setUpCodeCompletionBuffer();
 
   for (const InputFile &input :
        Invocation.getFrontendOptions().InputsAndOutputs.getAllInputs())
     if (setUpForInput(input))
       return true;
 
-  // Set the primary file to the code-completion point if one exists.
-  if (codeCompletionBufferID.hasValue() &&
-      !isPrimaryInput(*codeCompletionBufferID)) {
-    assert(PrimaryBufferIDs.empty() && "re-setting PrimaryBufferID");
-    recordPrimaryInputBuffer(*codeCompletionBufferID);
-  }
-
   if (MainBufferID == NO_SUCH_BUFFER &&
       InputSourceCodeBufferIDs.size() == 1 &&
       shouldTreatSingleInputAsMain(Invocation.getInputKind())) {
+    MainBufferID = InputSourceCodeBufferIDs.front();
+  }
+
+  return false;
+}
+
+bool CompilerInstance::setupCodeCompletionInput(
+    std::unique_ptr<llvm::MemoryBuffer> buffer, unsigned offset,
+    std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory) {
+
+  // Reset previous code compiletion buffer.
+  if (auto PreviousBufferID = getSourceMgr().getCodeCompletionBufferID()) {
+    std::remove(InputSourceCodeBufferIDs.begin(), InputSourceCodeBufferIDs.end(), PreviousBufferID);
+    PrimaryBufferIDs.remove(PreviousBufferID);
+    if (MainBufferID == PreviousBufferID)
+      MainBufferID = NO_SUCH_BUFFER;
+  }
+
+  for (auto bufID : InputSourceCodeBufferIDs) {
+    if (SourceMgr.getIdentifierForBuffer(bufID) == buffer->getBufferIdentifier()) {
+      std::remove(InputSourceCodeBufferIDs.begin(), InputSourceCodeBufferIDs.end(), bufID);
+      PrimaryBufferIDs.remove(bufID);
+      if (MainBufferID == bufID)
+        MainBufferID = NO_SUCH_BUFFER;
+      break;
+    }
+  }
+
+  // Copy to a new buffer.
+  auto codeCompletionBufferID = SourceMgr.addNewSourceBuffer(std::move(buffer));
+  InputSourceCodeBufferIDs.push_back(codeCompletionBufferID);
+  SourceMgr.setCodeCompletionPoint(codeCompletionBufferID, offset);
+  assert(PrimaryBufferIDs.empty());
+  recordPrimaryInputBuffer(codeCompletionBufferID);
+  CodeCompletionFactory = std::move(callbacksFactory);
+
+  if (MainBufferID == NO_SUCH_BUFFER &&
+      InputSourceCodeBufferIDs.size() == 1) {
     MainBufferID = InputSourceCodeBufferIDs.front();
   }
 
@@ -695,7 +723,7 @@ void CompilerInstance::createREPLFile(const ImplicitImports &implicitImports) {
 
 std::unique_ptr<DelayedParsingCallbacks>
 CompilerInstance::computeDelayedParsingCallback(bool isPrimary) {
-  if (Invocation.isCodeCompletion())
+  if (CodeCompletionFactory != nullptr)
     return llvm::make_unique<CodeCompleteDelayedCallbacks>(
         SourceMgr.getCodeCompletionLoc());
   if (!isPrimary)
@@ -729,7 +757,7 @@ void CompilerInstance::parseAndCheckTypesUpTo(
       implicitImports, PersistentState,
       PrimaryDelayedCB.get(),
       SecondaryDelayedCB.get());
-  if (Invocation.isCodeCompletion()) {
+  if (CodeCompletionFactory != nullptr) {
     // When we are doing code completion, make sure to emit at least one
     // diagnostic, so that ASTContext is marked as erroneous.  In this case
     // various parts of the compiler (for example, AST verifier) have less
@@ -778,9 +806,9 @@ void CompilerInstance::parseAndCheckTypesUpTo(
   if (auto *stdlib = Context->getStdlibModule())
     Context->recordKnownProtocols(stdlib);
 
-  if (Invocation.isCodeCompletion()) {
+  if (CodeCompletionFactory != nullptr) {
     performDelayedParsing(MainModule, PersistentState,
-                          Invocation.getCodeCompletionFactory());
+                          CodeCompletionFactory.get());
   }
   finishTypeChecking(TypeCheckOptions);
 }
@@ -792,11 +820,28 @@ void CompilerInstance::parseLibraryFile(
     DelayedParsingCallbacks *SecondaryDelayedCB) {
   FrontendStatsTracer tracer(Context->Stats, "parse-library-file");
 
+  auto IsPrimary = isWholeModuleCompilation() || isPrimaryInput(BufferID);
+
+  StringRef fileName = getSourceMgr().getIdentifierForBuffer(BufferID);
+  if (!fileName.empty()) {
+    ModuleDecl *mainModule = getMainModule();
+    for (auto *FUnit : mainModule->getFiles()) {
+      auto *SF = dyn_cast<SourceFile>(FUnit);
+      if (!SF || SF->getFilename() != fileName)
+        continue;
+      if (IsPrimary) {
+        mainModule->removeFile(*FUnit);
+        break;
+      } else {
+        return;
+      }
+    }
+  }
+
   auto *NextInput = createSourceFileForMainModule(
       SourceFileKind::Library, implicitImports.kind, BufferID);
   addAdditionalInitialImportsTo(NextInput, implicitImports);
 
-  auto IsPrimary = isWholeModuleCompilation() || isPrimaryInput(BufferID);
   auto *DelayedCB = IsPrimary ? PrimaryDelayedCB : SecondaryDelayedCB;
 
   auto &Diags = NextInput->getASTContext().Diags;

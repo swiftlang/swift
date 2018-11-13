@@ -21,6 +21,7 @@
 #include "SourceKit/Support/ThreadSafeRefCntPtr.h"
 #include "SourceKit/Support/Tracing.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/IDE/Formatting.h"
 #include "swift/IDE/Refactoring.h"
 #include "swift/Index/IndexSymbol.h"
@@ -280,6 +281,7 @@ class SwiftLangSupport : public LangSupport {
   std::string RuntimeResourcePath;
   std::shared_ptr<SwiftASTManager> ASTMgr;
   std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocuments;
+  std::unique_ptr<swift::CompilerInstance> CodeCompletionCompilerInstance = nullptr;
   SwiftInterfaceGenMap IFaceGenContexts;
   ThreadSafeRefCntPtr<SwiftCompletionCache> CCCache;
   ThreadSafeRefCntPtr<SwiftPopularAPI> PopularAPI;
@@ -293,6 +295,13 @@ public:
 
   std::shared_ptr<NotificationCenter> getNotificationCenter() const {
     return NotificationCtr;
+  }
+
+  void setCodeCompletionInstance(std::unique_ptr<swift::CompilerInstance> Inst) {
+    CodeCompletionCompilerInstance = std::move(Inst);
+  }
+  std::unique_ptr<swift::CompilerInstance> takeCodeCompletionCompilerInstance() {
+    return std::move(CodeCompletionCompilerInstance);
   }
 
   StringRef getRuntimeResourcePath() const { return RuntimeResourcePath; }

@@ -368,6 +368,7 @@ class CompilerInstance {
   DiagnosticEngine Diagnostics{SourceMgr};
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<SILModule> TheSILModule;
+  std::unique_ptr<CodeCompletionCallbacksFactory> CodeCompletionFactory;
 
   /// Null if no tracker.
   std::unique_ptr<DependencyTracker> DepTracker;
@@ -436,12 +437,17 @@ public:
     return *Context;
   }
   bool hasASTContext() const { return Context != nullptr; }
+  const CompilerInvocation &getInvocation() const { return Invocation; }
+
 
   SILOptions &getSILOptions() { return Invocation.getSILOptions(); }
   const SILOptions &getSILOptions() const { return Invocation.getSILOptions(); }
 
   void addDiagnosticConsumer(DiagnosticConsumer *DC) {
     Diagnostics.addConsumer(*DC);
+  }
+  void clearDiagnosticConsumers() {
+    Diagnostics.clearConsumers();
   }
 
   void createDependencyTracker(bool TrackSystemDeps) {
@@ -515,6 +521,15 @@ public:
   /// \brief Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation);
 
+
+  /// Setup code completion point.
+  bool setupCodeCompletionInput(
+                                std::unique_ptr<llvm::MemoryBuffer> buffer, unsigned offset,
+                                std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory);
+
+  void clearCodeCompletion() {
+    CodeCompletionFactory.reset();
+  }
 private:
   /// Set up the file system by loading and validating all VFS overlay YAML
   /// files. If the process of validating VFS files failed, or the overlay

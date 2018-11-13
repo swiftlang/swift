@@ -50,7 +50,7 @@ struct Options {
 
 struct SwiftCompletionInfo {
   swift::ASTContext *swiftASTContext = nullptr;
-  swift::CompilerInvocation *invocation = nullptr;
+  const swift::CompilerInvocation *invocation = nullptr;
   swift::ide::CodeCompletionContext *completionContext = nullptr;
 };
 

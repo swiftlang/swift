@@ -710,7 +710,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
 
   CompilerInvocation Invocation(InitInvok);
 
-  Invocation.setCodeCompletionPoint(CleanFile.get(), CodeCompletionOffset);
+  //Invocation.setCodeCompletionPoint(CleanFile.get(), CodeCompletionOffset);
 
 
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
@@ -732,7 +732,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
       ide::makeCodeCompletionCallbacksFactory(CompletionContext,
                                               *Consumer));
 
-  Invocation.setCodeCompletionFactory(CompletionCallbacksFactory.get());
+  //Invocation.setCodeCompletionFactory(CompletionCallbacksFactory.get());
   if (!SecondSourceFileName.empty()) {
     Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
         SecondSourceFileName);
@@ -746,6 +746,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   }
   if (CI.setup(Invocation))
     return 1;
+  CI.setupCodeCompletionInput(std::move(CleanFile), CodeCompletionOffset, std::move(CompletionCallbacksFactory));
   CI.performSema();
   return 0;
 }

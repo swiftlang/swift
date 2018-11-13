@@ -89,7 +89,7 @@ struct SwiftCodeCompletionConsumer
       : handleResultsImpl(handleResultsImpl) {}
 
   void setContext(swift::ASTContext *context,
-                  swift::CompilerInvocation *invocation,
+                  const swift::CompilerInvocation *invocation,
                   swift::ide::CodeCompletionContext *completionContext) {
     swiftContext.swiftASTContext = context;
     swiftContext.invocation = invocation;
@@ -125,38 +125,52 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
     CodeCompletionOffset = origBuffSize;
   }
 
-  CompilerInstance CI;
-  // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
-  CI.addDiagnosticConsumer(&PrintDiags);
-
   EditorDiagConsumer TraceDiags;
   trace::TracedOperation TracedOp(trace::OperationKind::CodeCompletion);
-  if (TracedOp.enabled()) {
-    CI.addDiagnosticConsumer(&TraceDiags);
-    trace::SwiftInvocation SwiftArgs;
-    trace::initTraceInfo(SwiftArgs, InputFile->getBufferIdentifier(), Args);
-    TracedOp.setDiagnosticProvider(
-        [&TraceDiags](SmallVectorImpl<DiagnosticEntryInfo> &diags) {
-          TraceDiags.getAllDiagnostics(diags);
-        });
-    TracedOp.start(SwiftArgs,
-                   {std::make_pair("OriginalOffset", std::to_string(Offset)),
-                    std::make_pair("Offset",
-                      std::to_string(CodeCompletionOffset))});
+  auto setupDiagnostics = [&](CompilerInstance &CI) {
+
+    // Display diagnostics to stderr.
+    CI.addDiagnosticConsumer(&PrintDiags);
+
+    if (TracedOp.enabled()) {
+      CI.addDiagnosticConsumer(&TraceDiags);
+      trace::SwiftInvocation SwiftArgs;
+      trace::initTraceInfo(SwiftArgs, InputFile->getBufferIdentifier(), Args);
+      TracedOp.setDiagnosticProvider(
+                                     [&TraceDiags](SmallVectorImpl<DiagnosticEntryInfo> &diags) {
+                                       TraceDiags.getAllDiagnostics(diags);
+                                     });
+      TracedOp.start(SwiftArgs,
+                     {std::make_pair("OriginalOffset", std::to_string(Offset)),
+                       std::make_pair("Offset",
+                                      std::to_string(CodeCompletionOffset))});
+    }
+  };
+
+  auto CI = Lang.takeCodeCompletionCompilerInstance();
+  if (CI == nullptr) {
+    CI = llvm::make_unique<CompilerInstance>();
+    setupDiagnostics(*CI);
+    CompilerInvocation Invocation;
+    bool Failed = Lang.getASTManager()->initCompilerInvocation(
+        Invocation, Args, CI->getDiags(), InputFile->getBufferIdentifier(), Error);
+    if (Failed) {
+      return false;
+    }
+    if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
+      Error = "no input filenames specified";
+      return false;
+    }
+    if (CI->setup(Invocation)) {
+      // FIXME: error?
+      return true;
+    }
+  } else {
+    setupDiagnostics(*CI);
   }
 
-  CompilerInvocation Invocation;
-  bool Failed = Lang.getASTManager()->initCompilerInvocation(
-      Invocation, Args, CI.getDiags(), InputFile->getBufferIdentifier(), Error);
-  if (Failed) {
-    return false;
-  }
-  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
-    Error = "no input filenames specified";
-    return false;
-  }
-
+  // Create completion buffer.
   const char *Position = InputFile->getBufferStart() + CodeCompletionOffset;
   std::unique_ptr<llvm::WritableMemoryBuffer> NewBuffer =
       llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
@@ -167,8 +181,6 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
   *NewPos = '\0';
   std::copy(Position, InputFile->getBufferEnd(), NewPos+1);
 
-  Invocation.setCodeCompletionPoint(NewBuffer.get(), CodeCompletionOffset);
-
   auto swiftCache = Lang.getCodeCompletionCache(); // Pin the cache.
   ide::CodeCompletionContext CompletionContext(swiftCache->getCache());
 
@@ -178,23 +190,20 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
       ide::makeCodeCompletionCallbacksFactory(CompletionContext,
                                               SwiftConsumer));
 
-  Invocation.setCodeCompletionFactory(CompletionCallbacksFactory.get());
-
   // FIXME: We need to be passing the buffers from the open documents.
   // It is not a huge problem in practice because Xcode auto-saves constantly.
+  CI->setupCodeCompletionInput(std::move(NewBuffer), CodeCompletionOffset, std::move(CompletionCallbacksFactory));
 
-  if (CI.setup(Invocation)) {
-    // FIXME: error?
-    return true;
-  }
+  CI->getASTContext();
 
-  CloseClangModuleFiles scopedCloseFiles(
-      *CI.getASTContext().getClangModuleLoader());
-  SwiftConsumer.setContext(&CI.getASTContext(), &Invocation,
+  SwiftConsumer.setContext(&CI->getASTContext(), &CI->getInvocation(),
                            &CompletionContext);
-  CI.performSema();
+  CI->performSema();
   SwiftConsumer.clearContext();
 
+  CI->clearDiagnosticConsumers();
+  CI->clearCodeCompletion();
+  Lang.setCodeCompletionInstance(std::move(CI));
   return true;
 }
 
