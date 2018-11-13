@@ -101,7 +101,8 @@ static bool findConcreteType(ApplySite AI, int ArgIdx, CanType &ConcreteType) {
     SILValue InitExistential =
         findInitExistentialFromGlobalAddrAndApply(GAI, AI, ArgIdx);
     /// If the Arg is already init_existential, return the concrete type.
-    if (findConcreteTypeFromInitExistential(InitExistential, ConcreteType)) {
+    if (InitExistential &&
+        findConcreteTypeFromInitExistential(InitExistential, ConcreteType)) {
       return true;
     }
   }
