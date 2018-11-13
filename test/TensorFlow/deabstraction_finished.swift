@@ -276,3 +276,11 @@ public func getTensorAndAddOneFunction() -> (Tensor<Float>, (Tensor<Float>) -> T
 // CHECK-NOT: --- TFPartition Accelerator Result: {{.*}}getZero{{.*}}
 // CHECK: --- TFPartition Accelerator Result: {{.*}}getTensorAndAddOneFunction{{.*}}
 
+// This test can still compile in graph mode, especially of the dynamic
+// attribute `padding`, since we will run the conv2D op out-of-graph (via eager
+// op dispatch).
+public func nonConstantAttribute(x: Tensor<Float>, padding: Padding) {
+  _hostOp(x.convolved2D(withFilter: Tensor<Float>(ones: [1, 3, 3, 1]),
+                        strides: (1, 1, 1, 1),
+                        padding: padding))
+}

@@ -2486,13 +2486,11 @@ DestructureTupleInst *DestructureTupleInst::create(SILModule &M,
 GraphOperationInst::GraphOperationInst(
     SILModule &M, SILDebugLocation loc, Identifier name,
     ArrayRef<SILValue> arguments, ArrayRef<GraphOperationAttribute> attrs,
-    ArrayRef<SILType> resultTypes,
-    ArrayRef<ValueOwnershipKind> resultOwnerships) :
-  InstructionBase(loc),
-  MultipleValueInstructionTrailingObjects(this, resultTypes,
-                                          resultOwnerships),
-  Name(name), NumOperands(arguments.size())
-{
+    bool noClustering, ArrayRef<SILType> resultTypes,
+    ArrayRef<ValueOwnershipKind> resultOwnerships)
+    : InstructionBase(loc), MultipleValueInstructionTrailingObjects(
+                                this, resultTypes, resultOwnerships),
+      Name(name), NumOperands(arguments.size()), NoClustering(noClustering) {
   auto allOperands = getAllOperands();
   for (unsigned i : indices(arguments))
     new (&allOperands[i]) Operand(this, arguments[i]);
@@ -2508,10 +2506,11 @@ GraphOperationInst::~GraphOperationInst() {
   delete[] getAttributes().data();
 }
 
-GraphOperationInst *GraphOperationInst::create(
-    SILModule &M, SILDebugLocation loc, Identifier name,
-    ArrayRef<SILValue> arguments, ArrayRef<GraphOperationAttribute> attributes,
-    ArrayRef<SILType> resultTypes) {
+GraphOperationInst *
+GraphOperationInst::create(SILModule &M, SILDebugLocation loc, Identifier name,
+                           ArrayRef<SILValue> arguments,
+                           ArrayRef<GraphOperationAttribute> attributes,
+                           bool noClustering, ArrayRef<SILType> resultTypes) {
   llvm::SmallVector<ValueOwnershipKind, 4> resultOwnerships;
   for (auto resultType : resultTypes) {
     auto ownership = resultType.isTrivial(M)
@@ -2523,8 +2522,9 @@ GraphOperationInst *GraphOperationInst::create(
     totalSizeToAlloc<MultipleValueInstruction *, GraphOperationResult, Operand>(
       1, resultTypes.size(), arguments.size());
   void *buffer = M.allocateInst(size, alignof(GraphOperationInst));
-  return ::new (buffer) GraphOperationInst(M, loc, name, arguments, attributes,
-                                           resultTypes, resultOwnerships);
+  return ::new (buffer)
+      GraphOperationInst(M, loc, name, arguments, attributes, noClustering,
+                         resultTypes, resultOwnerships);
 }
 
 GraphOperationAttribute GraphOperationInst::getAttribute(unsigned i) const {

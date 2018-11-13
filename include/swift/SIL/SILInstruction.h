@@ -7852,10 +7852,16 @@ class GraphOperationInst final
   unsigned NumOperands;
   /// The attributes of the graph operation.
   MutableArrayRef<GraphOperationAttribute> Attributes;
+  /// When true, this instruction is to be executed out-of-graph (via eager op
+  /// dispatch). Otherwise, we attempt to "cluster" this graph op with other
+  /// graph ops into a graph function. For an op with dynamic attribute(s), it
+  /// must run out-of-graph, and thus have this field set to true.
+  // FIXME: Extend parser and printer with this field.
+  bool NoClustering;
 
   GraphOperationInst(SILModule &M, SILDebugLocation loc, Identifier name,
                      ArrayRef<SILValue> arguments,
-                     ArrayRef<GraphOperationAttribute> attrs,
+                     ArrayRef<GraphOperationAttribute> attrs, bool noClustering,
                      ArrayRef<SILType> resultTypes,
                      ArrayRef<ValueOwnershipKind> resultOwnerships);
 
@@ -7864,11 +7870,10 @@ public:
   using MultipleValueInstructionTrailingObjects::totalSizeToAlloc;
 
   ~GraphOperationInst();
-  static GraphOperationInst *create(SILModule &M, SILDebugLocation loc,
-                                    Identifier name,
-                                    ArrayRef<SILValue> arguments,
-                                    ArrayRef<GraphOperationAttribute> attrs,
-                                    ArrayRef<SILType> resultTypes);
+  static GraphOperationInst *
+  create(SILModule &M, SILDebugLocation loc, Identifier name,
+         ArrayRef<SILValue> arguments, ArrayRef<GraphOperationAttribute> attrs,
+         bool noClustering, ArrayRef<SILType> resultTypes);
 
   Identifier getName() const { return Name; }
   unsigned getNumOperands() const { return NumOperands; }
@@ -7900,6 +7905,9 @@ public:
   }
 
   Optional<SymbolicValue> getAttributeNamed(StringRef name);
+
+  void setNoClustering(bool noClustering) { NoClustering = noClustering; }
+  bool getNoClustering() const { return NoClustering; }
 
   static bool classof(const SILNode *N) {
     return N->getKind() == SILNodeKind::GraphOperationInst;
