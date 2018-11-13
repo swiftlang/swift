@@ -30,7 +30,7 @@ Swift 5.0
   optimized (`-O`/`-Osize`) builds. Programs that violate exclusivity will
   trap at runtime with an "overlapping access" diagnostic
   message. This can be disabled via a command line flag:
-  `-enforce-exclusivity=unchecked`, but doing do may result in undefined
+  `-enforce-exclusivity=unchecked`, but doing so may result in undefined
   behavior.
 
   Run-time violations of exclusivity typically result from
