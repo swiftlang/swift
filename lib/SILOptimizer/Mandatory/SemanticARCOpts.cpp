@@ -180,11 +180,11 @@ namespace {
 struct SemanticARCOpts : SILFunctionTransform {
   void run() override {
     SILFunction &f = *getFunction();
-    // Do not run the semantic arc opts unless we are running on the
-    // standard library. This is because this is the only module that
-    // passes the ownership verifier.
-    if (!f.getModule().isStdlibModule())
-      return;
+
+    // Make sure we are running with ownership verification enabled.
+    assert(f.getModule().getOptions().EnableSILOwnership &&
+           "Can not perform semantic arc optimization unless ownership "
+           "verification is enabled");
 
     // Iterate over all of the arguments, performing small peephole
     // ARC optimizations.
