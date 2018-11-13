@@ -3282,11 +3282,12 @@ public:
     // If any of the function's parameters contain an uninhabited type
     // then emit a diagnostic on the func decl, as the function can never
     // be called.
-    auto params = FD->getParameters()->getArray();
-    for (auto &&index: indices(params)) {
-      auto param = params[index];
-      if (param->hasInterfaceType() && param->getType()->isStructurallyUninhabited()) {
-        TC.diagnose(FD->getLoc(), diag::function_parameter_type_uninhabited, FD->getName(), param->getName());
+    for (auto param : *FD->getParameters()) {
+      if (param->hasInterfaceType() &&
+          param->getInterfaceType()->isStructurallyUninhabited()) {
+        TC.diagnose(param->getLoc(),
+                    diag::function_parameter_type_uninhabited,
+                    FD->getName(), param->getName());
       }
     }
 
