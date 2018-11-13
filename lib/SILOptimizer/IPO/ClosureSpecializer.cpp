@@ -1035,7 +1035,8 @@ bool SILClosureSpecializerTransform::gatherCallSites(
         // so continue...
         auto AI = FullApplySite::isa(Use->getUser());
         if (!AI || AI.hasSubstitutions() ||
-            !canSpecializeFullApplySite(AI.getKind()))
+            !canSpecializeFullApplySite(AI.getKind()) ||
+            !AI.canOptimize())
           continue;
 
         // Check if we have already associated this apply inst with a closure to
