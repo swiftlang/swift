@@ -2025,7 +2025,7 @@ getClangTopLevelOwningModule(ClangNode Node,
 }
 
 static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
-                                const ValueDecl *VD) {
+                                ValueDecl *VD) {
   assert(ModuleFilter);
 
   auto ContainingUnit = VD->getDeclContext()->getModuleScopeContext();
@@ -2040,24 +2040,34 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
 
   auto ClangNode = VD->getClangNode();
   if (!ClangNode) {
-    // If we synthesized a ValueDecl, it won't have a Clang node. But so far
-    // all the situations where we synthesize top-level declarations are
-    // situations where we don't have to worry about C redeclarations.
-    // We should only consider the declaration visible from its owning module.
+    // If we synthesized a ValueDecl, it won't have a Clang node. Find the
+    // associated declaration that /does/ have a Clang node, and use that.
     auto *SynthesizedTypeAttr =
         VD->getAttrs().getAttribute<ClangImporterSynthesizedTypeAttr>();
     assert(SynthesizedTypeAttr);
 
-    // When adding new ClangImporterSynthesizedTypeAttr::Kinds, make sure that
-    // the above statement still holds: "we don't want to allow these
-    // declarations to be treated as present in multiple modules".
     switch (SynthesizedTypeAttr->getKind()) {
     case ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapper:
-    case ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapperAnon:
+    case ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapperAnon: {
+      ASTContext &Ctx = ContainingUnit->getASTContext();
+      auto LookupFlags =
+          NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+      auto WrapperStruct = cast<StructDecl>(VD);
+      TinyPtrVector<ValueDecl *> LookupResults =
+          WrapperStruct->lookupDirect(Ctx.Id_Code, LookupFlags);
+      assert(!LookupResults.empty() && "imported error enum without Code");
+
+      auto CodeEnumIter = llvm::find_if(LookupResults,
+                                        [&](ValueDecl *Member) -> bool {
+        return Member->getDeclContext() == WrapperStruct;
+      });
+      assert(CodeEnumIter != LookupResults.end() &&
+             "could not find Code enum in wrapper struct");
+      assert((*CodeEnumIter)->hasClangNode());
+      ClangNode = (*CodeEnumIter)->getClangNode();
       break;
     }
-
-    return false;
+    }
   }
 
   // Macros can be "redeclared" by putting an equivalent definition in two

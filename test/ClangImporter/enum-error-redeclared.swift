@@ -1,4 +1,10 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify -enable-objc-interop -I %S/Inputs/custom-modules/RedeclaredErrorEnum
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify -enable-objc-interop -I %S/Inputs/custom-modules/RedeclaredErrorEnum -DIMPORT_BASE
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify -enable-objc-interop -I %S/Inputs/custom-modules/RedeclaredErrorEnum -DIMPORT_BASE -Xcc -DNO_IMPORT_BASE_FROM_REDECLARED
+
+#if IMPORT_BASE
+import Base
+#endif
 
 import Redeclared
 
