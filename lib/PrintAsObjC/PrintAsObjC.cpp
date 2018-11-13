@@ -971,11 +971,9 @@ private:
           
           bool hasSameParameterTypes = true;
           for (auto index : indices(*cParams)) {
-            TypeMatchOptions matchMode = TypeMatchFlags::AllowOverride;
-            matchMode |= TypeMatchFlags::AllowTopLevelOptionalMismatch;
             auto cParamsType = cParams->get(index)->getType();
             auto dParamsType = dParams->get(index)->getType();
-            if (!cParamsType->matchesParameter(dParamsType, matchMode)) {
+            if (!cParamsType->matchesParameter(dParamsType, TypeMatchFlags::AllowOverride)) {
               hasSameParameterTypes = false;
               break;
             }
