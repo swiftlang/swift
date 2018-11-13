@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 
 @dynamicCallable
 struct Callable {
@@ -64,8 +64,8 @@ func testIUO(
 
 @dynamicCallable
 struct CallableReturningFunction {
-  func dynamicallyCall(withArguments arguments: [Int]) -> (_ a: Int) -> Void {
-    return { a in () }
+  func dynamicallyCall(withArguments arguments: [Int]) -> (Int) -> Void {
+    return { x in () }
   }
 }
 
@@ -138,7 +138,7 @@ class InvalidDerived : InvalidBase {
 }
 
 //===----------------------------------------------------------------------===//
-// Multiple `dynamicallyCall` method tests
+// Multiple `dynamicallyCall` methods
 //===----------------------------------------------------------------------===//
 
 @dynamicCallable
@@ -160,7 +160,7 @@ func testOverloaded(x: OverloadedCallable) {
 }
 
 //===----------------------------------------------------------------------===//
-// Existential tests
+// Existentials
 //===----------------------------------------------------------------------===//
 
 @dynamicCallable
@@ -318,7 +318,7 @@ func testEnum() {
 }
 
 //===----------------------------------------------------------------------===//
-// Generics tests
+// Generics
 //===----------------------------------------------------------------------===//
 
 @dynamicCallable
