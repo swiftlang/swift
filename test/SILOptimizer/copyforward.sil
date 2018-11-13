@@ -604,8 +604,8 @@ bb0(%0 : $*P, %1 : $*T):
 }
 
 public struct S<T> {
-  @sil_stored var f: T { get set }
-  @sil_stored var g: T { get set }
+  @_hasStorage var f: T { get set }
+  @_hasStorage var g: T { get set }
   init(f: T, g: T)
 }
 

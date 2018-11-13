@@ -232,7 +232,7 @@ bb3:
 }
 
 class TestArrayStorage {
-  @sil_stored var count: Builtin.Int32
+  @_hasStorage var count: Builtin.Int32
   init()
 }
 

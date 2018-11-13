@@ -6,7 +6,7 @@ struct Struct<T> {
 }
 
 // CHECK-LABEL: struct Struct<T> {
-// CHECK:   @sil_stored var x: T { get set }
+// CHECK:   @_hasStorage var x: T { get set }
 // CHECK:   init(x: T)
 // CHECK:   enum CodingKeys : CodingKey {
 // CHECK:     case x

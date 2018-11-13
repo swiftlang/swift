@@ -1224,7 +1224,7 @@ namespace  {
     UNINTERESTING_ATTR(SynthesizedProtocol)
     UNINTERESTING_ATTR(RequiresStoredPropertyInits)
     UNINTERESTING_ATTR(Transparent)
-    UNINTERESTING_ATTR(SILStored)
+    UNINTERESTING_ATTR(HasStorage)
     UNINTERESTING_ATTR(Testable)
 
     UNINTERESTING_ATTR(WarnUnqualifiedAccess)

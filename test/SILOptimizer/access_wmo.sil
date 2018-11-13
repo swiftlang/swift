@@ -16,13 +16,13 @@ var internalGlobal: Int64
 public var publicGlobal: Int64
 
 public class C {
-  @sil_stored var setterProp: Int64 { get set }
-  @sil_stored final var finalProp: Int64 { get set }
-  @sil_stored var inlinedProp: Int64 { get set }
-  @sil_stored var internalProp: Int64 { get set }
-  @sil_stored var keyPathProp: Int64 { get set }
-  @sil_stored final var finalKeyPathProp: Int64 { get set }
-  @sil_stored public var publicProp: Int64 { get set }
+  @_hasStorage var setterProp: Int64 { get set }
+  @_hasStorage final var finalProp: Int64 { get set }
+  @_hasStorage var inlinedProp: Int64 { get set }
+  @_hasStorage var internalProp: Int64 { get set }
+  @_hasStorage var keyPathProp: Int64 { get set }
+  @_hasStorage final var finalKeyPathProp: Int64 { get set }
+  @_hasStorage public var publicProp: Int64 { get set }
   init()
   deinit
 }

@@ -11,7 +11,7 @@ import Swift
 import SwiftShims
 
 struct X {
-  @sil_stored var i: Int64 { get set }
+  @_hasStorage var i: Int64 { get set }
   init(i: Int64)
   init()
 }
