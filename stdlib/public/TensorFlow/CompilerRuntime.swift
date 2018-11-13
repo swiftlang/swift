@@ -481,6 +481,14 @@ fileprivate extension _ExecutionContext {
   }
 }
 
+public extension _ExecutionContext {
+  /// Load functions from a graph encoded as a byte-pointer and length into the
+  /// tensorflow eagerContext.
+  func loadFunctionsFromGraph(byteAddress: UnsafeRawPointer, byteCount: Int) {
+    _ = loadProgramInBytes(byteAddress, count: byteCount)
+  }
+}
+
 @usableFromInline
 internal func dumpTensorContent<Scalar : _TensorFlowDataTypeCompatible>(
   _ inputTensor: CTensorHandle, _: Scalar.Type
@@ -1121,6 +1129,21 @@ public func _TFCFinishTensorComputation(
 @_silgen_name("_swift_tfc_TerminateTensorComputation")
 public func _TFCTerminateTensorComputation(_ computation: _TensorComputation) {
   computation.terminate()
+}
+
+/// Registers all functions in a graph into the eager context if in eager mode.
+///
+/// - Parameters:
+///   - programByteAddress: The address of the raw program.
+///   - programByteCount: The number of bytes in the program.
+@inlinable
+@_silgen_name("_swift_tfc_RegisterTensorFunctions")
+public func _TFCRegisterTensorFunctions(
+  _ programByteAddress: UnsafeRawPointer,
+  _ programByteCount: Int
+) {
+  _ExecutionContext.global.loadFunctionsFromGraph(byteAddress: programByteAddress,
+                                                  byteCount: programByteCount)
 }
 
 /// Creates a scalar CTensorHandle value for the given data type.
