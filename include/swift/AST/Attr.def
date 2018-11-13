@@ -179,7 +179,7 @@ SIMPLE_DECL_ATTR(unsafe_no_objc_tagged_pointer, UnsafeNoObjCTaggedPointer,
   UserInaccessible,
   19)
 DECL_ATTR(inline, Inline,
-  OnFunc | OnAccessor | OnConstructor,
+  OnVar | OnSubscript | OnAbstractFunction,
   20)
 DECL_ATTR(_semantics, Semantics,
   OnAbstractFunction | OnSubscript |

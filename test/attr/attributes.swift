@@ -214,12 +214,12 @@ func func_type_attribute_with_space(x: @convention (c) () -> Int) {} // OK. Know
 var thinFunc : @thin () -> () // expected-error {{attribute is not supported}}
 
 @inline(never) func nolineFunc() {}
-@inline(never) var noinlineVar : Int // expected-error {{'@inline(never)' attribute cannot be applied to this declaration}} {{1-16=}}
+@inline(never) var noinlineVar : Int { return 0 }
 @inline(never) class FooClass { // expected-error {{'@inline(never)' attribute cannot be applied to this declaration}} {{1-16=}}
 }
 
 @inline(__always) func AlwaysInlineFunc() {}
-@inline(__always) var alwaysInlineVar : Int // expected-error {{'@inline(__always)' attribute cannot be applied to this declaration}} {{1-19=}}
+@inline(__always) var alwaysInlineVar : Int { return 0 }
 @inline(__always) class FooClass2 { // expected-error {{'@inline(__always)' attribute cannot be applied to this declaration}} {{1-19=}}
 }
 
