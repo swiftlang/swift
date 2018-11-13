@@ -69,11 +69,6 @@ protected:
   DependencyTracker * const dependencyTracker;
   ModuleLoader(DependencyTracker *tracker) : dependencyTracker(tracker) {}
 
-  void addDependency(StringRef file, bool IsSystem=false) {
-    if (dependencyTracker)
-      dependencyTracker->addDependency(file, IsSystem);
-  }
-
 public:
   virtual ~ModuleLoader() = default;
 
