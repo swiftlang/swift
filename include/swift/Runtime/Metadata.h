@@ -429,7 +429,7 @@ MetadataResponse swift_getAssociatedTypeWitness(
 ///
 /// \param wtable The witness table.
 /// \param conformingType Metadata for the conforming type.
-/// \param assocType Metadata for the sasociated type.
+/// \param assocType Metadata for the associated type.
 /// \param reqBase "Base" requirement used to compute the witness index
 /// \param assocConformance Associated conformance descriptor.
 ///

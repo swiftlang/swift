@@ -1755,7 +1755,8 @@ public:
   void checkConformance(NormalProtocolConformance *conformance);
 
   /// Check the requirement signature of the given conformance.
-  void checkConformanceRequirements(NormalProtocolConformance *conformance);
+  void checkConformanceRequirements(NormalProtocolConformance *conformance)
+         override ;
 
   /// Check all of the conformances in the given context.
   void checkConformancesInContext(DeclContext *dc,

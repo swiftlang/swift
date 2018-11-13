@@ -413,6 +413,11 @@ public:
   std::string mangleSymbolNameForSymbolicMangling(
                                               const SymbolicMangling &mangling,
                                               MangledTypeRefRole role);
+
+  std::string mangleSymbolNameForAssociatedConformanceWitness(
+                                  const NormalProtocolConformance *conformance,
+                                  CanType associatedType,
+                                  const ProtocolDecl *proto);
 protected:
   SymbolicMangling
   withSymbolicReferences(IRGenModule &IGM,

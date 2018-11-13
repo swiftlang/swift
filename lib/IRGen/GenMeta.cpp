@@ -788,15 +788,15 @@ namespace {
           continue;
 
         auto witness = entry.getAssociatedTypeProtocolWitness().Witness;
-        return getDefaultAssociatedConformanceAccessFunction(
-                 AssociatedConformance(Proto, association, requirement),
-                 witness);
+        AssociatedConformance conformance(Proto, association, requirement);
+        defineDefaultAssociatedConformanceAccessFunction(conformance, witness);
+        return IGM.getMangledAssociatedConformance(nullptr, conformance);
       }
 
       return nullptr;
     }
 
-    llvm::Constant *getDefaultAssociatedConformanceAccessFunction(
+    void defineDefaultAssociatedConformanceAccessFunction(
                       AssociatedConformance requirement,
                       ProtocolConformanceRef conformance) {
       auto accessor =
@@ -839,7 +839,7 @@ namespace {
                                                     conformance.getConcrete());
         auto returnValue = conformanceI->getTable(IGF, &associatedTypeMetadata);
         IGF.Builder.CreateRet(returnValue);
-        return accessor;
+        return;
       }
 
       // For an abstract table, emit a reference to the witness table.
@@ -852,7 +852,7 @@ namespace {
             cast<ArchetypeType>(associatedTypeInContext),
             associatedProtocol);
       IGF.Builder.CreateRet(returnValue);
-      return accessor;
+      return;
     }
 
     void addAssociatedTypeNames() {
