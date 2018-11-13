@@ -312,6 +312,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
       OSS << p << "\0";
     OSSLE.write(K.ResultsHaveLeadingDot);
     OSSLE.write(K.ForTestableLookup);
+    OSSLE.write(K.ForPrivateImportLookup);
     OSSLE.write(K.CodeCompleteInitsInPostfixExpr);
     LE.write(static_cast<uint32_t>(OSS.tell()));   // Size of debug info
     out.write(OSS.str().data(), OSS.str().size()); // Debug info blob
@@ -423,6 +424,8 @@ static std::string getName(StringRef cacheDirectory,
   // name[-dot][-testable][-inits]
   OSS << (K.ResultsHaveLeadingDot ? "-dot" : "")
       << (K.ForTestableLookup ? "-testable" : "")
+      << (K.ForPrivateLookup ? "-private" : "")
+      << (K.CodeCompleteInitsInPostfixExpr ? "-inits" : "");
       << (K.CodeCompleteInitsInPostfixExpr ? "-inits" : "");
 
   // name[-access-path-components]
