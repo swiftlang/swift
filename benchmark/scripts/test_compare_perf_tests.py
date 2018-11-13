@@ -445,14 +445,15 @@ class TestLogParser(unittest.TestCase):
     def test_parse_results_csv(self):
         """Ignores uknown lines, extracts data from supported formats."""
         log = """#,TEST,SAMPLES,MIN(us),MAX(us),MEAN(us),SD(us),MEDIAN(us)
-34,BitCount,20,3,4,4,0,4
+34,Flatten.Array.Tuple4.lazy.for-in.Reserve,20,3,4,4,0,4
 
 Total performance tests executed: 1
 """
         parser = LogParser()
         results = parser.parse_results(log.splitlines())
         self.assertTrue(isinstance(results[0], PerformanceTestResult))
-        self.assertEquals(results[0].name, 'BitCount')
+        self.assertEquals(results[0].name,
+                          'Flatten.Array.Tuple4.lazy.for-in.Reserve')
 
     def test_parse_results_tab_delimited(self):
         log = '34\tBitCount\t20\t3\t4\t4\t0\t4'

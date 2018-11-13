@@ -363,9 +363,9 @@ class LogParser(object):
     # Parse lines like this
     # #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs)
     results_re = re.compile(
-        r'( *\d+[, \t]+[\w.]+[, \t]+' +  # #,TEST
-        r'[, \t]+'.join([r'\d+'] * 2) +  # at least 2...
-        r'(?:[, \t]+\d*)*)')             # ...or more numeric columns
+        r'( *\d+[, \t]+[\w.\-]+[, \t]+' +  # #,TEST
+        r'[, \t]+'.join([r'\d+'] * 2) +    # at least 2...
+        r'(?:[, \t]+\d*)*)')               # ...or more numeric columns
 
     def _append_result(self, result):
         columns = result.split(',') if ',' in result else result.split()
