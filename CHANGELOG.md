@@ -33,7 +33,7 @@ Swift 5.0
   `-enforce-exclusivity=unchecked`, but doing so may result in undefined
   behavior.
 
-  Run-time violations of exclusivity typically result from
+  Runtime violations of exclusivity typically result from
   simultaneous access of class properties, global variables (including
   variables in top-level code), or variables captured by escaping
   closures.
