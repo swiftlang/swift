@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 
 using namespace swift;
@@ -74,4 +75,39 @@ bool swift::isGuaranteedForwardingInst(SILInstruction *i) {
 
 bool swift::isOwnershipForwardingInst(SILInstruction *i) {
   return isOwnershipForwardingValueKind(SILNodeKind(i->getKind()));
+}
+
+bool swift::getUnderlyingBorrowIntroducers(SILValue inputValue,
+                                           SmallVectorImpl<SILValue> &out) {
+  SmallVector<SILValue, 32> worklist;
+  worklist.emplace_back(inputValue);
+
+  while (!worklist.empty()) {
+    SILValue v = worklist.pop_back_val();
+
+    // First check if v is an introducer. If so, stash it and continue.
+    if (isa<SILFunctionArgument>(v) || isa<LoadBorrowInst>(v) ||
+        isa<BeginBorrowInst>(v)) {
+      out.push_back(v);
+      continue;
+    }
+
+    // Otherwise if v is an ownership forwarding value, add its defining
+    // instruction
+    if (isGuaranteedForwardingValue(v)) {
+      auto *i = v->getDefiningInstruction();
+      assert(i);
+      transform(i->getAllOperands(), std::back_inserter(worklist),
+                [](const Operand &op) -> SILValue { return op.get(); });
+      continue;
+    }
+
+    // If v produces any ownership, then we can ignore it. Otherwise, we need to
+    // return false since this is an introducer we do not understand.
+    if (v.getOwnershipKind() != ValueOwnershipKind::Any &&
+        v.getOwnershipKind() != ValueOwnershipKind::Trivial)
+      return false;
+  }
+
+  return true;
 }
