@@ -85,20 +85,20 @@ void checkGenericParamList(TypeChecker &tc,
           
           if (auto decl = owner.dc->getAsDecl()) {
             if (auto extDecl = dyn_cast<ExtensionDecl>(decl)) {
-              auto ownerType = extDecl->getExtendedType();
-              auto ownerSelfType = extDecl->getSelfInterfaceType();
+              auto extType = extDecl->getExtendedType();
+              auto extSelfType = extDecl->getSelfInterfaceType();
               auto reqLHSType = req.getFirstType();
               auto reqRHSType = req.getSecondType();
               
-              if (ownerType->isExistentialType() &&
-                  reqLHSType->isEqual(ownerSelfType)
-                  && reqRHSType->isEqual(ownerType)) {
+              if (extType->isExistentialType() &&
+                  reqLHSType->isEqual(extSelfType)
+                  && reqRHSType->isEqual(extType)) {
                 
                 auto &ctx = extDecl->getASTContext();
                 ctx.Diags.diagnose(extDecl->getLoc(),
                                    diag::protocol_extension_redundant_requirement,
-                                   ownerType->getString(),
-                                   ownerSelfType->getString(),
+                                   extType->getString(),
+                                   extSelfType->getString(),
                                    reqRHSType->getString());
               }
             }
