@@ -2816,8 +2816,7 @@ private:
   };
 
   struct PotentialBindings {
-    using BindingScore =
-        std::tuple<bool, bool, bool, bool, unsigned char, unsigned int>;
+    using BindingScore = std::tuple<bool, bool, bool, bool, unsigned char, int>;
 
     TypeVariableType *TypeVar;
 
