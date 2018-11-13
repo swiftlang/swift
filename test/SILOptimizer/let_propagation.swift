@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s  -emit-sil -enforce-exclusivity=unchecked -O | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s  -emit-sil -O | %FileCheck %s
 
 // Check that LoadStoreOpts can handle "let" variables properly.
 // Such variables should be loaded only once and their loaded values can be reused.
