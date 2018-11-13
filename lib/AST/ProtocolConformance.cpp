@@ -850,6 +850,14 @@ NormalProtocolConformance::getAssociatedConformance(Type assocType,
                                                 LazyResolver *resolver) const {
   assert(assocType->isTypeParameter() &&
          "associated type must be a type parameter");
+
+  // Fill in the signature conformances, if we haven't done so yet.
+  if (getSignatureConformances().empty()) {
+    assocType->getASTContext().getLazyResolver()
+      ->checkConformanceRequirements(
+        const_cast<NormalProtocolConformance *>(this));
+  }
+
   assert(!getSignatureConformances().empty() &&
          "signature conformances not yet computed");
 

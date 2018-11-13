@@ -90,6 +90,9 @@ The following symbolic reference kinds are currently implemented:
    dependent-associated-conformance ::= '\x05' .{4}  // Reference points directly to associated conformance descriptor (NOT IMPLEMENTED)
    dependent-associated-conformance ::= '\x06' .{4}  // Reference points indirectly to associated conformance descriptor (NOT IMPLEMENTED)
 
+   associated-conformance-acceess-function ::= '\x07' .{4}  // Reference points directly to associated conformance access function relative to the protocol
+   associated-conformance-acceess-function ::= '\x08' .{4}  // Reference points directly to associated conformance access function relative to the conforming type
+
 Globals
 ~~~~~~~
 
