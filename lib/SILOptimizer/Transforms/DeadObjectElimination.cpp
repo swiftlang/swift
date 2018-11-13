@@ -192,7 +192,9 @@ removeInstructions(ArrayRef<SILInstruction*> UsersToRemove) {
 //===----------------------------------------------------------------------===//
 
 /// Returns true if silTy is the Swift.DefaultStringInterpolation type.
-static bool isDefaultStringInterpolation(SILType silTy) {
+static bool allocatesDefaultStringInterpolation(AllocationInst *Inst) {
+  auto silTy = Inst->getType().getObjectType();
+
   auto astTy = silTy.getASTType();
   if (!astTy) return false;
 
@@ -236,7 +238,7 @@ static SILInstruction *getBaseAddrInst(LoadInst *Load) {
 /// Returns false if Inst is an instruction that would require us to keep the
 /// alloc_ref alive.
 static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
-                              SILInstruction *AllocInst) {
+                              AllocationInst *AllocInst) {
   if (isa<SetDeallocatingInst>(Inst) || isa<FixLifetimeInst>(Inst))
     return true;
 
@@ -287,7 +289,7 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
             // DeadObjectAnalysis below is supposed to do), but we know we don't
             // need to for DefaultStringInterpolation, because we know that the
             // initialization of its sole property will be eliminated too.
-            isDefaultStringInterpolation(*AllocInst->getResultTypes().begin());
+            allocatesDefaultStringInterpolation(AllocInst);
 
   // Otherwise we do not know how to handle this instruction. Be conservative
   // and don't zap it.
@@ -297,7 +299,7 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
 /// Analyze the use graph of AllocRef for any uses that would prevent us from
 /// zapping it completely.
 static bool
-hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users,
+hasUnremovableUsers(AllocationInst *AllocRef, UserList &Users,
                     bool acceptRefCountInsts) {
   SmallVector<SILInstruction *, 16> Worklist;
   Worklist.push_back(AllocRef);
@@ -785,7 +787,7 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
   if (!ASI->getElementType().isTrivial(ASI->getModule()) &&
       // DefaultStringInterpolation is not trivial, but canZapInstruction()
       // can recognize and eliminate its memory management.
-      !isDefaultStringInterpolation(ASI->getElementType())) {
+      !allocatesDefaultStringInterpolation(ASI)) {
     LLVM_DEBUG(llvm::dbgs() << "    Skipping due to non-trivial type:" << *ASI);
     return false;
   }
