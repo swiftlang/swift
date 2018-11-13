@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend  -O -emit-sil -enforce-exclusivity=unchecked  %s | %FileCheck %s
-// RUN: %target-swift-frontend  -O -wmo -emit-sil -enforce-exclusivity=unchecked  %s | %FileCheck -check-prefix=CHECK-WMO %s
+// RUN: %target-swift-frontend  -O -emit-sil  %s | %FileCheck %s
+// RUN: %target-swift-frontend  -O -wmo -emit-sil  %s | %FileCheck -check-prefix=CHECK-WMO %s
 
 // Check that values of internal and private global variables, which are provably assigned only 
 // once, are propagated into their uses and enable further optimizations like constant

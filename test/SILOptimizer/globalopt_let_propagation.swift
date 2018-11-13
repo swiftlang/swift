@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -O -emit-sil -enforce-exclusivity=unchecked -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend  -O -emit-sil -primary-file %s | %FileCheck %s
 
 // Check that values of static let and global let variables are propagated into their uses
 // and enable further optimizations like constant propagation, simplifications, etc.
