@@ -187,7 +187,7 @@ class BenchmarkDriver(object):
         with open(log_file, 'w') as f:
             f.write(output)
 
-    RESULT = '{:>3} {:<25} {:>7} {:>7} {:>6} {:>10} {:>6} {:>7} {:>10}'
+    RESULT = '{:>3} {:<40} {:>7} {:>7} {:>6} {:>10} {:>6} {:>7} {:>10}'
 
     def run_and_log(self, csv_console=True):
         """Run benchmarks and continuously log results to the console.
