@@ -1677,6 +1677,8 @@ ERROR(autodiff_use_wrt_not_withrespectto,none,
 //------------------------------------------------------------------------------
 // Graph operation related parsing diagnostics
 //------------------------------------------------------------------------------
+ERROR(sil_graph_op_no_clustering_attr_expected_rsquare,PointsToFirstBadToken,
+      "expected ']' in 'graph_op' 'no_clustering' attribute", ())
 ERROR(sil_graph_op_name_comma,PointsToFirstBadToken,
       "'graph_op' name cannot contain ','", ())
 ERROR(sil_graph_op_expected_attr_name,PointsToFirstBadToken,

@@ -3119,24 +3119,20 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
   case SILInstructionKind::GraphOperationInst: {
     bool noClustering = false;
     if (P.consumeIf(tok::l_square)) {
+      // The only valid option is [no_clustering], when we see an l_square.
+      noClustering = true;
+
       Identifier ident;
       SourceLoc identLoc;
       if (parseSILIdentifier(ident, identLoc,
-                             diag::expected_in_attribute_list)) {
+                             diag::expected_in_attribute_list) ||
+          ident.str() != "no_clustering") {
         P.diagnose(P.Tok, diag::expected_tok_in_sil_instr,
                    "'no_clustering' attribute");
         return true;
       }
-      StringRef attr = ident.str();
-
-      if (attr == "no_clustering")
-        noClustering = true;
-      else {
-        P.diagnose(P.Tok, diag::expected_tok_in_sil_instr,
-                   "'no_clustering' attribute");
-        return true;
-      }
-      if (!P.consumeIf(tok::r_square))
+      if (P.parseToken(tok::r_square,
+                       diag::sil_graph_op_no_clustering_attr_expected_rsquare))
         return true;
     }
 
