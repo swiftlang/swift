@@ -133,20 +133,7 @@ extension JoinedSequence: Sequence {
   @inlinable // lazy-performance
   public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     var result = ContiguousArray<Element>()
-    let separatorSize: Int = numericCast(_separator.count)
-
-    let reservation = _base._preprocessingPass {
-      () -> Int in
-      var r = 0
-      for chunk in _base {
-        r += separatorSize + chunk.underestimatedCount
-      }
-      return r - separatorSize
-    }
-
-    if let n = reservation {
-      result.reserveCapacity(numericCast(n))
-    }
+    let separatorSize = _separator.count
 
     if separatorSize == 0 {
       for x in _base {

@@ -1979,51 +1979,5 @@ self.test("\(testNamePrefix).first(where:)/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
-// _preprocessingPass()
-//===----------------------------------------------------------------------===//
-
-self.test("\(testNamePrefix)._preprocessingPass/semantics") {
-  for test in forEachTests {
-    let s = makeWrappedSequence(test.sequence.map(OpaqueValue.init))
-    var wasInvoked = false
-    let result = s._preprocessingPass {
-      () -> OpaqueValue<Int> in
-      wasInvoked = true
-
-      expectEqualSequence(
-        test.sequence,
-        s.map { extractValue($0).value })
-
-      return OpaqueValue(42)
-    }
-    if wasInvoked {
-      expectEqual(42, result?.value)
-    } else {
-      expectNil(result)
-    }
-  }
-
-  for test in forEachTests {
-    let s = makeWrappedSequence(test.sequence.map(OpaqueValue.init))
-    var wasInvoked = false
-    var caughtError: Error?
-    var result: OpaqueValue<Int>?
-    do {
-      result = try s._preprocessingPass {
-        () -> OpaqueValue<Int> in
-        wasInvoked = true
-        throw TestError.error2
-      }
-    } catch {
-      caughtError = error
-    }
-    expectNil(result)
-    if wasInvoked {
-      expectEqual(TestError.error2, caughtError as? TestError)
-    }
-  }
-}
-
-//===----------------------------------------------------------------------===//
   } // addSequenceTests
 }

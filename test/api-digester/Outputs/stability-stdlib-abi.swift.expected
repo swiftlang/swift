@@ -259,3 +259,24 @@ Var Dictionary.keys has declared type change from LazyMapCollection<Dictionary<�
 Var Dictionary.values has declared type change from LazyMapCollection<Dictionary<τ_0_0, τ_0_1>, τ_0_1> to LazyMapSequence<Dictionary<τ_0_0, τ_0_1>, τ_0_1>
 Var LazySequence._base has removed its setter
 Var _DropWhileSequence._iterator has declared type change from τ_0_0 to τ_0_0.Iterator
+Func Collection._preprocessingPass(_:) has been removed
+Func StrideThrough._preprocessingPass(_:) has been removed
+Func StrideTo._preprocessingPass(_:) has been removed
+Func AnyBidirectionalCollection._preprocessingPass(_:) has been removed
+Func AnyCollection._preprocessingPass(_:) has been removed
+Func AnyRandomAccessCollection._preprocessingPass(_:) has been removed
+Func AnySequence._preprocessingPass(_:) has been removed
+Func Sequence._preprocessingPass(_:) has been removed
+Func _AnySequenceBox.__copyContents(initializing:) in a non-resilient type changes position from 7 to 6
+Func _AnySequenceBox.__copyToContiguousArray() in a non-resilient type changes position from 6 to 5
+Func _AnySequenceBox.__preprocessingPass(_:) has been removed
+Func _AnySequenceBox._drop(while:) in a non-resilient type changes position from 8 to 7
+Func _AnySequenceBox._dropFirst(_:) in a non-resilient type changes position from 9 to 8
+Func _AnySequenceBox._dropLast(_:) in a non-resilient type changes position from 10 to 9
+Func _AnySequenceBox._prefix(_:) in a non-resilient type changes position from 11 to 10
+Func _AnySequenceBox._prefix(while:) in a non-resilient type changes position from 12 to 11
+Func _AnySequenceBox._suffix(_:) in a non-resilient type changes position from 13 to 12
+Func _BidirectionalCollectionBox.__preprocessingPass(_:) has been removed
+Func _CollectionBox.__preprocessingPass(_:) has been removed
+Func _RandomAccessCollectionBox.__preprocessingPass(_:) has been removed
+Func _SequenceBox.__preprocessingPass(_:) has been removed

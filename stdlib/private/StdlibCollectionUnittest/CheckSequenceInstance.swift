@@ -87,32 +87,6 @@ public func checkSequence<
   expectGE(
     expectedCount, sequence.underestimatedCount, message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-
-  // Test `_copyContents(initializing:)` if we can do so without destroying the
-  // sequence.
-  _ = sequence._preprocessingPass { () -> Void in
-    var count = 0
-    for _ in sequence { count += 1 }
-    let ptr = UnsafeMutablePointer<S.Element>.allocate(capacity: count)
-    let buf = UnsafeMutableBufferPointer(start: ptr, count: count)
-    var (remainders,writtenUpTo) = sequence._copyContents(initializing: buf)
-    expectTrue(remainders.next() == nil,
-      "_copyContents returned unwritten elements")
-    expectTrue(writtenUpTo == buf.endIndex,
-      "_copyContents failed to use entire buffer")
-    expectEqualSequence(expected, buf, message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), sameValue: sameValue)
-    ptr.deinitialize(count: count)
-    ptr.deallocate()
-  }
-
-  // Test `_copyToContiguousArray()` if we can do so
-  // without destroying the sequence.
-  _ = sequence._preprocessingPass { () -> Void in
-    let copy = sequence._copyToContiguousArray()
-    expectEqualSequence(expected, copy, message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), sameValue: sameValue)
-  }
 }
 
 public func checkSequence<
@@ -206,32 +180,6 @@ public func checkSequence<
   expectGE(
     expectedCount, sequence.underestimatedCount, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-
-  // Test `_copyContents(initializing:)` if we can do so without destroying the
-  // sequence.
-  _ = sequence._preprocessingPass { () -> Void in
-    var count = 0
-    for _ in sequence { count += 1 }
-    let ptr = UnsafeMutablePointer<S.Element>.allocate(capacity: count)
-    let buf = UnsafeMutableBufferPointer(start: ptr, count: count)
-    var (remainders,writtenUpTo) = sequence._copyContents(initializing: buf)
-    expectTrue(remainders.next() == nil,
-      "_copyContents returned unwritten elements")
-    expectTrue(writtenUpTo == buf.endIndex,
-      "_copyContents failed to use entire buffer")
-    expectEqualSequence(expected, buf, message(),
-    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), sameValue: sameValue)
-    ptr.deinitialize(count: count)
-    ptr.deallocate()
-  }
-
-  // Test `_copyToContiguousArray()` if we can do so
-  // without destroying the sequence.
-  _ = sequence._preprocessingPass { () -> Void in
-    let copy = sequence._copyToContiguousArray()
-    expectEqualSequence(expected, copy, message(),
-    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), sameValue: sameValue)
-  }
 }
 
 public func checkSequence<
