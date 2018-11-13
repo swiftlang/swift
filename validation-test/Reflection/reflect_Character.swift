@@ -50,9 +50,9 @@ reflect(object: obj)
 // CHECK-32: Type info:
 // CHECK-32-NEXT: (class_instance size=20 alignment=4 stride=20 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:   (field name=t offset=8
-// CHECK-32-NEXT:     (struct size=12 alignment=4 stride=12 num_extra_inhabitants=128 bitwise_takable=1
+// CHECK-32-NEXT:     (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
 // CHECK-32-NEXT:       (field name=_str offset=0
-// CHECK-32-NEXT:         (struct size=12 alignment=4 stride=12 num_extra_inhabitants=128 bitwise_takable=1
+// CHECK-32-NEXT:         (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
 
 doneReflecting()
 
