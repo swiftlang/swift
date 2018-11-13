@@ -426,7 +426,7 @@ func noinline_callee() {}
 @inline(__always)
 func always_inline_callee() {}
 
-// CHECK-LABEL: sil [serialized] [always_inline] @$s9functions27public_always_inline_calleeyyF : $@convention(thin) () -> ()
+// CHECK-LABEL: sil [always_inline] @$s9functions27public_always_inline_calleeyyF : $@convention(thin) () -> ()
 @inline(__always)
 public func public_always_inline_callee() {}
 

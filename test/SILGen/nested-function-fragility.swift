@@ -43,7 +43,7 @@ internal func bar() {
 public func publicFunc() {}
 
 // CHECK-LABEL: sil [serialized] [always_inline] @$s4main3basyyF
-@inline(__always)
+@inlinable @inline(__always)
 public func bas() {
   // CHECK-LABEL: sil shared [serialized] [always_inline] @$s4main3basyyF3zimL_yyF
   @inline(__always)
