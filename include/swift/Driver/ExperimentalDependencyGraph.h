@@ -44,7 +44,12 @@ namespace swift {
         using MemoizedNode = swift::experimental_dependencies::MemoizedNode;
         using Arc = swift::experimental_dependencies::Arc;
 
+        /// When rereading a dependencies file, must be able to find the old nodes for that file.
         std::unordered_map<std::string, MemoizedNode::Cache> nodesByDepsFile;
+        
+        /// When reading a dependencies file, there are nodes that are depended-upon but
+        /// (do not yet) correspond to any file.
+        MemoizedNode::Cache orphans;
         
       public:
         ExpDependencyGraph() = default;

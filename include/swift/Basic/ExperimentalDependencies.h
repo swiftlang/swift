@@ -143,6 +143,11 @@ namespace experimental_dependencies {
                                 Graph &g);
   };
 
+/// The frontend does not need to be able to remove nodes from the graph, so
+  /// it can represent arcs with a simpler format relying on sequence numbers.
+  class FrontendMemoizedNOde: public MemoizedNode {
+    
+  };
  
   
   

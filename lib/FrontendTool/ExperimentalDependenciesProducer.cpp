@@ -193,7 +193,14 @@ namespace {
     void addOneTypeOfProviderNodesToGraph(CPVec<DeclT> &decls, Node::Kind kind, std::string(*nameFn)(const DeclT *)) {
       for (const auto* D: decls) {
         std::string nameForHolderOfMember{};
-        MemoizedNode::create(kind, (*nameFn)(D), kind == Node::Kind::member ? computeContextNameOfMember(D) : "", "", cache, g);
+        // native nodes have non-empty container names
+        // TODO: centralize this invarient
+        MemoizedNode::create(kind,
+                             (*nameFn)(D),
+                             kind == Node::Kind::member ? computeContextNameOfMember(D) : sourceFileNode->getNameForDependencies(),
+                             "",
+                             cache,
+                             g);
       }
     }
     /// name converters
@@ -284,6 +291,8 @@ void GraphConstructor::addToGraphThatThisWholeFileDependsUpon(Node::Kind kind,
                                                               const std::string &nameForHolderOfMember,
                                                               const std::string &dependedUponNameIfNotEmpty,
                                                               bool cascades) {
+  // foreign nodes have empty container names
+  // TODO: centralize this invarient
   MemoizedNode *whatIsDependedUpon = MemoizedNode::create(kind, dependedUponNameIfNotEmpty, nameForHolderOfMember, "", cache, g);
   if (!cascades)
     g.addArc(Arc{sourceFileNode, whatIsDependedUpon});
