@@ -7,8 +7,8 @@ sil_stage canonical
 import Swift
 
 public struct ExternalGeneric<T: Comparable> {
-  @sil_stored public var ro: T { get }
-  @sil_stored public var rw: T { get set }
+  @_hasStorage public var ro: T { get }
+  @_hasStorage public var rw: T { get set }
 
   public var computedRO: T { get }
   public var computedRW: T { get set }
@@ -21,8 +21,8 @@ public struct ExternalGeneric<T: Comparable> {
 }
 
 public struct External {
-  @sil_stored public var ro: Int { get }
-  @sil_stored public var rw: Int { get set }
+  @_hasStorage public var ro: Int { get }
+  @_hasStorage public var rw: Int { get set }
 
   public var computedRO: Int { get }
   public var computedRW: Int { get set }
@@ -35,8 +35,8 @@ public struct External {
 }
 
 public struct ExternalReabstractions<T> {
-  @sil_stored public var ro: T { get }
-  @sil_stored public var reabstracted: () -> () { get set }
+  @_hasStorage public var ro: T { get }
+  @_hasStorage public var reabstracted: () -> () { get set }
 }
 
 // -- struct property, offset resolved from field offset vector in metadata

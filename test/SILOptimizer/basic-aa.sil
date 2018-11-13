@@ -509,8 +509,8 @@ sil @different_fields : $@convention(thin) () -> () {
 }
 
 public final class C {
-  @sil_stored final var a: Int { get set }
-  @sil_stored final var b: Int { get set }
+  @_hasStorage final var a: Int { get set }
+  @_hasStorage final var b: Int { get set }
    deinit
   init()
 }

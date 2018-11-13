@@ -36,13 +36,13 @@ bb3:                                            // Preds: bb0 bb409
 // Verify that we do not crash in argument splitting (rdar://problem/25008398).
 
 class C {
-  @sil_stored let x: Builtin.Int32
+  @_hasStorage let x: Builtin.Int32
   init()
 }
 
 struct Pair {
-  @sil_stored let first: C
-  @sil_stored let second: C
+  @_hasStorage let first: C
+  @_hasStorage let second: C
 }
 
 // CHECK-LABEL: @simplify_args_crash

@@ -8,7 +8,7 @@ import Swift
 import SwiftShims
 
 public struct S {
-  @sil_stored var i: Builtin.Int64 { get set }
+  @_hasStorage var i: Builtin.Int64 { get set }
   init(i: Int)
 }
 

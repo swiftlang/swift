@@ -3215,7 +3215,7 @@ extension PM {
 
 
 public final class VV {
-  @sil_stored final var m: PM { get set }
+  @_hasStorage final var m: PM { get set }
   init()
   deinit
 }

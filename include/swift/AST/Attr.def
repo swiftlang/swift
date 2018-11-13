@@ -245,9 +245,9 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(override, Override,
   OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor | OnAssociatedType |
   DeclModifier |
   NotSerialized, 44)
-SIMPLE_DECL_ATTR(sil_stored, SILStored,
+SIMPLE_DECL_ATTR(_hasStorage, HasStorage,
   OnVar |
-  SILOnly |
+  UserInaccessible |
   NotSerialized, 45)
 DECL_ATTR(private, AccessControl,
   OnFunc | OnAccessor | OnExtension | OnGenericType | OnVar | OnSubscript |
