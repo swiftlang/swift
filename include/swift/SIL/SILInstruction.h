@@ -7638,8 +7638,8 @@ public:
     return getAllOperands().drop_front();
   }
 
-  ArrayRef<Operand>
-  getAssociatedFunctionList(unsigned differentiationOrder) const;
+  std::pair<SILValue, SILValue>
+  getAssociatedFunctionPair(unsigned differentiationOrder) const;
 
   SILValue getAssociatedFunction(unsigned differentiationOrder,
                                  SILAutoDiffAssociatedFunctionKind kind) const;
@@ -7665,6 +7665,10 @@ private:
   SILAutoDiffAssociatedFunctionKind associatedFunctionKind;
   /// 2 operands: the `@autodiff` function and the differentiation order.
   FixedOperandList<2> operands;
+
+  static CanSILFunctionType
+  getAssociatedFunctionType(SILValue function,
+                            SILAutoDiffAssociatedFunctionKind kind);
 
 public:
   explicit AutoDiffFunctionExtractInst(

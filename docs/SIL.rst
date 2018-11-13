@@ -5468,23 +5468,21 @@ autodiff_function
   sil-autodiff-function-order ::= '[' 'order' [0-9]+ ']'
   sil-autodiff-associated-functions-clause ::= 'with' sil-autodiff-associated-function-list
                                                (',' sil-autodiff-associated-function-list)*
-  sil-autodiff-associated-function-list ::= '{' sil-value (',' sil-value)* '}'
+  sil-autodiff-associated-function-list ::= '{' sil-value ',' sil-value '}'
 
 
   autodiff_function [wrt 0] [order 1] %0 : $(T) -> T \
-    with {%1 : $(T) -> (T) -> T, %2 : $(T, @box {...}) -> T, \
-      %3 : $(T) -> (T) -> T, %4 : $(T, @box {...}) -> T}
+    with {%1 : $(T) -> (T) -> T, %2 : $(T) -> (T) -> T}
   autodiff_function [legacy_reverse] [wrt 0] [order 1] %0 : $(T) -> T \
     with {%1 : $(T) -> (..., T), %2 : $(T, ..., T, T) -> T}
 
 Bundles a function with its associated differentiation functions up to a
-specified differentiation order into an ``@autodiff`` function. Normally, there
-are 4 associated functions per differentiation order: a Jacobian-vector products
-(JVP) function, a thick differential function that acts as the JVP function's
-result, vector-Jacobian products (VJP) function, and a thick pullback function
-that acts as the VJP function's result. When ``[legacy_reverse]`` is specified,
-only first-order reverse-mode differentiation is legal, and only two functions
-are being bundled: the primal function and the adjoint function.
+specified differentiation order into an ``@autodiff`` function. There are 2
+associated functions per differentiation order: a Jacobian-vector products
+(JVP) function and a vector-Jacobian products (VJP) function.
+When ``[legacy_reverse]`` is specified, only first-order reverse-mode
+differentiation is legal, and functions being bundled are the primal function
+and the adjoint function.
 
 ``[parameters ...]`` specifies parameter indices that the original function is
 differentiable with respect to. When not specified, it defaults to all
@@ -5500,6 +5498,32 @@ clause will be added to the instruction.
 
 In raw SIL, it is optional to provide a ``with`` clause. In canonical SIL, a
 ``with`` clause is mandatory.
+
+
+autodiff_function_extract
+`````````````````````````
+
+::
+
+  sil-instruction ::= 'autodiff_function_extract'
+                      sil-autodiff-function-legacy-reverse-mode?
+                      sil-autodiff-associated-function-kind
+                      sil-value ':' sil-type 'order' sil-value ':' sil-type
+
+  sil-autodiff-associated-function-kind ::= '[' sil-autodiff-associated-function-kind-name ']'
+  sil-autodiff-associated-function-kind-name ::= 'primal' | 'adjoint' | 'jvp' | 'vjp'
+
+
+  autodiff_function_extract [jvp] %0 : $@autodiff (T) -> T order %1 : $Builtin.Int64
+  autodiff_function_extract [legacy_reverse] [primal] %0 : $@autodiff (T) -> T order %1 : $Builtin.Int64
+
+Extracts an associated differentiation function from the given ``@autodiff``
+function at a specific differentiation order. It must be provided with an
+associated function kind.
+
+When ``[legacy_reverse]`` is specified, ``[primal]`` and ``[adjoint]`` are the
+available associated function kinds. Otherwise, ``[jvp]`` and ``[vjp]`` are
+available instead.
 
 .. SWIFT_ENABLE_TENSORFLOW
 

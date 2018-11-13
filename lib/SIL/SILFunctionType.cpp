@@ -99,8 +99,7 @@ CanType SILFunctionType::getSelfInstanceType() const {
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
-CanSILFunctionType
-SILFunctionType::getGradientType(
+CanSILFunctionType SILFunctionType::getGradientType(
     const SILAutoDiffConfig &config, SILModule &M) {
   // FIXME: Handle `Delayed` gradient option.
   auto originalParams = getParameters();
@@ -208,6 +207,11 @@ CanSILFunctionType SILFunctionType::getWithDifferentiability(
   // FIXME(rxwei): Handle parameter indices.
   return getWithExtInfo(
       getExtInfo().withDifferentiability(Differentiability::Bidirectional));
+}
+
+CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
+    SILAutoDiffAssociatedFunctionKind kind) {
+  llvm_unreachable("FIXME: Implement this");
 }
 
 ProtocolDecl *

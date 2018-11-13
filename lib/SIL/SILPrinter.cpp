@@ -1167,12 +1167,9 @@ public:
       *this << " with ";
       interleave(range(1, adfi->getDifferentiationOrder() + 1),
                  [&](unsigned order) {
-                   auto list = adfi->getAssociatedFunctionList(order);
-                   *this << '{';
-                   interleave(list, [&](const Operand &op) {
-                     *this << getIDAndType(op.get());
-                   }, [this] { *this << ", "; });
-                   *this << '}';
+                   auto pair = adfi->getAssociatedFunctionPair(order);
+                   *this << '{' << getIDAndType(pair.first) << ", "
+                         << getIDAndType(pair.second) << '}';
                  }, [this] { *this << ", "; });
     }
   }
@@ -1191,14 +1188,8 @@ public:
     case swift::SILAutoDiffAssociatedFunctionKind::JVP:
       *this << "jvp";
       break;
-    case swift::SILAutoDiffAssociatedFunctionKind::Differential:
-      *this << "differential";
-      break;
     case swift::SILAutoDiffAssociatedFunctionKind::VJP:
       *this << "vjp";
-      break;
-    case swift::SILAutoDiffAssociatedFunctionKind::Pullback:
-      *this << "pullback";
       break;
     }
     *this << "] " << getIDAndType(adfei->getFunctionOperand())

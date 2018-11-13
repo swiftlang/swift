@@ -647,14 +647,13 @@ AutoDiffFunctionInst *AutoDiffFunctionInst::create(
                                              associatedFunctions);
 }
 
-ArrayRef<Operand> AutoDiffFunctionInst::
-getAssociatedFunctionList(unsigned differentiationOrder) const {
+std::pair<SILValue, SILValue> AutoDiffFunctionInst::
+getAssociatedFunctionPair(unsigned differentiationOrder) const {
   assert(differentiationOrder > 0 &&
          differentiationOrder <= this->differentiationOrder);
-  auto numAssocFns = autodiff::
-      getNumAutoDiffAssociatedFunctionsPerOrder(isLegacyReverseMode());
-  auto offset = (differentiationOrder - 1) * numAssocFns;
-  return getAssociatedFunctions().slice(offset, numAssocFns);
+  auto offset = (differentiationOrder - 1) * 2;
+  auto assocFns = getAssociatedFunctions();
+  return {assocFns[offset].get(), assocFns[offset+1].get()};
 }
 
 SILValue AutoDiffFunctionInst::
@@ -667,15 +666,21 @@ getAssociatedFunction(unsigned differentiationOrder,
   return getAssociatedFunctions()[offset].get();
 }
 
+CanSILFunctionType AutoDiffFunctionExtractInst::
+getAssociatedFunctionType(SILValue function,
+                          SILAutoDiffAssociatedFunctionKind kind) {
+  auto fnTy = function->getType().castTo<SILFunctionType>();
+  return fnTy->getAutoDiffAssociatedFunctionType(kind);
+}
+
 AutoDiffFunctionExtractInst::AutoDiffFunctionExtractInst(
     SILModule &module, SILDebugLocation debugLoc, bool isLegacyReverseMode,
     SILAutoDiffAssociatedFunctionKind associatedFunctionKind,
     SILValue theFunction, SILValue differentiationOrder)
-    : InstructionBase(debugLoc
-                      /*FIXME(rxwei): compute the associated function type*/),
-    legacyReverseModeFlag(isLegacyReverseMode),
-    associatedFunctionKind(associatedFunctionKind),
-    operands(this, theFunction, differentiationOrder) {
+    : InstructionBase(debugLoc, SILType()),
+      legacyReverseModeFlag(isLegacyReverseMode),
+      associatedFunctionKind(associatedFunctionKind),
+      operands(this, theFunction, differentiationOrder) {
 }
 
 FunctionRefInst::FunctionRefInst(SILDebugLocation Loc, SILFunction *F)

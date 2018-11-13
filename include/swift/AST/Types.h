@@ -4077,6 +4077,11 @@ public:
   CanSILFunctionType getWithDifferentiability(
       unsigned differentiationOrder, const SmallBitVector &parameterIndices);
 
+  /// Returns the differentiation function type associated functions with this
+  /// function type.
+  CanSILFunctionType getAutoDiffAssociatedFunctionType(
+      SILAutoDiffAssociatedFunctionKind kind);
+
   /// If this is a @convention(witness_method) function with a protocol
   /// constrained self parameter, return the protocol constraint for
   /// the Self type.

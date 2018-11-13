@@ -2932,13 +2932,12 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     // e.g. autodiff_function [wrt 0 1 2] [order 2] %0 : $T
     //
     // e.g. autodiff_function [wrt 0 1 2] [order 2] %0 : $T with
-    //      { %1 : $T, %2 : $T, %3 : $T, %4 : $T },
-    //      { %5 : $T, %6 : $T, %7 : $T, %8 : $T }
-    // //      ^ vjp    ^ df     ^ jvp    ^ pullback
+    //      {%1 : $T, %2 : $T}, {%3 : $T, %4 : $T}
+    //        ^ jvp    ^ vjp
     //
     // e.g. autodiff_function [legacy_reverse] [wrt 0 1 2] %0 : $T with
-    //      { %1 : $T,    %2 : $T }
-    // //      ^ primal    ^ adjoint
+    //      {%1 : $T,   %2 : $T}
+    // //      ^ primal  ^ adjoint
     SourceLoc lastLoc;
     bool isLegacyReverseMode = false;
     SmallBitVector parameterIndices(32);
@@ -2996,33 +2995,27 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (parseTypedValueRef(original, B))
       return true;
     SmallVector<SILValue, 16> associatedFunctions;
-    // Parse optional operand lists `with { <operand>... }, ...`.
+    // Parse optional operand lists `with { <operand> , <operand> }, ...`.
     if (P.Tok.is(tok::identifier) && P.Tok.getText() == "with") {
       P.consumeToken(tok::identifier);
       // Parse associated function values as operand lists. There are as many
       // operand lists as the differentiation order.
-      auto numFnsPerOrder = autodiff::
-          getNumAutoDiffAssociatedFunctionsPerOrder(isLegacyReverseMode);
-      associatedFunctions.reserve(numFnsPerOrder * order);
+      associatedFunctions.reserve(2 * order);
       for (unsigned listIdx = 0; listIdx < order; ++listIdx) {
+        // FIXME(rxwei): Change this to *not* require a type signature once
+        // we can infer AD associated function types.
+        SILValue newAssocFn1, newAssocFn2;
         if (P.parseToken(tok::l_brace,
-                         diag::sil_inst_autodiff_operand_list_expected_lbrace))
-          return true;
-        for (unsigned fnIdx : range(numFnsPerOrder)) {
-          if (fnIdx != 0)
-            if (P.parseToken(tok::comma,
-                  diag::sil_inst_autodiff_operand_list_expected_comma))
-              return true;
-          SILValue newAssocFn;
-          // FIXME(rxwei): Change this to *not* require a type signature once
-          // we can infer AD associated function types.
-          if (parseTypedValueRef(newAssocFn, B))
-            return true;
-          associatedFunctions.push_back(newAssocFn);
-        }
-        if (P.parseToken(tok::r_brace,
+                diag::sil_inst_autodiff_operand_list_expected_lbrace) ||
+            parseTypedValueRef(newAssocFn1, B) ||
+            P.parseToken(tok::comma,
+                diag::sil_inst_autodiff_operand_list_expected_comma) ||
+            parseTypedValueRef(newAssocFn2, B) ||
+            P.parseToken(tok::r_brace,
                          diag::sil_inst_autodiff_operand_list_expected_rbrace))
           return true;
+        associatedFunctions.push_back(newAssocFn1);
+        associatedFunctions.push_back(newAssocFn2);
       }
       if (P.Tok.is(tok::l_brace)) {
         P.diagnose(P.Tok,
@@ -3067,9 +3060,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
           .Case("primal", SILAutoDiffAssociatedFunctionKind::LegacyPrimal)
           .Case("adjoint", SILAutoDiffAssociatedFunctionKind::LegacyAdjoint)
           .Case("jvp", SILAutoDiffAssociatedFunctionKind::JVP)
-          .Case("differential", SILAutoDiffAssociatedFunctionKind::Differential)
           .Case("vjp", SILAutoDiffAssociatedFunctionKind::VJP)
-          .Case("pullback", SILAutoDiffAssociatedFunctionKind::Pullback)
           .Default(None);
     if (!assocFnKind) {
       P.diagnose(kindIdLoc,
@@ -3085,7 +3076,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createAutoDiffFunctionExtract(InstLoc, isLegacyReverseMode,
-                                                assocFnKind, functionOperand,
+                                                *assocFnKind, functionOperand,
                                                 orderOperand);
     break;
   }
