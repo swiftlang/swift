@@ -3509,6 +3509,8 @@ bb0(%0 : $*Builtin.Int64, %1 : $B):
   return %4 : $Builtin.Int64
 }
 
+protocol _NSArrayCore {}
+
 // CHECK-LABEL: sil @mark_dependence_base2
 // CHECK: bb0(
 // CHECK-NOT: open_existential_ref
