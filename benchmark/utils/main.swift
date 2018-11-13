@@ -72,7 +72,7 @@ import ErrorHandling
 import Exclusivity
 import ExistentialPerformance
 import Fibonacci
-import FlattenList
+import Flatten
 import FloatingPointPrinting
 import Hanoi
 import Hash
@@ -242,8 +242,7 @@ registerBenchmark(ErrorHandling)
 registerBenchmark(Exclusivity)
 registerBenchmark(ExistentialPerformance)
 registerBenchmark(Fibonacci)
-registerBenchmark(FlattenListLoop)
-registerBenchmark(FlattenListFlatMap)
+registerBenchmark(Flatten)
 registerBenchmark(FloatingPointPrinting)
 registerBenchmark(Hanoi)
 registerBenchmark(HashTest)

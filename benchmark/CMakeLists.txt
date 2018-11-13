@@ -84,13 +84,13 @@ set(SWIFT_BENCH_MODULES
     single-source/Exclusivity
     single-source/ExistentialPerformance
     single-source/Fibonacci
-    single-source/FlattenList
+    single-source/Flatten
     single-source/FloatingPointPrinting
     single-source/Hanoi
     single-source/Hash
     single-source/HashQuadratic
     single-source/Histogram
-    single-source/InsertCharacter  
+    single-source/InsertCharacter
     single-source/Integrate
     single-source/IterateData
     single-source/Join

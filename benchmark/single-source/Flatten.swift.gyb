@@ -1,0 +1,275 @@
+//===--- Flatten.swift -------------------------------------  -*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+% # Ignore the following warning. This _is_ the correct file to edit.
+////////////////////////////////////////////////////////////////////////////////
+// WARNING: This file is manually generated from .gyb template and should not
+// be directly modified. Instead, make changes to Flatten.swift.gyb and run
+// scripts/generate_harness/generate_harness.py to regenerate this file.
+////////////////////////////////////////////////////////////////////////////////
+
+import TestsUtils
+
+let t: [BenchmarkCategory] = [.api, .validation]
+%{
+import re
+
+method_variant_re = re.compile(r'\.([a-z])')
+control_flow_separator_re = re.compile(r'-')
+group_separator_re = re.compile(r'\.')
+
+def run_function_name(benchmark_name):
+  return 'run_' + group_separator_re.sub(  # remove dots
+    '', method_variant_re.sub(  # replace .methodName with _methodName
+      r'_\1', control_flow_separator_re.sub( # remove dashes
+        '', benchmark_name)))
+
+Tuple4 = [
+  ('flatMap', """
+    let f = input.flatMap { [$0.0, $0.1, $0.2, $0.3] }
+"""),
+  ('map.joined', """
+    let f = input.map({ [$0.0, $0.1, $0.2, $0.3] }).joined()
+"""),
+  ('for-in.Naive', """
+    var f: [Int] = []
+
+    for (x, y, z, w) in input {
+      f.append(x)
+      f.append(y)
+      f.append(z)
+      f.append(w)
+    }
+"""),
+  ('for-in.Reserve', """
+    var f: [Int] = []
+    f.reserveCapacity(input.count * 4)
+
+    for (x, y, z, w) in input {
+      f.append(x)
+      f.append(y)
+      f.append(z)
+      f.append(w)
+    }
+"""),
+  ('Unsafe', """
+    let f = input.withUnsafeBufferPointer {
+      $0.baseAddress!.withMemoryRebound(to: Int.self, capacity: input.count * 4) {
+        Array(UnsafeBufferPointer(start: $0, count: input.count * 4))
+      }
+    }
+"""),
+]
+
+CollT4 = Tuple4[0:-1]  # skip Unsafe, input is not an Array
+SeqT4 = Tuple4[0:-2]  # skip Reserve, input is just some Sequence, size unknown
+
+FlattenTuple4 = (
+  [('Flatten.Array.Tuple4.' + n, c) for (n, c) in Tuple4] +
+  [('Flatten.Array.Tuple4.lazy.' + n, c) for (n, c) in CollT4] +
+  [('Flatten.Seq.Tuple4.' + n, c) for (n, c) in SeqT4] +
+  [('Flatten.AnySeq.Array.Tuple4.' + n, c) for (n, c) in SeqT4] +
+  [('Flatten.AnySeq.Seq.Tuple4.' + n, c) for (n, c) in SeqT4]
+)
+
+Array4 = [
+  ('flatMap', """
+    let f = input.flatMap { $0 }
+"""),
+  ('joined', """
+    let f = input.joined()
+"""),
+  ('for-in.Elem', """
+    var f: [Int] = []
+
+    for array in input {
+      for element in array {
+        f.append(element)
+      }
+    }
+"""),
+  ('for-in.Batch', """
+    var f: [Int] = []
+
+    for array in input {
+      f += array
+    }
+"""),
+]
+
+FlattenArray4 = (
+  [('Flatten.Array.Array4.' + n, c) for (n, c) in Array4] +
+  [('Flatten.Array.Array4.lazy.' + n, c) for (n, c) in Array4] +
+  [('Flatten.Seq.Array4.' + n, c) for (n, c) in Array4] +
+  [('Flatten.AnySeq.Array.Array4.' + n, c) for (n, c) in Array4] +
+  [('Flatten.AnySeq.Seq.Array4.' + n, c) for (n, c) in Array4]
+)
+
+Colors = [  # let's pretend we're converting pixel data from RGBA to ARGB
+  ('flatMap', """
+    let f = input.flatMap { [$0.a, $0.r, $0.g, $0.b] }
+"""),
+  ('map.joined', """
+    let f = input.map({ [$0.a, $0.r, $0.g, $0.b] }).joined()
+"""),
+  ('lazy.map.joined', """
+    let f = input.lazy.map({ [$0.a, $0.r, $0.g, $0.b] }).joined()
+"""),
+  ('for-in.Naive', """
+    var f: [UInt8] = []
+
+    for c in input {
+      f.append(c.a)
+      f.append(c.r)
+      f.append(c.g)
+      f.append(c.b)
+    }
+"""),
+  ('Unsafe', """
+    let f = input.withUnsafeBufferPointer {
+      $0.baseAddress!.withMemoryRebound(to: UInt32.self, capacity: input.count) {
+        UnsafeBufferPointer(start:$0, count: input.count).flatMap {
+          (rawColor: UInt32) -> [UInt8] in
+          let rgba = rawColor.bigEndian
+          let argb = (rgba << 24) | (rgba >> 8) // rotate
+          return stride(from:24, through:0, by: -8).map {
+            UInt8(truncatingIfNeeded: argb >> UInt32($0))
+          }
+        }
+      }
+    }
+    // print(f.suffix(4))
+"""),
+  ('Unsafe2', """
+    let f = input.withUnsafeBufferPointer {
+      $0.baseAddress!.withMemoryRebound(to: UInt32.self, capacity: input.count) {
+        UnsafeBufferPointer(start:$0, count: input.count).map { rgba in
+          // rotate (inverted direction, because x86 is little endian)
+          (rgba >> 24) | (rgba << 8)
+        }
+        .withUnsafeBytes(Array.init)
+      }
+    }
+    // print(f.suffix(4))
+"""),
+  ('Unsafe3', """
+    let f = input.map { c in ColorVal(r: c.a, g: c.r, b: c.g, a: c.b) }
+        .withUnsafeBytes(Array.init)
+    // print(f.suffix(4))
+"""),
+]
+FlattenColors = (
+  [('Flatten.Array.Color.Val.' + n, c) for (n, c) in Colors] +
+  [('Flatten.Array.Color.Ref.' + n, c) for (n, c) in Colors[0:-3]]
+)
+
+Variants = FlattenTuple4 + FlattenArray4 + FlattenColors
+}%
+
+public let Flatten = [
+% for (Name, _) in Variants:
+  BenchmarkInfo(
+    name: "${Name}",
+    runFunction: ${run_function_name(Name)}, tags: t${
+    ',\n\t\tsetUpFunction: { blackHole(arrayTuple4) }' if 'Array.Tuple4' in Name else
+    ',\n\t\tsetUpFunction: { blackHole(arrayArray4) }' if 'Array.Array4' in Name else
+    ',\n\t\tsetUpFunction: { blackHole(arrayColorVals) }' if 'Color.Val' in Name else
+    ',\n\t\tsetUpFunction: { blackHole(arrayColorRefs) }' if 'Color.Ref' in Name else
+    '' }),
+% end
+]
+
+let size = 1<<14
+let flatSize = size * 4
+let lastElement = size + 3
+
+let tuple4: (Int) -> (Int, Int, Int, Int) = { ($0, $0 + 1, $0 + 2, $0 + 3) }
+let arrayTuple4 = (1...size).map(tuple4)
+let sequenceTuple4 = (1...size).lazy.map(tuple4)
+
+let array4: (Int) -> [Int] = { [$0, $0 + 1, $0 + 2, $0 + 3] }
+let arrayArray4 = (1...size).map(array4)
+let sequenceArray4 = (1...size).lazy.map(array4)
+
+// 32-bit color
+struct ColorVal { let r, g, b, a: UInt8 }
+final class ColorRef {
+  let r, g, b, a: UInt8
+  init(r: UInt8, g: UInt8, b: UInt8, a: UInt8) {
+    self.r = r; self.g = g; self.b = b; self.a = a
+  }
+}
+
+let c: (Int) -> UInt8 = { UInt8($0 % 256) } // clamp
+let arrayColorVals = (1...size).map {
+  ColorVal(r: c($0), g: c($0 + 1), b: c($0 + 2), a: c($0 + 3))
+}
+let arrayColorRefs = (1...size).map {
+  ColorRef(r: c($0), g: c($0 + 1), b: c($0 + 2), a: c($0 + 3))
+}
+let lastBlue = c(size + 2)
+
+struct CountLast<T> {
+  var count: Int = 0
+  var last: T? = nil
+  static func collect(_ cl: inout CountLast, _ element: T){
+    cl.count += 1
+    cl.last = element
+  }
+}
+
+% for (Name, Code) in Variants:
+@inline(never)
+public func ${run_function_name(Name)}(_ N: Int) {
+  for _ in 1...N {
+%   if 'Tuple4' in Name:
+    let input = ${
+    'AnySequence(arrayTuple4)' if 'AnySeq.Array' in Name else
+    'AnySequence(sequenceTuple4)' if 'AnySeq.Seq' in Name else
+    'sequenceTuple4' if 'Seq' in Name else
+    'arrayTuple4.lazy' if '.lazy' in Name else
+    'arrayTuple4'
+}
+%   end
+%   if 'Array4' in Name:
+    let input = ${
+    'AnySequence(arrayArray4)' if 'AnySeq.Array' in Name else
+    'AnySequence(sequenceArray4)' if 'AnySeq.Seq' in Name else
+    'sequenceArray4' if 'Seq' in Name else
+    'arrayArray4.lazy' if '.lazy' in Name else
+    'arrayArray4'
+}
+%   end
+%   if 'Color' in Name:
+    let input = arrayColor${ 'Vals' if 'Val' in Name else 'Refs' }
+%   end
+${Code}
+%   if 'Seq' in Name or 'lazy' in Name:
+%  #// Materialize the Sequence.
+%  #// Avoiding memory allocation overhead, it's functionally equivalent to:
+%  #// let fa = Array(f)
+%  #// CheckResults((fa.count, fa.last!) == (flatSize, lastElement))
+    let cl = f.reduce(into: CountLast(), CountLast.collect)
+    CheckResults((cl.count, cl.last!) == (flatSize, last${
+      'Blue' if 'Color' in Name else 'Element' }))
+%   else:
+    CheckResults((f.count, f.last!) == (flatSize, last${
+      'Blue' if 'Color' in Name else 'Element' }))
+%   end
+  }
+}
+
+% end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:
