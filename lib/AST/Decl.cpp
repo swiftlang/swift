@@ -1416,7 +1416,7 @@ SourceRange IfConfigDecl::getSourceRange() const {
 }
 
 static bool isPolymorphic(const AbstractStorageDecl *storage) {
-  if (storage->isDynamic())
+  if (storage->isObjCDynamic())
     return true;
 
 
@@ -1622,6 +1622,9 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
       // accessors are dynamically dispatched, and we cannot do direct access.
       if (isPolymorphic(this))
         return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ true);
+
+      if (isDynamic())
+        return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ false);
 
       // If the storage is resilient to the given use DC (perhaps because
       // it's @_transparent and we have to be careful about it being inlined
