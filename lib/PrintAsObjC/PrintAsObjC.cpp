@@ -915,7 +915,8 @@ private:
   
   const ValueDecl *getRenameDecl(const ValueDecl *D, const ParsedDeclName renamedParsedDeclName) {
     auto declContext = D->getDeclContext();
-    auto renamedDeclName = renamedParsedDeclName.formDeclName(D->getASTContext());
+    ASTContext &astContext = D->getASTContext();
+    auto renamedDeclName = renamedParsedDeclName.formDeclName(astContext);
     
     if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D)) {
       UnqualifiedLookup lookup(renamedDeclName.getBaseIdentifier(),
@@ -928,7 +929,7 @@ private:
       TypeDecl *typeDecl = declContext->getSelfNominalTypeDecl();
       
       if (!renamedParsedDeclName.ContextName.empty()) {
-        auto contextIdentifier = D->getASTContext().getIdentifier(renamedParsedDeclName.ContextName);
+        auto contextIdentifier = astContext.getIdentifier(renamedParsedDeclName.ContextName);
         UnqualifiedLookup specificTypeLookup(contextIdentifier,
                                              declContext->getModuleScopeContext(),
                                              nullptr,
