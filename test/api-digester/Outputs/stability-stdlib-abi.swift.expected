@@ -161,6 +161,14 @@ Func SystemRandomNumberGenerator._fill(bytes:) has been removed
 Func _createStringTableCache(_:) has been removed
 Struct _StringSwitchContext has been removed
 
+Class __SwiftNativeNSEnumerator has been removed
+Constructor _RawDictionaryStorage.init() has been removed
+Constructor _RawSetStorage.init() has been removed
+Constructor __SwiftNativeNSDictionary.init() has been removed
+Constructor __SwiftNativeNSSet.init() has been removed
+Class _DictionaryStorage is now without @_fixed_layout
+Class _SetStorage is now without @_fixed_layout
+
 Protocol Numeric has generic signature change from <τ_0_0 : Equatable, τ_0_0 : ExpressibleByIntegerLiteral, τ_0_0.Magnitude : Comparable, τ_0_0.Magnitude : Numeric> to <τ_0_0 : AdditiveArithmetic, τ_0_0 : ExpressibleByIntegerLiteral, τ_0_0.Magnitude : Comparable, τ_0_0.Magnitude : Numeric>
 Func Numeric.+(_:) has been removed
 Func Numeric.+(_:_:) has been removed

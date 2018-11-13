@@ -41,15 +41,15 @@ internal func _isValidArraySubscript(_ index: Int, count: Int) -> Bool {
 /// NOTE: older runtimes called this
 /// _SwiftNativeNSArrayWithContiguousStorage. The two must coexist, so
 /// it was renamed. The old name must not be used in the new runtime.
-@_fixed_layout // FIXME(sil-serialize-all)
+@_fixed_layout
 @usableFromInline
 internal class __SwiftNativeNSArrayWithContiguousStorage
   : __SwiftNativeNSArray { // Provides NSArray inheritance and native refcounting
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @nonobjc internal override init() {}
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   deinit {}
 
   // Operate on our contiguous storage
