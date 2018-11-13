@@ -1254,7 +1254,37 @@ public:
   }
 
   void checkAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
-    // TODO: Handle this.
+    // FIXME(rxwei): Complete verification.
+    for (auto &op : adfi->getAllOperands())
+      require(op.get()->getType().is<SILFunctionType>(),
+              "All operands must have a function type");
+    auto fnTy = adfi->getOriginalFunction()
+        ->getType().castTo<SILFunctionType>();
+    require(!fnTy->isDifferentiable(),
+            "The original function operand must not be '@autodiff'");
+  }
+  
+  void checkAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *adfei) {
+    // FIXME(rxwei): Complete verification.
+    auto fnTy = adfei->getFunctionOperand()->getType().getAs<SILFunctionType>();
+    require(fnTy, "The function operand must have a function type");
+    require(fnTy->isDifferentiable(),
+            "The function operand must be an '@autodiff' function");
+    auto orderSILTy = adfei->getDifferentiationOrderOperand()->getType();
+    require(orderSILTy.is<BuiltinIntegerType>(),
+            "The order operand must have a Builtin.Int<n> type");
+    if (adfei->isLegacyReverseMode())
+      require((adfei->getAssociatedFunctionKind() ==
+                   SILAutoDiffAssociatedFunctionKind::LegacyPrimal ||
+               adfei->getAssociatedFunctionKind() ==
+                   SILAutoDiffAssociatedFunctionKind::LegacyAdjoint),
+        "Only '[primal]' and '[adjoint]' are available in legacy reverse mode");
+    else
+      require((adfei->getAssociatedFunctionKind() !=
+                   SILAutoDiffAssociatedFunctionKind::LegacyPrimal &&
+               adfei->getAssociatedFunctionKind() !=
+                   SILAutoDiffAssociatedFunctionKind::LegacyAdjoint),
+        "'[primal]' and '[adjoint]' are only available in legacy reverse mode");
   }
 
   void verifyLLVMIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID) {

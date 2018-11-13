@@ -868,9 +868,9 @@ void
 SILCloner<ImplClass>::visitGradientInst(GradientInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst,
-    getBuilder().createGradient(getOpLocation(Inst->getLoc()),
-                                getOpValue(Inst->getOriginal()),
-                                Inst->getConfig()));
+      getBuilder().createGradient(getOpLocation(Inst->getLoc()),
+                                  getOpValue(Inst->getOriginal()),
+                                  Inst->getConfig()));
 }
 
 template<typename ImplClass>
@@ -888,6 +888,18 @@ SILCloner<ImplClass>::visitAutoDiffFunctionInst(AutoDiffFunctionInst *Inst) {
                                         Inst->getDifferentiationOrder(),
                                         getOpValue(Inst->getOriginalFunction()),
                                         mappedAssocFns));
+}
+
+template<typename ImplClass>
+void SILCloner<ImplClass>::
+visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst,
+      getBuilder().createAutoDiffFunctionExtract(
+          getOpLocation(Inst->getLoc()), Inst->isLegacyReverseMode(),
+          Inst->getAssociatedFunctionKind(),
+          getOpValue(Inst->getFunctionOperand()),
+          getOpValue(Inst->getDifferentiationOrderOperand())));
 }
 
 template<typename ImplClass>

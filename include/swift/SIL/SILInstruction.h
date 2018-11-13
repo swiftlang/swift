@@ -7568,27 +7568,27 @@ public:
   }
 };
 
-// `autodiff_function` - given a function and differentiation indices and its
-// associated differentiation functions, create an `@autodiff` function that
-// represents a bundle of these functions and configurations.
+/// `autodiff_function` - given a function and differentiation indices and its
+/// associated differentiation functions, create an `@autodiff` function that
+/// represents a bundle of these functions and configurations.
 class AutoDiffFunctionInst final :
-  public InstructionBaseWithTrailingOperands<
-             SILInstructionKind::AutoDiffFunctionInst,
-             AutoDiffFunctionInst, SingleValueInstruction> {
+    public InstructionBaseWithTrailingOperands<
+               SILInstructionKind::AutoDiffFunctionInst,
+               AutoDiffFunctionInst, SingleValueInstruction> {
 private:
   friend SILBuilder;
-  // A boolean flag that indicates whether this is for legacy reverse-mode AD,
-  // which indicates that there's a primal and an adjoint and that this is only
-  // first-order differentiation. This will be removed once legacy reverse-mode
-  // AD gets upgraded to the new linearization + partial evaluation AD model.
+  /// A boolean flag that indicates whether this is for legacy reverse-mode AD,
+  /// which indicates that there's a primal and an adjoint and that this is only
+  /// first-order differentiation. This will be removed once legacy reverse-mode
+  /// AD gets upgraded to the new linearization + partial evaluation AD model.
   bool legacyReverseModeFlag;
-  // Differentiation parameter indices.
+  /// Differentiation parameter indices.
   SmallBitVector parameterIndices;
-  // The order of differentiation.
+  /// The order of differentiation.
   unsigned differentiationOrder;
-  // The number of operands. The first operand is always the original function.
-  // The rest of operands determined by the order of differentiation and whether
-  // this is the new AD model or the legacy reverse-mode AD model.
+  /// The number of operands. The first operand is always the original function.
+  /// The rest of operands determined by the order of differentiation and whether
+  /// this is the new AD model or the legacy reverse-mode AD model.
   unsigned numOperands;
 
   AutoDiffFunctionInst(SILModule &module, SILDebugLocation debugLoc,
@@ -7646,6 +7646,58 @@ public:
 
   static bool classof(const SILNode *N) {
     return N->getKind() == SILNodeKind::AutoDiffFunctionInst;
+  }
+};
+
+/// `autodiff_function_extract` - given an `@autodiff` function representing a
+/// bundle of the original function and associated functions, extract the
+/// specified function.
+class AutoDiffFunctionExtractInst :
+    public InstructionBase<SILInstructionKind::AutoDiffFunctionInst,
+                           SingleValueInstruction> {
+private:
+  /// A boolean flag that indicates whether this is for legacy reverse-mode AD,
+  /// which indicates that there's a primal and an adjoint and that this is only
+  /// first-order differentiation. This will be removed once legacy reverse-mode
+  /// AD gets upgraded to the new linearization + partial evaluation AD model.
+  bool legacyReverseModeFlag;
+  /// The kind of the associated function to extract.
+  SILAutoDiffAssociatedFunctionKind associatedFunctionKind;
+  /// 2 operands: the `@autodiff` function and the differentiation order.
+  FixedOperandList<2> operands;
+
+public:
+  explicit AutoDiffFunctionExtractInst(
+      SILModule &module, SILDebugLocation debugLoc, bool isLegacyReverseMode,
+      SILAutoDiffAssociatedFunctionKind associatedFunctionKind,
+      SILValue theFunction, SILValue differentiationOrder);
+
+  bool isLegacyReverseMode() const {
+    return legacyReverseModeFlag;
+  }
+
+  SILAutoDiffAssociatedFunctionKind getAssociatedFunctionKind() const {
+    return associatedFunctionKind;
+  }
+
+  SILValue getFunctionOperand() const {
+    return operands[0].get();
+  }
+
+  SILValue getDifferentiationOrderOperand() const {
+    return operands[1].get();
+  }
+
+  ArrayRef<Operand> getAllOperands() const {
+    return operands.asArray();
+  }
+
+  MutableArrayRef<Operand> getAllOperands() {
+    return operands.asArray();
+  }
+
+  static bool classof(const SILNode *N) {
+    return N->getKind() == SILNodeKind::AutoDiffFunctionExtractInst;
   }
 };
 

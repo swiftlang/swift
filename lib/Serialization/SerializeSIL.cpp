@@ -955,6 +955,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::AutoDiffFunctionInst: {
     llvm_unreachable("FIXME: handle this");
   }
+  case SILInstructionKind::AutoDiffFunctionExtractInst: {
+    llvm_unreachable("FIXME: handle this");
+  }
   case SILInstructionKind::GraphOperationInst: {
     // TODO(SR-8848): Serialize attributes.
     const GraphOperationInst *GI = cast<GraphOperationInst>(&SI);

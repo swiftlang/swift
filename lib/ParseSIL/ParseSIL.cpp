@@ -3037,6 +3037,58 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
                                          associatedFunctions);
     break;
   }
+  
+  case SILInstructionKind::AutoDiffFunctionExtractInst: {
+    bool isLegacyReverseMode = false;
+    // Parse optional `[legacy_reverse]`.
+    if (P.Tok.is(tok::l_square) && P.peekToken().is(tok::identifier) &&
+        P.peekToken().getText() == "legacy_reverse") {
+      P.consumeToken(tok::l_square);
+      P.consumeToken(tok::identifier);
+      isLegacyReverseMode = true;
+      if (P.parseToken(tok::r_square,
+                       diag::sil_inst_autodiff_attr_expected_rsquare,
+                       "legacy reverse mode indicator"))
+        return true;
+    }
+    // Parse an associated function kind.
+    Identifier kindId;
+    SourceLoc kindIdLoc;
+    if (P.parseToken(tok::l_square,
+            diag::sil_inst_autodiff_expected_associated_function_kind_attr) ||
+        P.parseIdentifier(kindId, kindIdLoc,
+            diag::sil_inst_autodiff_expected_associated_function_kind_attr) ||
+        P.parseToken(tok::r_square,
+                     diag::sil_inst_autodiff_attr_expected_rsquare,
+                     "associated function kind"))
+      return true;
+    auto assocFnKind = llvm::StringSwitch<
+        Optional<SILAutoDiffAssociatedFunctionKind>>(kindId.str())
+          .Case("primal", SILAutoDiffAssociatedFunctionKind::LegacyPrimal)
+          .Case("adjoint", SILAutoDiffAssociatedFunctionKind::LegacyAdjoint)
+          .Case("jvp", SILAutoDiffAssociatedFunctionKind::JVP)
+          .Case("differential", SILAutoDiffAssociatedFunctionKind::Differential)
+          .Case("vjp", SILAutoDiffAssociatedFunctionKind::VJP)
+          .Case("pullback", SILAutoDiffAssociatedFunctionKind::Pullback)
+          .Default(None);
+    if (!assocFnKind) {
+      P.diagnose(kindIdLoc,
+          diag::sil_inst_autodiff_expected_associated_function_kind_attr);
+      return true;
+    }
+    // Parse a function operand, an order operand and a debug location.
+    SILValue functionOperand, orderOperand;
+    if (parseTypedValueRef(functionOperand, B) ||
+        P.parseSpecificIdentifier("order",
+            diag::sil_inst_autodiff_expected_order_operand) ||
+        parseTypedValueRef(orderOperand, B) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createAutoDiffFunctionExtract(InstLoc, isLegacyReverseMode,
+                                                assocFnKind, functionOperand,
+                                                orderOperand);
+    break;
+  }
 
   case SILInstructionKind::BuiltinInst: {
     if (P.Tok.getKind() != tok::string_literal) {

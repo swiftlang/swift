@@ -1177,6 +1177,34 @@ public:
     }
   }
 
+  void visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *adfei) {
+    if (adfei->isLegacyReverseMode())
+      *this << "[legacy_reverse] ";
+    *this << '[';
+    switch (adfei->getAssociatedFunctionKind()) {
+    case swift::SILAutoDiffAssociatedFunctionKind::LegacyPrimal:
+      *this << "primal";
+      break;
+    case swift::SILAutoDiffAssociatedFunctionKind::LegacyAdjoint:
+      *this << "adjoint";
+      break;
+    case swift::SILAutoDiffAssociatedFunctionKind::JVP:
+      *this << "jvp";
+      break;
+    case swift::SILAutoDiffAssociatedFunctionKind::Differential:
+      *this << "differential";
+      break;
+    case swift::SILAutoDiffAssociatedFunctionKind::VJP:
+      *this << "vjp";
+      break;
+    case swift::SILAutoDiffAssociatedFunctionKind::Pullback:
+      *this << "pullback";
+      break;
+    }
+    *this << "] " << getIDAndType(adfei->getFunctionOperand())
+          << " order " << getIDAndType(adfei->getDifferentiationOrderOperand());
+  }
+
   void visitFunctionRefInst(FunctionRefInst *FRI) {
     FRI->getReferencedFunction()->printName(PrintState.OS);
     *this << " : " << FRI->getType();

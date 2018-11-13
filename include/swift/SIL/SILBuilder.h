@@ -505,6 +505,15 @@ public:
                                                original,
                                                associatedFunctions));
   }
+  
+  AutoDiffFunctionExtractInst *createAutoDiffFunctionExtract(
+      SILLocation loc, bool isLegacyReverseMode,
+      SILAutoDiffAssociatedFunctionKind associatedFunctionKind,
+      SILValue theFunction, SILValue differentiationOrder) {
+    return insert(new (getModule()) AutoDiffFunctionExtractInst(
+        getModule(), getSILDebugLocation(loc), isLegacyReverseMode,
+        associatedFunctionKind, theFunction, differentiationOrder));
+  }
 
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
                              SubstitutionMap Subs,
