@@ -2169,7 +2169,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     isDependent
       ? getAddrOfWitnessTablePattern(conf, initializer)
       : getAddrOfWitnessTable(conf, initializer));
-  global->setConstant(isDependent || isConstantWitnessTable(wt));
+  global->setConstant(isConstantWitnessTable(wt));
   global->setAlignment(getWitnessTableAlignment().getValue());
 
   // Collect the information that will go into the protocol conformance

@@ -59,7 +59,7 @@ struct GenericWithUniversal<T> : Assocked {
 }
 
 //   Witness table for Fulfilled : Assocked.
-// GLOBAL-LABEL: @"$s23associated_type_witness9FulfilledVyxGAA8AssockedAAWp" = internal constant [4 x i8*] [
+// GLOBAL-LABEL: @"$s23associated_type_witness9FulfilledVyxGAA8AssockedAAWp" = internal global [4 x i8*] [
 // GLOBAL-SAME:    @"$s23associated_type_witness9FulfilledVyxGAA8AssockedAAMc"
 // GLOBAL-SAME:    @"associated conformance 23associated_type_witness9FulfilledVyxGAA8AssockedAA5AssocAaEP_AA1P"
 // GLOBAL-SAME:    @"associated conformance 23associated_type_witness9FulfilledVyxGAA8AssockedAA5AssocAaEP_AA1Q"
@@ -86,7 +86,7 @@ struct Fulfilled<T : P & Q> : Assocked {
 struct Pair<T, U> : P, Q {}
 
 //   Generic witness table pattern for Computed : Assocked.
-// GLOBAL-LABEL: @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAWp" = internal constant [4 x i8*] [
+// GLOBAL-LABEL: @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAWp" = internal global [4 x i8*] [
 // GLOBAL-SAME:    @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAMc"
 // GLOBAL-SAME:    @"associated conformance 23associated_type_witness8ComputedVyxq_GAA8AssockedAA5Assoc_AA1P"
 // GLOBAL-SAME:    @"associated conformance 23associated_type_witness8ComputedVyxq_GAA8AssockedAA5Assoc_AA1Q"

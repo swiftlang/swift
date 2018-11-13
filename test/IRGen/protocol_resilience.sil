@@ -82,7 +82,7 @@ protocol InternalProtocol {
 
 // CHECK: @"$s19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWp" =
 
-// CHECK-SAME: internal constant [1 x i8*] [
+// CHECK-SAME: internal global [1 x i8*] [
 
 // -- conformance descriptor
 // CHECK-SAME: "$s19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAMc"
@@ -92,7 +92,7 @@ protocol InternalProtocol {
 
 // Witness table pattern for conformance with resilient associated type
 
-// CHECK: @"$s19protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWp" = {{(protected )?}}internal constant [3 x i8*] [
+// CHECK: @"$s19protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWp" = {{(protected )?}}internal global [3 x i8*] [
 // CHECK-SAME:   @"associated conformance 19protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AA1TAaDP_010resilient_A005OtherE8Protocol"
 // CHECK-SAME:   @"symbolic 19protocol_resilience23ResilientConformingTypeV"
 // CHECK-SAME: ]
