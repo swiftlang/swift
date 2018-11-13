@@ -158,10 +158,10 @@ namespace {
                      const DependencyTracker &depTracker,
                      StringRef outputPath) : SF(SF), depTracker(depTracker), outputPath(outputPath) {}
   private:
-    Graph g;
+    FrontendGraph g;
     
   public:
-    Graph construct() {
+    FrontendGraph construct() {
       //TODO storage mgmt
       sourceFileNode = MemoizedNode::create(Node::Kind::sourceFileProvide, outputPath, "", getInterfaceHash(), cache, g);
       
@@ -295,11 +295,11 @@ void GraphConstructor::addToGraphThatThisWholeFileDependsUpon(Node::Kind kind,
   // TODO: centralize this invarient
   MemoizedNode *whatIsDependedUpon = MemoizedNode::create(kind, dependedUponNameIfNotEmpty, nameForHolderOfMember, "", cache, g);
   if (!cascades)
-    g.addArc(Arc{sourceFileNode, whatIsDependedUpon});
+    g.addArc(sourceFileNode, whatIsDependedUpon);
   else
     std::for_each(cache.begin(), cache.end(),
                   [&](std::pair<MemoizedNode::Key, MemoizedNode *> entry) {
-                    g.addArc(Arc{entry.second, whatIsDependedUpon});
+                    g.addArc(entry.second, whatIsDependedUpon);
                   });
 }
 
@@ -327,7 +327,7 @@ public:
   void entry(StringRef(key), const std::string &value) const {
     entry(key, StringRef(value));
   }
-  void entry(StringRef(key), ArrayRef<uint> numbers) const {
+  void entry(StringRef(key), ArrayRef<size_t> numbers) const {
     out << " " << key << ": \n";
     for (auto i: numbers)
       out << "  - " << i << "\n";
@@ -342,23 +342,23 @@ namespace {
   template <typename Emitter>
   class GraphEmitter {
   private:
-    const Graph &g;
+    const FrontendGraph &g;
     Emitter emitter;
   public:
-    GraphEmitter(const Graph& g, llvm::raw_ostream &out) : g(g), emitter(Emitter(out)) {}
+    GraphEmitter(const FrontendGraph& g, llvm::raw_ostream &out) : g(g), emitter(Emitter(out)) {}
   public:
     void emit() const {
       // FIXME: emits info for each arc twice
-      std::for_each(g.nodesBegin(), g.nodesEnd(), [&](const Node* n) {emitNode(n); });
+      std::for_each(g.nodesBegin(), g.nodesEnd(), [&](const FrontendNode* n) {emitNode(n); });
     }
-    void emitNode(const Node*) const;
+    void emitNode(const FrontendNode*) const;
   };
 }
 template <>
-void GraphEmitter<YAMLEmitter>::emitNode(const Node* n) const {
+void GraphEmitter<YAMLEmitter>::emitNode(const FrontendNode* n) const {
   emitter.newNode();
   // TODO: factor these strings with those in ExperimentalDependencyGraph.cpp
-  emitter.entry("kind", uint(n->getKind()));
+  emitter.entry("kind", size_t(n->getKind()));
   emitter.entry("nameForDependencies", n->getNameForDependencies());
   emitter.entry("nameForHolderOfMember", n->getNameForHolderOfMember());
   emitter.entry("fingerprint", n->getFingerprint());
@@ -382,7 +382,7 @@ bool swift::experimental_dependencies::emitReferenceDependencies(
   llvm::sys::fs::rename(outputPath, outputPath + "~");
   return withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out)  {
     GraphConstructor gc(SF, depTracker, outputPath);
-    Graph g = gc.construct();
+    FrontendGraph g = gc.construct();
     GraphEmitter<YAMLEmitter>(g, out).emit();
     return false;
   });

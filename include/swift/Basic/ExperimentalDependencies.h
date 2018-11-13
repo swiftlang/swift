@@ -43,44 +43,24 @@ namespace experimental_dependencies {
       externalDepend,
       sourceFileProvide,
       kindCount };
-    enum class SerializationKeys {
-      kind,
-      nameForDependencies,
-      nameForHolderOfMember,
-      fingerprint,
-      sequenceNumber,
-      departures,
-      arrivals,
-      serializationKeyCount
-    };
+
   private:
     Kind kind;
     std::string nameForDependencies;
     std::string nameForHolderOfMember;
     std::string fingerprint;
     
-    friend class Graph;
-    friend class Arc;
-    uint sequenceNumber;
-    std::vector<uint> departures, arrivals;
-
   public:
   Node() = default;
   Node(
        Kind kind,
        std::string nameForDependencies,
        std::string nameForHolderOfMember,
-       std::string fingerprint,
-       uint sequenceNumber = ~0,
-       std::vector<uint>&& departures = {},
-       std::vector<uint>&& arrivals = {}) :
+       std::string fingerprint) :
     kind(kind),
     nameForDependencies(nameForDependencies),
     nameForHolderOfMember(nameForHolderOfMember),
-    fingerprint(fingerprint),
-    sequenceNumber(sequenceNumber),
-    departures(departures),
-    arrivals(arrivals)
+    fingerprint(fingerprint)
     {
       assert((kind == Kind::member) == !nameForHolderOfMember.empty() && "only member nodes have the holder name");
       assert(kind != Kind::sourceFileProvide || !fingerprint.empty() && "source files must have fingerprint (old interfaceHash");
@@ -93,16 +73,14 @@ namespace experimental_dependencies {
     StringRef getNameForHolderOfMember() const { return nameForHolderOfMember; }
     StringRef getFingerprint() const { return fingerprint; }
     void setFingerprint(StringRef fp) { fingerprint = fp; }
-    uint getSequenceNumber() const { return sequenceNumber; }
-    ArrayRef<uint> getDepartures() const { return departures; }
-    ArrayRef<uint> getArrivals() const { return arrivals; }
   };
   
   /// Memoize nodes serving as heads of dependency arcs:
   /// Could be a definition in another file that a lookup here depends upon,
   /// or could be definition in this file that a lookup here depends upon.
+  // TODO: maybe instead of this class, have a node memo class??
+  // TODO: rename cache -> memo?
   
-  class Graph;
   class MemoizedNode: public Node {
   public:
     using Key = std::tuple<std::string, std::string, Node::Kind>;
@@ -139,46 +117,84 @@ namespace experimental_dependencies {
                                 std::string nameForDependencies,
                                 std::string nameForHolderOfMember,
                                 std::string fingerprint,
-                                Cache &cache,
-                                Graph &g);
+                                Cache &cache);
   };
 
 /// The frontend does not need to be able to remove nodes from the graph, so
   /// it can represent arcs with a simpler format relying on sequence numbers.
-  class FrontendMemoizedNOde: public MemoizedNode {
+  class FrontendNode: public MemoizedNode {
+  private:
+    friend class Arc;
+    size_t sequenceNumber;
+    std::vector<size_t> dependees, dependers;
+  public:
+    enum class SerializationKeys {
+      kind,
+      nameForDependencies,
+      nameForHolderOfMember,
+      fingerprint,
+      sequenceNumber,
+      departures,
+      arrivals,
+      serializationKeyCount
+    };
+  private:
+    FrontendNode(
+                 Kind kind,
+                 std::string nameForDependencies,
+                 std::string nameForHolderOfMember,
+                 std::string fingerprint,
+                 size_t sequenceNumber = ~0,
+                 std::vector<size_t>&& dependees = {},
+                 std::vector<size_t>&& dependers = {}) :
+    MemoizedNode(kind, nameForDependencies, nameForHolderOfMember, fingerprint),
+    sequenceNumber(sequenceNumber), dependees(dependees), dependers(dependers) {}
+  public:
+    /// The right way to create a node. Don't use the constructor.
+    static FrontendNode *create(Kind kind,
+                                std::string nameForDependencies,
+                                std::string nameForHolderOfMember,
+                                std::string fingerprint,
+                                Cache &cache,
+                                FrontendGraph &g);
+
+
     
+    size_t getSequenceNumber() const { return sequenceNumber; }
+    void setSequenceNumber(size_t n) {sequenceNumber = n;}
+    ArrayRef<size_t> getDependees() const { return dependees; }
+    ArrayRef<size_t> getDependers() const { return dependers; }
+    void addDependee(size_t n) {
+      if (n != getSequenceNumber())
+        dependees.push_back(n);
+    }
+    void addDepender(size_t n) {
+      if (n != getSequenceNumber())
+        dependers.push_back(n);
+    }
   };
  
   
   
-  class Arc {
+   class FrontendGraph {
+    std::vector<FrontendNode*> allNodes;
   public:
-    const uint tailSeqNo, headSeqNo;
-    Arc(const Node* tail, const Node* head) :
-    tailSeqNo(tail->sequenceNumber), headSeqNo(head->sequenceNumber) {}
-  };
-  
-  class Graph {
-    std::vector<Node*> allNodes;
-  public:
-    void addNode(Node* n) {
-      n->sequenceNumber = allNodes.size();
+    void addNode(FrontendNode* n) {
+      n->setSequenceNumber(allNodes.size());
       allNodes.push_back(n);
     }
-    void addArc(const Arc arc) {
-      if (arc.headSeqNo == arc.tailSeqNo)
-        return; // no point
-      allNodes[arc.tailSeqNo]->departures.push_back(arc.headSeqNo);
-      allNodes[arc.headSeqNo]->arrivals  .push_back(arc.tailSeqNo);
+    void addArc(FrontendNode *depender, FrontendNode *dependee) {
+      allNodes[depender->getSequenceNumber()]->addDependee(dependee->getSequenceNumber());
+      allNodes[dependee->getSequenceNumber()]->addDepender(depender->getSequenceNumber());
     }
     decltype(allNodes)::const_iterator nodesBegin() const { return allNodes.cbegin(); }
     decltype(allNodes)::const_iterator nodesEnd() const { return allNodes.cend(); }
     
-    Graph() = default;
-    Graph(const Graph& g) = delete;
-    Graph(Graph&& g) = default;
+    FrontendGraph() = default;
+    FrontendGraph(const FrontendGraph& g) = delete;
+    FrontendGraph(FrontendGraph&& g) = default;
     
-    ~Graph() {
+    ~FrontendGraph() {
       for (Node* n: allNodes) {
         delete n;
       }
