@@ -133,7 +133,9 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(optional, Optional,
   OnConstructor | OnFunc | OnAccessor | OnVar | OnSubscript |
   DeclModifier,
   5)
-// NOTE: 6 is unused
+SIMPLE_DECL_ATTR(dynamicCallable, DynamicCallable,
+  OnNominalType,
+  6)
 SIMPLE_DECL_ATTR(noreturn, NoReturn,
   OnFunc | OnAccessor,
   7)
@@ -243,9 +245,9 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(override, Override,
   OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor | OnAssociatedType |
   DeclModifier |
   NotSerialized, 44)
-SIMPLE_DECL_ATTR(sil_stored, SILStored,
+SIMPLE_DECL_ATTR(_hasStorage, HasStorage,
   OnVar |
-  SILOnly |
+  UserInaccessible |
   NotSerialized, 45)
 DECL_ATTR(private, AccessControl,
   OnFunc | OnAccessor | OnExtension | OnGenericType | OnVar | OnSubscript |

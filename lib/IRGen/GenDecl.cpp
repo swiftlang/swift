@@ -1288,7 +1288,7 @@ void IRGenerator::emitDynamicReplacements() {
   //     RelativeIndirectablePointer<KeyEntry, false> replacedFunctionKey;
   //     RelativeDirectPointer<void> newFunction;
   //     RelativeDirectPointer<LinkEntry> replacement;
-  //     uint32_t flags; // unused.
+  //     uint32_t flags; // shouldChain.
   //   }[0]
   // };
   ConstantInitBuilder builder(IGM);
@@ -1315,7 +1315,8 @@ void IRGenerator::emitDynamicReplacements() {
     replacement.addRelativeAddress(newFnPtr); // direct relative reference.
     replacement.addRelativeAddress(
         replacementLinkEntry); // direct relative reference.
-    replacement.addInt32(0); // unused flags.
+    replacement.addInt32(
+        Opts.EnableDynamicReplacementChaining ? 1 : 0);
     replacement.finishAndAddTo(replacementsArray);
   }
   replacementsArray.finishAndAddTo(replacementScope);
@@ -2428,9 +2429,11 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
   // Handle SILFunctions specially, because unlike other entities they aren't
   // variables and aren't kept in the GlobalVars table.
   if (entity.isSILFunction()) {
-    auto fn = getAddrOfSILFunction(entity.getSILFunction(), NotForDefinition);
-    if (entity.getSILFunction()->isDefinition()
-        && !isAvailableExternally(entity.getSILFunction()->getLinkage())) {
+    auto *silFn = entity.getSILFunction();
+    auto fn = getAddrOfSILFunction(silFn, NotForDefinition);
+    if (silFn->isDefinition() &&
+        !isAvailableExternally(silFn->getLinkage()) &&
+        this == IRGen.getGenModule(silFn)) {
       return {fn, ConstantReference::Direct};
     }
     

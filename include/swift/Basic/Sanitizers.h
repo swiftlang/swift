@@ -19,7 +19,8 @@ namespace swift {
 enum class SanitizerKind : unsigned {
   Address = 1 << 1,
   Thread = 1 << 2,
-  Fuzzer = 1 << 3
+  Fuzzer = 1 << 3,
+  Undefined = 1 << 4
 };
 
 } // end namespace swift

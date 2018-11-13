@@ -78,6 +78,7 @@ public:
   IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
   IGNORED_ATTR(DiscardableResult)
+  IGNORED_ATTR(DynamicCallable)
   IGNORED_ATTR(DynamicMemberLookup)
   IGNORED_ATTR(Effects)
   IGNORED_ATTR(Exported)
@@ -284,7 +285,7 @@ public:
   void visitAccessControlAttr(AccessControlAttr *attr);
   void visitSetterAccessAttr(SetterAccessAttr *attr);
   bool visitAbstractAccessControlAttr(AbstractAccessControlAttr *attr);
-  void visitSILStoredAttr(SILStoredAttr *attr);
+  void visitHasStorageAttr(HasStorageAttr *attr);
   void visitObjCMembersAttr(ObjCMembersAttr *attr);
 };
 } // end anonymous namespace
@@ -427,7 +428,7 @@ void AttributeEarlyChecker::visitGKInspectableAttr(GKInspectableAttr *attr) {
                                  attr->getAttrName());
 }
 
-void AttributeEarlyChecker::visitSILStoredAttr(SILStoredAttr *attr) {
+void AttributeEarlyChecker::visitHasStorageAttr(HasStorageAttr *attr) {
   auto *VD = cast<VarDecl>(D);
   if (VD->getDeclContext()->getSelfClassDecl())
     return;
@@ -818,6 +819,7 @@ public:
     IGNORED_ATTR(Exported)
     IGNORED_ATTR(ForbidSerializingReference)
     IGNORED_ATTR(GKInspectable)
+    IGNORED_ATTR(HasStorage)
     IGNORED_ATTR(IBDesignable)
     IGNORED_ATTR(IBInspectable)
     IGNORED_ATTR(IBOutlet) // checked early.
@@ -845,7 +847,6 @@ public:
     IGNORED_ATTR(Semantics)
     IGNORED_ATTR(ShowInInterface)
     IGNORED_ATTR(SILGenName)
-    IGNORED_ATTR(SILStored)
     IGNORED_ATTR(StaticInitializeObjCMetadata)
     IGNORED_ATTR(SynthesizedProtocol)
     IGNORED_ATTR(Testable)
@@ -859,6 +860,8 @@ public:
   void visitAvailableAttr(AvailableAttr *attr);
   
   void visitCDeclAttr(CDeclAttr *attr);
+
+  void visitDynamicCallableAttr(DynamicCallableAttr *attr);
 
   void visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr);
   
@@ -946,23 +949,115 @@ static bool isRelaxedIBAction(TypeChecker &TC) {
   return isiOS(TC) || iswatchOS(TC);
 }
 
-/// Given a subscript defined as "subscript(dynamicMember:)->T", return true if
-/// it is an acceptable implementation of the @dynamicMemberLookup attribute's
-/// requirement.
-bool swift::isAcceptableDynamicMemberLookupSubscript(SubscriptDecl *decl,
-                                                     DeclContext *DC,
-                                                     TypeChecker &TC) {
-  // The only thing that we care about is that the index list has exactly one
-  // non-variadic entry.  The type must conform to ExpressibleByStringLiteral.
+/// Returns true if the given method is an valid implementation of a
+/// @dynamicCallable attribute requirement. The method is given to be defined
+/// as one of the following: `dynamicallyCall(withArguments:)` or
+/// `dynamicallyCall(withKeywordArguments:)`.
+bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
+                                         TypeChecker &TC,
+                                         bool hasKeywordArguments) {
+  // There are two cases to check.
+  // 1. `dynamicallyCall(withArguments:)`.
+  //    In this case, the method is valid if the argument has type `A` where
+  //    `A` conforms to `ExpressibleByArrayLiteral`.
+  //    `A.ArrayLiteralElement` and the return type can be arbitrary.
+  // 2. `dynamicallyCall(withKeywordArguments:)`
+  //    In this case, the method is valid if the argument has type `D` where
+  //    `D` conforms to `ExpressibleByDictionaryLiteral` and `D.Key` conforms to
+  //    `ExpressibleByStringLiteral`.
+  //    `D.Value` and the return type can be arbitrary.
+
+  TC.validateDeclForNameLookup(decl);
+  auto paramList = decl->getParameters();
+  if (paramList->size() != 1 || paramList->get(0)->isVariadic()) return false;
+  auto argType = paramList->get(0)->getType();
+
+  // If non-keyword (positional) arguments, check that argument type conforms to
+  // `ExpressibleByArrayLiteral`.
+  if (!hasKeywordArguments) {
+    auto arrayLitProto =
+      TC.Context.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
+    return TC.conformsToProtocol(argType, arrayLitProto, DC,
+                                 ConformanceCheckOptions()).hasValue();
+  }
+  // If keyword arguments, check that argument type conforms to
+  // `ExpressibleByDictionaryLiteral` and that the `Key` associated type
+  // conforms to `ExpressibleByStringLiteral`.
+  auto stringLitProtocol =
+    TC.Context.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
+  auto dictLitProto =
+    TC.Context.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
+  auto dictConf = TC.conformsToProtocol(argType, dictLitProto, DC,
+                                        ConformanceCheckOptions());
+  if (!dictConf) return false;
+  auto lookup = dictLitProto->lookupDirect(TC.Context.Id_Key);
+  auto keyAssocType =
+    cast<AssociatedTypeDecl>(lookup[0])->getDeclaredInterfaceType();
+  auto keyType = dictConf.getValue().getAssociatedType(argType, keyAssocType);
+  return TC.conformsToProtocol(keyType, stringLitProtocol, DC,
+                               ConformanceCheckOptions()).hasValue();
+}
+
+/// Returns true if the given nominal type has a valid implementation of a
+/// @dynamicCallable attribute requirement with the given argument name.
+static bool hasValidDynamicCallableMethod(TypeChecker &TC,
+                                          NominalTypeDecl *decl,
+                                          Identifier argumentName,
+                                          bool hasKeywordArgs) {
+  auto declType = decl->getDeclaredType();
+  auto methodName = DeclName(TC.Context,
+                             DeclBaseName(TC.Context.Id_dynamicallyCall),
+                             { argumentName });
+  auto candidates = TC.lookupMember(decl, declType, methodName);
+  if (candidates.empty()) return false;
+
+  // Filter valid candidates.
+  candidates.filter([&](LookupResultEntry entry, bool isOuter) {
+    auto candidate = cast<FuncDecl>(entry.getValueDecl());
+    return isValidDynamicCallableMethod(candidate, decl, TC, hasKeywordArgs);
+  });
+
+  // If there are no valid candidates, return false.
+  if (candidates.size() == 0) return false;
+  return true;
+}
+
+void AttributeChecker::
+visitDynamicCallableAttr(DynamicCallableAttr *attr) {
+  // This attribute is only allowed on nominal types.
+  auto decl = cast<NominalTypeDecl>(D);
+  auto type = decl->getDeclaredType();
+
+  bool hasValidMethod = false;
+  hasValidMethod |=
+    hasValidDynamicCallableMethod(TC, decl, TC.Context.Id_withArguments,
+                                  /*hasKeywordArgs*/ false);
+  hasValidMethod |=
+    hasValidDynamicCallableMethod(TC, decl, TC.Context.Id_withKeywordArguments,
+                                  /*hasKeywordArgs*/ true);
+  if (!hasValidMethod) {
+    TC.diagnose(attr->getLocation(), diag::invalid_dynamic_callable_type, type);
+    attr->setInvalid();
+  }
+}
+
+/// Returns true if the given subscript method is an valid implementation of
+/// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
+/// The method is given to be defined as `subscript(dynamicMember:)`.
+bool swift::isValidDynamicMemberLookupSubscript(SubscriptDecl *decl,
+                                                DeclContext *DC,
+                                                TypeChecker &TC) {
+  // There are two requirements:
+  // - The subscript method has exactly one, non-variadic parameter.
+  // - The parameter type conforms to `ExpressibleByStringLiteral`.
   auto indices = decl->getIndices();
-  
-  auto EBSL =
+
+  auto stringLitProto =
     TC.Context.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
   
-  return indices->size() == 1 &&
-    !indices->get(0)->isVariadic() &&
+  return indices->size() == 1 && !indices->get(0)->isVariadic() &&
     TC.conformsToProtocol(indices->get(0)->getType(),
-                          EBSL, DC, ConformanceCheckOptions());
+                          stringLitProto, DC, ConformanceCheckOptions());
 }
 
 /// The @dynamicMemberLookup attribute is only allowed on types that have at
@@ -971,9 +1066,8 @@ bool swift::isAcceptableDynamicMemberLookupSubscript(SubscriptDecl *decl,
 /// subscript<KeywordType: ExpressibleByStringLiteral, LookupValue>
 ///   (dynamicMember name: KeywordType) -> LookupValue { get }
 ///
-/// ... but doesn't care about the mutating'ness of the getter/setter.  We just
-/// manually check the requirements here.
-///
+/// ... but doesn't care about the mutating'ness of the getter/setter.
+/// We just manually check the requirements here.
 void AttributeChecker::
 visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   // This attribute is only allowed on nominal types.
@@ -991,25 +1085,25 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   // Lookup the implementations of our subscript.
   auto candidates = TC.lookupMember(decl, type, subscriptName, lookupOptions);
   
-  // If we have none, then there is no attribute.
+  // If we have none, then the attribute is invalid.
   if (candidates.empty()) {
-    TC.diagnose(attr->getLocation(), diag::type_invalid_dml, type);
+    TC.diagnose(attr->getLocation(), diag::invalid_dynamic_member_lookup_type,
+                type);
     attr->setInvalid();
     return;
   }
 
-  
   // If none of the ones we find are acceptable, then reject one.
   auto oneCandidate = candidates.front();
   candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
     auto cand = cast<SubscriptDecl>(entry.getValueDecl());
     TC.validateDeclForNameLookup(cand);
-    return isAcceptableDynamicMemberLookupSubscript(cand, decl, TC);
+    return isValidDynamicMemberLookupSubscript(cand, decl, TC);
   });
 
   if (candidates.empty()) {
     TC.diagnose(oneCandidate.getValueDecl()->getLoc(),
-                diag::type_invalid_dml, type);
+                diag::invalid_dynamic_member_lookup_type, type);
     attr->setInvalid();
   }
 }
@@ -2372,7 +2466,8 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
       isa<AccessorDecl>(D))
     return;
 
-  if (!D->getAttrs().hasAttribute<DynamicAttr>()) {
+  if (!D->getAttrs().hasAttribute<DynamicAttr>() &&
+      !D->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
     auto attr = new (D->getASTContext()) DynamicAttr(/*implicit=*/true);
     D->getAttrs().add(attr);
   }

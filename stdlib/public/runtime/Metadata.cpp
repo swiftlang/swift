@@ -3712,6 +3712,13 @@ template <> OpaqueValue *Metadata::allocateBufferIn(ValueBuffer *buffer) const {
   return reinterpret_cast<OpaqueValue *>(ptr);
 }
 
+template <> OpaqueValue *Metadata::projectBufferFrom(ValueBuffer *buffer) const{
+  auto *vwt = getValueWitnesses();
+  if (vwt->isValueInline())
+    return reinterpret_cast<OpaqueValue *>(buffer);
+  return reinterpret_cast<OpaqueValue *>(buffer->PrivateData[0]);
+}
+
 template <> void Metadata::deallocateBufferIn(ValueBuffer *buffer) const {
   auto *vwt = getValueWitnesses();
   if (vwt->isValueInline())
@@ -4172,9 +4179,47 @@ const WitnessTable *swift::swift_getAssociatedConformanceWitness(
 
   // Call the access function.
   unsigned witnessIndex = assocConformance - reqBase;
-  auto witness =
-    ((AssociatedWitnessTableAccessFunction* const *)wtable)[witnessIndex];
-  return witness(assocType, conformingType, wtable);
+  auto witness = ((const void* const *)wtable)[witnessIndex];
+  // Fast path: we've already resolved this to a witness table, so return it.
+  if (LLVM_LIKELY((uintptr_t(witness) &
+         ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
+    return static_cast<const WitnessTable *>(witness);
+  }
+
+  // Find the mangled name.
+  const char *mangledNameBase =
+    (const char *)(uintptr_t(witness) &
+                     ~ProtocolRequirementFlags::AssociatedTypeMangledNameBit);
+
+
+  // Extract the mangled name itself.
+  StringRef mangledName =
+    Demangle::makeSymbolicMangledNameStringRef(mangledNameBase);
+
+  // Relative reference to an associate conformance witness function.
+  // FIXME: This is intended to be a temporary mangling, to be replaced
+  // by a real "protocol conformance" mangling.
+  if (mangledName.size() == 5 &&
+      (mangledName[0] == '\x07' || mangledName[0] == '\x08')) {
+    // Resolve the relative reference to the witness function.
+    int32_t offset;
+    memcpy(&offset, mangledName.data() + 1, 4);
+    auto ptr = detail::applyRelativeOffset(mangledName.data() + 1, offset);
+
+    // Call the witness function.
+    auto witnessFn = (AssociatedWitnessTableAccessFunction *)ptr;
+    auto assocWitnessTable = witnessFn(assocType, conformingType, wtable);
+
+    assert((uintptr_t(assocWitnessTable) &
+            ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0);
+
+    // Update the cache.
+    reinterpret_cast<const void**>(wtable)[witnessIndex] = assocWitnessTable;
+
+    return assocWitnessTable;
+  }
+
+  swift_runtime_unreachable("Invalid mangled associate conformance");
 }
 
 /***************************************************************************/

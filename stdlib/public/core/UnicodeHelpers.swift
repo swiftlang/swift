@@ -262,6 +262,7 @@ extension _StringGuts {
 #endif
   }
 
+  @usableFromInline
   @_effects(releasenone)
   internal func foreignErrorCorrectedScalar(
     startingAt idx: String.Index
@@ -373,5 +374,66 @@ extension _StringGuts {
     _sanityCheck(idx.encodedOffset > 0,
       "Error-correction shouldn't give trailing surrogate at position zero")
     return String.Index(encodedOffset: idx.encodedOffset &- 1)
+  }
+
+  @usableFromInline @inline(never)
+  @_effects(releasenone)
+  internal func foreignErrorCorrectedGrapheme(
+    startingAt start: Int, endingAt end: Int
+  ) -> Character {
+#if _runtime(_ObjC)
+    _sanityCheck(self.isForeign)
+
+    // Both a fast-path for single-code-unit graphemes and validation:
+    //   ICU treats isolated surrogates as isolated graphemes
+    let count = end &- start
+    if start &- end == 1 {
+      return Character(String(self.foreignErrorCorrectedScalar(
+        startingAt: String.Index(encodedOffset: start)
+      ).0))
+    }
+
+    // TODO(String performance): Stack buffer if small enough
+    var cus = Array<UInt16>(repeating: 0, count: count)
+    cus.withUnsafeMutableBufferPointer {
+      _cocoaStringCopyCharacters(
+        from: self._object.cocoaObject,
+        range: start..<end,
+        into: $0.baseAddress._unsafelyUnwrappedUnchecked)
+    }
+    return cus.withUnsafeBufferPointer {
+      return Character(String._uncheckedFromUTF16($0))
+    }
+#else
+    fatalError("No foreign strings on Linux in this version of Swift")
+#endif
+  }
+}
+
+// Higher level aggregate operations. These should only be called when the
+// result is the sole operation done by a caller, otherwise it's always more
+// efficient to use `withFastUTF8` in the caller.
+extension _StringGuts {
+  @inlinable @inline(__always)
+  internal func errorCorrectedScalar(
+    startingAt i: Int
+  ) -> (Unicode.Scalar, scalarLength: Int) {
+    if _fastPath(isFastUTF8) {
+      return withFastUTF8 { _decodeScalar($0, startingAt: i) }
+    }
+    return foreignErrorCorrectedScalar(
+      startingAt: String.Index(encodedOffset: i))
+  }
+  @inlinable @inline(__always)
+  internal func errorCorrectedCharacter(
+    startingAt start: Int, endingAt end: Int
+  ) -> Character {
+    if _fastPath(isFastUTF8) {
+      return withFastUTF8(range: start..<end) { utf8 in
+        return Character(unchecked: String._uncheckedFromUTF8(utf8))
+      }
+    }
+
+    return foreignErrorCorrectedGrapheme(startingAt: start, endingAt: end)
   }
 }

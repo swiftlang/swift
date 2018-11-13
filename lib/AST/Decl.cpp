@@ -1781,17 +1781,17 @@ bool AbstractStorageDecl::isFormallyResilient() const {
   if (getAttrs().hasAttribute<FixedLayoutAttr>())
     return false;
 
-  // Private and (unversioned) internal variables always have a
-  // fixed layout.
-  if (!getFormalAccessScope(/*useDC=*/nullptr,
-                            /*treatUsableFromInlineAsPublic=*/true).isPublic())
-    return false;
-
   // If we're an instance property of a nominal type, query the type.
   auto *dc = getDeclContext();
   if (!isStatic())
     if (auto *nominalDecl = dc->getSelfNominalTypeDecl())
       return nominalDecl->isResilient();
+
+  // Non-public global and static variables always have a
+  // fixed layout.
+  if (!getFormalAccessScope(/*useDC=*/nullptr,
+                            /*treatUsableFromInlineAsPublic=*/true).isPublic())
+    return false;
 
   return true;
 }
@@ -2040,7 +2040,6 @@ mapSignatureExtInfo(AnyFunctionType::ExtInfo info,
     return AnyFunctionType::ExtInfo();
   return AnyFunctionType::ExtInfo()
       .withRepresentation(info.getRepresentation())
-      .withIsAutoClosure(info.isAutoClosure())
       .withThrows(info.throws());
 }
 
@@ -4802,7 +4801,8 @@ ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
     ArgumentName(PD->getArgumentName()),
     ArgumentNameLoc(PD->getArgumentNameLoc()),
     SpecifierLoc(PD->getSpecifierLoc()),
-    DefaultValueAndIsVariadic(nullptr, PD->DefaultValueAndIsVariadic.getInt()) {
+    DefaultValueAndIsVariadic(nullptr, PD->DefaultValueAndIsVariadic.getInt()),
+    IsAutoClosure(PD->isAutoClosure()) {
   Bits.ParamDecl.IsTypeLocImplicit = PD->Bits.ParamDecl.IsTypeLocImplicit;
   Bits.ParamDecl.defaultArgumentKind = PD->Bits.ParamDecl.defaultArgumentKind;
   typeLoc = PD->getTypeLoc().clone(PD->getASTContext());
@@ -5107,8 +5107,7 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
   return DeclName();
 }
 
-std::pair<DefaultArgumentKind, Type>
-swift::getDefaultArgumentInfo(ValueDecl *source, unsigned Index) {
+const ParamDecl *swift::getParameterAt(ValueDecl *source, unsigned index) {
   const ParameterList *paramList;
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(source)) {
     paramList = AFD->getParameters();
@@ -5116,8 +5115,7 @@ swift::getDefaultArgumentInfo(ValueDecl *source, unsigned Index) {
     paramList = cast<EnumElementDecl>(source)->getParameterList();
   }
 
-  auto param = paramList->get(Index);
-  return { param->getDefaultArgumentKind(), param->getInterfaceType() };
+  return paramList->get(index);
 }
 
 Type AbstractFunctionDecl::getMethodInterfaceType() const {
@@ -5620,7 +5618,6 @@ AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
                                        SourceLoc declLoc,
                                        SourceLoc accessorKeywordLoc,
                                        AccessorKind accessorKind,
-                                       AddressorKind addressorKind,
                                        AbstractStorageDecl *storage,
                                        SourceLoc staticLoc,
                                        StaticSpellingKind staticSpelling,
@@ -5635,7 +5632,7 @@ AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
   void *buffer = allocateMemoryForDecl<AccessorDecl>(ctx, size,
                                                      !clangNode.isNull());
   auto D = ::new (buffer)
-      AccessorDecl(declLoc, accessorKeywordLoc, accessorKind, addressorKind,
+      AccessorDecl(declLoc, accessorKeywordLoc, accessorKind,
                    storage, staticLoc, staticSpelling, throws, throwsLoc,
                    hasImplicitSelfDecl, genericParams, parent);
   if (clangNode)
@@ -5650,7 +5647,6 @@ AccessorDecl *AccessorDecl::createDeserialized(ASTContext &ctx,
                                                SourceLoc declLoc,
                                                SourceLoc accessorKeywordLoc,
                                                AccessorKind accessorKind,
-                                               AddressorKind addressorKind,
                                                AbstractStorageDecl *storage,
                                                SourceLoc staticLoc,
                                               StaticSpellingKind staticSpelling,
@@ -5658,7 +5654,7 @@ AccessorDecl *AccessorDecl::createDeserialized(ASTContext &ctx,
                                                GenericParamList *genericParams,
                                                DeclContext *parent) {
   return createImpl(ctx, declLoc, accessorKeywordLoc, accessorKind,
-                    addressorKind, storage, staticLoc, staticSpelling,
+                    storage, staticLoc, staticSpelling,
                     throws, throwsLoc, genericParams, parent,
                     ClangNode());
 }
@@ -5667,7 +5663,6 @@ AccessorDecl *AccessorDecl::create(ASTContext &ctx,
                                    SourceLoc declLoc,
                                    SourceLoc accessorKeywordLoc,
                                    AccessorKind accessorKind,
-                                   AddressorKind addressorKind,
                                    AbstractStorageDecl *storage,
                                    SourceLoc staticLoc,
                                    StaticSpellingKind staticSpelling,
@@ -5678,7 +5673,7 @@ AccessorDecl *AccessorDecl::create(ASTContext &ctx,
                                    DeclContext *parent,
                                    ClangNode clangNode) {
   auto *D = AccessorDecl::createImpl(
-      ctx, declLoc, accessorKeywordLoc, accessorKind, addressorKind, storage,
+      ctx, declLoc, accessorKeywordLoc, accessorKind, storage,
       staticLoc, staticSpelling, throws, throwsLoc,
       genericParams, parent, clangNode);
   D->setParameters(bodyParams);

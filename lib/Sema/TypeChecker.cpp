@@ -300,6 +300,28 @@ static void prepareGenericParamList(GenericParamList *genericParams) {
     prepareGenericParamList(outerGenericParams);
 }
 
+/// Ensure that the outer generic parameters of the given generic
+/// context have been configured.
+static void configureOuterGenericParams(const GenericContext *dc) {
+  auto genericParams = dc->getGenericParams();
+  if (!genericParams) return;
+
+  if (genericParams->getOuterParameters()) return;
+
+  DeclContext *outerDC = dc->getParent();
+  while (!outerDC->isModuleScopeContext()) {
+    if (auto outerDecl = outerDC->getAsDecl()) {
+      if (auto outerGenericDC = outerDecl->getAsGenericContext()) {
+        genericParams->setOuterParameters(outerGenericDC->getGenericParams());
+        configureOuterGenericParams(outerGenericDC);
+        return;
+      }
+    }
+
+    outerDC = outerDC->getParent();
+  }
+}
+
 /// Bind the given extension to the given nominal type.
 static void bindExtensionToNominal(ExtensionDecl *ext,
                                    NominalTypeDecl *nominal) {
@@ -313,10 +335,7 @@ static void bindExtensionToNominal(ExtensionDecl *ext,
     ext->setGenericParams(genericParams);
   } else if (auto genericParams = nominal->getGenericParamsOfContext()) {
     // Make sure the generic parameters are set up.
-    if (auto nominalGenericParams = nominal->getGenericParams()) {
-      nominalGenericParams->setOuterParameters(
-        nominal->getDeclContext()->getGenericParamsOfContext());
-    }
+    configureOuterGenericParams(nominal);
 
     // Clone the generic parameter list of a generic type.
     prepareGenericParamList(genericParams);

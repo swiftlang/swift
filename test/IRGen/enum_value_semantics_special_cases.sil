@@ -11,7 +11,7 @@ enum NullableRefcounted {
   case None
 }
 
-// CHECK-LABEL: define linkonce_odr hidden void @"$s34enum_value_semantics_special_cases18NullableRefcountedOwxx"(%swift.opaque* noalias %object, %swift.type* %NullableRefcounted) {{.*}} {
+// CHECK-LABEL: define internal void @"$s34enum_value_semantics_special_cases18NullableRefcountedOwxx"(%swift.opaque* noalias %object, %swift.type* %NullableRefcounted) {{.*}} {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %object to %T34enum_value_semantics_special_cases18NullableRefcountedO*
 // CHECK:   %1 = bitcast %T34enum_value_semantics_special_cases18NullableRefcountedO* %0 to %swift.refcounted**
@@ -20,7 +20,7 @@ enum NullableRefcounted {
 // CHECK:   ret void
 // CHECK: }
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$s34enum_value_semantics_special_cases18NullableRefcountedOwcp"(%swift.opaque* noalias %dest, %swift.opaque* noalias %src, %swift.type* %NullableRefcounted) {{.*}} {
+// CHECK-LABEL: define internal %swift.opaque* @"$s34enum_value_semantics_special_cases18NullableRefcountedOwcp"(%swift.opaque* noalias %dest, %swift.opaque* noalias %src, %swift.type* %NullableRefcounted) {{.*}} {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %dest to %T34enum_value_semantics_special_cases18NullableRefcountedO*
 // CHECK:   %1 = bitcast %swift.opaque* %src to %T34enum_value_semantics_special_cases18NullableRefcountedO*
@@ -33,7 +33,7 @@ enum NullableRefcounted {
 // CHECK:   ret %swift.opaque* %6
 // CHECK: }
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$s34enum_value_semantics_special_cases18NullableRefcountedOwca"(%swift.opaque* %dest, %swift.opaque* %src, %swift.type* %NullableRefcounted) {{.*}} {
+// CHECK-LABEL: define internal %swift.opaque* @"$s34enum_value_semantics_special_cases18NullableRefcountedOwca"(%swift.opaque* %dest, %swift.opaque* %src, %swift.type* %NullableRefcounted) {{.*}} {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %dest to %T34enum_value_semantics_special_cases18NullableRefcountedO*
 // CHECK:   %1 = bitcast %swift.opaque* %src to %T34enum_value_semantics_special_cases18NullableRefcountedO*
@@ -48,7 +48,7 @@ enum NullableRefcounted {
 // CHECK:   ret %swift.opaque* %7
 // CHECK: }
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$s34enum_value_semantics_special_cases18NullableRefcountedOwta"(%swift.opaque* noalias %dest, %swift.opaque* noalias %src, %swift.type* %NullableRefcounted) {{.*}} {
+// CHECK-LABEL: define internal %swift.opaque* @"$s34enum_value_semantics_special_cases18NullableRefcountedOwta"(%swift.opaque* noalias %dest, %swift.opaque* noalias %src, %swift.type* %NullableRefcounted) {{.*}} {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %dest to %T34enum_value_semantics_special_cases18NullableRefcountedO*
 // CHECK:   %1 = bitcast %swift.opaque* %src to %T34enum_value_semantics_special_cases18NullableRefcountedO*
@@ -69,7 +69,7 @@ enum NullableBlockRefcounted {
   case None
 }
 
-// CHECK-LABEL: define linkonce_odr hidden void @"$s34enum_value_semantics_special_cases23NullableBlockRefcountedOwxx"(%swift.opaque* noalias %object, %swift.type* %NullableBlockRefcounted) {{.*}} {
+// CHECK-LABEL: define internal void @"$s34enum_value_semantics_special_cases23NullableBlockRefcountedOwxx"(%swift.opaque* noalias %object, %swift.type* %NullableBlockRefcounted) {{.*}} {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %object to %T34enum_value_semantics_special_cases23NullableBlockRefcountedO*
 // CHECK:   %1 = bitcast %T34enum_value_semantics_special_cases23NullableBlockRefcountedO* %0 to %objc_block**
@@ -78,7 +78,7 @@ enum NullableBlockRefcounted {
 // CHECK:   ret void
 // CHECK: }
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$s34enum_value_semantics_special_cases23NullableBlockRefcountedOwcp"(%swift.opaque* noalias %dest, %swift.opaque* noalias %src, %swift.type* %NullableBlockRefcounted) {{.*}} {
+// CHECK-LABEL: define internal %swift.opaque* @"$s34enum_value_semantics_special_cases23NullableBlockRefcountedOwcp"(%swift.opaque* noalias %dest, %swift.opaque* noalias %src, %swift.type* %NullableBlockRefcounted) {{.*}} {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %dest to %T34enum_value_semantics_special_cases23NullableBlockRefcountedO*
 // CHECK:   %1 = bitcast %swift.opaque* %src to %T34enum_value_semantics_special_cases23NullableBlockRefcountedO*
@@ -91,7 +91,7 @@ enum NullableBlockRefcounted {
 // CHECK:   ret %swift.opaque* %6
 // CHECK: }
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$s34enum_value_semantics_special_cases23NullableBlockRefcountedOwca"(%swift.opaque* %dest, %swift.opaque* %src, %swift.type* %NullableBlockRefcounted) {{.*}} {
+// CHECK-LABEL: define internal %swift.opaque* @"$s34enum_value_semantics_special_cases23NullableBlockRefcountedOwca"(%swift.opaque* %dest, %swift.opaque* %src, %swift.type* %NullableBlockRefcounted) {{.*}} {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %dest to %T34enum_value_semantics_special_cases23NullableBlockRefcountedO*
 // CHECK:   %1 = bitcast %swift.opaque* %src to %T34enum_value_semantics_special_cases23NullableBlockRefcountedO*
@@ -106,7 +106,7 @@ enum NullableBlockRefcounted {
 // CHECK:   ret %swift.opaque* %7
 // CHECK: }
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$s34enum_value_semantics_special_cases23NullableBlockRefcountedOwta"(%swift.opaque* noalias %dest, %swift.opaque* noalias %src, %swift.type* %NullableBlockRefcounted) {{.*}} {
+// CHECK-LABEL: define internal %swift.opaque* @"$s34enum_value_semantics_special_cases23NullableBlockRefcountedOwta"(%swift.opaque* noalias %dest, %swift.opaque* noalias %src, %swift.type* %NullableBlockRefcounted) {{.*}} {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %dest to %T34enum_value_semantics_special_cases23NullableBlockRefcountedO*
 // CHECK:   %1 = bitcast %swift.opaque* %src to %T34enum_value_semantics_special_cases23NullableBlockRefcountedO*
@@ -127,7 +127,7 @@ enum MultipleEmptyRefcounted {
   case B
 }
 
-// CHECK-LABEL: define linkonce_odr hidden void @"$s34enum_value_semantics_special_cases23MultipleEmptyRefcountedOwxx"(%swift.opaque* noalias %object, %swift.type* %MultipleEmptyRefcounted) {{.*}} {
+// CHECK-LABEL: define internal void @"$s34enum_value_semantics_special_cases23MultipleEmptyRefcountedOwxx"(%swift.opaque* noalias %object, %swift.type* %MultipleEmptyRefcounted) {{.*}} {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %object to %T34enum_value_semantics_special_cases23MultipleEmptyRefcountedO*
 // CHECK:   %1 = bitcast %T34enum_value_semantics_special_cases23MultipleEmptyRefcountedO* %0 to i64*
@@ -166,7 +166,7 @@ enum AllRefcounted {
   case None
 }
 
-// CHECK-LABEL: define linkonce_odr hidden void @"$s34enum_value_semantics_special_cases13AllRefcountedOwxx"(%swift.opaque* noalias %object, %swift.type* %AllRefcounted) {{.*}} {
+// CHECK-LABEL: define internal void @"$s34enum_value_semantics_special_cases13AllRefcountedOwxx"(%swift.opaque* noalias %object, %swift.type* %AllRefcounted) {{.*}} {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %object to %T34enum_value_semantics_special_cases13AllRefcountedO*
 // CHECK:   %1 = bitcast %T34enum_value_semantics_special_cases13AllRefcountedO* %0 to i64*
@@ -178,7 +178,7 @@ enum AllRefcounted {
 // CHECK:   ret void
 // CHECK: }
 
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$s34enum_value_semantics_special_cases13AllRefcountedOwcp"(%swift.opaque* noalias %dest, %swift.opaque* noalias %src, %swift.type* %AllRefcounted)
+// CHECK-LABEL: define internal %swift.opaque* @"$s34enum_value_semantics_special_cases13AllRefcountedOwcp"(%swift.opaque* noalias %dest, %swift.opaque* noalias %src, %swift.type* %AllRefcounted)
 // --                              0x3fffffffffffffff
 // CHECK:         %4 = and i64 %3, 4611686018427387903
 // CHECK:         %5 = inttoptr i64 %4 to %swift.refcounted*
@@ -196,5 +196,5 @@ enum AllRefcountedTwoSimple {
   case Nothing
 }
 
-// CHECK-LABEL: define linkonce_odr hidden void @"$s34enum_value_semantics_special_cases22AllRefcountedTwoSimpleOwxx"
+// CHECK-LABEL: define internal void @"$s34enum_value_semantics_special_cases22AllRefcountedTwoSimpleOwxx"
 // CHECK:   call void @"$s34enum_value_semantics_special_cases22AllRefcountedTwoSimpleOWOy"

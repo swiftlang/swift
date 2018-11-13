@@ -478,13 +478,6 @@ extension Unicode.UTF32 : UnicodeCodec {
   public mutating func decode<I : IteratorProtocol>(
     _ input: inout I
   ) -> UnicodeDecodingResult where I.Element == CodeUnit {
-    return UTF32._decode(&input)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal static func _decode<I : IteratorProtocol>(
-    _ input: inout I
-  ) -> UnicodeDecodingResult where I.Element == CodeUnit {
     var parser = ForwardParser()
     
     switch parser.parseScalar(from: &input) {

@@ -1522,12 +1522,12 @@ void TypeChecker::checkDefaultArguments(ParameterList *params,
       continue;
 
     Expr *e = param->getDefaultValue();
-    auto initContext = param->getDefaultArgumentInitContext();
+    auto *initContext = param->getDefaultArgumentInitContext();
 
-    // Type-check the initializer, then flag that we did so.
-    auto resultTy = typeCheckExpression(
-        e, initContext, TypeLoc::withoutLoc(param->getType()),
-        CTP_DefaultParameter);
+    auto resultTy =
+        typeCheckParameterDefault(e, initContext, param->getType(),
+                                  /*isAutoClosure=*/param->isAutoClosure());
+
     if (resultTy) {
       param->setDefaultValue(e);
     } else {

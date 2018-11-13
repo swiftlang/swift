@@ -1595,26 +1595,6 @@ static StringRef getAccessorLabel(AccessorDecl *accessor) {
   case AccessorKind::ID: return #KEYWORD;
 #define ACCESSOR(ID)
 #include "swift/AST/AccessorKinds.def"
-
-  case AccessorKind::Address:
-    switch (accessor->getAddressorKind()) {
-    case AddressorKind::NotAddressor: llvm_unreachable("bad combination");
-#define IMMUTABLE_ADDRESSOR(ID, KEYWORD) \
-    case AddressorKind::ID: return #KEYWORD;
-#define ACCESSOR(ID)
-#include "swift/AST/AccessorKinds.def"
-    }
-    llvm_unreachable("bad addressor kind");
-
-  case AccessorKind::MutableAddress:
-    switch (accessor->getAddressorKind()) {
-    case AddressorKind::NotAddressor: llvm_unreachable("bad combination");
-#define MUTABLE_ADDRESSOR(ID, KEYWORD) \
-    case AddressorKind::ID: return #KEYWORD;
-#define ACCESSOR(ID)
-#include "swift/AST/AccessorKinds.def"
-    }
-    llvm_unreachable("bad addressor kind");
   }
   llvm_unreachable("bad accessor kind");
 }
@@ -2375,12 +2355,12 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
   printDocumentationComment(decl);
-  // Print @sil_stored when the attribute is not already
+  // Print @_hasStorage when the attribute is not already
   // on, decl has storage and it is on a class.
   if (Options.PrintForSIL && decl->hasStorage() &&
       isStructOrClassContext(decl->getDeclContext()) &&
-      !decl->getAttrs().hasAttribute<SILStoredAttr>())
-    Printer << "@sil_stored ";
+      !decl->getAttrs().hasAttribute<HasStorageAttr>())
+    Printer << "@_hasStorage ";
   printAttributes(decl);
   printAccess(decl);
   if (!Options.SkipIntroducerKeywords) {

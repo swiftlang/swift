@@ -13,6 +13,8 @@
 #include "IRGenMangler.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/ProtocolAssociations.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/ABI/MetadataValues.h"
@@ -235,5 +237,46 @@ mangleSymbolNameForSymbolicMangling(const SymbolicMangling &mangling,
       llvm_unreachable("unhandled referent");
   }
   
+  return finalize();
+}
+
+std::string IRGenMangler::mangleSymbolNameForAssociatedConformanceWitness(
+                                  const NormalProtocolConformance *conformance,
+                                  CanType associatedType,
+                                  const ProtocolDecl *proto) {
+  beginManglingWithoutPrefix();
+  if (conformance) {
+    Buffer << "associated conformance ";
+    appendProtocolConformance(conformance);
+  } else {
+    Buffer << "default associated conformance";
+  }
+
+  bool isFirstAssociatedTypeIdentifier = true;
+  appendAssociatedTypePath(associatedType, isFirstAssociatedTypeIdentifier);
+  appendProtocolName(proto);
+  return finalize();
+}
+
+std::string IRGenMangler::mangleSymbolNameForKeyPathMetadata(
+                                           const char *kind,
+                                           CanGenericSignature genericSig,
+                                           CanType type,
+                                           ProtocolConformanceRef conformance) {
+  beginManglingWithoutPrefix();
+  Buffer << kind << " ";
+
+  if (genericSig)
+    appendGenericSignature(genericSig);
+
+  if (type)
+    appendType(type);
+
+  if (conformance.isConcrete())
+    appendConcreteProtocolConformance(conformance.getConcrete());
+  else if (conformance.isAbstract())
+    appendProtocolName(conformance.getAbstract());
+  else
+    assert(conformance.isInvalid() && "Unknown protocol conformance");
   return finalize();
 }

@@ -2541,25 +2541,6 @@ public:
       }
     }
 
-    // Reject variable if it is a stored property with an uninhabited type
-    if (VD->hasStorage() && 
-        VD->getInterfaceType()->isStructurallyUninhabited()) {
-      auto uninhabitedTypeDiag = diag::pattern_no_uninhabited_type;
-      
-      if (VD->getInterfaceType()->is<TupleType>()) {
-        uninhabitedTypeDiag = diag::pattern_no_uninhabited_tuple_type;
-      } else {
-        assert((VD->getInterfaceType()->is<EnumType>() || 
-                VD->getInterfaceType()->is<BoundGenericEnumType>()) && 
-          "unknown structurally uninhabited type");
-      }
-          
-      TC.diagnose(VD->getLoc(), uninhabitedTypeDiag, VD->isLet(),
-                  VD->isInstanceMember(), VD->getName(),
-                  VD->getInterfaceType());
-      VD->markInvalid();
-    }
-
     if (!checkOverrides(VD)) {
       // If a property has an override attribute but does not override
       // anything, complain.
@@ -3821,37 +3802,7 @@ Type buildAddressorResultType(TypeChecker &TC,
     (addressor->getAccessorKind() == AccessorKind::Address)
       ? TC.getUnsafePointerType(addressor->getLoc(), valueType)
       : TC.getUnsafeMutablePointerType(addressor->getLoc(), valueType);
-  if (!pointerType) return Type();
-
-  switch (addressor->getAddressorKind()) {
-  case AddressorKind::NotAddressor:
-    llvm_unreachable("addressor without addressor kind");
-
-  // For unsafe addressors, it's just the pointer type.
-  case AddressorKind::Unsafe:
-    return pointerType;
-
-  // For non-native owning addressors, the return type is actually
-  //   (Unsafe{,Mutable}Pointer<T>, AnyObject)
-  case AddressorKind::Owning: {
-    TupleTypeElt elts[] = {
-      pointerType,
-      TC.Context.getAnyObjectType()
-    };
-    return TupleType::get(elts, TC.Context);
-  }
-
-  // For native owning addressors, the return type is actually
-  //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject)
-  case AddressorKind::NativeOwning: {
-    TupleTypeElt elts[] = {
-      pointerType,
-      TC.Context.TheNativeObjectType
-    };
-    return TupleType::get(elts, TC.Context);
-  }
-  }
-  llvm_unreachable("bad addressor kind");
+  return pointerType;
 }
 
 static TypeLoc getTypeLocForFunctionResult(FuncDecl *FD) {

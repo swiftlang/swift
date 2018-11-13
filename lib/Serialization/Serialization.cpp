@@ -916,8 +916,6 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::GENERIC_PARAM_LIST);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::GENERIC_PARAM);
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::GENERIC_REQUIREMENT);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::LAYOUT_REQUIREMENT);
@@ -1158,20 +1156,6 @@ static uint8_t getRawStableMetatypeRepresentation(AnyMetatypeType *metatype) {
   llvm_unreachable("bad representation");
 }
 
-static uint8_t getRawStableAddressorKind(swift::AddressorKind kind) {
-  switch (kind) {
-  case swift::AddressorKind::NotAddressor:
-    return uint8_t(serialization::AddressorKind::NotAddressor);
-  case swift::AddressorKind::Unsafe:
-    return uint8_t(serialization::AddressorKind::Unsafe);
-  case swift::AddressorKind::Owning:
-    return uint8_t(serialization::AddressorKind::Owning);
-  case swift::AddressorKind::NativeOwning:
-    return uint8_t(serialization::AddressorKind::NativeOwning);
-  }
-  llvm_unreachable("bad addressor kind");
-}
-
 static uint8_t getRawStableResilienceExpansion(swift::ResilienceExpansion e) {
   switch (e) {
   case swift::ResilienceExpansion::Minimal:
@@ -1372,23 +1356,19 @@ void Serializer::writeInlinableBodyTextIfNeeded(
   InlinableBodyTextLayout::emitRecord(Out, ScratchRecord, abbrCode, body);
 }
 
-bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
+void Serializer::writeGenericParams(const GenericParamList *genericParams) {
   using namespace decls_block;
 
   // Don't write anything if there are no generic params.
   if (!genericParams)
-    return true;
+    return;
+
+  SmallVector<DeclID, 4> paramIDs;
+  for (auto next : genericParams->getParams())
+    paramIDs.push_back(addDeclRef(next));
 
   unsigned abbrCode = DeclTypeAbbrCodes[GenericParamListLayout::Code];
-  GenericParamListLayout::emitRecord(Out, ScratchRecord, abbrCode);
-
-  abbrCode = DeclTypeAbbrCodes[GenericParamLayout::Code];
-  for (auto next : genericParams->getParams()) {
-    GenericParamLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   addDeclRef(next));
-  }
-
-  return true;
+  GenericParamListLayout::emitRecord(Out, ScratchRecord, abbrCode, paramIDs);
 }
 
 void Serializer::writeGenericSignature(const GenericSignature *sig) {
@@ -2697,8 +2677,7 @@ void Serializer::writeDecl(const Decl *D) {
           if (auto *SF = dyn_cast<SourceFile>(enclosingFile)) {
             return llvm::sys::path::filename(SF->getFilename());
           } else if (auto *LF = dyn_cast<LoadedFile>(enclosingFile)) {
-            return llvm::sys::path::filename(
-                (LF->getFilenameForPrivateDecl(decl)));
+            return LF->getFilenameForPrivateDecl(decl);
           }
           return StringRef();
         };
@@ -3249,6 +3228,7 @@ void Serializer::writeDecl(const Decl *D) {
         getRawStableVarDeclSpecifier(param->getSpecifier()),
         addTypeRef(interfaceType),
         param->isVariadic(),
+        param->isAutoClosure(),
         getRawStableDefaultArgumentKind(param->getDefaultArgumentKind()),
         defaultArgumentText);
 
@@ -3330,8 +3310,6 @@ void Serializer::writeDecl(const Decl *D) {
     uint8_t rawAccessLevel = getRawStableAccessLevel(fn->getFormalAccess());
     uint8_t rawAccessorKind =
       uint8_t(getStableAccessorKind(fn->getAccessorKind()));
-    uint8_t rawAddressorKind =
-      getRawStableAddressorKind(fn->getAddressorKind());
     uint8_t rawDefaultArgumentResilienceExpansion =
       getRawStableResilienceExpansion(
           fn->getDefaultArgumentResilienceExpansion());
@@ -3359,7 +3337,6 @@ void Serializer::writeDecl(const Decl *D) {
                                addDeclRef(fn->getOverriddenDecl()),
                                addDeclRef(fn->getStorage()),
                                rawAccessorKind,
-                               rawAddressorKind,
                                rawAccessLevel,
                                fn->needsNewVTableEntry(),
                                rawDefaultArgumentResilienceExpansion,
@@ -3866,11 +3843,9 @@ void Serializer::writeType(Type ty) {
       FunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
              addTypeRef(fnTy->getResult()),
              getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-             fnTy->isAutoClosure(),
              fnTy->isNoEscape(),
              fnTy->throws());
     } else {
-      assert(!fnTy->isAutoClosure());
       assert(!fnTy->isNoEscape());
 
       auto *genericSig = cast<GenericFunctionType>(fnTy)->getGenericSignature();
@@ -4131,10 +4106,9 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<TypedPatternLayout>();
   registerDeclTypeAbbr<InlinableBodyTextLayout>();
   registerDeclTypeAbbr<GenericParamListLayout>();
-  registerDeclTypeAbbr<GenericParamLayout>();
+  registerDeclTypeAbbr<GenericSignatureLayout>();
   registerDeclTypeAbbr<GenericRequirementLayout>();
   registerDeclTypeAbbr<LayoutRequirementLayout>();
-  registerDeclTypeAbbr<GenericSignatureLayout>();
   registerDeclTypeAbbr<SILGenericEnvironmentLayout>();
   registerDeclTypeAbbr<SubstitutionMapLayout>();
 

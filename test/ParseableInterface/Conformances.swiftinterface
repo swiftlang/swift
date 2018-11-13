@@ -2,10 +2,10 @@
 // swift-module-flags: 
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/Conformances.swiftmodule -enable-resilience -emit-sil -o %t/Conformances.sil %s
+// RUN: %target-swift-frontend -emit-module-path %t/Conformances.swiftmodule -enable-resilience -emit-sil -o %t/Conformances.sil -enable-objc-interop -disable-objc-attr-requires-foundation-module %s
 // RUN: %FileCheck -check-prefix CHECK-MODULE %s < %t/Conformances.sil
 // RUN: %FileCheck -check-prefix NEGATIVE-MODULE %s < %t/Conformances.sil
-// RUN: %target-swift-frontend -emit-sil -I %t %S/Inputs/ConformancesUser.swift -O | %FileCheck %s
+// RUN: %target-swift-frontend -enable-objc-interop -emit-sil -I %t %S/Inputs/ConformancesUser.swift -O | %FileCheck %s
 
 public protocol MyProto {
   init()
@@ -47,3 +47,36 @@ public struct OpaqueStructImpl: MyProto {}
 // CHECK: function_ref @$s12Conformances7MyProtoP4propSivs
 // CHECK: function_ref @$s12Conformances7MyProtoPyS2icig
 // CHECK: end sil function '$s16ConformancesUser10testOpaqueSiyF'
+
+public struct ResilientStructImpl: MyProto {
+  @available(*, unavailable) // Ignore this, because the conformance is resilient.
+  public init()
+}
+
+// CHECK-LABEL: sil @$s16ConformancesUser13testResilientSiyF
+// CHECK: witness_method $ResilientStructImpl, #MyProto.init!allocator.1
+// CHECK: witness_method $ResilientStructImpl, #MyProto.method!1
+// CHECK: witness_method $ResilientStructImpl, #MyProto.prop!setter.1
+// CHECK: witness_method $ResilientStructImpl, #MyProto.subscript!getter.1
+// CHECK: end sil function '$s16ConformancesUser13testResilientSiyF'
+
+
+@objc public protocol OptionalReqs {
+  @objc optional func method()
+}
+@_fixed_layout
+public final class OptionalReqsPresent: OptionalReqs {
+  public func method () {}
+}
+@_fixed_layout
+public final class OptionalReqsAbsent: OptionalReqs {}
+
+// It would be okay if this one got optimized...
+// CHECK-LABEL: sil @$s16ConformancesUser19testOptionalPresentySb0A00d4ReqsE0CF
+// CHECK: dynamic_method_br %0 : $OptionalReqsPresent, #OptionalReqs.method!1.foreign
+// CHECK: end sil function '$s16ConformancesUser19testOptionalPresentySb0A00d4ReqsE0CF'
+
+// ...but not this one, because the method that's currently absent might get added.
+// CHECK-LABEL: sil @$s16ConformancesUser18testOptionalAbsentySb0A00d4ReqsE0CF
+// CHECK: dynamic_method_br %0 : $OptionalReqsAbsent, #OptionalReqs.method!1.foreign
+// CHECK: end sil function '$s16ConformancesUser18testOptionalAbsentySb0A00d4ReqsE0CF'

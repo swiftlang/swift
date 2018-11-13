@@ -18,7 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Ownership.h"
@@ -45,8 +45,7 @@
 using namespace swift;
 using namespace swift::Mangle;
 
-static StringRef getCodeForAccessorKind(AccessorKind kind,
-                                        AddressorKind addressorKind) {
+static StringRef getCodeForAccessorKind(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::Get:
     return "g";
@@ -62,29 +61,9 @@ static StringRef getCodeForAccessorKind(AccessorKind kind,
     return "M";
   case AccessorKind::Address:
     // 'l' is for location. 'A' was taken.
-    switch (addressorKind) {
-    case AddressorKind::NotAddressor:
-      llvm_unreachable("bad combo");
-    case AddressorKind::Unsafe:
-      return "lu";
-    case AddressorKind::Owning:
-      return "lO";
-    case AddressorKind::NativeOwning:
-      return "lo";
-    }
-    llvm_unreachable("bad addressor kind");
+    return "lu";
   case AccessorKind::MutableAddress:
-    switch (addressorKind) {
-    case AddressorKind::NotAddressor:
-      llvm_unreachable("bad combo");
-    case AddressorKind::Unsafe:
-      return "au";
-    case AddressorKind::Owning:
-      return "aO";
-    case AddressorKind::NativeOwning:
-      return "ao";
-    }
-    llvm_unreachable("bad addressor kind");
+    return "au";
   }
   llvm_unreachable("bad accessor kind");
 }
@@ -139,13 +118,11 @@ std::string ASTMangler::mangleIVarInitDestroyEntity(const ClassDecl *decl,
 }
 
 std::string ASTMangler::mangleAccessorEntity(AccessorKind kind,
-                                             AddressorKind addressorKind,
                                              const AbstractStorageDecl *decl,
                                              bool isStatic,
                                              SymbolKind SKind) {
   beginMangling();
-  appendAccessorEntity(getCodeForAccessorKind(kind, addressorKind), decl,
-                       isStatic);
+  appendAccessorEntity(getCodeForAccessorKind(kind), decl, isStatic);
   appendSymbolKind(SKind);
   return finalize();
 }
@@ -378,18 +355,15 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
   return finalize();
 }
 
-std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC,
-                                              GenericEnvironment *GE) {
+std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   PrettyStackTraceType prettyStackTrace(Ty->getASTContext(),
                                         "mangling type for debugger", Ty);
 
-  GenericEnv = GE;
   DWARFMangling = true;
   beginMangling();
   
   if (DC)
     bindGenericParameters(DC);
-  DeclCtx = DC;
 
   if (auto *fnType = Ty->getAs<AnyFunctionType>()) {
     appendFunction(fnType, false);
@@ -516,14 +490,12 @@ std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
 }
 
 std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
-                                                  AddressorKind addressorKind,
                                                   const AbstractStorageDecl *decl,
                                                   StringRef USRPrefix) {
   beginManglingWithoutPrefix();
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
   Buffer << USRPrefix;
-  appendAccessorEntity(getCodeForAccessorKind(kind, addressorKind), decl,
-                       /*isStatic*/ false);
+  appendAccessorEntity(getCodeForAccessorKind(kind), decl, /*isStatic*/ false);
   // We have a custom prefix, so finalize() won't verify for us. Do it manually.
   verify(Storage.str().drop_front(USRPrefix.size()));
   return finalize();
@@ -682,20 +654,10 @@ static bool shouldMangleAsGeneric(Type type) {
   if (!type)
     return false;
 
-  TypeBase *typePtr = type.getPointer();
-  if (auto typeAlias = dyn_cast<NameAliasType>(typePtr))
+  if (auto typeAlias = dyn_cast<NameAliasType>(type.getPointer()))
     return !typeAlias->getSubstitutionMap().empty();
 
-  if (auto bound = dyn_cast<BoundGenericType>(typePtr))
-    return true;
-
-  if (auto nominal = dyn_cast<NominalType>(typePtr))
-    return shouldMangleAsGeneric(nominal->getParent());
-
-  if (auto unbound = dyn_cast<UnboundGenericType>(typePtr))
-    return shouldMangleAsGeneric(unbound->getParent());
-
-  return false;
+  return type->isSpecialized();
 }
 
 /// Mangle a type into the buffer.
@@ -1113,15 +1075,15 @@ void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
 
   if (auto *unboundType = dyn_cast<UnboundGenericType>(typePtr)) {
     if (Type parent = unboundType->getParent())
-      appendBoundGenericArgs(parent, isFirstArgList);
+      appendBoundGenericArgs(parent->getDesugaredType(), isFirstArgList);
   } else if (auto *nominalType = dyn_cast<NominalType>(typePtr)) {
     if (Type parent = nominalType->getParent())
-      appendBoundGenericArgs(parent, isFirstArgList);
+      appendBoundGenericArgs(parent->getDesugaredType(), isFirstArgList);
   } else {
     auto boundType = cast<BoundGenericType>(typePtr);
     genericArgs = boundType->getGenericArgs();
     if (Type parent = boundType->getParent())
-      appendBoundGenericArgs(parent, isFirstArgList);
+      appendBoundGenericArgs(parent->getDesugaredType(), isFirstArgList);
   }
   if (isFirstArgList) {
     appendOperator("y");
@@ -1731,7 +1693,7 @@ void ASTMangler::appendFunction(AnyFunctionType *fn, bool isFunctionMangling) {
   }
 }
 
-void ASTMangler::appendFunctionType(AnyFunctionType *fn) {
+void ASTMangler::appendFunctionType(AnyFunctionType *fn, bool isAutoClosure) {
   assert((DWARFMangling || fn->isCanonical()) &&
          "expecting canonical types when not mangling for the debugger");
 
@@ -1753,7 +1715,7 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn) {
   case AnyFunctionType::Representation::Thin:
     return appendOperator("Xf");
   case AnyFunctionType::Representation::Swift:
-    if (fn->isAutoClosure()) {
+    if (isAutoClosure) {
       if (fn->isNoEscape())
         return appendOperator("XK");
       else
@@ -1837,7 +1799,11 @@ void ASTMangler::appendTypeList(Type listTy) {
 
 void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
                                        ParameterTypeFlags flags) {
-  appendType(elementType);
+  if (auto *fnType = elementType->getAs<FunctionType>())
+    appendFunctionType(fnType, flags.isAutoClosure());
+  else
+    appendType(elementType);
+
   switch (flags.getValueOwnership()) {
   case ValueOwnership::Default:
     /* nothing */
@@ -2060,29 +2026,24 @@ void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt) {
 void ASTMangler::appendClosureEntity(
                               const SerializedAbstractClosureExpr *closure) {
   appendClosureComponents(closure->getType(), closure->getDiscriminator(),
-                          closure->isImplicit(), closure->getParent(),
-                          closure->getLocalContext());
+                          closure->isImplicit(), closure->getParent());
 }
 
 void ASTMangler::appendClosureEntity(const AbstractClosureExpr *closure) {
   appendClosureComponents(closure->getType(), closure->getDiscriminator(),
-                          isa<AutoClosureExpr>(closure), closure->getParent(),
-                          closure->getLocalContext());
+                          isa<AutoClosureExpr>(closure), closure->getParent());
 }
 
 void ASTMangler::appendClosureComponents(Type Ty, unsigned discriminator,
-                                      bool isImplicit,
-                                      const DeclContext *parentContext,
-                                      const DeclContext *localContext) {
-  if (!DeclCtx) DeclCtx = localContext;
-
+                                         bool isImplicit,
+                                         const DeclContext *parentContext) {
   assert(discriminator != AbstractClosureExpr::InvalidDiscriminator
          && "closure must be marked correctly with discriminator");
 
   appendContext(parentContext);
 
   if (!Ty)
-    Ty = ErrorType::get(localContext->getASTContext());
+    Ty = ErrorType::get(parentContext->getASTContext());
 
   Ty = Ty->mapTypeOutOfContext();
   appendType(Ty->getCanonicalType());
@@ -2226,7 +2187,6 @@ void ASTMangler::appendAccessorEntity(StringRef accessorKindCode,
 
 void ASTMangler::appendEntity(const ValueDecl *decl, StringRef EntityOp,
                               bool isStatic) {
-  if (!DeclCtx) DeclCtx = decl->getInnermostDeclContext();
   appendContextOf(decl);
   appendDeclName(decl);
   appendDeclType(decl);
@@ -2236,7 +2196,6 @@ void ASTMangler::appendEntity(const ValueDecl *decl, StringRef EntityOp,
 }
 
 void ASTMangler::appendEntity(const ValueDecl *decl) {
-  if (!DeclCtx) DeclCtx = decl->getInnermostDeclContext();
   assert(!isa<ConstructorDecl>(decl));
   assert(!isa<DestructorDecl>(decl));
   
@@ -2244,8 +2203,7 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
   // declaration.
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
     return appendAccessorEntity(
-        getCodeForAccessorKind(accessor->getAccessorKind(),
-                               accessor->getAddressorKind()),
+        getCodeForAccessorKind(accessor->getAccessorKind()),
         accessor->getStorage(), accessor->isStatic());
   }
 

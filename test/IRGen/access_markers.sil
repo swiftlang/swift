@@ -4,8 +4,8 @@ import Builtin
 import Swift
 
 class A {
-  @sil_stored var property: Int { get set }
-  @sil_stored var exProperty: Any { get set }
+  @_hasStorage var property: Int { get set }
+  @_hasStorage var exProperty: Any { get set }
   deinit
   init()
 }

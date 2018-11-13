@@ -262,8 +262,8 @@ class C {
   @_optimize(size) var c : Int // expected-error {{'@_optimize(size)' attribute cannot be applied to stored properties}}
 }
 
-class SILStored {
-  @sil_stored var x : Int = 42  // expected-error {{'sil_stored' only allowed in SIL modules}}
+class HasStorage {
+  @_hasStorage var x : Int = 42  // ok, _hasStorage is allowed here
 }
 
 @_show_in_interface protocol _underscored {}

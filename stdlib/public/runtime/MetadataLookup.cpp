@@ -1565,6 +1565,13 @@ void DynamicReplacementDescriptor::enableReplacement() const {
     }
   }
 
+  // Unlink the previous entry if we are not chaining.
+  if (!shouldChain() && chainRoot->next) {
+    auto *previous = chainRoot->next;
+    chainRoot->next = previous->next;
+    chainRoot->implementationFunction = previous->implementationFunction;
+  }
+
   // First populate the current replacement's chain entry.
   auto *currentEntry =
       const_cast<DynamicReplacementChainEntry *>(chainEntry.get());
@@ -1645,12 +1652,14 @@ void swift::addImageDynamicReplacementBlockCallback(
       [&] { automaticReplacements->enableReplacements(); });
 }
 
-void swift::swift_enableDynamicReplacementScope(const DynamicReplacementScope *scope) {
-  scope->enable();
+void swift::swift_enableDynamicReplacementScope(
+    const DynamicReplacementScope *scope) {
+  DynamicReplacementLock.get().withLock([=] { scope->enable(); });
 }
 
-void swift::swift_disableDynamicReplacementScope(const DynamicReplacementScope *scope) {
-  scope->disable();
+void swift::swift_disableDynamicReplacementScope(
+    const DynamicReplacementScope *scope) {
+  DynamicReplacementLock.get().withLock([=] { scope->disable(); });
 }
 #define OVERRIDE_METADATALOOKUP COMPATIBILITY_OVERRIDE
 #include "CompatibilityOverride.def"

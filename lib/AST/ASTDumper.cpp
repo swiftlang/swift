@@ -316,8 +316,6 @@ static StringRef getAccessorKindString(AccessorKind value) {
 #define SINGLETON_ACCESSOR(ID, KEYWORD) \
   case AccessorKind::ID: return #KEYWORD;
 #include "swift/AST/AccessorKinds.def"
-  case AccessorKind::Address: return "address";
-  case AccessorKind::MutableAddress: return "mutableAddress";
   }
 
   llvm_unreachable("Unhandled AccessorKind in switch.");
@@ -983,6 +981,9 @@ namespace {
 
       if (P->isVariadic())
         OS << " variadic";
+
+      if (P->isAutoClosure())
+        OS << " autoclosure";
 
       if (P->getDefaultArgumentKind() != DefaultArgumentKind::None)
         printField("default_arg",
@@ -3438,7 +3439,6 @@ namespace {
         printField("representation",
                    getSILFunctionTypeRepresentationString(representation));
 
-      printFlag(T->isAutoClosure(), "autoclosure");
       printFlag(!T->isNoEscape(), "escaping");
       printFlag(T->throws(), "throws");
 

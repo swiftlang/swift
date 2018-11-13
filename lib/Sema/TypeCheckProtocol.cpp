@@ -1173,23 +1173,6 @@ bool WitnessChecker::findBestWitness(
   }
 
   if (numViable == 0) {
-    // Assume any missing value witnesses for a conformance in a parseable
-    // interface can be treated as opaque.
-    // FIXME: ...but we should do something better about types.
-    if (conformance && !conformance->isInvalid()) {
-      if (auto *SF = DC->getParentSourceFile()) {
-        if (SF->Kind == SourceFileKind::Interface) {
-          auto match = matchWitness(TC, ReqEnvironmentCache, Proto,
-                                    conformance, DC, requirement, requirement);
-          assert(match.isViable());
-          numViable = 1;
-          bestIdx = matches.size();
-          matches.push_back(std::move(match));
-          return true;
-        }
-      }
-    }
-
     if (anyFromUnconstrainedExtension &&
         conformance != nullptr &&
         conformance->isInvalid()) {
@@ -1288,18 +1271,13 @@ bool WitnessChecker::checkWitnessAccess(ValueDecl *requirement,
     // That is, if '@testable' allows us to see the witness here, it should
     // allow us to see it anywhere, because any other client could also add
     // their own `@testable import`.
+    // Same with @_private(sourceFile:) import.
     if (auto parentFile = dyn_cast<SourceFile>(DC->getModuleScopeContext())) {
       const ModuleDecl *witnessModule = witness->getModuleContext();
       if (parentFile->getParentModule() != witnessModule &&
-          parentFile->hasTestableOrPrivateImport(AccessLevel::Internal,
-                                                 witnessModule) &&
+          parentFile->hasTestableOrPrivateImport(witness->getFormalAccess(),
+                                                 witness) &&
           witness->isAccessibleFrom(parentFile)) {
-        actualScopeToCheck = parentFile;
-      // Same with @_private(sourceFile:) import.
-      } else if (parentFile->getParentModule() != witnessModule &&
-                 parentFile->hasTestableOrPrivateImport(
-                     witness->getFormalAccess(), witness) &&
-                 witness->isAccessibleFrom(parentFile)) {
         actualScopeToCheck = parentFile;
       }
     }
@@ -2915,6 +2893,23 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
 }
 
 ResolveWitnessResult
+ConformanceChecker::resolveWitnessAsOpaque(ValueDecl *requirement) {
+  assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
+  auto match = matchWitness(TC, ReqEnvironmentCache, Proto,
+                            Conformance, DC, requirement, requirement);
+  recordWitness(requirement, match);
+  return ResolveWitnessResult::Success;
+}
+
+static bool isConformanceFromParseableInterface(
+    const NormalProtocolConformance *conformance) {
+  auto *containingSF = conformance->getDeclContext()->getParentSourceFile();
+  if (!containingSF)
+    return false;
+  return containingSF->Kind == SourceFileKind::Interface;
+}
+
+ResolveWitnessResult
 ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
 
@@ -2931,25 +2926,33 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     }
   }
 
-  // Determine whether we can derive a witness for this requirement.
-  bool canDerive = false;
+  // Determine whether we can get a witness for this requirement some other way.
+  bool hasFallbacks = false;
+  if (!hasFallbacks)
+    hasFallbacks = requirement->getAttrs().hasAttribute<OptionalAttr>();
+  if (!hasFallbacks)
+    hasFallbacks = requirement->getAttrs().isUnavailable(TC.Context);
+  if (!hasFallbacks)
+    hasFallbacks = isConformanceFromParseableInterface(Conformance);
 
-  // Can a witness for this requirement be derived for this nominal type?
-  if (auto derivable = DerivedConformance::getDerivableRequirement(
-                         TC,
-                         nominal,
-                         requirement)) {
-    if (derivable == requirement) {
-      // If it's the same requirement, we can derive it here.
-      canDerive = true;
-    } else {
-      // Otherwise, go satisfy the derivable requirement, which can introduce
-      // a member that could in turn satisfy *this* requirement.
-      auto derivableProto = cast<ProtocolDecl>(derivable->getDeclContext());
-      if (auto conformance =
-            TC.conformsToProtocol(Adoptee, derivableProto, DC, None)) {
-        if (conformance->isConcrete())
-          (void)conformance->getConcrete()->getWitnessDecl(derivable, &TC);
+  if (!hasFallbacks) {
+    // Can a witness for this requirement be derived for this nominal type?
+    if (auto derivable = DerivedConformance::getDerivableRequirement(
+                           TC,
+                           nominal,
+                           requirement)) {
+      if (derivable == requirement) {
+        // If it's the same requirement, we can derive it here.
+        hasFallbacks = true;
+      } else {
+        // Otherwise, go satisfy the derivable requirement, which can introduce
+        // a member that could in turn satisfy *this* requirement.
+        auto derivableProto = cast<ProtocolDecl>(derivable->getDeclContext());
+        if (auto conformance =
+              TC.conformsToProtocol(Adoptee, derivableProto, DC, None)) {
+          if (conformance->isConcrete())
+            (void)conformance->getConcrete()->getWitnessDecl(derivable, &TC);
+        }
       }
     }
   }
@@ -2960,11 +2963,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   unsigned bestIdx = 0;
   bool doNotDiagnoseMatches = false;
   bool ignoringNames = false;
-  bool considerRenames =
-    !canDerive && !requirement->getAttrs().hasAttribute<OptionalAttr>() &&
-    !requirement->getAttrs().isUnavailable(TC.Context);
-  if (findBestWitness(requirement,
-                      considerRenames ? &ignoringNames : nullptr,
+  if (findBestWitness(requirement, hasFallbacks ? nullptr : &ignoringNames,
                       Conformance,
                       /* out parameters: */
                       matches, numViable, bestIdx, doNotDiagnoseMatches)) {
@@ -3182,19 +3181,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   // We have either no matches or an ambiguous match.
 
   // If we can derive a definition for this requirement, just call it missing.
-  if (canDerive) {
-    return ResolveWitnessResult::Missing;
-  }
-
-  // If the requirement is optional, it's okay. We'll satisfy this via
-  // our handling of default definitions.
-  //
-  // FIXME: revisit this once we get default definitions in protocol bodies.
-  //
-  // Treat 'unavailable' implicitly as if it were 'optional'.
-  // The compiler will reject actual uses.
-  auto Attrs = requirement->getAttrs();
-  if (Attrs.hasAttribute<OptionalAttr>() || Attrs.isUnavailable(TC.Context)) {
+  if (hasFallbacks) {
     return ResolveWitnessResult::Missing;
   }
 
@@ -3353,6 +3340,47 @@ CheckTypeWitnessResult swift::checkTypeWitness(TypeChecker &tc, DeclContext *dc,
 
   // Success!
   return CheckTypeWitnessResult();
+}
+
+ResolveWitnessResult
+ConformanceChecker::resolveWitnessTryingAllStrategies(ValueDecl *requirement) {
+  using ResolveWitnessStrategy =
+      decltype(&ConformanceChecker::resolveWitnessViaLookup);
+  static const constexpr ResolveWitnessStrategy defaultStrategies[] = {
+      &ConformanceChecker::resolveWitnessViaLookup,
+      &ConformanceChecker::resolveWitnessViaDerivation,
+      &ConformanceChecker::resolveWitnessViaDefault};
+  ArrayRef<ResolveWitnessStrategy> strategies = defaultStrategies;
+
+  // Don't try any sort of derivation when processing a parseable interface.
+  if (isConformanceFromParseableInterface(Conformance)) {
+    if (Conformance->isResilient()) {
+      // Resilient conformances don't allow any sort of devirtualization, so
+      // don't bother looking up witnesses at all.
+      static const constexpr ResolveWitnessStrategy resilientStrategies[] = {
+          &ConformanceChecker::resolveWitnessAsOpaque};
+      strategies = resilientStrategies;
+    } else {
+      static const constexpr ResolveWitnessStrategy interfaceStrategies[] = {
+          &ConformanceChecker::resolveWitnessViaLookup,
+          &ConformanceChecker::resolveWitnessAsOpaque};
+      strategies = interfaceStrategies;
+    }
+  }
+
+  for (auto strategy : strategies) {
+    ResolveWitnessResult result = (this->*strategy)(requirement);
+    switch (result) {
+    case ResolveWitnessResult::Success:
+    case ResolveWitnessResult::ExplicitFailed:
+      return result;
+    case ResolveWitnessResult::Missing:
+      // Continue trying.
+      break;
+    }
+  }
+
+  return ResolveWitnessResult::Missing;
 }
 
 /// Attempt to resolve a type witness via member name lookup.
@@ -3625,60 +3653,14 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
 }
 
 #pragma mark Protocol conformance checking
-void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
-  assert(!Conformance->isComplete() && "Conformance is already complete");
 
-  FrontendStatsTracer statsTracer(TC.Context.Stats, "check-conformance",
-                                  Conformance);
-
-  llvm::SaveAndRestore<bool> restoreSuppressDiagnostics(SuppressDiagnostics);
-  SuppressDiagnostics = false;
-
-  // FIXME: Caller checks that this type conforms to all of the
-  // inherited protocols.
-
-  // Emit known diags for this conformance.
-  emitDelayedDiags();
-
-  // If delayed diags have already complained, return.
-  if (AlreadyComplained) {
-    Conformance->setInvalid();
-    return;
-  }
-
-  // Resolve all of the type witnesses.
-  resolveTypeWitnesses();
-
-  // Diagnose missing type witnesses for now.
-  diagnoseMissingWitnesses(Kind);
-
-  // Ensure the conforming type is used.
-  //
-  // FIXME: This feels like the wrong place for this, but if we don't put
-  // it here, extensions don't end up depending on the extended type.
-  recordConformanceDependency(DC, Adoptee->getAnyNominal(), Conformance, false);
-
-  // If we complain about any associated types, there is no point in continuing.
-  // FIXME: Not really true. We could check witnesses that don't involve the
-  // failed associated types.
-  if (AlreadyComplained) {
-    Conformance->setInvalid();
-    return;
-  }
-
-  // Diagnose missing value witnesses later.
-  SWIFT_DEFER { diagnoseMissingWitnesses(Kind); };
-
-  // Ensure the associated type conformances are used.
-  addUsedConformances(Conformance);
-
-  // Check non-type requirements.
+void ConformanceChecker::resolveValueWitnesses() {
   for (auto member : Proto->getMembers()) {
     auto requirement = dyn_cast<ValueDecl>(member);
     if (!requirement)
       continue;
 
-    // Associated type requirements handled above.
+    // Associated type requirements handled elsewhere.
     if (isa<TypeDecl>(requirement))
       continue;
 
@@ -3829,9 +3811,9 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
     // If this is an accessor for a storage decl, ignore it.
     if (isa<AccessorDecl>(requirement))
       continue;
-    
-    // Try to resolve the witness via explicit definitions.
-    switch (resolveWitnessViaLookup(requirement)) {
+
+    // Try to resolve the witness.
+    switch (resolveWitnessTryingAllStrategies(requirement)) {
     case ResolveWitnessResult::Success:
       finalizeWitness();
       continue;
@@ -3841,40 +3823,61 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
       continue;
 
     case ResolveWitnessResult::Missing:
-      // Continue trying below.
-      break;
-    }
-
-    // Try to resolve the witness via derivation.
-    switch (resolveWitnessViaDerivation(requirement)) {
-    case ResolveWitnessResult::Success:
-      finalizeWitness();
-      continue;
-
-    case ResolveWitnessResult::ExplicitFailed:
-      Conformance->setInvalid();
-      continue;
-
-    case ResolveWitnessResult::Missing:
-      // Continue trying below.
-      break;
-    }
-
-    // Try to resolve the witness via defaults.
-    switch (resolveWitnessViaDefault(requirement)) {
-    case ResolveWitnessResult::Success:
-      finalizeWitness();
-      continue;
-
-    case ResolveWitnessResult::ExplicitFailed:
-      Conformance->setInvalid();
-      continue;
-
-    case ResolveWitnessResult::Missing:
-      // Continue trying below.
+      // Let it get diagnosed later.
       break;
     }
   }
+}
+
+void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
+  assert(!Conformance->isComplete() && "Conformance is already complete");
+
+  FrontendStatsTracer statsTracer(TC.Context.Stats, "check-conformance",
+                                  Conformance);
+
+  llvm::SaveAndRestore<bool> restoreSuppressDiagnostics(SuppressDiagnostics);
+  SuppressDiagnostics = false;
+
+  // FIXME: Caller checks that this type conforms to all of the
+  // inherited protocols.
+
+  // Emit known diags for this conformance.
+  emitDelayedDiags();
+
+  // If delayed diags have already complained, return.
+  if (AlreadyComplained) {
+    Conformance->setInvalid();
+    return;
+  }
+
+  // Resolve all of the type witnesses.
+  resolveTypeWitnesses();
+
+  // Diagnose missing type witnesses for now.
+  diagnoseMissingWitnesses(Kind);
+
+  // Ensure the conforming type is used.
+  //
+  // FIXME: This feels like the wrong place for this, but if we don't put
+  // it here, extensions don't end up depending on the extended type.
+  recordConformanceDependency(DC, Adoptee->getAnyNominal(), Conformance, false);
+
+  // If we complain about any associated types, there is no point in continuing.
+  // FIXME: Not really true. We could check witnesses that don't involve the
+  // failed associated types.
+  if (AlreadyComplained) {
+    Conformance->setInvalid();
+    return;
+  }
+
+  // Diagnose missing value witnesses later.
+  SWIFT_DEFER { diagnoseMissingWitnesses(Kind); };
+
+  // Ensure the associated type conformances are used.
+  addUsedConformances(Conformance);
+
+  // Check non-type requirements.
+  resolveValueWitnesses();
 
   emitDelayedDiags();
 

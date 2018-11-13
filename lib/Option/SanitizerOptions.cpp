@@ -37,6 +37,8 @@ static StringRef toStringRef(const SanitizerKind kind) {
     return "thread";
   case SanitizerKind::Fuzzer:
     return "fuzzer";
+  case SanitizerKind::Undefined:
+    return "undefined";
   }
   llvm_unreachable("Unsupported sanitizer");
 }
@@ -49,6 +51,8 @@ static const char* toFileName(const SanitizerKind kind) {
     return "tsan";
   case SanitizerKind::Fuzzer:
     return "fuzzer";
+  case SanitizerKind::Undefined:
+    return "ubsan";
   }
   llvm_unreachable("Unsupported sanitizer");
 }
@@ -134,6 +138,7 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
         .Case("address", SanitizerKind::Address)
         .Case("thread", SanitizerKind::Thread)
         .Case("fuzzer", SanitizerKind::Fuzzer)
+        .Case("undefined", SanitizerKind::Undefined)
         .Default(None);
     bool isShared = kind && *kind != SanitizerKind::Fuzzer;
     if (!kind) {

@@ -33,13 +33,12 @@ class ASTMangler : public Mangler {
 protected:
   CanGenericSignature CurGenericSignature;
   ModuleDecl *Mod = nullptr;
-  const DeclContext *DeclCtx = nullptr;
-  GenericEnvironment *GenericEnv = nullptr;
 
   /// Optimize out protocol names if a type only conforms to one protocol.
   bool OptimizeProtocolNames = true;
 
-  /// If enabled, Arche- and Alias types are mangled with context.
+  /// If enabled, non-canonical types are allowed and type alias types get a
+  /// special mangling.
   bool DWARFMangling;
 
   /// If enabled, entities that ought to have names but don't get a placeholder.
@@ -93,7 +92,6 @@ public:
                                           bool isDestroyer, SymbolKind SKind);
 
   std::string mangleAccessorEntity(AccessorKind kind,
-                                   AddressorKind addressorKind,
                                    const AbstractStorageDecl *decl,
                                    bool isStatic,
                                    SymbolKind SKind);
@@ -148,8 +146,7 @@ public:
   std::string mangleKeyPathHashHelper(ArrayRef<CanType> indices,
                                       GenericSignature *signature);
 
-  std::string mangleTypeForDebugger(Type decl, const DeclContext *DC,
-                                    GenericEnvironment *GE);
+  std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
 
   std::string mangleDeclType(const ValueDecl *decl);
   
@@ -164,7 +161,6 @@ public:
   std::string mangleDeclAsUSR(const ValueDecl *Decl, StringRef USRPrefix);
 
   std::string mangleAccessorEntityAsUSR(AccessorKind kind,
-                                        AddressorKind addressorKind,
                                         const AbstractStorageDecl *decl,
                                         StringRef USRPrefix);
 
@@ -233,7 +229,7 @@ protected:
   void appendAnyGenericType(const GenericTypeDecl *decl);
 
   void appendFunction(AnyFunctionType *fn, bool isFunctionMangling = false);
-  void appendFunctionType(AnyFunctionType *fn);
+  void appendFunctionType(AnyFunctionType *fn, bool isAutoClosure = false);
 
   void appendFunctionSignature(AnyFunctionType *fn);
 
@@ -269,8 +265,7 @@ protected:
   void appendClosureEntity(const AbstractClosureExpr *closure);
 
   void appendClosureComponents(Type Ty, unsigned discriminator, bool isImplicit,
-                               const DeclContext *parentContext,
-                               const DeclContext *localContext);
+                               const DeclContext *parentContext);
 
   void appendDefaultArgumentEntity(const DeclContext *ctx, unsigned index);
 

@@ -1223,8 +1223,8 @@ sil [transparent] [serialized] [thunk] @a_regular_thunk : $@convention(thin) () 
 }
 
 public class WeakUnownedTest {
-  @sil_stored public unowned var unownedVal: @sil_unowned AnyObject { get set }
-  @sil_stored public weak var weakVal: @sil_weak AnyObject? { get set }
+  @_hasStorage public unowned var unownedVal: @sil_unowned AnyObject { get set }
+  @_hasStorage public weak var weakVal: @sil_weak AnyObject? { get set }
   public init(protoVal: AnyObject)
   deinit
 }
@@ -1249,7 +1249,7 @@ bb0(%0 : $WeakUnownedTest, %1 : $AnyObject):
 
 
 class A {
-  @sil_stored var property: Any { get set }
+  @_hasStorage var property: Any { get set }
   deinit
   init()
 }

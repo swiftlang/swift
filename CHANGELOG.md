@@ -24,6 +24,39 @@ CHANGELOG
 Swift 5.0
 ---------
 
+* [SR-7139][]:
+
+  Exclusive memory access is now enforced at runtime by default in
+  optimized (`-O`/`-Osize`) builds. Programs that violate exclusivity will
+  trap at runtime with an "overlapping access" diagnostic
+  message. This can be disabled via a command line flag:
+  `-enforce-exclusivity=unchecked`, but doing so may result in undefined
+  behavior.
+
+  Runtime violations of exclusivity typically result from
+  simultaneous access of class properties, global variables (including
+  variables in top-level code), or variables captured by escaping
+  closures.
+
+* [SE-0216][]:
+
+  The `@dynamicCallable` attribute enables nominal types to be "callable" via a
+  simple syntactic sugar. The primary use case is dynamic language
+  interoperability.
+
+  Toy example:
+
+  ```swift
+  @dynamicCallable
+  struct ToyCallable {
+    func dynamicallyCall(withArguments: [Int]) {}
+    func dynamicallyCall(withKeywordArguments: KeyValuePairs<String, Int>) {}
+  }
+  let x = ToyCallable()
+  x(1, 2, 3) // desugars to `x.dynamicallyCall(withArguments: [1, 2, 3])`
+  x(label: 1, 2) // desugars to `x.dynamicallyCall(withKeywordArguments: ["label": 1, "": 2])`
+  ```
+
 * [SR-7251][]:
 
   In Swift 5 mode, attempting to declare a static property with the same name as a
@@ -7259,6 +7292,7 @@ Swift 1.0
 [SE-0224]: <https://github.com/apple/swift-evolution/blob/master/proposals/0224-ifswift-lessthan-operator.md>
 [SE-0225]: <https://github.com/apple/swift-evolution/blob/master/proposals/0225-binaryinteger-iseven-isodd-ismultiple.md>
 [SE-0226]: <https://github.com/apple/swift-evolution/blob/master/proposals/0226-package-manager-target-based-dep-resolution.md>
+[SE-0227]: <https://github.com/apple/swift-evolution/blob/master/proposals/0227-identity-keypath.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>
@@ -7270,4 +7304,5 @@ Swift 1.0
 [SR-2394]: <https://bugs.swift.org/browse/SR-2394>
 [SR-2608]: <https://bugs.swift.org/browse/SR-2608>
 [SR-4248]: <https://bugs.swift.org/browse/SR-4248>
+[SR-7139]: <https://bugs.swift.org/browse/SR-7139>
 [SR-7251]: <https://bugs.swift.org/browse/SR-7251>
