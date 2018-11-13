@@ -180,13 +180,12 @@ extension S1 {
 // Protocol extensions with redundant requirements
 // ----------------------------------------------------------------------------
 
-protocol Foo {}
-extension Foo where Self: Foo {} // expected-warning {{requirement of 'Self': 'Foo' is redundant in an extension of 'Foo'}}
+protocol FooProtocol {}
+extension FooProtocol where Self: FooProtocol {} // expected-warning {{requirement of 'Self' to 'FooProtocol' is redundant in an extension of 'FooProtocol'}}
 
-protocol Bar {}
-protocol Baz {}
-extension Bar where Self: Baz {} // ok
-extension Bar where Self: Bar, Self: Baz {} // expected-warning {{requirement of 'Self': 'Bar' is redundant in an extension of 'Bar'}}
+protocol AnotherFooProtocol {}
+protocol BazProtocol {}
+extension AnotherFooProtocol where Self: BazProtocol, Self: AnotherFooProtocol {} // expected-warning {{requirement of 'Self' to 'AnotherFooProtocol' is redundant in an extension of 'AnotherFooProtocol'}}
 
 // ----------------------------------------------------------------------------
 // Protocol extensions with additional requirements

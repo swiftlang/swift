@@ -83,15 +83,24 @@ void checkGenericParamList(TypeChecker &tc,
           // for example, `extension Foo where Self: Foo`, then emit a
           // diagnostic.
           
-          if (auto extDecl = dyn_cast<ExtensionDecl>(owner.dc->getAsDecl())) {
-            auto ownerType = extDecl->getExtendedType();
-            auto selfType = req.getFirstType();
-            auto reqType = req.getSecondType();
-            
-            if (ownerType->isExistentialType() && reqType->isEqual(ownerType)) {
-              auto &ctx = extDecl->getASTContext();
-              ctx.Diags.diagnose(extDecl->getLoc(), diag::protocol_extension_redundant_requirement,
-                                 ownerType->getString(), selfType->getString(), reqType->getString());
+          if (auto decl = owner.dc->getAsDecl()) {
+            if (auto extDecl = dyn_cast<ExtensionDecl>(decl)) {
+              auto ownerType = extDecl->getExtendedType();
+              auto ownerSelfType = extDecl->getSelfInterfaceType();
+              auto reqLHSType = req.getFirstType();
+              auto reqRHSType = req.getSecondType();
+              
+              if (ownerType->isExistentialType() &&
+                  reqLHSType->isEqual(ownerSelfType)
+                  && reqRHSType->isEqual(ownerType)) {
+                
+                auto &ctx = extDecl->getASTContext();
+                ctx.Diags.diagnose(extDecl->getLoc(),
+                                   diag::protocol_extension_redundant_requirement,
+                                   ownerType->getString(),
+                                   ownerSelfType->getString(),
+                                   reqRHSType->getString());
+              }
             }
           }
           
