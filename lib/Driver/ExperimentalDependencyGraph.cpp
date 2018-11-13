@@ -120,8 +120,8 @@ void ExpDependencyGraph::parseNode(llvm::yaml::MappingNode *mappingNodeNode,
   SmallString<64> scratch1, scratch2, scratch3;
 
   for (auto i = mappingNodeNode->begin(), e = mappingNodeNode->end(); i != e; ++i) {
-    if (isa<yaml::NullNode>(i->getValue()))
-      continue;
+//    if (isa<yaml::NullNode>(i->getValue()))
+//      continue;
     auto *key = dyn_cast<yaml::ScalarNode>(i->getKey());
     if (!key)
       return errorCallback();
@@ -185,6 +185,8 @@ void ExpDependencyGraph::parseNode(llvm::yaml::MappingNode *mappingNodeNode,
 Optional<std::pair<std::string, Optional<std::vector<uint>>>>
 ExpDependencyGraph::parseValue(llvm::yaml::Node * n) {
   Optional<std::vector<uint>> valueIfInts;
+  if (isa<llvm::yaml::NullNode>(n)) // empty vector
+    return std::make_pair( std::string(), Optional<std::vector<uint>>(std::vector<uint>{}));
   if (auto *value = dyn_cast<llvm::yaml::SequenceNode>(n)) {
     std::vector<uint> v;
     for (auto &rawNode : *value) {
