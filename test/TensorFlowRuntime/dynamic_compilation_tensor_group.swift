@@ -1,3 +1,4 @@
+// RUN: %target-run-simple-swift
 // RUN: %target-run-dynamic-compilation-swift
 // REQUIRES: executable_test
 
