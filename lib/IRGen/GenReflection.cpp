@@ -198,7 +198,6 @@ llvm::Constant *IRGenModule::getMangledAssociatedConformance(
   // See if we emitted the constant already.
   auto &entry = StringsForTypeRef[symbolName];
   if (entry.second) {
-
     return entry.second;
   }
 
