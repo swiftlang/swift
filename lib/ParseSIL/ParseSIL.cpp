@@ -3117,6 +3117,29 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
   }
   // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::GraphOperationInst: {
+    bool noClustering = false;
+    if (P.consumeIf(tok::l_square)) {
+      Identifier ident;
+      SourceLoc identLoc;
+      if (parseSILIdentifier(ident, identLoc,
+                             diag::expected_in_attribute_list)) {
+        P.diagnose(P.Tok, diag::expected_tok_in_sil_instr,
+                   "'no_clustering' attribute");
+        return true;
+      }
+      StringRef attr = ident.str();
+
+      if (attr == "no_clustering")
+        noClustering = true;
+      else {
+        P.diagnose(P.Tok, diag::expected_tok_in_sil_instr,
+                   "'no_clustering' attribute");
+        return true;
+      }
+      if (!P.consumeIf(tok::r_square))
+        return true;
+    }
+
     // Parse graph operation name.
     if (P.Tok.isNot(tok::string_literal)) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "graph_op name");
@@ -3234,7 +3257,9 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (parseSILDebugLocation(InstLoc, B))
       return true;
 
-    ResultVal = opBuilder.build(B, P.Context, InstLoc, resultTypes);
+    auto op = opBuilder.build(B, P.Context, InstLoc, resultTypes);
+    op->setNoClustering(noClustering);
+    ResultVal = op;
     break;
   }
   case SILInstructionKind::OpenExistentialAddrInst:

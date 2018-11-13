@@ -1284,6 +1284,9 @@ public:
     auto opName = info.getOperationName();
     auto &arguments = info.getStructuredArguments();
 
+    if (GI->getNoClustering())
+      *this << "[no_clustering] ";
+
     *this << QuotedString(opName);
 
     *this << "(";
