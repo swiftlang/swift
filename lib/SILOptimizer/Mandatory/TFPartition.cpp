@@ -3754,7 +3754,8 @@ void TFFunctionPartition::insertReplacementGraphOp(
     SILValue newTH = opResult->getResult(resultNumber);
     // Manually walk the use list in a custom way to avoid invalidating the
     // iterator as we potentially change it.
-    for (auto *operand : result->getUses()) {
+    for (auto UI = result->use_begin(), UE = result->use_end(); UI != UE;) {
+      auto *operand = *UI++;
       auto user = operand->getUser();
 
       // Users may be either inside (e.g. another tensor op, or a non-tensor op
@@ -3764,7 +3765,6 @@ void TFFunctionPartition::insertReplacementGraphOp(
       // balance, and then nuke it later.
       if (DI.dominates(tensorEndPoint, user)) {
         operand->set(newTH);
-        continue;
       }
     }
   }

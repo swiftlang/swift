@@ -2389,8 +2389,22 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       }
 
       if (astType->is<SILFunctionType>()) {
-        // TODO: dynamic function attributes
-        lowerOpToError("dynamic function attributes not supported");
+        if (auto *CFI = dyn_cast<ConvertFunctionInst>(silValue)) {
+          silValue = CFI->getConverted();
+        }
+        if (auto *Fn = dyn_cast<FunctionRefInst>(silValue)) {
+          auto fnName = getGraphFuncNameForFuncAttr(
+              Fn->getReferencedFunction()->getName());
+          auto attrValAddr = IGM.getAddrOfGlobalString(fnName);
+          auto attrLength = llvm::ConstantInt::get(IGM.SizeTy, fnName.size());
+
+          auto *setAttrFn = IGM.getTFE_OpSetAttrFunctionNameFn();
+          Builder.CreateCall(setAttrFn,
+                             {op, attrNameValAddr, attrValAddr, attrLength});
+          break;
+        }
+        lowerOpToError("dynamic function attributes not fully supported. "
+                       "Most likely the function is not a constant.");
         return;
       }
 
