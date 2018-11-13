@@ -47,7 +47,7 @@ namespace experimental_dependencies {
       nameForDependencies,
       nameForHolderOfMember,
       fingerprint,
-      sequenceNumberInGraph,
+      sequenceNumber,
       departures,
       arrivals,
       serializationKeyCount
@@ -60,7 +60,7 @@ namespace experimental_dependencies {
     
     friend class Graph;
     friend class Arc;
-    uint sequenceNumberInGraph;
+    uint sequenceNumber;
     std::vector<uint> departures, arrivals;
 
   public:
@@ -70,14 +70,14 @@ namespace experimental_dependencies {
        std::string nameForDependencies,
        std::string nameForHolderOfMember,
        std::string fingerprint,
-       uint sequenceNumberInGraph = ~0,
+       uint sequenceNumber = ~0,
        std::vector<uint>&& departures = {},
        std::vector<uint>&& arrivals = {}) :
     kind(kind),
     nameForDependencies(nameForDependencies),
     nameForHolderOfMember(nameForHolderOfMember),
     fingerprint(fingerprint),
-    sequenceNumberInGraph(sequenceNumberInGraph),
+    sequenceNumber(sequenceNumber),
     departures(departures),
     arrivals(arrivals)
     {
@@ -90,7 +90,7 @@ namespace experimental_dependencies {
     StringRef getNameForDependencies() const { return nameForDependencies; }
     StringRef getNameForHolderOfMember() const { return nameForHolderOfMember; }
     StringRef getFingerprint() const { return fingerprint; }
-    uint getSequenceNumber() const { return sequenceNumberInGraph; }
+    uint getSequenceNumber() const { return sequenceNumber; }
     ArrayRef<uint> getDepartures() const { return departures; }
     ArrayRef<uint> getArrivals() const { return arrivals; }
   };
@@ -104,14 +104,14 @@ namespace experimental_dependencies {
   public:
     const uint tailSeqNo, headSeqNo;
     Arc(const Node* tail, const Node* head) :
-    tailSeqNo(tail->sequenceNumberInGraph), headSeqNo(head->sequenceNumberInGraph) {}
+    tailSeqNo(tail->sequenceNumber), headSeqNo(head->sequenceNumber) {}
   };
   
   class Graph {
     std::vector<Node*> allNodes;
   public:
     void addNode(Node* n) {
-      n->sequenceNumberInGraph = allNodes.size();
+      n->sequenceNumber = allNodes.size();
       allNodes.push_back(n);
     }
     void addArc(const Arc arc) {

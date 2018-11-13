@@ -70,7 +70,7 @@ ExpDependencyGraph::loadFromBuffer(const void *node,
   // Init to UpToDate in case the file is empty.
   DependencyGraphImpl::LoadResult result = DependencyGraphImpl::LoadResult::UpToDate;
 
-  auto nodeCallback = [](const Node*) { abort(); };
+  auto nodeCallback = [](Node&& n) { abort(); };
   auto errorCallBack = [&result]() { result = LoadResult::HadError; };
   
   
@@ -115,9 +115,9 @@ void ExpDependencyGraph::parseNode(llvm::yaml::MappingNode *mappingNodeNode,
   uint allKeys = 0;
   Node::Kind kind;
   std::string nameForDependencies, nameForHolderOfMember, fingerprint;
-  uint sequenceNumberInGraph;
+  uint sequenceNumber;
   std::vector<uint> deparatures, arrivals;
-  SmallString<64> scratch1, scratch2;
+  SmallString<64> scratch1, scratch2, scratch3;
 
   for (auto i = mappingNodeNode->begin(), e = mappingNodeNode->end(); i != e; ++i) {
     if (isa<yaml::NullNode>(i->getValue()))
@@ -127,54 +127,83 @@ void ExpDependencyGraph::parseNode(llvm::yaml::MappingNode *mappingNodeNode,
       return errorCallback();
     StringRef keyString = key->getValue(scratch1);
     
-#error if not right key
-    auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
-    if (!value)
+    auto valueUnion = parseValue(i->getValue());
+    if (!valueUnion)
       return errorCallback();
-    StringRef valueString = value->getValue(scratch2);
-    
+
     Keys keyCode = llvm::StringSwitch<Keys>(keyString)
     .Case("kind", Keys::kind)
     .Case("nameForDependencies", Keys::nameForDependencies)
     .Case("nameForHolderOfMember", Keys::nameForHolderOfMember)
     .Case("fingerprint", Keys::fingerprint)
-    .Case("sequenceNumberInGraph", Keys::sequenceNumberInGraph)
+    .Case("sequenceNumber", Keys::sequenceNumber)
     .Case("departures", Keys::departures)
     .Case("arrivals", Keys::arrivals);
-    if (allKeys & uint(keyCode))
+    uint keyCodeMask = 1 << uint(keyCode);
+    if (allKeys & keyCodeMask)
       llvm_unreachable("duplicate key code");
-    allKeys |= uint(keyCode);
+    allKeys |= keyCodeMask;
     switch (keyCode) {
       default: llvm_unreachable("bad code");
       case Keys::kind: {
-        uint k = std::stoi(valueString);
+        uint k = std::stoi(valueUnion->first);
         if (k >= uint(Node::Kind::kindCount))
           return errorCallback();
         kind = Node::Kind(k);
         break;
       }
       case Keys::nameForDependencies:
-        nameForDependencies = valueString;
+        nameForDependencies = valueUnion->first;
         break;
-      case Keys::fingerprint:
-        fingerprint = valueString;
+      case Keys::nameForHolderOfMember:
+        nameForHolderOfMember = valueUnion->first;
         break;
-      case Keys::sequenceNumberInGraph:
-        sequenceNumberInGraph = std::stoi(valueString);
+     case Keys::fingerprint:
+        fingerprint = valueUnion->first;
+        break;
+      case Keys::sequenceNumber:
+        sequenceNumber = std::stoi(valueUnion->first);
         break;
       case Keys::departures:
-        deparatures = xxx;
+        if (!valueUnion->second)
+          return errorCallback();
+        deparatures = std::move(valueUnion->second.getValue());
         break;
       case Keys::arrivals:
-        arrivals = xxx;
+        if (!valueUnion->second)
+          return errorCallback();
+        arrivals = std::move(valueUnion->second.getValue());
         break;
     }
   }
   if (allKeys != (1u << uint(Keys::serializationKeyCount)) - 1)
     return errorCallback();
-  nodeCallback(
-               std::move(Node(kind, nameForDependencies, nameForHolderOfMember, fingerprint,
-                    sequenceNumberInGraph, std::move(deparatures), std::move(arrivals))));
+  nodeCallback(Node(kind, nameForDependencies, nameForHolderOfMember, fingerprint,
+                    sequenceNumber, std::move(deparatures), std::move(arrivals)));
+}
+
+Optional<std::pair<std::string, Optional<std::vector<uint>>>>
+ExpDependencyGraph::parseValue(llvm::yaml::Node * n) {
+  Optional<std::vector<uint>> valueIfInts;
+  if (auto *value = dyn_cast<llvm::yaml::SequenceNode>(n)) {
+    std::vector<uint> v;
+    for (auto &rawNode : *value) {
+      if (auto *sn = dyn_cast<llvm::yaml::ScalarNode>(&rawNode)) {
+        SmallString<64> scratch;
+        auto s = sn->getValue(scratch);
+        v.push_back(std::stoi(s.str()));
+      }
+      else
+        return None;
+    }
+    return Optional<std::pair<std::string, Optional<std::vector<uint>>>>(std::make_pair( std::string(), std::move(v)));
+  }
+  if (auto *value = dyn_cast<llvm::yaml::ScalarNode>(n)) {
+    SmallString<64> scratch;
+    return std::make_pair( value->getValue(scratch).str(), Optional<std::vector<uint>>() );
+  }
+  else
+    return None;
 }
 
 bool ExpDependencyGraph::isMarked(const Job* Cmd) const {

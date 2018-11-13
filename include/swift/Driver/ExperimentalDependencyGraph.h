@@ -69,7 +69,7 @@ namespace swift {
       private:
         DependencyGraphImpl::LoadResult loadFromBuffer(const void *node,
                                                        llvm::MemoryBuffer &buffer);
-        using NodeCallbackTy = void(const Node*);
+        using NodeCallbackTy = void(Node &&);
         using ErrorCallbackTy = void();
         static void
         parseDependencyFile(llvm::MemoryBuffer &buffer,
@@ -78,6 +78,9 @@ namespace swift {
         static void parseNode(llvm::yaml::MappingNode *,
                               llvm::function_ref<NodeCallbackTy> nodeCallback,
                               llvm::function_ref<ErrorCallbackTy> errorCallback);
+        // TODO: really a union
+        static Optional<std::pair<std::string, Optional<std::vector<uint>>>>
+        parseValue(llvm::yaml::Node *);
 
         void registerCmdForReevaluation(const Job* Cmd);
         static std::string depsFileForCmd(const Job* Cmd);

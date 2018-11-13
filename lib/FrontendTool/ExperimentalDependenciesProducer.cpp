@@ -380,7 +380,7 @@ public:
   void entry(StringRef(key), ArrayRef<uint> numbers) const {
     out << " " << key << ": \n";
     for (auto i: numbers)
-      out << "  " << i << "\n";
+      out << "  - " << i << "\n";
   }
 };
 
@@ -407,6 +407,7 @@ namespace {
 template <>
 void GraphEmitter<YAMLEmitter>::emitNode(const Node* n) const {
   emitter.newNode();
+  // TODO: factor these strings with those in ExperimentalDependencyGraph.cpp
   emitter.entry("kind", uint(n->getKind()));
   emitter.entry("nameForDependencies", n->getNameForDependencies());
   emitter.entry("nameForHolderOfMember", n->getNameForHolderOfMember());
