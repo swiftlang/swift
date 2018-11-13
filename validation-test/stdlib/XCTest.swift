@@ -8,6 +8,8 @@
 // REQUIRES: OS=macosx
 // UNSUPPORTED: remote_run
 
+// REQUIRES: rdar46030955
+
 import StdlibUnittest
 
 
