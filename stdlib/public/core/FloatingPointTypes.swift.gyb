@@ -175,24 +175,24 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   //  Implementation details.
-  @inlinable
+  @inlinable // FIXME(inline-always) was usableFromInline
   internal static var _infinityExponent: UInt {
     @inline(__always) get { return 1 &<< UInt(exponentBitCount) - 1 }
   }
 
-  @inlinable
+  @inlinable // FIXME(inline-always) was usableFromInline
   internal static var _exponentBias: UInt {
     @inline(__always) get { return _infinityExponent &>> 1 }
   }
 
-  @inlinable
+  @inlinable // FIXME(inline-always) was usableFromInline
   internal static var _significandMask: ${RawSignificand} {
     @inline(__always) get {
       return 1 &<< ${RawSignificand}(significandBitCount) - 1
     }
   }
 
-  @inlinable
+  @inlinable // FIXME(inline-always) was usableFromInline
   internal static var _quietNaNMask: ${RawSignificand} {
     @inline(__always) get {
       return 1 &<< ${RawSignificand}(significandBitCount - 1)
@@ -1103,7 +1103,8 @@ extension ${Self}: BinaryFloatingPoint {
   /// `formRemainder(dividingBy:)` method is always exact.
   ///
   /// - Parameter other: The value to use when dividing this value.
-  @inlinable @inline(__always)
+  @inlinable // FIXME(inline-always)
+  @inline(__always)
   public mutating func formRemainder(dividingBy other: ${Self}) {
     self = _stdlib_remainder${cFuncSuffix}(self, other)
   }
@@ -1137,7 +1138,8 @@ extension ${Self}: BinaryFloatingPoint {
   /// method is always exact.
   ///
   /// - Parameter other: The value to use when dividing this value.
-  @inlinable @inline(__always)
+  @inlinable // FIXME(inline-always)
+  @inline(__always)
   public mutating func formTruncatingRemainder(dividingBy other: ${Self}) {
     _value = Builtin.frem_FPIEEE${bits}(self._value, other._value)
   }
@@ -1258,7 +1260,8 @@ extension ${Self}: BinaryFloatingPoint {
   /// A *normal* value is a finite number that uses the full precision
   /// available to values of a type. Zero is neither a normal nor a subnormal
   /// number.
-  @inlinable public var isNormal: Bool {
+  @inlinable // FIXME(inline-always)
+  public var isNormal: Bool {
     @inline(__always)
     get {
       return exponentBitPattern > 0 && isFinite
@@ -1269,7 +1272,8 @@ extension ${Self}: BinaryFloatingPoint {
   ///
   /// All values other than NaN and infinity are considered finite, whether
   /// normal or subnormal.
-  @inlinable public var isFinite: Bool {
+  @inlinable // FIXME(inline-always)
+  public var isFinite: Bool {
     @inline(__always)
     get {
       return exponentBitPattern < ${Self}._infinityExponent
@@ -1285,7 +1289,8 @@ extension ${Self}: BinaryFloatingPoint {
   ///     let x = -0.0
   ///     x.isZero        // true
   ///     x == 0.0        // true
-  @inlinable public var isZero: Bool {
+  @inlinable // FIXME(inline-always)
+  public var isZero: Bool {
     @inline(__always)
     get {
       return exponentBitPattern == 0 && significandBitPattern == 0
@@ -1301,7 +1306,8 @@ extension ${Self}: BinaryFloatingPoint {
   /// Zero is neither a normal nor a subnormal number. Subnormal numbers are
   /// often called *denormal* or *denormalized*---these are different names
   /// for the same concept.
-  @inlinable public var isSubnormal:  Bool {
+  @inlinable // FIXME(inline-always)
+  public var isSubnormal:  Bool {
     @inline(__always)
     get {
       return exponentBitPattern == 0 && significandBitPattern != 0
@@ -1312,7 +1318,8 @@ extension ${Self}: BinaryFloatingPoint {
   ///
   /// Note that `isFinite` and `isInfinite` do not form a dichotomy, because
   /// they are not total: If `x` is `NaN`, then both properties are `false`.
-  @inlinable public var isInfinite:  Bool {
+  @inlinable // FIXME(inline-always)
+  public var isInfinite:  Bool {
     @inline(__always)
     get {
       return !isFinite && significandBitPattern == 0
@@ -1342,7 +1349,8 @@ extension ${Self}: BinaryFloatingPoint {
   ///     // Prints "true"
   ///
   /// This property is `true` for both quiet and signaling NaNs.
-  @inlinable public var isNaN:  Bool {
+  @inlinable // FIXME(inline-always)
+  public var isNaN:  Bool {
     @inline(__always)
     get {
       return !isFinite && significandBitPattern != 0
@@ -1353,7 +1361,8 @@ extension ${Self}: BinaryFloatingPoint {
   ///
   /// Signaling NaNs typically raise the Invalid flag when used in general
   /// computing operations.
-  @inlinable public var isSignalingNaN: Bool {
+  @inlinable // FIXME(inline-always)
+  public var isSignalingNaN: Bool {
     @inline(__always)
     get {
       return isNaN && (significandBitPattern & ${Self}._quietNaNMask) == 0
@@ -1447,7 +1456,8 @@ extension ${Self}: BinaryFloatingPoint {
   ///     // x == 21.25
   ///
   /// - Parameter value: The new floating-point value.
-  @inlinable @inline(__always)
+  @inlinable // FIXME(inline-always)
+  @inline(__always)
   public init(floatLiteral value: ${Self}) {
     self = value
   }
@@ -1590,7 +1600,8 @@ extension ${Self} {
   ///     // Use 'abs(_:)' instead of 'magnitude'
   ///     print("Missed the target by \(abs(margin)) meters.")
   ///     // Prints "Missed the target by 0.25 meters."
-  @inlinable public var magnitude: ${Self} {
+  @inlinable // FIXME(inline-always)
+  public var magnitude: ${Self} {
     @inline(__always)
     get {
       return ${Self}(Builtin.int_fabs_FPIEEE${bits}(_value))
@@ -1614,14 +1625,16 @@ extension ${Self} {
 
   // We "shouldn't" need this, but the typechecker barfs on an expression
   // in the test suite without it.
-  @inlinable @inline(__always)
+  @inlinable // FIXME(inline-always)
+  @inline(__always)
   public init(_ v: Int) {
     _value = Builtin.sitofp_Int${word_bits}_FPIEEE${bits}(v._value)
   }
 
   // Fast-path for conversion when the source is representable as a 64-bit int,
   // falling back on the generic _convert operation otherwise.
-  @inlinable @inline(__always)
+  @inlinable // FIXME(inline-always)
+  @inline(__always)
   public init<Source : BinaryInteger>(_ value: Source) {
     if value.bitWidth <= ${word_bits} {
       if Source.isSigned {
@@ -1666,7 +1679,8 @@ extension ${Self} {
   ///     // z.isNaN == true
   ///
   /// - Parameter other: The value to use for the new instance.
-  @inlinable @inline(__always)
+  @inlinable // FIXME(inline-always)
+  @inline(__always)
   public init(_ other: ${That}) {
 %   if srcBits > bits:
     _value = Builtin.fptrunc_FPIEEE${srcBits}_FPIEEE${bits}(other._value)
