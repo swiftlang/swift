@@ -350,6 +350,17 @@ void SILPassManager::dumpPassInfo(const char *Title, unsigned TransIdx,
   llvm::dbgs() << '\n';
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+static void logS4TFPassEvent(llvm::sys::TimePoint<> StartTime, long long Delta,
+                             StringRef passName, bool isFunction,
+                             StringRef funcName) {
+  auto tt = std::chrono::system_clock::to_time_t(StartTime);
+  auto strTime = ctime(&tt);
+  strTime[strlen(strTime) - 1] = '\0';
+  llvm::dbgs() << "S4TF," << Delta << "," << strTime << "," << passName << ","
+               << (isFunction ? "F" : "M") << "," << funcName << "\n";
+}
+
 void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
 
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
@@ -415,6 +426,13 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   if (SILPrintPassTime) {
     llvm::dbgs() << Delta << " (" << SFT->getID() << "," << F->getName()
                  << ")\n";
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // Write CSV-formatted events, so that we can do aggregate analysis. Format:
+    // [S4TF] Delta,StartTime,PassName,PassType,FuncName
+    // Here PassType is F since it's a function pass.
+    logS4TFPassEvent(StartTime, Delta, SFT->getID(), /*isFunction*/ true,
+                     F->getName());
   }
 
   // If this pass invalidated anything, print and verify.
@@ -561,6 +579,12 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
   auto Delta = (std::chrono::system_clock::now() - StartTime).count();
   if (SILPrintPassTime) {
     llvm::dbgs() << Delta << " (" << SMT->getID() << ",Module)\n";
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // Write CSV-formatted events, so that we can do aggregate analysis. Format:
+    // [S4TF] Delta,StartTime,PassName,PassType
+    // Here PassType is M since it's a module pass.
+    logS4TFPassEvent(StartTime, Delta, SMT->getID(), /*isFunction*/ false, "");
   }
 
   // If this pass invalidated anything, print and verify.
