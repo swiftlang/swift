@@ -5946,12 +5946,15 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       if (!ModuleFilename.empty()) {
         auto &Ctx = TheModule->getASTContext();
         CodeCompletionCache::Key K{
-            ModuleFilename,
-            TheModule->getName().str(),
-            AccessPath,
-            Request.NeedLeadingDot,
-            SF.hasTestableOrPrivateImport(AccessLevel::Internal, TheModule),
-            Ctx.LangOpts.CodeCompleteInitsInPostfixExpr};
+          ModuleFilename, TheModule->getName().str(), AccessPath,
+              Request.NeedLeadingDot,
+              SF.hasTestableOrPrivateImport(
+                  AccessLevel::Internal, TheModule,
+                  SourceFile::ImportQueryKind::TestableOnly),
+              SF.hasTestableOrPrivateImport(
+                  AccessLevel::Internal, TheModule,
+                  SourceFile::ImportQueryKind::PrivateOnly),
+          Ctx.LangOpts.CodeCompleteInitsInPostfixExpr};
 
         using PairType = llvm::DenseSet<swift::ide::CodeCompletionCache::Key,
             llvm::DenseMapInfo<CodeCompletionCache::Key>>::iterator;

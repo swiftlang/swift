@@ -1389,7 +1389,8 @@ void SourceFile::addImports(ArrayRef<ImportedModuleDesc> IM) {
 }
 
 bool SourceFile::hasTestableOrPrivateImport(
-    AccessLevel accessLevel, const swift::ValueDecl *ofDecl) const {
+    AccessLevel accessLevel, const swift::ValueDecl *ofDecl,
+    SourceFile::ImportQueryKind queryKind) const {
   auto *module = ofDecl->getModuleContext();
   switch (accessLevel) {
   case AccessLevel::Internal:
@@ -1399,10 +1400,19 @@ bool SourceFile::hasTestableOrPrivateImport(
     // decls).
     return std::any_of(
         Imports.begin(), Imports.end(),
-        [module](ImportedModuleDesc desc) -> bool {
-          return desc.module.second == module &&
-                 (desc.importOptions.contains(ImportFlags::PrivateImport) ||
-                  desc.importOptions.contains(ImportFlags::Testable));
+        [module, queryKind](ImportedModuleDesc desc) -> bool {
+          if (queryKind == ImportQueryKind::TestableAndPrivate)
+            return desc.module.second == module &&
+                   (desc.importOptions.contains(ImportFlags::PrivateImport) ||
+                    desc.importOptions.contains(ImportFlags::Testable));
+          else if (queryKind == ImportQueryKind::TestableOnly)
+            return desc.module.second == module &&
+                   desc.importOptions.contains(ImportFlags::Testable);
+          else {
+            assert(queryKind == ImportQueryKind::PrivateOnly);
+            return desc.module.second == module &&
+                   desc.importOptions.contains(ImportFlags::PrivateImport);
+          }
         });
   case AccessLevel::Open:
     return true;
@@ -1411,6 +1421,9 @@ bool SourceFile::hasTestableOrPrivateImport(
     // Fallthrough.
     break;
   }
+
+  if (queryKind == ImportQueryKind::TestableOnly)
+    return false;
 
   auto *DC = ofDecl->getDeclContext();
   if (!DC)
