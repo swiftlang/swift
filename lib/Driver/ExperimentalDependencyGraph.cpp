@@ -31,34 +31,9 @@ using namespace swift::driver;
 using namespace swift::driver::experimental_dependencies;
 
 
-
-
-//FrontendNode* ExpDependencyGraph::addNodeForFile(StringRef depsFile, FrontendNode::Cache &cache, Node& n) {
-//  auto oldNodeIter = cache.find(
-//                            FrontendNode::createMemoizedKey(n.getKind(), n.getNameForDependencies(), n.getNameForHolderOfMember()));
-//  if (oldNodeIter != cache.end()) {
-//    auto *oldNode = oldNodeIter->second;
-//    if (oldNode->getFingerprint() == n.getFingerprint())
-//      return nullptr; // nothing to do
-//    oldNode->setFingerprint(n.getFingerprint());
-//    return oldNode;
-//  }
-//  FrontendNode *newNode = FrontendNode::create(n.getKind(),
-//                                          n.getNameForDependencies(),
-//                                          n.getNameForHolderOfMember(),
-//                                          n.getFingerprint(),
-//                                          cache,
-//                                          *this);
-//  return newNode;
-//}
-//
-////void ExpDependencyGraph::addArc(Arc* a) {
-////  Graph::addArc(a);
-////}
-
 using LoadResult = driver::experimental_dependencies::DependencyGraphImpl::LoadResult;
 
-LoadResult ExpDependencyGraph::loadFromPath(const Job* Cmd, StringRef path) {
+LoadResult DriverGraph::loadFromPath(const Job* Cmd, StringRef path) {
   auto buffer = llvm::MemoryBuffer::getFile(path);
   if (!buffer)
     return LoadResult::HadError;
@@ -66,149 +41,46 @@ LoadResult ExpDependencyGraph::loadFromPath(const Job* Cmd, StringRef path) {
 }
 
 LoadResult
-ExpDependencyGraph::loadFromBuffer(const void *node,
+DriverGraph::loadFromBuffer(const void *node,
                                    llvm::MemoryBuffer &buffer) {
-  // Init to UpToDate in case the file is empty.
-  DependencyGraphImpl::LoadResult result = DependencyGraphImpl::LoadResult::UpToDate;
 
-  FrontendGraph fg;
-  auto nodeCallback = [&fg](FrontendNode* n) { fg.addDeserializedNode(n); };
-  auto errorCallBack = [&result]() {
-    result = LoadResult::HadError;
-  };
+  Optional<FrontendGraph> fg = FrontendGraph::loadFromBuffer(buffer);
+  if (!fg)
+    return DependencyGraphImpl::LoadResult::HadError;
   
-
-  parseDependencyFile(buffer, nodeCallback, errorCallBack);
-  if (result == LoadResult::HadError)
-    return result;
-  return integrate(std::move(fg));
-}
-
-namespace {
- namespace yaml = llvm::yaml;
-
-class YAMLParser {
-private:
-  llvm::SourceMgr SM;
-  yaml::Stream stream;
-  yaml::SequenceNode::iterator nextFieldOfNode;
-  bool hadError = false;
-
-public:
-  YAMLParser(llvm::MemoryBuffer &buffer) :
-  stream(buffer.getMemBufferRef(), SM)
-  {}
-  
-  /// true for error
-  template <typename NodeCallback>
-  bool forEachNode(NodeCallback nodeCallback) {
-    auto I = stream.begin();
-    if (I == stream.end() || !I->getRoot())
-      return true;
-    if (isa<yaml::NullNode>(I->getRoot()))
-      return true;
-    auto *nodeSequence = dyn_cast<yaml::SequenceNode>(I->getRoot());
-    if (!nodeSequence)
-      return true;
-    for (yaml::Node &rawNode : *nodeSequence)  {
-      auto *sequenceNodeNode = dyn_cast<yaml::SequenceNode>(&rawNode);
-      if (!sequenceNodeNode)
-        return true;
-      nextFieldOfNode = sequenceNodeNode->begin();
-      nodeCallback();
-      if (nextFieldOfNode != sequenceNodeNode->end())
-        return true;
-      if (hadError)
-        return true;
-    }
-    return false;
-  }
-  void entry(size_t &s) {
-    yaml::ScalarNode *scalarNode = dyn_cast<yaml::ScalarNode>(&*nextFieldOfNode);
-    if (!scalarNode) {
-      hadError = true;
-      return;
-    }
-    llvm::SmallString<64> scratch;
-    s = stoi(scalarNode->getValue(scratch).str());
-    ++nextFieldOfNode;
-  }
-  void entry(std::string &s) {
-    auto *scalarNode = dyn_cast<yaml::ScalarNode>(&*nextFieldOfNode);
-    if (!scalarNode) {
-      hadError = true;
-      return;
-    }
-    llvm::SmallString<64> scratch;
-    s = scalarNode->getValue(scratch);
-    ++nextFieldOfNode;
-  }
-  void entry(std::vector<size_t> &v) {
-    auto *sequenceNode = dyn_cast<yaml::SequenceNode>(&*nextFieldOfNode);
-    if (!sequenceNode) {
-      hadError = true;
-      return;
-    }
-    for (auto &n: *sequenceNode) {
-      auto *scalarNode = dyn_cast<yaml::ScalarNode>(&n);
-      if (!scalarNode) {
-        hadError = true;
-        return;
-      }
-      llvm::SmallString<64> scratch;
-      v.push_back(stoi(scalarNode->getValue(scratch).str()));
-    }
-    ++nextFieldOfNode;
-  }
-};
-}
-
-
-void
-ExpDependencyGraph::parseDependencyFile(llvm::MemoryBuffer &buffer,
-                                        llvm::function_ref<NodeCallbackTy> nodeCallback,
-                                        llvm::function_ref<ErrorCallbackTy> errorCallback) {
-  YAMLParser reader(buffer);
-  const bool hadError = reader.forEachNode(
-                                           [&]() {
-                                             auto n = new FrontendNode();
-                                             n->serialize(
-                                                          [&](size_t &s) {reader.entry(s);},
-                                                          [&](std::string &s) {reader.entry(s);},
-                                                          [&](std::vector<size_t> &s) {reader.entry(s);});
-                                             nodeCallback(n);
-                                           });
-  if (hadError)
-    errorCallback();
+  return integrate(fg.getValue());
 }
 
 
 
-LoadResult ExpDependencyGraph::integrate(FrontendGraph &&g) {
+
+
+
+LoadResult DriverGraph::integrate(const FrontendGraph &g) {
   abort();
 }
 
-bool ExpDependencyGraph::isMarked(const Job* Cmd) const {
+bool DriverGraph::isMarked(const Job* Cmd) const {
   abort();
 }
 template <unsigned N>
-void ExpDependencyGraph::markTransitive(SmallVector<const Job*, N> &visited, const Job* node,
+void DriverGraph::markTransitive(SmallVector<const Job*, N> &visited, const Job* node,
                                         DependencyGraph<const Job*>::MarkTracer *tracer) {
   abort();
 }
-template void ExpDependencyGraph::markTransitive<16u>(SmallVector<const Job*, 16> &visited, const Job* node,
+template void DriverGraph::markTransitive<16u>(SmallVector<const Job*, 16> &visited, const Job* node,
                                                       DependencyGraph<const Job*>::MarkTracer *tracer);
 
-bool ExpDependencyGraph::markIntransitive(const Job* node) {
+bool DriverGraph::markIntransitive(const Job* node) {
   abort();
 }
-void ExpDependencyGraph::addIndependentNode(const Job* node) {
+void DriverGraph::addIndependentNode(const Job* node) {
   abort();
 }
-std::vector<std::string> ExpDependencyGraph::getExternalDependencies() const {
+std::vector<std::string> DriverGraph::getExternalDependencies() const {
   abort();
 }
-void ExpDependencyGraph::markExternal(SmallVectorImpl<const Job *> &visited,
+void DriverGraph::markExternal(SmallVectorImpl<const Job *> &visited,
                                       StringRef externalDependency) {
   abort();
 }

@@ -35,37 +35,34 @@
 namespace swift {
   namespace driver {
     namespace experimental_dependencies {
+      using Node = swift::experimental_dependencies::Node;
+      using FrontendNode = swift::experimental_dependencies::FrontendNode;
+      using FrontendGraph = swift::experimental_dependencies::FrontendGraph;
+      using NodeDependencyKey = swift::experimental_dependencies::NodeDependencyKey;
+
+      class DriverNode: public Node {
+        std::string swiftDepsFile;
+        std::set<NodeDependencyKey> dependers;
+      };
+      
+      
       class DependencyGraphImpl {
       public:
         using LoadResult = typename swift::DependencyGraphImpl::LoadResult;
       };
-      // TODO: not FrontendGraph
-      class ExpDependencyGraph: public swift::experimental_dependencies::FrontendGraph {
-        using Node = swift::experimental_dependencies::Node;
-        using FrontendNode = swift::experimental_dependencies::FrontendNode;
 
-        /// When rereading a dependencies file, must be able to find the old nodes for that file.
-//        std::unordered_map<std::string,
-//        FrontendNode::Cache
-//        > nodesByDepsFile;
-        
-        /// When reading a dependencies file, there are nodes that are depended-upon but
-        /// (do not yet) correspond to any file.
-//        FrontendNode::Cache orphans;
+      class DriverGraph {
+        std::unordered_map<std::string, std::vector<DriverNode*>> nodesBySwiftDepsFile;
+        std::vector<DriverNode*> nodesInNoSwiftDepsFile;
+        std::unordered_multimap<NodeDependencyKey, DriverNode*, typename NodeDependencyKey::hash> nodesByDependency;
+
         
       public:
-        ExpDependencyGraph() = default;
-        ExpDependencyGraph(ExpDependencyGraph &&other) = default;
+        DriverGraph() = default;
         
         DependencyGraphImpl::LoadResult loadFromPath(const Job* Cmd, StringRef path);
         
         bool isMarked(const Job* Cmd) const;//XXX
-        
-        /// returns address of node IF it has changed or is new
-        FrontendNode* addNodeForFile(StringRef depsFile,
-//                                     , FrontendNode::Cache&,
-                                     FrontendNode&);
-//        void addArc(Arc*);
         
         template <unsigned N>
         void markTransitive(SmallVector<const Job*, N> &visited, const Job* node,
@@ -79,26 +76,10 @@ namespace swift {
       private:
         DependencyGraphImpl::LoadResult loadFromBuffer(const void *node,
                                                        llvm::MemoryBuffer &buffer);
-        using NodeCallbackTy = void(FrontendNode *);
-        using ErrorCallbackTy = void();
-        void
-        parseDependencyFile(llvm::MemoryBuffer &buffer,
-                            llvm::function_ref<NodeCallbackTy> nodeCallback,
-                            llvm::function_ref<ErrorCallbackTy> errorCallback);
-        static void parseNode(llvm::yaml::SequenceNode *,
-                              llvm::function_ref<NodeCallbackTy> nodeCallback,
-                              llvm::function_ref<ErrorCallbackTy> errorCallback);
-        
-        DependencyGraphImpl::LoadResult integrate(FrontendGraph &&);
-        
-//        FrontendNode::Cache &getMemoizedNodesForFile(StringRef depsFileName) {
-//          auto iter = nodesByDepsFile.find(depsFileName);
-//          if (iter != nodesByDepsFile.end())
-//            return iter->second;
-//          nodesByDepsFile.insert(std::make_pair(depsFileName, FrontendNode::Cache()));
-//          return getMemoizedNodesForFile(depsFileName);
-//        }
-      };
+      
+       
+        DependencyGraphImpl::LoadResult integrate(const FrontendGraph &);
+       };
     } // experimental_dependencies
   } // driver
 } // swift

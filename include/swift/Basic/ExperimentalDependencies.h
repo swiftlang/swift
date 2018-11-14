@@ -249,6 +249,16 @@ namespace experimental_dependencies {
         delete n;
       }
     }
+    
+    Optional<FrontendGraph> static loadFromPath(StringRef path);
+    using NodeCallbackTy = void(FrontendNode *);
+    using ErrorCallbackTy = void();
+    
+    Optional<FrontendGraph> static  loadFromBuffer(llvm::MemoryBuffer &buffer);
+  private:
+    static void parseDependencyFile(llvm::MemoryBuffer &buffer,
+                        llvm::function_ref<NodeCallbackTy> nodeCallback,
+                        llvm::function_ref<ErrorCallbackTy> errorCallback);
   };
   
 } // end namespace experimental_dependencies

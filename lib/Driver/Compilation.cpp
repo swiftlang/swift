@@ -218,7 +218,7 @@ namespace driver {
     DependencyGraph StandardDepGraph;
 
     /// Experimental Dependency graph for finer-grained dependencies
-    Optional<experimental_dependencies::ExpDependencyGraph> ExpDepGraph;
+    Optional<experimental_dependencies::DriverGraph> ExpDepGraph;
   private:
     /// Helper for tracing the propagation of marks in the graph.
     DependencyGraph::MarkTracer ActualIncrementalTracer;
@@ -686,7 +686,7 @@ namespace driver {
       if (Comp.getShowIncrementalBuildDecisions() || Comp.getStatsReporter())
         IncrementalTracer = &ActualIncrementalTracer;
       if (Comp.getEnableExperimentalDependencies())
-        ExpDepGraph.emplace(experimental_dependencies::ExpDependencyGraph());
+        ExpDepGraph.emplace(experimental_dependencies::DriverGraph());
     }
     
     /// Schedule and run initial, additional, and batch jobs.

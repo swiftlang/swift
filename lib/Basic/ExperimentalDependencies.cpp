@@ -39,4 +39,121 @@
 using namespace swift;
 using namespace experimental_dependencies;
 
+namespace {
+  namespace yaml = llvm::yaml;
+  
+  class YAMLFrontendDependenciesParser {
+  private:
+    llvm::SourceMgr SM;
+    yaml::Stream stream;
+    yaml::SequenceNode::iterator nextFieldOfNode;
+    bool hadError = false;
+    
+  public:
+    YAMLFrontendDependenciesParser(llvm::MemoryBuffer &buffer) :
+    stream(buffer.getMemBufferRef(), SM)
+    {}
+    
+    /// true for error
+    template <typename NodeCallback>
+    bool forEachNode(NodeCallback nodeCallback) {
+      auto I = stream.begin();
+      if (I == stream.end() || !I->getRoot())
+        return true;
+      if (isa<yaml::NullNode>(I->getRoot()))
+        return true;
+      auto *nodeSequence = dyn_cast<yaml::SequenceNode>(I->getRoot());
+      if (!nodeSequence)
+        return true;
+      for (yaml::Node &rawNode : *nodeSequence)  {
+        auto *sequenceNodeNode = dyn_cast<yaml::SequenceNode>(&rawNode);
+        if (!sequenceNodeNode)
+          return true;
+        nextFieldOfNode = sequenceNodeNode->begin();
+        nodeCallback();
+        if (nextFieldOfNode != sequenceNodeNode->end())
+          return true;
+        if (hadError)
+          return true;
+      }
+      return false;
+    }
+    void entry(size_t &s) {
+      yaml::ScalarNode *scalarNode = dyn_cast<yaml::ScalarNode>(&*nextFieldOfNode);
+      if (!scalarNode) {
+        hadError = true;
+        return;
+      }
+      llvm::SmallString<64> scratch;
+      s = stoi(scalarNode->getValue(scratch).str());
+      ++nextFieldOfNode;
+    }
+    void entry(std::string &s) {
+      auto *scalarNode = dyn_cast<yaml::ScalarNode>(&*nextFieldOfNode);
+      if (!scalarNode) {
+        hadError = true;
+        return;
+      }
+      llvm::SmallString<64> scratch;
+      s = scalarNode->getValue(scratch);
+      ++nextFieldOfNode;
+    }
+    void entry(std::vector<size_t> &v) {
+      auto *sequenceNode = dyn_cast<yaml::SequenceNode>(&*nextFieldOfNode);
+      if (!sequenceNode) {
+        hadError = true;
+        return;
+      }
+      for (auto &n: *sequenceNode) {
+        auto *scalarNode = dyn_cast<yaml::ScalarNode>(&n);
+        if (!scalarNode) {
+          hadError = true;
+          return;
+        }
+        llvm::SmallString<64> scratch;
+        v.push_back(stoi(scalarNode->getValue(scratch).str()));
+      }
+      ++nextFieldOfNode;
+    }
+  };
+}
 
+
+Optional<FrontendGraph> FrontendGraph::loadFromPath(StringRef path) {
+  auto buffer = llvm::MemoryBuffer::getFile(path);
+  if (!buffer)
+    return None;
+  return loadFromBuffer(*buffer.get());
+}
+Optional<FrontendGraph> FrontendGraph::loadFromBuffer(llvm::MemoryBuffer &buffer) {
+  // Init to UpToDate in case the file is empty.
+  bool hadError = false;
+  
+  FrontendGraph fg;
+  auto nodeCallback = [&fg](FrontendNode* n) { fg.addDeserializedNode(n); };
+  auto errorCallBack = [&hadError]() {
+    hadError = true;
+  };
+  
+  parseDependencyFile(buffer, nodeCallback, errorCallBack);
+  if (hadError)
+    return None;
+  return std::move(fg);
+}
+
+void FrontendGraph::parseDependencyFile(llvm::MemoryBuffer &buffer,
+                                 llvm::function_ref<NodeCallbackTy> nodeCallback,
+                                 llvm::function_ref<ErrorCallbackTy> errorCallback) {
+  YAMLFrontendDependenciesParser reader(buffer);
+  const bool hadError = reader.forEachNode(
+                                           [&]() {
+                                             auto n = new FrontendNode();
+                                             n->serialize(
+                                                          [&](size_t &s) {reader.entry(s);},
+                                                          [&](std::string &s) {reader.entry(s);},
+                                                          [&](std::vector<size_t> &s) {reader.entry(s);});
+                                             nodeCallback(n);
+                                           });
+  if (hadError)
+    errorCallback();
+}
