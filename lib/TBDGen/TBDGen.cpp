@@ -217,27 +217,30 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
 }
 
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
-  // Non-global variables might have an explicit initializer symbol, in
-  // non-resilient modules.
-  if (VD->getAttrs().hasAttribute<HasInitialValueAttr>() &&
-      SwiftModule->getResilienceStrategy() == ResilienceStrategy::Default &&
-      !isGlobalOrStaticVar(VD)) {
-    auto declRef = SILDeclRef(VD, SILDeclRef::Kind::StoredPropertyInitializer);
-    // Stored property initializers for public properties are currently
-    // public.
-    addSymbol(declRef);
-  }
-
-  // statically/globally stored variables have some special handling.
-  if (VD->hasStorage() && isGlobalOrStaticVar(VD)) {
-    if (getDeclLinkage(VD) == FormalLinkage::PublicUnique) {
-      // The actual variable has a symbol.
-      Mangle::ASTMangler mangler;
-      addSymbol(mangler.mangleEntity(VD, false));
+  // Variables inside non-resilient modules have some additional symbols.
+  if (!VD->isResilient()) {
+    // Non-global variables might have an explicit initializer symbol, in
+    // non-resilient modules.
+    if (VD->getAttrs().hasAttribute<HasInitialValueAttr>() &&
+        !isGlobalOrStaticVar(VD)) {
+      auto declRef = SILDeclRef(VD, SILDeclRef::Kind::StoredPropertyInitializer);
+      // Stored property initializers for public properties are currently
+      // public.
+      addSymbol(declRef);
     }
 
-    if (VD->isLazilyInitializedGlobal())
-      addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
+    // statically/globally stored variables have some special handling.
+    if (VD->hasStorage() &&
+        isGlobalOrStaticVar(VD)) {
+      if (getDeclLinkage(VD) == FormalLinkage::PublicUnique) {
+        // The actual variable has a symbol.
+        Mangle::ASTMangler mangler;
+        addSymbol(mangler.mangleEntity(VD, false));
+      }
+
+      if (VD->isLazilyInitializedGlobal())
+        addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
+    }
   }
 
   visitAbstractStorageDecl(VD);
