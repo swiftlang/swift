@@ -172,3 +172,19 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// Do not eliminate a copy from an unowned value. This will cause us to pass the
+// unowned value as guaranteed... =><=.
+//
+// CHECK-LABEL: sil @unowned_arg_copy : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'unowned_arg_copy'
+sil @unowned_arg_copy : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : @unowned $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  %2 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %2(%1) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
