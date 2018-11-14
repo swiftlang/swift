@@ -212,7 +212,9 @@ set(SWIFTLIB_SOURCES
   SIMDVector.swift
   UnfoldSequence.swift
   VarArgs.swift
-  Zip.swift)
+  Zip.swift
+  "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
+  )
 
 set(SWIFTLIB_GYB_SOURCES
     ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
