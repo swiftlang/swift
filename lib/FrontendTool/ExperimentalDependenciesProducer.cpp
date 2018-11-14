@@ -321,7 +321,7 @@ public:
   void newNode() const { out << "-\n"; }
   
   void entry(const std::string &s) const {
-    out << " - " << llvm::yaml::escape(s) << "\n";
+    out << " - \"" << llvm::yaml::escape(s) << "\"\n";
   }
   void entry(size_t n) const {
     out << " - " << n << "\n";
