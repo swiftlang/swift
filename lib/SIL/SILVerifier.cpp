@@ -2459,6 +2459,8 @@ public:
     require(EI->getFieldNo() < operandTy->getNumElements(),
             "invalid field index for tuple_extract instruction");
     if (EI->getModule().getStage() != SILStage::Lowered) {
+      llvm::dbgs() << EI->getType().getASTType() << "\n";
+      llvm::dbgs() << operandTy.getElementType(EI->getFieldNo()) << "\n";
       require(EI->getType().getASTType() ==
                   operandTy.getElementType(EI->getFieldNo()),
               "type of tuple_extract does not match type of element");

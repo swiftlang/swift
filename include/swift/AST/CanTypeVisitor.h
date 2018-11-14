@@ -37,6 +37,7 @@ public:
     case TypeKind::CLASS:
 #define TYPE(CLASS, PARENT)
 #include "swift/AST/TypeNodes.def"
+      llvm::dbgs() << "non-canonical or unchecked " << T << "\n";
       llvm_unreachable("non-canonical or unchecked type");
 
 #define UNCHECKED_TYPE(CLASS, PARENT)

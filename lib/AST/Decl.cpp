@@ -2904,12 +2904,16 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
     }
   }
 
+  llvm::dbgs() << "here\n";
   if (decl->getGenericParams() &&
       !isa<ProtocolDecl>(decl)) {
+    llvm::dbgs() << "has generic\n";
     switch (kind) {
     case DeclTypeKind::DeclaredType:
+      llvm::dbgs() << "unbound geeneric\n";
       return UnboundGenericType::get(decl, Ty, ctx);
     case DeclTypeKind::DeclaredInterfaceType: {
+      llvm::dbgs() << "bound generic\n";
       // Note that here, we need to be able to produce a type
       // before the decl has been validated, so we rely on
       // the generic parameter list directly instead of looking
@@ -2924,6 +2928,7 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
 
     llvm_unreachable("Unhandled DeclTypeKind in switch.");
   } else {
+    llvm::dbgs() << "no generic\n";
     return NominalType::get(decl, Ty, ctx);
   }
 }

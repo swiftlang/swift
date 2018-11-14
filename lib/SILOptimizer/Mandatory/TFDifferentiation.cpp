@@ -99,10 +99,16 @@ static void createEntryArguments(SILFunction *f) {
   auto conv = f->getConventions();
   assert((entry->getNumArguments() == 0 || conv.getNumSILArguments() == 0) &&
          "Entry already has arguments?!");
-  for (auto indResultTy : conv.getIndirectSILResultTypes())
+  for (auto indResultTy : conv.getIndirectSILResultTypes()) {
+    llvm::dbgs() << "indirect result " << indResultTy << "\n";
     entry->createFunctionArgument(indResultTy.getAddressType());
-  for (auto paramTy : conv.getParameterSILTypes())
-    entry->createFunctionArgument(paramTy);
+  }
+  for (auto param : conv.getParameters()) {
+    llvm::dbgs() << "param " << param << "\n";
+    auto paramTy = conv.getSILType(param);
+    llvm::dbgs() << "createFunctionArgument " << paramTy << "\n";
+    entry->createFunctionArgument(f->mapTypeIntoContext(paramTy));
+  }
 }
 
 /// Looks up a function in the current module. If it exists, returns it.
@@ -120,7 +126,8 @@ static SILParameterInfo getFormalParameterInfo(CanType type,
                                                SILModule &module) {
   SILType silTy = SILType::getPrimitiveObjectType(type);
   ParameterConvention conv;
-  if (SILModuleConventions::isPassedIndirectlyInSIL(silTy, module))
+  if (type->hasTypeParameter() ||
+      SILModuleConventions::isPassedIndirectlyInSIL(silTy, module))
     conv = ParameterConvention::Indirect_In;
   else if (silTy.isTrivial(module))
     conv = ParameterConvention::Direct_Unowned;
@@ -642,6 +649,120 @@ public:
   }
 };
 
+static CanSILFunctionType computeAdjointFunctionType(ASTContext &ctx, SILModule &module, SILFunctionType *origTy, PrimalInfo *pi, const SILAutoDiffIndices &indices) {
+  // Parameters of the adjoint include the original parameters, a primal value
+  // struct, original results, and a seed.
+  // Results of the adjoint have the same type as the original parameters.
+  SmallVector<SILParameterInfo, 8> adjParams;
+  SmallVector<SILResultInfo, 8> adjResults;
+  auto origParams = origTy->getParameters();
+  assert((!origTy->hasSelfParam() ||
+          origParams.back() == origTy->getSelfParameter()) &&
+         "self argument should be the last one");
+  auto origParamsWithoutSelf = origTy->hasSelfParam() ?
+      origParams.slice(0, origParams.size() - 1) : origParams;
+
+  // Add adjoint parameters for the original non-self parameters. If there is a
+  // self parameter, we'll push it later as the last adjoint parameter, because
+  // Swift's method convention always has self last.
+  for (auto &param : origParamsWithoutSelf)
+    adjParams.push_back(param);
+
+  // If there's a generated primal, accept a primal value struct in the adjoint
+  // parameter list.
+  if (pi) {
+    llvm::dbgs() << "going for interface type\n";
+    auto pvType = pi->getPrimalValueStruct()
+                      ->getDeclaredInterfaceType()
+                      ->getCanonicalType();
+    //pvType = original->mapTypeIntoContext(pvType)->getCanonicalType();
+    llvm::dbgs() << "pushing pvType " << pvType << "\n";
+    llvm::dbgs() << "  with kind " << (unsigned)pvType->getKind() << "\n";
+    adjParams.push_back(getFormalParameterInfo(pvType, module));
+    llvm::dbgs() << "survived that\n";
+  }
+
+  // Add adjoint parameters for the original results.
+  for (auto &origRes : origTy->getResults())
+    adjParams.push_back(getFormalParameterInfo(origRes.getType(), module));
+
+  // Add adjoint parameter for the seed.
+  adjParams.push_back(getFormalParameterInfo(
+      origTy->getResults()[indices.source].getType(), module));
+
+  // Add adjoint parameter for the original self parameter, if applicable.
+  if (origTy->hasSelfParam())
+    adjParams.push_back(origTy->getSelfParameter());
+
+  // Add adjoint result for the wrt self parameter, if it was requested.
+  auto selfParamIndex = origParams.size() - 1;
+  if (origTy->hasSelfParam() &&
+      indices.isWrtParameter(selfParamIndex))
+    adjResults.push_back(getFormalResultInfo(
+        origParams[selfParamIndex].getType(), module));
+
+  // Add adjoint results for the requested non-self wrt parameters.
+  for (auto i : indices.parameters.set_bits()) {
+    if (origTy->hasSelfParam() && i == selfParamIndex)
+      continue;
+    adjResults.push_back(getFormalResultInfo(origParams[i].getType(), module));
+  }
+
+  return SILFunctionType::get(
+      origTy->getGenericSignature(), origTy->getExtInfo(),
+      origTy->getCoroutineKind(), origTy->getCalleeConvention(), adjParams, {},
+      adjResults, None, ctx, origTy->getWitnessMethodConformanceOrNone());
+}
+
+
+
+class DifferentiationFunctionSource {
+public:
+  virtual const SILAutoDiffIndices &getIndices() const = 0;
+  virtual CanSILFunctionType getOrigLoweredFunctionType() const = 0;
+  virtual CanSILFunctionType getPrimalLoweredFunctionType() const = 0;
+  virtual PrimalInfo *getPrimalInfo() const = 0;
+  virtual SingleValueInstruction *emitPrimalFunctionRef(SILBuilder &builder, SILLocation loc) const = 0;
+  virtual SingleValueInstruction *emitAdjointFunctionRef(SILBuilder &builder, SILLocation loc) const = 0;
+};
+
+class WitnessMethodInfo : public DifferentiationFunctionSource {
+  SILAutoDiffIndices indices;
+  WitnessMethodInst *inst;
+public:
+  WitnessMethodInfo(SILAutoDiffIndices indices, WitnessMethodInst *inst) : indices(indices), inst(inst) {}
+
+  const SILAutoDiffIndices &getIndices() const {
+    return indices;
+  }
+  CanSILFunctionType getOrigLoweredFunctionType() const {
+    return inst->getType().castTo<SILFunctionType>();
+  }
+  CanSILFunctionType getPrimalLoweredFunctionType() const {
+    // For witness methods, the primal is the original (for now).
+    return inst->getType().castTo<SILFunctionType>();
+  }
+  PrimalInfo *getPrimalInfo() const {
+    // For witness methods, the primal is the original (for now).
+    return nullptr;
+  }
+  SingleValueInstruction *emitPrimalFunctionRef(SILBuilder &builder, SILLocation loc) const {
+    auto silDeclRef = SILDeclRef::getDifferentiationFunc(
+        inst->getMember().getDecl(),
+        DifferentiationFuncId(DifferentiationFuncId::Kind::Primal));
+    return builder.createWitnessMethod(
+        loc, inst->getLookupType(), inst->getConformance(), silDeclRef, inst->getType());
+  }
+  SingleValueInstruction *emitAdjointFunctionRef(SILBuilder &builder, SILLocation loc) const {
+    auto silDeclRef = SILDeclRef::getDifferentiationFunc(
+        inst->getMember().getDecl(),
+        DifferentiationFuncId(DifferentiationFuncId::Kind::Adjoint));
+    auto adjType = computeAdjointFunctionType(inst->getModule().getASTContext(), inst->getModule(), getOrigLoweredFunctionType(), getPrimalInfo(), indices);
+    return builder.createWitnessMethod(
+        loc, inst->getLookupType(), inst->getConformance(), silDeclRef, inst->getModule().Types.getLoweredType(adjType));
+  }
+};
+
 /// A differentiation task, specifying the original function and the
 /// `[reverse_differentiable]` attribute on the function. PrimalGen and
 /// AdjointGen will synthesize the primal and the adjoint for this task, filling
@@ -649,7 +770,7 @@ public:
 ///
 /// NOTE: A task instance manages a `[reverse_differentiable]` SIL attribute and
 /// shall be the only one that modifies this attribute.
-class DifferentiationTask {
+class DifferentiationTask : public DifferentiationFunctionSource {
   friend llvm::DenseMapInfo<DifferentiationTask>;
   friend class ADContext;
 
@@ -675,7 +796,7 @@ private:
   /// differentiation tasks, if it's active. This is filled during primal
   /// synthesis, so that adjoint synthesis does not need to recompute the
   /// original function and differentiation indices.
-  DenseMap<ApplyInst *, DifferentiationTask *> associatedTasks;
+  DenseMap<ApplyInst *, DifferentiationFunctionSource *> associatedTasks;
 
   /// Cache for primal and adjoint.
   SILFunction *primal = nullptr;
@@ -709,6 +830,19 @@ public:
 
   PrimalInfo *getPrimalInfo() const { return primalInfo.get(); }
 
+  CanSILFunctionType getOrigLoweredFunctionType() const {
+    return getOriginal()->getLoweredFunctionType();
+  }
+  CanSILFunctionType getPrimalLoweredFunctionType() const {
+    return getPrimal()->getLoweredFunctionType();
+  }
+  SingleValueInstruction *emitPrimalFunctionRef(SILBuilder &builder, SILLocation loc) const {
+    return builder.createFunctionRef(loc, getPrimal());
+  }
+  SingleValueInstruction *emitAdjointFunctionRef(SILBuilder &builder, SILLocation loc) const {
+    return builder.createFunctionRef(loc, getAdjoint());
+  }
+
   /// Initialize primal info for primal synthesis.
   void initializePrimalInfo(StructDecl *pvStruct, const SILModule &module) {
     assert(!primalInfo && "Primal info was previously initialized");
@@ -734,7 +868,7 @@ public:
     attr->setAdjointName(fn->getName(), /*primitive*/ false);
   }
 
-  DenseMap<ApplyInst *, DifferentiationTask *> &getAssociatedTasks() {
+  DenseMap<ApplyInst *, DifferentiationFunctionSource *> &getAssociatedTasks() {
     return associatedTasks;
   }
 
@@ -1980,7 +2114,6 @@ ADContext::createPrimalValueStruct(const DifferentiationTask *task) {
                               /*NameLoc*/ loc, /*Inherited*/ {},
                               /*GenericParams*/ nullptr, // to be set later
                               /*DC*/ &file);
-  pvStruct->computeType();
   if (auto *dc = function->getDeclContext()) {
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(dc)) {
       auto funcAccess = afd->getEffectiveAccess();
@@ -1996,12 +2129,15 @@ ADContext::createPrimalValueStruct(const DifferentiationTask *task) {
         new (astCtx) UsableFromInlineAttr(/*implicit*/ true));
   }
   // If the original function has generic parameters, clone them.
-  auto *genEnv = function->getGenericEnvironment();
-  if (genEnv && genEnv->getGenericSignature()) {
-    auto *genParams = function->getDeclContext()->getGenericParamsOfContext();
-    pvStruct->setGenericParams(genParams->clone(pvStruct));
-  }
+  // auto *genEnv = function->getGenericEnvironment();
+  // if (genEnv && genEnv->getGenericSignature()) {
+  //   auto *genParams = function->getDeclContext()->getGenericParamsOfContext();
+  //   pvStruct->setGenericParams(genParams->clone(pvStruct));
+  //   llvm::dbgs() << "set generic params\n";
+  //   genParams->dump();
+  // }
   file.addVisibleDecl(pvStruct);
+  //pvStruct->computeType();
   LLVM_DEBUG({
     auto &s = getADDebugStream();
     s << "Primal value struct created for function " << function->getName()
@@ -2284,6 +2420,7 @@ public:
     }
     // Clone.
     cloneFunctionBody(original, entry, entryArgs);
+    llvm::dbgs() << "cloned function body\n";
     // If errors occurred, back out.
     if (errorOccurred)
       return true;
@@ -2298,7 +2435,7 @@ public:
     // tapes.
     auto loc = getPrimal()->getLocation();
     auto structTy =
-        getPrimalInfo().getPrimalValueStruct()->getDeclaredInterfaceType();
+        original->mapTypeIntoContext(getPrimalInfo().getPrimalValueStruct()->getDeclaredInterfaceType());
     auto &builder = getBuilder();
     builder.setInsertionPoint(exit);
     auto structLoweredTy =
@@ -2398,42 +2535,46 @@ public:
                                       activeParamIndices);
     // Retrieve the original function being called before conversion.
     auto calleeOrigin = ai->getCalleeOrigin();
-    auto *calleeOriginFnRef = dyn_cast<FunctionRefInst>(calleeOrigin);
-    // If callee does not trace back to a `function_ref`, it is an opaque
-    // function. Emit a "not differentiable" diagnostic here.
-    // FIXME: Handle `partial_apply`.
-    if (!calleeOriginFnRef) {
+    DifferentiationFunctionSource *dfs = nullptr;
+    if (auto *calleeOriginFnRef = dyn_cast<FunctionRefInst>(calleeOrigin)) {
+      auto calleeOriginType = calleeOriginFnRef->getFunctionType();
+      // Find or register a differentiation task for this function.
+      auto *newTask = context.lookUpOrRegisterDifferentiationTask(
+          calleeOriginFnRef->getReferencedFunction(), indices,
+          /*invoker*/ {ai, synthesis.task});
+      // Associate the new differentiation task with this `apply` instruction, so
+      // that adjoint synthesis can pick it up.
+      dfs = newTask;
+      getDifferentiationTask()->getAssociatedTasks().insert({ai, dfs});
+      // Get the primal function from the task. If the task was newly created,
+      // then we need to schedule a synthesis item for the primal.
+      auto *primalFn = newTask->getPrimal();
+      if (!primalFn)
+        primalFn = primalGen.lookUpPrimalOrScheduleSynthesis(newTask);
+    } else if (auto *calleeOriginWitnessMethod = dyn_cast<WitnessMethodInst>(calleeOrigin)) {
+      // TODO: Allocate it into some more appropriate memory.
+      dfs = new WitnessMethodInfo(indices, calleeOriginWitnessMethod);
+      getDifferentiationTask()->getAssociatedTasks().insert({ai, dfs});
+    } else {
+      llvm::dbgs() << "calleeOrigin is not fnref or witnessmeth. it's: " << calleeOrigin << "\n";
       context.emitNondifferentiabilityError(ai, synthesis.task);
       errorOccurred = true;
       return;
     }
-    auto calleeOriginType = calleeOriginFnRef->getFunctionType();
-    // Find or register a differentiation task for this function.
-    auto *newTask = context.lookUpOrRegisterDifferentiationTask(
-        calleeOriginFnRef->getReferencedFunction(), indices,
-        /*invoker*/ {ai, synthesis.task});
-    // Associate the new differentiation task with this `apply` instruction, so
-    // that adjoint synthesis can pick it up.
-    getDifferentiationTask()->getAssociatedTasks().insert({ai, newTask});
-    // Get the primal function from the task. If the task was newly created,
-    // then we need to schedule a synthesis item for the primal.
-    auto *primalFn = newTask->getPrimal();
-    if (!primalFn)
-      primalFn = primalGen.lookUpPrimalOrScheduleSynthesis(newTask);
     // Now that we have the primal, get ready to call it.
     // But before calling it, we need to convert the primal function like how
     // the original function is converted.
     SILBuilder &builder = getBuilder();
     // %0 = function_ref <primal>
-    auto *primal =
-        builder.createFunctionRef(ai->getCallee().getLoc(), primalFn);
+    auto primal = dfs->emitPrimalFunctionRef(builder, ai->getCallee().getLoc());
+        //builder.createFunctionRef(ai->getCallee().getLoc(), primalFn);
     // %1 = ... convert %0 ...
     auto convertedPrimal = reapplyFunctionConversion(
         primal, calleeOrigin, ai->getCallee(), builder, primal->getLoc(),
         [&](SILValue v) { return getOpValue(v); });
     // Call the primal function using the original parameters.
     SmallVector<SILValue, 8> newArgs;
-    auto primalFnTy = primalFn->getLoweredFunctionType();
+    auto primalFnTy = dfs->getPrimalLoweredFunctionType();
     auto numPrimalParams = primalFnTy->getNumParameters();
     auto numPrimalIndRes = primalFnTy->getNumIndirectFormalResults();
     auto numArgs = numPrimalParams + numPrimalIndRes;
@@ -2458,7 +2599,7 @@ public:
     // These results include direct primal values and direct original results.
     SmallVector<SILValue, 8> primVals, origResults, allDirResults;
     extractAllElements(primalCall, builder, allDirResults);
-    collectPrimalValuesAndOriginalResults(calleeOriginType, primalCall,
+    collectPrimalValuesAndOriginalResults(dfs->getOrigLoweredFunctionType(), primalCall,
                                           allDirResults, primVals, origResults);
     LLVM_DEBUG({
       auto &s = getADDebugStream();
@@ -2575,6 +2716,7 @@ bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
 /// Creates a primal function.
 std::pair<SILFunction *, StructDecl *>
 PrimalGen::createEmptyPrimal(DifferentiationTask *task) {
+  llvm::dbgs() << "createEmptyPrimal\n";
   auto indices = task->getIndices();
   auto *original = task->getOriginal();
   auto &module = context.getModule();
@@ -2582,14 +2724,41 @@ PrimalGen::createEmptyPrimal(DifferentiationTask *task) {
       "AD__" + original->getName().str() + "__primal_" + mangleADIndices(indices);
   StructDecl *primalValueStructDecl = context.createPrimalValueStruct(task);
   task->initializePrimalInfo(primalValueStructDecl, module);
-  auto pvType = primalValueStructDecl->getDeclaredType()->getCanonicalType();
+  CanType outOfContextPvType = primalValueStructDecl->getDeclaredInterfaceType()->getCanonicalType();
+  CanType pvType = original->mapTypeIntoContext(outOfContextPvType)->getCanonicalType();
+  // auto *originalGenEnv = original->getGenericEnvironment();
+  // if (originalGenEnv && originalGenEnv->getGenericSignature()) {
+  //   SmallVector<Type, 4> genericArgs;
+  //   for (auto genericParam : originalGenEnv->getGenericSignature()->getGenericParams())
+  //     genericArgs.push_back(genericParam);
+  //   outOfContextPvType = BoundGenericStructType::get(primalValueStructDecl, Type(), genericArgs)->getCanonicalType();
+  //   pvType = original->mapTypeIntoContext(outOfContextPvType)->getCanonicalType();
+  //   // llvm::dbgs() << "originalGenEnv\n";
+  //   // originalGenEnv->dump();
+  //   // llvm::dbgs() << "genericSignature\n";
+  //   // originalGenEnv->getGenericSignature()->dump();
+  //   // llvm::dbgs() << "original\n";
+  //   // original->dump();
+  //   // pvType = primalValueStructDecl->getDeclaredType()->getCanonicalType();
+  // } else {
+  //   pvType = primalValueStructDecl->getDeclaredType()->getCanonicalType();
+  //   outOfContextPvType = pvType;
+  // }
+  llvm::dbgs() << "pvType " << pvType << "\n";
+  llvm::dbgs() << "pvTypeKind " << (unsigned)pvType->getKind() << "\n";
+  llvm::dbgs() << "StructTypeKind " << (unsigned)TypeKind::Struct << "\n";
+  llvm::dbgs() << "BoundGenericStructTypeKind " << (unsigned)TypeKind::BoundGenericStruct << "\n";
+  llvm::dbgs() << "UnboundGenericTypeKind " << (unsigned)TypeKind::UnboundGeneric << "\n";
   auto objTy = SILType::getPrimitiveObjectType(pvType);
+  llvm::dbgs() << "objTy " << objTy << "\n";
   auto resultConv = objTy.isLoadable(module) ? ResultConvention::Owned
                                              : ResultConvention::Unowned;
+  llvm::dbgs() << "got it\n";
   auto origResults = original->getLoweredFunctionType()->getResults();
   SmallVector<SILResultInfo, 8> results;
-  results.push_back({pvType, resultConv});
+  results.push_back({outOfContextPvType, resultConv});
   results.append(origResults.begin(), origResults.end());
+  llvm::dbgs() << "results things\n";
   // Create result info for checkpoints.
   auto originalTy = original->getLoweredFunctionType();
   auto primalTy = SILFunctionType::get(
@@ -2597,6 +2766,7 @@ PrimalGen::createEmptyPrimal(DifferentiationTask *task) {
       originalTy->getCoroutineKind(), originalTy->getCalleeConvention(),
       originalTy->getParameters(), originalTy->getYields(), results,
       originalTy->getOptionalErrorResult(), context.getASTContext());
+  llvm::dbgs() << "primalTy " << primalTy << "\n";
   SILOptFunctionBuilder fb(context.getTransform());
   auto linkage = original->getLinkage();
   if (linkage == SILLinkage::Public)
@@ -2604,6 +2774,7 @@ PrimalGen::createEmptyPrimal(DifferentiationTask *task) {
   auto *primal = fb.getOrCreateFunction(
       original->getLocation(), primalName, linkage, primalTy,
       original->isBare(), original->isTransparent(), original->isSerialized());
+  primal->setGenericEnvironment(original->getGenericEnvironment());
   primal->setUnqualifiedOwnership();
   LLVM_DEBUG(getADDebugStream() << "Primal function created \n"
                                 << *primal << '\n');
@@ -2685,66 +2856,11 @@ private:
 SILFunction *AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
   auto &module = context.getModule();
   auto *original = task->getOriginal();
-  // Parameters of the adjoint include the original parameters, a primal value
-  // struct, original results, and a seed.
-  // Results of the adjoint have the same type as the original parameters.
-  SmallVector<SILParameterInfo, 8> adjParams;
-  SmallVector<SILResultInfo, 8> adjResults;
   auto origTy = original->getLoweredFunctionType();
-  auto origParams = origTy->getParameters();
-  assert((!origTy->hasSelfParam() ||
-          origParams.back() == origTy->getSelfParameter()) &&
-         "self argument should be the last one");
-  auto origParamsWithoutSelf = origTy->hasSelfParam() ?
-      origParams.slice(0, origParams.size() - 1) : origParams;
-
-  // Add adjoint parameters for the original non-self parameters. If there is a
-  // self parameter, we'll push it later as the last adjoint parameter, because
-  // Swift's method convention always has self last.
-  for (auto &param : origParamsWithoutSelf)
-    adjParams.push_back(param);
-
-  // If there's a generated primal, accept a primal value struct in the adjoint
-  // parameter list.
-  if (auto *pi = task->getPrimalInfo()) {
-    auto pvType = pi->getPrimalValueStruct()
-                      ->getDeclaredInterfaceType()
-                      ->getCanonicalType();
-    adjParams.push_back(getFormalParameterInfo(pvType, module));
-  }
-
-  // Add adjoint parameters for the original results.
-  for (auto &origRes : origTy->getResults())
-    adjParams.push_back(getFormalParameterInfo(origRes.getType(), module));
-
-  // Add adjoint parameter for the seed.
-  adjParams.push_back(getFormalParameterInfo(
-      origTy->getResults()[task->getIndices().source].getType(), module));
-
-  // Add adjoint parameter for the original self parameter, if applicable.
-  if (origTy->hasSelfParam())
-    adjParams.push_back(origTy->getSelfParameter());
-
-  // Add adjoint result for the wrt self parameter, if it was requested.
-  auto selfParamIndex = origParams.size() - 1;
-  if (origTy->hasSelfParam() &&
-      task->getIndices().isWrtParameter(selfParamIndex))
-    adjResults.push_back(getFormalResultInfo(
-        origParams[selfParamIndex].getType(), module));
-
-  // Add adjoint results for the requested non-self wrt parameters.
-  for (auto i : task->getIndices().parameters.set_bits()) {
-    if (origTy->hasSelfParam() && i == selfParamIndex)
-      continue;
-    adjResults.push_back(getFormalResultInfo(origParams[i].getType(), module));
-  }
+  auto adjType = computeAdjointFunctionType(original->getASTContext(), module, origTy, task->getPrimalInfo(), task->getIndices());
 
   auto adjName = "AD__" + original->getName().str() + "__adjoint_" +
                  mangleADIndices(task->getIndices());
-  auto adjType = SILFunctionType::get(
-      origTy->getGenericSignature(), origTy->getExtInfo(),
-      origTy->getCoroutineKind(), origTy->getCalleeConvention(), adjParams, {},
-      adjResults, None, original->getASTContext());
   SILOptFunctionBuilder fb(context.getTransform());
   auto linkage = original->getLinkage();
   if (linkage == SILLinkage::Public)
@@ -2752,6 +2868,7 @@ SILFunction *AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
   auto *adjoint = fb.createFunction(linkage, adjName, adjType,
       original->getGenericEnvironment(), original->getLocation(),
       original->isBare(), original->isTransparent(), original->isSerialized());
+  adjoint->setGenericEnvironment(original->getGenericEnvironment());
   adjoint->setUnqualifiedOwnership();
   adjoint->setDebugScope(new (module)
                              SILDebugScope(original->getLocation(), adjoint));
@@ -3156,7 +3273,9 @@ public:
     auto origTy = original.getLoweredFunctionType();
     // Create entry BB and arguments.
     auto *adjointEntry = getAdjoint().createBasicBlock();
+    llvm::dbgs() << "creating entry arguments for adjoint\n";
     createEntryArguments(&adjoint);
+    llvm::dbgs() << "done creating entry arguments for adjoint\n";
     auto *origRetBB = &*original.findReturnBB();
     adjointBBMap.insert({origRetBB, adjointEntry});
     SILFunctionConventions origConv(origTy, getModule());
@@ -3406,9 +3525,8 @@ public:
     }
     // When we have a differentiation task, just get the adjoint and call it.
     auto *otherTask = assocTaskLookUp->getSecond();
-    auto origTy = otherTask->getOriginal()->getLoweredFunctionType();
+    auto origTy = otherTask->getOrigLoweredFunctionType();
     SILFunctionConventions origConvs(origTy, getModule());
-    auto *adjoint = otherTask->getAdjoint();
     auto loc = remapLocation(ai->getLoc());
     // Prepare arguments for calling the corresponding adjoint.
     // Parameters: (orig_args..., prim_val_struct?, orig_res..., seed...)
@@ -3469,7 +3587,8 @@ public:
       args.push_back(remapValue(ai->getSelfArgument()));
 
     // Call the adjoint function.
-    auto *adjointRef = getBuilder().createFunctionRef(ai->getLoc(), adjoint);
+    //auto *adjointRef = getBuilder().createFunctionRef(ai->getLoc(), adjoint);
+    auto adjointRef = otherTask->emitAdjointFunctionRef(getBuilder(), ai->getLoc());
     auto origFnRef = ai->getCalleeOrigin();
     auto convertedAdjFn = reapplyFunctionConversion(
         adjointRef, origFnRef, ai->getCallee(), getBuilder(), ai->getLoc());
@@ -3706,6 +3825,7 @@ public:
       break;
     }
     default:
+      llvm::dbgs() << "bad builtin\n";
       getContext().emitNondifferentiabilityError(bi, getDifferentiationTask());
       errorOccurred = true;
       return;
@@ -4180,7 +4300,10 @@ static SILFunction *lookUpOrSynthesizeGradient(ADContext &context,
     gradFn = createGradFunction(config);
     // Create entry basic block.
     auto *entry = gradFn->createBasicBlock();
+    llvm::dbgs() << "creating entry arguments for gradFn\n";
+    gradFn->dump();
     createEntryArguments(gradFn);
+    llvm::dbgs() << "done creating entry arguments for gradFn\n";
     // Build a call to the canonical gradient function.
     SILBuilder builder(entry);
     auto loc = gradFn->getLocation();
@@ -4289,7 +4412,9 @@ static void fillCanonicalGradient(SILFunction &canGrad,
       adjointConv(adjointTy, module), canGradConv(canGradTy, module);
   // Create an entry basic block.
   auto *entry = canGrad.createBasicBlock();
+  llvm::dbgs() << "creating entry arguments for canGrad\n";
   createEntryArguments(&canGrad);
+  llvm::dbgs() << "done creating entry arguments for canGrad\n";
   // Initialize arguments.
   SILBuilder builder(entry);
   // Call primal with original arguments.
@@ -4317,7 +4442,7 @@ static void fillCanonicalGradient(SILFunction &canGrad,
   if (primalConv.getNumDirectSILResults() == 1)
     primalResults.push_back(primalApply);
   else {
-    auto tupleSILTy = primalConv.getSILResultType();
+    auto tupleSILTy = primalApply->getType();
     for (unsigned i : range(primalConv.getNumDirectSILResults())) {
       auto val = builder.createTupleExtract(loc, primalApply, i,
                                             tupleSILTy.getTupleElementType(i));
@@ -4394,6 +4519,7 @@ bool Differentiation::processGradientInst(GradientInst *gi,
   SILFunction *parent = gi->getFunction();
   auto operand = gi->getOperand(0);
   SILFunction *gradFn = nullptr;
+  llvm::dbgs() << "processing gradient inst " << operand << "\n";
   // If it traces back to a `function_ref`, differentiate that.
   if (auto *originalFRI = findReferenceToVisibleFunction(operand)) {
     auto *original = originalFRI->getReferencedFunction();

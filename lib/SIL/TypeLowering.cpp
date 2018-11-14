@@ -1589,6 +1589,8 @@ TypeConverter::getTypeLoweringForUncachedLoweredType(TypeKey key) {
   assert(!find(key) && "re-entrant or already cached");
   assert(key.SubstType->isLegalSILType() && "type is not already lowered");
 
+  llvm::dbgs() << "getTypeLoweringForUncachedLoweredType " << key.SubstType << "\n";
+
 #ifndef NDEBUG
   // Catch reentrancy bugs.
   insert(key, nullptr);
