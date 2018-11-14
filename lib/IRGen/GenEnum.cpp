@@ -1473,10 +1473,7 @@ namespace {
     auto func =
         llvm::Function::Create(consumeTy, llvm::GlobalValue::LinkOnceODRLinkage,
                                llvm::StringRef(name), IGM.getModule());
-    ApplyIRLinkage({llvm::GlobalValue::LinkOnceODRLinkage,
-                    llvm::GlobalValue::HiddenVisibility,
-                    llvm::GlobalValue::DefaultStorageClass})
-        .to(func);
+    ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(func);
     func->setAttributes(IGM.constructInitialAttributes());
     func->setDoesNotThrow();
     func->setCallingConv(IGM.DefaultCC);
