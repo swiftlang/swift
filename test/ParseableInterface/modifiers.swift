@@ -3,7 +3,7 @@
 // RUN: %FileCheck %s < %t/Test.swiftinterface
 // RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -disable-objc-attr-requires-foundation-module -emit-parseable-module-interface-path - -module-name Test -enable-objc-interop | %FileCheck %s
 
-// CHECK: final public class FinalClass {
+// CHECK-LABEL: final public class FinalClass {
 public final class FinalClass {
   // CHECK: @inlinable final public class var a: [[INT:(Swift.)?Int]] {
   // CHECK-NEXT: {{^}} get {
@@ -53,7 +53,35 @@ public final class FinalClass {
   }
 }
 
-// CHECK: public struct MyStruct {
+// CHECK-LABEL: public class Base {
+public class Base {
+  // CHECK-NEXT: @objc public init(){{$}}
+  @objc public init() {}
+  // CHECK-NEXT: @objc required public init(x: [[INT]]){{$}}
+  @objc public required init(x: Int) {}
+  // CHECK-NEXT: @objc deinit{{$}}
+} // CHECK-NEXT: {{^}$}}
+
+
+// CHECK-LABEL: public class SubImplicit : {{(Test[.])?Base}} {
+public class SubImplicit: Base {
+  // CHECK-NEXT: @objc override public init(){{$}}
+  // CHECK-NEXT: @objc required public init(x: [[INT]]){{$}}
+  // CHECK-NEXT: @objc deinit{{$}}
+} // CHECK-NEXT: {{^}$}}
+
+
+// CHECK-LABEL: public class SubExplicit : {{(Test[.])?Base}} {
+public class SubExplicit: Base {
+  // Make sure adding "required" preserves both "required" and "override".
+  // CHECK-NEXT: @objc override required public init(){{$}}
+  public override required init() { super.init() }
+  // CHECK-NEXT: @objc required public init(x: [[INT]]){{$}}
+  public required init(x: Int) { super.init() }
+  // CHECK-NEXT: @objc deinit{{$}}
+} // CHECK-NEXT: {{^}$}}
+
+// CHECK-LABEL: public struct MyStruct {
 public struct MyStruct {
   // CHECK: public var e: [[INT]] {
   // CHECK-NEXT: {{^}} mutating get{{$}}

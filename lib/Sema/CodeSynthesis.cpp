@@ -2473,11 +2473,12 @@ configureInheritedDesignatedInitAttributes(TypeChecker &tc,
   }
 
   // Wire up the overrides.
-  ctor->getAttrs().add(new (ctx) OverrideAttr(/*IsImplicit=*/true));
   ctor->setOverriddenDecl(superclassCtor);
 
   if (superclassCtor->isRequired())
-    ctor->getAttrs().add(new (ctx) RequiredAttr(/*IsImplicit=*/true));
+    ctor->getAttrs().add(new (ctx) RequiredAttr(/*IsImplicit=*/false));
+  else
+    ctor->getAttrs().add(new (ctx) OverrideAttr(/*IsImplicit=*/false));
 
   // If the superclass constructor is @objc but the subclass constructor is
   // not representable in Objective-C, add @nonobjc implicitly.
