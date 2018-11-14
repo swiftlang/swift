@@ -774,17 +774,17 @@ private:
     No = false,
     Yes = true
   };
-
-  /// Returns \c true if anything was printed.
+ 
+    /// Returns \c true if anything was printed.
   bool printAvailability(const Decl *D, PrintLeadingSpace printLeadingSpace =
-                         PrintLeadingSpace::Yes) {
+                                            PrintLeadingSpace::Yes) {
     bool hasPrintedAnything = false;
     auto maybePrintLeadingSpace = [&] {
       if (printLeadingSpace == PrintLeadingSpace::Yes || hasPrintedAnything)
         os << " ";
       hasPrintedAnything = true;
     };
-    
+
     for (auto AvAttr : D->getAttrs().getAttributes<AvailableAttr>()) {
       if (AvAttr->Platform == PlatformKind::none) {
         if (AvAttr->PlatformAgnostic ==
@@ -794,8 +794,8 @@ private:
             // rename
             maybePrintLeadingSpace();
             os << "SWIFT_UNAVAILABLE_MSG(\"'"
-            << cast<ValueDecl>(D)->getBaseName()
-            << "' has been renamed to '";
+               << cast<ValueDecl>(D)->getBaseName()
+               << "' has been renamed to '";
             printRenameForDecl(AvAttr, cast<ValueDecl>(D), false);
             os << '\'';
             if (!AvAttr->Message.empty()) {
@@ -831,7 +831,7 @@ private:
         }
         continue;
       }
-      
+
       // Availability for a specific platform
       if (!AvAttr->Introduced.hasValue() && !AvAttr->Deprecated.hasValue() &&
           !AvAttr->Obsoleted.hasValue() &&
@@ -839,37 +839,37 @@ private:
           !AvAttr->isUnconditionallyUnavailable()) {
         continue;
       }
-      
+
       const char *plat;
       switch (AvAttr->Platform) {
-        case PlatformKind::OSX:
-          plat = "macos";
-          break;
-        case PlatformKind::iOS:
-          plat = "ios";
-          break;
-        case PlatformKind::tvOS:
-          plat = "tvos";
-          break;
-        case PlatformKind::watchOS:
-          plat = "watchos";
-          break;
-        case PlatformKind::OSXApplicationExtension:
-          plat = "macos_app_extension";
-          break;
-        case PlatformKind::iOSApplicationExtension:
-          plat = "ios_app_extension";
-          break;
-        case PlatformKind::tvOSApplicationExtension:
-          plat = "tvos_app_extension";
-          break;
-        case PlatformKind::watchOSApplicationExtension:
-          plat = "watchos_app_extension";
-          break;
-        case PlatformKind::none:
-          llvm_unreachable("handled above");
+      case PlatformKind::OSX:
+        plat = "macos";
+        break;
+      case PlatformKind::iOS:
+        plat = "ios";
+        break;
+      case PlatformKind::tvOS:
+        plat = "tvos";
+        break;
+      case PlatformKind::watchOS:
+        plat = "watchos";
+        break;
+      case PlatformKind::OSXApplicationExtension:
+        plat = "macos_app_extension";
+        break;
+      case PlatformKind::iOSApplicationExtension:
+        plat = "ios_app_extension";
+        break;
+      case PlatformKind::tvOSApplicationExtension:
+        plat = "tvos_app_extension";
+        break;
+      case PlatformKind::watchOSApplicationExtension:
+        plat = "watchos_app_extension";
+        break;
+      case PlatformKind::none:
+        llvm_unreachable("handled above");
       }
-      
+
       maybePrintLeadingSpace();
       os << "SWIFT_AVAILABILITY(" << plat;
       if (AvAttr->isUnconditionallyUnavailable()) {
@@ -895,7 +895,7 @@ private:
       }
       if (!AvAttr->Rename.empty() && isa<ValueDecl>(D)) {
         os << ",message=\"'" << cast<ValueDecl>(D)->getBaseName()
-        << "' has been renamed to '";
+           << "' has been renamed to '";
         printRenameForDecl(AvAttr, cast<ValueDecl>(D), false);
         os << '\'';
         if (!AvAttr->Message.empty()) {
@@ -911,13 +911,13 @@ private:
     }
     return hasPrintedAnything;
   }
-  
+
   const ValueDecl *getRenameDecl(const ValueDecl *D,
                                  const ParsedDeclName renamedParsedDeclName) {
     auto declContext = D->getDeclContext();
     ASTContext &astContext = D->getASTContext();
     auto renamedDeclName = renamedParsedDeclName.formDeclName(astContext);
-    
+
     if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D)) {
       UnqualifiedLookup lookup(renamedDeclName.getBaseIdentifier(),
                                declContext->getModuleScopeContext(), nullptr,
@@ -926,34 +926,34 @@ private:
       return lookup.getSingleTypeResult();
     } else {
       TypeDecl *typeDecl = declContext->getSelfNominalTypeDecl();
-      
+
       if (!renamedParsedDeclName.ContextName.empty()) {
         auto contextIdentifier =
-        astContext.getIdentifier(renamedParsedDeclName.ContextName);
+            astContext.getIdentifier(renamedParsedDeclName.ContextName);
         UnqualifiedLookup specificTypeLookup(
-                                             contextIdentifier, declContext->getModuleScopeContext(), nullptr,
-                                             SourceLoc(), UnqualifiedLookup::Flags::TypeLookup);
+            contextIdentifier, declContext->getModuleScopeContext(), nullptr,
+            SourceLoc(), UnqualifiedLookup::Flags::TypeLookup);
         if (!specificTypeLookup.getSingleTypeResult()) {
           return nullptr;
         }
-        
+
         if (typeDecl->getDeclaredInterfaceType()->matches(
-                                                          specificTypeLookup.getSingleTypeResult()
-                                                          ->getDeclaredInterfaceType(),
-                                                          TypeMatchFlags::AllowOverride)) {
+                specificTypeLookup.getSingleTypeResult()
+                    ->getDeclaredInterfaceType(),
+                TypeMatchFlags::AllowOverride)) {
           // If the Context Name contain the name of the subclass then we would
           // find the renamed in the superclass instead
           typeDecl = specificTypeLookup.getSingleTypeResult();
         } else if (!specificTypeLookup.getSingleTypeResult()
-                   ->getDeclaredInterfaceType()
-                   ->matches(typeDecl->getDeclaredInterfaceType(),
-                             TypeMatchFlags::AllowOverride)) {
-                     // Failed and print the raw renamed attributed when there is no
-                     // relationship between those 2 types
-                     return nullptr;
-                   }
+                        ->getDeclaredInterfaceType()
+                        ->matches(typeDecl->getDeclaredInterfaceType(),
+                                  TypeMatchFlags::AllowOverride)) {
+          // Failed and print the raw renamed attributed when there is no
+          // relationship between those 2 types
+          return nullptr;
+        }
       }
-      
+
       const ValueDecl *renamedDecl = nullptr;
       SmallVector<ValueDecl *, 4> lookupResults;
       declContext->lookupQualified(typeDecl, renamedDeclName,
@@ -961,19 +961,19 @@ private:
       for (auto candidate : lookupResults) {
         if (!shouldInclude(candidate))
           continue;
-        
+
         if (candidate->getKind() != D->getKind() ||
             (candidate->isInstanceMember() !=
              cast<ValueDecl>(D)->isInstanceMember()))
           continue;
-        
+
         if (isa<FuncDecl>(candidate)) {
           auto cParams = cast<FuncDecl>(candidate)->getParameters();
           auto dParams = cast<FuncDecl>(D)->getParameters();
-          
+
           if (cParams->size() != dParams->size())
             continue;
-          
+
           bool hasSameParameterTypes = true;
           for (auto index : indices(*cParams)) {
             auto cParamsType = cParams->get(index)->getType();
@@ -984,12 +984,12 @@ private:
               break;
             }
           }
-          
+
           if (!hasSameParameterTypes) {
             continue;
           }
         }
-        
+
         if (renamedDecl) {
           // If we found a duplicated candidate then we would silently fail.
           renamedDecl = nullptr;
@@ -1000,24 +1000,24 @@ private:
       return renamedDecl;
     }
   }
-  
+
   void printRenameForDecl(const AvailableAttr *AvAttr, const ValueDecl *D,
                           bool includeQuotes) {
     assert(!AvAttr->Rename.empty());
-    
+
     const swift::ValueDecl *renamedDecl =
-    getRenameDecl(D, parseDeclName(AvAttr->Rename));
-    
+        getRenameDecl(D, parseDeclName(AvAttr->Rename));
+
     if (renamedDecl) {
       SmallString<128> scratch;
       auto renamedObjCRuntimeName =
-      renamedDecl->getObjCRuntimeName()->getString(scratch);
+          renamedDecl->getObjCRuntimeName()->getString(scratch);
       printEncodedString(renamedObjCRuntimeName, includeQuotes);
     } else {
       printEncodedString(AvAttr->Rename, includeQuotes);
     }
   }
-
+    
   void printSwift3ObjCDeprecatedInference(ValueDecl *VD) {
     const LangOptions &langOpts = M.getASTContext().LangOpts;
     if (!langOpts.EnableSwift3ObjCInference ||
