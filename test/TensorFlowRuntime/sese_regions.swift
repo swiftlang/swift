@@ -15,7 +15,7 @@ enum TestError : Error {
   case PositiveOutOfBound
 }
 
-public func testFunctionRegion(_ count : Int32) -> Tensor<Int32> {
+public func testSharedRegion(_ count : Int32) -> Tensor<Int32> {
   var result = Tensor<Int32>(0)
   do {
     if count > 0 {
@@ -49,14 +49,14 @@ public func testFunctionRegion(_ count : Int32) -> Tensor<Int32> {
 // expected-note @+3 {{value used here}}
 // expected-note @+2 {{value used here}}
 // expected-note @+1 {{value used here}}
-SESERegionTests.testAllBackends("testFunctionRegion") { 
-  expectEqualWithScalarTensor(1, testFunctionRegion(99))
-  expectEqualWithScalarTensor(7, testFunctionRegion(101))
-  expectEqualWithScalarTensor(3, testFunctionRegion(-99))
-  expectEqualWithScalarTensor(9, testFunctionRegion(-101))
+SESERegionTests.testAllBackends("testSharedRegion") { 
+  expectEqualWithScalarTensor(1, testSharedRegion(99))
+  expectEqualWithScalarTensor(7, testSharedRegion(101))
+  expectEqualWithScalarTensor(3, testSharedRegion(-99))
+  expectEqualWithScalarTensor(9, testSharedRegion(-101))
 }
 
-// CHECK-LABEL:--- XLA CFG Canonicalize: {{.*}}testFunctionRegion{{.*}}
+// CHECK-LABEL:--- XLA CFG Canonicalize: {{.*}}testSharedRegion{{.*}}
 // CHECK:[sequence
 // CHECK:  {condition Header: {{bb[0-9]+}}
 // CHECK:    {condition Header: {{bb[0-9]+}}
@@ -76,7 +76,7 @@ SESERegionTests.testAllBackends("testFunctionRegion") {
 // CHECK:  block {{bb[0-9]+}}]
 // CHECK:--- XLA CFG Canonicalize end
 
-public func testFunctionRegionWithLoop(_ count : Int32) -> Tensor<Int32> {
+public func testSharedRegionWithLoop(_ count : Int32) -> Tensor<Int32> {
   var result = Tensor<Int32>(0)
   do {
     if count > 0 {
@@ -114,15 +114,15 @@ public func testFunctionRegionWithLoop(_ count : Int32) -> Tensor<Int32> {
 // expected-note @+3 {{value used here}}
 // expected-note @+2 {{value used here}}
 // expected-note @+1 {{value used here}}
-SESERegionTests.testAllBackends("testFunctionRegionWithLoop") { 
-  expectEqualWithScalarTensor(1, testFunctionRegionWithLoop(99))
-  expectEqualWithScalarTensor(12, testFunctionRegionWithLoop(101))
-  expectEqualWithScalarTensor(3, testFunctionRegionWithLoop(-99))
-  expectEqualWithScalarTensor(14, testFunctionRegionWithLoop(-101))
+SESERegionTests.testAllBackends("testSharedRegionWithLoop") { 
+  expectEqualWithScalarTensor(1, testSharedRegionWithLoop(99))
+  expectEqualWithScalarTensor(12, testSharedRegionWithLoop(101))
+  expectEqualWithScalarTensor(3, testSharedRegionWithLoop(-99))
+  expectEqualWithScalarTensor(14, testSharedRegionWithLoop(-101))
 }
 
 
-// CHECK-LABEL:--- XLA CFG Canonicalize: {{.*}}testFunctionRegionWithLoop{{.*}}
+// CHECK-LABEL:--- XLA CFG Canonicalize: {{.*}}testSharedRegionWithLoop{{.*}}
 // CHECK:[sequence
 // CHECK:  {condition Header: {{bb[0-9]+}}
 // CHECK:    {condition Header: {{bb[0-9]+}}

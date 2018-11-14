@@ -163,9 +163,7 @@ namespace {
 
     /// Map that keeps track of the underlying SESERegionTree for the
     /// SharedSESERegion that starts at the given block. The key is starting
-    /// block of the shared region. The value is a pair consiting of the
-    /// SESERegionTree for the shared region and the exit block for the function
-    /// region.
+    /// block of the shared region and the value is the shared SESERegionTree.
     llvm::DenseMap<SILBasicBlock *, std::shared_ptr<SESERegionTree>>
         sharedRegions;
 
@@ -271,7 +269,7 @@ std::shared_ptr<SESERegionTree>
 SESERegionBuilder::createSharedRegionExcludingEnd(SILBasicBlock *startBB, SILBasicBlock *endBB) {
   auto iter = sharedRegions.find(startBB);
   if (iter == sharedRegions.end()) {
-    // Create and cache the function region.
+    // Create and cache the shared region.
     std::shared_ptr<SESERegionTree> subSESERegion(
         processAcyclicRegionExcludingEnd(startBB, endBB).release());
     auto emplace_result = sharedRegions.try_emplace(startBB, subSESERegion);
@@ -299,15 +297,19 @@ SESERegionBuilder::processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
   // block nodes as we go.
   SILBasicBlock *currentBB = startBB;
   while (currentBB != endBB) {
-    // If currentBB is not dominated by startBB, we create a function region.
+    // If currentBB is not dominated by startBB, we create a shared region.
     if (!DI.dominates(startBB, currentBB)) {
-      // We need to create a new SESE Region so that this can be marked
-      // as a shared SharedSESERegion.
+      // We need to create a new SESE Region so that this can be marked as a
+      // shared SharedSESERegion. Given that `currentBB` is not dominated by
+      // `startBB`, any node reachable by `currentBB` is not dominated by
+      // `startBB`, and therefore, should be included in the shared region. The
+      // nodes reachable from `currentBB` in this region consists of all nodes
+      // up to `endBB` as `endBB` post-dominates `currentBB`.
       std::shared_ptr<SESERegionTree> sharedRegionTree =
           createSharedRegionExcludingEnd(currentBB, endBB);
       results.push_back(llvm::make_unique<SharedSESERegion>(sharedRegionTree));
       currentBB = endBB;
-      continue;
+      break;
     }
     // If this ends with a loop, it will already have been processed and
     // collapsed into a single node.  Just use it.
