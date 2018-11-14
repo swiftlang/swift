@@ -22,8 +22,7 @@ extension Unicode {
   /// An encoding error was detected.
   ///
   /// `length` is the number of underlying code units consumed by this
-  /// error (the length of the longest prefix of a valid encoding
-  /// sequence that could be recognized).
+  /// error, guaranteed to be greater than 0.
   case error(length: Int)
 
     @inlinable // FIXME(sil-serialize-all)
