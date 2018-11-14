@@ -1297,7 +1297,8 @@ void NominalTypeDecl::prepareConformanceTable() const {
   // via the Clang importer, don't add any synthesized conformances.
   auto *file = cast<FileUnit>(getModuleScopeContext());
   if (file->getKind() != FileUnitKind::Source &&
-      file->getKind() != FileUnitKind::ClangModule) {
+      file->getKind() != FileUnitKind::ClangModule &&
+      file->getKind() != FileUnitKind::DWARFModule) {
     return;
   }
 

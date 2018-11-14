@@ -876,6 +876,7 @@ lookupOperatorDeclForName(const FileUnit &File, SourceLoc Loc, Identifier Name,
     break;
   case FileUnitKind::SerializedAST:
   case FileUnitKind::ClangModule:
+  case FileUnitKind::DWARFModule:
     return OperatorLookup<OP_DECL>::lookup(cast<LoadedFile>(File), Name);
   }
 

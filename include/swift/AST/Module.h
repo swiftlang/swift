@@ -94,6 +94,8 @@ enum class FileUnitKind {
   SerializedAST,
   /// An imported Clang module.
   ClangModule,
+  /// A Clang module imported from DWARF.
+  DWARFModule
 };
 
 enum class SourceFileKind {
@@ -1326,7 +1328,8 @@ public:
 
   static bool classof(const FileUnit *file) {
     return file->getKind() == FileUnitKind::SerializedAST ||
-           file->getKind() == FileUnitKind::ClangModule;
+           file->getKind() == FileUnitKind::ClangModule ||
+           file->getKind() == FileUnitKind::DWARFModule;
   }
   static bool classof(const DeclContext *DC) {
     return isa<FileUnit>(DC) && classof(cast<FileUnit>(DC));

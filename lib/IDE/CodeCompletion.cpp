@@ -3248,6 +3248,7 @@ public:
         switch (fileUnit->getKind()) {
         case FileUnitKind::Builtin:
         case FileUnitKind::ClangModule:
+        case FileUnitKind::DWARFModule:
           continue;
         case FileUnitKind::Source:
           collectOperatorsFrom(cast<SourceFile>(fileUnit), results);

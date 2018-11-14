@@ -1380,6 +1380,7 @@ void ASTContext::addExternalDecl(Decl *decl) {
 void ASTContext::addSynthesizedDecl(Decl *decl) {
   auto *mod = cast<FileUnit>(decl->getDeclContext()->getModuleScopeContext());
   if (mod->getKind() == FileUnitKind::ClangModule ||
+      mod->getKind() == FileUnitKind::DWARFModule ||
       mod->getKind() == FileUnitKind::SerializedAST) {
     ExternalDefinitions.insert(decl);
     return;
@@ -1422,11 +1423,10 @@ void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
 
 void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
                                  bool IsClang) {
-  if (IsClang) {
-    assert(!getImpl().TheClangModuleLoader && "Already have a Clang module loader");
+  if (IsClang && !getImpl().TheClangModuleLoader)
     getImpl().TheClangModuleLoader =
-      static_cast<ClangModuleLoader *>(loader.get());
-  }
+        static_cast<ClangModuleLoader *>(loader.get());
+
   getImpl().ModuleLoaders.push_back(std::move(loader));
 }
 

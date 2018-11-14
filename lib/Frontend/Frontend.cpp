@@ -23,6 +23,7 @@
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/DWARFImporter/DWARFImporter.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
@@ -338,6 +339,18 @@ bool CompilerInstance::setUpModuleLoaders() {
   }
   Context->addModuleLoader(std::move(SML));
   Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
+
+  if (Invocation.getLangOptions().EnableDWARFImporter) {
+    auto dwarfImporter =
+        DWARFImporter::create(*Context, Invocation.getClangImporterOptions(),
+                              getDependencyTracker());
+    if (!dwarfImporter) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
+      return true;
+    }
+    Context->addModuleLoader(std::move(dwarfImporter));
+  }
+
   return false;
 }
 
