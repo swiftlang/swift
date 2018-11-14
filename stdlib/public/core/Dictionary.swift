@@ -481,7 +481,10 @@ public struct Dictionary<Key: Hashable, Value> {
     var native = _NativeDictionary<Key, Value>(
       capacity: keysAndValues.underestimatedCount)
     // '_MergeError.keyCollision' is caught and handled with an appropriate
-    // error message one level down, inside native.merge(_:...).
+    // error message one level down, inside native.merge(_:...). We throw an
+    // error instead of calling fatalError() directly because we want the
+    // message to include the duplicate key, and the closure only has access to
+    // the conflicting values.
     try! native.merge(
       keysAndValues,
       isUnique: true,
