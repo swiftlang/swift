@@ -191,26 +191,23 @@ namespace experimental_dependencies {
   class FrontendGraph {
     std::vector<FrontendNode*> allNodes;
     // allows iteration of all Here nodes
-    Optional<decltype(allNodes.cend())> firstElsewhereNode;
+    size_t hereNodeCount = 0;
     Memoizer<NodeDependencyKey, FrontendNode*> memoizer;
     
-    void setFirstElsewhereNode(FrontendNode::Location locationToBeAdded) {
-      if (allNodes.empty()) {
-        assert(locationToBeAdded == FrontendNode::Location::Here && "first node should be source file node which is here");
-        return;
-      }
-      auto priorLocation = allNodes.back()->getLocation();
-      if (priorLocation == locationToBeAdded)
-        return;
-      if (priorLocation == FrontendNode::Location::Here)
-        firstElsewhereNode = allNodes.cend();
-      else
-        llvm_unreachable("should never add here after elsewhere");
+    void maintainHereNodeCount() {
+      assert(!allNodes.empty() && "should have added node");
+      auto justAdded = allNodes.back()->getLocation();
+      assert((justAdded == FrontendNode::Location::Elsewhere
+             || allNodes.size() < 2
+              || allNodes[allNodes.size() - 2]->getLocation() == FrontendNode::Location::Here) && "all here nodes must preceed all elsewhere nodes");
+      
+      if (justAdded == FrontendNode::Location::Here)
+        hereNodeCount = allNodes.size();
     }
     template <typename FnT>
     void forEachHereNode(FnT fn) {
-      assert(firstElsewhereNode.hasValue() && "should have nodes for decls here by now");
-      std::for_each(allNodes.cbegin(), firstElsewhereNode.getValue(), fn);
+      for (size_t i = 0;  i < hereNodeCount;  ++i)
+        fn(allNodes[i]);
     }
   public:
     FrontendNode* addNode(NodeDependencyKey key,
@@ -218,19 +215,19 @@ namespace experimental_dependencies {
                           FrontendNode::Location location) {
       return memoizer.create(key,
                              [&](NodeDependencyKey key) -> FrontendNode* {
-                               setFirstElsewhereNode(location);
                                FrontendNode *n = new FrontendNode(key,
                                                                   fingerprint,
                                                                   location,
                                                                   allNodes.size());
                                allNodes.push_back(n);
+                               maintainHereNodeCount();
                                return n;
                              });
     }
     void addDeserializedNode(FrontendNode *n) {
-      if (n->getLocation() == FrontendNode::Location::Elsewhere)
-        firstElsewhereNode = allNodes.end();
       allNodes.push_back(n);
+      if (n->getLocation() == FrontendNode::Location::Here)
+        hereNodeCount = allNodes.size();
       memoizer.insert(n->getDependencyKey(), n);
     }
     void addArc(FrontendNode *depender, FrontendNode *dependee) {
