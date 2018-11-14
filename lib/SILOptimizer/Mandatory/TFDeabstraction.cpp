@@ -59,8 +59,8 @@ static llvm::cl::opt<bool> TFDeleteGraphOps(
     "tf-delete-graph-ops", llvm::cl::init(false),
     llvm::cl::desc(
         "If enabled, delete all graph_ops at the end of the deabstraction "
-        "pass. This is an internal flag used to assess compiler overtime in "
-        "processing graph_op's in the optimizer passes."));
+        "pass. This is an internal flag used to measure the compiler overhead in"
+        "processing graph_op's in the optimization passes."));
 
 template<typename...T, typename...U>
 static InFlightDiagnostic
