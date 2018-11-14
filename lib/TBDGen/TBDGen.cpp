@@ -165,7 +165,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   addSymbol(SILDeclRef(AFD));
 
   // Add the global function pointer for a dynamically replaceable function.
-  if (AFD->isDynamic() && ! AFD->isObjC()) {
+  if (AFD->isNativeDynamic()) {
     addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(AFD));
     addSymbol(LinkEntity::forDynamicallyReplaceableFunctionImpl(AFD));
     addSymbol(LinkEntity::forDynamicallyReplaceableFunctionKey(AFD));

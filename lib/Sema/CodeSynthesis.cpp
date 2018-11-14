@@ -2042,6 +2042,11 @@ void swift::maybeAddAccessorsToStorage(TypeChecker &TC,
     return;
 
   if (!dc->isTypeContext()) {
+    // dynamic globals need accessors.
+    if (dc->isModuleScopeContext() && storage->isNativeDynamic()) {
+      addTrivialAccessorsToStorage(storage, TC);
+      return;
+    }
     // Fixed-layout global variables don't get accessors.
     if (!storage->isResilient())
       return;

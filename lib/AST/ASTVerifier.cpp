@@ -3149,12 +3149,12 @@ public:
                storageDecl->getWriteImpl() ==
                    WriteImplKind::StoredWithObservers ||
                storageDecl->getWriteImpl() == WriteImplKind::MutableAddress) &&
-              storageDecl->isDynamic() && !storageDecl->isObjC()) &&
+              storageDecl->isNativeDynamic()) &&
             // We allow a non dynamic getter if there is a dynamic read.
             !(FD->isGetter() &&
               (storageDecl->getReadImpl() == ReadImplKind::Read ||
                storageDecl->getReadImpl() == ReadImplKind::Address) &&
-              storageDecl->isDynamic() && !storageDecl->isObjC())) {
+              storageDecl->isNativeDynamic())) {
           Out << "Property and accessor do not match for 'dynamic'\n";
           abort();
         }

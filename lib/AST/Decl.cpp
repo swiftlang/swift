@@ -1549,7 +1549,7 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
     return AccessStrategy::getStorage();
   case ReadWriteImplKind::Stored: {
     // If the storage isDynamic (and not @objc) use the accessors.
-    if (storage->isDynamic() && !storage->isObjC())
+    if (storage->isNativeDynamic())
       return AccessStrategy::getMaterializeToTemporary(
           getOpaqueReadAccessStrategy(storage, false),
           getOpaqueWriteAccessStrategy(storage, false));
@@ -1623,7 +1623,7 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
       if (isPolymorphic(this))
         return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ true);
 
-      if (isDynamic())
+      if (isNativeDynamic())
         return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ false);
 
       // If the storage is resilient to the given use DC (perhaps because

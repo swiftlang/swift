@@ -2175,7 +2175,7 @@ void TypeChecker::checkDynamicReplacementAttribute(ValueDecl *D) {
     return;
   }
 
-  if (D->isDynamic() && !D->isObjC()) {
+  if (D->isNativeDynamic()) {
     diagnose(attr->getLocation(), diag::dynamic_replacement_must_not_be_dynamic,
              D->getBaseName());
     attr->setInvalid();
@@ -2451,9 +2451,6 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
 }
 
 void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
-  if (!getLangOpts().EnableImplicitDynamic)
-    return;
-
   // Add the attribute if the decl kind allows it and it is not an accessor
   // decl. Accessor decls should always infer the var/subscript's attribute.
   if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, D) ||
