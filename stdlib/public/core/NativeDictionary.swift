@@ -121,7 +121,7 @@ extension _NativeDictionary { // Low-level unchecked operations
     return _values[bucket.offset]
   }
 
-  @inlinable
+  @inlinable // FIXME(inline-always) was usableFromInline
   @inline(__always)
   internal func uncheckedInitialize(
     at bucket: Bucket,
@@ -133,7 +133,7 @@ extension _NativeDictionary { // Low-level unchecked operations
     (_values + bucket.offset).initialize(to: value)
   }
 
-  @inlinable
+  @inlinable // FIXME(inline-always) was usableFromInline
   @inline(__always)
   internal func uncheckedDestroy(at bucket: Bucket) {
     defer { _fixLifetime(self) }
