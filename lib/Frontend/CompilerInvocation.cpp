@@ -100,18 +100,10 @@ static void diagnoseSwiftVersion(Optional<version::Version> &vers, Arg *verArg,
   diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                  verArg->getAsString(Args), verArg->getValue());
 
-  // Check for an unneeded minor version, otherwise just list valid versions
-  if (vers.hasValue() && !vers.getValue().empty() &&
-      vers.getValue().asMajorVersion().getEffectiveLanguageVersion()) {
-    diags.diagnose(SourceLoc(), diag::note_swift_version_major,
-                   vers.getValue()[0]);
-  } else {
-    // Note valid versions instead
-    auto validVers = version::Version::getValidEffectiveVersions();
-    auto versStr =
-        "'" + llvm::join(validVers.begin(), validVers.end(), "', '") + "'";
-    diags.diagnose(SourceLoc(), diag::note_valid_swift_versions, versStr);
-  }
+  // Note valid versions.
+  auto validVers = version::Version::getValidEffectiveVersions();
+  auto versStr = "'" + llvm::join(validVers, "', '") + "'";
+  diags.diagnose(SourceLoc(), diag::note_valid_swift_versions, versStr);
 }
 
 /// \brief Create a new Regex instance out of the string value in \p RpassArg.
