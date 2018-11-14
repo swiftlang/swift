@@ -57,8 +57,21 @@ DriverGraph::loadFromBuffer(const void *node,
 
 
 LoadResult DriverGraph::integrate(const FrontendGraph &g) {
+  StringRef depsFileName = g.getSourceFileProvideNode()->getNameForDependencies();
+  auto iter = nodesBySwiftDepsFile.find(depsFileName);
+  return iter == nodesBySwiftDepsFile.end()
+  ? integrateNew(g)
+  : integrateExisting(g, iter->second);
+}
+
+LoadResult DriverGraph::integrateNew(const FrontendGraph &) {
   abort();
 }
+LoadResult DriverGraph::integrateExisting(const FrontendGraph &, std::vector<DriverNode*>&) {
+  abort();
+}
+
+
 
 bool DriverGraph::isMarked(const Job* Cmd) const {
   abort();

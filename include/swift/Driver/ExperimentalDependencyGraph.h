@@ -79,7 +79,9 @@ namespace swift {
       
        
         DependencyGraphImpl::LoadResult integrate(const FrontendGraph &);
-       };
+        DependencyGraphImpl::LoadResult integrateNew(const FrontendGraph &);
+        DependencyGraphImpl::LoadResult integrateExisting(const FrontendGraph &, std::vector<DriverNode*>&);
+      };
     } // experimental_dependencies
   } // driver
 } // swift

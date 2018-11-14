@@ -204,12 +204,24 @@ namespace experimental_dependencies {
       if (justAdded == FrontendNode::Location::Here)
         hereNodeCount = allNodes.size();
     }
+  public:
+    const FrontendNode* getSourceFileProvideNode() const {
+      assert(!allNodes.empty());
+      const auto *r = allNodes.front();
+      assert(r->getKind() == NodeKind::sourceFileProvide);
+      return r;
+    }
     template <typename FnT>
     void forEachHereNode(FnT fn) {
       for (size_t i = 0;  i < hereNodeCount;  ++i)
         fn(allNodes[i]);
     }
-  public:
+    template <typename FnT>
+    void forEachElsewhereNode(FnT fn) {
+      for (size_t i = hereNodeCount;  i < allNodes.size();  ++i)
+        fn(allNodes[i]);
+    }
+
     FrontendNode* addNode(NodeDependencyKey key,
                           StringRef fingerprint,
                           FrontendNode::Location location) {
@@ -259,6 +271,7 @@ namespace experimental_dependencies {
     static void parseDependencyFile(llvm::MemoryBuffer &buffer,
                         llvm::function_ref<NodeCallbackTy> nodeCallback,
                         llvm::function_ref<ErrorCallbackTy> errorCallback);
+    
   };
   
 } // end namespace experimental_dependencies
