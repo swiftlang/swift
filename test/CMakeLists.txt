@@ -334,7 +334,10 @@ foreach(SDK ${SWIFT_SDKS})
             DEPENDS ${dependencies}
             COMMENT "Running ${test_subset} Swift tests for ${VARIANT_TRIPLE} from custom test locations"
             USES_TERMINAL)
-        set_property(TARGET "${test_target_name}" "${test_target_name}-custom"
+        set_property(TARGET
+            "${test_target_name}"
+            "${test_target_name}-custom"
+            "${test_dependencies_target_name}"
             PROPERTY FOLDER "Tests/check-swift")
       endforeach()
     endforeach()
@@ -360,7 +363,11 @@ foreach(test_mode ${TEST_MODES})
     set_property(TARGET "${test_target_name}"
         PROPERTY FOLDER "Tests/check-swift")
 
-    add_custom_target("swift${test_subset_target_suffix}${test_mode_target_suffix}-test-depends"
+    set(test_depends_target_name
+        "swift${test_subset_target_suffix}${test_mode_target_suffix}-test-depends")
+    add_custom_target("${test_depends_target_name}"
         DEPENDS "swift${test_subset_target_suffix}${test_mode_target_suffix}${SWIFT_PRIMARY_VARIANT_SUFFIX}-test-depends")
+    set_property(TARGET "${test_depends_target_name}"
+        PROPERTY FOLDER "Tests/check-swift")
   endforeach()
 endforeach()

@@ -11,6 +11,8 @@ function(add_sourcekit_symbol_exports target_name export_file)
     add_custom_target(${target_name}_exports DEPENDS symbol.exports)
     set_property(DIRECTORY APPEND
       PROPERTY ADDITIONAL_MAKE_CLEAN_FILES symbol.exports)
+    set_target_properties(${target_name}_exports PROPERTIES
+      FOLDER "SourceKit libraries")
 
     get_property(srcs TARGET ${target_name} PROPERTY SOURCES)
     foreach(src ${srcs})
