@@ -264,7 +264,7 @@ namespace {
         return true;
       }
 
-      Result = ValueOwnershipKind(*Iter);
+      Result = T(*Iter);
       return false;
     }
 
