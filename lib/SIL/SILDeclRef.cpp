@@ -964,7 +964,8 @@ bool SILDeclRef::isDynamicallyReplaceable() const {
     return false;
 
   if (kind == SILDeclRef::Kind::Destroyer ||
-      kind == SILDeclRef::Kind::Initializer) {
+      kind == SILDeclRef::Kind::Initializer ||
+      kind == SILDeclRef::Kind::GlobalAccessor) {
     return false;
   }
 

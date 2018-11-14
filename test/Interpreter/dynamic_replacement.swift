@@ -72,6 +72,8 @@ func expectedResult(_ forOriginalLibrary: Bool,  _ expectedOriginalString: Strin
 }
 
 func checkExpectedResults(forOriginalLibrary useOrig: Bool) {
+ expectTrue(public_global_var == expectedResult(useOrig, "public_global_var"))
+
  expectTrue(public_global_func() ==
             expectedResult(useOrig, "public_global_func"))
  expectTrue(public_global_generic_func(Int.self) ==

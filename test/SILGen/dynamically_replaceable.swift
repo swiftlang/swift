@@ -271,3 +271,14 @@ extension GenericS {
     }
   }
 }
+
+dynamic var globalX = 0
+// CHECK-LABEL: sil hidden [dynamically_replacable] @$s23dynamically_replaceable7globalXSivg : $@convention(thin) () -> Int
+// CHECK-LABEL: sil hidden [dynamically_replacable] @$s23dynamically_replaceable7globalXSivs : $@convention(thin) (Int) -> ()
+// CHECK-LABEL: sil hidden @$s23dynamically_replaceable7getsetXyS2iF
+// CHECK: dynamic_function_ref @$s23dynamically_replaceable7globalXSivs
+// CHECK: dynamic_function_ref @$s23dynamically_replaceable7globalXSivg
+func getsetX(_ x: Int) -> Int {
+  globalX = x
+  return globalX
+}
