@@ -28,74 +28,56 @@ namespace {
   class OptionalTryMigratorPass: public ASTMigratorPass,
   public SourceEntityWalker {
     
-    std::vector<DeclContext *> ConditionStack;
+    bool explicitCastActiveForOptionalTry = false;
     
-    void handleIfAndGuard(const LabeledConditionalStmt *IF) {
-      // Look for cases like this:
-      //   if let optX = try? somethingOptional(),
-      //      let x = optX { }
-      
-      NamedPattern *tempVarNamePattern = nullptr;
-      SourceLoc endOfPrecedingElement;
-      
-      for (auto conditionElement : IF->getCond()) {
-        if (conditionElement.getKind() != StmtConditionElement::CK_PatternBinding) {
-          continue;
-        }
-        
-        const auto pattern = dyn_cast<OptionalSomePattern>(conditionElement.getPattern());
-        if (!pattern) {
-          // We are only concerned with patterns that are unwrapping optionals.
-          continue;
-        }
-        
-        const auto initializer = conditionElement.getInitializer();
-        
-        if (tempVarNamePattern && initializer->getKind() == ExprKind::DeclRef) {
-          const auto declExpr = static_cast<DeclRefExpr *>(initializer);
-          
-          if (const auto rhsVarDecl = dyn_cast<VarDecl>(declExpr->getDecl())) {
-            if (rhsVarDecl->getName() == tempVarNamePattern->getBoundName()) {
-              
-              // We found an unwrap binding of our previous 'try?' variable
-              auto thisVarPattern = dyn_cast<VarPattern>(pattern->getSubPattern());
-              if (!thisVarPattern) { continue; }
-              
-              // Use the final unwrapped variable name for the original 'try?' expression
-              auto tempVarRange = Lexer::getCharSourceRangeFromSourceRange(SM, tempVarNamePattern->getSourceRange());
-              Editor.replace(tempVarRange, thisVarPattern->getBoundName().str());
-              
-              // Remove this condition element that only served to unwrap the try.
-              auto rangeToRemove = SourceRange(endOfPrecedingElement, conditionElement.getEndLoc());
-              auto charRangeToRemove = Lexer::getCharSourceRangeFromSourceRange(SM, rangeToRemove);
-              Editor.remove(charRangeToRemove);
-              
-              // We've made our change. Clear out the tempVarNamePattern to allow for
-              // finding another pattern in this 'if'
-              tempVarNamePattern = nullptr;
-            }
-          }
-        }
-        else if (const auto optTryExpr = dyn_cast<OptionalTryExpr>(initializer)) {
-          if (!optTryExpr->getSubExpr()->getType()->getOptionalObjectType()) {
-            continue;
-          }
-          // This is a `try?` wrapping an optional. It's behavior has changed in Swift 5
-          const auto VP = dyn_cast<VarPattern>(pattern->getSubPattern());
-          const auto NP = dyn_cast<NamedPattern>(VP->getSubPattern());
-          if (!NP) { continue; }
-          
-          tempVarNamePattern = NP;
-        }
-        endOfPrecedingElement = conditionElement.getEndLoc().getAdvancedLoc(1);
+    bool walkToExprPre(Expr *E) override {
+      if (dyn_cast<ParenExpr>(E) || E->isImplicit()) {
+        // Look through parentheses and implicit expressions.
+        return true;
       }
-    }
-    
-    bool walkToStmtPre(Stmt *S) override {
-      if (const auto *IF = dyn_cast<LabeledConditionalStmt>(S)) {
-        handleIfAndGuard(IF);
+      
+      if (const auto *explicitCastExpr = dyn_cast<ExplicitCastExpr>(E)) {
+        // If the user has already provided an explicit cast for the
+        // 'try?', then we don't need to add one. So let's track whether
+        // one is active
+        explicitCastActiveForOptionalTry = true;
+      }
+      else if (const auto *optTryExpr = dyn_cast<OptionalTryExpr>(E)) {
+        wrapTryInCastIfNeeded(optTryExpr);
+        return false;
+      }
+      else if (explicitCastActiveForOptionalTry) {
+        // If an explicit cast is active and we are entering a new
+        // expression that is not an OptionalTryExpr, then the cast
+        // does not apply to the OptionalTryExpr.
+        explicitCastActiveForOptionalTry = false;
       }
       return true;
+    }
+    
+    bool walkToExprPost(Expr *E) override {
+      explicitCastActiveForOptionalTry = false;
+      return true;
+    }
+    
+    void wrapTryInCastIfNeeded(const OptionalTryExpr *optTryExpr) {
+      if (explicitCastActiveForOptionalTry) {
+        // There's already an explicit cast here; we don't need to add anything
+        return;
+      }
+      
+      if (!optTryExpr->getSubExpr()->getType()->getOptionalObjectType()) {
+        // This 'try?' doesn't wrap an optional, so its behavior does not
+        // change from Swift 4 to Swift 5
+        return;
+      }
+      
+      Type typeToPreserve = optTryExpr->getType();
+      auto typeName = typeToPreserve->getStringAsComponent();
+      
+      auto range = optTryExpr->getSourceRange();
+      auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, range);
+      Editor.insertWrap("((", charRange, (Twine(") as ") + typeName + ")").str());
     }
     
   public:
