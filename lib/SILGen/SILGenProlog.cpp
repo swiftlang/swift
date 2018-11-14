@@ -490,11 +490,19 @@ uint16_t SILGenFunction::emitProlog(ParameterList *paramList,
   // Add the SILArguments and use them to initialize the local argument
   // values.
   if (paramList)
-    for (auto *param : *paramList)
+    for (auto *param : *paramList) {
+      if (param->getType()->isStructurallyUninhabited()) {
+        SILLocation unreachableLoc(param);
+        unreachableLoc.markAsPrologue();
+        B.createUnreachable(unreachableLoc);
+      }
+      
       emitter.emitParam(param);
-  if (selfParam)
-    emitter.emitParam(selfParam);
-
+      
+      if (selfParam) {
+        emitter.emitParam(selfParam);
+      }
+    }
   // Record the ArgNo of the artificial $error inout argument. 
   unsigned ArgNo = emitter.getNumArgs();
   if (throws) {
