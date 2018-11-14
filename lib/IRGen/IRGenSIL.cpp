@@ -2383,9 +2383,11 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
       if (astType->isEqual(getArrayType(
           astCtx, astCtx.getStringDecl()->getDeclaredInterfaceType()))) {
-        // TODO: dynamic string list attributes
-        lowerOpToError("dynamic string list attributes not supported");
-        return;
+        auto *fn = IGM.getTFC_OpSetAttrStringArrayFn();
+        auto *attrValue = getLoweredSingletonExplosion(silValue);
+        auto *attrValueUntyped = Builder.CreateBitCast(attrValue, IGM.Int8PtrTy);
+        Builder.CreateCall(fn, {op, attrNameValAddr, attrValueUntyped});
+        break;
       }
 
       if (astType->is<SILFunctionType>()) {
@@ -2450,9 +2452,26 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       LLVM_DEBUG(llvm::dbgs() << "  Adding dynamic ShapeAttribute of type "
                  << astType << "\n");
 
-      // TODO: dynamic shape attributes
-      lowerOpToError("dynamic shape attributes not supported");
-      return;
+      auto *attrNameValAddr = IGM.getAddrOfGlobalString(argumentName.c_str());
+
+      if (astType->isEqual(astCtx.getTensorShapeDecl()->getDeclaredInterfaceType())) {
+        auto *fn = IGM.getTFC_OpSetAttrTensorShapeFn();
+        auto *attrValue = getLoweredSingletonExplosion(silValue);
+        auto *attrValueUntyped = Builder.CreateBitCast(attrValue, IGM.Int8PtrTy);
+        Builder.CreateCall(fn, {op, attrNameValAddr, attrValueUntyped, status});
+        checkOk(status);
+        break;
+      }
+
+      if (astType->isEqual(getOptionalType(astCtx, astCtx.getTensorShapeDecl()->getDeclaredInterfaceType()))) {
+        auto *fn = IGM.getTFC_OpSetAttrOptionalTensorShapeFn();
+        auto *attrValue = getLoweredSingletonExplosion(silValue);
+        Builder.CreateCall(fn, {op, attrNameValAddr, attrValue, status});
+        checkOk(status);
+        break;
+      }
+
+      assert(0 && "unknown ShapeAttribute type");
     }
   }
 
