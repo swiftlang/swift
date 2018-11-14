@@ -18,6 +18,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/ABI/Enum.h"
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
@@ -948,31 +949,6 @@ public:
   }
 };
 
-// Copy-and-pasted from stdlib/public/runtime/Enum.cpp -- should probably go
-// in a header somewhere, since the formula is part of the ABI.
-static unsigned getNumTagBytes(size_t size, unsigned emptyCases,
-                               unsigned payloadCases) {
-  // We can use the payload area with a tag bit set somewhere outside of the
-  // payload area to represent cases. See how many bytes we need to cover
-  // all the empty cases.
-
-  unsigned numTags = payloadCases;
-  if (emptyCases > 0) {
-    if (size >= 4)
-      // Assume that one tag bit is enough if the precise calculation overflows
-      // an int32.
-      numTags += 1;
-    else {
-      unsigned bits = size * 8U;
-      unsigned casesPerTagBitValue = 1U << bits;
-      numTags += ((emptyCases + (casesPerTagBitValue-1U)) >> bits);
-    }
-  }
-  return (numTags <=    1 ? 0 :
-          numTags <   256 ? 1 :
-          numTags < 65536 ? 2 : 4);
-}
-
 class EnumTypeInfoBuilder {
   TypeConverter &TC;
   unsigned Size, Alignment, NumExtraInhabitants;
@@ -1035,9 +1011,9 @@ public:
     // NoPayloadEnumImplStrategy
     if (PayloadCases.empty()) {
       Kind = RecordKind::NoPayloadEnum;
-      Size += getNumTagBytes(/*size=*/0,
-                             NoPayloadCases,
-                             /*payloadCases=*/0);
+      Size += getEnumTagCounts(/*size=*/0,
+                               NoPayloadCases,
+                               /*payloadCases=*/0).numTagBytes;
 
     // SinglePayloadEnumImplStrategy
     } else if (PayloadCases.size() == 1) {
@@ -1065,9 +1041,9 @@ public:
           // Not enough extra inhabitants for all cases. We have to add an
           // extra tag field.
           NumExtraInhabitants = 0;
-          Size += getNumTagBytes(Size,
-                                 NoPayloadCases - NumExtraInhabitants,
-                                 /*payloadCases=*/1);
+          Size += getEnumTagCounts(Size,
+                                   NoPayloadCases - NumExtraInhabitants,
+                                   /*payloadCases=*/1).numTagBytes;
         }
       }
 
@@ -1091,14 +1067,20 @@ public:
         NumExtraInhabitants = FixedDescriptor->NumExtraInhabitants;
         BitwiseTakable = FixedDescriptor->isBitwiseTakable();
       } else {
-        // Dynamic multi-payload enums do not have extra inhabitants
-        NumExtraInhabitants = 0;
-
         // Dynamic multi-payload enums always use an extra tag to differentiate
         // between cases
-        Size += getNumTagBytes(Size,
-                               NoPayloadCases,
-                               PayloadCases.size());
+        auto tagCounts = getEnumTagCounts(Size, NoPayloadCases,
+                                          PayloadCases.size());
+        
+        Size += tagCounts.numTagBytes;
+        // Dynamic multi-payload enums use the tag representations not assigned
+        // to cases for extra inhabitants.
+        if (tagCounts.numTagBytes >= 32) {
+          NumExtraInhabitants = INT_MAX;
+        } else {
+          NumExtraInhabitants =
+            (1 << (tagCounts.numTagBytes * 8)) - tagCounts.numTags;
+        }
       }
     }
 
