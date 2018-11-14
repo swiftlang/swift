@@ -118,14 +118,14 @@
 // DUPLICATE-NAME: note: filenames are used to distinguish private declarations with the same name
 
 // FILELIST: bin/swift
-// FILELIST: -filelist [[SOURCES:(["][^"]+|[^ ]+)sources([^"]+["]|[^ ]+)]]
-// FILELIST: -primary-filelist  [[PRIMARY_FILELIST:(["][^"]+|[^ ]+)primaryInputs([^"]+["]|[^ ]+)]]
-// FILELIST: -supplementary-output-file-map [[SUPPLEMENTARY_OUTPUT_FILEMAP:(["][^"]+|[^ ]+)supplementaryOutputs([^"]+["]|[^ ]+)]]
+// FILELIST: -filelist [[SOURCES:(["][^"]+sources[^"]+["]|[^ ]+sources[^ ]+)]]
+// FILELIST: -primary-filelist  {{(["][^"]+primaryInputs[^"]+["]|[^ ]+primaryInputs[^ ]+)}}
+// FILELIST: -supplementary-output-file-map {{(["][^"]+supplementaryOutputs[^"]+["]|[^ ]+supplementaryOutputs[^ ]+)}}
 // FILELIST: -output-filelist {{[^-]}}
 // FILELIST-NEXT: bin/swift
 // FILELIST: -filelist [[SOURCES]]
-// FILELIST: -primary-filelist  {{(["][^"]+|[^ ]+)primaryInputs([^"]+["]|[^ ]+)}}
-// FILELIST: -supplementary-output-file-map {{(["][^"]+|[^ ]+)supplementaryOutputs([^"]+["]|[^ ]+)}}
+// FILELIST: -primary-filelist  {{(["][^"]+primaryInputs[^"]+["]|[^ ]+primaryInputs[^ ]+)}}
+// FILELIST: -supplementary-output-file-map {{(["][^"]+supplementaryOutputs[^"]+["]|[^ ]+supplementaryOutputs[^ ]+)}}
 // FILELIST: -output-filelist {{[^-]}}
 
 // UPDATE-CODE: DISTINCTIVE-PATH/usr/bin/swift
