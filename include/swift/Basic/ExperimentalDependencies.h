@@ -209,6 +209,7 @@ namespace experimental_dependencies {
     }
     template <typename FnT>
     void forEachHereNode(FnT fn) {
+      assert(firstElsewhereNode.hasValue() && "should have nodes for decls here by now");
       std::for_each(allNodes.cbegin(), firstElsewhereNode.getValue(), fn);
     }
   public:
