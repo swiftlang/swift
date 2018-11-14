@@ -3569,7 +3569,6 @@ retry_after_fail:
       constraintKind == ConstraintKind::ValueMember &&
       memberName.isSimpleName() && !memberName.isSpecial()) {
     auto name = memberName.getBaseIdentifier();
-    // TC.extract
     if (hasDynamicMemberLookupAttribute(instanceTy, DynamicMemberLookupCache)) {
       auto &ctx = getASTContext();
 
