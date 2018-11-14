@@ -72,8 +72,6 @@ extension LazyPrefixWhileSequence.Iterator: IteratorProtocol, Sequence {
 }
 
 extension LazyPrefixWhileSequence: Sequence {
-  public typealias SubSequence = AnySequence<Element> // >:(
-  
   @inlinable // lazy-performance
   public __consuming func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator(), predicate: _predicate)
@@ -109,31 +107,7 @@ extension LazySequenceProtocol {
 ///   the usual performance given by the `Collection` protocol. Be aware,
 ///   therefore, that general operations on `${Self}` instances may not have
 ///   the documented complexity.
-@_fixed_layout // lazy-performance
-public struct LazyPrefixWhileCollection<Base: Collection> {
-  public typealias Element = Base.Element
-  public typealias SubSequence = Slice<LazyPrefixWhileCollection<Base>>
-  
-  @inlinable // lazy-performance
-  internal init(_base: Base, predicate: @escaping (Element) -> Bool) {
-    self._base = _base
-    self._predicate = predicate
-  }
-
-  @usableFromInline // lazy-performance
-  internal var _base: Base
-  @usableFromInline // lazy-performance
-  internal let _predicate: (Element) -> Bool
-}
-
-extension LazyPrefixWhileCollection: Sequence {
-  public typealias Iterator = LazyPrefixWhileSequence<Base>.Iterator
-  
-  @inlinable // lazy-performance
-  public __consuming func makeIterator() -> Iterator {
-    return Iterator(_base: _base.makeIterator(), predicate: _predicate)
-  }
-}
+public typealias LazyPrefixWhileCollection<T: Collection> = LazyPrefixWhileSequence<T>
 
 extension LazyPrefixWhileCollection {
   /// A position in the base collection of a `LazyPrefixWhileCollection` or the
@@ -169,7 +143,8 @@ extension LazyPrefixWhileCollection {
   }
 }
 
-extension LazyPrefixWhileCollection.Index: Comparable {
+// FIXME: should work on the typealias
+extension LazyPrefixWhileSequence.Index: Comparable where Base: Collection {
   @inlinable // lazy-performance
   public static func == (
     lhs: LazyPrefixWhileCollection<Base>.Index, 
@@ -201,7 +176,8 @@ extension LazyPrefixWhileCollection.Index: Comparable {
   }
 }
 
-extension LazyPrefixWhileCollection.Index: Hashable where Base.Index: Hashable {
+// FIXME: should work on the typealias
+extension LazyPrefixWhileSequence.Index: Hashable where Base.Index: Hashable, Base: Collection {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
@@ -219,6 +195,8 @@ extension LazyPrefixWhileCollection.Index: Hashable where Base.Index: Hashable {
 }
 
 extension LazyPrefixWhileCollection: Collection {
+  public typealias SubSequence = Slice<LazyPrefixWhileCollection<Base>>
+
   @inlinable // lazy-performance
   public var startIndex: Index {
     return Index(_base.startIndex)
@@ -288,26 +266,5 @@ where Base: BidirectionalCollection {
       }
       return Index(result)
     }
-  }
-}
-
-extension LazyPrefixWhileCollection: LazyCollectionProtocol {
-  public typealias Elements = LazyPrefixWhileCollection
-}
-
-extension LazyCollectionProtocol {
-  /// Returns a lazy collection of the initial consecutive elements that
-  /// satisfy `predicate`.
-  ///
-  /// - Parameter predicate: A closure that takes an element of the collection
-  ///   as its argument and returns `true` if the element should be included
-  ///   or `false` otherwise. Once `predicate` returns `false` it will not be
-  ///   called again.
-  @inlinable // lazy-performance
-  public __consuming func prefix(
-    while predicate: @escaping (Element) -> Bool
-  ) -> LazyPrefixWhileCollection<Elements> {
-    return LazyPrefixWhileCollection(
-      _base: self.elements, predicate: predicate)
   }
 }

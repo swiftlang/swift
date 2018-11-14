@@ -108,7 +108,7 @@
 ///       }
 ///     }
 ///
-/// - See also: `LazySequence`, `LazyCollectionProtocol`, `LazyCollection`
+/// - See also: `LazySequence`
 ///
 /// - Note: The explicit permission to implement further operations
 ///   lazily applies only in contexts where the sequence is statically
@@ -177,8 +177,9 @@ extension LazySequenceProtocol where Elements: LazySequenceProtocol {
 ///
 /// - See also: `LazySequenceProtocol`
 @_fixed_layout // lazy-performance
-public struct LazySequence<Base : Sequence>: _SequenceWrapper {
-  public var _base: Base
+public struct LazySequence<Base : Sequence> {
+  @usableFromInline
+  internal var _base: Base
 
   /// Creates a sequence that has the same elements as `base`, but on
   /// which some operations such as `map` and `filter` are implemented
@@ -186,6 +187,39 @@ public struct LazySequence<Base : Sequence>: _SequenceWrapper {
   @inlinable // lazy-performance
   internal init(_base: Base) {
     self._base = _base
+  }
+}
+
+extension LazySequence: Sequence {
+  public typealias Element = Base.Element
+  public typealias Iterator = Base.Iterator
+
+  @inlinable
+  public __consuming func makeIterator() -> Iterator {
+    return _base.makeIterator()
+  }
+  
+  @inlinable // lazy-performance
+  public var underestimatedCount: Int {
+    return _base.underestimatedCount
+  }
+
+  @inlinable // lazy-performance
+  @discardableResult
+  public __consuming func _copyContents(
+    initializing buf: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
+    return _base._copyContents(initializing: buf)
+  }
+
+  @inlinable // lazy-performance
+  public func _customContainsEquatableElement(_ element: Element) -> Bool? { 
+    return _base._customContainsEquatableElement(element)
+  }
+  
+  @inlinable // generic-performance
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
+    return _base._copyToContiguousArray()
   }
 }
 
