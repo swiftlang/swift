@@ -16,6 +16,8 @@ add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_
     POSIXError.swift
     MachError.swift
 
+    "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
+
     SWIFT_COMPILE_FLAGS -Xfrontend -disable-objc-attr-requires-foundation-module "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS ALL_APPLE_PLATFORMS
