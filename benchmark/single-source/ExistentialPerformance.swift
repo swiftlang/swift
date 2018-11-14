@@ -1,4 +1,4 @@
-//===----------------------------------------------------------------------===//
+//===--- ExistentialPerformance.swift -------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,6 +9,12 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
+////////////////////////////////////////////////////////////////////////////////
+// WARNING: This file is manually generated from .gyb template and should not
+// be directly modified. Instead, change ExistentialPerformance.swift.gyb
+// and run scripts/generate_harness/generate_harness.py to regenerate this file.
+////////////////////////////////////////////////////////////////////////////////
 
 import TestsUtils
 
@@ -144,10 +150,10 @@ struct IntValueBuffer1 : Existential {
     return f0 == 0
 	}
   func reallyDoIt() -> Bool {
-    return true
+   return true
   }
   mutating func mutateIt() -> Bool {
-		next(&f0, upto: 1)
+    next(&f0, upto: 1)
     return true
 	}
 }
@@ -180,8 +186,7 @@ struct IntValueBuffer3 : Existential {
   func reallyDoIt() -> Bool {
    return f0 == 0 && f1 == 3 && f2 == 7
   }
-
-  mutating func mutateIt() -> Bool{
+  mutating func mutateIt() -> Bool {
     next(&f0, upto: 1)
     next(&f1, upto: 3)
     next(&f2, upto: 7)
@@ -201,8 +206,7 @@ struct IntValueBuffer4 : Existential {
   func reallyDoIt() -> Bool {
    return f0 == 0 && f1 == 3 && f2 == 7 && f3 == 13
   }
-
-  mutating func mutateIt() -> Bool{
+  mutating func mutateIt() -> Bool {
     next(&f0, upto: 1)
     next(&f1, upto: 3)
     next(&f2, upto: 7)
@@ -281,12 +285,11 @@ struct ClassValueBuffer4 : Existential {
 	var f0: Klazz = Klazz()
 	var f1: Klazz = Klazz()
 	var f2: Klazz = Klazz()
-  var f3: Int = 0
+	var f3: Int = 0
 
   func doIt() -> Bool {
     return f0.doIt()
 	}
-
   func reallyDoIt() -> Bool {
    return f0.reallyDoIt()
   }
@@ -415,6 +418,7 @@ func runTestArrayShift<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
     }
   }
 }
+
 func runTestArrayConditionalShift<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   var existentialArray = initExistentialArray(withType: T.self, count: 128)
   for _ in 0 ..< N * 10 {
@@ -746,3 +750,7 @@ public func run_ExistentialTestArrayConditionalShift_ClassValueBuffer3(_ N: Int)
 public func run_ExistentialTestArrayConditionalShift_ClassValueBuffer4(_ N: Int) {
   runTestArrayConditionalShift(withType: ClassValueBuffer4.self, numberOfTimes: N)
 }
+
+// Local Variables:
+// eval: (read-only-mode 1)
+// End:
