@@ -11,6 +11,10 @@
 // BASICC: 0: input, "{{.*}}actions.swift", swift
 // BASICC: 1: compile, {0}, object
 
+// RUN: %swiftc_driver -driver-print-actions -dump-ast %s 2>&1 | %FileCheck %s -check-prefix=BASICAST
+// BASICAST: 0: input, "{{.*}}actions.swift", swift
+// BASICAST: 1: compile, {0}, ast-dump
+
 // RUN: %swiftc_driver -driver-print-actions -emit-sil %s 2>&1 | %FileCheck %s -check-prefix=BASICSIL
 // BASICSIL: 0: input, "{{.*}}actions.swift", swift
 // BASICSIL: 1: compile, {0}, sil
