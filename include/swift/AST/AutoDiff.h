@@ -227,9 +227,7 @@ struct SILAutoDiffConfig {
 
   /// Returns the "master" configuration, which all variants with the same
   /// parameter indices can derive from.
-  static
-  SILAutoDiffConfig getMaster(
-      const SILAutoDiffIndices &indices) {
+  static SILAutoDiffConfig getMaster(const SILAutoDiffIndices &indices) {
     return {
       indices,
       getCanonicalGradientOptions()
@@ -252,15 +250,18 @@ struct SILAutoDiffConfig {
 
 /// The kind of an associated function in the `autodiff_function` and
 /// `autodiff_function_extract` instructions in SIL.
-enum class SILAutoDiffAssociatedFunctionKind : uint8_t {
-  // The primal function in legacy reverse-mode.
-  LegacyPrimal,
-  // The adjoint function in legacy reverse-mode.
-  LegacyAdjoint,
-  // The vector-Jacobian products operator.
-  JVP,
-  // The Jacobian-vector products operator.
-  VJP,
+struct SILAutoDiffAssociatedFunctionKind {
+  enum innerty : uint8_t {
+     // The vector-Jacobian products operator.
+     JVP = 0,
+     // The Jacobian-vector products operator.
+     VJP = 1
+  } rawValue;
+
+  SILAutoDiffAssociatedFunctionKind() = default;
+  SILAutoDiffAssociatedFunctionKind(innerty rawValue) : rawValue(rawValue) {}
+  explicit SILAutoDiffAssociatedFunctionKind(StringRef string);
+  operator innerty() const { return rawValue; }
 };
 
 /// Automatic differentiation utility namespace.
@@ -271,21 +272,10 @@ namespace autodiff {
 /// This is used for both ordering in the `autodiff_function` instruction and
 /// ABI layout.
 ///
-/// |---------------------------------------------------------------|
-/// | 1. Standard mode.                                             |
-/// |---------------------------------------------------------------|
-/// |              Order 1       Order 2     ...|
-/// |----------| |-----|-----| |-----|-----| ...|
-/// | Original | | JVP | VJP | | JVP | VJP | ...|
-/// |----------| |-----|-----| |-----|-----| ...|
-/// |---------------------------------------------------------------|
-/// | 2. Legacy reverse mode.                                       |
-/// |---------------------------------------------------------------|
-/// |              Order 1                                          |
-/// |----------| |--------|---------|                               |
-/// | Original | | Primal | Adjoint |                               |
-/// |----------| |--------|---------|                               |
-/// |---------------------------------------------------------------|
+///                Order 1       Order 2     ...
+/// |----------| |-----|-----| |-----|-----| ...
+/// | Original | | JVP | VJP | | JVP | VJP | ...
+/// |----------| |-----|-----| |-----|-----| ...
 unsigned
 getOffsetForAutoDiffAssociatedFunction(unsigned order,
                                        SILAutoDiffAssociatedFunctionKind kind);

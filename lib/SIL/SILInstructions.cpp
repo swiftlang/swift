@@ -620,13 +620,12 @@ AutoDiffFunctionInst::getAutoDiffType(SILValue originalFunction,
 }
 
 AutoDiffFunctionInst::AutoDiffFunctionInst(
-    SILModule &module, SILDebugLocation debugLoc, bool isLegacyReverseMode,
+    SILModule &module, SILDebugLocation debugLoc,
     const SmallBitVector &parameterIndices, unsigned differentiationOrder,
     SILValue originalFunction, ArrayRef<SILValue> associatedFunctions)
     : InstructionBaseWithTrailingOperands(originalFunction, associatedFunctions,
           debugLoc, getAutoDiffType(originalFunction, differentiationOrder,
                                     parameterIndices)),
-      legacyReverseModeFlag(isLegacyReverseMode),
       parameterIndices(parameterIndices),
       differentiationOrder(differentiationOrder),
       numOperands(1 + associatedFunctions.size()) {
@@ -634,13 +633,12 @@ AutoDiffFunctionInst::AutoDiffFunctionInst(
 
 AutoDiffFunctionInst *AutoDiffFunctionInst::create(
     SILModule &module, SILDebugLocation debugLoc,
-    bool isLegacyReverseAD, const SmallBitVector &parameterIndices,
+    const SmallBitVector &parameterIndices,
     unsigned differentiationOrder, SILValue originalFunction,
     ArrayRef<SILValue> associatedFunctions) {
   size_t size = totalSizeToAlloc<Operand>(associatedFunctions.size() + 1);
   void *buffer = module.allocateInst(size, alignof(AutoDiffFunctionInst));
   return ::new (buffer) AutoDiffFunctionInst(module, debugLoc,
-                                             isLegacyReverseAD,
                                              parameterIndices,
                                              differentiationOrder,
                                              originalFunction,
@@ -674,11 +672,10 @@ getAssociatedFunctionType(SILValue function,
 }
 
 AutoDiffFunctionExtractInst::AutoDiffFunctionExtractInst(
-    SILModule &module, SILDebugLocation debugLoc, bool isLegacyReverseMode,
+    SILModule &module, SILDebugLocation debugLoc,
     SILAutoDiffAssociatedFunctionKind associatedFunctionKind,
     SILValue theFunction, SILValue differentiationOrder)
     : InstructionBase(debugLoc, SILType()),
-      legacyReverseModeFlag(isLegacyReverseMode),
       associatedFunctionKind(associatedFunctionKind),
       operands(this, theFunction, differentiationOrder) {
 }

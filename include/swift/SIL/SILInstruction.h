@@ -7577,11 +7577,6 @@ class AutoDiffFunctionInst final :
                AutoDiffFunctionInst, SingleValueInstruction> {
 private:
   friend SILBuilder;
-  /// A boolean flag that indicates whether this is for legacy reverse-mode AD,
-  /// which indicates that there's a primal and an adjoint and that this is only
-  /// first-order differentiation. This will be removed once legacy reverse-mode
-  /// AD gets upgraded to the new linearization + partial evaluation AD model.
-  bool legacyReverseModeFlag;
   /// Differentiation parameter indices.
   SmallBitVector parameterIndices;
   /// The order of differentiation.
@@ -7592,7 +7587,6 @@ private:
   unsigned numOperands;
 
   AutoDiffFunctionInst(SILModule &module, SILDebugLocation debugLoc,
-                       bool isLegacyReverseMode,
                        const SmallBitVector &parameterIndices,
                        unsigned differentiationOrder,
                        SILValue originalFunction,
@@ -7601,7 +7595,6 @@ private:
 public:
   static AutoDiffFunctionInst *create(SILModule &module,
                                       SILDebugLocation debugLoc,
-                                      bool isLegacyReverseAD,
                                       const SmallBitVector &parameterIndices,
                                       unsigned differentiationOrder,
                                       SILValue originalFunction,
@@ -7613,12 +7606,6 @@ public:
 
   /// Returns the original function.
   SILValue getOriginalFunction() const { return getAllOperands()[0].get(); }
-
-  /// Returns a boolean flag that indicates whether this is for legacy
-  /// reverse-mode AD.
-  bool isLegacyReverseMode() const {
-    return legacyReverseModeFlag;
-  }
 
   /// Returns differentiation indices.
   const SmallBitVector &getParameterIndices() const {
@@ -7656,11 +7643,6 @@ class AutoDiffFunctionExtractInst :
     public InstructionBase<SILInstructionKind::AutoDiffFunctionInst,
                            SingleValueInstruction> {
 private:
-  /// A boolean flag that indicates whether this is for legacy reverse-mode AD,
-  /// which indicates that there's a primal and an adjoint and that this is only
-  /// first-order differentiation. This will be removed once legacy reverse-mode
-  /// AD gets upgraded to the new linearization + partial evaluation AD model.
-  bool legacyReverseModeFlag;
   /// The kind of the associated function to extract.
   SILAutoDiffAssociatedFunctionKind associatedFunctionKind;
   /// 2 operands: the `@autodiff` function and the differentiation order.
@@ -7672,13 +7654,9 @@ private:
 
 public:
   explicit AutoDiffFunctionExtractInst(
-      SILModule &module, SILDebugLocation debugLoc, bool isLegacyReverseMode,
+      SILModule &module, SILDebugLocation debugLoc,
       SILAutoDiffAssociatedFunctionKind associatedFunctionKind,
       SILValue theFunction, SILValue differentiationOrder);
-
-  bool isLegacyReverseMode() const {
-    return legacyReverseModeFlag;
-  }
 
   SILAutoDiffAssociatedFunctionKind getAssociatedFunctionKind() const {
     return associatedFunctionKind;

@@ -269,7 +269,7 @@ namespace {
         return true;
       }
 
-      Result = ValueOwnershipKind(*Iter);
+      Result = T(*Iter);
       return false;
     }
 
@@ -2934,26 +2934,9 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     // e.g. autodiff_function [wrt 0 1 2] [order 2] %0 : $T with
     //      {%1 : $T, %2 : $T}, {%3 : $T, %4 : $T}
     //        ^ jvp    ^ vjp
-    //
-    // e.g. autodiff_function [legacy_reverse] [wrt 0 1 2] %0 : $T with
-    //      {%1 : $T,   %2 : $T}
-    // //      ^ primal  ^ adjoint
     SourceLoc lastLoc;
-    bool isLegacyReverseMode = false;
     SmallBitVector parameterIndices(32);
     unsigned order = 1;
-    // Parse optional `[legacy_reverse]`
-    if (P.Tok.is(tok::l_square) &&
-        P.peekToken().is(tok::identifier) &&
-        P.peekToken().getText() == "legacy_reverse") {
-      P.consumeToken(tok::l_square);
-      P.consumeToken(tok::identifier);
-      isLegacyReverseMode = true;
-      if (P.parseToken(tok::r_square,
-                       diag::sil_inst_autodiff_attr_expected_rsquare,
-                       "legacy reverse mode indicator"))
-        return true;
-    }
     // Parse optional `[wrt <integer_literal>...]`
     if (P.Tok.is(tok::l_square) &&
         P.peekToken().is(tok::identifier) &&
@@ -3025,29 +3008,16 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     }
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createAutoDiffFunction(InstLoc, isLegacyReverseMode,
-                                         parameterIndices, order, original,
-                                         associatedFunctions);
+    ResultVal = B.createAutoDiffFunction(InstLoc, parameterIndices, order,
+                                         original, associatedFunctions);
     break;
   }
   
   case SILInstructionKind::AutoDiffFunctionExtractInst: {
-    bool isLegacyReverseMode = false;
-    // Parse optional `[legacy_reverse]`.
-    if (P.Tok.is(tok::l_square) && P.peekToken().is(tok::identifier) &&
-        P.peekToken().getText() == "legacy_reverse") {
-      P.consumeToken(tok::l_square);
-      P.consumeToken(tok::identifier);
-      isLegacyReverseMode = true;
-      if (P.parseToken(tok::r_square,
-                       diag::sil_inst_autodiff_attr_expected_rsquare,
-                       "legacy reverse mode indicator"))
-        return true;
-    }
     // Parse the rest of the instruction: an associated function kind, a
     // function operand, an order operand and a debug location.
     SILAutoDiffAssociatedFunctionKind assocFnKind;
-    StringRef assocFnKindNames[4] = { "primal", "adjoint", "jvp", "vjp" };
+    StringRef assocFnKindNames[2] = {"jvp", "vjp"};
     SILValue functionOperand, orderOperand;
     if (P.parseToken(tok::l_square,
             diag::sil_inst_autodiff_expected_associated_function_kind_attr) ||
@@ -3062,9 +3032,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         parseTypedValueRef(orderOperand, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createAutoDiffFunctionExtract(InstLoc, isLegacyReverseMode,
-                                                assocFnKind, functionOperand,
-                                                orderOperand);
+    ResultVal = B.createAutoDiffFunctionExtract(InstLoc, assocFnKind,
+                                                functionOperand, orderOperand);
     break;
   }
 

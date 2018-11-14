@@ -1153,8 +1153,6 @@ public:
   }
 
   void visitAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
-    if (adfi->isLegacyReverseMode())
-      *this << "[legacy_reverse] ";
     if (adfi->getParameterIndices().any()) {
       *this << "[wrt";
       for (auto i : adfi->getParameterIndices().set_bits())
@@ -1175,16 +1173,8 @@ public:
   }
 
   void visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *adfei) {
-    if (adfei->isLegacyReverseMode())
-      *this << "[legacy_reverse] ";
     *this << '[';
     switch (adfei->getAssociatedFunctionKind()) {
-    case swift::SILAutoDiffAssociatedFunctionKind::LegacyPrimal:
-      *this << "primal";
-      break;
-    case swift::SILAutoDiffAssociatedFunctionKind::LegacyAdjoint:
-      *this << "adjoint";
-      break;
     case swift::SILAutoDiffAssociatedFunctionKind::JVP:
       *this << "jvp";
       break;

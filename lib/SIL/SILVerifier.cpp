@@ -1273,18 +1273,6 @@ public:
     auto orderSILTy = adfei->getDifferentiationOrderOperand()->getType();
     require(orderSILTy.is<BuiltinIntegerType>(),
             "The order operand must have a Builtin.Int<n> type");
-    if (adfei->isLegacyReverseMode())
-      require((adfei->getAssociatedFunctionKind() ==
-                   SILAutoDiffAssociatedFunctionKind::LegacyPrimal ||
-               adfei->getAssociatedFunctionKind() ==
-                   SILAutoDiffAssociatedFunctionKind::LegacyAdjoint),
-        "Only '[primal]' and '[adjoint]' are available in legacy reverse mode");
-    else
-      require((adfei->getAssociatedFunctionKind() !=
-                   SILAutoDiffAssociatedFunctionKind::LegacyPrimal &&
-               adfei->getAssociatedFunctionKind() !=
-                   SILAutoDiffAssociatedFunctionKind::LegacyAdjoint),
-        "'[primal]' and '[adjoint]' are only available in legacy reverse mode");
   }
 
   void verifyLLVMIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID) {

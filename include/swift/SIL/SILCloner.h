@@ -883,7 +883,6 @@ SILCloner<ImplClass>::visitAutoDiffFunctionInst(AutoDiffFunctionInst *Inst) {
     mappedAssocFns.push_back(getOpValue(fn.get()));
   recordClonedInstruction(Inst,
     getBuilder().createAutoDiffFunction(getOpLocation(Inst->getLoc()),
-                                        Inst->isLegacyReverseMode(),
                                         Inst->getParameterIndices(),
                                         Inst->getDifferentiationOrder(),
                                         getOpValue(Inst->getOriginalFunction()),
@@ -896,7 +895,7 @@ visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst,
       getBuilder().createAutoDiffFunctionExtract(
-          getOpLocation(Inst->getLoc()), Inst->isLegacyReverseMode(),
+          getOpLocation(Inst->getLoc()),
           Inst->getAssociatedFunctionKind(),
           getOpValue(Inst->getFunctionOperand()),
           getOpValue(Inst->getDifferentiationOrderOperand())));

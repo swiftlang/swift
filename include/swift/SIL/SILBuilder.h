@@ -493,13 +493,11 @@ public:
   }
 
   AutoDiffFunctionInst *createAutoDiffFunction(
-      SILLocation loc, bool isLegacyReverseMode,
-      const llvm::SmallBitVector &parameterIndices,
+      SILLocation loc, const llvm::SmallBitVector &parameterIndices,
       unsigned differentiationOrder, SILValue original,
       ArrayRef<SILValue> associatedFunctions) {
     return insert(AutoDiffFunctionInst::create(getModule(),
                                                getSILDebugLocation(loc),
-                                               isLegacyReverseMode,
                                                parameterIndices,
                                                differentiationOrder,
                                                original,
@@ -507,12 +505,11 @@ public:
   }
   
   AutoDiffFunctionExtractInst *createAutoDiffFunctionExtract(
-      SILLocation loc, bool isLegacyReverseMode,
-      SILAutoDiffAssociatedFunctionKind associatedFunctionKind,
+      SILLocation loc, SILAutoDiffAssociatedFunctionKind associatedFunctionKind,
       SILValue theFunction, SILValue differentiationOrder) {
     return insert(new (getModule()) AutoDiffFunctionExtractInst(
-        getModule(), getSILDebugLocation(loc), isLegacyReverseMode,
-        associatedFunctionKind, theFunction, differentiationOrder));
+        getModule(), getSILDebugLocation(loc), associatedFunctionKind,
+        theFunction, differentiationOrder));
   }
 
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,

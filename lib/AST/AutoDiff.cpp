@@ -14,6 +14,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
 
@@ -46,6 +47,15 @@ bool SILAutoDiffIndices::operator==(
   return buffer.none();
 }
 
+SILAutoDiffAssociatedFunctionKind::
+SILAutoDiffAssociatedFunctionKind(StringRef string) {
+  Optional<innerty> result =
+      llvm::StringSwitch<Optional<innerty>>(string)
+         .Case("vjp", JVP).Case("vjp", VJP);
+  assert(result && "Invalid string");
+  rawValue = *result;
+}
+
 Differentiability::Differentiability(AutoDiffMode mode,
                                      bool wrtSelf,
                                      llvm::SmallBitVector parameterIndices,
@@ -73,20 +83,5 @@ Differentiability::Differentiability(AutoDiffMode mode,
 
 unsigned autodiff::getOffsetForAutoDiffAssociatedFunction(
     unsigned order, SILAutoDiffAssociatedFunctionKind kind) {
-  unsigned offset;
-  switch (kind) {
-  case SILAutoDiffAssociatedFunctionKind::LegacyPrimal:
-    offset = 0;
-    break;
-  case SILAutoDiffAssociatedFunctionKind::LegacyAdjoint:
-    offset = 1;
-    break;
-  case SILAutoDiffAssociatedFunctionKind::JVP:
-    offset = 0;
-    break;
-  case SILAutoDiffAssociatedFunctionKind::VJP:
-    offset = 1;
-    break;
-  }
-  return (order - 1) * 2 + offset;
+  return (order - 1) * 2 + kind.rawValue;
 }
