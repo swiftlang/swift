@@ -7856,7 +7856,6 @@ class GraphOperationInst final
   /// dispatch). Otherwise, we attempt to "cluster" this graph op with other
   /// graph ops into a graph function. For an op with dynamic attribute(s), it
   /// must run out-of-graph, and thus have this field set to true.
-  // FIXME: Extend parser and printer with this field.
   bool NoClustering;
 
   GraphOperationInst(SILModule &M, SILDebugLocation loc, Identifier name,
