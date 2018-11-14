@@ -973,5 +973,5 @@ bool SILDeclRef::isDynamicallyReplaceable() const {
     return false;
 
   auto decl = getDecl();
-  return decl->isDynamic() && !decl->isObjC();
+  return decl->isNativeDynamic();
 }

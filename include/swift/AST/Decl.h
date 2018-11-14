@@ -2597,6 +2597,10 @@ public:
     return isObjC() && isDynamic();
   }
 
+  bool isNativeDynamic() const {
+    return !isObjC() && isDynamic();
+  }
+
   /// Set whether this type is 'dynamic' or not.
   void setIsDynamic(bool value);
 

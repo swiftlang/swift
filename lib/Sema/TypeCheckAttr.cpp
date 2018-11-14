@@ -2175,7 +2175,7 @@ void TypeChecker::checkDynamicReplacementAttribute(ValueDecl *D) {
     return;
   }
 
-  if (D->isDynamic() && !D->isObjC()) {
+  if (D->isNativeDynamic()) {
     diagnose(attr->getLocation(), diag::dynamic_replacement_must_not_be_dynamic,
              D->getBaseName());
     attr->setInvalid();
