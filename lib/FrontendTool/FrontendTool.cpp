@@ -687,15 +687,24 @@ static SourceFile *getPrimaryOrMainSourceFile(CompilerInvocation &Invocation,
 
 /// Dumps the AST of all available primary source files. If corresponding output
 /// files were specified, use them; otherwise, dump the AST to stdout.
-static void dumpAST(CompilerInstance &Instance) {
+static void dumpAST(CompilerInvocation &Invocation,
+                    CompilerInstance &Instance) {
   // FIXME: WMO doesn't use the notion of primary files, so this doesn't do the
   // right thing. Perhaps it'd be best to ignore WMO when dumping the AST, just
   // like WMO ignores `-incremental`.
-  for (SourceFile *sourceFile: Instance.getPrimarySourceFiles()) {
-    const StringRef OutputFilename =
-      Instance.getPrimarySpecificPathsForSourceFile(*sourceFile).OutputFilename;
-    auto OS = getFileOutputStream(OutputFilename, Instance.getASTContext());
-    sourceFile->dump(*OS);
+
+  auto primaryFiles = Instance.getPrimarySourceFiles();
+  if (!primaryFiles.empty()) {
+    for (SourceFile *sourceFile: primaryFiles) {
+      auto PSPs = Instance.getPrimarySpecificPathsForSourceFile(*sourceFile);
+      auto OutputFilename = PSPs.OutputFilename;
+      auto OS = getFileOutputStream(OutputFilename, Instance.getASTContext());
+      sourceFile->dump(*OS);
+    }
+  } else {
+    // Some invocations don't have primary files. In that case, we default to
+    // looking for the main file and dumping it to `stdout`.
+    getPrimaryOrMainSourceFile(Invocation, Instance)->dump(llvm::outs());
   }
 }
 
@@ -742,7 +751,7 @@ static Optional<bool> dumpASTIfNeeded(CompilerInvocation &Invocation,
 
   case FrontendOptions::ActionType::DumpParse:
   case FrontendOptions::ActionType::DumpAST:
-    dumpAST(Instance);
+    dumpAST(Invocation, Instance);
     break;
 
   case FrontendOptions::ActionType::EmitImportedModules:
