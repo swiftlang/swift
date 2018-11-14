@@ -319,22 +319,18 @@ func passExistentialTwiceTwoMethodCalls(_ e0: Existential, _ e1: Existential) ->
 
 func runTestOneMethodCall<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   let existential = initExistential(withType: T.self)
-  for _ in 0 ..< N {
-    for _ in 0 ..< 5_000_000 {
-      if !existential.doIt() {
-        fatalError("expected true")
-      }
+  for _ in 0 ..< N * 20_000 {
+    if !existential.doIt() {
+      fatalError("expected true")
     }
   }
 }
 
 func runTestTwoMethodCalls<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   let existential = initExistential(withType: T.self)
-  for _ in 0 ..< N {
-    for _ in 0 ..< 5_000_000 {
-      if !existential.doIt()  || !existential.reallyDoIt() {
-        fatalError("expected true")
-      }
+  for _ in 0 ..< N * 20_000 {
+    if !existential.doIt()  || !existential.reallyDoIt() {
+      fatalError("expected true")
     }
   }
 }
@@ -342,11 +338,9 @@ func runTestTwoMethodCalls<T: Existential>(withType: T.Type, numberOfTimes N: In
 func runTestPassExistentialOneMethodCall<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   let existential = initExistential(withType: T.self)
   let existential2 = initExistential(withType: T.self)
-  for _ in 0 ..< N {
-    for _ in 0 ..< 5_000_000 {
-      if !passExistentialTwiceOneMethodCall(existential, existential2) {
-        fatalError("expected true")
-      }
+  for _ in 0 ..< N * 20_000 {
+    if !passExistentialTwiceOneMethodCall(existential, existential2) {
+      fatalError("expected true")
     }
   }
 }
@@ -354,46 +348,38 @@ func runTestPassExistentialOneMethodCall<T: Existential>(withType: T.Type, numbe
 func runTestPassExistentialTwoMethodCalls<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   let existential = initExistential(withType: T.self)
   let existential2 = initExistential(withType: T.self)
-  for _ in 0 ..< N {
-    for _ in 0 ..< 5_000_000 {
-      if !passExistentialTwiceTwoMethodCalls(existential, existential2) {
-        fatalError("expected true")
-      }
+  for _ in 0 ..< N * 20_000 {
+    if !passExistentialTwiceTwoMethodCalls(existential, existential2) {
+      fatalError("expected true")
     }
   }
 }
 
 func runTestMutating<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   var existential = initExistential(withType: T.self)
-  for _ in 0 ..< N {
-    for _ in 0 ..< 5_000_000 {
-      if !existential.mutateIt()  {
-        fatalError("expected true")
-      }
+  for _ in 0 ..< N * 10_000 {
+    if !existential.mutateIt()  {
+      fatalError("expected true")
     }
   }
 }
 
 func runTestMutatingAndNonMutating<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   var existential = initExistential(withType: T.self)
-  for _ in 0 ..< N {
-    for _ in 0 ..< 5_000_000 {
-      let _ = existential.doIt()
-      if !existential.mutateIt()  {
-        fatalError("expected true")
-      }
+  for _ in 0 ..< N * 10_000 {
+    let _ = existential.doIt()
+    if !existential.mutateIt()  {
+      fatalError("expected true")
     }
   }
 }
 
 func runTestArrayOneMethodCall<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   let existentialArray = initExistentialArray(withType: T.self, count: 128)
-  for _ in 0 ..< N {
-    for _ in 0 ..< 5_000 {
-      for elt in existentialArray {
-        if !elt.doIt()  {
-          fatalError("expected true")
-        }
+  for _ in 0 ..< N * 100 {
+    for elt in existentialArray {
+      if !elt.doIt()  {
+        fatalError("expected true")
       }
     }
   }
@@ -401,12 +387,10 @@ func runTestArrayOneMethodCall<T: Existential>(withType: T.Type, numberOfTimes N
 
 func runTestArrayTwoMethodCalls<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   let existentialArray = initExistentialArray(withType: T.self, count: 128)
-  for _ in 0 ..< N {
-    for _ in 0 ..< 5_000 {
-      for elt in existentialArray {
-        if !elt.doIt() || !elt.reallyDoIt() {
-          fatalError("expected true")
-        }
+  for _ in 0 ..< N * 100 {
+    for elt in existentialArray {
+      if !elt.doIt() || !elt.reallyDoIt() {
+        fatalError("expected true")
       }
     }
   }
@@ -414,12 +398,10 @@ func runTestArrayTwoMethodCalls<T: Existential>(withType: T.Type, numberOfTimes 
 
 func runTestArrayMutating<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   var existentialArray = initExistentialArray(withType: T.self, count: 128)
-  for _ in 0 ..< N {
-    for _ in 0 ..< 5_000 {
-      for i in 0 ..< existentialArray.count {
-        if !existentialArray[i].mutateIt()  {
-          fatalError("expected true")
-        }
+  for _ in 0 ..< N * 100 {
+    for i in 0 ..< existentialArray.count {
+      if !existentialArray[i].mutateIt()  {
+        fatalError("expected true")
       }
     }
   }
@@ -427,24 +409,20 @@ func runTestArrayMutating<T: Existential>(withType: T.Type, numberOfTimes N: Int
 
 func runTestArrayShift<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   var existentialArray = initExistentialArray(withType: T.self, count: 128)
-  for _ in 0 ..< N {
-    for _ in 0 ..< 5_000 {
-      for i in 0 ..< existentialArray.count-1 {
-        existentialArray.swapAt(i, i+1)
-      }
+  for _ in 0 ..< N * 10 {
+    for i in 0 ..< existentialArray.count-1 {
+      existentialArray.swapAt(i, i+1)
     }
   }
 }
 func runTestArrayConditionalShift<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   var existentialArray = initExistentialArray(withType: T.self, count: 128)
-  for _ in 0 ..< N {
-    for _ in 0 ..< 5_000 {
-      for i in 0 ..< existentialArray.count-1 {
-        let curr = existentialArray[i]
-        if curr.doIt() {
-          existentialArray[i] = existentialArray[i+1]
-          existentialArray[i+1] = curr
-        }
+  for _ in 0 ..< N * 10 {
+    for i in 0 ..< existentialArray.count-1 {
+      let curr = existentialArray[i]
+      if curr.doIt() {
+        existentialArray[i] = existentialArray[i+1]
+        existentialArray[i+1] = curr
       }
     }
   }
