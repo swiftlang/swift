@@ -55,6 +55,13 @@ static llvm::cl::opt<bool> TFPromoteGlobalVariables(
         "If enabled, promote global variables into SSA with a best "
         "effort to minimize sends/recvs. This is a performance optimization."));
 
+static llvm::cl::opt<bool> TFDeleteGraphOps(
+    "tf-delete-graph-ops", llvm::cl::init(false),
+    llvm::cl::desc(
+        "If enabled, delete all graph_ops at the end of the deabstraction "
+        "pass. This is an internal flag used to assess compiler overtime in "
+        "processing graph_op's in the optimizer passes."));
+
 template<typename...T, typename...U>
 static InFlightDiagnostic
 diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
@@ -1946,6 +1953,18 @@ static GraphOperationInst *tryToPromoteTensorFromScalars1D(
   return result;
 }
 
+static void maybeDeleteGraphOp(GraphOperationInst *op, SILModule &module) {
+  if (!TFDeleteGraphOps)
+    return;
+  SmallVector<SILValue, 4> undefResults;
+  for (auto result : op->getResults()) {
+    auto undefResult = SILUndef::get(result->getType(), module);
+    undefResults.push_back(undefResult);
+  }
+  op->replaceAllUsesPairwiseWith(undefResults);
+  op->eraseFromParent();
+}
+
 /// Canonicalize tensor ops, validating that attribute arguments are constant
 /// expressions, and transform the IR to use GraphOperationInst.
 void TFDeabstraction::checkAttributesAndFormGraphOps() {
@@ -2027,23 +2046,29 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
 
       if (callee && (callee->getName() == "__tf_tensor_from_scalar" ||
                      callee->getName() == "__tf_string_tensor_from_string")) {
-          inst = transformTensorFromScalar(apply, constants, deviceInfo);
-          assert(inst);
-        continue;
+          auto *opInst = transformTensorFromScalar(apply, constants, deviceInfo);
+          assert(opInst);
+          maybeDeleteGraphOp(opInst, fn.getModule());
+          inst = opInst;
+          continue;
       }
       if (callee && (callee->getName() == "__tf_tensor_from_scalars" ||
                      callee->getName() == "__tf_string_tensor_from_strings")) {
-        if (auto result =
-                tryToPromoteTensorFromScalars(apply, constants, deviceInfo))
-          inst = result;
+        if (auto *opInst =
+                tryToPromoteTensorFromScalars(apply, constants, deviceInfo)) {
+          maybeDeleteGraphOp(opInst, fn.getModule());
+          inst = opInst;
+        }
         continue;
       }
       if (callee && (callee->getName() == "__tf_tensor_from_scalars_1d" ||
                      callee->getName() ==
                          "__tf_string_tensor_from_strings_1d")) {
-        if (auto result =
-                tryToPromoteTensorFromScalars1D(apply, constants, deviceInfo))
-          inst = result;
+        if (auto *opInst =
+                tryToPromoteTensorFromScalars1D(apply, constants, deviceInfo)) {
+          maybeDeleteGraphOp(opInst, fn.getModule());
+          inst = opInst;
+        }
         continue;
       }
     }
@@ -2643,6 +2668,7 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
   // Time to create the op and deal with results.
   auto loc = getUserSourceLocation(origInst);
 
+  GraphOperationInst *op = nullptr;
   // If there is only one result, it may be an aggregate that we have to pack.
   if (origInst->getNumResults() == 1) {
     auto origResult = origInst->getResults()[0];
@@ -2658,8 +2684,7 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
     auto resultSILTypes = map<SmallVector<SILType, 8>>(resultTypes, [&](Type ty) {
         return SILType::getPrimitiveObjectType(ty->getCanonicalType()); });
 
-    auto op = opBuilder.build(B, context, loc, resultSILTypes);
-    op->setNoClustering(noClustering);
+    op = opBuilder.build(B, context, loc, resultSILTypes);
 
     // Recursively pack results to a value with the user-specified aggregate type.
     auto resultIt = op->getResults().begin();
@@ -2696,12 +2721,14 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
     for (auto resultType : origResultTypes)
       assert(isTensorFlowValue(resultType) &&
              "when there are multiple results, they should be tf types");
-    auto op = opBuilder.build(B, context, loc, origResultTypes);
-    op->setNoClustering(noClustering);
+    op = opBuilder.build(B, context, loc, origResultTypes);
     origInst->replaceAllUsesPairwiseWith(op);
   }
-
   origInst->eraseFromParent();
+
+  assert(op);
+  op->setNoClustering(noClustering);
+  maybeDeleteGraphOp(op, fn.getModule());
 
   // TODO: Analyze the operands to the instruction and remove them if they are
   // now dead.
