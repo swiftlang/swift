@@ -1630,6 +1630,8 @@ namespace {
 
       auto ref = ConcreteDeclRef(ctor, substitutions);
 
+      tc.requestMemberLayout(ctor);
+
       // The constructor was opened with the allocating type, not the
       // initializer type. Map the former into the latter.
       auto resultTy = solution.simplifyType(openedFullType);
