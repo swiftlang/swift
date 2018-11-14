@@ -16,6 +16,9 @@ Func _int64ToStringImpl(_:_:_:_:_:) has been removed
 Func _uint64ToStringImpl(_:_:_:_:_:) has been removed
 Func _withUninitializedString(_:) has been removed
 
+Func Optional.unwrappedOrError() has been removed
+Struct _UnwrappingFailed has been removed
+
 Class _stdlib_AtomicInt has been removed
 Func _stdlib_atomicCompareExchangeStrongInt(object:expected:desired:) has been removed
 Func _stdlib_atomicCompareExchangeStrongInt32(object:expected:desired:) has been removed
