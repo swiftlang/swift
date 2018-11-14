@@ -528,26 +528,47 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   return IsNotSerialized;
 }
 
-/// \brief True if the function has noinline attribute.
+/// \brief True if the function has an @inline(never) attribute.
 bool SILDeclRef::isNoinline() const {
   if (!hasDecl())
     return false;
-  if (auto InlineA = getDecl()->getAttrs().getAttribute<InlineAttr>())
-    if (InlineA->getKind() == InlineKind::Never)
+
+  auto *decl = getDecl();
+  if (auto *attr = decl->getAttrs().getAttribute<InlineAttr>())
+    if (attr->getKind() == InlineKind::Never)
       return true;
-  if (auto *semanticsA = getDecl()->getAttrs().getAttribute<SemanticsAttr>())
-    if (semanticsA->Value.equals("keypath.entry"))
+
+  if (auto *accessorDecl = dyn_cast<AccessorDecl>(decl)) {
+    auto *storage = accessorDecl->getStorage();
+    if (auto *attr = storage->getAttrs().getAttribute<InlineAttr>())
+      if (attr->getKind() == InlineKind::Never)
+        return true;
+  }
+
+  if (auto *attr = decl->getAttrs().getAttribute<SemanticsAttr>())
+    if (attr->Value.equals("keypath.entry"))
       return true;
+
   return false;
 }
 
-/// \brief True if the function has noinline attribute.
+/// \brief True if the function has the @inline(__always) attribute.
 bool SILDeclRef::isAlwaysInline() const {
   if (!hasDecl())
     return false;
-  if (auto InlineA = getDecl()->getAttrs().getAttribute<InlineAttr>())
-    if (InlineA->getKind() == InlineKind::Always)
+
+  auto *decl = getDecl();
+  if (auto attr = decl->getAttrs().getAttribute<InlineAttr>())
+    if (attr->getKind() == InlineKind::Always)
       return true;
+
+  if (auto *accessorDecl = dyn_cast<AccessorDecl>(decl)) {
+    auto *storage = accessorDecl->getStorage();
+    if (auto *attr = storage->getAttrs().getAttribute<InlineAttr>())
+      if (attr->getKind() == InlineKind::Always)
+        return true;
+  }
+
   return false;
 }
 

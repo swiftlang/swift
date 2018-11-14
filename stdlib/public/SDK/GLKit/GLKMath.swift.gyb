@@ -21,7 +21,7 @@
 // types.
 
 // Do dirty pointer manipulations to index an opaque struct like an array.
-@inline(__always)
+@inlinable @inline(__always)
 public func _indexHomogeneousValue<TTT, T>(_ aggregate: UnsafePointer<TTT>,
                                            _ index: Int) -> T {
   return UnsafeRawPointer(aggregate).load(
@@ -31,7 +31,7 @@ public func _indexHomogeneousValue<TTT, T>(_ aggregate: UnsafePointer<TTT>,
 %{
 def defineSubscript(Type, limit):
   return """
-  public subscript(i: Int) -> Float {{
+  @inlinable public subscript(i: Int) -> Float {{
     @inline(__always)
     get {{
       precondition(i >= 0, "Negative {0} index out of range")

@@ -4097,7 +4097,6 @@ ERROR(usable_from_inline_attr_in_protocol,none,
 
 #define FRAGILE_FUNC_KIND \
   "%select{a '@_transparent' function|" \
-  "an '@inline(__always)' function|" \
   "an '@inlinable' function|" \
   "a default argument value|" \
   "a property initializer in a '@_fixed_layout' type}"
@@ -4126,7 +4125,7 @@ NOTE(resilience_decl_declared_here,
 
 ERROR(class_designated_init_inlinable_resilient,none,
       "initializer for class %0 is "
-      "'%select{@_transparent|@inline(__always)|@inlinable|%error}1' and must "
+      "'%select{@_transparent|@inlinable|%error}1' and must "
       "delegate to another initializer", (Type, unsigned))
 
 ERROR(attribute_invalid_on_stored_property,

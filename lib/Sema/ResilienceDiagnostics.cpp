@@ -58,11 +58,6 @@ TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
         return std::make_pair(FragileFunctionKind::Inlinable,
                               /*treatUsableFromInlineAsPublic=*/true);
 
-      if (auto attr = AFD->getAttrs().getAttribute<InlineAttr>())
-        if (attr->getKind() == InlineKind::Always)
-          return std::make_pair(FragileFunctionKind::InlineAlways,
-                                /*treatUsableFromInlineAsPublic=*/true);
-
       // If a property or subscript is @inlinable, the accessors are
       // @inlinable also.
       if (auto accessor = dyn_cast<AccessorDecl>(AFD))
