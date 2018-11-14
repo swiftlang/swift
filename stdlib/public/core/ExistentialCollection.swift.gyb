@@ -310,7 +310,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
 %   if Kind == 'Collection':
   @inlinable
-  internal subscript(i: _AnyIndexBox) -> Element { _abstract() }
+  internal subscript(i: _AnyIndexBox) -> Element { _read { _abstract() } }
 
   @inlinable
   internal func _index(after i: _AnyIndexBox) -> _AnyIndexBox { _abstract() }
@@ -395,7 +395,9 @@ internal class _AnyRandomAccessCollectionBox<Element>
   internal ${override} subscript(
     start start: _AnyIndexBox,
     end end: _AnyIndexBox
-  ) -> _Any${Kind}Box<Element> { _abstract() }
+  ) -> _Any${Kind}Box<Element> { 
+      _read { _abstract() }
+  }
 %   end
 
 %   if Kind == 'BidirectionalCollection':
@@ -562,7 +564,9 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Element>
 
   @inlinable
   internal override subscript(position: _AnyIndexBox) -> Element {
-    return _base[_unbox(position)]
+    _read {
+      yield _base[_unbox(position)]      
+    }
   }
 
   @inlinable
@@ -1036,7 +1040,9 @@ extension ${Self}: ${SelfProtocol} {
   ///   `position != endIndex`.
   @inlinable
   public subscript(position: Index) -> Element {
-    return _box[position._box]
+    _read {
+      yield _box[position._box]      
+    }
   }
 
   @inlinable
