@@ -39,14 +39,14 @@ reflect(object: obj)
 // CHECK-32: Type info:
 // CHECK-32-NEXT: (class_instance size=20 alignment=4 stride=20 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:   (field name=t offset=8
-// CHECK-32-NEXT:     (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK-32-NEXT:     (struct size=12 alignment=4 stride=12 num_extra_inhabitants=128 bitwise_takable=1
 // CHECK-32-NEXT:       (field name=_guts offset=0
-// CHECK-32-NEXT:         (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK-32-NEXT:         (struct size=12 alignment=4 stride=12 num_extra_inhabitants=128 bitwise_takable=1
 // CHECK-32-NEXT:           (field name=_object offset=0
-// CHECK-32-NEXT:             (struct size=12 alignment=4 stride=12 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK-32-NEXT:             (struct size=12 alignment=4 stride=12 num_extra_inhabitants=128 bitwise_takable=1
 // (unstable implementation details omitted)
 // CHECK-32:               (field name=_variant offset=4
-// CHECK-32-NEXT:                 (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK-32-NEXT:                 (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // (unstable implementation details omitted)
 // CHECK-32:               (field name=_discriminator offset=9
 // CHECK-32-NEXT:                 (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=128 bitwise_takable=1

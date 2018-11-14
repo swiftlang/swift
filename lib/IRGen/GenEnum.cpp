@@ -1181,7 +1181,7 @@ namespace {
     // discriminate enum cases.
     unsigned ExtraTagBitCount = ~0u;
     // The number of possible values for the extra tag bits that are used.
-    // Log2(NumExtraTagValues - 1) + 1 <= ExtraTagBitCount
+    // Log2(NumExtraTagValues - 1) + 1 == ExtraTagBitCount
     unsigned NumExtraTagValues = ~0u;
     
     APInt getExtraTagBitConstant(uint64_t value) const {
@@ -4817,74 +4817,15 @@ namespace {
 
     /// \group Extra inhabitants
 
-    // If we didn't use all of the available tag bit representations, offer
-    // the remaining ones as extra inhabitants.
+    // TODO
 
-    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
-      if (TIK >= Fixed)
-        return getFixedExtraInhabitantCount(IGM) > 0;
-      return true;
-    }
-    
-    /// Rounds the extra tag bit count up to the next byte size.
-    unsigned getExtraTagBitCountForExtraInhabitants() const {
-      if (!ExtraTagTy)
-        return 0;
-      return (ExtraTagTy->getBitWidth() + 7) & ~7;
-    }
-    
-    Address projectExtraTagBitsForExtraInhabitants(IRGenFunction &IGF,
-                                                   Address base) const {
-      auto addr = projectExtraTagBits(IGF, base);
-      if (ExtraTagTy->getBitWidth() != getExtraTagBitCountForExtraInhabitants()) {
-        addr = IGF.Builder.CreateBitCast(addr,
-             llvm::IntegerType::get(IGF.IGM.getLLVMContext(),
-                                     getExtraTagBitCountForExtraInhabitants())
-               ->getPointerTo());
-      }
-      return addr;
-    }
+    bool mayHaveExtraInhabitants(IRGenModule &) const override { return false; }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address src,
                                          SILType T,
                                          bool isOutlined) const override {
-      // For dynamic layouts, the runtime provides a value witness to do this.
-      if (TIK < Fixed) {
-        return emitGetExtraInhabitantIndexCall(IGF, T, src);
-      }
-      
-      llvm::Value *tag;
-      if (CommonSpareBits.count()) {
-        auto payload = EnumPayload::load(IGF, projectPayload(IGF, src),
-                                         PayloadSchema);
-        tag = payload.emitGatherSpareBits(IGF, CommonSpareBits, 0, 32);
-        if (getExtraTagBitCountForExtraInhabitants()) {
-          auto extraTagAddr = projectExtraTagBitsForExtraInhabitants(IGF, src);
-          auto extraTag = IGF.Builder.CreateLoad(extraTagAddr);
-          auto extraTagBits =
-            IGF.Builder.CreateZExtOrTrunc(extraTag, IGF.IGM.Int32Ty);
-          extraTagBits =
-            IGF.Builder.CreateShl(extraTagBits, CommonSpareBits.count());
-          tag = IGF.Builder.CreateOr(tag, extraTagBits);
-        }
-      } else {
-        auto extraTagAddr = projectExtraTagBitsForExtraInhabitants(IGF, src);
-        auto extraTag = IGF.Builder.CreateLoad(extraTagAddr);
-        tag = IGF.Builder.CreateZExtOrTrunc(extraTag, IGF.IGM.Int32Ty);
-      }
-      
-      // Check whether it really is an extra inhabitant.
-      auto tagBits = CommonSpareBits.count() + getExtraTagBitCountForExtraInhabitants();
-      auto maxTag = tagBits >= 32 ? ~0u : (1 << tagBits) - 1;
-      auto index = IGF.Builder.CreateSub(
-                               llvm::ConstantInt::get(IGF.IGM.Int32Ty, maxTag),
-                               tag);
-      auto isExtraInhabitant = IGF.Builder.CreateICmpULT(index,
-                 llvm::ConstantInt::get(IGF.IGM.Int32Ty,
-                                        getFixedExtraInhabitantCount(IGF.IGM)));
-      return IGF.Builder.CreateSelect(isExtraInhabitant,
-                            index, llvm::ConstantInt::get(IGF.IGM.Int32Ty, -1));
+      llvm_unreachable("extra inhabitants for multi-payload enums not implemented");
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF,
@@ -4892,86 +4833,25 @@ namespace {
                               Address dest,
                               SILType T,
                               bool isOutlined) const override {
-      // For dynamic layouts, the runtime provides a value witness to do this.
-      if (TIK < Fixed) {
-        emitStoreExtraInhabitantCall(IGF, T, index, dest);
-        return;
-      }
-
-      auto indexValue = IGF.Builder.CreateNot(index);
-      if (CommonSpareBits.count()) {
-        // Factor the index value into parts to scatter into the payload and
-        // to store in the extra tag bits, if any.
-        EnumPayload payload =
-          interleaveSpareBits(IGF, PayloadSchema, CommonSpareBits, indexValue);
-        payload.store(IGF, projectPayload(IGF, dest));
-        if (getExtraTagBitCountForExtraInhabitants() > 0) {
-          auto tagBits = IGF.Builder.CreateLShr(indexValue,
-              llvm::ConstantInt::get(IGF.IGM.Int32Ty, CommonSpareBits.count()));
-          auto tagAddr = projectExtraTagBitsForExtraInhabitants(IGF, dest);
-          tagBits = IGF.Builder.CreateZExtOrTrunc(tagBits,
-                      tagAddr.getAddress()->getType()->getPointerElementType());
-          IGF.Builder.CreateStore(tagBits, tagAddr);
-        }
-      } else {
-        // Only need to store the tag value.
-        auto tagAddr = projectExtraTagBitsForExtraInhabitants(IGF, dest);
-        indexValue = IGF.Builder.CreateZExtOrTrunc(indexValue,
-                      tagAddr.getAddress()->getType()->getPointerElementType());
-        IGF.Builder.CreateStore(indexValue, tagAddr);
-      }
+      llvm_unreachable("extra inhabitants for multi-payload enums not implemented");
     }
     
     APInt
     getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
-      // The extra inhabitant goes into the tag bits.
-      auto tagBits = CommonSpareBits.asAPInt();
-      auto fixedTI = cast<FixedTypeInfo>(TI);
-      if (getExtraTagBitCountForExtraInhabitants() > 0) {
-        auto bitSize = fixedTI->getFixedSize().getValueInBits();
-        tagBits = tagBits.zext(bitSize);
-        auto extraTagMask = APInt::getAllOnesValue(bitSize)
-          .shl(CommonSpareBits.size());
-        tagBits |= extraTagMask;
-      }
-      return tagBits;
+      // TODO may not always be all-ones
+      return APInt::getAllOnesValue(
+                      cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits());
     }
     
     unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
-      unsigned totalTagBits = CommonSpareBits.count() + getExtraTagBitCountForExtraInhabitants();
-      if (totalTagBits >= 32)
-        return INT_MAX;
-      unsigned totalTags = 1u << totalTagBits;
-      return totalTags - ElementsWithPayload.size() - NumEmptyElementTags;
+      return 0;
     }
 
     APInt
     getFixedExtraInhabitantValue(IRGenModule &IGM,
                                  unsigned bits,
                                  unsigned index) const override {
-      // Count down from all-ones since a small negative number constant is
-      // likely to be easier to reify.
-      auto mask = ~index;
-      auto extraTagMask = getExtraTagBitCountForExtraInhabitants() >= 32
-        ? ~0u : (1 << getExtraTagBitCountForExtraInhabitants()) - 1;
-
-      if (auto payloadBitCount = CommonSpareBits.count()) {
-        auto payloadTagMask = payloadBitCount >= 32
-          ? ~0u : (1 << payloadBitCount) - 1;
-        auto payloadPart = mask & payloadTagMask;
-        auto payloadBits = interleaveSpareBits(IGM, CommonSpareBits,
-                                               bits, payloadPart, 0);
-        if (getExtraTagBitCountForExtraInhabitants() > 0) {
-          auto extraBits = APInt(bits,
-                                 (mask >> payloadBitCount) & extraTagMask)
-            .shl(CommonSpareBits.size());
-          payloadBits |= extraBits;
-        }
-        return payloadBits;
-      } else {
-        auto value = APInt(bits, mask & extraTagMask);
-        return value.shl(CommonSpareBits.size());
-      }
+      llvm_unreachable("extra inhabitants for multi-payload enums not implemented");
     }
 
     ClusteredBitVector

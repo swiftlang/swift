@@ -1044,19 +1044,19 @@
 // CHECK-64-NEXT:       (field name=Indirect offset=0
 // CHECK-64-NEXT:         (reference kind=strong refcounting=native))))
 // CHECK-64-NEXT:   (field name=multiPayloadConcrete offset=24
-// CHECK-64-NEXT:     (multi_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=2045 bitwise_takable=1
+// CHECK-64-NEXT:     (multi_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:       (field name=Left offset=0
 // CHECK-64-NEXT:         (reference kind=strong refcounting=native))
 // CHECK-64-NEXT:       (field name=Right offset=0
 // CHECK-64-NEXT:         (reference kind=strong refcounting=native))))
 // CHECK-64-NEXT:   (field name=multiPayloadGenericFixed offset=32
-// CHECK-64-NEXT:     (multi_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK-64-NEXT:     (multi_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:       (field name=Left offset=0
 // CHECK-64-NEXT:         (reference kind=strong refcounting=native))
 // CHECK-64-NEXT:       (field name=Right offset=0
 // CHECK-64-NEXT:         (reference kind=strong refcounting=native))))
 // CHECK-64-NEXT:   (field name=multiPayloadGenericDynamic offset=48
-// CHECK-64-NEXT:     (multi_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=253 bitwise_takable=1
+// CHECK-64-NEXT:     (multi_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:       (field name=Left offset=0
 // CHECK-64-NEXT:         (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64-NEXT:           (field name=_value offset=0
@@ -1082,9 +1082,9 @@
 
 12TypeLowering23EnumStructWithOwnershipV
 // CHECK-64:      (struct TypeLowering.EnumStructWithOwnership)
-// CHECK-64-NEXT: (struct size=25 alignment=8 stride=32 num_extra_inhabitants=254 bitwise_takable=0
+// CHECK-64-NEXT: (struct size=25 alignment=8 stride=32 num_extra_inhabitants=0 bitwise_takable=0
 // CHECK-64-NEXT:   (field name=multiPayloadConcrete offset=0
-// CHECK-64-NEXT:     (multi_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=254 bitwise_takable=0
+// CHECK-64-NEXT:     (multi_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=0
 // CHECK-64-NEXT:       (field name=Left offset=0
 // CHECK-64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=0
 // CHECK-64-NEXT:           (field name=weakRef offset=0
@@ -1094,7 +1094,7 @@
 // CHECK-64-NEXT:           (field name=weakRef offset=0
 // CHECK-64-NEXT:             (reference kind=weak refcounting=native))))))
 // CHECK-64-NEXT:   (field name=multiPayloadGeneric offset=16
-// CHECK-64-NEXT:     (multi_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=254 bitwise_takable=0
+// CHECK-64-NEXT:     (multi_payload_enum size=9 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=0
 // CHECK-64-NEXT:       (field name=Left offset=0
 // CHECK-64-NEXT:         (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=0
 // CHECK-64-NEXT:           (field name=weakRef offset=0
@@ -1105,9 +1105,9 @@
 // CHECK-64-NEXT:             (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1)))))))
 
 // CHECK-32:      (struct TypeLowering.EnumStructWithOwnership)
-// CHECK-32-NEXT: (struct size=13 alignment=4 stride=16 num_extra_inhabitants=254 bitwise_takable=0
+// CHECK-32-NEXT: (struct size=13 alignment=4 stride=16 num_extra_inhabitants=0 bitwise_takable=0
 // CHECK-32-NEXT:   (field name=multiPayloadConcrete offset=0
-// CHECK-32-NEXT:     (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=254 bitwise_takable=0
+// CHECK-32-NEXT:     (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=0 bitwise_takable=0
 // CHECK-32-NEXT:       (field name=Left offset=0
 // CHECK-32-NEXT:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=0
 // CHECK-32-NEXT:           (field name=weakRef offset=0
@@ -1117,7 +1117,7 @@
 // CHECK-32-NEXT:           (field name=weakRef offset=0
 // CHECK-32-NEXT:             (reference kind=weak refcounting=native))))))
 // CHECK-32-NEXT:   (field name=multiPayloadGeneric offset=8
-// CHECK-32-NEXT:     (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=254 bitwise_takable=0
+// CHECK-32-NEXT:     (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=0 bitwise_takable=0
 // CHECK-32-NEXT:       (field name=Left offset=0
 // CHECK-32-NEXT:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=0
 // CHECK-32-NEXT:           (field name=weakRef offset=0
