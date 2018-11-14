@@ -79,19 +79,17 @@ namespace swift {
       private:
         DependencyGraphImpl::LoadResult loadFromBuffer(const void *node,
                                                        llvm::MemoryBuffer &buffer);
-        using NodeCallbackTy = void(Node &&);
+        using NodeCallbackTy = void(FrontendNode *);
         using ErrorCallbackTy = void();
-        static void
+        void
         parseDependencyFile(llvm::MemoryBuffer &buffer,
                             llvm::function_ref<NodeCallbackTy> nodeCallback,
                             llvm::function_ref<ErrorCallbackTy> errorCallback);
-        static void parseNode(llvm::yaml::MappingNode *,
+        static void parseNode(llvm::yaml::SequenceNode *,
                               llvm::function_ref<NodeCallbackTy> nodeCallback,
                               llvm::function_ref<ErrorCallbackTy> errorCallback);
-        static Optional<std::string> parseStringValue(llvm::yaml::Node *);
-        static Optional<std::vector<uint>> parseUIntVectorValue(llvm::yaml::Node *);
         
-        DependencyGraphImpl::LoadResult integrate(std::vector<Node>);
+        DependencyGraphImpl::LoadResult integrate(FrontendGraph &&);
         
 //        FrontendNode::Cache &getMemoizedNodesForFile(StringRef depsFileName) {
 //          auto iter = nodesByDepsFile.find(depsFileName);

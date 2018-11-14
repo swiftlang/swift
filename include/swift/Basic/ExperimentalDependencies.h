@@ -48,6 +48,7 @@ namespace experimental_dependencies {
     std::string nameForDependencies;
     std::string nameForHolderOfMember;
   
+    NodeDependencyKey() : kind(NodeKind::kindCount), nameForDependencies(), nameForHolderOfMember() {}
     NodeDependencyKey(NodeKind kind,
                       std::string nameForDependencies,
                       std::string nameForHolderOfMember) :
@@ -85,7 +86,7 @@ namespace experimental_dependencies {
     std::string fingerprint;
     
   public:
-  Node() = default;
+    Node() : dependencyKey(), fingerprint() {}
   Node(
        NodeDependencyKey dependencyKey,
        std::string fingerprint) :
@@ -111,6 +112,11 @@ namespace experimental_dependencies {
     
   public:
     Memoizer() = default;
+    
+    // for deserialization
+    void insert(KeyT key, ValueT value) {
+      memos.insert(std::make_pair(key, value));
+    }
 
     template <typename CreateFnT>
     ValueT create(KeyT key, CreateFnT createFn) {
@@ -118,7 +124,7 @@ namespace experimental_dependencies {
       if (iter != memos.end())
         return iter->second;
       ValueT v = createFn(key);
-      memos.insert(std::make_pair(key, v));
+      insert(key, v);
       return v;
     }
   };
@@ -138,6 +144,9 @@ namespace experimental_dependencies {
     size_t sequenceNumber;
     std::vector<size_t> dependees, dependers;
   public:
+    // for deserialization
+    FrontendNode() : Node(), location(Location::Here), sequenceNumber(~0) {}
+    
     FrontendNode(NodeDependencyKey dependencyKey,
                  StringRef fingerprint,
                  Location location,
@@ -146,6 +155,7 @@ namespace experimental_dependencies {
     location(location),
     sequenceNumber(sequenceNumber) {}
     
+    const NodeDependencyKey &getDependencyKey() const { return dependencyKey; }
     Location getLocation() const { return location; }
     size_t getSequenceNumber() const { return sequenceNumber; }
     ArrayRef<size_t> getDependees() const { return dependees; }
@@ -162,13 +172,13 @@ namespace experimental_dependencies {
  // To serialize supply functions that take references to the approriate types and read or write
     template <typename Fn_size_t, typename Fn_string, typename Fn_size_t_vector>
     void serialize(Fn_size_t fn_size_t, Fn_string fn_string, Fn_size_t_vector fn_size_t_vector) {
-      uint k = uint(dependencyKey.kind);
+      size_t k = size_t(dependencyKey.kind);
       fn_size_t(k);
       dependencyKey.kind = NodeKind(k);
       fn_string(dependencyKey.nameForDependencies);
       fn_string(dependencyKey.nameForHolderOfMember);
       fn_string(fingerprint);
-      uint loc = uint(location);
+      size_t loc = size_t(location);
       fn_size_t(loc);
       location = Location(loc);
       fn_size_t(sequenceNumber);
@@ -215,6 +225,12 @@ namespace experimental_dependencies {
                                allNodes.push_back(n);
                                return n;
                              });
+    }
+    void addDeserializedNode(FrontendNode *n) {
+      if (n->getLocation() == FrontendNode::Location::Elsewhere)
+        firstElsewhereNode = allNodes.end();
+      allNodes.push_back(n);
+      memoizer.insert(n->getDependencyKey(), n);
     }
     void addArc(FrontendNode *depender, FrontendNode *dependee) {
       allNodes[depender->getSequenceNumber()]->addDependee(dependee->getSequenceNumber());
