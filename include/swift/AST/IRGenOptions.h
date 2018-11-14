@@ -171,6 +171,10 @@ public:
   /// Bypass resilience when accessing resilient frameworks.
   unsigned EnableResilienceBypass : 1;
 
+  /// Force lazy initialization of class metadata
+  /// Used on Windows to avoid cross-module references.
+  unsigned LazyInitializeClassMetadata : 1;
+
   /// The path to load legacy type layouts from.
   StringRef ReadTypeInfoPath;
 
@@ -221,10 +225,10 @@ public:
         EmbedMode(IRGenEmbedMode::None), HasValueNamesSetting(false),
         ValueNames(false), EnableReflectionMetadata(true),
         EnableReflectionNames(true), EnableClassResilience(false),
-        EnableResilienceBypass(false), UseIncrementalLLVMCodeGen(true),
-        UseSwiftCall(false), GenerateProfile(false),
-        EnableDynamicReplacementChaining(false), CmdArgs(),
-        SanitizeCoverage(llvm::SanitizerCoverageOptions()),
+        EnableResilienceBypass(false), LazyInitializeClassMetadata(false),
+        UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),
+        GenerateProfile(false), EnableDynamicReplacementChaining(false),
+        CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
 
   // Get a hash of all options which influence the llvm compilation but are not

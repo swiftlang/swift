@@ -1060,6 +1060,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.EnableResilienceBypass = true;
   }
 
+  // PE/COFF cannot deal with the cross-module reference to the metadata parent
+  // (e.g. NativeObject).  Force the lazy initialization of the VWT always.
+  Opts.LazyInitializeClassMetadata = Triple.isOSBinFormatCOFF();
+
   if (const Arg *A = Args.getLastArg(OPT_read_type_info_path_EQ)) {
     Opts.ReadTypeInfoPath = A->getValue();
   }
