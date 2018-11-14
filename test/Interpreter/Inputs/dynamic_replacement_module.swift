@@ -140,7 +140,7 @@ import Module1
 
 @_dynamicReplacement(for: public_global_var)
 public var replacement_for_public_global_var : String {
-  return "replacement of " + public_global_var
+  return "replacement of public_global_var"
 }
 
 @_dynamicReplacement(for: public_global_func())
