@@ -89,7 +89,6 @@ class YAMLParser {
 private:
   llvm::SourceMgr SM;
   yaml::Stream stream;
-  yaml::SequenceNode* sequenceNodeNode = nullptr;
   yaml::SequenceNode::iterator iter;
   bool hadError = false;
 
@@ -110,7 +109,7 @@ public:
     if (!nodeSequence)
       return true;
     for (yaml::Node &rawNode : *nodeSequence)  {
-      sequenceNodeNode = dyn_cast<yaml::SequenceNode>(&rawNode);
+      auto *sequenceNodeNode = dyn_cast<yaml::SequenceNode>(&rawNode);
       if (!sequenceNodeNode)
         return true;
       iter = sequenceNodeNode->begin();
@@ -122,27 +121,26 @@ public:
   }
   void entry(size_t &s) {
     yaml::ScalarNode *scalarNode = dyn_cast<yaml::ScalarNode>(&*iter);
-    ++iter;
     if (!scalarNode) {
       hadError = true;
       return;
     }
     llvm::SmallString<64> scratch;
     s = stoi(scalarNode->getValue(scratch).str());
+    ++iter;
   }
   void entry(std::string &s) {
     auto *scalarNode = dyn_cast<yaml::ScalarNode>(&*iter);
-    ++iter;
     if (!scalarNode) {
       hadError = true;
       return;
     }
     llvm::SmallString<64> scratch;
     s = scalarNode->getValue(scratch);
+    ++iter;
   }
   void entry(std::vector<size_t> &v) {
     auto *sequenceNode = dyn_cast<yaml::SequenceNode>(&*iter);
-    ++iter;
     if (!sequenceNode) {
       hadError = true;
       return;
@@ -156,6 +154,7 @@ public:
       llvm::SmallString<64> scratch;
       v.push_back(stoi(scalarNode->getValue(scratch).str()));
     }
+    ++iter;
   }
 };
 }
