@@ -556,8 +556,9 @@ ModuleDecl *SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
                     isFramework)) {
       return nullptr;
     }
-
-    addDependency(moduleInputBuffer->getBufferIdentifier());
+    if (dependencyTracker)
+      dependencyTracker->addDependency(moduleInputBuffer->getBufferIdentifier(),
+                                       /*isSystem=*/false);
   }
 
   assert(moduleInputBuffer);

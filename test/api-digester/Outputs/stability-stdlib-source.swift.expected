@@ -18,9 +18,6 @@ Func Numeric.-=(_:_:) has been removed
 Func Sequence.filter(_:) has been removed
 Func Sequence.forEach(_:) has been removed
 Func Sequence.map(_:) has been removed
-Func _SequenceWrapper.filter(_:) has been removed
-Func _SequenceWrapper.forEach(_:) has been removed
-Func _SequenceWrapper.map(_:) has been removed
 TypeAlias ExpressibleByStringInterpolation has been removed (deprecated)
 Var AnyBidirectionalCollection.first has been removed
 Var AnyBidirectionalCollection.last has been removed
@@ -30,10 +27,6 @@ Var AnyRandomAccessCollection.last has been removed
 Var BidirectionalCollection.last has been removed
 Var Collection.first has been removed
 Var Dictionary.first has been removed
-Var LazyCollection.first has been removed
-Var LazyCollection.last has been removed
-Var LazyMapCollection.first has been removed
-Var LazyMapCollection.last has been removed
 Var Set.first has been removed
 
 /* Moved Decls */
@@ -55,3 +48,66 @@ Protocol SignedNumeric has added inherited protocol AdditiveArithmetic
 /* Protocol Requirement Changes */
 Protocol StringProtocol has added inherited protocol ExpressibleByStringInterpolation
 Protocol UnsignedInteger has added inherited protocol AdditiveArithmetic
+
+/* SE-0234 */
+AssociatedType Sequence.SubSequence has been removed
+Func AnyBidirectionalCollection.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func AnyCollection.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func AnyRandomAccessCollection.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func AnySequence.dropLast(_:) has return type change from AnySequence<Element> to [Element]
+Func AnySequence.prefix(while:) has return type change from AnySequence<Element> to [Element]
+Func AnySequence.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func AnySequence.suffix(_:) has return type change from AnySequence<Element> to [Element]
+Func Collection.joined() has been removed
+Func DropFirstSequence.dropFirst(_:) has return type change from AnySequence<DropFirstSequence<Base>.Element> to DropFirstSequence<Base>
+Func PrefixSequence.prefix(_:) has return type change from AnySequence<Base.Element> to PrefixSequence<Base>
+Func Sequence.drop(while:) has return type change from Self.SubSequence to DropWhileSequence<Self>
+Func Sequence.dropFirst() has been removed
+Func Sequence.dropFirst(_:) has return type change from Self.SubSequence to DropFirstSequence<Self>
+Func Sequence.dropLast() has been removed
+Func Sequence.dropLast(_:) has return type change from Self.SubSequence to [Self.Element]
+Func Sequence.prefix(_:) has return type change from Self.SubSequence to PrefixSequence<Self>
+Func Sequence.prefix(while:) has return type change from Self.SubSequence to [Self.Element]
+Func Sequence.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has return type change from [Self.SubSequence] to [ArraySlice<Self.Element>]
+Func Sequence.split(separator:maxSplits:omittingEmptySubsequences:) has return type change from [Self.SubSequence] to [ArraySlice<Self.Element>]
+Func Sequence.suffix(_:) has return type change from Self.SubSequence to [Self.Element]
+Protocol Collection has generic signature change from <Self : Sequence, Self.Index : Comparable, Self.Index == Self.Indices.Element, Self.Indices : Collection, Self.Indices == Self.Indices.SubSequence, Self.SubSequence : Collection, Self.Indices.Element == Self.Indices.Index, Self.Indices.Index == Self.SubSequence.Index, Self.SubSequence.Index == Self.Indices.Indices.Element, Self.Indices.Indices.Element == Self.Indices.Indices.Index, Self.Indices.Indices.Index == Self.SubSequence.Indices.Element, Self.SubSequence.Indices.Element == Self.SubSequence.Indices.Index, Self.SubSequence.Indices.Index == Self.SubSequence.Indices.Indices.Element, Self.SubSequence.Indices.Indices.Element == Self.SubSequence.Indices.Indices.Index> to <Self : Sequence, Self.Element == Self.SubSequence.Element, Self.Index : Comparable, Self.Index == Self.Indices.Element, Self.Indices : Collection, Self.Indices == Self.Indices.SubSequence, Self.SubSequence : Collection, Self.SubSequence == Self.SubSequence.SubSequence, Self.Indices.Element == Self.Indices.Index, Self.Indices.Index == Self.SubSequence.Index, Self.SubSequence.Index == Self.Indices.Indices.Element, Self.Indices.Indices.Element == Self.Indices.Indices.Index, Self.Indices.Indices.Index == Self.SubSequence.Indices.Element, Self.SubSequence.Indices.Element == Self.SubSequence.Indices.Index, Self.SubSequence.Indices.Index == Self.SubSequence.Indices.Indices.Element, Self.SubSequence.Indices.Indices.Element == Self.SubSequence.Indices.Indices.Index>
+Protocol Sequence has generic signature change from <Self.Element == Self.Iterator.Element, Self.Iterator : IteratorProtocol, Self.SubSequence : Sequence, Self.SubSequence == Self.SubSequence.SubSequence, Self.Iterator.Element == Self.SubSequence.Element, Self.SubSequence.Element == Self.SubSequence.Iterator.Element> to <Self.Element == Self.Iterator.Element, Self.Iterator : IteratorProtocol>
+Protocol _SequenceWrapper has been removed
+Struct AnySequence has removed conformance to Sequence
+Struct Iterator has been removed
+Struct LazySequence has removed conformance to _SequenceWrapper
+Struct ReversedCollection has removed conformance to LazyCollectionProtocol
+Struct Slice has removed conformance to LazyCollectionProtocol
+TypeAlias AnyIterator.SubSequence has been removed
+TypeAlias AnySequence.SubSequence has been removed
+TypeAlias EmptyCollection.Iterator.SubSequence has been removed
+TypeAlias EnumeratedSequence.Iterator.SubSequence has been removed
+TypeAlias EnumeratedSequence.SubSequence has been removed
+TypeAlias FlattenSequence.Iterator.SubSequence has been removed
+TypeAlias FlattenSequence.SubSequence has generic signature change from <Base where Base : Sequence, Base.Element : Sequence> to <Base where Base : BidirectionalCollection, Base.Element : BidirectionalCollection>
+TypeAlias FlattenSequence.SubSequence has underlying type change from AnySequence<Base.Element.Element> to Slice<FlattenSequence<Base>>
+TypeAlias IteratorSequence.SubSequence has been removed
+TypeAlias JoinedSequence.SubSequence has been removed
+TypeAlias LazyDropWhileSequence.SubSequence has generic signature change from <Base where Base : Sequence> to <Base where Base : Collection>
+TypeAlias LazyDropWhileSequence.SubSequence has underlying type change from AnySequence<LazyDropWhileSequence<Base>.Element> to Slice<LazyDropWhileCollection<Base>>
+TypeAlias LazyFilterSequence.Iterator.SubSequence has been removed
+TypeAlias LazyFilterSequence.SubSequence has generic signature change from <Base where Base : Sequence> to <Base where Base : Collection>
+TypeAlias LazyFilterSequence.SubSequence has underlying type change from AnySequence<Base.Element> to LazyFilterCollection<Base.SubSequence>
+TypeAlias LazyMapSequence.Iterator.SubSequence has been removed
+TypeAlias LazyMapSequence.SubSequence has generic signature change from <Base, Element where Base : Sequence> to <Base, Element where Base : Collection>
+TypeAlias LazyMapSequence.SubSequence has underlying type change from AnySequence<Element> to LazyMapCollection<Base.SubSequence, Element>
+TypeAlias LazyPrefixWhileSequence.Iterator.SubSequence has been removed
+TypeAlias LazyPrefixWhileSequence.SubSequence has generic signature change from <Base where Base : Sequence> to <Base where Base : Collection>
+TypeAlias LazyPrefixWhileSequence.SubSequence has underlying type change from AnySequence<LazyPrefixWhileSequence<Base>.Element> to Slice<LazyPrefixWhileCollection<Base>>
+TypeAlias LazySequence.Base has been removed
+TypeAlias LazySequence.SubSequence has generic signature change from <Base where Base : Sequence> to <Base where Base : Collection>
+TypeAlias LazySequence.SubSequence has underlying type change from Base.SubSequence to Slice<LazySequence<Base>>
+TypeAlias PartialRangeFrom.SubSequence has been removed
+TypeAlias ReversedCollection.Iterator.SubSequence has been removed
+TypeAlias StrideThrough.SubSequence has been removed
+TypeAlias StrideTo.SubSequence has been removed
+TypeAlias UnfoldSequence.SubSequence has been removed
+TypeAlias UnsafeRawBufferPointer.Iterator.SubSequence has been removed
+TypeAlias Zip2Sequence.SubSequence has been removed
+Var Collection.lazy has been removed

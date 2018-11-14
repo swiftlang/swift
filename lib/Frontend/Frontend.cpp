@@ -141,7 +141,7 @@ CompilerInvocation::computeSerializationOptions(const SupplementaryOutputPaths &
   // so only serialize them if the module isn't going to be shipped to
   // the public.
   serializationOpts.SerializeOptionsForDebugging =
-      !moduleIsPublic || opts.AlwaysSerializeDebuggingOptions;
+      opts.SerializeOptionsForDebugging.getValueOr(!moduleIsPublic);
 
   return serializationOpts;
 }

@@ -52,29 +52,32 @@ tests.add${traversal}${kind}Tests(
 )
 % end
 
+var rdar45956357: Bool
 // Test collection instances and iterators.
 % for (traversal, kind) in variations:
-tests.test("FlattenCollection instances (${traversal}${kind})") {
-  do {
-    let expected : [String] = []
-    let base: [[String]] = [[], [], []]
-    check${traversal}${kind}(
-      expected,
-      Minimal${traversal}${kind}(elements: base).joined(),
-      sameValue: { $0 == $1 })
-  }
-  do {
-    let expected = ["apple", "orange", "banana", "grapefruit", "lychee"]
-    let base = [["apple", "orange"], ["banana", "grapefruit"], ["lychee"]]
-    let flattened = Minimal${traversal}${kind}(elements: base).joined()
-    check${traversal}${kind}(
-      expected,
-      Minimal${traversal}${kind}(elements: base).joined(),
-      sameValue: { $0 == $1 })
-    checkSequence(
-      expected,
-      flattened.makeIterator(),
-      sameValue: { $0 == $1 })
+if #available(macOS 10.14, iOS 12.0, watchOS 5.0, tvOS 12.0, *) {
+  tests.test("FlattenCollection instances (${traversal}${kind})") {
+    do {
+      let expected : [String] = []
+      let base: [[String]] = [[], [], []]
+      check${traversal}${kind}(
+        expected,
+        Minimal${traversal}${kind}(elements: base).joined(),
+        sameValue: { $0 == $1 })
+    }
+    do {
+      let expected = ["apple", "orange", "banana", "grapefruit", "lychee"]
+      let base = [["apple", "orange"], ["banana", "grapefruit"], ["lychee"]]
+      let flattened = Minimal${traversal}${kind}(elements: base).joined()
+      check${traversal}${kind}(
+        expected,
+        Minimal${traversal}${kind}(elements: base).joined(),
+        sameValue: { $0 == $1 })
+      checkSequence(
+        expected,
+        flattened.makeIterator(),
+        sameValue: { $0 == $1 })
+    }
   }
 }
 % end

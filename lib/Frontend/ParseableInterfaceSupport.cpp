@@ -27,6 +27,8 @@
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/HeaderSearch.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/StringSet.h"
+#include "llvm/Support/xxhash.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/CrashRecoveryContext.h"
@@ -35,9 +37,13 @@
 #include "llvm/Support/StringSaver.h"
 
 using namespace swift;
+using FileDependency = SerializationOptions::FileDependency;
 
+#define SWIFT_INTERFACE_FORMAT_VERSION_KEY "swift-interface-format-version"
 #define SWIFT_TOOLS_VERSION_KEY "swift-tools-version"
 #define SWIFT_MODULE_FLAGS_KEY "swift-module-flags"
+
+static swift::version::Version InterfaceFormatVersion({1, 0});
 
 static bool
 extractSwiftInterfaceVersionAndArgs(DiagnosticEngine &Diags,
@@ -53,7 +59,7 @@ extractSwiftInterfaceVersionAndArgs(DiagnosticEngine &Diags,
     return true;
   }
   auto SB = FileOrError.get()->getBuffer();
-  auto VersRe = getSwiftInterfaceToolsVersionRegex();
+  auto VersRe = getSwiftInterfaceFormatVersionRegex();
   auto FlagRe = getSwiftInterfaceModuleFlagsRegex();
   SmallVector<StringRef, 1> VersMatches, FlagMatches;
   if (!VersRe.match(SB, &VersMatches)) {
@@ -73,6 +79,21 @@ extractSwiftInterfaceVersionAndArgs(DiagnosticEngine &Diags,
   return false;
 }
 
+static std::unique_ptr<llvm::MemoryBuffer>
+getBufferOfDependency(llvm::vfs::FileSystem &FS,
+                      StringRef ModulePath, StringRef DepPath,
+                      DiagnosticEngine &Diags) {
+  auto DepBuf = FS.getBufferForFile(DepPath, /*FileSize=*/-1,
+                                    /*RequiresNullTerminator=*/false);
+  if (!DepBuf) {
+    Diags.diagnose(SourceLoc(),
+                   diag::missing_dependency_of_parseable_module_interface,
+                   DepPath, ModulePath, DepBuf.getError().message());
+    return nullptr;
+  }
+  return std::move(DepBuf.get());
+}
+
 /// Construct a cache key for the .swiftmodule being generated. There is a
 /// balance to be struck here between things that go in the cache key and
 /// things that go in the "up to date" check of the cache entry. We want to
@@ -83,9 +104,9 @@ extractSwiftInterfaceVersionAndArgs(DiagnosticEngine &Diags,
 /// -- rather than making a new one and potentially filling up the cache
 /// with dead entries -- when other factors change, such as the contents of
 /// the .swiftinterface input or its dependencies.
-std::string getCacheHash(ASTContext &Ctx,
-                         CompilerInvocation &SubInvocation,
-                         StringRef InPath) {
+static std::string getCacheHash(ASTContext &Ctx,
+                                CompilerInvocation &SubInvocation,
+                                StringRef InPath) {
   // Start with the compiler version (which will be either tag names or revs).
   std::string vers = swift::version::getSwiftFullVersion(
       Ctx.LangOpts.EffectiveLanguageVersion);
@@ -124,6 +145,10 @@ ParseableInterfaceModuleLoader::configureSubInvocationAndOutputPaths(
   SubInvocation.setTargetTriple(LangOpts.Target);
   SubInvocation.setClangModuleCachePath(CacheDir);
 
+  // Inhibit warnings from the SubInvocation since we are assuming the user
+  // is not in a position to fix them.
+  SubInvocation.getDiagnosticOptions().SuppressWarnings = true;
+
   // Calculate an output filename that includes a hash of relevant key data, and
   // wire up the SubInvocation's InputsAndOutputs to contain both input and
   // output filenames.
@@ -150,21 +175,16 @@ ParseableInterfaceModuleLoader::configureSubInvocationAndOutputPaths(
 static bool
 swiftModuleIsUpToDate(llvm::vfs::FileSystem &FS,
                       StringRef ModuleCachePath,
-                      StringRef OutPath) {
-
-  if (!FS.exists(OutPath))
-    return false;
-
-  auto OutStatus = FS.status(OutPath);
-  if (!OutStatus)
-    return false;
+                      StringRef OutPath,
+                      DiagnosticEngine &Diags,
+                      DependencyTracker *OuterTracker) {
 
   auto OutBuf = FS.getBufferForFile(OutPath);
   if (!OutBuf)
     return false;
 
   LLVM_DEBUG(llvm::dbgs() << "Validating deps of " << OutPath << "\n");
-  SmallVector<SerializationOptions::FileDependency, 16> AllDeps;
+  SmallVector<FileDependency, 16> AllDeps;
   auto VI = serialization::validateSerializedAST(
       OutBuf.get()->getBuffer(),
       /*ExtendedValidationInfo=*/nullptr, &AllDeps);
@@ -173,22 +193,14 @@ swiftModuleIsUpToDate(llvm::vfs::FileSystem &FS,
     return false;
 
   for (auto In : AllDeps) {
-    auto InStatus = FS.status(In.Path);
-    if (!InStatus ||
-        (InStatus.get().getSize() != In.Size) ||
-        (InStatus.get().getLastModificationTime() != In.LastModTime)) {
+    if (OuterTracker)
+      OuterTracker->addDependency(In.Path, /*IsSystem=*/false);
+    auto DepBuf = getBufferOfDependency(FS, OutPath, In.Path, Diags);
+    if (!DepBuf ||
+        DepBuf->getBufferSize() != In.Size ||
+        xxHash64(DepBuf->getBuffer()) != In.Hash) {
       LLVM_DEBUG(llvm::dbgs() << "Dep " << In.Path
                  << " is directly out of date\n");
-      return false;
-    }
-    // Recursively check freshness of any .swiftmodules in the module cache.
-    auto Ext = llvm::sys::path::extension(In.Path);
-    auto Ty = file_types::lookupTypeForExtension(Ext);
-    if (Ty == file_types::TY_SwiftModuleFile &&
-        In.Path.startswith(ModuleCachePath) &&
-        !swiftModuleIsUpToDate(FS, ModuleCachePath, In.Path)) {
-      LLVM_DEBUG(llvm::dbgs() << "Dep " << In.Path
-                 << " is indirectly out of date\n");
       return false;
     }
     LLVM_DEBUG(llvm::dbgs() << "Dep " << In.Path << " is up to date\n");
@@ -196,9 +208,74 @@ swiftModuleIsUpToDate(llvm::vfs::FileSystem &FS,
   return true;
 }
 
+/// Populate the provided \p Deps with \c FileDependency entries including:
+///
+///    - \p InPath - The .swiftinterface input file
+///
+///    - All the dependencies mentioned by \p SubInstance's DependencyTracker,
+///      that were read while compiling the module.
+///
+///    - For any file in the latter set that is itself a .swiftmodule
+///      living in \p ModuleCachePath, all of _its_ dependencies, copied
+///      out to avoid having to do recursive scanning when rechecking this
+///      dependency in the future.
+static bool
+collectDepsForSerialization(llvm::vfs::FileSystem &FS,
+                            CompilerInstance &SubInstance,
+                            StringRef InPath, StringRef ModuleCachePath,
+                            SmallVectorImpl<FileDependency> &Deps,
+                            DiagnosticEngine &Diags,
+                            DependencyTracker *OuterTracker) {
+  auto DTDeps = SubInstance.getDependencyTracker()->getDependencies();
+  SmallVector<StringRef, 16> InitialDepNames(DTDeps.begin(), DTDeps.end());
+  InitialDepNames.push_back(InPath);
+  llvm::StringSet<> AllDepNames;
+  for (auto const &DepName : InitialDepNames) {
+    if (AllDepNames.insert(DepName).second && OuterTracker) {
+        OuterTracker->addDependency(DepName, /*IsSystem=*/false);
+    }
+    auto DepBuf = getBufferOfDependency(FS, InPath, DepName, Diags);
+    if (!DepBuf) {
+      return true;
+    }
+    uint64_t Size = DepBuf->getBufferSize();
+    uint64_t Hash = xxHash64(DepBuf->getBuffer());
+    Deps.push_back(FileDependency{Size, Hash, DepName});
+
+    // If Dep is itself a .swiftmodule in the cache dir, pull out its deps
+    // and include them in our own, so we have a single-file view of
+    // transitive deps: removes redundancies, and avoids opening and reading
+    // multiple swiftmodules during future loads.
+    auto Ext = llvm::sys::path::extension(DepName);
+    auto Ty = file_types::lookupTypeForExtension(Ext);
+    if (Ty == file_types::TY_SwiftModuleFile &&
+        DepName.startswith(ModuleCachePath)) {
+      SmallVector<FileDependency, 16> SubDeps;
+      auto VI = serialization::validateSerializedAST(
+          DepBuf->getBuffer(),
+          /*ExtendedValidationInfo=*/nullptr, &SubDeps);
+      if (VI.status != serialization::Status::Valid) {
+        Diags.diagnose(SourceLoc(),
+                       diag::error_extracting_dependencies_from_cached_module,
+                       DepName);
+        return true;
+      }
+      for (auto const &SubDep : SubDeps) {
+        if (AllDepNames.insert(SubDep.Path).second) {
+          Deps.push_back(SubDep);
+          if (OuterTracker)
+            OuterTracker->addDependency(SubDep.Path, /*IsSystem=*/false);
+        }
+      }
+    }
+  }
+  return false;
+}
+
 static bool buildSwiftModuleFromSwiftInterface(
     llvm::vfs::FileSystem &FS, DiagnosticEngine &Diags,
-    CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath) {
+    CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath,
+    StringRef ModuleCachePath, DependencyTracker *OuterTracker) {
   bool SubError = false;
   bool RunSuccess = llvm::CrashRecoveryContext().RunSafelyOnThread([&] {
 
@@ -208,6 +285,17 @@ static bool buildSwiftModuleFromSwiftInterface(
     swift::version::Version Vers;
     if (extractSwiftInterfaceVersionAndArgs(Diags, FS, InPath, Vers,
                                             SubArgSaver, SubArgs)) {
+      SubError = true;
+      return;
+    }
+
+    // For now: we support anything with the same "major version" and assume
+    // minor versions might be interesting for debugging, or special-casing a
+    // compatible field variant.
+    if (Vers.asMajorVersion() != InterfaceFormatVersion.asMajorVersion()) {
+      Diags.diagnose(SourceLoc(),
+                     diag::unsupported_version_of_parseable_interface,
+                     InPath, Vers);
       SubError = true;
       return;
     }
@@ -224,9 +312,8 @@ static bool buildSwiftModuleFromSwiftInterface(
                << InPath << " to " << OutPath << "\n");
     CompilerInstance SubInstance;
 
-    // FIXME: Temporary: this should forward to the outer Diags somehow.
-    PrintingDiagnosticConsumer PDC;
-    SubInstance.addDiagnosticConsumer(&PDC);
+    ForwardingDiagnosticConsumer FDC(Diags);
+    SubInstance.addDiagnosticConsumer(&FDC);
 
     SubInstance.createDependencyTracker(/*TrackSystemDeps=*/false);
     if (SubInstance.setup(SubInvocation)) {
@@ -256,27 +343,19 @@ static bool buildSwiftModuleFromSwiftInterface(
     }
 
     LLVM_DEBUG(llvm::dbgs() << "Serializing " << OutPath << "\n");
-    SerializationOptions serializationOpts;
+    SerializationOptions SerializationOpts;
     std::string OutPathStr = OutPath;
-    serializationOpts.OutputPath = OutPathStr.c_str();
-    serializationOpts.SerializeAllSIL = true;
-    auto DTDeps = SubInstance.getDependencyTracker()->getDependencies();
-    SmallVector<std::string, 16> DepNames(DTDeps.begin(), DTDeps.end());
-    DepNames.push_back(InPath);
-    SmallVector<SerializationOptions::FileDependency, 16> Deps;
-    for (auto const &Dep : DepNames) {
-      auto DepStatus = FS.status(Dep);
-      if (!DepStatus) {
-        SubError = true;
-        return;
-      }
-      Deps.push_back(SerializationOptions::FileDependency{
-          DepStatus.get().getSize(), DepStatus.get().getLastModificationTime(),
-          Dep});
+    SerializationOpts.OutputPath = OutPathStr.c_str();
+    SerializationOpts.SerializeAllSIL = true;
+    SmallVector<FileDependency, 16> Deps;
+    if (collectDepsForSerialization(FS, SubInstance, InPath, ModuleCachePath,
+                                    Deps, Diags, OuterTracker)) {
+      SubError = true;
+      return;
     }
-    serializationOpts.Dependencies = Deps;
+    SerializationOpts.Dependencies = Deps;
     SILMod->setSerializeSILAction([&]() {
-        serialize(Mod, serializationOpts, SILMod.get());
+        serialize(Mod, SerializationOpts, SILMod.get());
       });
     SILMod->serialize();
     SubError = Diags.hadAnyError();
@@ -311,9 +390,9 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
   configureSubInvocationAndOutputPaths(SubInvocation, InPath, OutPath);
 
   // Evaluate if we need to run this sub-invocation, and if so run it.
-  if (!swiftModuleIsUpToDate(FS, CacheDir, OutPath)) {
+  if (!swiftModuleIsUpToDate(FS, CacheDir, OutPath, Diags, dependencyTracker)) {
     if (buildSwiftModuleFromSwiftInterface(FS, Diags, SubInvocation, InPath,
-                                           OutPath))
+                                           OutPath, CacheDir, dependencyTracker))
       return std::make_error_code(std::errc::invalid_argument);
   }
 
@@ -350,21 +429,26 @@ static void diagnoseScopedImports(DiagnosticEngine &diags,
   }
 }
 
-/// Prints to \p out a comment containing a tool-versions identifier as well
-/// as any relevant command-line flags in \p Opts used to construct \p M.
+/// Prints to \p out a comment containing a format version number, tool version
+/// string as well as any relevant command-line flags in \p Opts used to
+/// construct \p M.
 static void printToolVersionAndFlagsComment(raw_ostream &out,
                                             ParseableInterfaceOptions const &Opts,
                                             ModuleDecl *M) {
   auto &Ctx = M->getASTContext();
+  auto ToolsVersion = swift::version::getSwiftFullVersion(
+      Ctx.LangOpts.EffectiveLanguageVersion);
+  out << "// " SWIFT_INTERFACE_FORMAT_VERSION_KEY ": "
+      << InterfaceFormatVersion << "\n";
   out << "// " SWIFT_TOOLS_VERSION_KEY ": "
-      << Ctx.LangOpts.EffectiveLanguageVersion << "\n";
+      << ToolsVersion << "\n";
   out << "// " SWIFT_MODULE_FLAGS_KEY ": "
       << Opts.ParseableInterfaceFlags << "\n";
 }
 
-llvm::Regex swift::getSwiftInterfaceToolsVersionRegex() {
-  return llvm::Regex("^// " SWIFT_TOOLS_VERSION_KEY ": ([0-9\\.]+)$",
-                     llvm::Regex::Newline);
+llvm::Regex swift::getSwiftInterfaceFormatVersionRegex() {
+  return llvm::Regex("^// " SWIFT_INTERFACE_FORMAT_VERSION_KEY
+                     ": ([0-9\\.]+)$", llvm::Regex::Newline);
 }
 
 llvm::Regex swift::getSwiftInterfaceModuleFlagsRegex() {
