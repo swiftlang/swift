@@ -117,6 +117,13 @@ static void addDiagnosticInfoForArchitectureMismatch(ASTContext &ctx,
     }
   }
 
+  if (foundArchs.empty()) {
+    // Maybe this swiftmodule directory only contains swiftinterfaces, or
+    // maybe something else is going on. Regardless, we shouldn't emit a
+    // possibly incorrect diagnostic.
+    return;
+  }
+
   ctx.Diags.diagnose(sourceLocation, diag::sema_no_import_arch, moduleName,
                      archName, foundArchs);
 }
