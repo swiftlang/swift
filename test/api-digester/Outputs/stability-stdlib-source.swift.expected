@@ -22,6 +22,7 @@ Func LazyCollectionProtocol.flatMap(_:) has been removed (deprecated)
 Func Numeric.+(_:) has been removed
 Func Numeric.+(_:_:) has been removed
 Func Numeric.+=(_:_:) has been removed
+Func Numeric.-(_:_:) has been removed
 Func Numeric.-=(_:_:) has been removed
 Func Sequence.filter(_:) has been removed
 Func Sequence.forEach(_:) has been removed
