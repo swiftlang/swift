@@ -73,7 +73,9 @@ ExpDependencyGraph::loadFromBuffer(const void *node,
 
   FrontendGraph fg;
   auto nodeCallback = [&fg](FrontendNode* n) { fg.addDeserializedNode(n); };
-  auto errorCallBack = [&result]() { result = LoadResult::HadError; };
+  auto errorCallBack = [&result]() {
+    result = LoadResult::HadError;
+  };
   
 
   parseDependencyFile(buffer, nodeCallback, errorCallBack);
@@ -89,7 +91,7 @@ class YAMLParser {
 private:
   llvm::SourceMgr SM;
   yaml::Stream stream;
-  yaml::SequenceNode::iterator iter;
+  yaml::SequenceNode::iterator nextFieldOfNode;
   bool hadError = false;
 
 public:
@@ -112,35 +114,37 @@ public:
       auto *sequenceNodeNode = dyn_cast<yaml::SequenceNode>(&rawNode);
       if (!sequenceNodeNode)
         return true;
-      iter = sequenceNodeNode->begin();
+      nextFieldOfNode = sequenceNodeNode->begin();
       nodeCallback();
+      if (nextFieldOfNode != sequenceNodeNode->end())
+        return true;
       if (hadError)
         return true;
     }
     return false;
   }
   void entry(size_t &s) {
-    yaml::ScalarNode *scalarNode = dyn_cast<yaml::ScalarNode>(&*iter);
+    yaml::ScalarNode *scalarNode = dyn_cast<yaml::ScalarNode>(&*nextFieldOfNode);
     if (!scalarNode) {
       hadError = true;
       return;
     }
     llvm::SmallString<64> scratch;
     s = stoi(scalarNode->getValue(scratch).str());
-    ++iter;
+    ++nextFieldOfNode;
   }
   void entry(std::string &s) {
-    auto *scalarNode = dyn_cast<yaml::ScalarNode>(&*iter);
+    auto *scalarNode = dyn_cast<yaml::ScalarNode>(&*nextFieldOfNode);
     if (!scalarNode) {
       hadError = true;
       return;
     }
     llvm::SmallString<64> scratch;
     s = scalarNode->getValue(scratch);
-    ++iter;
+    ++nextFieldOfNode;
   }
   void entry(std::vector<size_t> &v) {
-    auto *sequenceNode = dyn_cast<yaml::SequenceNode>(&*iter);
+    auto *sequenceNode = dyn_cast<yaml::SequenceNode>(&*nextFieldOfNode);
     if (!sequenceNode) {
       hadError = true;
       return;
@@ -154,7 +158,7 @@ public:
       llvm::SmallString<64> scratch;
       v.push_back(stoi(scalarNode->getValue(scratch).str()));
     }
-    ++iter;
+    ++nextFieldOfNode;
   }
 };
 }

@@ -327,6 +327,10 @@ public:
     out << " - " << n << "\n";
   }
   void entry(std::vector<size_t> &numbers) const {
+    if (numbers.empty()) {
+      out << " - []\n";
+      return;
+    }
     out << " - \n";
     for (auto i: numbers)
       out << "  - " << i << "\n";
