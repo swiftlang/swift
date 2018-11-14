@@ -197,6 +197,12 @@ public:
   /// \see ModuleDecl::arePrivateImportsEnabled
   bool EnablePrivateImports = false;
 
+
+  /// Indicates whether we add implicit dynamic.
+  ///
+  /// \see ModuleDecl::isImplicitDynamicEnabled
+  bool EnableImplicitDynamic = false;
+
   /// Enables the "fully resilient" resilience strategy.
   ///
   /// \see ResilienceStrategy::Resilient

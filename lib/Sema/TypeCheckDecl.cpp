@@ -1214,6 +1214,11 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, decl))
     return false;
 
+  // Add dynamic if -enable-implicit-dynamic was requested.
+  if (decl->getModuleContext()->isImplicitDynamicEnabled()) {
+    TypeChecker::addImplicitDynamicAttribute(decl);
+  }
+
   // If 'dynamic' was explicitly specified, check it.
   if (decl->getAttrs().hasAttribute<DynamicAttr>()) {
     if (decl->getASTContext().LangOpts.isSwiftVersionAtLeast(5))
@@ -2470,7 +2475,6 @@ public:
 
   void visitBoundVariable(VarDecl *VD) {
     TC.validateDecl(VD);
-    TC.addImplicitDynamicAttribute(VD);
 
     // Set up accessors.
     maybeAddAccessorsToStorage(TC, VD);
@@ -2727,8 +2731,6 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
-    TC.addImplicitDynamicAttribute(SD);
-
     TC.validateDecl(SD);
 
     if (!SD->isInvalid()) {
@@ -3198,8 +3200,6 @@ public:
   }
 
   void visitVarDecl(VarDecl *VD) {
-    TC.addImplicitDynamicAttribute(VD);
-
     // Delay type-checking on VarDecls until we see the corresponding
     // PatternBindingDecl.
 
@@ -3251,8 +3251,6 @@ public:
   }
 
   void visitFuncDecl(FuncDecl *FD) {
-    TC.addImplicitDynamicAttribute(FD);
-
     TC.validateDecl(FD);
 
     if (!FD->isInvalid()) {
@@ -3369,7 +3367,6 @@ public:
   }
 
   void visitConstructorDecl(ConstructorDecl *CD) {
-    TC.addImplicitDynamicAttribute(CD);
     TC.validateDecl(CD);
 
     if (!CD->isInvalid()) {
