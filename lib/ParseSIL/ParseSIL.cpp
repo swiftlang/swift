@@ -3123,9 +3123,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       noClustering = true;
 
       Identifier ident;
-      SourceLoc identLoc;
-      if (parseSILIdentifier(ident, identLoc,
-                             diag::expected_in_attribute_list) ||
+      if (parseSILIdentifier(ident, diag::expected_in_attribute_list) ||
           ident.str() != "no_clustering") {
         P.diagnose(P.Tok, diag::expected_tok_in_sil_instr,
                    "'no_clustering' attribute");
