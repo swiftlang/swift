@@ -283,6 +283,14 @@ public:
     Bits.ModuleDecl.TestingEnabled = enabled;
   }
 
+  // Returns true if this module is compiled with implicit dynamic.
+  bool isImplicitDynamicEnabled() const {
+    return Bits.ModuleDecl.ImplicitDynamicEnabled;
+  }
+  void setImplicitDynamicEnabled(bool enabled = true) {
+    Bits.ModuleDecl.ImplicitDynamicEnabled = enabled;
+  }
+
   /// Returns true if this module was or is begin compile with
   /// `-enable-private-imports`.
   bool arePrivateImportsEnabled() const {

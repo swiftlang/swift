@@ -1095,7 +1095,7 @@ public:
   void typeCheckDecl(Decl *D);
 
   void checkDeclAttributesEarly(Decl *D);
-  void addImplicitDynamicAttribute(Decl *D);
+  static void addImplicitDynamicAttribute(Decl *D);
   void checkDeclAttributes(Decl *D);
   void checkDynamicReplacementAttribute(ValueDecl *D);
   void checkTypeModifyingDeclAttributes(VarDecl *var);
