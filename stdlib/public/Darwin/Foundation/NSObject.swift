@@ -52,7 +52,7 @@ fileprivate extension NSObject {
 // must coexist, so it was renamed. The old name must not be used in the
 // new runtime.
 @objc private class __KVOKeyPathBridgeMachinery : NSObject {
-    @nonobjc static var swizzler: ()? = {
+    @nonobjc static let swizzler: () = {
         /*
          Move all our methods into place. We want the following:
          __KVOKeyPathBridgeMachinery's automaticallyNotifiesObserversForKey:, and keyPathsForValuesAffectingValueForKey: methods replaces NSObject's versions of them
@@ -61,8 +61,6 @@ fileprivate extension NSObject {
          */
         threeWaySwizzle(#selector(NSObject.keyPathsForValuesAffectingValue(forKey:)), with: #selector(NSObject.__old_unswizzled_keyPathsForValuesAffectingValue(forKey:)))
         threeWaySwizzle(#selector(NSObject.automaticallyNotifiesObservers(forKey:)), with: #selector(NSObject.__old_unswizzled_automaticallyNotifiesObservers(forKey:)))
-        
-        return nil
     }()
     
     /// Performs a 3-way swizzle between `NSObject` and `__KVOKeyPathBridgeMachinery`.
@@ -174,13 +172,12 @@ public class NSKeyValueObservation : NSObject {
         
         // workaround for <rdar://problem/31640524> Erroneous (?) error when using bridging in the Foundation overlay
         // specifically, overriding observeValue(forKeyPath:of:change:context:) complains that it's not Obj-C-compatible
-        @nonobjc static var swizzler: ()? = {
+        @nonobjc static let swizzler: () = {
             let bridgeClass: AnyClass = Helper.self
             let observeSel = #selector(NSObject.observeValue(forKeyPath:of:change:context:))
             let swapSel = #selector(Helper._swizzle_me_observeValue(forKeyPath:of:change:context:))
             let swapObserveMethod = class_getInstanceMethod(bridgeClass, swapSel)!
             class_addMethod(bridgeClass, observeSel, method_getImplementation(swapObserveMethod), method_getTypeEncoding(swapObserveMethod))
-            return nil
         }()
         
         @nonobjc init(object: NSObject, keyPath: AnyKeyPath, options: NSKeyValueObservingOptions, callback: @escaping (NSObject, NSKeyValueObservedChange<Any>) -> Void) {
