@@ -78,8 +78,10 @@ extension Repeated: RandomAccessCollection {
   ///   `endIndex` property.
   @inlinable // trivial-implementation
   public subscript(position: Int) -> Element {
-    _precondition(position >= 0 && position < count, "Index out of range")
-    return repeatedValue
+    _read {
+      _precondition(position >= 0 && position < count, "Index out of range")
+      yield repeatedValue      
+    }
   }
 }
 

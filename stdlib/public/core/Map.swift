@@ -119,7 +119,9 @@ extension LazyMapCollection: Collection {
   ///   `position != endIndex`.
   @inlinable
   public subscript(position: Base.Index) -> Element {
-    return _transform(_base[position])
+    _read {
+      yield _transform(_base[position])      
+    }
   }
 
   @inlinable

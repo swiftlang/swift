@@ -156,9 +156,9 @@ extension Slice: Collection {
 
   @inlinable // generic-performance
   public subscript(index: Index) -> Base.Element {
-    get {
+    _read {
       _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
-      return _base[index]
+      yield _base[index]
     }
   }
 
@@ -235,9 +235,9 @@ extension Slice: BidirectionalCollection where Base: BidirectionalCollection {
 extension Slice: MutableCollection where Base: MutableCollection {
   @inlinable // generic-performance
   public subscript(index: Index) -> Base.Element {
-    get {
+    _read {
       _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
-      return _base[index]
+      yield _base[index]
     }
     set {
       _failEarlyRangeCheck(index, bounds: startIndex..<endIndex)

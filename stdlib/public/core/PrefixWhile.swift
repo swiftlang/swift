@@ -230,11 +230,13 @@ extension LazyPrefixWhileCollection: Collection {
 
   @inlinable // lazy-performance
   public subscript(position: Index) -> Element {
-    switch position._value {
-    case .index(let i):
-      return _base[i]
-    case .pastEnd:
-      _preconditionFailure("Index out of range")
+    _read {
+      switch position._value {
+      case .index(let i):
+        yield _base[i]
+      case .pastEnd:
+        _preconditionFailure("Index out of range")
+      }      
     }
   }
 }

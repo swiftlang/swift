@@ -127,9 +127,9 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
   ///   valid position in a `CollectionOfOne` instance is `0`.
   @inlinable // trivial-implementation
   public subscript(position: Int) -> Element {
-    get {
+    _read {
       _precondition(position == 0, "Index out of range")
-      return _element
+      yield _element
     }
     _modify {
       _precondition(position == 0, "Index out of range")

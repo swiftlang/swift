@@ -390,7 +390,9 @@ extension FlattenCollection: Collection {
   ///   `position != endIndex`.
   @inlinable // lazy-performance
   public subscript(position: Index) -> Base.Element.Element {
-    return _base[position._outer][position._inner!]
+    _read {
+      yield _base[position._outer][position._inner!]
+    }
   }
 
   @inlinable // lazy-performance

@@ -53,7 +53,9 @@ extension DefaultIndices: Collection {
   @inlinable
   public subscript(i: Index) -> Elements.Index {
     // FIXME: swift-3-indexing-model: range check.
-    return i
+    _read {
+      yield i      
+    }
   }
 
   @inlinable

@@ -407,8 +407,9 @@ extension _ArrayBuffer {
   /// Get or set the value of the ith element.
   @inlinable
   internal subscript(i: Int) -> Element {
-    get {
-      return getElement(i, wasNativeTypeChecked: _isNativeTypeChecked)
+    _read {
+      // FIXME(accessors): put the getElement code in here:
+      yield getElement(i, wasNativeTypeChecked: _isNativeTypeChecked)
     }
     
     nonmutating set {

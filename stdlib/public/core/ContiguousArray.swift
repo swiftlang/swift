@@ -381,9 +381,9 @@ extension ContiguousArray: RandomAccessCollection, MutableCollection {
   ///   writing is O(*n*), where *n* is the length of the array.
   @inlinable
   public subscript(index: Int) -> Element {
-    get {
+    _read {
       _checkSubscript_native(index)
-      return _buffer.getElement(index)
+      yield _buffer.getElement(index)
     }
     _modify {
       _makeMutableAndUnique()

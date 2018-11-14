@@ -294,14 +294,16 @@ internal struct _SliceBuffer<Element>
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   @inlinable
-  internal subscript(position: Int) -> Element {
-    get {
-      return getElement(position)
+  internal subscript(i: Int) -> Element {
+    _read {
+      _sanityCheck(i >= startIndex, "slice index is out of range (before startIndex)")
+      _sanityCheck(i < endIndex, "slice index is out of range")
+      yield subscriptBaseAddress[i]
     }
     nonmutating set {
-      _sanityCheck(position >= startIndex, "slice index is out of range (before startIndex)")
-      _sanityCheck(position < endIndex, "slice index is out of range")
-      subscriptBaseAddress[position] = newValue
+      _sanityCheck(i >= startIndex, "slice index is out of range (before startIndex)")
+      _sanityCheck(i < endIndex, "slice index is out of range")
+      subscriptBaseAddress[i] = newValue
     }
   }
 

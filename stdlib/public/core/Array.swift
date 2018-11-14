@@ -692,7 +692,7 @@ extension Array: RandomAccessCollection, MutableCollection {
   ///   O(*n*), where *n* is the length of the array.
   @inlinable
   public subscript(index: Int) -> Element {
-    get {
+    _read {
       // This call may be hoisted or eliminated by the optimizer.  If
       // there is an inout violation, this value may be stale so needs to be
       // checked again below.
@@ -703,7 +703,7 @@ extension Array: RandomAccessCollection, MutableCollection {
       let token = _checkSubscript(
         index, wasNativeTypeChecked: wasNativeTypeChecked)
 
-      return _getElement(
+      yield _getElement(
         index, wasNativeTypeChecked: wasNativeTypeChecked,
         matchingSubscriptCheck: token)
     }

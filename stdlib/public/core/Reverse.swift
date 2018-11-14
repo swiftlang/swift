@@ -245,7 +245,9 @@ extension ReversedCollection: BidirectionalCollection {
 
   @inlinable
   public subscript(position: Index) -> Element {
-    return _base[_base.index(before: position.base)]
+    _read {
+      yield _base[_base.index(before: position.base)]      
+    }
   }
 }
 

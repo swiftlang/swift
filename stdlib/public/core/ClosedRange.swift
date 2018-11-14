@@ -285,16 +285,17 @@ where Bound : Strideable, Bound.Stride : SignedInteger
   ///   index.
   @inlinable
   public subscript(position: Index) -> Bound {
-    // FIXME: swift-3-indexing-model: range checks and tests.
-    switch position {
-    case .inRange(let x): return x
-    case .pastEnd: _preconditionFailure("Index out of range")
+    _read {      
+      // FIXME: swift-3-indexing-model: range checks and tests.
+      switch position {
+      case .inRange(let x): yield x
+      case .pastEnd: _preconditionFailure("Index out of range")
+      }
     }
   }
 
   @inlinable
-  public subscript(bounds: Range<Index>)
-    -> Slice<ClosedRange<Bound>> {
+  public subscript(bounds: Range<Index>) -> Slice<ClosedRange<Bound>> {
     return Slice(base: self, bounds: bounds)
   }
 

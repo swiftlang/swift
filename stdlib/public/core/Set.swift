@@ -330,9 +330,9 @@ extension Set: Collection {
   /// Accesses the member at the given position.
   @inlinable
   public subscript(position: Index) -> Element {
-    //FIXME(accessors): Provide a _read
-    get {
-      return _variant.element(at: position)
+    _read {
+      //FIXME(accessors): make _variant.element a yielding subscript
+      yield _variant.element(at: position)
     }
   }
 

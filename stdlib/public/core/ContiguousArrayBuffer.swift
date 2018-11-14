@@ -327,8 +327,9 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   @inlinable
   internal subscript(i: Int) -> Element {
     @inline(__always)
-    get {
-      return getElement(i)
+    _read {
+      _sanityCheck(i >= 0 && i < count, "Array index out of range")
+      yield firstElementAddress[i]
     }
     @inline(__always)
     nonmutating set {
