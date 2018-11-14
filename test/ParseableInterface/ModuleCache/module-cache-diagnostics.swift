@@ -1,3 +1,4 @@
+// REQUIRES: rdar46073729
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/modulecache)
 //
