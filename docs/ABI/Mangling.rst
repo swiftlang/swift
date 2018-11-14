@@ -195,8 +195,8 @@ types where the metadata itself has unknown layout.)
   global ::= protocol 'TL'               // protocol requirements base descriptor
   global ::= assoc-type-name 'Tl'        // associated type descriptor
   global ::= assoc-type-name 'TM'        // default associated type witness accessor (HISTORICAL)
-  global ::= type assoc-type-path protocol 'Tn' // associated conformance descriptor
-  global ::= type assoc-type-path protocol 'TN' // default associated conformance witness accessor
+  global ::= type assoc-type-list protocol 'Tn' // associated conformance descriptor
+  global ::= type assoc-type-list protocol 'TN' // default associated conformance witness accessor
 
   REABSTRACT-THUNK-TYPE ::= 'R'          // reabstraction thunk helper function
   REABSTRACT-THUNK-TYPE ::= 'r'          // reabstraction thunk
