@@ -4124,7 +4124,7 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
     // For a class, chase the superclass chain up until we hit the
     // type that specified the conformance.
     auto originalConformingType = findConformingSuperclass(conformingType,
-                                                           protocol);
+                                                           conformance);
     SubstGenericParametersFromMetadata substitutions(originalConformingType);
     assocTypeMetadata = _getTypeByMangledName(mangledName, substitutions);
   }
