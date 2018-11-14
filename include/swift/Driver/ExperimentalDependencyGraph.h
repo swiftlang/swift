@@ -39,17 +39,19 @@ namespace swift {
       public:
         using LoadResult = typename swift::DependencyGraphImpl::LoadResult;
       };
-      class ExpDependencyGraph: public swift::experimental_dependencies::Graph {
+      // TODO: not FrontendGraph
+      class ExpDependencyGraph: public swift::experimental_dependencies::FrontendGraph {
         using Node = swift::experimental_dependencies::Node;
-        using MemoizedNode = swift::experimental_dependencies::MemoizedNode;
-        using Arc = swift::experimental_dependencies::Arc;
+        using FrontendNode = swift::experimental_dependencies::FrontendNode;
 
         /// When rereading a dependencies file, must be able to find the old nodes for that file.
-        std::unordered_map<std::string, MemoizedNode::Cache> nodesByDepsFile;
+//        std::unordered_map<std::string,
+//        FrontendNode::Cache
+//        > nodesByDepsFile;
         
         /// When reading a dependencies file, there are nodes that are depended-upon but
         /// (do not yet) correspond to any file.
-        MemoizedNode::Cache orphans;
+//        FrontendNode::Cache orphans;
         
       public:
         ExpDependencyGraph() = default;
@@ -60,7 +62,9 @@ namespace swift {
         bool isMarked(const Job* Cmd) const;//XXX
         
         /// returns address of node IF it has changed or is new
-        MemoizedNode* addNodeForFile(StringRef depsFile, MemoizedNode::Cache&, Node&);
+        FrontendNode* addNodeForFile(StringRef depsFile,
+//                                     , FrontendNode::Cache&,
+                                     FrontendNode&);
 //        void addArc(Arc*);
         
         template <unsigned N>
@@ -89,13 +93,13 @@ namespace swift {
         
         DependencyGraphImpl::LoadResult integrate(std::vector<Node>);
         
-        MemoizedNode::Cache &getMemoizedNodesForFile(StringRef depsFileName) {
-          auto iter = nodesByDepsFile.find(depsFileName);
-          if (iter != nodesByDepsFile.end())
-            return iter->second;
-          nodesByDepsFile.insert(std::make_pair(depsFileName, MemoizedNode::Cache()));
-          return getMemoizedNodesForFile(depsFileName);
-        }
+//        FrontendNode::Cache &getMemoizedNodesForFile(StringRef depsFileName) {
+//          auto iter = nodesByDepsFile.find(depsFileName);
+//          if (iter != nodesByDepsFile.end())
+//            return iter->second;
+//          nodesByDepsFile.insert(std::make_pair(depsFileName, FrontendNode::Cache()));
+//          return getMemoizedNodesForFile(depsFileName);
+//        }
       };
     } // experimental_dependencies
   } // driver

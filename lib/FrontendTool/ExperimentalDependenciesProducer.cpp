@@ -149,8 +149,7 @@ namespace {
     SourceFile *SF;
     const DependencyTracker &depTracker;
     StringRef outputPath;
-    MemoizedNode *sourceFileNode;
-    MemoizedNode::Cache cache{};
+    FrontendNode *sourceFileNode;
  
   public:
      GraphConstructor(
@@ -163,7 +162,8 @@ namespace {
   public:
     FrontendGraph construct() {
       //TODO storage mgmt
-      sourceFileNode = MemoizedNode::create(Node::Kind::sourceFileProvide, outputPath, "", getInterfaceHash(), cache, g);
+      sourceFileNode = g.addNode(
+                                 NodeDependencyKey(NodeKind::sourceFileProvide, outputPath, ""), getInterfaceHash(), FrontendNode::Location::Here);
       
       addProviderNodesToGraph(); // must preceed dependencies for cascades
       addDependencyArcsToGraph();
@@ -190,17 +190,18 @@ namespace {
     }
     
     template <typename DeclT>
-    void addOneTypeOfProviderNodesToGraph(CPVec<DeclT> &decls, Node::Kind kind, std::string(*nameFn)(const DeclT *)) {
+    void addOneTypeOfProviderNodesToGraph(CPVec<DeclT> &decls, NodeKind kind, std::string(*nameFn)(const DeclT *)) {
       for (const auto* D: decls) {
         std::string nameForHolderOfMember{};
         // native nodes have non-empty container names
-        // TODO: centralize this invarient
-        MemoizedNode::create(kind,
-                             (*nameFn)(D),
-                             kind == Node::Kind::member ? computeContextNameOfMember(D) : sourceFileNode->getNameForDependencies(),
-                             "",
-                             cache,
-                             g);
+        // TODO: centralize this invariant
+        g.addNode(NodeDependencyKey(
+                                    kind,
+                                    (*nameFn)(D),
+                                    kind == NodeKind::member ? computeContextNameOfMember(D) : sourceFileNode->getNameForDependencies()
+                                    ),
+                  "",
+                  FrontendNode::Location::Here);
       }
     }
     /// name converters
@@ -215,7 +216,7 @@ namespace {
       return Mangler.mangleTypeAsContextUSR(NTD);
     }
     
-    template<Node::Kind kind>
+    template<NodeKind kind>
     void addOneTypeOfDependencyToGraph(const llvm::DenseMap<DeclBaseName, bool>& map) {
       for (const auto &p: map)
         addToGraphThatThisWholeFileDependsUpon(kind, "", p.first.userFacingName(), p.second);
@@ -228,12 +229,12 @@ namespace {
     
     void addOneTypeOfDependencyToGraph(ArrayRef<std::string> externals) {
       for (const auto &s: externals)
-        addToGraphThatThisWholeFileDependsUpon(Node::Kind::externalDepend, "", s, true);
+        addToGraphThatThisWholeFileDependsUpon(NodeKind::externalDepend, "", s, true);
     }
     
-    void addToGraphThatThisWholeFileDependsUpon(Node::Kind,
+    void addToGraphThatThisWholeFileDependsUpon(NodeKind,
                                                 const std::string &nameForHolderOfMember,
-                                                const std::string &dependedUponNameIfNotEmpty,
+                                                const std::string &dependeeNameIfNotEmpty,
                                                 bool cascades);
   };
 }
@@ -241,19 +242,19 @@ namespace {
 void GraphConstructor::addProviderNodesToGraph() {
   SourceFileDeclDemux demux(SF);
    // TODO: express the multiple provides and depends streams with variadic templates
-  addOneTypeOfProviderNodesToGraph(demux.precedenceGroups, Node::Kind::topLevel, getName);
-  addOneTypeOfProviderNodesToGraph(demux.memberOperatorDecls, Node::Kind::topLevel, getName);
-  addOneTypeOfProviderNodesToGraph(demux.operators, Node::Kind::topLevel, getName);
-  addOneTypeOfProviderNodesToGraph(demux.topNominals, Node::Kind::topLevel, getName);
-  addOneTypeOfProviderNodesToGraph(demux.topValues, Node::Kind::topLevel, getBaseName);
+  addOneTypeOfProviderNodesToGraph(demux.precedenceGroups, NodeKind::topLevel, getName);
+  addOneTypeOfProviderNodesToGraph(demux.memberOperatorDecls, NodeKind::topLevel, getName);
+  addOneTypeOfProviderNodesToGraph(demux.operators, NodeKind::topLevel, getName);
+  addOneTypeOfProviderNodesToGraph(demux.topNominals, NodeKind::topLevel, getName);
+  addOneTypeOfProviderNodesToGraph(demux.topValues, NodeKind::topLevel, getBaseName);
   
-  addOneTypeOfProviderNodesToGraph(demux.allNominals, Node::Kind::nominals, mangleTypeAsContext);
-  addOneTypeOfProviderNodesToGraph(demux.allNominals, Node::Kind::blankMembers, mangleTypeAsContext); // TODO: fix someday
+  addOneTypeOfProviderNodesToGraph(demux.allNominals, NodeKind::nominals, mangleTypeAsContext);
+  addOneTypeOfProviderNodesToGraph(demux.allNominals, NodeKind::blankMembers, mangleTypeAsContext); // TODO: fix someday
   
-  addOneTypeOfProviderNodesToGraph(demux.valuesInExtensions, Node::Kind::member, getBaseName);
+  addOneTypeOfProviderNodesToGraph(demux.valuesInExtensions, NodeKind::member, getBaseName);
   
   // could optimize by uniqueing by name, but then what of container?
-  addOneTypeOfProviderNodesToGraph(demux.classMembers, Node::Kind::dynamicLookup, getBaseName);
+  addOneTypeOfProviderNodesToGraph(demux.classMembers, NodeKind::dynamicLookup, getBaseName);
 }
 
 void GraphConstructor::addOneTypeOfDependencyToGraph(
@@ -265,12 +266,12 @@ void GraphConstructor::addOneTypeOfDependencyToGraph(
       holdersOfCascadingMembers.insert(entry.first.first);
   for (auto &entry: map) {
     const std::string mangledTypeAsContext = mangleTypeAsContext(entry.first.first);
-    addToGraphThatThisWholeFileDependsUpon(Node::Kind::nominals,
+    addToGraphThatThisWholeFileDependsUpon(NodeKind::nominals,
                                            "", // nominal name IS the holder
                                            mangledTypeAsContext,
                                            holdersOfCascadingMembers.count(entry.first.first) != 0);
     const bool isMemberBlank = entry.first.second.empty();
-    addToGraphThatThisWholeFileDependsUpon(isMemberBlank ? Node::Kind::blankMembers : Node::Kind::member,
+    addToGraphThatThisWholeFileDependsUpon(isMemberBlank ? NodeKind::blankMembers : NodeKind::member,
                   mangledTypeAsContext,
                   isMemberBlank ? "" : entry.first.second.userFacingName(),
                   entry.second);
@@ -281,26 +282,28 @@ void GraphConstructor::addOneTypeOfDependencyToGraph(
   // TODO: express the multiple provides and depends streams with variadic templates
 
 void GraphConstructor::addDependencyArcsToGraph() {
-  addOneTypeOfDependencyToGraph<Node::Kind::topLevel>(SF->getReferencedNameTracker()->getTopLevelNames());
+  addOneTypeOfDependencyToGraph<NodeKind::topLevel>(SF->getReferencedNameTracker()->getTopLevelNames());
   addOneTypeOfDependencyToGraph(SF->getReferencedNameTracker()->getUsedMembers());
-  addOneTypeOfDependencyToGraph<Node::Kind::dynamicLookup>(SF->getReferencedNameTracker()->getDynamicLookupNames());
+  addOneTypeOfDependencyToGraph<NodeKind::dynamicLookup>(SF->getReferencedNameTracker()->getDynamicLookupNames());
   addOneTypeOfDependencyToGraph(depTracker.getDependencies());
 }
 
-void GraphConstructor::addToGraphThatThisWholeFileDependsUpon(Node::Kind kind,
+void GraphConstructor::addToGraphThatThisWholeFileDependsUpon(NodeKind kind,
                                                               const std::string &nameForHolderOfMember,
-                                                              const std::string &dependedUponNameIfNotEmpty,
+                                                              const std::string &dependeeNameIfNotEmpty,
                                                               bool cascades) {
   // foreign nodes have empty container names
   // TODO: centralize this invarient
-  MemoizedNode *whatIsDependedUpon = MemoizedNode::create(kind, dependedUponNameIfNotEmpty, nameForHolderOfMember, "", cache, g);
+  FrontendNode *dependee = g.addNode(
+                                     NodeDependencyKey(kind,
+                                                       dependeeNameIfNotEmpty,
+                                                       nameForHolderOfMember),
+                                     "",
+                                     FrontendNode::Location::Elsewhere);
   if (!cascades)
-    g.addArc(sourceFileNode, whatIsDependedUpon);
+    g.addArc(sourceFileNode, dependee);
   else
-    std::for_each(cache.begin(), cache.end(),
-                  [&](std::pair<MemoizedNode::Key, MemoizedNode *> entry) {
-                    g.addArc(entry.second, whatIsDependedUpon);
-                  });
+    g.addArcFromEveryNodeHereTo(dependee);
 }
 
 
@@ -317,18 +320,14 @@ public:
   
   void newNode() const { out << "-\n"; }
   
-  template <typename T>
-  void entry(StringRef(key), T value) const {
-    out << " " << key << ": " << value << "\n";
+  void entry(const std::string &s) const {
+    out << " - " << llvm::yaml::escape(s) << "\n";
   }
-  void entry(StringRef(key), StringRef value) const {
-    out << " " << key << ": " << "\"" << llvm::yaml::escape(value) << "\"\n";
+  void entry(size_t n) const {
+    out << " - " << n << "\n";
   }
-  void entry(StringRef(key), const std::string &value) const {
-    entry(key, StringRef(value));
-  }
-  void entry(StringRef(key), ArrayRef<size_t> numbers) const {
-    out << " " << key << ": \n";
+  void entry(std::vector<size_t> &numbers) const {
+    out << " - \n";
     for (auto i: numbers)
       out << "  - " << i << "\n";
   }
@@ -357,14 +356,11 @@ namespace {
 template <>
 void GraphEmitter<YAMLEmitter>::emitNode(const FrontendNode* n) const {
   emitter.newNode();
-  // TODO: factor these strings with those in ExperimentalDependencyGraph.cpp
-  emitter.entry("kind", size_t(n->getKind()));
-  emitter.entry("nameForDependencies", n->getNameForDependencies());
-  emitter.entry("nameForHolderOfMember", n->getNameForHolderOfMember());
-  emitter.entry("fingerprint", n->getFingerprint());
-  emitter.entry("sequenceNumber", n->getSequenceNumber());
-  emitter.entry("departures", n->getDepartures());
-  emitter.entry("arrivals", n->getArrivals());
+  auto nn = const_cast<FrontendNode*>(n);
+  nn->serialize(
+               [&](size_t s) {emitter.entry(s);},
+               [&](std::string &s) {emitter.entry(s);},
+               [&](std::vector<size_t> &s) {emitter.entry(s);});
 }
 
 

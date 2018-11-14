@@ -39,40 +39,4 @@
 using namespace swift;
 using namespace experimental_dependencies;
 
-namespace {
-  
-
-} // namespace
-
-
-
-MemoizedNode *MemoizedNode::create(Kind kind,
-                                   std::string nameForDependencies,
-                                   std::string nameForHolderOfMember,
-                                   std::string fingerprint,
-                                   Cache &cache) {
-  auto key = createMemoizedKey(kind, nameForDependencies, nameForHolderOfMember);
-  auto iter = cache.find(key);
-  if (iter != cache.end())
-    return iter->second;
-  auto node = new MemoizedNode(kind, nameForDependencies, nameForHolderOfMember, fingerprint);
-  cache.insert(std::make_pair(key, node));
-  return node;
-}
-
-FrontendNode *FrontendNode::create(Kind kind,
-                                   std::string nameForDependencies,
-                                   std::string nameForHolderOfMember,
-                                   std::string fingerprint,
-                                   Cache &cache,
-                                   FrontendGraph &g) {
-  auto key = createMemoizedKey(kind, nameForDependencies, nameForHolderOfMember);
-  auto iter = cache.find(key);
-  if (iter != cache.end())
-    return iter->second;
-  auto node = new MemoizedNode(kind, nameForDependencies, nameForHolderOfMember, fingerprint);
-  cache.insert(std::make_pair(key, node));
-  g.addNode(node);
-  return node;
-}
 
