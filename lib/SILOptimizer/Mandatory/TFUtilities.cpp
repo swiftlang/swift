@@ -339,17 +339,27 @@ bool tf::isAcceleratorOnly(const SILFunction &hostFn) {
 // TensorFunctionClassifier Implementation
 //===----------------------------------------------------------------------===//
 
+// This function contains a (somewhat ad-hoc) set of heuristics and rules in
+// deciding what to partition (aka "transform").
+//
+// In general we first handle cases that do not need partition (cases that
+// "return false"), such as functions that are not defined in this module, or
+// functions that can and will be inlined.
+//
+// We then handle cases that should need partition, such as functions that are
+// public or marked @inline(never).
+//
+// For the remaining functions, we use the following heuristics to decide
+// whether to pratition them: If they take or return tensorflow values, inlining
+// them is believed to be profittable for GPE, so we do not partition
+// them. Otherwise we partition them.
 bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn,
                                                    bool forceTFFunctions) {
+  // Part 1: Functions that need no partition.
+
   // Ignore transparent functions.
   if (fn->isTransparent())
     return false;
-
-  auto hasInlinableAttrs = [&](Decl *decl) -> bool {
-    if (decl->getAttrs().hasAttribute<InlinableAttr>())
-      return true;
-    return false;
-  };
 
   // Don't transform functions that are marked @_inlineable or inline(always)
   // unless they are a thunk.  Thunks are only generated for inherently
@@ -358,6 +368,9 @@ bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn,
     if (fn->getInlineStrategy() == AlwaysInline)
       return false;
 
+    auto hasInlinableAttrs = [&](Decl *decl) -> bool {
+      return decl->getAttrs().hasAttribute<InlinableAttr>();
+    };
     if (auto dc = fn->getDeclContext()) {
       if (auto fnDecl = dc->getInnermostDeclarationDeclContext()) {
         if (hasInlinableAttrs(fnDecl))
@@ -371,6 +384,14 @@ bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn,
       }
     }
   }
+
+  // If this is a function that was inlined from some other module but only
+  // exists so we can see into it, don't transform it.  It won't be a canonical
+  // declaration for anything anyway.
+  if (isAvailableExternally(fn->getLinkage()))
+    return false;
+
+  // Part 2: Functions that must be partitioned.
 
   // Graph functions always get partitioned because they can be used as
   // attributes.
@@ -392,12 +413,6 @@ bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn,
   if (fn->getInlineStrategy() == NoInline)
     return true;
 
-  // If this is a function that was inlined from some other module but only
-  // exists so we can see into it, don't transform it.  It won't be a canonical
-  // declaration for anything anyway.
-  if (isAvailableExternally(fn->getLinkage()))
-    return false;
-
   // Something is creating public thunks around 'shared' implementations, which
   // prevents the above check from working.  Check for public functions.
   // FIXME: This should go away when we get deabstraction.
@@ -407,11 +422,12 @@ bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn,
         if (fd->getFormalAccess() >= AccessLevel::Public)
           return true;
 
-  // Otherwise, the function is either public and inlininable or it is internal
-  // to the current module.  In both cases, we check to see if the function
-  // takes TensorHandle values as arguments or results.  If so, then we know
-  // that it will be inlined away by deabstraction, and we don't need to touch
-  // it.
+  // Part 3: Use function signature to decide whether to partition.
+
+  // Otherwise, the function is either (public and inlininable) or it is
+  // internal to the current module.  In both cases, we check to see if the
+  // function takes tensorflow values as arguments or results.  If so, it will
+  // be inlined away by deabstraction, and we don't need to touch it.
   if (containsTensorFlowValue(fn->getLoweredFunctionType())) {
     if (forceTFFunctions) {
       // Return true if it is referenced somewhere.
