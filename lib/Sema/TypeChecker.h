@@ -1956,7 +1956,6 @@ public:
   /// Used in diagnostic %selects.
   enum class FragileFunctionKind : unsigned {
     Transparent,
-    InlineAlways,
     Inlinable,
     DefaultArgument,
     PropertyInitializer

@@ -172,7 +172,7 @@ internal func _numUTF16CodeUnits(_ scalar: Unicode.Scalar) -> Int {
 // Scalar helpers
 //
 extension _StringGuts {
-  @usableFromInline @inline(__always) // fast-path: fold common fastUTF8 check
+  @inlinable @inline(__always) // fast-path: fold common fastUTF8 check
   internal func scalarAlign(_ idx: Index) -> Index {
     // TODO(String performance): isASCII check
 

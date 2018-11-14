@@ -221,7 +221,7 @@ public func Random() -> Int64 {
   return lfsrRandomGenerator.randInt()
 }
 
-@inline(__always)
+@inlinable @inline(__always)
 public func CheckResults(
     _ resultsMatch: Bool,
     file: StaticString = #file,

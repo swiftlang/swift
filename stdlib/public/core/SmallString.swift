@@ -192,7 +192,7 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
     }
   }
 
-  @usableFromInline // testable
+  @inlinable // testable
   internal subscript(_ bounds: Range<Index>) -> SubSequence {
     @inline(__always) get {
       // TODO(String performance): In-vector-register operation

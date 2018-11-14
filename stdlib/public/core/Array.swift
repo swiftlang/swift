@@ -384,7 +384,7 @@ extension Array {
   }
 
   @_semantics("array.get_element")
-  @inline(__always)
+  @inlinable @inline(__always)
   public // @testable
   func _getElement(
     _ index: Int,
@@ -440,7 +440,7 @@ extension Array: _ArrayProtocol {
   @inlinable
   public // @testable
   var _owner: AnyObject? {
-    @inline(__always)
+    @inlinable @inline(__always)
     get {
       return _buffer.owner      
     }
@@ -1447,7 +1447,7 @@ extension Array {
   ///   method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_semantics("array.withUnsafeMutableBufferPointer")
-  @inline(__always) // Performance: This method should get inlined into the
+  @inlinable @inline(__always) // Performance: This method should get inlined into the
   // caller such that we can combine the partial apply with the apply in this
   // function saving on allocating a closure context. This becomes unnecessary
   // once we allocate noescape closures on the stack.
