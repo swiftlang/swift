@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 5 -typecheck -dump-ast %s 2>&1 | %FileCheck  %s
+// RUN: %target-swift-frontend -swift-version 5 -typecheck -dump-ast %s | %FileCheck  %s
 
 struct Strukt {
   // CHECK: (struct_decl {{.*}} "Strukt"
