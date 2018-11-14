@@ -2470,6 +2470,7 @@ public:
 
   void visitBoundVariable(VarDecl *VD) {
     TC.validateDecl(VD);
+    TC.addImplicitDynamicAttribute(VD);
 
     // Set up accessors.
     maybeAddAccessorsToStorage(TC, VD);
