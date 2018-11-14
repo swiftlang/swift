@@ -3319,6 +3319,10 @@ struct TargetResilientClassMetadataPattern {
 using ResilientClassMetadataPattern =
   TargetResilientClassMetadataPattern<InProcess>;
 
+extern "C" {
+  extern const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(Bo);
+}
+
 /// The control structure for performing non-trivial initialization of
 /// singleton value metadata, which is required when e.g. a non-generic
 /// value type has a resilient component type.
@@ -3362,6 +3366,7 @@ struct TargetSingletonMetadataInitialization {
       return ResilientPattern->RelocationFunction(description,
                                                   ResilientPattern.get());
     }
+    IncompleteMetadata.get()->setValueWitnesses(&VALUE_WITNESS_SYM(Bo));
     return IncompleteMetadata.get();
   }
 };
