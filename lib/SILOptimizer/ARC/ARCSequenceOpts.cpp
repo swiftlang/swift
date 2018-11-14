@@ -41,6 +41,17 @@ STATISTIC(NumRefCountOpsRemoved, "Total number of increments removed");
 
 llvm::cl::opt<bool> EnableLoopARC("enable-loop-arc", llvm::cl::init(false));
 
+// SWIFT_ENABLE_TENSORFLOW
+llvm::cl::opt<bool> TFReduceOptimizingPasses(
+    "tf-reduce-optimizing-passes", llvm::cl::init(false),
+    llvm::cl::desc("When true, selectively turn off some optimization passes "
+                   "(e.g. ARCSequenceOpts, ReleaseHosting) that are expensive "
+                   "and are assumed to only provide only limited benefits for "
+                   "Swift for TensorFlow programs."));
+namespace llvm {
+extern cl::opt<bool> TFDynamicCompilation;
+}
+
 //===----------------------------------------------------------------------===//
 //                                Code Motion
 //===----------------------------------------------------------------------===//
@@ -264,6 +275,15 @@ namespace {
 class ARCSequenceOpts : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
+
+    // This pass could consume up to 70% of total compilation time in graph
+    // mode, and does not yield clear benefit. So add a code path to turn it
+    // off.
+#ifdef SWIFT_ENABLE_TENSORFLOW
+    if (TFReduceOptimizingPasses && !llvm::TFDynamicCompilation)
+      return;
+#endif
+
     auto *F = getFunction();
     // If ARC optimizations are disabled, don't optimize anything and bail.
     if (!getOptions().EnableARCOptimizations)

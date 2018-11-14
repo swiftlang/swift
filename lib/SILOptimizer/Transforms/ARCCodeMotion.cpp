@@ -96,6 +96,12 @@ STATISTIC(NumReleasesHoisted, "Number of releases hoisted");
 
 llvm::cl::opt<bool> DisableARCCodeMotion("disable-arc-cm", llvm::cl::init(false));
 
+// SWIFT_ENABLE_TENSORFLOW
+extern llvm::cl::opt<bool> TFReduceOptimizingPasses;
+namespace llvm {
+extern cl::opt<bool> TFDynamicCompilation;
+}
+
 //===----------------------------------------------------------------------===//
 //                             Block State 
 //===----------------------------------------------------------------------===//
@@ -1141,6 +1147,15 @@ public:
 
   /// The entry point to the transformation.
   void run() override {
+    // This pass (in particular ReleaseHoisting) could consume up to 30% of
+    // total compilation time in graph mode (after disabling the ARCSequenceOpts
+    // pass first), and does not yield clear benefit. So add a code path to turn
+    // it off.
+#ifdef SWIFT_ENABLE_TENSORFLOW
+    if (TFReduceOptimizingPasses && !llvm::TFDynamicCompilation)
+      return;
+#endif
+
     // Code motion disabled.
     if (DisableARCCodeMotion)
       return;
