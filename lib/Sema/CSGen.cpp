@@ -1306,7 +1306,7 @@ namespace {
       // use the right labels before forming the call to the initializer.
       DeclName constrName = tc.getObjectLiteralConstructorName(expr);
       assert(constrName);
-      ArrayRef<ValueDecl *> constrs = protocol->lookupDirect(constrName);
+      auto constrs = protocol->lookupDirect(constrName);
       if (constrs.size() != 1 || !isa<ConstructorDecl>(constrs.front())) {
         tc.diagnose(protocol, diag::object_literal_broken_proto);
         return nullptr;
