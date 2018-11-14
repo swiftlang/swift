@@ -893,10 +893,14 @@ SubclassScope SILDeclRef::getSubclassScope() const {
     return SubclassScope::NotApplicable;
 
   // If this declaration is a function which goes into a vtable, then it's
-  // symbol must be as visible as its class. Derived classes even have to put
+  // symbol must be as visible as its class, because derived classes have to put
   // all less visible methods of the base class into their vtables.
 
-  auto *FD = dyn_cast<AbstractFunctionDecl>(getDecl());
+  if (auto *CD = dyn_cast<ConstructorDecl>(getDecl()))
+    if (!CD->isRequired())
+      return SubclassScope::NotApplicable;
+
+  auto *FD = dyn_cast<FuncDecl>(getDecl());
   if (!FD)
     return SubclassScope::NotApplicable;
 
@@ -924,6 +928,9 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   assert(FD->getEffectiveAccess() <= classType->getEffectiveAccess() &&
          "class must be as visible as its members");
 
+  if (classType->isResilient())
+    return SubclassScope::Resilient;
+
   switch (classType->getEffectiveAccess()) {
   case AccessLevel::Private:
   case AccessLevel::FilePrivate:
@@ -932,8 +939,6 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   case AccessLevel::Public:
     return SubclassScope::Internal;
   case AccessLevel::Open:
-    if (classType->isResilient())
-      return SubclassScope::Internal;
     return SubclassScope::External;
   }
 
