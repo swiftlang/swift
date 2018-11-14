@@ -991,7 +991,7 @@ public:
   void addImports(ArrayRef<ImportedModuleDesc> IM);
 
   enum ImportQueryKind {
-    /// Return the resuls for testable or private imports.
+    /// Return the results for testable or private imports.
     TestableAndPrivate,
     /// Return the results only for testable imports.
     TestableOnly,
