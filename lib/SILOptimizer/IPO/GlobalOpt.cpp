@@ -200,7 +200,7 @@ public:
 // If this is a call to a global initializer, map it.
 void SILGlobalOpt::collectGlobalInitCall(ApplyInst *AI) {
   SILFunction *F = AI->getReferencedFunction();
-  if (!F || !F->isGlobalInit())
+  if (!F || !F->isGlobalInit() || !ApplySite(AI).canOptimize())
     return;
 
   GlobalInitCallMap[F].push_back(AI);
