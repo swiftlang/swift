@@ -4,6 +4,8 @@ include("../../../../cmake/modules/StandaloneOverlay.cmake")
 add_swift_target_library(swiftCoreFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   CoreFoundation.swift
 
+  "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
+
   SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   SWIFT_MODULE_DEPENDS_OSX Darwin Dispatch ObjectiveC # auto-updated
