@@ -25,6 +25,7 @@
 
 namespace swift {
   class DiagnosticArgument;
+  class DiagnosticEngine;
   class SourceManager;
   enum class DiagID : uint32_t;
 
@@ -115,6 +116,19 @@ public:
 /// \brief DiagnosticConsumer that discards all diagnostics.
 class NullDiagnosticConsumer : public DiagnosticConsumer {
 public:
+  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
+                        DiagnosticKind Kind,
+                        StringRef FormatString,
+                        ArrayRef<DiagnosticArgument> FormatArgs,
+                        const DiagnosticInfo &Info) override;
+};
+
+/// \brief DiagnosticConsumer that forwards diagnostics to the consumers of
+// another DiagnosticEngine.
+class ForwardingDiagnosticConsumer : public DiagnosticConsumer {
+  DiagnosticEngine &TargetEngine;
+public:
+  ForwardingDiagnosticConsumer(DiagnosticEngine &Target);
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                         DiagnosticKind Kind,
                         StringRef FormatString,
