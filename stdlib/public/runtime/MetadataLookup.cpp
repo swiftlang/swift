@@ -1066,8 +1066,7 @@ public:
                                                           genericParamCounts);
       bool failed =
         _checkGenericRequirements(genericContext->getGenericRequirements(),
-                                  allGenericArgsVec, substitutions,
-                                  substitutions);
+                                  allGenericArgsVec, substitutions);
       if (failed)
         return BuiltType();
 
@@ -1331,29 +1330,6 @@ void SubstGenericParametersFromMetadata::setup() const {
     return;
 
   buildDescriptorPath(base->getTypeContextDescriptor());
-}
-
-const Metadata *
-SubstGenericParametersFromMetadata::operator()(unsigned flatIndex) const {
-  // On first access, compute the descriptor path.
-  setup();
-
-  // Find the depth at which this parameter occurs.
-  unsigned depth = descriptorPath.size();
-  unsigned index = flatIndex;
-  for (const auto &pathElement : descriptorPath) {
-    // If the flat index is beyond the element at this position, we're done.
-    if (flatIndex >= pathElement.context->getNumGenericParams()) {
-      // Subtract off the number of parameters.
-      index -= pathElement.context->getNumGenericParams();
-      break;
-    }
-
-    --depth;
-  }
-
-  // Perform the access based on depth/index.
-  return (*this)(depth, index);
 }
 
 const Metadata *

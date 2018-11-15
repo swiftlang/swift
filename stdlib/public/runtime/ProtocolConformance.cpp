@@ -163,7 +163,7 @@ ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
     SubstGenericParametersFromMetadata substitutions(type);
     bool failed =
       _checkGenericRequirements(getConditionalRequirements(), conditionalArgs,
-                                substitutions, substitutions);
+                                substitutions);
     if (failed) return nullptr;
   }
 
@@ -619,7 +619,6 @@ swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
 bool swift::_checkGenericRequirements(
                       llvm::ArrayRef<GenericRequirementDescriptor> requirements,
                       std::vector<const void *> &extraArguments,
-                      SubstFlatGenericParameterFn substFlatGenericParam,
                       SubstGenericParameterFn substGenericParam) {
   for (const auto &req : requirements) {
     // Make sure we understand the requirement we're dealing with.

@@ -224,12 +224,6 @@ public:
   Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type,
                                                       Demangle::Demangler &Dem);
 
-  /// Callback used to provide the substitution for a generic parameter
-  /// referenced by a "flat" index (where all depths have been collapsed)
-  /// to its metadata.
-  using SubstFlatGenericParameterFn =
-    llvm::function_ref<const Metadata *(unsigned flatIndex)>;
-
   /// Callback used to provide the substitution of a generic parameter
   /// (described by depth/index) to its metadata.
   using SubstGenericParameterFn =
@@ -277,7 +271,6 @@ public:
     explicit SubstGenericParametersFromMetadata(const Metadata *base)
       : base(base) { }
 
-    const Metadata *operator()(unsigned flatIndex) const;
     const Metadata *operator()(unsigned depth, unsigned index) const;
   };
 
@@ -346,7 +339,6 @@ public:
   bool _checkGenericRequirements(
                     llvm::ArrayRef<GenericRequirementDescriptor> requirements,
                     std::vector<const void *> &extraArguments,
-                    SubstFlatGenericParameterFn substFlatGenericParam,
                     SubstGenericParameterFn substGenericParam);
 
   /// A helper function which avoids performing a store if the destination
