@@ -2947,10 +2947,9 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   auto theConformance = cast<RootProtocolConformance>(
                           MF->readConformance(SILCursor).getConcrete());
 
-  PrettyStackTraceType trace(SILMod.getASTContext(),
-                             "deserializing SIL witness table for",
-                             theConformance->getType());
-  PrettyStackTraceDecl trace2("... to", theConformance->getProtocol());
+  PrettyStackTraceConformance trace(SILMod.getASTContext(),
+                                    "deserializing SIL witness table for",
+                                    theConformance);
 
   if (!existingWt)
     existingWt = SILMod.lookUpWitnessTable(theConformance, false);

@@ -2203,9 +2203,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     return;
 
   auto conf = wt->getConformance();
-  PrettyStackTraceType stackTraceRAII(Context, "emitting witness table for",
-                                      conf->getType());
-  PrettyStackTraceDecl stackTraceRAII2("...conforming to", conf->getProtocol());
+  PrettyStackTraceConformance _st(Context, "emitting witness table for", conf);
 
   // Build the witness table.
   ConstantInitBuilder builder(*this);

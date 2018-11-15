@@ -4321,9 +4321,7 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
 }
 
 void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
-  PrettyStackTraceType trace1(Context, "checking conformance of",
-                              conformance->getType());
-  PrettyStackTraceDecl trace2("...to", conformance->getProtocol());
+  PrettyStackTraceConformance trace(Context, "type-checking", conformance);
 
   MultiConformanceChecker checker(*this);
   checker.addConformance(conformance);
@@ -4336,9 +4334,8 @@ void TypeChecker::checkConformanceRequirements(
   if (conformance->isInvalid())
     return;
 
-  PrettyStackTraceType trace1(Context, "checking conformance requirements of",
-                              conformance->getType());
-  PrettyStackTraceDecl trace2("...to", conformance->getProtocol());
+  PrettyStackTraceConformance trace(Context, "checking requirements of",
+                                    conformance);
 
   conformance->setSignatureConformances({ });
 
