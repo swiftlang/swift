@@ -7,8 +7,6 @@ add_swift_host_tool(swift
   LINK_LIBRARIES
     swiftDriver
     swiftFrontendTool
-  LLVM_COMPONENT_DEPENDS
-    DebugInfoCodeView
   SWIFT_COMPONENT compiler
 )
 
