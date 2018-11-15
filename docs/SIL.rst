@@ -5457,15 +5457,13 @@ autodiff_function
 ::
 
   sil-instruction ::= 'autodiff_function'
-                      sil-autodiff-function-legacy-reverse-mode?
                       sil-autodiff-function-parameter-indices?
                       sil-autodiff-function-order?
                       sil-value ':' sil-type
                       sil-autodiff-associated-functions-clause?
                       
-  sil-autodiff-function-legacy-reverse-mode ::= '[' 'legacy_reverse' ']'
   sil-autodiff-function-parameter-indices ::= '[' 'wrt' [0-9]+ (',', [0-9]+)* ']'
-  sil-autodiff-function-order ::= '[' 'order' [0-9]+ ']'
+  sil-autodiff-function-differentiation-order ::= '[' 'order' [0-9]+ ']'
   sil-autodiff-associated-functions-clause ::= 'with' sil-autodiff-associated-function-list
                                                (',' sil-autodiff-associated-function-list)*
   sil-autodiff-associated-function-list ::= '{' sil-value ',' sil-value '}'
@@ -5473,18 +5471,13 @@ autodiff_function
 
   autodiff_function [wrt 0] [order 1] %0 : $(T) -> T \
     with {%1 : $(T) -> (T) -> T, %2 : $(T) -> (T) -> T}
-  autodiff_function [legacy_reverse] [wrt 0] [order 1] %0 : $(T) -> T \
-    with {%1 : $(T) -> (..., T), %2 : $(T, ..., T, T) -> T}
 
 Bundles a function with its associated differentiation functions up to a
 specified differentiation order into an ``@autodiff`` function. There are 2
 associated functions per differentiation order: a Jacobian-vector products
 (JVP) function and a vector-Jacobian products (VJP) function.
-When ``[legacy_reverse]`` is specified, only first-order reverse-mode
-differentiation is legal, and functions being bundled are the primal function
-and the adjoint function.
 
-``[parameters ...]`` specifies parameter indices that the original function is
+``[wrt ...]`` specifies parameter indices that the original function is
 differentiable with respect to. When not specified, it defaults to all
 parameters.
 
@@ -5506,24 +5499,21 @@ autodiff_function_extract
 ::
 
   sil-instruction ::= 'autodiff_function_extract'
-                      sil-autodiff-function-legacy-reverse-mode?
                       sil-autodiff-associated-function-kind
-                      sil-value ':' sil-type 'order' sil-value ':' sil-type
+                      sil-autodiff-function-order
+                      sil-value ':' sil-type
 
   sil-autodiff-associated-function-kind ::= '[' sil-autodiff-associated-function-kind-name ']'
-  sil-autodiff-associated-function-kind-name ::= 'primal' | 'adjoint' | 'jvp' | 'vjp'
+  sil-autodiff-associated-function-kind-name ::= 'jvp' | 'vjp'
+  sil-autodiff-function-differentiation-order ::= '[' 'order' [0-9]+ ']'
 
 
-  autodiff_function_extract [jvp] %0 : $@autodiff (T) -> T order %1 : $Builtin.Int64
-  autodiff_function_extract [legacy_reverse] [primal] %0 : $@autodiff (T) -> T order %1 : $Builtin.Int64
+  autodiff_function_extract [jvp] [order 1] %0 : $@autodiff (T) -> T
+  autodiff_function_extract [vjp] [order 1] %0 : $@autodiff (T) -> T
 
 Extracts an associated differentiation function from the given ``@autodiff``
 function at a specific differentiation order. It must be provided with an
-associated function kind.
-
-When ``[legacy_reverse]`` is specified, ``[primal]`` and ``[adjoint]`` are the
-available associated function kinds. Otherwise, ``[jvp]`` and ``[vjp]`` are
-available instead.
+associated function kind: ``[jvp]`` or ``[vjp]``.
 
 .. SWIFT_ENABLE_TENSORFLOW
 
