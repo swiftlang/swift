@@ -94,7 +94,6 @@ void ExistentialSpecializerCloner::cloneAndPopulateFunction() {
   SILModule &M = OrigF->getModule();
   auto &Ctx = M.getASTContext();
   llvm::SmallDenseMap<int, AllocStackInst *> ArgToAllocStackMap;
-  bool MissingDestroyUse = false;
 
   NewFBuilder.setInsertionPoint(ClonedEntryBB);
 
@@ -153,9 +152,7 @@ void ExistentialSpecializerCloner::cloneAndPopulateFunction() {
             IsInitialization_t::IsInitialization);
         if (ExistentialArgDescriptor[ArgDesc.Index].DestroyAddrUse) {
           NewFBuilder.createDestroyAddr(InsertLoc, NewArg);
-        } else {
-          MissingDestroyUse = true;
-        }
+        } 
         entryArgs.push_back(ASI);
         break;
       }
@@ -189,45 +186,30 @@ void ExistentialSpecializerCloner::cloneAndPopulateFunction() {
   // entry block, cloning all instructions and terminators.
   cloneFunctionBody(&Original, ClonedEntryBB, entryArgs);
 
-  /// If there is an argument with no DestroyUse, insert DeallocStack
-  /// before return Instruction.
+  /// Insert DeallocStack before return Instruction.
   llvm::SmallPtrSet<ReturnInst *, 4> ReturnInsts;
-  if (MissingDestroyUse) {
-    /// Find the set of return instructions in a function.
-    for (auto &BB : NewF) {
-      TermInst *TI = BB.getTerminator();
-      if (auto *RI = dyn_cast<ReturnInst>(TI)) {
-        ReturnInsts.insert(RI);
-      }
+  /// Find the set of return instructions in a function.
+  for (auto &BB : NewF) {
+    TermInst *TI = BB.getTerminator();
+    if (auto *RI = dyn_cast<ReturnInst>(TI)) {
+      ReturnInsts.insert(RI);
     }
   }
 
-  /// Walk over destroy_addr instructions and perform fixups.
+  /// Walk over ReturnInsts and insert dealloc_stack.
   for (auto &ArgDesc : reversed(ArgumentDescList)) {
     int ArgIndex = ArgDesc.Index;
     auto iter = ArgToAllocStackMap.find(ArgIndex);
     if (iter != ArgToAllocStackMap.end()) {
-      auto it = ExistentialArgDescriptor.find(ArgIndex);
-      if (it != ExistentialArgDescriptor.end() && it->second.DestroyAddrUse) {
-        for (Operand *ASIUse : iter->second->getUses()) {
-          auto *ASIUser = ASIUse->getUser();
-          if (auto *DAI = dyn_cast<DestroyAddrInst>(ASIUser)) {
-            SILBuilder Builder(ASIUser);
-            Builder.setInsertionPoint(&*std::next(ASIUser->getIterator()));
-            Builder.createDeallocStack(DAI->getLoc(), iter->second);
-          }
-        }
-      } else { // Need to insert DeallocStack before return.
-        for (auto *I : ReturnInsts) {
-          SILBuilder Builder(I->getParent());
-          Builder.setInsertionPoint(I);
-          Builder.createDeallocStack(iter->second->getLoc(), iter->second);
-        }
+      // Need to insert DeallocStack before return.
+      for (auto *I : ReturnInsts) {
+        SILBuilder Builder(I->getParent());
+        Builder.setInsertionPoint(I);
+        Builder.createDeallocStack(iter->second->getLoc(), iter->second);
       }
     }
   }
 }
-
 /// Create a new function name for the newly generated protocol constrained
 /// generic function.
 std::string ExistentialTransform::createExistentialSpecializedFunctionName() {
