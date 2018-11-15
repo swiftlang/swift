@@ -350,7 +350,7 @@ bool tf::isAcceleratorOnly(const SILFunction &hostFn) {
 // public or marked @inline(never).
 //
 // For the remaining functions, we use the following heuristics to decide
-// whether to pratition them: If they take or return tensorflow values, inlining
+// whether to partition them: If they take or return tensorflow values, inlining
 // them is believed to be profittable for GPE, so we do not partition
 // them. Otherwise we partition them.
 bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn,
@@ -385,9 +385,9 @@ bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn,
     }
   }
 
-  // If this is a function that was inlined from some other module but only
-  // exists so we can see into it, don't transform it.  It won't be a canonical
-  // declaration for anything anyway.
+  // If this is a function defined in some other module, don't transform it.
+  // We might still try inlining it into some call-sites defined in this module,
+  // but we never partition externally defined functions.
   if (isAvailableExternally(fn->getLinkage()))
     return false;
 
