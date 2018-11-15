@@ -2451,7 +2451,7 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
 }
 
 void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
-  if (!decl->getModuleContext()->isImplicitDynamicEnabled())
+  if (!D->getModuleContext()->isImplicitDynamicEnabled())
     return;
 
   // Add the attribute if the decl kind allows it and it is not an accessor
