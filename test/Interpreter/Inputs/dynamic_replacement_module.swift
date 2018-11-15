@@ -101,7 +101,7 @@ public struct PublicStruct {
   public func genericFunction<T>(_ t: T.Type) -> String {
     return "public_struct_generic_func"
   }
-  public var public_stored_property : String = "public_stored_property"
+  dynamic public var public_stored_property : String = "public_stored_property"
 
   public subscript(_ x: Int) -> String {
     get {
