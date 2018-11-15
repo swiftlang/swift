@@ -91,8 +91,8 @@ void checkGenericParamList(TypeChecker &tc,
               auto reqRHSType = req.getSecondType();
               
               if (extType->isExistentialType() &&
-                  reqLHSType->isEqual(extSelfType)
-                  && reqRHSType->isEqual(extType)) {
+                  reqLHSType->isEqual(extSelfType) &&
+                  reqRHSType->isEqual(extType)) {
                 
                 auto &ctx = extDecl->getASTContext();
                 ctx.Diags.diagnose(extDecl->getLoc(),
