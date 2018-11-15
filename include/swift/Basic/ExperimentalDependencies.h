@@ -63,6 +63,10 @@ namespace experimental_dependencies {
       nameForDependencies == rhs.nameForDependencies  &&
       nameForHolderOfMember == rhs.nameForHolderOfMember;
     }
+    
+    bool operator != (const NodeDependencyKey& rhs) const {
+      return !(*this == rhs);
+    }
 
     
     size_t hash() const {

@@ -105,10 +105,24 @@ namespace swift {
       
        
         DependencyGraphImpl::LoadResult integrate(const FrontendGraph &);
+        
+        struct IntegrationResult {
+          DriverNode *const node;
+          const bool isNewToFile;
+          const bool isNewToGraph;
+          const bool mustRecompileDependers;
+        }
        
-        void integrateHereNode(const FrontendNode *integrand, const std::string &depsFilename, NodesByKey &nodesInFile, NodesByKey &nodesToRemove);
-        void integrateElsewhereNode(const FrontendNode *integrand);
-        void rememberToPropagateChangesFrom(DriverNode* n);
+        /// Return a node IF a new one was added to the file
+        DriverNode *integrateHereNode(const FrontendNode *integrand, const std::string &depsFilename,
+                               std::unordered_set<NodeDependencyKey>&);
+        void integrateElsewhereNode(const FrontendNode *integrand,
+                                    std::unordered_set<NodeDependencyKey>&);
+        
+        std::pair<DriverNode *, bool> findExistingNodeRelocatingIfNeeded(
+                                               const std::string &depsFilename,
+                                               const NodeDependencyKey &key);
+        DriverNode *findAndRemoveExpat(const NodeDependencyKey&);
         
         void updateDependersByDependeesFor(const FrontendNode* n, const FrontendGraph& g);
         
