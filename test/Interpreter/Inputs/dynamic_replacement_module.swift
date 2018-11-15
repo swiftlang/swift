@@ -66,7 +66,7 @@ public enum PublicEnumeration<Q> {
   }
 }
 #elseif MODULENODYNAMIC
-public var public_global_var = "public_global_var"
+public dynamic var public_global_var = "public_global_var"
 
 public func public_global_func() -> String {
   return "public_global_func"
