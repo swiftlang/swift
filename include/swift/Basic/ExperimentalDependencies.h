@@ -229,6 +229,7 @@ namespace experimental_dependencies {
       for (size_t i = 0;  i < hereNodeCount;  ++i)
         fn(allNodes[i]);
     }
+    // TODO: next two may be unused
     template <typename FnT>
     void forEachHereNode(FnT fn) const {
       for (size_t i = 0;  i < hereNodeCount;  ++i)
@@ -239,6 +240,12 @@ namespace experimental_dependencies {
       for (size_t i = hereNodeCount;  i < allNodes.size();  ++i)
         fn(allNodes[i]);
     }
+    template <typename FnT>
+    void forEachNode(FnT fn) const {
+      for (auto *n: allNodes)
+        fn(n);
+    }
+
     
     template <typename FnT>
     void forEachDependerOn(const FrontendNode *n, FnT fn) const {

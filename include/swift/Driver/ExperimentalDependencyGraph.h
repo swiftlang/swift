@@ -108,25 +108,19 @@ namespace swift {
         
         struct IntegrationResult {
           DriverNode *const node;
-          const bool isNewToFile;
+          const bool isNewToHolder;
           const bool isNewToGraph;
           const bool mustRecompileDependers;
-        }
+        };
        
         /// Return a node IF a new one was added to the file
-        DriverNode *integrateHereNode(const FrontendNode *integrand, const std::string &depsFilename,
-                               std::unordered_set<NodeDependencyKey>&);
-        void integrateElsewhereNode(const FrontendNode *integrand,
-                                    std::unordered_set<NodeDependencyKey>&);
+        IntegrationResult integrateNode(const FrontendNode *integrand, const NodesByKey &holder);
         
-        std::pair<DriverNode *, bool> findExistingNodeRelocatingIfNeeded(
-                                               const std::string &depsFilename,
-                                               const NodeDependencyKey &key);
+ 
         DriverNode *findAndRemoveExpat(const NodeDependencyKey&);
         
         void updateDependersByDependeesFor(const FrontendNode* n, const FrontendGraph& g);
         
-        void addNode(StringRef swiftDeps, DriverNode *n);
         void removeNode(StringRef swiftDeps, DriverNode *n);
       };
     } // experimental_dependencies
