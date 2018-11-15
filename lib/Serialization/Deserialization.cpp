@@ -473,6 +473,14 @@ ProtocolConformanceRef ModuleFile::readConformance(
     return ProtocolConformanceRef(proto);
   }
 
+  case SELF_PROTOCOL_CONFORMANCE: {
+    DeclID protoID;
+    SelfProtocolConformanceLayout::readRecord(scratch, protoID);
+    auto proto = cast<ProtocolDecl>(getDecl(protoID));
+    auto conformance = getContext().getSelfConformance(proto);
+    return ProtocolConformanceRef(conformance);
+  }
+
   case SPECIALIZED_PROTOCOL_CONFORMANCE: {
     TypeID conformingTypeID;
     SubstitutionMapID substitutionMapID;

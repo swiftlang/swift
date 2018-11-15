@@ -25,6 +25,7 @@ namespace swift {
 
 class AbstractClosureExpr;
 class ConformanceAccessPath;
+class RootProtocolConformance;
 
 namespace Mangle {
 
@@ -114,7 +115,7 @@ public:
                                            const ConstructorDecl *Derived,
                                            bool isAllocating);
 
-  std::string mangleWitnessTable(const NormalProtocolConformance *C);
+  std::string mangleWitnessTable(const RootProtocolConformance *C);
 
   std::string mangleWitnessThunk(const ProtocolConformance *Conformance,
                                  const ValueDecl *Requirement);
@@ -295,8 +296,7 @@ protected:
   void appendEntity(const ValueDecl *decl);
 
   void appendProtocolConformance(const ProtocolConformance *conformance);
-  void appendProtocolConformanceRef(
-                                const NormalProtocolConformance *conformance);
+  void appendProtocolConformanceRef(const RootProtocolConformance *conformance);
   void appendConcreteProtocolConformance(
                                         const ProtocolConformance *conformance);
   void appendDependentProtocolConformance(const ConformanceAccessPath &path);

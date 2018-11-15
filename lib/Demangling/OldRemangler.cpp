@@ -818,6 +818,11 @@ void Remangler::mangleProtocolConformanceDescriptor(Node *node) {
   mangleProtocolConformance(node->begin()[0]);
 }
 
+void Remangler::mangleProtocolSelfConformanceDescriptor(Node *node) {
+  Out << "MS";
+  mangleProtocol(node->begin()[0]);
+}
+
 void Remangler::manglePartialApplyForwarder(Node *node) {
   Out << "PA__T";
   mangleSingleChildNode(node); // global
@@ -883,6 +888,11 @@ void Remangler::mangleFieldOffset(Node *node) {
 void Remangler::mangleEnumCase(Node *node) {
   Out << "WC";
   mangleSingleChildNode(node); // enum case
+}
+
+void Remangler::mangleProtocolSelfConformanceWitnessTable(Node *node) {
+  Out << "WS";
+  mangleSingleChildNode(node); // protocol
 }
 
 void Remangler::mangleProtocolWitnessTable(Node *node) {
@@ -959,6 +969,11 @@ void Remangler::mangleReabstractionThunk(Node *node) {
   Out << "Tr";
   if (node->getNumChildren() == 3) Out << 'G';
   mangleChildNodes(node); // generic signature?, type, type
+}
+
+void Remangler::mangleProtocolSelfConformanceWitness(Node *node) {
+  Out << "TS";
+  mangleSingleChildNode(node); // entity
 }
 
 void Remangler::mangleProtocolWitness(Node *node) {

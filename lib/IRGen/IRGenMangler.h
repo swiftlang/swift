@@ -218,12 +218,7 @@ public:
   }
 
   std::string mangleProtocolConformanceDescriptor(
-                                 const ProtocolConformance *Conformance) {
-    beginMangling();
-    appendProtocolConformance(Conformance);
-    appendOperator("Mc");
-    return finalize();
-  }
+                                   const RootProtocolConformance *conformance);
   
   std::string manglePropertyDescriptor(const AbstractStorageDecl *storage) {
     beginMangling();
@@ -244,10 +239,6 @@ public:
     appendEntity(Decl);
     appendOperator("WC");
     return finalize();
-  }
-
-  std::string mangleDirectProtocolWitnessTable(const ProtocolConformance *C) {
-    return mangleConformanceSymbol(Type(), C, "WP");
   }
 
   std::string mangleProtocolWitnessTablePattern(const ProtocolConformance *C) {

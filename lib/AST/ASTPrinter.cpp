@@ -4355,6 +4355,12 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
        << " module " << normal->getDeclContext()->getParentModule()->getName();
     break;
   }
+  case ProtocolConformanceKind::Self: {
+    auto self = cast<SelfProtocolConformance>(this);
+    os << self->getProtocol()->getName()
+       << " module " << self->getDeclContext()->getParentModule()->getName();
+    break;
+  }
   case ProtocolConformanceKind::Specialized: {
     auto spec = cast<SpecializedProtocolConformance>(this);
     os << "specialize <";

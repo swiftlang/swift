@@ -133,6 +133,8 @@ Globals
 
   global ::= type 'w' VALUE-WITNESS-KIND // value witness
 
+  global ::= protocol 'MS'               // protocol self-conformance descriptor
+  global ::= protocol 'WS'               // protocol self-conformance witness table
   global ::= protocol-conformance 'Mc'   // protocol conformance descriptor
   global ::= protocol-conformance 'WP'   // protocol witness table
   global ::= protocol-conformance 'Wa'   // protocol witness table accessor (HISTORICAL)
@@ -181,6 +183,7 @@ types where the metadata itself has unknown layout.)
   global ::= type label-list? 'D'        // type mangling for the debugger with label list for function types.
   global ::= type 'TC'                   // continuation prototype (not actually used for real symbols)
   global ::= protocol-conformance entity 'TW' // protocol witness thunk
+  global ::= protocol-conformance entity 'TS' // protocol self-conformance witness thunk
   global ::= context identifier identifier 'TB' // property behavior initializer thunk (not used currently)
   global ::= context identifier identifier 'Tb' // property behavior setter thunk (not used currently)
   global ::= global specialization       // function specialization
