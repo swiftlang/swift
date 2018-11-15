@@ -220,8 +220,8 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::FieldOffset:
     return mangler.mangleFieldOffset(getDecl());
 
-  case Kind::DirectProtocolWitnessTable:
-    return mangler.mangleDirectProtocolWitnessTable(getProtocolConformance());
+  case Kind::ProtocolWitnessTable:
+    return mangler.mangleWitnessTable(getRootProtocolConformance());
 
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
     return mangler.mangleGenericProtocolWitnessTableInstantiationFunction(
@@ -519,9 +519,10 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return getSILLinkage(getDeclLinkage(getAssociatedType()->getProtocol()),
                          forDefinition);
 
-  case Kind::DirectProtocolWitnessTable:
+  case Kind::ProtocolWitnessTable:
   case Kind::ProtocolConformanceDescriptor:
-    return getLinkageAsConformance();
+    return getLinkageForProtocolConformance(getRootProtocolConformance(),
+                                            forDefinition);
 
   case Kind::ProtocolWitnessTablePattern:
     if (getLinkageAsConformance() == SILLinkage::Shared)
@@ -672,9 +673,10 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::EnumCase:
     return ::isAvailableExternally(IGM, getDecl());
 
-  case Kind::DirectProtocolWitnessTable:
+  case Kind::ProtocolWitnessTable:
   case Kind::ProtocolConformanceDescriptor:
-    return ::isAvailableExternally(IGM, getProtocolConformance()->getDeclContext());
+    return ::isAvailableExternally(IGM,
+                             getRootProtocolConformance()->getDeclContext());
 
   case Kind::ProtocolWitnessTablePattern:
   case Kind::ObjCClassRef:
@@ -783,7 +785,7 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::ReflectionAssociatedTypeDescriptor:
     return IGM.FieldDescriptorTy;
   case Kind::ValueWitnessTable:
-  case Kind::DirectProtocolWitnessTable:
+  case Kind::ProtocolWitnessTable:
   case Kind::ProtocolWitnessTablePattern:
     return IGM.WitnessTableTy;
   case Kind::FieldOffset:
@@ -838,7 +840,7 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::ValueWitnessTable:
   case Kind::FieldOffset:
   case Kind::ProtocolWitnessTableLazyCacheVariable:
-  case Kind::DirectProtocolWitnessTable:
+  case Kind::ProtocolWitnessTable:
   case Kind::ProtocolWitnessTablePattern:
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
@@ -923,7 +925,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::TypeMetadataCompletionFunction:
   case Kind::ExtensionDescriptor:
   case Kind::AnonymousDescriptor:
-  case Kind::DirectProtocolWitnessTable:
+  case Kind::ProtocolWitnessTable:
   case Kind::ProtocolWitnessTablePattern:
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
   case Kind::AssociatedTypeWitnessTableAccessFunction:
@@ -1011,16 +1013,22 @@ const SourceFile *LinkEntity::getSourceFileForEmission() const {
     }
     break;
     
-  case Kind::DirectProtocolWitnessTable:
+  case Kind::ProtocolWitnessTable:
+  case Kind::ProtocolConformanceDescriptor:
+    sf = getSourceFileForDeclContext(
+                              getRootProtocolConformance()->getDeclContext());
+    if (!sf)
+      return nullptr;
+    break;
+
   case Kind::ProtocolWitnessTablePattern:
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
   case Kind::AssociatedTypeWitnessTableAccessFunction:
   case Kind::ReflectionAssociatedTypeDescriptor:
-  case Kind::ProtocolConformanceDescriptor:
   case Kind::ProtocolWitnessTableLazyCacheVariable:
   case Kind::ProtocolWitnessTableLazyAccessFunction:
     sf = getSourceFileForDeclContext(
-      getProtocolConformance()->getRootNormalConformance()->getDeclContext());
+      getProtocolConformance()->getRootConformance()->getDeclContext());
     if (!sf)
       return nullptr;
     break;

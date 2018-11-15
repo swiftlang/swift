@@ -180,6 +180,11 @@ switch (getKind()) {                                                         \
                     &NormalProtocolConformance::Method,                      \
                   "Must override NormalProtocolConformance::" #Method);      \
     return cast<NormalProtocolConformance>(this)->Method Args;               \
+  case ProtocolConformanceKind::Self:                                        \
+    static_assert(&ProtocolConformance::Method !=                            \
+                    &SelfProtocolConformance::Method,                        \
+                  "Must override SelfProtocolConformance::" #Method);        \
+    return cast<SelfProtocolConformance>(this)->Method Args;                 \
   case ProtocolConformanceKind::Specialized:                                 \
     static_assert(&ProtocolConformance::Method !=                            \
                     &SpecializedProtocolConformance::Method,                 \
@@ -190,6 +195,24 @@ switch (getKind()) {                                                         \
                     &InheritedProtocolConformance::Method,                   \
                   "Must override InheritedProtocolConformance::" #Method);   \
     return cast<InheritedProtocolConformance>(this)->Method Args;            \
+}                                                                            \
+llvm_unreachable("bad ProtocolConformanceKind");
+
+#define ROOT_CONFORMANCE_SUBCLASS_DISPATCH(Method, Args)                     \
+switch (getKind()) {                                                         \
+  case ProtocolConformanceKind::Normal:                                      \
+    static_assert(&RootProtocolConformance::Method !=                        \
+                    &NormalProtocolConformance::Method,                      \
+                  "Must override NormalProtocolConformance::" #Method);      \
+    return cast<NormalProtocolConformance>(this)->Method Args;               \
+  case ProtocolConformanceKind::Self:                                        \
+    static_assert(&RootProtocolConformance::Method !=                        \
+                    &SelfProtocolConformance::Method,                        \
+                  "Must override SelfProtocolConformance::" #Method);        \
+    return cast<SelfProtocolConformance>(this)->Method Args;                 \
+  case ProtocolConformanceKind::Specialized:                                 \
+  case ProtocolConformanceKind::Inherited:                                   \
+    llvm_unreachable("not a root conformance");                              \
 }                                                                            \
 llvm_unreachable("bad ProtocolConformanceKind");
 
@@ -247,7 +270,10 @@ ValueDecl *ProtocolConformance::getWitnessDecl(ValueDecl *requirement,
     return cast<NormalProtocolConformance>(this)->getWitness(requirement,
                                                              resolver)
       .getDecl();
-
+  case ProtocolConformanceKind::Self:
+    return cast<SelfProtocolConformance>(this)->getWitness(requirement,
+                                                           resolver)
+      .getDecl();
   case ProtocolConformanceKind::Inherited:
     return cast<InheritedProtocolConformance>(this)
       ->getInheritedConformance()->getWitnessDecl(requirement, resolver);
@@ -270,6 +296,7 @@ GenericEnvironment *ProtocolConformance::getGenericEnvironment() const {
   switch (getKind()) {
   case ProtocolConformanceKind::Inherited:
   case ProtocolConformanceKind::Normal:
+  case ProtocolConformanceKind::Self:
     // If we have a normal or inherited protocol conformance, look for its
     // generic parameters.
     return getDeclContext()->getGenericEnvironmentOfContext();
@@ -290,6 +317,7 @@ GenericSignature *ProtocolConformance::getGenericSignature() const {
   switch (getKind()) {
   case ProtocolConformanceKind::Inherited:
   case ProtocolConformanceKind::Normal:
+  case ProtocolConformanceKind::Self:
     // If we have a normal or inherited protocol conformance, look for its
     // generic signature.
     return getDeclContext()->getGenericSignatureOfContext();
@@ -308,9 +336,10 @@ SubstitutionMap ProtocolConformance::getSubstitutions(ModuleDecl *M) const {
   // Walk down to the base NormalProtocolConformance.
   SubstitutionMap subMap;
   const ProtocolConformance *parent = this;
-  while (!isa<NormalProtocolConformance>(parent)) {
+  while (!isa<RootProtocolConformance>(parent)) {
     switch (parent->getKind()) {
     case ProtocolConformanceKind::Normal:
+    case ProtocolConformanceKind::Self:
       llvm_unreachable("should have exited the loop?!");
     case ProtocolConformanceKind::Inherited:
       parent =
@@ -334,7 +363,9 @@ SubstitutionMap ProtocolConformance::getSubstitutions(ModuleDecl *M) const {
   // specialized conformance, collect the substitutions from the generic type.
   // FIXME: The AST should do this for us.
   const NormalProtocolConformance *normalC =
-      cast<NormalProtocolConformance>(parent);
+      dyn_cast<NormalProtocolConformance>(parent);
+  if (!normalC)
+    return SubstitutionMap();
 
   if (!normalC->getType()->isSpecialized())
     return SubstitutionMap();
@@ -344,11 +375,25 @@ SubstitutionMap ProtocolConformance::getSubstitutions(ModuleDecl *M) const {
 }
 
 bool ProtocolConformance::isBehaviorConformance() const {
-  return getRootNormalConformance()->isBehaviorConformance();
+  return getRootConformance()->isBehaviorConformance();
 }
 
 AbstractStorageDecl *ProtocolConformance::getBehaviorDecl() const {
-  return getRootNormalConformance()->getBehaviorDecl();
+  if (auto normal = dyn_cast<NormalProtocolConformance>(getRootConformance()))
+    return normal->getBehaviorDecl();
+  return nullptr;
+}
+
+bool RootProtocolConformance::isInvalid() const {
+  ROOT_CONFORMANCE_SUBCLASS_DISPATCH(isInvalid, ())
+}
+
+SourceLoc RootProtocolConformance::getLoc() const {
+  ROOT_CONFORMANCE_SUBCLASS_DISPATCH(getLoc, ())
+}
+
+bool RootProtocolConformance::hasWitness(ValueDecl *requirement) const {
+  ROOT_CONFORMANCE_SUBCLASS_DISPATCH(hasWitness, (requirement))
 }
 
 bool NormalProtocolConformance::isRetroactive() const {
@@ -877,6 +922,11 @@ NormalProtocolConformance::getAssociatedConformance(Type assocType,
     "requested conformance was not a direct requirement of the protocol");
 }
 
+Witness RootProtocolConformance::getWitness(ValueDecl *requirement,
+                                            LazyResolver *resolver) const {
+  ROOT_CONFORMANCE_SUBCLASS_DISPATCH(getWitness, (requirement, resolver))
+}
+
 /// Retrieve the value witness corresponding to the given requirement.
 Witness NormalProtocolConformance::getWitness(ValueDecl *requirement,
                                               LazyResolver *resolver) const {
@@ -902,9 +952,14 @@ Witness NormalProtocolConformance::getWitness(ValueDecl *requirement,
   }
 }
 
+Witness SelfProtocolConformance::getWitness(ValueDecl *requirement,
+                                            LazyResolver *resolver) const {
+  return Witness(requirement, SubstitutionMap(), nullptr, SubstitutionMap());
+}
+
 ConcreteDeclRef
-NormalProtocolConformance::getWitnessDeclRef(ValueDecl *requirement,
-                                             LazyResolver *resolver) const {
+RootProtocolConformance::getWitnessDeclRef(ValueDecl *requirement,
+                                           LazyResolver *resolver) const {
   if (auto witness = getWitness(requirement, resolver))
     return witness.getDeclRef();
   return ConcreteDeclRef();
@@ -1098,11 +1153,18 @@ InheritedProtocolConformance::getWitnessDeclRef(ValueDecl *requirement,
 
 const NormalProtocolConformance *
 ProtocolConformance::getRootNormalConformance() const {
+  // This is an unsafe cast; remove this entire method.
+  return cast<NormalProtocolConformance>(getRootConformance());
+}
+
+const RootProtocolConformance *
+ProtocolConformance::getRootConformance() const {
   const ProtocolConformance *C = this;
-  while (!isa<NormalProtocolConformance>(C)) {
+  while (true) {
     switch (C->getKind()) {
     case ProtocolConformanceKind::Normal:
-      llvm_unreachable("should have broken out of loop");
+    case ProtocolConformanceKind::Self:
+      return cast<RootProtocolConformance>(C);
     case ProtocolConformanceKind::Inherited:
       C = cast<InheritedProtocolConformance>(C)
           ->getInheritedConformance();
@@ -1113,7 +1175,6 @@ ProtocolConformance::getRootNormalConformance() const {
       break;
     }
   }
-  return cast<NormalProtocolConformance>(C);
 }
 
 bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
@@ -1148,6 +1209,8 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
                                    const_cast<ProtocolConformance *>(this),
                                    subMap);
   }
+  case ProtocolConformanceKind::Self:
+    return const_cast<ProtocolConformance*>(this);
   case ProtocolConformanceKind::Inherited: {
     // Substitute the base.
     auto inheritedConformance
@@ -1377,6 +1440,7 @@ bool ProtocolConformance::isCanonical() const {
     return false;
 
   switch (getKind()) {
+  case ProtocolConformanceKind::Self:
   case ProtocolConformanceKind::Normal: {
     return true;
   }
@@ -1405,8 +1469,9 @@ ProtocolConformance *ProtocolConformance::getCanonicalConformance() {
     return this;
 
   switch (getKind()) {
+  case ProtocolConformanceKind::Self:
   case ProtocolConformanceKind::Normal: {
-    // Normal conformances are always canonical by construction.
+    // Root conformances are always canonical by construction.
     return this;
   }
 

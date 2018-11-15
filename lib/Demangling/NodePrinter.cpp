@@ -418,6 +418,9 @@ private:
     case Node::Kind::ProtocolConformanceDescriptor:
     case Node::Kind::ProtocolDescriptor:
     case Node::Kind::ProtocolRequirementsBaseDescriptor:
+    case Node::Kind::ProtocolSelfConformanceDescriptor:
+    case Node::Kind::ProtocolSelfConformanceWitness:
+    case Node::Kind::ProtocolSelfConformanceWitnessTable:
     case Node::Kind::ProtocolWitness:
     case Node::Kind::ProtocolWitnessTable:
     case Node::Kind::ProtocolWitnessTableAccessor:
@@ -1375,6 +1378,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << " and conformance ";
     print(Node->getChild(1));
     return nullptr;
+  case Node::Kind::ProtocolSelfConformanceWitnessTable:
+    Printer << "protocol self-conformance witness table for ";
+    print(Node->getFirstChild());
+    return nullptr;
   case Node::Kind::ProtocolWitnessTableAccessor:
     Printer << "protocol witness table accessor for ";
     print(Node->getFirstChild());
@@ -1403,6 +1410,11 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "vtable thunk for ";
     print(Node->getChild(1));
     Printer << " dispatching to ";
+    print(Node->getChild(0));
+    return nullptr;
+  }
+  case Node::Kind::ProtocolSelfConformanceWitness: {
+    Printer << "protocol self-conformance witness for ";
     print(Node->getChild(0));
     return nullptr;
   }
@@ -1550,6 +1562,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::Metaclass:
     Printer << "metaclass for ";
     print(Node->getFirstChild());
+    return nullptr;
+  case Node::Kind::ProtocolSelfConformanceDescriptor:
+    Printer << "protocol self-conformance descriptor for ";
+    print(Node->getChild(0));
     return nullptr;
   case Node::Kind::ProtocolConformanceDescriptor:
     Printer << "protocol conformance descriptor for ";

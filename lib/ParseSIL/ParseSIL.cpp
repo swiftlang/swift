@@ -6157,8 +6157,9 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
                                                     nullptr);
   WitnessState.ContextGenericEnv = witnessEnv;
 
-  NormalProtocolConformance *theConformance = conf ?
-      dyn_cast<NormalProtocolConformance>(conf) : nullptr;
+  // FIXME: support parsing a self-conformance here.
+  auto theConformance
+    = dyn_cast_or_null<RootProtocolConformance>(conf);
 
   SILWitnessTable *wt = nullptr;
   if (theConformance) {
