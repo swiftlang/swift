@@ -283,3 +283,102 @@ Func _BidirectionalCollectionBox.__preprocessingPass(_:) has been removed
 Func _CollectionBox.__preprocessingPass(_:) has been removed
 Func _RandomAccessCollectionBox.__preprocessingPass(_:) has been removed
 Func _SequenceBox.__preprocessingPass(_:) has been removed
+
+Class _DictionaryStorage has removed conformance to _NSDictionaryCore
+Class _EmptyDictionarySingleton has removed conformance to _NSDictionaryCore
+Constructor Dictionary.init(_immutableCocoaDictionary:) has parameter 0 type change from _NSDictionary to AnyObject
+Constructor _CocoaDictionary.init(_:) has parameter 0 type change from _NSDictionary to AnyObject
+Func Dictionary._bridgeToObjectiveCImpl() has return type change from _NSDictionaryCore to AnyObject
+Func _NativeDictionary.bridged() has return type change from _NSDictionary to AnyObject
+Protocol _NSDictionary has been removed
+Protocol _NSDictionaryCore has been removed
+Var Dictionary._Variant.object has declared type change from _BridgeStorage<_RawDictionaryStorage, _NSDictionary> to _BridgeStorage<_RawDictionaryStorage>
+Var _CocoaDictionary.object has declared type change from _NSDictionary to AnyObject
+
+Class _EmptySetSingleton has removed conformance to _NSSetCore
+Class _SetStorage has removed conformance to _NSSetCore
+Constructor Set.init(_immutableCocoaSet:) has parameter 0 type change from _NSSet to AnyObject
+Constructor _CocoaSet.init(_:) has parameter 0 type change from _NSSet to AnyObject
+Func Set._bridgeToObjectiveCImpl() has return type change from _NSSetCore to AnyObject
+Func _NativeSet.bridged() has return type change from _NSSet to AnyObject
+Func _stdlib_CFSetGetValues(_:_:) has been removed
+Protocol _NSSet has been removed
+Protocol _NSSetCore has been removed
+Var Set._Variant.object has declared type change from _BridgeStorage<_RawSetStorage, _NSSet> to _BridgeStorage<_RawSetStorage>
+Var _CocoaSet.object has declared type change from _NSSet to AnyObject
+
+Protocol _NSNumber has been removed
+
+Class _ContiguousArrayStorage has removed conformance to _NSArrayCore
+Class __ContiguousArrayStorageBase has removed conformance to _NSArrayCore
+Class __EmptyArrayStorage has removed conformance to _NSArrayCore
+Class __SwiftDeferredNSArray has removed conformance to _NSArrayCore
+Class __SwiftNativeNSArrayWithContiguousStorage has removed conformance to _NSArrayCore
+Constructor Array.init(_immutableCocoaArray:) has parameter 0 type change from _NSArrayCore to AnyObject
+Constructor _ArrayBuffer.init(nsArray:) has parameter 0 type change from _NSArrayCore to AnyObject
+Constructor _ArrayBuffer.init(storage:) has parameter 0 type change from _BridgeStorage<__ContiguousArrayStorageBase, _NSArrayCore> to _BridgeStorage<__ContiguousArrayStorageBase>
+Constructor _CocoaArrayWrapper.init(_:) has parameter 0 type change from _NSArrayCore to AnyObject
+Func _ArrayBuffer._asCocoaArray() has return type change from _NSArrayCore to AnyObject
+Func _CocoaArrayWrapper.contiguousStorage(_:) has been removed
+Func _ContiguousArrayBuffer._asCocoaArray() has return type change from _NSArrayCore to AnyObject
+Func _bridgeCocoaArray(_:) has parameter 0 type change from _NSArrayCore to AnyObject
+Protocol _NSArrayCore has been removed
+Struct _CocoaArrayWrapper has type witness type for BidirectionalCollection.SubSequence changing from Slice<_CocoaArrayWrapper> to _SliceBuffer<AnyObject>
+Struct _CocoaArrayWrapper has type witness type for Collection.SubSequence changing from Slice<_CocoaArrayWrapper> to _SliceBuffer<AnyObject>
+Struct _CocoaArrayWrapper has type witness type for RandomAccessCollection.SubSequence changing from Slice<_CocoaArrayWrapper> to _SliceBuffer<AnyObject>
+Var _ArrayBuffer._nonNative has declared type change from _NSArrayCore to _CocoaArrayWrapper
+Var _ArrayBuffer._storage has declared type change from _BridgeStorage<__ContiguousArrayStorageBase, _NSArrayCore> to _BridgeStorage<__ContiguousArrayStorageBase>
+Var _CocoaArrayWrapper.buffer has declared type change from _NSArrayCore to AnyObject
+
+Var _SliceBuffer.endIndexAndFlags in a non-resilient type changes position from 2 to 3
+Var _SliceBuffer.startIndex in a non-resilient type changes position from 3 to 2
+
+Constructor _BridgeStorage.init(native:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : AnyObject, τ_0_1 : AnyObject> to <τ_0_0 where τ_0_0 : AnyObject>
+Constructor _BridgeStorage.init(native:) has return type change from _BridgeStorage<τ_0_0, τ_0_1> to _BridgeStorage<τ_0_0>
+Constructor _BridgeStorage.init(native:isFlagged:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : AnyObject, τ_0_1 : AnyObject> to <τ_0_0 where τ_0_0 : AnyObject>
+Constructor _BridgeStorage.init(native:isFlagged:) has return type change from _BridgeStorage<τ_0_0, τ_0_1> to _BridgeStorage<τ_0_0>
+Constructor _BridgeStorage.init(objC:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : AnyObject, τ_0_1 : AnyObject> to <τ_0_0 where τ_0_0 : AnyObject>
+Constructor _BridgeStorage.init(objC:) has parameter 0 type change from τ_0_1 to AnyObject
+Constructor _BridgeStorage.init(objC:) has return type change from _BridgeStorage<τ_0_0, τ_0_1> to _BridgeStorage<τ_0_0>
+Constructor _BridgeStorage.init(taggedPayload:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : AnyObject, τ_0_1 : AnyObject> to <τ_0_0 where τ_0_0 : AnyObject>
+Constructor _BridgeStorage.init(taggedPayload:) has return type change from _BridgeStorage<τ_0_0, τ_0_1> to _BridgeStorage<τ_0_0>
+Func _BridgeStorage.isUniquelyReferencedNative() has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : AnyObject, τ_0_1 : AnyObject> to <τ_0_0 where τ_0_0 : AnyObject>
+Func _BridgeStorage.isUniquelyReferencedUnflaggedNative() has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : AnyObject, τ_0_1 : AnyObject> to <τ_0_0 where τ_0_0 : AnyObject>
+Struct _BridgeStorage has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : AnyObject, τ_0_1 : AnyObject> to <τ_0_0 where τ_0_0 : AnyObject>
+Var _BridgeStorage.objCInstance has declared type change from τ_0_1 to AnyObject
+
+Class _ContiguousArrayStorage has removed conformance to _NSCopying
+Class _ContiguousArrayStorage has removed conformance to _NSFastEnumeration
+Class _ContiguousArrayStorage has removed conformance to _ShadowProtocol
+Class _DictionaryStorage has removed conformance to _NSCopying
+Class _DictionaryStorage has removed conformance to _NSFastEnumeration
+Class _DictionaryStorage has removed conformance to _ShadowProtocol
+Class _EmptyDictionarySingleton has removed conformance to _NSCopying
+Class _EmptyDictionarySingleton has removed conformance to _NSFastEnumeration
+Class _EmptyDictionarySingleton has removed conformance to _ShadowProtocol
+Class _EmptySetSingleton has removed conformance to _NSCopying
+Class _EmptySetSingleton has removed conformance to _NSFastEnumeration
+Class _EmptySetSingleton has removed conformance to _ShadowProtocol
+Class _SetStorage has removed conformance to _NSCopying
+Class _SetStorage has removed conformance to _NSFastEnumeration
+Class _SetStorage has removed conformance to _ShadowProtocol
+Class _SharedStringStorage has removed conformance to _NSCopying
+Class _SharedStringStorage has removed conformance to _ShadowProtocol
+Class _StringStorage has removed conformance to _NSCopying
+Class _StringStorage has removed conformance to _ShadowProtocol
+Class __ContiguousArrayStorageBase has removed conformance to _NSCopying
+Class __ContiguousArrayStorageBase has removed conformance to _NSFastEnumeration
+Class __ContiguousArrayStorageBase has removed conformance to _ShadowProtocol
+Class __EmptyArrayStorage has removed conformance to _NSCopying
+Class __EmptyArrayStorage has removed conformance to _NSFastEnumeration
+Class __EmptyArrayStorage has removed conformance to _ShadowProtocol
+Class __SwiftDeferredNSArray has removed conformance to _NSCopying
+Class __SwiftDeferredNSArray has removed conformance to _NSFastEnumeration
+Class __SwiftDeferredNSArray has removed conformance to _ShadowProtocol
+Class __SwiftNativeNSArrayWithContiguousStorage has removed conformance to _NSCopying
+Class __SwiftNativeNSArrayWithContiguousStorage has removed conformance to _NSFastEnumeration
+Class __SwiftNativeNSArrayWithContiguousStorage has removed conformance to _ShadowProtocol
+Protocol _NSCopying has been removed
+Protocol _NSEnumerator has been removed
+Protocol _NSFastEnumeration has been removed
+Protocol _ShadowProtocol has been removed

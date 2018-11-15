@@ -414,7 +414,7 @@ public struct Dictionary<Key: Hashable, Value> {
   ///   are reference types).
   @inlinable
   public // SPI(Foundation)
-  init(_immutableCocoaDictionary: __owned _NSDictionary) {
+  init(_immutableCocoaDictionary: __owned AnyObject) {
     _sanityCheck(
       _isBridgedVerbatimToObjectiveC(Key.self) &&
       _isBridgedVerbatimToObjectiveC(Value.self),

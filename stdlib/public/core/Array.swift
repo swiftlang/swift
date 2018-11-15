@@ -1728,7 +1728,7 @@ extension Array {
 // to do the bridging in an ABI safe way. Even though this looks useless,
 // DO NOT DELETE!
 @usableFromInline internal
-func _bridgeCocoaArray<T>(_ _immutableCocoaArray: _NSArrayCore) -> Array<T> {
+func _bridgeCocoaArray<T>(_ _immutableCocoaArray: AnyObject) -> Array<T> {
   return Array(_buffer: _ArrayBuffer(nsArray: _immutableCocoaArray))
 }
 
@@ -1764,7 +1764,7 @@ extension Array {
   /// * `Element` is bridged verbatim to Objective-C (i.e.,
   ///   is a reference type).
   @inlinable
-  public init(_immutableCocoaArray: _NSArrayCore) {
+  public init(_immutableCocoaArray: AnyObject) {
     self = _bridgeCocoaArray(_immutableCocoaArray)
   }
 }

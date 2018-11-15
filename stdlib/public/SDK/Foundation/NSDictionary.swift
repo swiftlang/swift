@@ -34,7 +34,7 @@ extension Dictionary {
   ///
   /// The provided `NSDictionary` will be copied to ensure that the copy can
   /// not be mutated by other code.
-  fileprivate init(_cocoaDictionary: __shared _NSDictionary) {
+  fileprivate init(_cocoaDictionary: __shared AnyObject) {
     assert(
       _isBridgedVerbatimToObjectiveC(Key.self) &&
       _isBridgedVerbatimToObjectiveC(Value.self),
@@ -49,9 +49,7 @@ extension Dictionary {
     // The bug is fixed in: OS X 10.11.0, iOS 9.0, all versions of tvOS
     // and watchOS.
     self = Dictionary(
-      _immutableCocoaDictionary:
-        unsafeBitCast(_cocoaDictionary.copy(with: nil) as AnyObject,
-                      to: _NSDictionary.self))
+      _immutableCocoaDictionary: _cocoaDictionary.copy(with: nil) as AnyObject)
   }
 }
 
@@ -75,8 +73,7 @@ extension Dictionary : _ObjectiveCBridgeable {
 
     if _isBridgedVerbatimToObjectiveC(Key.self) &&
        _isBridgedVerbatimToObjectiveC(Value.self) {
-      result = [Key : Value](
-        _cocoaDictionary: unsafeBitCast(d as AnyObject, to: _NSDictionary.self))
+      result = [Key : Value](_cocoaDictionary: d)
       return
     }
 

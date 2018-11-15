@@ -187,7 +187,7 @@ public struct Set<Element: Hashable> {
   ///   is a reference type).
   @inlinable
   public // SPI(Foundation)
-  init(_immutableCocoaSet: __owned _NSSet) {
+  init(_immutableCocoaSet: __owned AnyObject) {
     _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self),
       "Set can be backed by NSSet _variant only when the member type can be bridged verbatim to Objective-C")
     self.init(_cocoa: _CocoaSet(_immutableCocoaSet))
