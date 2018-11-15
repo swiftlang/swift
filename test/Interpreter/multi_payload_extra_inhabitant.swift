@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift -parse-stdlib -Xfrontend -verify-type-layout -Xfrontend SpareBitExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend SpareBitSingleExtraInhabitant -Xfrontend -verify-type-layout -Xfrontend SpareBitNoExtraInhabitant -Xfrontend -verify-type-layout -Xfrontend SpareBitNoExtraInhabitant2 -Xfrontend -verify-type-layout -Xfrontend TwoTagExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend ThreeTagExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend NoTagExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend DynamicExtraInhabitantsOneByte -Xfrontend -verify-type-layout -Xfrontend DynamicExtraInhabitantsTwoBytes -O -o %t/a.out %s
+// RUN: %target-build-swift -parse-stdlib -Xfrontend -verify-type-layout -Xfrontend SpareBitExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend SpareBitSingleExtraInhabitant -Xfrontend -verify-type-layout -Xfrontend SpareBitNoExtraInhabitant -Xfrontend -verify-type-layout -Xfrontend SpareBitNoExtraInhabitant2 -Xfrontend -verify-type-layout -Xfrontend TwoTagExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend ThreeTagExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend NoTagExtraInhabitants -Xfrontend -verify-type-layout -Xfrontend DynamicExtraInhabitantsNever -Xfrontend -verify-type-layout -Xfrontend DynamicExtraInhabitantsZeroBytes -Xfrontend -verify-type-layout -Xfrontend DynamicExtraInhabitantsOneByte -Xfrontend -verify-type-layout -Xfrontend DynamicExtraInhabitantsTwoBytes -O -o %t/a.out %s
 // RUN: %target-run %t/a.out 2>&1
 
 // Type layout verifier is only compiled into the runtime in asserts builds.
@@ -133,6 +133,8 @@ enum DynamicExtraInhabitants<T> {
   case tagDIA, tagDIB, tagDIC, tagDID, tagDIE, tagDIF, tagDIG, tagDIH
 }
 
+typealias DynamicExtraInhabitantsNever = DynamicExtraInhabitants<Never>
+typealias DynamicExtraInhabitantsZeroBytes = DynamicExtraInhabitants<()>
 typealias DynamicExtraInhabitantsOneByte = DynamicExtraInhabitants<UInt8>
 typealias DynamicExtraInhabitantsTwoBytes = DynamicExtraInhabitants<UInt16>
 
@@ -185,14 +187,18 @@ tests.test("types that have at least one extra inhabitant") {
   expectHasExtraInhabitant(SpareBitSingleExtraInhabitant.self, nil: nil)
   expectHasExtraInhabitant(TwoTagExtraInhabitants.self, nil: nil)
   expectHasExtraInhabitant(ThreeTagExtraInhabitants.self, nil: nil)
+  expectHasExtraInhabitant(DynamicExtraInhabitantsNever.self, nil: nil)
+  expectHasExtraInhabitant(DynamicExtraInhabitantsZeroBytes.self, nil: nil)
   expectHasExtraInhabitant(DynamicExtraInhabitantsOneByte.self, nil: nil)
   expectHasExtraInhabitant(DynamicExtraInhabitantsTwoBytes.self, nil: nil)
 }
 tests.test("types that have at least two extra inhabitants") {
-  expectHasExtraInhabitant(SpareBitExtraInhabitants.self, nil: nil)
-  expectHasExtraInhabitant(TwoTagExtraInhabitants.self, nil: nil)
-  expectHasExtraInhabitant(ThreeTagExtraInhabitants.self, nil: nil)
-  expectHasExtraInhabitant(DynamicExtraInhabitantsOneByte.self, nil: nil)
-  expectHasExtraInhabitant(DynamicExtraInhabitantsTwoBytes.self, nil: nil)
+  expectHasAtLeastTwoExtraInhabitants(SpareBitExtraInhabitants.self, nil: nil, someNil: .some(nil))
+  expectHasAtLeastTwoExtraInhabitants(TwoTagExtraInhabitants.self, nil: nil, someNil: .some(nil))
+  expectHasAtLeastTwoExtraInhabitants(ThreeTagExtraInhabitants.self, nil: nil, someNil: .some(nil))
+  expectHasAtLeastTwoExtraInhabitants(DynamicExtraInhabitantsNever.self, nil: nil, someNil: .some(nil))
+  expectHasAtLeastTwoExtraInhabitants(DynamicExtraInhabitantsZeroBytes.self, nil: nil, someNil: .some(nil))
+  expectHasAtLeastTwoExtraInhabitants(DynamicExtraInhabitantsOneByte.self, nil: nil, someNil: .some(nil))
+  expectHasAtLeastTwoExtraInhabitants(DynamicExtraInhabitantsTwoBytes.self, nil: nil, someNil: .some(nil))
 }
 runAllTests()
