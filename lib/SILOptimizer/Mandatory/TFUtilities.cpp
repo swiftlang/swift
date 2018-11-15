@@ -424,10 +424,10 @@ bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn,
 
   // Part 3: Use function signature to decide whether to partition.
 
-  // Otherwise, the function is either (public and inlininable) or it is
-  // internal to the current module.  In both cases, we check to see if the
-  // function takes tensorflow values as arguments or results.  If so, it will
-  // be inlined away by deabstraction, and we don't need to touch it.
+  // Otherwise, the function is either (public and inlinable) or it is internal
+  // to the current module.  In both cases, we check to see if the function
+  // takes tensorflow values as arguments or results.  If so, it will be inlined
+  // away by deabstraction, and we don't need to touch it.
   if (containsTensorFlowValue(fn->getLoweredFunctionType())) {
     if (forceTFFunctions) {
       // Return true if it is referenced somewhere.
