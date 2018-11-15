@@ -1625,8 +1625,9 @@ extension ${Self} {
 
   // We "shouldn't" need this, but the typechecker barfs on an expression
   // in the test suite without it.
-  @inlinable // FIXME(inline-always)
-  @inline(__always)
+  // If replaced with @inline(__always) the init no longer gets
+  // inlined in -Onone and this breaks the abi_v7k test in a subtle way.
+  @_transparent
   public init(_ v: Int) {
     _value = Builtin.sitofp_Int${word_bits}_FPIEEE${bits}(v._value)
   }
