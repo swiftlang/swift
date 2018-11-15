@@ -349,35 +349,16 @@ struct _NormalizedUTF16CodeUnitIterator: IteratorProtocol {
 
   mutating func next() -> UInt16? {
     if segmentBufferCount == segmentBufferIndex {
+      if source.isEmpty {
+        return nil
+      }
       segmentBuffer = _FixedArray16<CodeUnit>(allZeros:())
       segmentBufferCount = 0
       segmentBufferIndex = 0
     }
-
-    if source.isEmpty
-    && segmentBufferCount == 0 {
-      // Our source of code units to normalize is empty and our buffers from
-      // previous normalizations are also empty.
-      return nil
-    }
+    
     if segmentBufferCount == 0 {
-      //time to fill a buffer if possible. Otherwise we are done, return nil
-      // Normalize segment, and then compare first code unit
-      if segmentHeapBuffer == nil,
-         let filled = source.tryFill(into: &normalizationBuffer)
-      {
-        if let count = _tryNormalize(
-          _castOutputBuffer(&normalizationBuffer,
-          endingAt: filled),
-          into: &segmentBuffer
-        ) {
-          segmentBufferCount = count
-        } else {
-          segmentBufferCount = normalizeWithHeapBuffers()
-        }
-      } else {
-        segmentBufferCount = normalizeWithHeapBuffers()
-      }
+      segmentBufferCount = normalizeFromSource()
     }
 
     //exactly one of the buffers should have code units for us to return
@@ -385,31 +366,54 @@ struct _NormalizedUTF16CodeUnitIterator: IteratorProtocol {
               != ((overflowBuffer?.count ?? 0) == 0))
 
     if segmentBufferIndex < segmentBufferCount {
+      defer { segmentBufferIndex += 1 }
       if _slowPath(segmentHeapBuffer != nil) {
-        _internalInvariant(segmentBufferIndex < segmentHeapBuffer!.count)
-        let index = segmentBufferIndex
-        segmentBufferIndex += 1
-        return segmentHeapBuffer![index]
+        return segmentHeapBuffer![segmentBufferIndex]
       } else {
-        let index = segmentBufferIndex
-        segmentBufferIndex += 1
-        return segmentBuffer[index]
+        return segmentBuffer[segmentBufferIndex]
       }
     } else {
       return nil
     }
   }
   
-  mutating func normalizeWithHeapBuffers() -> Int {
+  mutating func normalizeFromSource() -> Int {
+    if segmentHeapBuffer == nil,
+       let filled = source.tryFill(into: &normalizationBuffer)
+    {
+      if let count = _tryNormalize(
+        _castOutputBuffer(&normalizationBuffer,
+        endingAt: filled),
+        into: &segmentBuffer
+      ) {
+        return count
+      } else {
+        return normalizeWithHeapBuffers(filled)
+      }
+    } else {
+      return normalizeWithHeapBuffers()
+    }
+  }
+  
+  mutating func normalizeWithHeapBuffers(
+    _ copyFromNormalizationBuffer: Int? = nil
+  ) -> Int {
     if segmentHeapBuffer == nil {
-      let size = source.remaining * _Normalization._maxNFCExpansionFactor
+      _sanityCheck(normalizationHeapBuffer == nil)
+      let extraInBuffer = copyFromNormalizationBuffer ?? 0
+      let size = (source.remaining + extraInBuffer) 
+                 * _Normalization._maxNFCExpansionFactor
       segmentHeapBuffer = Array(repeating: 0, count: size)
       normalizationHeapBuffer = Array(repeating:0, count: size)
+      for i in 0..<extraInBuffer {
+        normalizationHeapBuffer![i] = normalizationBuffer[i]
+      }
     }
-
+    
     guard let count = normalizationHeapBuffer!.withUnsafeMutableBufferPointer({
       (normalizationHeapBufferPtr) -> Int? in
-      guard let filled = source.tryFill(into: normalizationHeapBufferPtr)
+      guard let filled = copyFromNormalizationBuffer ??
+        source.tryFill(into: normalizationHeapBufferPtr)
       else {
         fatalError("Invariant broken, buffer should have space")
       }
