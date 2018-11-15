@@ -22,13 +22,13 @@ public protocol _UTFParser {
   func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8)
   func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar
   
-  var _buffer: _UIntBuffer<UInt32, Encoding.CodeUnit> { get set }
+  var _buffer: _UIntBuffer<Encoding.CodeUnit> { get set }
 }
 
 extension _UTFParser
 where Encoding.EncodedScalar : RangeReplaceableCollection {
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   public mutating func parseScalar<I : IteratorProtocol>(
     from input: inout I

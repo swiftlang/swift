@@ -329,9 +329,9 @@ extension Substring : LosslessStringConvertible {
 }
 
 extension Substring {
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @_fixed_layout
   public struct UTF8View {
-    @usableFromInline // FIXME(sil-serialize-all)
+    @usableFromInline
     internal var _slice: Slice<String.UTF8View>
   }
 }
@@ -390,12 +390,12 @@ extension Substring.UTF8View : BidirectionalCollection {
     return _slice.distance(from: start, to: end)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
     _slice._failEarlyRangeCheck(index, bounds: bounds)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func _failEarlyRangeCheck(
     _ range: Range<Index>, bounds: Range<Index>
   ) {

@@ -66,7 +66,7 @@ public enum PublicEnumeration<Q> {
   }
 }
 #elseif MODULENODYNAMIC
-public var public_global_var = "public_global_var"
+public dynamic var public_global_var = "public_global_var"
 
 public func public_global_func() -> String {
   return "public_global_func"
@@ -101,7 +101,7 @@ public struct PublicStruct {
   public func genericFunction<T>(_ t: T.Type) -> String {
     return "public_struct_generic_func"
   }
-  public var public_stored_property : String = "public_stored_property"
+  dynamic public var public_stored_property : String = "public_stored_property"
 
   public subscript(_ x: Int) -> String {
     get {

@@ -98,12 +98,12 @@ extension String {
   ///         print(snowy[range])
   ///     }
   ///     // Prints "Let it snow!"
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @_fixed_layout
   public struct UTF16View {
     @usableFromInline
     internal var _guts: _StringGuts
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     internal init(_ guts: _StringGuts) {
       self._guts = guts
       _invariantCheck()
@@ -127,7 +127,7 @@ extension String.UTF16View: BidirectionalCollection {
 
   /// The position of the first code unit if the `String` is
   /// nonempty; identical to `endIndex` otherwise.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var startIndex: Index {
     @inline(__always) get { return _guts.startIndex }
   }
@@ -136,7 +136,7 @@ extension String.UTF16View: BidirectionalCollection {
   /// the last valid subscript argument.
   ///
   /// In an empty UTF-16 view, `endIndex` is equal to `startIndex`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var endIndex: Index {
     @inline(__always) get { return _guts.endIndex }
   }
@@ -280,7 +280,7 @@ extension String.UTF16View: CustomDebugStringConvertible {
 
 extension String {
   /// A UTF-16 encoding of `self`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var utf16: UTF16View {
     @inline(__always) get { return UTF16View(_guts) }
     @inline(__always) set { self = String(newValue._guts) }
@@ -356,7 +356,6 @@ extension String.UTF16View.Index {
   ///   position in `unicodeScalars`, this method returns `nil`. For example,
   ///   an attempt to convert the position of a UTF-16 trailing surrogate
   ///   returns `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   public func samePosition(
     in unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarIndex? {
