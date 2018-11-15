@@ -126,9 +126,9 @@ namespace experimental_dependencies {
   public:
     Memoizer() = default;
     
-    // for deserialization
-    void insert(KeyT key, ValueT value) {
-      memos.insert(std::make_pair(key, value));
+/// returns if was inserted
+    bool insert(KeyT key, ValueT value) {
+      return memos.insert(std::make_pair(key, value)).second;
     }
 
     template <typename CreateFnT>
@@ -271,7 +271,8 @@ namespace experimental_dependencies {
       allNodes.push_back(n);
       if (n->isHere())
         hereNodeCount = allNodes.size();
-      memoizer.insert(n->getDependencyKey(), n);
+      const bool wasInserted = memoizer.insert(n->getDependencyKey(), n);
+      assert(wasInserted && "frontend should have memoized");
     }
     void addArc(FrontendNode *depender, FrontendNode *dependee) {
       allNodes[depender->getSequenceNumber()]->addDependee(dependee->getSequenceNumber());
