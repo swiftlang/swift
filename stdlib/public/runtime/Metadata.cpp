@@ -4053,13 +4053,13 @@ static StringRef findAssociatedTypeName(const ProtocolDescriptor *protocol,
   return StringRef();
 }
 
-MetadataResponse
-swift::swift_getAssociatedTypeWitness(MetadataRequest request,
+static MetadataResponse
+swift_getAssociatedTypeWitnessSlowImpl(
+                                      MetadataRequest request,
                                       WitnessTable *wtable,
                                       const Metadata *conformingType,
                                       const ProtocolRequirement *reqBase,
                                       const ProtocolRequirement *assocType) {
-
 #ifndef NDEBUG
   {
     const ProtocolConformanceDescriptor *conformance = wtable->Description;
@@ -4077,7 +4077,7 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
   unsigned witnessIndex = assocType - reqBase;
   auto witness = ((const void* const *)wtable)[witnessIndex];
   if (LLVM_LIKELY((uintptr_t(witness) &
-         ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
+        ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
     // Cached metadata pointers are always complete.
     return MetadataResponse{(const Metadata *)witness, MetadataState::Complete};
   }
@@ -4158,7 +4158,26 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
   return response;
 }
 
-const WitnessTable *swift::swift_getAssociatedConformanceWitness(
+MetadataResponse
+swift::swift_getAssociatedTypeWitness(MetadataRequest request,
+                                      WitnessTable *wtable,
+                                      const Metadata *conformingType,
+                                      const ProtocolRequirement *reqBase,
+                                      const ProtocolRequirement *assocType) {
+  // If the low bit of the witness is clear, it's already a metadata pointer.
+  unsigned witnessIndex = assocType - reqBase;
+  auto witness = ((const void* const *)wtable)[witnessIndex];
+  if (LLVM_LIKELY((uintptr_t(witness) &
+        ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
+    // Cached metadata pointers are always complete.
+    return MetadataResponse{(const Metadata *)witness, MetadataState::Complete};
+  }
+
+  return swift_getAssociatedTypeWitnessSlow(request, wtable, conformingType,
+                                            reqBase, assocType);
+}
+
+static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
                                   WitnessTable *wtable,
                                   const Metadata *conformingType,
                                   const Metadata *assocType,
@@ -4177,7 +4196,7 @@ const WitnessTable *swift::swift_getAssociatedConformanceWitness(
   }
 #endif
 
-  // Call the access function.
+  // Retrieve the witness.
   unsigned witnessIndex = assocConformance - reqBase;
   auto witness = ((const void* const *)wtable)[witnessIndex];
   // Fast path: we've already resolved this to a witness table, so return it.
@@ -4220,6 +4239,26 @@ const WitnessTable *swift::swift_getAssociatedConformanceWitness(
   }
 
   swift_runtime_unreachable("Invalid mangled associate conformance");
+}
+
+const WitnessTable *swift::swift_getAssociatedConformanceWitness(
+                                  WitnessTable *wtable,
+                                  const Metadata *conformingType,
+                                  const Metadata *assocType,
+                                  const ProtocolRequirement *reqBase,
+                                  const ProtocolRequirement *assocConformance) {
+  // Retrieve the witness.
+  unsigned witnessIndex = assocConformance - reqBase;
+  auto witness = ((const void* const *)wtable)[witnessIndex];
+  // Fast path: we've already resolved this to a witness table, so return it.
+  if (LLVM_LIKELY((uintptr_t(witness) &
+         ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
+    return static_cast<const WitnessTable *>(witness);
+  }
+
+  return swift_getAssociatedConformanceWitnessSlow(wtable, conformingType,
+                                                   assocType, reqBase,
+                                                   assocConformance);
 }
 
 /***************************************************************************/
@@ -4842,4 +4881,5 @@ const HeapObject *swift_getKeyPathImpl(const void *pattern,
                                        const void *arguments);
 
 #define OVERRIDE_KEYPATH COMPATIBILITY_OVERRIDE
+#define OVERRIDE_WITNESSTABLE COMPATIBILITY_OVERRIDE
 #include "CompatibilityOverride.def"

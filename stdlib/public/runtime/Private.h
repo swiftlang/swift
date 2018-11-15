@@ -457,6 +457,40 @@ public:
   const Metadata *findConformingSuperclass(
                              const Metadata *type,
                              const ProtocolConformanceDescriptor *conformance);
+
+  /// Retrieve an associated type witness from the given witness table.
+  ///
+  /// \param wtable The witness table.
+  /// \param conformingType Metadata for the conforming type.
+  /// \param reqBase "Base" requirement used to compute the witness index
+  /// \param assocType Associated type descriptor.
+  ///
+  /// \returns metadata for the associated type witness.
+  SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+  MetadataResponse swift_getAssociatedTypeWitnessSlow(
+                                        MetadataRequest request,
+                                        WitnessTable *wtable,
+                                        const Metadata *conformingType,
+                                        const ProtocolRequirement *reqBase,
+                                        const ProtocolRequirement *assocType);
+
+  /// Retrieve an associated conformance witness table from the given witness
+  /// table.
+  ///
+  /// \param wtable The witness table.
+  /// \param conformingType Metadata for the conforming type.
+  /// \param assocType Metadata for the associated type.
+  /// \param reqBase "Base" requirement used to compute the witness index
+  /// \param assocConformance Associated conformance descriptor.
+  ///
+  /// \returns corresponding witness table.
+  SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+  const WitnessTable *swift_getAssociatedConformanceWitnessSlow(
+                                  WitnessTable *wtable,
+                                  const Metadata *conformingType,
+                                  const Metadata *assocType,
+                                  const ProtocolRequirement *reqBase,
+                                  const ProtocolRequirement *assocConformance);
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */
