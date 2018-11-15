@@ -1375,14 +1375,6 @@ SubstGenericParametersFromMetadata::operator()(
 }
 
 const Metadata *SubstGenericParametersFromWrittenArgs::operator()(
-                                                    unsigned flatIndex) const {
-  if (flatIndex < allGenericArgs.size())
-    return allGenericArgs[flatIndex];
-
-  return nullptr;
-}
-
-const Metadata *SubstGenericParametersFromWrittenArgs::operator()(
                                                         unsigned depth,
                                                         unsigned index) const {
   if (auto flatIndex =

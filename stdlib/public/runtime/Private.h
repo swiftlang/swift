@@ -310,7 +310,6 @@ public:
       : allGenericArgs(allGenericArgs), genericParamCounts(genericParamCounts) {
     }
 
-    const Metadata *operator()(unsigned flatIndex) const;
     const Metadata *operator()(unsigned depth, unsigned index) const;
   };
 
