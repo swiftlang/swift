@@ -1215,9 +1215,7 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     return false;
 
   // Add dynamic if -enable-implicit-dynamic was requested.
-  if (decl->getModuleContext()->isImplicitDynamicEnabled()) {
-    TypeChecker::addImplicitDynamicAttribute(decl);
-  }
+  TypeChecker::addImplicitDynamicAttribute(decl);
 
   // If 'dynamic' was explicitly specified, check it.
   if (decl->getAttrs().hasAttribute<DynamicAttr>()) {
