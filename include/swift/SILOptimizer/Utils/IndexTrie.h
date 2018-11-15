@@ -77,7 +77,31 @@ public:
 
     return false;
   }
+
+  void dumpRef(llvm::raw_ostream &out, bool last = true) const {
+    if (Parent) {
+      Parent->dumpRef(out, false);
+      out << ", ";
+      out << Index;
+    } else {
+      out << "(Root";
+    }
+
+    if (last)
+      out << ")";
+  }
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dumpRef() const LLVM_ATTRIBUTE_USED,
+                            "Only meant for use in the debugger") {
+    dumpRef(llvm::errs());
+  }
 };
+
+static inline
+llvm::raw_ostream &operator<<(llvm::raw_ostream &out, IndexTrieNode *ITN) {
+  ITN->dumpRef(out);
+  return out;
+}
 
 } // end namespace swift
 

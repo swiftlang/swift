@@ -73,6 +73,7 @@ extension _StringGuts {
 
   // Grow to accomodate at least `n` code units
   @usableFromInline
+  @_semantics("interpolation.append")
   internal mutating func grow(_ n: Int) {
     defer { self._invariantCheck() }
 

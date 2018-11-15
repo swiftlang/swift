@@ -71,7 +71,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
   /// Do not call this initializer directly. It is used by the compiler when
   /// interpreting string interpolations.
   @inlinable
-  @_effects(readonly)
+  @inline(__always)
   public init(literalCapacity: Int, interpolationCount: Int) {
     let capacityPerInterpolation = 2
     let initialCapacity = literalCapacity +

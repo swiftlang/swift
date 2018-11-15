@@ -191,16 +191,20 @@ removeInstructions(ArrayRef<SILInstruction*> UsersToRemove) {
 //                             Use Graph Analysis
 //===----------------------------------------------------------------------===//
 
-/// Returns true if silTy is the Swift.DefaultStringInterpolation type.
-static bool allocatesDefaultStringInterpolation(AllocationInst *Inst) {
+/// Returns true if the allocation should be subjected to non-trivial dead
+/// object elimination.
+static bool allocationWhitelistedForInterpolation(AllocationInst *Inst) {
   auto silTy = Inst->getType().getObjectType();
 
   auto astTy = silTy.getASTType();
   if (!astTy) return false;
 
   auto decl = astTy.getNominalOrBoundGenericNominal();
+  auto &ctx = silTy.getASTContext();
 
-  return decl == silTy.getASTContext().getDefaultStringInterpolationDecl();
+  return decl == ctx.getDefaultStringInterpolationDecl()
+      || decl == ctx.get_StringGutsDecl()
+      || decl == ctx.get_StringObjectDecl();
 }
 
 /// Returns true if Apply applies a method with the interpolation.append
@@ -221,24 +225,9 @@ static bool appendsToAllocatedInterpolation(ApplyInst *Apply,
   return SelfInst == AllocInst;
 }
 
-/// Returns the instruction which the address being loaded by Load initially
-/// derived from, drilling through known pointer arithmetic instructions like
-/// StructElementAddrInst.
-static SILInstruction *getBaseAddrInst(LoadInst *Load) {
-  SILInstruction *Inst = Load->getOperand()->getDefiningInstruction();
-  // FIXME: This could support e.g. TupleElementAddrInst, but we don't need
-  // that for string interpolation.
-  while (Inst && isa<StructElementAddrInst>(Inst)) {
-    Inst = cast<StructElementAddrInst>(Inst)
-      ->getOperand()->getDefiningInstruction();
-  }
-  return Inst;
-}
-
 /// Returns false if Inst is an instruction that would require us to keep the
 /// alloc_ref alive.
-static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
-                              AllocationInst *AllocInst) {
+static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts) {
   if (isa<SetDeallocatingInst>(Inst) || isa<FixLifetimeInst>(Inst))
     return true;
 
@@ -269,28 +258,6 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
   if (isa<DestroyAddrInst>(Inst))
     return true;
 
-  // As a special rule, a string interpolation is eliminatable if its result is
-  // unused, even though this theoretically could remove the side effects of
-  // StringInterpolationProtocol methods or the string-conversion witnesses they
-  // would have called if not eliminated. Mutating methods this rule applies to
-  // should be marked with @_semantic("interpolation.append"); they will only
-  // allow their self parameter to be eliminated.
-  if (auto *Apply = dyn_cast<ApplyInst>(Inst))
-    if (appendsToAllocatedInterpolation(Apply, AllocInst))
-      return true;
-
-  // We can remove loads of addresses within the allocation.
-  if (auto *Load = dyn_cast<LoadInst>(Inst))
-    return getBaseAddrInst(Load) == AllocInst &&
-            // HACK: In the general case, we should find any memory management
-            // done with the results of this load, then find any corresponding
-            // stores into the allocation and replace the stores with equivalent
-            // memory management. We don't do that here (that's what
-            // DeadObjectAnalysis below is supposed to do), but we know we don't
-            // need to for DefaultStringInterpolation, because we know that the
-            // initialization of its sole property will be eliminated too.
-            allocatesDefaultStringInterpolation(AllocInst);
-
   // Otherwise we do not know how to handle this instruction. Be conservative
   // and don't zap it.
   return false;
@@ -304,12 +271,12 @@ hasUnremovableUsers(AllocationInst *AllocRef, UserList &Users,
   SmallVector<SILInstruction *, 16> Worklist;
   Worklist.push_back(AllocRef);
 
-  LLVM_DEBUG(llvm::dbgs() << "    Analyzing Use Graph.");
+  LLVM_DEBUG(llvm::dbgs() << "    Analyzing trivial allocation:" << *AllocRef);
 
   while (!Worklist.empty()) {
     SILInstruction *I = Worklist.pop_back_val();
 
-    LLVM_DEBUG(llvm::dbgs() << "        Visiting: " << *I);
+    LLVM_DEBUG(llvm::dbgs() << "        Visiting:" << *I);
 
     // Insert the instruction into our InvolvedInstructions set.  If we have
     // already seen it, then don't reprocess all of the uses.
@@ -319,7 +286,7 @@ hasUnremovableUsers(AllocationInst *AllocRef, UserList &Users,
     }
 
     // If we can't zap this instruction... bail...
-    if (!canZapInstruction(I, acceptRefCountInsts, AllocRef)) {
+    if (!canZapInstruction(I, acceptRefCountInsts)) {
       LLVM_DEBUG(llvm::dbgs() << "        Found instruction we can't zap...\n");
       return true;
     }
@@ -363,10 +330,14 @@ namespace {
 /// dead arrays. We just need a slightly better destructor analysis to prove
 /// that it only releases elements.
 class DeadObjectAnalysis {
-  // Map each address projection of this object to a list of stores.
+  // Map each address projection of this object to a list of source instructions
+  // for specific values, plus stores.
   // Do not iterate over this map's entries.
   using AddressToStoreMap =
-    llvm::DenseMap<IndexTrieNode*, llvm::SmallVector<StoreInst*, 4> >;
+    llvm::DenseMap<
+      IndexTrieNode*,
+      llvm::SmallVector<std::pair<SILValue, StoreInst*>, 4>
+    >;
 
   // The value of the object's address at the point of allocation.
   SILValue NewAddrValue;
@@ -379,6 +350,9 @@ class DeadObjectAnalysis {
 
   // Track all stores of refcounted elements per address projection.
   AddressToStoreMap StoredLocations;
+
+  // Any instructions that need to be added to fully remove an object.
+  llvm::SmallVector<SILInstruction *, 4> AdditionalInstructions;
 
   // Are any uses behind a PointerToAddressInst?
   bool SeenPtrToAddr;
@@ -393,6 +367,10 @@ public:
     return ArrayRef<SILInstruction*>(AllUsers.begin(), AllUsers.end());
   }
 
+  ArrayRef<SILInstruction*>getAdditionalInstructions() const {
+    return AdditionalInstructions;
+  }
+
   template<typename Visitor>
   void visitStoreLocations(Visitor visitor) {
     visitStoreLocations(visitor, AddressProjectionTrie.get());
@@ -400,6 +378,7 @@ public:
 
 private:
   void addStore(StoreInst *Store, IndexTrieNode *AddressNode);
+  bool explodeStore(IndexTrieNode *AddressNode);
   bool recursivelyCollectInteriorUses(ValueBase *DefInst,
                                       IndexTrieNode *AddressNode,
                                       bool IsInteriorAddress);
@@ -420,22 +399,28 @@ addStore(StoreInst *Store, IndexTrieNode *AddressNode) {
   auto &StoredLocs = StoredLocations[AddressNode];
   for (auto &OtherSt : StoredLocs) {
     // In case the object's address is stored in itself.
-    if (OtherSt == Store)
+    if (OtherSt.second == Store)
       return;
 
-    if (OtherSt->getParent() == Store->getParent()) {
+    if (OtherSt.second->getParent() == Store->getParent()) {
       for (auto II = std::next(Store->getIterator()),
                 IE = Store->getParent()->end();
            II != IE; ++II) {
-        if (&*II == OtherSt)
+        if (&*II == OtherSt.second)
           return; // Keep the other store.
       }
       // Replace OtherSt with this store.
-      OtherSt = Store;
+      OtherSt = std::make_pair(Store->getSrc(), Store);
       return;
     }
   }
-  StoredLocations[AddressNode].push_back(Store);
+  StoredLocations[AddressNode].push_back(std::make_pair(Store->getSrc(), Store));
+}
+
+static bool isLifetimeEndpoint(SILInstruction *Inst) {
+  return isa<RefCountingInst>(Inst) || isa<DeallocationInst>(Inst) ||
+         isa<DestroyAddrInst>(Inst) || isa<DeallocPartialRefInst>(Inst) ||
+         isa<DebugValueInst>(Inst);
 }
 
 // Collect instructions that either initialize or release any values at the
@@ -459,8 +444,7 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
     auto User = Op->getUser();
 
     // Lifetime endpoints that don't allow the address to escape.
-    if (isa<RefCountingInst>(User) ||
-        isa<DebugValueInst>(User)) {
+    if (isLifetimeEndpoint(User)) {
       AllUsers.insert(User);
       continue;
     }
@@ -468,7 +452,7 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
     if (auto *Store = dyn_cast<StoreInst>(User)) {
       // Bail if this address is stored to another object.
       if (Store->getDest() != DefInst) {
-        LLVM_DEBUG(llvm::dbgs() <<"        Found an escaping store: " << *User);
+        LLVM_DEBUG(llvm::dbgs() <<"        Found an escaping store:" << *User);
         return false;
       }
       IndexTrieNode *StoreAddrNode = AddressNode;
@@ -483,8 +467,11 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
     }
     if (auto PTAI = dyn_cast<PointerToAddressInst>(User)) {
       // Only one pointer-to-address is allowed for safety.
-      if (SeenPtrToAddr)
+      if (SeenPtrToAddr) {
+        LLVM_DEBUG(llvm::dbgs() << "        Found second pointer_to_address, bailing out:"
+                   << *PTAI);
         return false;
+      }
 
       SeenPtrToAddr = true;
       if (!recursivelyCollectInteriorUses(PTAI, AddressNode, IsInteriorAddress))
@@ -494,6 +481,33 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
     }
     // Recursively follow projections.
     if (auto ProjInst = dyn_cast<SingleValueInstruction>(User)) {
+      // Interpolation append operations. We can always eliminate interpolations
+      // if their result is unused, so these are never obstacles to eliminating
+      // self.
+      if (auto *Apply = dyn_cast<ApplyInst>(User))
+        if (appendsToAllocatedInterpolation(Apply,
+                                            DefInst->getDefiningInstruction())) {
+          AllUsers.insert(User);
+          continue;
+        }
+
+      // Loads are okay only if they lead immediately to lifetime endpoints;
+      // otherwise, something may have escaped.
+      if (auto Load = dyn_cast<LoadInst>(User)) {
+        for (auto LoadOp : Load->getUses()) {
+          auto LoadUser = LoadOp->getUser();
+          if (isLifetimeEndpoint(LoadUser))
+            AllUsers.insert(LoadUser);
+          else {
+            LLVM_DEBUG(llvm::dbgs() << "        Found load instruction:" << *Load
+                                    << "          With suspicious user:" << *LoadUser);
+            return false;
+          }
+        }
+        AllUsers.insert(User);
+        continue;
+      }
+
       ProjectionIndex PI(ProjInst);
       if (PI.isValid()) {
         IndexTrieNode *ProjAddrNode = AddressNode;
@@ -501,8 +515,11 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
         if (Projection::isAddressProjection(ProjInst)) {
           if (isa<IndexAddrInst>(ProjInst)) {
             // Don't support indexing within an interior address.
-            if (IsInteriorAddress)
+            if (IsInteriorAddress) {
+              LLVM_DEBUG(llvm::dbgs() << "        Found index into interior address:"
+                         << *ProjInst);
               return false;
+            }
           }
           else if (!IsInteriorAddress) {
             // Push an extra zero index node for the first interior address.
@@ -512,6 +529,8 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
         }
         else if (IsInteriorAddress) {
           // Don't expect to extract values once we've taken an address.
+          LLVM_DEBUG(llvm::dbgs() << "        Found projection from interior address:"
+                     << *ProjInst);
           return false;
         }
         if (!recursivelyCollectInteriorUses(ProjInst,
@@ -523,8 +542,57 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
       }
     }
     // Otherwise bail.
-    LLVM_DEBUG(llvm::dbgs() << "        Found an escaping use: " << *User);
+    LLVM_DEBUG(llvm::dbgs() << "        Found an escaping use:" << *User);
     return false;
+  }
+  return true;
+}
+
+bool DeadObjectAnalysis::explodeStore(IndexTrieNode *AddressNode) {
+  auto Locations = StoredLocations[AddressNode];
+  assert(!Locations.empty());
+
+  for (auto Location : Locations) {
+    SILValue Src;
+    StoreInst *Store;
+    std::tie(Src, Store) = Location;
+
+    SILInstruction *SrcInst = Src->getDefiningInstruction();
+
+    Optional<SmallVector<SILValue, 4>> NewSrcs;
+
+    if (auto Struct = dyn_cast_or_null<StructInst>(SrcInst)) {
+      NewSrcs.emplace();
+      for (auto elem : Struct->getElements())
+        NewSrcs->push_back(elem);
+    }
+    else if (auto SVI = dyn_cast_or_null<SingleValueInstruction>(SrcInst)) {
+      if (auto structType = SVI->getType().getStructOrBoundGenericStruct()) {
+        SILBuilder accessBuilder(std::next(SVI->getIterator()));
+        NewSrcs.emplace();
+
+        for (auto field : structType->getStoredProperties()) {
+          auto extract =
+            accessBuilder.createStructExtract(SVI->getLoc(), Src, field);
+
+          assert(extract->getFieldNo() == NewSrcs->size());
+          NewSrcs->push_back(extract);
+        }
+      }
+    }
+
+    if (NewSrcs.hasValue()) {
+      StoredLocations.erase(AddressNode);
+
+      for (auto i : indices(*NewSrcs)) {
+        auto NewLocation = std::make_pair((*NewSrcs)[i], Store);
+        StoredLocations[AddressNode->getChild(i)].push_back(NewLocation);
+      }
+    } else {
+      // If we got here, there's trouble.
+      LLVM_DEBUG(llvm::dbgs() << "          Don't know how to explode:" <<*Src);
+      return false;
+    }
   }
   return true;
 }
@@ -532,7 +600,7 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
 // Track the lifetime, release points, and released values referenced by a
 // newly allocated object.
 bool DeadObjectAnalysis::analyze() {
-  LLVM_DEBUG(llvm::dbgs() << "    Analyzing nontrivial dead object: "
+  LLVM_DEBUG(llvm::dbgs() << "    Analyzing nontrivial dead object:"
                           << NewAddrValue);
 
   // Populate AllValues, AddressProjectionTrie, and StoredLocations.
@@ -544,10 +612,23 @@ bool DeadObjectAnalysis::analyze() {
   // If all stores are leaves in the AddressProjectionTrie, then we can analyze
   // the stores that reach the end of the object lifetime. Otherwise bail.
   // This iteration order is nondeterministic but has no impact.
-  for (auto &AddressToStoresPair : StoredLocations) {
-    IndexTrieNode *Location = AddressToStoresPair.first;
-    if (!Location->isLeaf())
-      return false;
+  bool recheck = true;
+  while (recheck) {
+    recheck = false;
+    for (auto &AddressToStoresPair : StoredLocations) {
+      IndexTrieNode *address = AddressToStoresPair.first;
+      if (!address->isLeaf()) {
+        LLVM_DEBUG(llvm::dbgs() << "        Exploding non-leaf value at "
+                                << address << " in " <<
+                                *AddressToStoresPair.second.front().first);
+        if (!explodeStore(address)) {
+          LLVM_DEBUG(llvm::dbgs() << "        Can't explode, bailing out\n");
+          return false;
+        }
+        recheck = true;
+        break;
+      }
+    }
   }
   return true;
 }
@@ -570,18 +651,18 @@ visitStoreLocations(Visitor visitor, IndexTrieNode *AddressNode) {
 //
 // The caller has already determined that all Stores are to the same element
 // within an otherwise dead object.
-static void insertReleases(ArrayRef<StoreInst*> Stores,
+static void insertReleases(ArrayRef<std::pair<SILValue, StoreInst*>> Stores,
                            ArrayRef<SILInstruction*> ReleasePoints,
                            SILSSAUpdater &SSAUp) {
   assert(!Stores.empty());
-  SILValue StVal = Stores.front()->getSrc();
+  SILValue StVal = Stores.front().first;
 
   SSAUp.Initialize(StVal->getType());
 
-  for (auto *Store : Stores)
-    SSAUp.AddAvailableValue(Store->getParent(), Store->getSrc());
+  for (auto Store : Stores)
+    SSAUp.AddAvailableValue(Store.second->getParent(), Store.first);
 
-  SILLocation Loc = Stores[0]->getLoc();
+  SILLocation Loc = Stores[0].second->getLoc();
   for (auto *RelPoint : ReleasePoints) {
     SILBuilder B(RelPoint);
     // This does not use the SSAUpdater::RewriteUse API because it does not do
@@ -636,7 +717,7 @@ static bool removeAndReleaseArray(SingleValueInstruction *NewArrayValue,
   // Require all stores to be into the array storage not the array object,
   // otherwise bail.
   bool HasStores = false;
-  DeadArray.visitStoreLocations([&](ArrayRef<StoreInst*>){ HasStores = true; });
+  DeadArray.visitStoreLocations([&](ArrayRef<std::pair<SILValue, StoreInst*>>){ HasStores = true; });
   if (HasStores)
     return false;
 
@@ -672,7 +753,7 @@ static bool removeAndReleaseArray(SingleValueInstruction *NewArrayValue,
     return false;
   }
 
-  DeadStorage.visitStoreLocations([&] (ArrayRef<StoreInst*> Stores) {
+  DeadStorage.visitStoreLocations([&] (ArrayRef<std::pair<SILValue, StoreInst*>> Stores) {
       insertReleases(Stores, ArrayFrontier, SSAUp);
     });
 
@@ -713,6 +794,8 @@ class DeadObjectElimination : public SILFunctionTransform {
   bool processAllocStack(AllocStackInst *ASI);
   bool processAllocBox(AllocBoxInst *ABI){ return false;}
   bool processAllocApply(ApplyInst *AI, DeadEndBlocks &DEBlocks);
+  bool processInterpolationAllocStack(AllocStackInst* ASI,
+                                      DeadEndBlocks &DEBlocks);
 
   bool processFunction(SILFunction &Fn) {
     DeadEndBlocks DEBlocks(&Fn);
@@ -724,7 +807,8 @@ class DeadObjectElimination : public SILFunctionTransform {
       if (auto *A = dyn_cast<AllocRefInst>(II))
         Changed |= processAllocRef(A);
       else if (auto *A = dyn_cast<AllocStackInst>(II))
-        Changed |= processAllocStack(A);
+        Changed |= processAllocStack(A)
+                || processInterpolationAllocStack(A, DEBlocks);
       else if (auto *A = dyn_cast<AllocBoxInst>(II))
         Changed |= processAllocBox(A);
       else if (auto *A = dyn_cast<ApplyInst>(II))
@@ -784,11 +868,8 @@ bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
 
 bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
   // Trivial types don't have destructors. Let's try to zap this AllocStackInst.
-  if (!ASI->getElementType().isTrivial(ASI->getModule()) &&
-      // DefaultStringInterpolation is not trivial, but canZapInstruction()
-      // can recognize and eliminate its memory management.
-      !allocatesDefaultStringInterpolation(ASI)) {
-    LLVM_DEBUG(llvm::dbgs() << "    Skipping due to non-trivial type:" << *ASI);
+  if (!ASI->getElementType().isTrivial(ASI->getModule())) {
+    LLVM_DEBUG(llvm::dbgs() << "    Stack allocation is nontrivial:" << *ASI);
     return false;
   }
 
@@ -848,6 +929,44 @@ static bool getDeadInstsAfterInitializerRemoved(
   // problem, we clear the out array here. We assert at the beginning that the
   // out array is empty, so this is safe.
   ToDestroy.clear();
+  return true;
+}
+
+bool
+DeadObjectElimination::processInterpolationAllocStack(AllocStackInst *ASI,
+                                                      DeadEndBlocks &DEBlocks) {
+  if (!allocationWhitelistedForInterpolation(ASI))
+    return false;
+
+  DeadObjectAnalysis deadInterpolation(ASI);
+
+  if (!deadInterpolation.analyze())
+    return false;
+
+  // Find array object lifetime.
+  ValueLifetimeAnalysis VLA(ASI, deadInterpolation.getAllUsers());
+
+  // For each store location, insert releases.
+  SILSSAUpdater SSAUp;
+  ValueLifetimeAnalysis::Frontier interpolationFrontier;
+  if (!VLA.computeFrontier(interpolationFrontier,
+                           ValueLifetimeAnalysis::UsersMustPostDomDef,
+                           &DEBlocks)) {
+    // In theory the allocated object must be released on all paths in which
+    // some object initialization occurs. If not (for some reason) we bail.
+    return false;
+  }
+
+  deadInterpolation.visitStoreLocations([&] (ArrayRef<std::pair<SILValue, StoreInst*>> Stores) {
+    insertReleases(Stores, interpolationFrontier, SSAUp);
+  });
+
+  removeInstructions(deadInterpolation.getAllUsers());
+
+  eraseUsesOfInstruction(ASI);
+  recursivelyDeleteTriviallyDeadInstructions(ASI, true);
+
+  LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating alloc_stack.\n");
   return true;
 }
 
