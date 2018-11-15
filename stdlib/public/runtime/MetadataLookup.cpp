@@ -914,17 +914,6 @@ static ArrayRef<GenericParamDescriptor> getLocalGenericParams(
 /// Constructs metadata by decoding a mangled type name, for use with
 /// \c TypeDecoder.
 class DecodedMetadataBuilder {
-public:
-  /// Callback used to handle the substitution of a generic parameter for
-  /// its metadata.
-  using SubstGenericParameterFn =
-    std::function<const Metadata *(unsigned depth, unsigned index)>;
-
-  /// Callback used to handle the lookup of dependent member types.
-  using LookupDependentMemberFn =
-    std::function<const Metadata *(const Metadata *base, StringRef assocType,
-                                   const ProtocolDescriptor *protocol)>;
-
 private:
   /// The demangler we'll use when building new nodes.
   Demangler &demangler;
@@ -932,21 +921,19 @@ private:
   /// Substitute generic parameters.
   SubstGenericParameterFn substGenericParameter;
 
-  /// Lookup dependent member types.
-  LookupDependentMemberFn lookupDependentMember;
+  /// Substitute dependent witness tables.
+  SubstDependentWitnessTableFn substWitnessTable;
 
   /// Ownership information related to the metadata we are trying to lookup.
   TypeReferenceOwnership ReferenceOwnership;
 
 public:
   DecodedMetadataBuilder(Demangler &demangler,
-                         SubstGenericParameterFn substGenericParameter
-                           = nullptr,
-                         LookupDependentMemberFn lookupDependentMember
-                           = nullptr)
+                         SubstGenericParameterFn substGenericParameter,
+                         SubstDependentWitnessTableFn substWitnessTable)
     : demangler(demangler),
       substGenericParameter(substGenericParameter),
-      lookupDependentMember(lookupDependentMember) { }
+      substWitnessTable(substWitnessTable) { }
 
   using BuiltType = const Metadata *;
   using BuiltNominalTypeDecl = const TypeContextDescriptor *;
@@ -1066,7 +1053,8 @@ public:
                                                           genericParamCounts);
       bool failed =
         _checkGenericRequirements(genericContext->getGenericRequirements(),
-                                  allGenericArgsVec, substitutions);
+                                  allGenericArgsVec, substitutions,
+                                  substitutions);
       if (failed)
         return BuiltType();
 
@@ -1172,10 +1160,22 @@ public:
       return BuiltType();
 #endif
 
-    if (lookupDependentMember)
-      return lookupDependentMember(base, name, protocol.getSwiftProtocol());
+    auto swiftProtocol = protocol.getSwiftProtocol();
+    auto witnessTable = swift_conformsToProtocol(base, swiftProtocol);
+    if (!witnessTable)
+      return BuiltType();
 
-    return BuiltType();
+    // Look for the named associated type within the protocol.
+    auto assocType = findAssociatedTypeByName(swiftProtocol, name);
+    if (!assocType) return nullptr;
+
+    // Call the associated type access function.
+    return swift_getAssociatedTypeWitness(
+                                 MetadataState::Abstract,
+                                 const_cast<WitnessTable *>(witnessTable),
+                                 base,
+                                 swiftProtocol->getRequirementBaseDescriptor(),
+                                 *assocType).Value;
   }
 
 #define REF_STORAGE(Name, ...) \
@@ -1198,8 +1198,20 @@ public:
 }
 
 TypeInfo
+swift::_getTypeByMangledNode(Demangler &demangler,
+                             Demangle::NodePointer node,
+                             SubstGenericParameterFn substGenericParam,
+                             SubstDependentWitnessTableFn substWitnessTable) {
+  DecodedMetadataBuilder builder(demangler, substGenericParam,
+                                 substWitnessTable);
+  auto type = Demangle::decodeMangledType(builder, node);
+  return {type, builder.getReferenceOwnership()};
+}
+
+TypeInfo
 swift::_getTypeByMangledName(StringRef typeName,
-                             SubstGenericParameterFn substGenericParam) {
+                             SubstGenericParameterFn substGenericParam,
+                             SubstDependentWitnessTableFn substWitnessTable) {
   auto demangler = getDemanglerForRuntimeTypeResolution();
   NodePointer node;
 
@@ -1243,29 +1255,9 @@ swift::_getTypeByMangledName(StringRef typeName,
     if (!node)
       return TypeInfo();
   }
-  
-  DecodedMetadataBuilder builder(demangler, substGenericParam,
-    [](const Metadata *base, StringRef assocType,
-       const ProtocolDescriptor *protocol) -> const Metadata * {
-      // Look for a conformance of the base type to the protocol.
-      auto witnessTable = swift_conformsToProtocol(base, protocol);
-      if (!witnessTable) return nullptr;
 
-      // Look for the named associated type within the protocol.
-      auto assocTypeReq = findAssociatedTypeByName(protocol, assocType);
-      if (!assocTypeReq) return nullptr;
-
-      // Call the associated type access function.
-      return swift_getAssociatedTypeWitness(
-                                     MetadataState::Abstract,
-                                     const_cast<WitnessTable *>(witnessTable),
-                                     base,
-                                     protocol->getRequirementBaseDescriptor(),
-                                     *assocTypeReq).Value;
-    });
-
-  auto type = Demangle::decodeMangledType(builder, node);
-  return {type, builder.getReferenceOwnership()};
+  return _getTypeByMangledNode(demangler, node, substGenericParam,
+                               substWitnessTable);
 }
 
 static const Metadata * _Nullable
@@ -1287,7 +1279,8 @@ swift_getTypeByMangledNameImpl(const char *typeNameStart, size_t typeNameLength,
         flatIndex += parametersPerLevel[i];
 
       return flatSubstitutions[flatIndex];
-    });
+    },
+    [](const Metadata *type, unsigned index) { return nullptr; });
 
   if (!metadata) return nullptr;
 
@@ -1329,7 +1322,8 @@ void SubstGenericParametersFromMetadata::setup() const {
   if (!descriptorPath.empty() || !base)
     return;
 
-  buildDescriptorPath(base->getTypeContextDescriptor());
+  auto descriptor = base->getTypeContextDescriptor();
+  numKeyGenericParameters = buildDescriptorPath(descriptor);
 }
 
 const Metadata *
@@ -1374,6 +1368,16 @@ SubstGenericParametersFromMetadata::operator()(
   return base->getGenericArgs()[flatIndex];
 }
 
+const WitnessTable *
+SubstGenericParametersFromMetadata::operator()(const Metadata *type,
+                                               unsigned index) const {
+  // On first access, compute the descriptor path.
+  setup();
+
+  return (const WitnessTable *)base->getGenericArgs()[
+                                              index + numKeyGenericParameters];
+}
+
 const Metadata *SubstGenericParametersFromWrittenArgs::operator()(
                                                         unsigned depth,
                                                         unsigned index) const {
@@ -1383,6 +1387,12 @@ const Metadata *SubstGenericParametersFromWrittenArgs::operator()(
       return allGenericArgs[*flatIndex];
   }
 
+  return nullptr;
+}
+
+const WitnessTable *
+SubstGenericParametersFromWrittenArgs::operator()(const Metadata *type,
+                                                  unsigned index) const {
   return nullptr;
 }
 
@@ -1488,7 +1498,8 @@ void swift::gatherWrittenGenericArgs(
       SubstGenericParametersFromWrittenArgs substitutions(allGenericArgs,
                                                           genericParamCounts);
       allGenericArgs[*lhsFlatIndex] =
-          _getTypeByMangledName(req.getMangledTypeName(), substitutions);
+          _getTypeByMangledName(req.getMangledTypeName(), substitutions,
+                                substitutions);
       continue;
     }
 

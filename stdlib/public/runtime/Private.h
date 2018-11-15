@@ -227,13 +227,18 @@ public:
   /// Callback used to provide the substitution of a generic parameter
   /// (described by depth/index) to its metadata.
   using SubstGenericParameterFn =
-    llvm::function_ref<const Metadata *(unsigned depth, unsigned index)>;
+    std::function<const Metadata *(unsigned depth, unsigned index)>;
+
+  /// Callback used to provide the substitution of a witness table based on
+  /// its index into the enclosing generic environment.
+  using SubstDependentWitnessTableFn =
+    std::function<const WitnessTable *(const Metadata *type, unsigned index)>;
 
   /// Function object that produces substitutions for the generic parameters
   /// that occur within a mangled name, using the generic arguments from
   /// the given metadata.
   ///
-  /// Use with \c swift__getTypeByMangledName to decode potentially-generic
+  /// Use with \c swift_getTypeByMangledName to decode potentially-generic
   /// types.
   class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromMetadata {
     const Metadata *base;
@@ -257,6 +262,9 @@ public:
     /// descriptor, from the outermost to the innermost.
     mutable std::vector<PathElement> descriptorPath;
 
+    /// The number of key generic parameters.
+    mutable unsigned numKeyGenericParameters = 0;
+
     /// Builds the descriptor path.
     ///
     /// \returns a pair containing the number of key generic parameters in
@@ -272,14 +280,31 @@ public:
       : base(base) { }
 
     const Metadata *operator()(unsigned depth, unsigned index) const;
+    const WitnessTable *operator()(const Metadata *type, unsigned index) const;
   };
+
+  /// Retrieve the type metadata described by the given demangled type name.
+  ///
+  /// \p substGenericParam Function that provides generic argument metadata
+  /// given a particular generic parameter specified by depth/index.
+  /// \p substWitnessTable Function that provides witness tables given a
+  /// particular dependent conformance index.
+  TypeInfo _getTypeByMangledNode(
+                               Demangler &demangler,
+                               Demangle::NodePointer node,
+                               SubstGenericParameterFn substGenericParam,
+                               SubstDependentWitnessTableFn substWitnessTable);
 
   /// Retrieve the type metadata described by the given type name.
   ///
   /// \p substGenericParam Function that provides generic argument metadata
   /// given a particular generic parameter specified by depth/index.
-  TypeInfo _getTypeByMangledName(StringRef typeName,
-                                 SubstGenericParameterFn substGenericParam);
+  /// \p substWitnessTable Function that provides witness tables given a
+  /// particular dependent conformance index.
+  TypeInfo _getTypeByMangledName(
+                               StringRef typeName,
+                               SubstGenericParameterFn substGenericParam,
+                               SubstDependentWitnessTableFn substWitnessTable);
 
   /// Function object that produces substitutions for the generic parameters
   /// that occur within a mangled name, using the complete set of generic
@@ -311,6 +336,7 @@ public:
     }
 
     const Metadata *operator()(unsigned depth, unsigned index) const;
+    const WitnessTable *operator()(const Metadata *type, unsigned index) const;
   };
 
   /// Gather generic parameter counts from a context descriptor.
@@ -338,7 +364,8 @@ public:
   bool _checkGenericRequirements(
                     llvm::ArrayRef<GenericRequirementDescriptor> requirements,
                     std::vector<const void *> &extraArguments,
-                    SubstGenericParameterFn substGenericParam);
+                    SubstGenericParameterFn substGenericParam,
+                    SubstDependentWitnessTableFn substWitnessTable);
 
   /// A helper function which avoids performing a store if the destination
   /// address already contains the source value.  This is useful when
