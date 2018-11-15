@@ -2965,6 +2965,11 @@ static void dumpProtocolConformanceRec(
     break;
   }
 
+  case ProtocolConformanceKind::Self: {
+    printCommon("self");
+    break;
+  }
+
   case ProtocolConformanceKind::Inherited: {
     auto conf = cast<InheritedProtocolConformance>(conformance);
     printCommon("inherited");

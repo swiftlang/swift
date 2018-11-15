@@ -113,20 +113,21 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
     if (!needsWTable)
       continue;
 
-    // Only normal conformances get symbols; the others get any public symbols
-    // from their parent normal conformance.
-    auto normalConformance = dyn_cast<NormalProtocolConformance>(conformance);
-    if (!normalConformance)
+    // Only root conformances get symbols; the others get any public symbols
+    // from their parent conformances.
+    auto rootConformance = dyn_cast<RootProtocolConformance>(conformance);
+    if (!rootConformance) {
       continue;
+    }
 
-    addSymbol(LinkEntity::forDirectProtocolWitnessTable(normalConformance));
-    addSymbol(LinkEntity::forProtocolConformanceDescriptor(normalConformance));
+    addSymbol(LinkEntity::forProtocolWitnessTable(rootConformance));
+    addSymbol(LinkEntity::forProtocolConformanceDescriptor(rootConformance));
 
     // FIXME: the logic around visibility in extensions is confusing, and
     // sometimes witness thunks need to be manually made public.
 
     auto conformanceIsFixed = SILWitnessTable::conformanceIsSerialized(
-        normalConformance);
+        rootConformance);
     auto addSymbolIfNecessary = [&](ValueDecl *requirementDecl,
                                     ValueDecl *witnessDecl) {
       auto witnessLinkage = SILDeclRef(witnessDecl).getLinkage(ForDefinition);
@@ -134,9 +135,15 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
           fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage)) {
         Mangle::ASTMangler Mangler;
         addSymbol(
-            Mangler.mangleWitnessThunk(normalConformance, requirementDecl));
+            Mangler.mangleWitnessThunk(rootConformance, requirementDecl));
       }
     };
+
+    // FIXME: skipping witnesses for self-conformances?
+    auto normalConformance =
+      dyn_cast<NormalProtocolConformance>(rootConformance);
+    if (!normalConformance) continue;
+
     normalConformance->forEachValueWitness(
         nullptr, [&](ValueDecl *valueReq, Witness witness) {
           auto witnessDecl = witness.getDecl();

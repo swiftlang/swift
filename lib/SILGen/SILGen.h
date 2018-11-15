@@ -296,7 +296,7 @@ public:
 
   /// Get or emit the witness table for a protocol conformance.
   SILWitnessTable *getWitnessTable(ProtocolConformance *conformance);
-  
+
   /// Emit a protocol witness entry point.
   SILFunction *
   emitProtocolWitness(ProtocolConformanceRef conformance, SILLinkage linkage,

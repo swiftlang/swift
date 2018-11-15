@@ -50,6 +50,7 @@
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
 #include "Callee.h"
+#include "ConformanceDescription.h"
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
@@ -991,7 +992,7 @@ void IRGenerator::emitGlobalTopLevel(bool emitForParallelEmission) {
 
   // Ensure that relative symbols are collocated in the same LLVM module.
   for (SILWitnessTable &wt : PrimaryIGM->getSILModule().getWitnessTableList()) {
-    CurrentIGMPtr IGM = getGenModule(wt.getConformance()->getDeclContext());
+    CurrentIGMPtr IGM = getGenModule(wt.getDeclContext());
     if (emitForParallelEmission)
       IGM->ensureRelativeSymbolCollocation(wt);
   }
@@ -1024,7 +1025,7 @@ void IRGenerator::emitGlobalTopLevel(bool emitForParallelEmission) {
 
   // Emit witness tables.
   for (SILWitnessTable &wt : PrimaryIGM->getSILModule().getWitnessTableList()) {
-    CurrentIGMPtr IGM = getGenModule(wt.getConformance()->getDeclContext());
+    CurrentIGMPtr IGM = getGenModule(wt.getDeclContext());
     if (!canEmitWitnessTableLazily(&wt)) {
       IGM->emitSILWitnessTable(&wt);
     }
@@ -1138,7 +1139,7 @@ void IRGenerator::emitLazyDefinitions() {
     }
     while (!LazyWitnessTables.empty()) {
       SILWitnessTable *wt = LazyWitnessTables.pop_back_val();
-      CurrentIGMPtr IGM = getGenModule(wt->getConformance()->getDeclContext());
+      CurrentIGMPtr IGM = getGenModule(wt->getDeclContext());
       IGM->emitSILWitnessTable(wt);
     }
 
@@ -2705,8 +2706,7 @@ llvm::Constant *IRGenModule::emitSwiftProtocols() {
   return var;
 }
 
-void IRGenModule::addProtocolConformance(
-                                ConformanceDescription record) {
+void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
   // Add this protocol conformance.
   ProtocolConformances.push_back(std::move(record));
 }
@@ -3521,7 +3521,7 @@ llvm::GlobalValue *IRGenModule::defineAssociatedConformanceDescriptor(
 }
 
 llvm::Constant *IRGenModule::getAddrOfProtocolConformanceDescriptor(
-                                const NormalProtocolConformance *conformance,
+                                const RootProtocolConformance *conformance,
                                 ConstantInit definition) {
   auto entity = LinkEntity::forProtocolConformanceDescriptor(conformance);
   return getAddrOfLLVMVariable(entity, definition,
@@ -3946,11 +3946,11 @@ IRGenModule::getAddrOfWitnessTableLazyCacheVariable(
 ///
 /// This can only be used with non-dependent conformances.
 llvm::Constant*
-IRGenModule::getAddrOfWitnessTable(const NormalProtocolConformance *conf,
+IRGenModule::getAddrOfWitnessTable(const RootProtocolConformance *conf,
                                    ConstantInit definition) {
   IRGen.addLazyWitnessTable(conf);
 
-  auto entity = LinkEntity::forDirectProtocolWitnessTable(conf);
+  auto entity = LinkEntity::forProtocolWitnessTable(conf);
   return getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
 }
 
