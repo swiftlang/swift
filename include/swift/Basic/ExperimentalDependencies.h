@@ -65,21 +65,28 @@ namespace experimental_dependencies {
     }
 
     
-    struct hash
-    : public std::unary_function<NodeDependencyKey, size_t>
-    {
-      size_t operator()(const NodeDependencyKey& key) const {
-        return
-        std::hash<size_t>()(size_t(key.kind)) ^
-        std::hash<std::string>()(key.nameForDependencies) ^
-        std::hash<std::string>()(key.nameForHolderOfMember);
-      }
-    };
+    size_t hash() const {
+      return
+      std::hash<size_t>()(size_t(kind)) ^
+      std::hash<std::string>()(nameForDependencies) ^
+      std::hash<std::string>()(nameForHolderOfMember);
+    }
     
     bool isForAnotherSourceFile() const { return nameForHolderOfMember.empty(); }
     bool isForThisSourceFile() const { return !isForAnotherSourceFile(); }
   };
-  
+}
+}
+
+template<>
+struct std::hash<typename swift::experimental_dependencies::NodeDependencyKey> {
+  size_t operator() (const swift::experimental_dependencies::NodeDependencyKey& key) const {
+    return key.hash();
+  }
+};
+
+namespace swift {
+namespace experimental_dependencies {
   class Node {
     friend class FrontendNode; // serialization
     NodeDependencyKey dependencyKey;
@@ -98,6 +105,8 @@ namespace experimental_dependencies {
     Node(const Node& other) = default;
     
     virtual ~Node() = default;
+
+    const NodeDependencyKey &getDependencyKey() const { return dependencyKey; }
     NodeKind getKind() const { return dependencyKey.kind; }
     const std::string &getNameForDependencies() const { return dependencyKey.nameForDependencies; }
     const std::string & getNameForHolderOfMember() const { return dependencyKey.nameForHolderOfMember; }
@@ -107,7 +116,7 @@ namespace experimental_dependencies {
   
   template <typename KeyT, typename ValueT>
   class Memoizer {
-    using Memos = typename std::unordered_map<KeyT, ValueT, typename KeyT::hash>;
+    using Memos = typename std::unordered_map<KeyT, ValueT>;
     Memos memos;
     
   public:
@@ -155,8 +164,8 @@ namespace experimental_dependencies {
     location(location),
     sequenceNumber(sequenceNumber) {}
     
-    const NodeDependencyKey &getDependencyKey() const { return dependencyKey; }
     Location getLocation() const { return location; }
+    bool isHere() const { return getLocation() == Location::Here; }
     size_t getSequenceNumber() const { return sequenceNumber; }
     ArrayRef<size_t> getDependees() const { return dependees; }
     ArrayRef<size_t> getDependers() const { return dependers; }
@@ -217,7 +226,12 @@ namespace experimental_dependencies {
         fn(allNodes[i]);
     }
     template <typename FnT>
-    void forEachElsewhereNode(FnT fn) {
+    void forEachHereNode(FnT fn) const {
+      for (size_t i = 0;  i < hereNodeCount;  ++i)
+        fn(allNodes[i]);
+    }
+    template <typename FnT>
+    void forEachElsewhereNode(FnT fn) const {
       for (size_t i = hereNodeCount;  i < allNodes.size();  ++i)
         fn(allNodes[i]);
     }
@@ -238,7 +252,7 @@ namespace experimental_dependencies {
     }
     void addDeserializedNode(FrontendNode *n) {
       allNodes.push_back(n);
-      if (n->getLocation() == FrontendNode::Location::Here)
+      if (n->isHere())
         hereNodeCount = allNodes.size();
       memoizer.insert(n->getDependencyKey(), n);
     }

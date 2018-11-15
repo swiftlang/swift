@@ -31,6 +31,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace swift {
   namespace driver {
@@ -43,6 +44,10 @@ namespace swift {
       class DriverNode: public Node {
         std::string swiftDepsFile;
         std::set<NodeDependencyKey> dependers;
+        
+      public:
+        DriverNode(const NodeDependencyKey &key, StringRef fingerprint)
+        : Node(key, fingerprint) {}
       };
       
       
@@ -52,10 +57,40 @@ namespace swift {
       };
 
       class DriverGraph {
-        std::unordered_map<std::string, std::vector<DriverNode*>> nodesBySwiftDepsFile;
-        std::vector<DriverNode*> nodesInNoSwiftDepsFile;
-        std::unordered_multimap<NodeDependencyKey, DriverNode*, typename NodeDependencyKey::hash> nodesByDependency;
+        using NodesByKey = std::unordered_map<NodeDependencyKey, DriverNode*>;
+        // empty string for no file
+        std::unordered_map<std::string, NodesByKey> nodesBySwiftDepsFile;
+        
+        std::unordered_map<NodeDependencyKey, std::unordered_map<std::string, DriverNode*>> nodesByDependencyKey;
 
+        //TODO template next 2
+//        DriverNode* findNode(StringRef depsFilename, const NodeDependencyKey &k) {
+//          auto iter = nodesBySwiftDepsFile.find(depsFilename);
+//          return iter == nodesBySwiftDepsFile.end() ? nullptr
+//          : findPointer(iter->second, k);
+//        }
+//        DriverNode* findNode(const NodeDependencyKey &k, StringRef depsFilename) {
+//          auto iter = nodesByDependencyKey.find(k);
+//          return iter == nodesByDependencyKey.end() ? nullptr
+//          : findPointer(iter->second, depsFilename);
+//        }
+        template <typename Key1, typename Key2>
+          DriverNode* findNode(std::unordered_map<Key1,
+                               std::unordered_map<Key2,
+                               DriverNode*>>
+                               &mapmap,
+                               const Key1 &key1, const Key2 &key2) {
+            auto iter = mapmap.find(key1);
+            return iter == mapmap.end() ? nullptr : findPointer(iter->second, key2);
+          }
+
+        // For a keyed container holding pointers, lookup and return nullptr if absent
+        template <typename Container>
+        static typename Container::value_type::second_type
+        findPointer(Container &c, const typename Container::key_type  &k) {
+          auto iter = c.find(k);
+          return iter == c.end() ? nullptr : iter->second;
+        }
         
       public:
         DriverGraph() = default;
@@ -79,8 +114,14 @@ namespace swift {
       
        
         DependencyGraphImpl::LoadResult integrate(const FrontendGraph &);
-        DependencyGraphImpl::LoadResult integrateNew(const FrontendGraph &);
-        DependencyGraphImpl::LoadResult integrateExisting(const FrontendGraph &, std::vector<DriverNode*>&);
+       
+        void integrateHereNode(const FrontendNode *integrand, const std::string &depsFilename, NodesByKey &nodesInFile, NodesByKey &nodesToRemove);
+        void integrateElsewhereNode(const FrontendNode *integrand);
+        void addExistingLinksTo(DriverNode* n);
+        void rememberToPropagateChangesFrom(DriverNode* n);
+        
+        void addNode(StringRef swiftDeps, DriverNode *n);
+        void removeNode(StringRef swiftDeps, DriverNode *n);
       };
     } // experimental_dependencies
   } // driver

@@ -57,20 +57,81 @@ DriverGraph::loadFromBuffer(const void *node,
 
 
 LoadResult DriverGraph::integrate(const FrontendGraph &g) {
-  StringRef depsFileName = g.getSourceFileProvideNode()->getNameForDependencies();
-  auto iter = nodesBySwiftDepsFile.find(depsFileName);
-  return iter == nodesBySwiftDepsFile.end()
-  ? integrateNew(g)
-  : integrateExisting(g, iter->second);
+  StringRef depsFilename = g.getSourceFileProvideNode()->getNameForDependencies();
+  NodesByKey &nodesInFile = nodesBySwiftDepsFile[depsFilename];
+  auto nodesToRemove = nodesInFile;
+
+  g.forEachHereNode([&](const FrontendNode *integrand) {
+    integrateHereNode(integrand, depsFilename, nodesInFile, nodesToRemove);});
+  
+  g.forEachElsewhereNode([&](const FrontendNode *integrand) {
+    integrateElsewhereNode(integrand);});
+
+  for (auto &p: nodesToRemove)
+    removeNode(depsFilename, p.second);
+
+  // handle links
+  abort(); // dependencies???
 }
 
-LoadResult DriverGraph::integrateNew(const FrontendGraph &) {
-  abort();
-}
-LoadResult DriverGraph::integrateExisting(const FrontendGraph &, std::vector<DriverNode*>&) {
-  abort();
+
+void DriverGraph::integrateHereNode(const FrontendNode *integrand, const std::string &depsFilename, NodesByKey &nodesInFile, NodesByKey &nodesToRemove) {
+  assert(integrand->isHere());
+  const auto &key = integrand->getDependencyKey();
+  auto *oldNode = findNode(nodesBySwiftDepsFile, depsFilename, key);
+  if (oldNode)
+    nodesToRemove.erase(key);
+  else {
+    NodesByKey expats = nodesBySwiftDepsFile.find("")->second;
+    auto iter = expats.find(key);
+    if (iter != expats.end()) {
+      oldNode = iter->second;
+      expats.erase(iter);
+      nodesInFile.insert(std::make_pair(key, oldNode));
+    }
+  }
+  if (!oldNode) {
+    auto *newNode = new DriverNode(key, integrand->getFingerprint());
+    addNode(depsFilename, newNode);
+    return;
+  }
+  if (oldNode->getFingerprint() == integrand->getFingerprint())
+    return;
+  oldNode->setFingerprint(integrand->getFingerprint());
+  rememberToPropagateChangesFrom(oldNode);
 }
 
+void DriverGraph::integrateElsewhereNode(const FrontendNode *integrand) {
+  assert(!integrand->isHere());
+  auto key = integrand->getDependencyKey();
+  assert(integrand->getFingerprint() == "" && "unimplemented");
+  DriverNode* oldNode = findNode(nodesBySwiftDepsFile, std::string(), key);
+  if (oldNode)
+    return;
+  DriverNode *newNode = new DriverNode(key, integrand->getFingerprint());
+  addNode("", newNode);
+};
+
+void DriverGraph::addNode(StringRef swiftDeps, DriverNode *n) {
+  auto const &key = n->getDependencyKey();
+  nodesBySwiftDepsFile[swiftDeps].insert(std::make_pair(key, n));
+  nodesByDependencyKey[key].insert(std::make_pair(swiftDeps, n));
+  addExistingLinksTo(n);
+}
+
+void DriverGraph::removeNode(StringRef swiftDeps, DriverNode *n) {
+  const auto &key = n->getDependencyKey();
+  nodesBySwiftDepsFile[swiftDeps].erase(key);
+  nodesByDependencyKey[key].erase(swiftDeps);
+  delete n;
+}
+
+void DriverGraph::addExistingLinksTo(DriverNode* n) {
+  abort();
+}
+void DriverGraph::rememberToPropagateChangesFrom(DriverNode* n) {
+  abort();
+}
 
 
 bool DriverGraph::isMarked(const Job* Cmd) const {
