@@ -19,69 +19,6 @@
 import TestsUtils
 
 public let ExistentialPerformance = [
-  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_ClassValueBuffer1", runFunction: run_ExistentialTestArrayConditionalShift_ClassValueBuffer1, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_ClassValueBuffer2", runFunction: run_ExistentialTestArrayConditionalShift_ClassValueBuffer2, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_ClassValueBuffer3", runFunction: run_ExistentialTestArrayConditionalShift_ClassValueBuffer3, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_ClassValueBuffer4", runFunction: run_ExistentialTestArrayConditionalShift_ClassValueBuffer4, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_IntValueBuffer0", runFunction: run_ExistentialTestArrayConditionalShift_IntValueBuffer0, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_IntValueBuffer1", runFunction: run_ExistentialTestArrayConditionalShift_IntValueBuffer1, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_IntValueBuffer2", runFunction: run_ExistentialTestArrayConditionalShift_IntValueBuffer2, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_IntValueBuffer3", runFunction: run_ExistentialTestArrayConditionalShift_IntValueBuffer3, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_IntValueBuffer4", runFunction: run_ExistentialTestArrayConditionalShift_IntValueBuffer4, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayMutating_ClassValueBuffer1", runFunction: run_ExistentialTestArrayMutating_ClassValueBuffer1, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayMutating_ClassValueBuffer2", runFunction: run_ExistentialTestArrayMutating_ClassValueBuffer2, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayMutating_ClassValueBuffer3", runFunction: run_ExistentialTestArrayMutating_ClassValueBuffer3, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayMutating_ClassValueBuffer4", runFunction: run_ExistentialTestArrayMutating_ClassValueBuffer4, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayMutating_IntValueBuffer0", runFunction: run_ExistentialTestArrayMutating_IntValueBuffer0, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayMutating_IntValueBuffer1", runFunction: run_ExistentialTestArrayMutating_IntValueBuffer1, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayMutating_IntValueBuffer2", runFunction: run_ExistentialTestArrayMutating_IntValueBuffer2, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayMutating_IntValueBuffer3", runFunction: run_ExistentialTestArrayMutating_IntValueBuffer3, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayMutating_IntValueBuffer4", runFunction: run_ExistentialTestArrayMutating_IntValueBuffer4, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_ClassValueBuffer1", runFunction: run_ExistentialTestArrayOneMethodCall_ClassValueBuffer1, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_ClassValueBuffer2", runFunction: run_ExistentialTestArrayOneMethodCall_ClassValueBuffer2, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_ClassValueBuffer3", runFunction: run_ExistentialTestArrayOneMethodCall_ClassValueBuffer3, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_ClassValueBuffer4", runFunction: run_ExistentialTestArrayOneMethodCall_ClassValueBuffer4, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_IntValueBuffer0", runFunction: run_ExistentialTestArrayOneMethodCall_IntValueBuffer0, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_IntValueBuffer1", runFunction: run_ExistentialTestArrayOneMethodCall_IntValueBuffer1, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_IntValueBuffer2", runFunction: run_ExistentialTestArrayOneMethodCall_IntValueBuffer2, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_IntValueBuffer3", runFunction: run_ExistentialTestArrayOneMethodCall_IntValueBuffer3, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_IntValueBuffer4", runFunction: run_ExistentialTestArrayOneMethodCall_IntValueBuffer4, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayShift_ClassValueBuffer1", runFunction: run_ExistentialTestArrayShift_ClassValueBuffer1, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayShift_ClassValueBuffer2", runFunction: run_ExistentialTestArrayShift_ClassValueBuffer2, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayShift_ClassValueBuffer3", runFunction: run_ExistentialTestArrayShift_ClassValueBuffer3, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayShift_ClassValueBuffer4", runFunction: run_ExistentialTestArrayShift_ClassValueBuffer4, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayShift_IntValueBuffer0", runFunction: run_ExistentialTestArrayShift_IntValueBuffer0, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayShift_IntValueBuffer1", runFunction: run_ExistentialTestArrayShift_IntValueBuffer1, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayShift_IntValueBuffer2", runFunction: run_ExistentialTestArrayShift_IntValueBuffer2, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayShift_IntValueBuffer3", runFunction: run_ExistentialTestArrayShift_IntValueBuffer3, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayShift_IntValueBuffer4", runFunction: run_ExistentialTestArrayShift_IntValueBuffer4, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_ClassValueBuffer1", runFunction: run_ExistentialTestArrayTwoMethodCalls_ClassValueBuffer1, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_ClassValueBuffer2", runFunction: run_ExistentialTestArrayTwoMethodCalls_ClassValueBuffer2, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_ClassValueBuffer3", runFunction: run_ExistentialTestArrayTwoMethodCalls_ClassValueBuffer3, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_ClassValueBuffer4", runFunction: run_ExistentialTestArrayTwoMethodCalls_ClassValueBuffer4, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_IntValueBuffer0", runFunction: run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer0, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_IntValueBuffer1", runFunction: run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer1, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_IntValueBuffer2", runFunction: run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer2, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_IntValueBuffer3", runFunction: run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer3, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_IntValueBuffer4", runFunction: run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer4, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_ClassValueBuffer1", runFunction: run_ExistentialTestMutatingAndNonMutating_ClassValueBuffer1, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_ClassValueBuffer2", runFunction: run_ExistentialTestMutatingAndNonMutating_ClassValueBuffer2, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_ClassValueBuffer3", runFunction: run_ExistentialTestMutatingAndNonMutating_ClassValueBuffer3, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_ClassValueBuffer4", runFunction: run_ExistentialTestMutatingAndNonMutating_ClassValueBuffer4, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_IntValueBuffer0", runFunction: run_ExistentialTestMutatingAndNonMutating_IntValueBuffer0, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_IntValueBuffer1", runFunction: run_ExistentialTestMutatingAndNonMutating_IntValueBuffer1, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_IntValueBuffer2", runFunction: run_ExistentialTestMutatingAndNonMutating_IntValueBuffer2, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_IntValueBuffer3", runFunction: run_ExistentialTestMutatingAndNonMutating_IntValueBuffer3, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_IntValueBuffer4", runFunction: run_ExistentialTestMutatingAndNonMutating_IntValueBuffer4, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutating_ClassValueBuffer1", runFunction: run_ExistentialTestMutating_ClassValueBuffer1, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutating_ClassValueBuffer2", runFunction: run_ExistentialTestMutating_ClassValueBuffer2, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutating_ClassValueBuffer3", runFunction: run_ExistentialTestMutating_ClassValueBuffer3, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutating_ClassValueBuffer4", runFunction: run_ExistentialTestMutating_ClassValueBuffer4, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutating_IntValueBuffer0", runFunction: run_ExistentialTestMutating_IntValueBuffer0, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutating_IntValueBuffer1", runFunction: run_ExistentialTestMutating_IntValueBuffer1, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutating_IntValueBuffer2", runFunction: run_ExistentialTestMutating_IntValueBuffer2, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutating_IntValueBuffer3", runFunction: run_ExistentialTestMutating_IntValueBuffer3, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutating_IntValueBuffer4", runFunction: run_ExistentialTestMutating_IntValueBuffer4, tags: [.unstable]),
   BenchmarkInfo(name: "ExistentialTestOneMethodCall_ClassValueBuffer1", runFunction: run_ExistentialTestOneMethodCall_ClassValueBuffer1, tags: [.unstable]),
   BenchmarkInfo(name: "ExistentialTestOneMethodCall_ClassValueBuffer2", runFunction: run_ExistentialTestOneMethodCall_ClassValueBuffer2, tags: [.unstable]),
   BenchmarkInfo(name: "ExistentialTestOneMethodCall_ClassValueBuffer3", runFunction: run_ExistentialTestOneMethodCall_ClassValueBuffer3, tags: [.unstable]),
@@ -91,6 +28,15 @@ public let ExistentialPerformance = [
   BenchmarkInfo(name: "ExistentialTestOneMethodCall_IntValueBuffer2", runFunction: run_ExistentialTestOneMethodCall_IntValueBuffer2, tags: [.unstable]),
   BenchmarkInfo(name: "ExistentialTestOneMethodCall_IntValueBuffer3", runFunction: run_ExistentialTestOneMethodCall_IntValueBuffer3, tags: [.unstable]),
   BenchmarkInfo(name: "ExistentialTestOneMethodCall_IntValueBuffer4", runFunction: run_ExistentialTestOneMethodCall_IntValueBuffer4, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_ClassValueBuffer1", runFunction: run_ExistentialTestTwoMethodCalls_ClassValueBuffer1, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_ClassValueBuffer2", runFunction: run_ExistentialTestTwoMethodCalls_ClassValueBuffer2, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_ClassValueBuffer3", runFunction: run_ExistentialTestTwoMethodCalls_ClassValueBuffer3, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_ClassValueBuffer4", runFunction: run_ExistentialTestTwoMethodCalls_ClassValueBuffer4, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_IntValueBuffer0", runFunction: run_ExistentialTestTwoMethodCalls_IntValueBuffer0, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_IntValueBuffer1", runFunction: run_ExistentialTestTwoMethodCalls_IntValueBuffer1, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_IntValueBuffer2", runFunction: run_ExistentialTestTwoMethodCalls_IntValueBuffer2, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_IntValueBuffer3", runFunction: run_ExistentialTestTwoMethodCalls_IntValueBuffer3, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_IntValueBuffer4", runFunction: run_ExistentialTestTwoMethodCalls_IntValueBuffer4, tags: [.unstable]),
   BenchmarkInfo(name: "ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer1", runFunction: run_ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer1, tags: [.unstable]),
   BenchmarkInfo(name: "ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer2", runFunction: run_ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer2, tags: [.unstable]),
   BenchmarkInfo(name: "ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer3", runFunction: run_ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer3, tags: [.unstable]),
@@ -109,15 +55,69 @@ public let ExistentialPerformance = [
   BenchmarkInfo(name: "ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer2", runFunction: run_ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer2, tags: [.unstable]),
   BenchmarkInfo(name: "ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer3", runFunction: run_ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer3, tags: [.unstable]),
   BenchmarkInfo(name: "ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer4", runFunction: run_ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer4, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_ClassValueBuffer1", runFunction: run_ExistentialTestTwoMethodCalls_ClassValueBuffer1, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_ClassValueBuffer2", runFunction: run_ExistentialTestTwoMethodCalls_ClassValueBuffer2, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_ClassValueBuffer3", runFunction: run_ExistentialTestTwoMethodCalls_ClassValueBuffer3, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_ClassValueBuffer4", runFunction: run_ExistentialTestTwoMethodCalls_ClassValueBuffer4, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_IntValueBuffer0", runFunction: run_ExistentialTestTwoMethodCalls_IntValueBuffer0, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_IntValueBuffer1", runFunction: run_ExistentialTestTwoMethodCalls_IntValueBuffer1, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_IntValueBuffer2", runFunction: run_ExistentialTestTwoMethodCalls_IntValueBuffer2, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_IntValueBuffer3", runFunction: run_ExistentialTestTwoMethodCalls_IntValueBuffer3, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_IntValueBuffer4", runFunction: run_ExistentialTestTwoMethodCalls_IntValueBuffer4, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestMutating_ClassValueBuffer1", runFunction: run_ExistentialTestMutating_ClassValueBuffer1, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestMutating_ClassValueBuffer2", runFunction: run_ExistentialTestMutating_ClassValueBuffer2, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestMutating_ClassValueBuffer3", runFunction: run_ExistentialTestMutating_ClassValueBuffer3, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestMutating_ClassValueBuffer4", runFunction: run_ExistentialTestMutating_ClassValueBuffer4, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestMutating_IntValueBuffer0", runFunction: run_ExistentialTestMutating_IntValueBuffer0, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestMutating_IntValueBuffer1", runFunction: run_ExistentialTestMutating_IntValueBuffer1, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestMutating_IntValueBuffer2", runFunction: run_ExistentialTestMutating_IntValueBuffer2, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestMutating_IntValueBuffer3", runFunction: run_ExistentialTestMutating_IntValueBuffer3, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestMutating_IntValueBuffer4", runFunction: run_ExistentialTestMutating_IntValueBuffer4, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_ClassValueBuffer1", runFunction: run_ExistentialTestMutatingAndNonMutating_ClassValueBuffer1, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_ClassValueBuffer2", runFunction: run_ExistentialTestMutatingAndNonMutating_ClassValueBuffer2, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_ClassValueBuffer3", runFunction: run_ExistentialTestMutatingAndNonMutating_ClassValueBuffer3, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_ClassValueBuffer4", runFunction: run_ExistentialTestMutatingAndNonMutating_ClassValueBuffer4, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_IntValueBuffer0", runFunction: run_ExistentialTestMutatingAndNonMutating_IntValueBuffer0, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_IntValueBuffer1", runFunction: run_ExistentialTestMutatingAndNonMutating_IntValueBuffer1, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_IntValueBuffer2", runFunction: run_ExistentialTestMutatingAndNonMutating_IntValueBuffer2, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_IntValueBuffer3", runFunction: run_ExistentialTestMutatingAndNonMutating_IntValueBuffer3, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_IntValueBuffer4", runFunction: run_ExistentialTestMutatingAndNonMutating_IntValueBuffer4, tags: [.unstable]),
+  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_ClassValueBuffer1", runFunction: run_ExistentialTestArrayOneMethodCall_ClassValueBuffer1, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_ClassValueBuffer2", runFunction: run_ExistentialTestArrayOneMethodCall_ClassValueBuffer2, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_ClassValueBuffer3", runFunction: run_ExistentialTestArrayOneMethodCall_ClassValueBuffer3, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_ClassValueBuffer4", runFunction: run_ExistentialTestArrayOneMethodCall_ClassValueBuffer4, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_IntValueBuffer0", runFunction: run_ExistentialTestArrayOneMethodCall_IntValueBuffer0, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_IntValueBuffer1", runFunction: run_ExistentialTestArrayOneMethodCall_IntValueBuffer1, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_IntValueBuffer2", runFunction: run_ExistentialTestArrayOneMethodCall_IntValueBuffer2, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_IntValueBuffer3", runFunction: run_ExistentialTestArrayOneMethodCall_IntValueBuffer3, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_IntValueBuffer4", runFunction: run_ExistentialTestArrayOneMethodCall_IntValueBuffer4, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_ClassValueBuffer1", runFunction: run_ExistentialTestArrayTwoMethodCalls_ClassValueBuffer1, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_ClassValueBuffer2", runFunction: run_ExistentialTestArrayTwoMethodCalls_ClassValueBuffer2, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_ClassValueBuffer3", runFunction: run_ExistentialTestArrayTwoMethodCalls_ClassValueBuffer3, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_ClassValueBuffer4", runFunction: run_ExistentialTestArrayTwoMethodCalls_ClassValueBuffer4, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_IntValueBuffer0", runFunction: run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer0, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_IntValueBuffer1", runFunction: run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer1, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_IntValueBuffer2", runFunction: run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer2, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_IntValueBuffer3", runFunction: run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer3, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_IntValueBuffer4", runFunction: run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer4, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayMutating_ClassValueBuffer1", runFunction: run_ExistentialTestArrayMutating_ClassValueBuffer1, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayMutating_ClassValueBuffer2", runFunction: run_ExistentialTestArrayMutating_ClassValueBuffer2, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayMutating_ClassValueBuffer3", runFunction: run_ExistentialTestArrayMutating_ClassValueBuffer3, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayMutating_ClassValueBuffer4", runFunction: run_ExistentialTestArrayMutating_ClassValueBuffer4, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayMutating_IntValueBuffer0", runFunction: run_ExistentialTestArrayMutating_IntValueBuffer0, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayMutating_IntValueBuffer1", runFunction: run_ExistentialTestArrayMutating_IntValueBuffer1, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayMutating_IntValueBuffer2", runFunction: run_ExistentialTestArrayMutating_IntValueBuffer2, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayMutating_IntValueBuffer3", runFunction: run_ExistentialTestArrayMutating_IntValueBuffer3, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayMutating_IntValueBuffer4", runFunction: run_ExistentialTestArrayMutating_IntValueBuffer4, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayShift_ClassValueBuffer1", runFunction: run_ExistentialTestArrayShift_ClassValueBuffer1, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayShift_ClassValueBuffer2", runFunction: run_ExistentialTestArrayShift_ClassValueBuffer2, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayShift_ClassValueBuffer3", runFunction: run_ExistentialTestArrayShift_ClassValueBuffer3, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayShift_ClassValueBuffer4", runFunction: run_ExistentialTestArrayShift_ClassValueBuffer4, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayShift_IntValueBuffer0", runFunction: run_ExistentialTestArrayShift_IntValueBuffer0, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayShift_IntValueBuffer1", runFunction: run_ExistentialTestArrayShift_IntValueBuffer1, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayShift_IntValueBuffer2", runFunction: run_ExistentialTestArrayShift_IntValueBuffer2, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayShift_IntValueBuffer3", runFunction: run_ExistentialTestArrayShift_IntValueBuffer3, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayShift_IntValueBuffer4", runFunction: run_ExistentialTestArrayShift_IntValueBuffer4, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_ClassValueBuffer1", runFunction: run_ExistentialTestArrayConditionalShift_ClassValueBuffer1, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_ClassValueBuffer2", runFunction: run_ExistentialTestArrayConditionalShift_ClassValueBuffer2, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_ClassValueBuffer3", runFunction: run_ExistentialTestArrayConditionalShift_ClassValueBuffer3, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_ClassValueBuffer4", runFunction: run_ExistentialTestArrayConditionalShift_ClassValueBuffer4, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_IntValueBuffer0", runFunction: run_ExistentialTestArrayConditionalShift_IntValueBuffer0, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_IntValueBuffer1", runFunction: run_ExistentialTestArrayConditionalShift_IntValueBuffer1, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_IntValueBuffer2", runFunction: run_ExistentialTestArrayConditionalShift_IntValueBuffer2, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_IntValueBuffer3", runFunction: run_ExistentialTestArrayConditionalShift_IntValueBuffer3, tags: [.unstable, .api, .Array]),
+  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_IntValueBuffer4", runFunction: run_ExistentialTestArrayConditionalShift_IntValueBuffer4, tags: [.unstable, .api, .Array]),
 ]
 
 protocol Existential {
@@ -125,6 +125,10 @@ protocol Existential {
   func doIt() -> Bool
   func reallyDoIt() -> Bool
   mutating func mutateIt() -> Bool
+}
+
+func next(_ x: inout Int, upto mod: Int) {
+  x = (x + 1) % (mod + 1)
 }
 
 struct IntValueBuffer0 : Existential {
@@ -139,10 +143,6 @@ struct IntValueBuffer0 : Existential {
 	}
 }
 
-func next(_ x: inout Int, upto mod: Int) {
-  x = (x + 1) % (mod + 1)
-}
-
 struct IntValueBuffer1 : Existential {
 	var f0: Int = 0
 
@@ -150,7 +150,7 @@ struct IntValueBuffer1 : Existential {
     return f0 == 0
 	}
   func reallyDoIt() -> Bool {
-   return true
+    return true
   }
   mutating func mutateIt() -> Bool {
     next(&f0, upto: 1)
@@ -166,7 +166,7 @@ struct IntValueBuffer2 : Existential {
     return f0 == 0
 	}
   func reallyDoIt() -> Bool {
-   return f0 == 0 && f1 == 3
+    return f0 == 0 && f1 == 3
   }
   mutating func mutateIt() -> Bool {
     next(&f0, upto: 1)
@@ -184,7 +184,7 @@ struct IntValueBuffer3 : Existential {
     return f0 == 0
 	}
   func reallyDoIt() -> Bool {
-   return f0 == 0 && f1 == 3 && f2 == 7
+    return f0 == 0 && f1 == 3 && f2 == 7
   }
   mutating func mutateIt() -> Bool {
     next(&f0, upto: 1)
@@ -204,7 +204,7 @@ struct IntValueBuffer4 : Existential {
     return f0 == 0
 	}
   func reallyDoIt() -> Bool {
-   return f0 == 0 && f1 == 3 && f2 == 7 && f3 == 13
+    return f0 == 0 && f1 == 3 && f2 == 7 && f3 == 13
   }
   mutating func mutateIt() -> Bool {
     next(&f0, upto: 1)
@@ -215,7 +215,7 @@ struct IntValueBuffer4 : Existential {
 	}
 }
 
-class Klazz {
+class Klazz { // body same as Val2
   var f0: Int = 0
   var f1: Int = 3
 
@@ -225,7 +225,6 @@ class Klazz {
   func reallyDoIt() -> Bool {
    return f0 == 0 && f1 == 3
   }
-
   func mutateIt() -> Bool{
     next(&f0, upto: 1)
     next(&f1, upto: 3)
@@ -242,7 +241,6 @@ struct ClassValueBuffer1 : Existential {
   func reallyDoIt() -> Bool {
    return f0.reallyDoIt()
   }
-
   mutating func mutateIt() -> Bool{
     return f0.mutateIt()
   }
@@ -258,7 +256,6 @@ struct ClassValueBuffer2 : Existential {
   func reallyDoIt() -> Bool {
    return f0.reallyDoIt()
   }
-
   mutating func mutateIt() -> Bool{
     return f0.mutateIt()
   }
@@ -275,7 +272,6 @@ struct ClassValueBuffer3 : Existential {
   func reallyDoIt() -> Bool {
    return f0.reallyDoIt()
   }
-
   mutating func mutateIt() -> Bool{
     return f0.mutateIt()
   }
@@ -293,7 +289,6 @@ struct ClassValueBuffer4 : Existential {
   func reallyDoIt() -> Bool {
    return f0.reallyDoIt()
   }
-
   mutating func mutateIt() -> Bool{
     return f0.mutateIt()
   }

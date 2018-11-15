@@ -20,20 +20,6 @@
 import TestsUtils
 
 %{
-FN = 'ExistentialTest'
-Groups = (
-  ['Array' + g for g in ['ConditionalShift', 'Mutating', 'OneMethodCall',
-                         'Shift', 'TwoMethodCalls']] +
-  ['MutatingAndNonMutating', 'Mutating', 'OneMethodCall',
-  'PassExistentialOneMethodCall', 'PassExistentialTwoMethodCalls',
-  'TwoMethodCalls']
-)
-Vars = [(0, 0), (1, 3), (2, 7), (3, 13)]
-Refs = ['ClassValueBuffer' + str(i) for i in range(1, 5)]
-Vals = ['IntValueBuffer' + str(i) for i in range(0, 5)]
-Variants = Refs + Vals
-Names = [FN + group + '_' + variant for group in Groups for variant in Variants]
-
 Setup = """
   let existentialArray = initExistentialArray(withType: T.self, count: 128)
   let existential = initExistential(withType: T.self)
@@ -111,6 +97,11 @@ Workloads = [
     }
 """),
 ]
+Vars = [(0, 0), (1, 3), (2, 7), (3, 13)]
+Refs = ['ClassValueBuffer' + str(i) for i in range(1, 5)]
+Vals = ['IntValueBuffer' + str(i) for i in range(0, 5)]
+Names = ['ExistentialTest' + group + '_' + variant
+         for (group, _, _, _) in Workloads for variant in Refs + Vals]
 }%
 public let ExistentialPerformance = [
 % for Name in Names:
@@ -126,45 +117,33 @@ protocol Existential {
   mutating func mutateIt() -> Bool
 }
 
-struct IntValueBuffer0 : Existential {
-  func doIt() -> Bool {
-    return true
-	}
-  func reallyDoIt() -> Bool {
-    return true
-  }
-  mutating func mutateIt() -> Bool {
-    return true
-	}
-}
-
 func next(_ x: inout Int, upto mod: Int) {
   x = (x + 1) % (mod + 1)
 }
 
-% for (V, i) in [(v, int(filter(str.isdigit, v))) for v in Vals[1:]]:
-struct ${V} : Existential {
-	${'\n	'.join(['var f{0}: Int = {1}'.format(vi, v)
-                for (vi, v) in Vars[0:i]])}
-
+% for (V, i) in [(v, int(filter(str.isdigit, v))) for v in Vals]:
+struct ${V} : Existential {${
+  ''.join(['\n	var f{0}: Int = {1}'.format(vi, v)
+              for (vi, v) in Vars[0:i]]) +
+  '\n' if i > 0 else ''}
   func doIt() -> Bool {
-    return f0 == 0
+    return ${'f0 == 0' if i > 0 else 'true'}
 	}
   func reallyDoIt() -> Bool {
-   return ${
-      'true' if i == 1 else
-      ' && '.join(['f{0} == {1}'.format(vi, v) for (vi, v) in Vars[0:i]])}
+    return ${
+      'true' if i == 1 else  # so that Val1 doesn't do more work than Val2
+      ' && '.join(['f{0} == {1}'.format(vi, v) for (vi, v) in Vars[0:i]]) or
+      'true'}
   }
-  mutating func mutateIt() -> Bool {
-    ${
-      '\n    '.join(['next(&f{0}, upto: {1})'.format(vi, (v if v > 0 else 1))
-                     for (vi, v) in Vars[0:i]])}
+  mutating func mutateIt() -> Bool {${
+    ''.join(['\n    next(&f{0}, upto: {1})'.format(vi, (v if v > 0 else 1))
+               for (vi, v) in Vars[0:i]])}
     return true
 	}
 }
 
 % end
-class Klazz {
+class Klazz { // body same as Val2
   var f0: Int = 0
   var f1: Int = 3
 
@@ -174,7 +153,6 @@ class Klazz {
   func reallyDoIt() -> Bool {
    return f0 == 0 && f1 == 3
   }
-
   func mutateIt() -> Bool{
     next(&f0, upto: 1)
     next(&f1, upto: 3)
@@ -193,7 +171,6 @@ struct ${V} : Existential {
   func reallyDoIt() -> Bool {
    return f0.reallyDoIt()
   }
-
   mutating func mutateIt() -> Bool{
     return f0.mutateIt()
   }
