@@ -70,6 +70,8 @@ public:
     /// limit anything, because programs that need to initialize tensors at
     /// runtime can simply use the runtime tensor initialization functions in
     /// the TensorFlow module.
+    ///
+    /// TODO(SR-9249): Consider supporting these in IRGenSIL.cpp.
     TensorAttribute,
 
     /// An array of integers that should be lowered to a shape attribute.
@@ -201,8 +203,10 @@ public:
   /// ArgumentLowering.  If the name is empty, this defaults to
   /// ArgumentLowering::Input.  If the name is non-empty but there is no
   /// modifier specified, then this defaults to
-  /// ArgumentLowering::NormalAttribute.
-  static std::pair<llvm::StringRef, ArgumentLowering>
+  /// ArgumentLowering::NormalAttribute.  If the modifier is invalid, returns
+  /// None (e.g  "value$bla").
+  /// TODO(SR-9250): Most callers should not have to deal with the Optional.
+  static llvm::Optional<std::pair<llvm::StringRef, ArgumentLowering>>
   decodeArgumentName(StringRef Name);
 };
 

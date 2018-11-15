@@ -95,8 +95,9 @@ CHECK-LABEL: --- INPUT FUNCTION {{.*}}stringAttributes
 
 public func tensorShape() -> Tensor<Float> {
   let shape : TensorShape = [1, 2]
+  let tensor = Tensor<Float>([[17.0, 18.0]])
 
-  return Tensor(handle: #tfop("Const", dtype$dtype: Float.tensorFlowDataType, value$tensor: [17.0 as Float, 18.0], shape$shape: shape))
+  return Tensor(handle: #tfop("EnsureShape", tensor, shape$shape: shape))
 }
 
 // b/75407624

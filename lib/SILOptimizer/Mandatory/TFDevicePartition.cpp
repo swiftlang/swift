@@ -753,7 +753,8 @@ public:
         for (unsigned i = 0, e = graphOpInst->getNumAttributes(); i != e; ++i) {
           auto attr = graphOpInst->getAttribute(i);
           auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
-          if (!tf::isShapeArrayPseudoAttr(attrInfo.first, attr.value))
+          assert(attrInfo && "attribute has malformed name");
+          if (!tf::isShapeArrayPseudoAttr(attrInfo->first, attr.value))
             continue;
           newInstBuilder.addAttribute(attr);
         }

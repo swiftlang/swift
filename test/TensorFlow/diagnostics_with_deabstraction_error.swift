@@ -26,37 +26,3 @@ public func resultPacking() {
   // expected-error @+1 {{cannot extract TensorFlow result into type 'Foo', because 'Foo' is not a TensorFlow value type or an aggregate of TensorFlow value types}}
   let _: Foo = #tfop("SomeOp")
 }
-
-public enum X {
-  case A, B
-}
-
-public func invalidAttributeArg() -> TensorHandle<Int32> {
-  // expected-error@+1 {{attribute 'someAttr' cannot be an enum, struct, or tuple}}
-  return #tfop("bar", someAttr: X.A)
-}
-
-public func noTensorShape() -> Tensor<Float> {
-  // expected-error @+1 {{attribute 'value' must be followed by a shape attribute}}
-  return Tensor(handle: #tfop("Const", dtype$dtype: Float.tensorFlowDataType, value$tensor: [17.0 as Float, 18.0]))
-}
-
-public func badTensorShape() -> Tensor<Float> {
-  let badShape : TensorShape = [1]
-  // expected-error @+1 {{attribute 'value' does not match the shape attribute in the number of scalar elements}}
-  return Tensor(handle: #tfop("Const", dtype$dtype: Float.tensorFlowDataType, value$tensor: [17.0 as Float, 18.0], shape$shape: badShape))
-}
-
-public func metatypeAttrs() {
-  // expected-error @+1 {{attribute 'T' cannot be a metatype}}
-  #tfop("DummyOp", T: Float.self) as Void
-
-  // expected-error @+1 {{attribute 'T' cannot be an array of metatypes}}
-  #tfop("DummyOp", T: [Float.self]) as Void
-
-  // expected-error @+1 {{attribute 'T' requires an integer or array of integers}}
-  #tfop("DummyOp", T$dtype: Float.self) as Void
-
-  // expected-error @+1 {{attribute 'T' requires an integer or array of integers}}
-  #tfop("DummyOp", T$dtype: [Float.self]) as Void
-}

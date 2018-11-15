@@ -290,3 +290,144 @@ structContainsTensorFlowValue(StructDecl *decl) {
 
   return declContainsTensorFlowValue[decl] = hasTensorFlowValue;
 }
+
+/// Returns the type Optional<`element`>.
+static Type getOptionalType(const ASTContext &ctx, Type element) {
+  return BoundGenericType::get(ctx.getOptionalDecl(), Type(), {element});
+}
+
+/// Returns the type Array<`element`>.
+static Type getArrayType(const ASTContext &ctx, Type element) {
+  return BoundGenericType::get(ctx.getArrayDecl(), Type(), {element});
+}
+
+constexpr char AttributeTypeClassifier::normalSupportedTypesDesc[];
+constexpr char AttributeTypeClassifier::shapeSupportedTypesDesc[];
+constexpr char AttributeTypeClassifier::tfDataTypeSupportedTypesDesc[];
+
+AttributeTypeClassifier::Normal
+AttributeTypeClassifier::classifyNormalAttribute(Type type) {
+  if (normalAttributeTypes.empty()) {
+    auto &ctx = type->getASTContext();
+    auto insertType = [&](Type type,
+                          AttributeTypeClassifier::Normal
+                              classification) {
+      normalAttributeTypes[type->getCanonicalType()] = classification;
+    };
+
+    insertType(
+        BuiltinIntegerType::get(1, ctx),
+        AttributeTypeClassifier::Normal::Bool);
+    insertType(
+        ctx.getBoolDecl()->getDeclaredInterfaceType(),
+        AttributeTypeClassifier::Normal::Bool);
+
+    insertType(
+        BuiltinIntegerType::get(64, ctx),
+        AttributeTypeClassifier::Normal::Int64);
+    insertType(
+        ctx.getInt64Decl()->getDeclaredInterfaceType(),
+        AttributeTypeClassifier::Normal::Int64);
+
+    insertType(
+        ctx.TheIEEE64Type,
+        AttributeTypeClassifier::Normal::Double);
+    insertType(
+        ctx.getDoubleDecl()->getDeclaredInterfaceType(),
+        AttributeTypeClassifier::Normal::Double);
+
+    insertType(
+        ctx.TheIEEE32Type,
+        AttributeTypeClassifier::Normal::Float);
+    insertType(
+        ctx.getFloatDecl()->getDeclaredInterfaceType(),
+        AttributeTypeClassifier::Normal::Float);
+
+    insertType(
+        ctx.getStringDecl()->getDeclaredInterfaceType(),
+        AttributeTypeClassifier::Normal::String);
+    insertType(
+        getArrayType(ctx, ctx.getBoolDecl()->getDeclaredInterfaceType()),
+        AttributeTypeClassifier::Normal::BoolArray);
+    insertType(
+        getArrayType(ctx, ctx.getInt32Decl()->getDeclaredInterfaceType()),
+        AttributeTypeClassifier::Normal::Int32Array);
+    insertType(
+        getArrayType(ctx, ctx.getInt64Decl()->getDeclaredInterfaceType()),
+        AttributeTypeClassifier::Normal::Int64Array);
+    insertType(
+        getArrayType(ctx, ctx.getDoubleDecl()->getDeclaredInterfaceType()),
+        AttributeTypeClassifier::Normal::DoubleArray);
+    insertType(
+        getArrayType(ctx, ctx.getFloatDecl()->getDeclaredInterfaceType()),
+        AttributeTypeClassifier::Normal::FloatArray);
+    insertType(
+        getArrayType(ctx, ctx.getStringDecl()->getDeclaredInterfaceType()),
+        AttributeTypeClassifier::Normal::StringArray);
+    insertType(
+        getArrayType(ctx, ctx.getTensorShapeDecl()->getDeclaredInterfaceType()),
+        AttributeTypeClassifier::Normal::TensorShapeArray);
+    insertType(
+        getArrayType(ctx, getOptionalType(
+            ctx, ctx.getTensorShapeDecl()->getDeclaredInterfaceType())),
+        AttributeTypeClassifier::Normal::OptionalTensorShapeArray);
+  }
+
+  auto it = normalAttributeTypes.find(type->getCanonicalType());
+  if (it != normalAttributeTypes.end())
+    return it->second;
+  if (type->is<AnyFunctionType>() || type->is<SILFunctionType>())
+    return AttributeTypeClassifier::Normal::Function;
+  return AttributeTypeClassifier::Normal::Unsupported;
+}
+
+AttributeTypeClassifier::Shape
+AttributeTypeClassifier::classifyShapeAttribute(Type type) {
+  if (shapeAttributeTypes.empty()) {
+    auto &ctx = type->getASTContext();
+    auto insertType = [&](Type type,
+                          AttributeTypeClassifier::Shape
+                              classification) {
+      shapeAttributeTypes[type->getCanonicalType()] = classification;
+    };
+    insertType(
+        ctx.getTensorShapeDecl()->getDeclaredInterfaceType(),
+        AttributeTypeClassifier::Shape::TensorShape);
+    insertType(
+        getOptionalType(ctx,
+                        ctx.getTensorShapeDecl()->getDeclaredInterfaceType()),
+        AttributeTypeClassifier::Shape::OptionalTensorShape);
+  }
+
+  auto it = shapeAttributeTypes.find(type->getCanonicalType());
+  if (it != shapeAttributeTypes.end())
+    return it->second;
+  return AttributeTypeClassifier::Shape::Unsupported;
+}
+
+AttributeTypeClassifier::TFDataType
+AttributeTypeClassifier::classifyTFDataTypeAttribute(Type type) {
+  if (tfDataTypeAttributeTypes.empty()) {
+    auto &ctx = type->getASTContext();
+    auto insertType = [&](Type type,
+                          AttributeTypeClassifier::TFDataType
+                              classification) {
+      tfDataTypeAttributeTypes[type->getCanonicalType()] = classification;
+    };
+    insertType(
+        BuiltinIntegerType::get(32, ctx),
+        AttributeTypeClassifier::TFDataType::TensorDataType);
+    insertType(
+        ctx.getTensorDataTypeDecl()->getDeclaredInterfaceType(),
+        AttributeTypeClassifier::TFDataType::TensorDataType);
+    insertType(
+        getArrayType(ctx,
+                     ctx.getTensorDataTypeDecl()->getDeclaredInterfaceType()),
+        AttributeTypeClassifier::TFDataType::TensorDataTypeArray);
+  }
+
+  auto it = tfDataTypeAttributeTypes.find(type->getCanonicalType());
+  if (it != tfDataTypeAttributeTypes.end())
+    return it->second;
+  return AttributeTypeClassifier::TFDataType::Unsupported;
+}

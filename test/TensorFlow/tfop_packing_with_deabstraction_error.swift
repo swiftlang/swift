@@ -51,39 +51,3 @@ public func packResultsToAggregate_toExternalStructNotFixedLayout() -> ExternalS
   // expected-error @+1 {{cannot extract TensorFlow result into type 'ExternalStructNotFixedLayout', because 'ExternalStructNotFixedLayout' is not a TensorFlow value type or an aggregate of TensorFlow value types}}
   return #tfop("SomeOp")
 }
-
-public func unpackInput_nonTensorFlow() {
-  struct Foo {
-    let x: Int
-    let y: Int
-  }
-  // expected-error @+1 {{argument of type 'Foo' is not a TensorFlow value or an aggregate of TensorFlow values}}
-  let _: Tensor<Float> = #tfop("SomeOp", Foo(x: 1, y: 1))
-}
-
-public func unpackInput_nonTensorFlowList() {
-  struct Foo {
-    let x: Int
-    let y: Int
-  }
-  // expected-error @+1 {{argument of type 'Foo' is not a TensorFlow value or an aggregate of TensorFlow values}}
-  let _: Tensor<Float> = #tfop("SomeOp", [Foo(x: 1, y: 1)])
-}
-
-public func unpackInput_nonWrappedZero() {
-  struct Foo {}
-  // expected-error @+2 {{argument of type 'Foo' must contain exactly one TensorFlow value}}
-  // expected-note @+1 {{value used here}}
-  let _: Tensor<Float> = #tfop("SomeOp", Foo())
-}
-
-
-public func unpackInput_nonWrappedMoreThanOne() {
-  // expected-error @+1 {{argument of type 'Foo' must contain exactly one TensorFlow value}}
-  struct Foo {
-    let x: Tensor<Float>
-    let y: Tensor<Int32>
-  }
-  // expected-note @+1 {{value used here}}
-  let _: Tensor<Float> = #tfop("SomeOp", Foo(x: Tensor(1), y: Tensor(2)))
-}

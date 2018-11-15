@@ -409,25 +409,19 @@ public func testResourceAndVariants() {
 
 
 public func testStringHandle() {
-  let str: TensorHandle<String> = #tfop(
-    "Const", dtype$dtype: String.tensorFlowDataType, value$tensor: "foo"
-  )
+  let str: TensorHandle<String> = StringTensor("foo").handle
   let _: TensorHandle<String> = #tfop(
     "Substr", str, Tensor<Int32>(0), Tensor<Int32>(1)
   )
-  let _: TensorHandle<String> = #tfop(
-    "Const", dtype$dtype: String.tensorFlowDataType,
-    value$tensor: ["foo", "bar"],
-    shape$shape: TensorShape(2)
-  )
+  let _: TensorHandle<String> = StringTensor(["foo", "bar"]).handle
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testStringHandle
-// CHECK: [[STR:%.*]] = graph_op "Const"() {dtype$dtype: i32 7, value$tensor: "foo", __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<String>
+// CHECK: [[STR:%.*]] = graph_op "Const"() {dtype$dtype: i32 7, value$tensor: "foo", __device: "ALL_DEVICES"} : $TensorHandle<String>
 // CHECK: [[POS:%.*]] = graph_op "Const"() {dtype$dtype: i32 3, value$tensor: i32 0, __device: "ALL_DEVICES"} : $TensorHandle<Int32>
 // CHECK: [[LEN:%.*]] = graph_op "Const"() {dtype$dtype: i32 3, value$tensor: i32 1, __device: "ALL_DEVICES"} : $TensorHandle<Int32>
 // CHECK: graph_op "Substr"([[STR]] : $TensorHandle<String>, [[POS]] : $TensorHandle<Int32>, [[LEN]] : $TensorHandle<Int32>) {__device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<String>
-// CHECK: graph_op "Const"() {dtype$dtype: i32 7, value$tensor: [$String: "foo", "bar"], shape$shape: [$Int32: (i32 2)], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<String>
+// CHECK: graph_op "Const"() {dtype$dtype: i32 7, value$tensor: [$String: "foo", "bar"], shape$shape: [$Int32: i32 2], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<String>
 
 
 // b/76117368
@@ -533,6 +527,6 @@ public func graphFuncReturningOpaqueHandles() -> (ResourceHandle, ResourceHandle
 
 // Allow Any.Type as a type list member for empty type lists.
 public func testSR8570() {
-  () = #tfop("FooOp", Targuments$dtype: [] as [UInt32]) // expected-error {{op named 'FooOp' is not registered in TensorFlow}}
+  () = #tfop("FooOp", Targuments$dtype: [] as [TensorDataType]) // expected-error {{op named 'FooOp' is not registered in TensorFlow}}
 }
 
