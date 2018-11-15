@@ -19,6 +19,106 @@ Func _withUninitializedString(_:) has been removed
 Func Optional.unwrappedOrError() has been removed
 Struct _UnwrappingFailed has been removed
 
+Constructor _UIntBuffer.Index.init(bitOffset:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Constructor _UIntBuffer.Iterator.init(_:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Constructor _UIntBuffer.Iterator.init(_:) has parameter 0 type change from _UIntBuffer<τ_0_0, τ_0_1> to _UIntBuffer<τ_0_0>
+Constructor _UIntBuffer.init() has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Constructor _UIntBuffer.init() has return type change from _UIntBuffer<τ_0_0, τ_0_1> to _UIntBuffer<τ_0_0>
+Constructor _UIntBuffer.init(_storage:_bitCount:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Constructor _UIntBuffer.init(_storage:_bitCount:) has parameter 0 type change from τ_0_0 to UInt32
+Constructor _UIntBuffer.init(_storage:_bitCount:) has return type change from _UIntBuffer<τ_0_0, τ_0_1> to _UIntBuffer<τ_0_0>
+Constructor _UIntBuffer.init(containing:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Constructor _UIntBuffer.init(containing:) has return type change from _UIntBuffer<τ_0_0, τ_0_1> to _UIntBuffer<τ_0_0>
+Constructor _ValidUTF8Buffer.Index.init(_biasedBits:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Constructor _ValidUTF8Buffer.Index.init(_biasedBits:) has parameter 0 type change from τ_0_0 to UInt32
+Constructor _ValidUTF8Buffer.Iterator.init(_:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Constructor _ValidUTF8Buffer.Iterator.init(_:) has parameter 0 type change from _ValidUTF8Buffer<τ_0_0> to _ValidUTF8Buffer
+Constructor _ValidUTF8Buffer.init() has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Constructor _ValidUTF8Buffer.init() has return type change from _ValidUTF8Buffer<τ_0_0> to _ValidUTF8Buffer
+Constructor _ValidUTF8Buffer.init(_biasedBits:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Constructor _ValidUTF8Buffer.init(_biasedBits:) has parameter 0 type change from τ_0_0 to UInt32
+Constructor _ValidUTF8Buffer.init(_biasedBits:) has return type change from _ValidUTF8Buffer<τ_0_0> to _ValidUTF8Buffer
+Constructor _ValidUTF8Buffer.init(_containing:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Constructor _ValidUTF8Buffer.init(_containing:) has return type change from _ValidUTF8Buffer<τ_0_0> to _ValidUTF8Buffer
+Enum Unicode.UTF16 has type witness type for _UnicodeEncoding.EncodedScalar changing from _UIntBuffer<UInt32, UInt16> to _UIntBuffer<UInt16>
+Enum Unicode.UTF8 has type witness type for _UnicodeEncoding.EncodedScalar changing from _ValidUTF8Buffer<UInt32> to _ValidUTF8Buffer
+Func Unicode.UTF16.ForwardParser._bufferedScalar(bitCount:) has return type change from _UIntBuffer<UInt32, UInt16> to _UIntBuffer<UInt16>
+Func Unicode.UTF16.ReverseParser._bufferedScalar(bitCount:) has return type change from _UIntBuffer<UInt32, UInt16> to _UIntBuffer<UInt16>
+Func Unicode.UTF16.decode(_:) has parameter 0 type change from _UIntBuffer<UInt32, UInt16> to _UIntBuffer<UInt16>
+Func Unicode.UTF16.encode(_:) has return type change from Optional<_UIntBuffer<UInt32, UInt16>> to Optional<_UIntBuffer<UInt16>>
+Func Unicode.UTF16.transcode(_:from:) has return type change from Optional<_UIntBuffer<UInt32, UInt16>> to Optional<_UIntBuffer<UInt16>>
+Func Unicode.UTF8.ForwardParser._bufferedScalar(bitCount:) has return type change from _ValidUTF8Buffer<UInt32> to _ValidUTF8Buffer
+Func Unicode.UTF8.ReverseParser._bufferedScalar(bitCount:) has return type change from _ValidUTF8Buffer<UInt32> to _ValidUTF8Buffer
+Func Unicode.UTF8.decode(_:) has parameter 0 type change from _ValidUTF8Buffer<UInt32> to _ValidUTF8Buffer
+Func Unicode.UTF8.encode(_:) has return type change from Optional<_ValidUTF8Buffer<UInt32>> to Optional<_ValidUTF8Buffer>
+Func Unicode.UTF8.transcode(_:from:) has return type change from Optional<_ValidUTF8Buffer<UInt32>> to Optional<_ValidUTF8Buffer>
+Func _UIntBuffer.Index.<(_:_:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Func _UIntBuffer.Index.==(_:_:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Func _UIntBuffer.Iterator.next() has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Func _UIntBuffer.append(_:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Func _UIntBuffer.distance(from:to:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Func _UIntBuffer.index(_:offsetBy:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Func _UIntBuffer.index(after:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Func _UIntBuffer.index(before:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Func _UIntBuffer.makeIterator() has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Func _UIntBuffer.removeFirst() has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Func _UIntBuffer.replaceSubrange(_:with:) has generic signature change from <τ_0_0, τ_0_1, τ_1_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger, τ_0_1 == τ_1_0.Element, τ_1_0 : Collection> to <τ_0_0, τ_1_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_0 == τ_1_0.Element, τ_1_0 : Collection>
+Func _ValidUTF8Buffer.Index.<(_:_:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.Index.==(_:_:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.Iterator.next() has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer._isValid(_:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.append(_:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.append(contentsOf:) has generic signature change from <τ_0_0, τ_1_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_1_0 : FixedWidthInteger, τ_1_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.append(contentsOf:) has parameter 0 type change from _ValidUTF8Buffer<τ_1_0> to _ValidUTF8Buffer
+Func _ValidUTF8Buffer.distance(from:to:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.index(_:offsetBy:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.index(after:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.index(before:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.makeIterator() has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.removeFirst() has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Func _ValidUTF8Buffer.replaceSubrange(_:with:) has generic signature change from <τ_0_0, τ_1_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_1_0 : Collection, τ_1_0.Element == UInt8> to <τ_0_0 where τ_0_0 : Collection, τ_0_0.Element == UInt8>
+Struct _UIntBuffer has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Struct _UIntBuffer has type witness type for BidirectionalCollection.Indices changing from DefaultIndices<_UIntBuffer<τ_0_0, τ_0_1>> to DefaultIndices<_UIntBuffer<τ_0_0>>
+Struct _UIntBuffer has type witness type for BidirectionalCollection.SubSequence changing from Slice<_UIntBuffer<τ_0_0, τ_0_1>> to Slice<_UIntBuffer<τ_0_0>>
+Struct _UIntBuffer has type witness type for Collection.Indices changing from DefaultIndices<_UIntBuffer<τ_0_0, τ_0_1>> to DefaultIndices<_UIntBuffer<τ_0_0>>
+Struct _UIntBuffer has type witness type for Collection.SubSequence changing from Slice<_UIntBuffer<τ_0_0, τ_0_1>> to Slice<_UIntBuffer<τ_0_0>>
+Struct _UIntBuffer has type witness type for RandomAccessCollection.Indices changing from DefaultIndices<_UIntBuffer<τ_0_0, τ_0_1>> to DefaultIndices<_UIntBuffer<τ_0_0>>
+Struct _UIntBuffer has type witness type for RandomAccessCollection.SubSequence changing from Slice<_UIntBuffer<τ_0_0, τ_0_1>> to Slice<_UIntBuffer<τ_0_0>>
+Struct _UIntBuffer has type witness type for RangeReplaceableCollection.SubSequence changing from Slice<_UIntBuffer<τ_0_0, τ_0_1>> to Slice<_UIntBuffer<τ_0_0>>
+Struct _UIntBuffer.Index has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Struct _UIntBuffer.Iterator has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Struct _ValidUTF8Buffer has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Struct _ValidUTF8Buffer has type witness type for BidirectionalCollection.Indices changing from DefaultIndices<_ValidUTF8Buffer<τ_0_0>> to DefaultIndices<_ValidUTF8Buffer>
+Struct _ValidUTF8Buffer has type witness type for BidirectionalCollection.SubSequence changing from Slice<_ValidUTF8Buffer<τ_0_0>> to Slice<_ValidUTF8Buffer>
+Struct _ValidUTF8Buffer has type witness type for Collection.Indices changing from DefaultIndices<_ValidUTF8Buffer<τ_0_0>> to DefaultIndices<_ValidUTF8Buffer>
+Struct _ValidUTF8Buffer has type witness type for Collection.SubSequence changing from Slice<_ValidUTF8Buffer<τ_0_0>> to Slice<_ValidUTF8Buffer>
+Struct _ValidUTF8Buffer has type witness type for RandomAccessCollection.Indices changing from DefaultIndices<_ValidUTF8Buffer<τ_0_0>> to DefaultIndices<_ValidUTF8Buffer>
+Struct _ValidUTF8Buffer has type witness type for RandomAccessCollection.SubSequence changing from Slice<_ValidUTF8Buffer<τ_0_0>> to Slice<_ValidUTF8Buffer>
+Struct _ValidUTF8Buffer has type witness type for RangeReplaceableCollection.SubSequence changing from Slice<_ValidUTF8Buffer<τ_0_0>> to Slice<_ValidUTF8Buffer>
+Struct _ValidUTF8Buffer.Index has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Struct _ValidUTF8Buffer.Iterator has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Subscript _UIntBuffer.subscript(_:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger, τ_0_1 : FixedWidthInteger, τ_0_1 : UnsignedInteger> to <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger>
+Subscript _ValidUTF8Buffer.subscript(_:) has generic signature change from <τ_0_0 where τ_0_0 : FixedWidthInteger, τ_0_0 : UnsignedInteger> to
+Var Unicode.Scalar._isASCIIDigit has been removed
+Var Unicode.Scalar._isPrintableASCII has been removed
+Var Unicode.Scalar._replacementCharacter has been removed
+Var Unicode.UTF16.ForwardParser._buffer has declared type change from _UIntBuffer<UInt32, UInt16> to _UIntBuffer<UInt16>
+Var Unicode.UTF16.ReverseParser._buffer has declared type change from _UIntBuffer<UInt32, UInt16> to _UIntBuffer<UInt16>
+Var Unicode.UTF16.encodedReplacementCharacter has declared type change from _UIntBuffer<UInt32, UInt16> to _UIntBuffer<UInt16>
+Var Unicode.UTF8.ForwardParser._buffer has declared type change from _UIntBuffer<UInt32, UInt8> to _UIntBuffer<UInt8>
+Var Unicode.UTF8.ReverseParser._buffer has declared type change from _UIntBuffer<UInt32, UInt8> to _UIntBuffer<UInt8>
+Var Unicode.UTF8.encodedReplacementCharacter has declared type change from _ValidUTF8Buffer<UInt32> to _ValidUTF8Buffer
+Var _UIntBuffer.Iterator._impl has declared type change from _UIntBuffer<τ_0_0, τ_0_1> to _UIntBuffer<τ_0_0>
+Var _UIntBuffer._storage has declared type change from τ_0_0 to UInt32
+Var _UTFParser._buffer has declared type change from _UIntBuffer<UInt32, τ_0_0.Encoding.CodeUnit> to _UIntBuffer<τ_0_0.Encoding.CodeUnit>
+Var _ValidUTF8Buffer.Index._biasedBits has declared type change from τ_0_0 to UInt32
+Var _ValidUTF8Buffer.Iterator._biasedBits has declared type change from τ_0_0 to UInt32
+Var _ValidUTF8Buffer._biasedBits has declared type change from τ_0_0 to UInt32
+Var _ValidUTF8Buffer.encodedReplacementCharacter has declared type change from _ValidUTF8Buffer<τ_0_0> to _ValidUTF8Buffer
+Var __swift_stdlib_UErrorCode.isFailure has been removed
+Var __swift_stdlib_UErrorCode.isSuccess has been removed
+Var __swift_stdlib_UErrorCode.isWarning has been removed
+
 Class _stdlib_AtomicInt has been removed
 Func _stdlib_atomicCompareExchangeStrongInt(object:expected:desired:) has been removed
 Func _stdlib_atomicCompareExchangeStrongInt32(object:expected:desired:) has been removed

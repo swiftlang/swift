@@ -29,6 +29,9 @@ Var Collection.first has been removed
 Var Dictionary.first has been removed
 Var Set.first has been removed
 
+TypeAlias Unicode.UTF16.EncodedScalar has underlying type change from _UIntBuffer<UInt32, UInt16> to _UIntBuffer<UInt16>
+TypeAlias Unicode.UTF8.EncodedScalar has underlying type change from _ValidUTF8Buffer<UInt32> to _ValidUTF8Buffer
+
 /* Moved Decls */
 
 /* Renamed Decls */
