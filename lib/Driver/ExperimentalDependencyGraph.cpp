@@ -82,7 +82,7 @@ void DriverGraph::integrateHereNode(const FrontendNode *integrand, const std::st
   if (oldNode)
     nodesToRemove.erase(key);
   else {
-    NodesByKey expats = nodesBySwiftDepsFile.find("")->second;
+    NodesByKey expats = nodesBySwiftDepsFile[""];
     auto iter = expats.find(key);
     if (iter != expats.end()) {
       oldNode = iter->second;
