@@ -17,6 +17,7 @@
 #include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
@@ -903,6 +904,9 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     Inliner.inlineFunction(Callee, AI, Args);
     NumFunctionsInlined++;
   }
+  // The inliner splits blocks at call sites. Re-merge trivial branches to
+  // reestablish a canonical CFG.
+  mergeBasicBlocks(Caller);
   return true;
 }
 

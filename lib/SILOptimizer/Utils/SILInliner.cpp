@@ -512,23 +512,12 @@ SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
   // NextIter is initialized during `fixUp`.
   cloneFunctionBody(getCalleeFunction(), callerBB, entryArgs);
 
-  // As a trivial optimization, if the apply block falls through, merge it. The
-  // fall through is likely the ReturnToBB, but that is not guaranteed.
-  if (auto *BI = dyn_cast<BranchInst>(callerBB->getTerminator())) {
-    // FIXME: should be an assert once critical edges are fixed.
-    // assert(BI->getDestBB()->getSinglePredecessorBlock() &&
-    //       "the return block cannot have other predecessors.");
-    if (BI->getDestBB()->getSinglePredecessorBlock()) {
-      SILInstruction *firstInlinedInst = &*NextIter;
-      if (firstInlinedInst == BI)
-        firstInlinedInst = &BI->getDestBB()->front();
-
-      mergeBasicBlockWithSuccessor(BI->getParent(), /*DT*/ nullptr,
-                                   /*LI*/ nullptr);
-      NextIter = firstInlinedInst->getIterator();
-      ReturnToBB = nullptr;
-    }
-  }
+  // For non-throwing applies, the inlined body now unconditionally branches to
+  // the returned-to-code, which was previously part of the call site's basic
+  // block. We could trivially merge these blocks now, however, this would be
+  // quadratic: O(num-calls-in-block * num-instructions-in-block). On the other
+  // hand, leaving the block's unmerged is non-canonical. Instead, wait until
+  // all calls within a block are inlined, then merge blocks.
   return NextIter;
 }
 

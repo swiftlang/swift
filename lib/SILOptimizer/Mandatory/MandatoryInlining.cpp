@@ -680,6 +680,9 @@ class MandatoryInlining : public SILModuleTransform {
       runOnFunctionRecursively(FuncBuilder, &F,
                                FullApplySite(), FullyInlinedSet, SetFactory,
                                SetFactory.getEmptySet(), CHA);
+      // The inliner splits blocks at call sites. Re-merge trivial branches
+      // to reestablish a canonical CFG.
+      mergeBasicBlocks(&F);
     }
 
     if (!ShouldCleanup)
