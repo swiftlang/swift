@@ -17,8 +17,9 @@ import SwiftShims
 /// Equivalent to `NSDictionary.allKeys`, but does not leave objects on the
 /// autorelease pool.
 internal func _stdlib_NSDictionary_allKeys(
-  _ nsd: _NSDictionary
+  _ object: AnyObject
 ) -> _BridgingBuffer {
+  let nsd = unsafeBitCast(object, to: _NSDictionary.self)
   let count = nsd.count
   let storage = _BridgingBuffer(count)
   nsd.getObjects(nil, andKeys: storage.baseAddress, count: count)
@@ -27,11 +28,11 @@ internal func _stdlib_NSDictionary_allKeys(
 
 extension _NativeDictionary { // Bridging
   @usableFromInline
-  __consuming internal func bridged() -> _NSDictionary {
+  __consuming internal func bridged() -> AnyObject {
     // We can zero-cost bridge if our keys are verbatim
     // or if we're the empty singleton.
 
-    // Temporary var for SOME type safety before a cast.
+    // Temporary var for SOME type safety.
     let nsDictionary: _NSDictionaryCore
 
     if _storage === _RawDictionaryStorage.empty || count == 0 {
@@ -45,10 +46,7 @@ extension _NativeDictionary { // Bridging
       nsDictionary = _SwiftDeferredNSDictionary(self)
     }
 
-    // Cast from "minimal NSDictionary" to "NSDictionary"
-    // Note that if you actually ask Swift for this cast, it will fail.
-    // Never trust a shadow protocol!
-    return unsafeBitCast(nsDictionary, to: _NSDictionary.self)
+    return nsDictionary
   }
 }
 
@@ -423,10 +421,10 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
 @_fixed_layout
 internal struct _CocoaDictionary {
   @usableFromInline
-  internal let object: _NSDictionary
+  internal let object: AnyObject
 
   @inlinable
-  internal init(_ object: __owned _NSDictionary) {
+  internal init(_ object: __owned AnyObject) {
     self.object = object
   }
 }
@@ -504,21 +502,22 @@ extension _CocoaDictionary: _DictionaryBuffer {
       "An NSDictionary key wassn't listed amongst its enumerated contents")
   }
 
-  @inlinable
+  @usableFromInline
   internal var count: Int {
-    return object.count
+    let nsd = unsafeBitCast(object, to: _NSDictionary.self)
+    return nsd.count
   }
 
-  @inlinable
-  @inline(__always)
+  @usableFromInline
   internal func contains(_ key: Key) -> Bool {
-    return object.object(forKey: key) != nil
+    let nsd = unsafeBitCast(object, to: _NSDictionary.self)
+    return nsd.object(forKey: key) != nil
   }
 
-  @inlinable
-  @inline(__always)
+  @usableFromInline
   internal func lookup(_ key: Key) -> Value? {
-    return object.object(forKey: key)
+    let nsd = unsafeBitCast(object, to: _NSDictionary.self)
+    return nsd.object(forKey: key)
   }
 
   @usableFromInline // FIXME(cocoa-index): Should be inlinable
@@ -774,7 +773,7 @@ extension _CocoaDictionary.Iterator: IteratorProtocol {
 
 extension Dictionary {
   @inlinable
-  public __consuming func _bridgeToObjectiveCImpl() -> _NSDictionaryCore {
+  public __consuming func _bridgeToObjectiveCImpl() -> AnyObject {
     guard _variant.isNative else {
       return _variant.asCocoa.object
     }

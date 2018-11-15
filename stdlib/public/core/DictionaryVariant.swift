@@ -34,13 +34,8 @@ extension Dictionary {
   @usableFromInline
   @_fixed_layout
   internal struct _Variant {
-#if _runtime(_ObjC)
     @usableFromInline
-    internal var object: _BridgeStorage<_RawDictionaryStorage, _NSDictionary>
-#else
-    @usableFromInline
-    internal var object: _BridgeStorage<_RawDictionaryStorage, AnyObject>
-#endif
+    internal var object: _BridgeStorage<_RawDictionaryStorage>
 
     @inlinable
     @inline(__always)

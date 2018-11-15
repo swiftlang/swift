@@ -431,7 +431,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   ///
   /// - Complexity: O(1).
   @inlinable
-  internal __consuming func _asCocoaArray() -> _NSArrayCore {
+  internal __consuming func _asCocoaArray() -> AnyObject {
     if count == 0 {
       return _emptyArrayStorage
     }
