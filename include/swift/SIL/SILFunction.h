@@ -997,6 +997,9 @@ public:
   /// Like ViewCFG, but the graph does not show the contents of basic blocks.
   void viewCFGOnly() const;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Get estimated code size, for debugging only.
+  unsigned codeSize() const;
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,

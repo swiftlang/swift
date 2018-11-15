@@ -42,6 +42,11 @@ using namespace swift;
 using namespace tf;
 using llvm::DenseMap;
 
+llvm::cl::opt<bool> TFLogDeabstractionStats(
+    "tf-log-deabstraction-stats", llvm::cl::init(false),
+    llvm::cl::desc("Log the function-level sizes and call edges as CSV events. "
+                   "One use case is to analyze the impact of inlining."));
+
 static llvm::cl::opt<bool>
 TFDumpDeabstractionDetails("tf-dump-deabstraction-details",
                            llvm::cl::init(false),
@@ -2502,6 +2507,16 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
   // now dead.
 }
 
+// Event schema:
+// "S4TF FuncSize",FuncName,Size,StageName
+// StageName can be one of {"BeforeInline", "AfterInline", "AfterDA"}
+static void maybeLogFuncSize(const SILFunction &fn, StringRef stageName) {
+  if (!TFLogDeabstractionStats)
+    return;
+  llvm::dbgs() << "S4TF FuncSize," << fn.getName() << "," << fn.codeSize()
+               << "," << stageName << "\n";
+}
+
 /// Process the specified top level function as a deabstraction context: if it
 /// contains Tensor operations simplify the code using predictable rules until
 /// the tensor operations are exposed in a canonical form inside of this
@@ -2516,8 +2531,11 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
 ///   4) Scalarization of struct/tuple values.
 ///
 void TFDeabstraction::doIt() {
+  maybeLogFuncSize(fn, "BeforeInline");
+
   // Start by inlining functions that take and return Tensor values.
   inlineCalls();
+  maybeLogFuncSize(fn, "AfterInline");
 
   // Scan for any Tensor operations, removing indirect operands and structs that
   // interfere with SSA construction.
@@ -2562,6 +2580,7 @@ void TFDeabstraction::doIt() {
   cleanupDeadInstructions();
 
   logCurrentState("Result", /*detailed*/false);
+  maybeLogFuncSize(fn, "AfterDA");
 }
 
 
