@@ -283,6 +283,14 @@ public:
     Bits.ModuleDecl.TestingEnabled = enabled;
   }
 
+  // Returns true if this module is compiled with implicit dynamic.
+  bool isImplicitDynamicEnabled() const {
+    return Bits.ModuleDecl.ImplicitDynamicEnabled;
+  }
+  void setImplicitDynamicEnabled(bool enabled = true) {
+    Bits.ModuleDecl.ImplicitDynamicEnabled = enabled;
+  }
+
   /// Returns true if this module was or is begin compile with
   /// `-enable-private-imports`.
   bool arePrivateImportsEnabled() const {
@@ -990,7 +998,18 @@ public:
 
   void addImports(ArrayRef<ImportedModuleDesc> IM);
 
-  bool hasTestableOrPrivateImport(AccessLevel accessLevel, const ValueDecl *ofDecl) const;
+  enum ImportQueryKind {
+    /// Return the results for testable or private imports.
+    TestableAndPrivate,
+    /// Return the results only for testable imports.
+    TestableOnly,
+    /// Return the results only for private imports.
+    PrivateOnly
+  };
+
+  bool
+  hasTestableOrPrivateImport(AccessLevel accessLevel, const ValueDecl *ofDecl,
+                             ImportQueryKind kind = TestableAndPrivate) const;
 
   void clearLookupCache();
 

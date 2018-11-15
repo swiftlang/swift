@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 466; // Last change: add isAutoClosure flag to param
+const uint16_t SWIFTMODULE_VERSION_MINOR = 467; // Last change: switch FILE_DEPENDENCY records to hashes.
 
 using DeclIDField = BCFixed<31>;
 
@@ -108,6 +108,7 @@ using CharOffsetField = BitOffsetField;
 
 using FileSizeField = BCVBR<16>;
 using FileModTimeField = BCVBR<16>;
+using FileHashField = BCVBR<16>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -652,7 +653,7 @@ namespace input_block {
     IMPORTED_HEADER,
     BCFixed<1>, // exported?
     FileSizeField, // file size (for validation)
-    FileModTimeField, // file mtime (for validation)
+    FileHashField, // file hash (for validation)
     BCBlob // file path
   >;
 

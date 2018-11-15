@@ -25,6 +25,7 @@ public struct _DependenceToken {
 /// This function is referenced by the compiler to allocate array literals.
 ///
 /// - Precondition: `storage` is `_ContiguousArrayStorage`.
+@inlinable // FIXME(inline-always)
 @inline(__always)
 public // COMPILER_INTRINSIC
 func _allocateUninitializedArray<Element>(_  builtinCount: Builtin.Word)

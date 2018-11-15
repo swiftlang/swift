@@ -83,7 +83,7 @@ extension LazyFilterSequence.Iterator: IteratorProtocol, Sequence {
   }
 }
 
-extension LazyFilterSequence: LazySequenceProtocol {
+extension LazyFilterSequence: Sequence {
   public typealias Element = Base.Element
   /// Returns an iterator over the elements of this sequence.
   ///
@@ -101,6 +101,8 @@ extension LazyFilterSequence: LazySequenceProtocol {
   }
 }
 
+extension LazyFilterSequence: LazySequenceProtocol { }
+
 /// A lazy `Collection` wrapper that includes the elements of an
 /// underlying collection that satisfy a predicate.
 ///
@@ -110,26 +112,9 @@ extension LazyFilterSequence: LazySequenceProtocol {
 ///   the usual performance given by `Collection`. Be aware, therefore, that
 ///   general operations on `LazyFilterCollection` instances may not have the
 ///   documented complexity.
-@_fixed_layout // lazy-performance
-public struct LazyFilterCollection<Base : Collection> {
-  @usableFromInline // lazy-performance
-  internal var _base: Base
-  @usableFromInline // lazy-performance
-  internal let _predicate: (Base.Element) -> Bool
+public typealias LazyFilterCollection<T: Collection> = LazyFilterSequence<T>
 
-  /// Creates an instance containing the elements of `base` that
-  /// satisfy `isIncluded`.
-  @inlinable // lazy-performance
-  public // @testable
-  init(_base: Base, _ isIncluded: @escaping (Base.Element) -> Bool) {
-    self._base = _base
-    self._predicate = isIncluded
-  }
-}
-
-extension LazyFilterCollection : LazySequenceProtocol {
-  public typealias Element = Base.Element
-  public typealias Iterator = LazyFilterSequence<Base>.Iterator
+extension LazyFilterCollection: Collection {
   public typealias SubSequence = LazyFilterCollection<Base.SubSequence>
 
   // Any estimate of the number of elements that pass `_predicate` requires
@@ -139,32 +124,6 @@ extension LazyFilterCollection : LazySequenceProtocol {
   @inlinable // lazy-performance
   public var underestimatedCount: Int { return 0 }
 
-  @inlinable // lazy-performance
-  public __consuming func _copyToContiguousArray() -> ContiguousArray<Base.Element> {
-
-    // The default implementation of `_copyToContiguousArray` queries the
-    // `count` property, which evaluates `_predicate` for every element --
-    // see the note above `underestimatedCount`. Here we treat `self` as a
-    // sequence and only rely on underestimated count.
-    return _copySequenceToContiguousArray(self)
-  }
-
-  /// Returns an iterator over the elements of this sequence.
-  ///
-  /// - Complexity: O(1).
-  @inlinable // lazy-performance
-  public __consuming func makeIterator() -> Iterator {
-    return Iterator(_base: _base.makeIterator(), _predicate)
-  }
-
-  @inlinable
-  public func _customContainsEquatableElement(_ element: Element) -> Bool? {
-    guard _predicate(element) else { return false }
-    return _base._customContainsEquatableElement(element)
-  }
-}
-
-extension LazyFilterCollection : LazyCollectionProtocol {
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
@@ -372,38 +331,12 @@ extension LazySequenceProtocol {
   }
 }
 
-extension LazyCollectionProtocol {
-  /// Returns the elements of `self` that satisfy `predicate`.
-  ///
-  /// - Note: The elements of the result are computed on-demand, as
-  ///   the result is used. No buffering storage is allocated and each
-  ///   traversal step invokes `predicate` on one or more underlying
-  ///   elements.
-  @inlinable // lazy-performance
-  public __consuming func filter(
-    _ isIncluded: @escaping (Elements.Element) -> Bool
-  ) -> LazyFilterCollection<Self.Elements> {
-    return LazyFilterCollection(_base: self.elements, isIncluded)
-  }
-}
-
 extension LazyFilterSequence {
   @available(swift, introduced: 5)
   public __consuming func filter(
     _ isIncluded: @escaping (Element) -> Bool
   ) -> LazyFilterSequence<Base> {
     return LazyFilterSequence(_base: _base) {
-      isIncluded($0) && self._predicate($0)
-    }
-  }
-}
-
-extension LazyFilterCollection {
-  @available(swift, introduced: 5)
-  public __consuming func filter(
-    _ isIncluded: @escaping (Element) -> Bool
-  ) -> LazyFilterCollection<Base> {
-    return LazyFilterCollection(_base: _base) {
       isIncluded($0) && self._predicate($0)
     }
   }

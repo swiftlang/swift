@@ -1012,6 +1012,9 @@ struct IRLinkage {
   llvm::GlobalValue::LinkageTypes Linkage;
   llvm::GlobalValue::VisibilityTypes Visibility;
   llvm::GlobalValue::DLLStorageClassTypes DLLStorage;
+
+  static const IRLinkage InternalLinkOnceODR;
+  static const IRLinkage Internal;
 };
 
 class ApplyIRLinkage {

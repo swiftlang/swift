@@ -7084,7 +7084,7 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
     return false;
   DeclName constrName = TC.getObjectLiteralConstructorName(E);
   assert(constrName);
-  ArrayRef<ValueDecl *> constrs = protocol->lookupDirect(constrName);
+  auto constrs = protocol->lookupDirect(constrName);
   if (constrs.size() != 1 || !isa<ConstructorDecl>(constrs.front()))
     return false;
   auto *constr = cast<ConstructorDecl>(constrs.front());

@@ -50,6 +50,7 @@ extension String: BidirectionalCollection {
   }
 
   /// The number of characters in a string.
+  @inlinable // FIXME(inline-always)
   public var count: Int {
     @inline(__always) get {
       return distance(from: startIndex, to: endIndex)

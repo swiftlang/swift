@@ -348,6 +348,39 @@ bb2:
   cond_br %0, bb2, bb1
 }
 
+// libg.MyGlobal.mutableAddressor : Swift.Int32
+sil [global_init] [dynamically_replacable] @_TF4libga8MyGlobalSi_dynamic : $@convention(thin) () -> Builtin.RawPointer
+
+// Don't hoist dynamic_function_ref calls.
+// CHECK-LABEL: sil @test_loopexit_and_loop_dynamic
+// CHECK: bb0(%0 : $Builtin.Int1):
+// CHECK: bb1:
+// CHECK: apply
+// CHECK: return
+// CHECK: bb2:
+// CHECK: apply
+// CHECK: cond_br
+sil @test_loopexit_and_loop_dynamic : $@convention(thin) (Builtin.Int1) -> Int64 {
+bb0(%0 : $Builtin.Int1):
+  br bb2
+
+bb1:
+  %1 = dynamic_function_ref @_TF4libga8MyGlobalSi_dynamic : $@convention(thin) () -> Builtin.RawPointer
+  %2 = apply %1() : $@convention(thin) () -> Builtin.RawPointer
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Int64
+  %4 = struct_element_addr %3 : $*Int64, #Int64._value
+  %5 = load %4 : $*Builtin.Int64
+  %r1 = struct $Int64 (%5 : $Builtin.Int64)
+  return %r1 : $Int64
+
+bb2:
+  %11 = dynamic_function_ref @_TF4libga8MyGlobalSi_dynamic : $@convention(thin) () -> Builtin.RawPointer
+  %12 = apply %11() : $@convention(thin) () -> Builtin.RawPointer
+  %13 = pointer_to_address %12 : $Builtin.RawPointer to [strict] $*Int64
+  %14 = struct_element_addr %13 : $*Int64, #Int64._value
+  %15 = load %14 : $*Builtin.Int64
+  cond_br %0, bb2, bb1
+}
 // An init-call, which is guarded by an availability-check may not be speculated.
 // In this test it may not be hoisted out of the loop.
 // CHECK-LABEL: sil @test_availability_loop

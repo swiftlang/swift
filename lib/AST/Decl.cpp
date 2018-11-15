@@ -1416,7 +1416,7 @@ SourceRange IfConfigDecl::getSourceRange() const {
 }
 
 static bool isPolymorphic(const AbstractStorageDecl *storage) {
-  if (storage->isDynamic())
+  if (storage->isObjCDynamic())
     return true;
 
 
@@ -1549,7 +1549,7 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
     return AccessStrategy::getStorage();
   case ReadWriteImplKind::Stored: {
     // If the storage isDynamic (and not @objc) use the accessors.
-    if (storage->isDynamic() && !storage->isObjC())
+    if (storage->isNativeDynamic())
       return AccessStrategy::getMaterializeToTemporary(
           getOpaqueReadAccessStrategy(storage, false),
           getOpaqueWriteAccessStrategy(storage, false));
@@ -1622,6 +1622,9 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
       // accessors are dynamically dispatched, and we cannot do direct access.
       if (isPolymorphic(this))
         return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ true);
+
+      if (isNativeDynamic())
+        return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ false);
 
       // If the storage is resilient to the given use DC (perhaps because
       // it's @_transparent and we have to be careful about it being inlined

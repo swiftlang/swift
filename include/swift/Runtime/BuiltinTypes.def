@@ -33,6 +33,7 @@
 #endif
 
 BUILTIN_TYPE(Bi1_, "Builtin.Int1")
+BUILTIN_TYPE(Bi7_, "Builtin.Int7")
 BUILTIN_TYPE(Bi8_, "Builtin.Int8")
 BUILTIN_TYPE(Bi16_, "Builtin.Int16")
 BUILTIN_TYPE(Bi32_, "Builtin.Int32")

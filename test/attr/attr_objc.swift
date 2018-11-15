@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify %s -swift-version 4 -enable-source-import -I %S/Inputs -enable-swift3-objc-inference
 // RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module -swift-version 4 -enable-source-import -I %S/Inputs -enable-swift3-objc-inference | %FileCheck %s
-// RUN: not %target-swift-frontend -typecheck -dump-ast -disable-objc-attr-requires-foundation-module %s -swift-version 4 -enable-source-import -I %S/Inputs -enable-swift3-objc-inference 2> %t.dump
-// RUN: %FileCheck -check-prefix CHECK-DUMP %s < %t.dump
+// RUN: not %target-swift-frontend -typecheck -dump-ast -disable-objc-attr-requires-foundation-module %s -swift-version 4 -enable-source-import -I %S/Inputs -enable-swift3-objc-inference > %t.ast
+// RUN: %FileCheck -check-prefix CHECK-DUMP %s < %t.ast
 // REQUIRES: objc_interop
 
 import Foundation

@@ -3914,6 +3914,8 @@ IRGenModule::getAddrOfWitnessTableLazyAccessFunction(
   Signature signature(fnType, llvm::AttributeList(), DefaultCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
+  ApplyIRLinkage({link.getLinkage(), link.getVisibility(), link.getDLLStorage()})
+      .to(entry);
   return entry;
 }
 
@@ -4026,10 +4028,7 @@ static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
   if (!def) return nullptr;
   if (!def->empty()) return nullptr;
 
-  ApplyIRLinkage({llvm::GlobalValue::LinkOnceODRLinkage,
-                 llvm::GlobalValue::HiddenVisibility,
-                 llvm::GlobalValue::DefaultStorageClass})
-      .to(def);
+  ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(def);
   def->setDoesNotThrow();
   def->setCallingConv(IGM.DefaultCC);
   if (setIsNoInline)

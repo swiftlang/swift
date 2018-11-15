@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -dump-ast 2> %t.ast
+// RUN: %target-typecheck-verify-swift -dump-ast > %t.ast
 // RUN: %FileCheck %s < %t.ast
 
 // Verify that upcasts of array literals upcast the individual elements in place

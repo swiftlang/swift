@@ -1,4 +1,6 @@
 #if MODULE
+public dynamic var public_global_var = "public_global_var"
+
 public dynamic func public_global_func() -> String {
   return "public_global_func"
 }
@@ -64,6 +66,8 @@ public enum PublicEnumeration<Q> {
   }
 }
 #elseif MODULENODYNAMIC
+public var public_global_var = "public_global_var"
+
 public func public_global_func() -> String {
   return "public_global_func"
 }
@@ -133,6 +137,11 @@ public enum PublicEnumeration<Q> {
 import Module1
 
 /// Public global functions, struct, class, and enum.
+
+@_dynamicReplacement(for: public_global_var)
+public var replacement_for_public_global_var : String {
+  return "replacement of public_global_var"
+}
 
 @_dynamicReplacement(for: public_global_func())
 public func replacement_for_public_global_func() -> String {

@@ -384,6 +384,7 @@ extension Array {
   }
 
   @_semantics("array.get_element")
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public // @testable
   func _getElement(
@@ -440,6 +441,7 @@ extension Array: _ArrayProtocol {
   @inlinable
   public // @testable
   var _owner: AnyObject? {
+    @inlinable // FIXME(inline-always)
     @inline(__always)
     get {
       return _buffer.owner      
@@ -1447,6 +1449,7 @@ extension Array {
   ///   method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_semantics("array.withUnsafeMutableBufferPointer")
+  @inlinable // FIXME(inline-always)
   @inline(__always) // Performance: This method should get inlined into the
   // caller such that we can combine the partial apply with the apply in this
   // function saving on allocating a closure context. This becomes unnecessary

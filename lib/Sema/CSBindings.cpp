@@ -177,6 +177,9 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
   if (!isViable(binding))
     return;
 
+  if (binding.isDefaultableBinding())
+    ++NumDefaultableBindings;
+
   Bindings.push_back(std::move(binding));
 }
 
@@ -660,7 +663,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     if (!exactTypes.insert(type->getCanonicalType()).second)
       continue;
 
-    ++result.NumDefaultableBindings;
     result.addPotentialBinding({type, AllowedBindingKind::Exact,
                                 constraint->getKind(), nullptr,
                                 constraint->getLocator()});

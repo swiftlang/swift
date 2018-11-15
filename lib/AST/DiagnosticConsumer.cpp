@@ -222,3 +222,21 @@ void NullDiagnosticConsumer::handleDiagnostic(
     llvm::dbgs() << "\n";
   });
 }
+
+ForwardingDiagnosticConsumer::ForwardingDiagnosticConsumer(DiagnosticEngine &Target)
+  : TargetEngine(Target) {}
+
+void ForwardingDiagnosticConsumer::handleDiagnostic(
+    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
+    const DiagnosticInfo &Info) {
+  LLVM_DEBUG({
+    llvm::dbgs() << "ForwardingDiagnosticConsumer received diagnostic: ";
+    DiagnosticEngine::formatDiagnosticText(llvm::dbgs(), FormatString,
+                                           FormatArgs);
+    llvm::dbgs() << "\n";
+  });
+  for (auto *C : TargetEngine.getConsumers()) {
+    C->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info);
+  }
+}

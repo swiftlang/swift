@@ -41,6 +41,7 @@ public:
     std::vector<std::string> AccessPath;
     bool ResultsHaveLeadingDot;
     bool ForTestableLookup;
+    bool ForPrivateImportLookup;
     bool CodeCompleteInitsInPostfixExpr;
 
     friend bool operator==(const Key &LHS, const Key &RHS) {
@@ -49,6 +50,7 @@ public:
         LHS.AccessPath == RHS.AccessPath &&
         LHS.ResultsHaveLeadingDot == RHS.ResultsHaveLeadingDot &&
         LHS.ForTestableLookup == RHS.ForTestableLookup &&
+        LHS.ForPrivateImportLookup == RHS.ForPrivateImportLookup &&
         LHS.CodeCompleteInitsInPostfixExpr == RHS.CodeCompleteInitsInPostfixExpr;
     }
   };
@@ -106,10 +108,10 @@ template<>
 struct DenseMapInfo<swift::ide::CodeCompletionCache::Key> {
   using KeyTy = swift::ide::CodeCompletionCache::Key;
   static inline KeyTy getEmptyKey() {
-    return KeyTy{"", "", {}, false, false, false};
+    return KeyTy{"", "", {}, false, false, false, false};
   }
   static inline KeyTy getTombstoneKey() {
-    return KeyTy{"", "", {}, true, false, false};
+    return KeyTy{"", "", {}, true, false, false, false};
   }
   static unsigned getHashValue(const KeyTy &Val) {
     size_t H = 0;
@@ -119,6 +121,7 @@ struct DenseMapInfo<swift::ide::CodeCompletionCache::Key> {
       H ^= std::hash<std::string>()(Piece);
     H ^= std::hash<bool>()(Val.ResultsHaveLeadingDot);
     H ^= std::hash<bool>()(Val.ForTestableLookup);
+    H ^= std::hash<bool>()(Val.ForPrivateImportLookup);
     return static_cast<unsigned>(H);
   }
   static bool isEqual(const KeyTy &LHS, const KeyTy &RHS) {
