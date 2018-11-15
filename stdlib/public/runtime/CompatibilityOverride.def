@@ -44,6 +44,7 @@
 #  define OVERRIDE_FOREIGN OVERRIDE
 #  define OVERRIDE_PROTOCOLCONFORMANCE OVERRIDE
 #  define OVERRIDE_KEYPATH OVERRIDE
+#  define OVERRIDE_WITNESSTABLE OVERRIDE
 #else
 #  ifndef OVERRIDE_METADATALOOKUP
 #    define OVERRIDE_METADATALOOKUP(...)
@@ -62,6 +63,9 @@
 #  endif
 #  ifndef OVERRIDE_KEYPATH
 #    define OVERRIDE_KEYPATH(...)
+#  endif
+#  ifndef OVERRIDE_WITNESSTABLE
+#    define OVERRIDE_WITNESSTABLE(...)
 #  endif
 #endif
 
@@ -140,6 +144,22 @@ OVERRIDE_KEYPATH(getKeyPath, const HeapObject *, , swift::,
                  (const void *pattern, const void *arguments),
                  (pattern, arguments))
 
+OVERRIDE_WITNESSTABLE(getAssociatedTypeWitnessSlow, MetadataResponse,
+                      SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL, swift::,
+                      (MetadataRequest request, WitnessTable *wtable,
+                       const Metadata *conformingType,
+                       const ProtocolRequirement *reqBase,
+                       const ProtocolRequirement *assocType),
+                      (request, wtable, conformingType, reqBase, assocType))
+
+OVERRIDE_WITNESSTABLE(getAssociatedConformanceWitnessSlow, const WitnessTable *,
+                      SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL, swift::,
+                      (WitnessTable *wtable, const Metadata *conformingType,
+                       const Metadata *assocType,
+                       const ProtocolRequirement *reqBase,
+                       const ProtocolRequirement *assocConformance),
+                      (wtable, conformingType, assocType, reqBase,
+                               assocConformance))
 #if SWIFT_OBJC_INTEROP
 
 OVERRIDE_OBJC(dynamicCastObjCClass, const void *, , swift::,
@@ -183,3 +203,4 @@ OVERRIDE_FOREIGN(dynamicCastForeignClassUnconditional, const void *, , swift::,
 #undef OVERRIDE_FOREIGN
 #undef OVERRIDE_PROTOCOLCONFORMANCE
 #undef OVERRIDE_KEYPATH
+#undef OVERRIDE_WITNESSTABLE
