@@ -187,11 +187,11 @@ protocol AnotherFooProtocol {}
 protocol BazProtocol {}
 extension AnotherFooProtocol where Self: BazProtocol, Self: AnotherFooProtocol {} // expected-warning {{requirement of 'Self' to 'AnotherFooProtocol' is redundant in an extension of 'AnotherFooProtocol'}}
 
-protocol A {
-  associatedtype V
+protocol AnotherBazProtocol {
+  associatedtype BazValue
 }
 
-extension A where V: A {} // ok, does not warn because V is not Self
+extension AnotherBazProtocol where BazValue: AnotherBazProtocol {} // ok, does not warn because BazValue is not Self
 
 // ----------------------------------------------------------------------------
 // Protocol extensions with additional requirements
