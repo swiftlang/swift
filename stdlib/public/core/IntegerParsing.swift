@@ -10,6 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// Returns c as a UTF16.CodeUnit.  Meant to be used as _ascii16("x").
+@inlinable
+internal func _ascii16(_ c: Unicode.Scalar) -> UTF16.CodeUnit {
+  _sanityCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")
+  return UTF16.CodeUnit(c.value)
+}
+
 @inlinable
 @inline(__always)
 internal func _asciiDigit<CodeUnit : UnsignedInteger, Result : BinaryInteger>(
