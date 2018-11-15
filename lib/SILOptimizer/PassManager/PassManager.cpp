@@ -354,7 +354,7 @@ void SILPassManager::dumpPassInfo(const char *Title, unsigned TransIdx,
 static void logS4TFPassEvent(long long Delta, llvm::sys::TimePoint<> StartTime,
                              StringRef passName, bool isFunctionPass,
                              StringRef funcName) {
-  auto tt = std::chrono::system_clock::to_time_t(StartTime);
+  auto tt = llvm::sys::toTimeT(StartTime);
   auto strTime = ctime(&tt);
   strTime[strlen(strTime) - 1] = '\0';
   llvm::dbgs() << "S4TF," << Delta << "," << strTime << "," << passName << ","
