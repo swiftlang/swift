@@ -357,7 +357,7 @@ static SILValue lookThroughSingleElementStructInsts(SILValue value) {
 /// value, extract out the underlying integer or float value.
 ///
 /// Returns nullptr when we fail to simplify `origInst` (e.g. when the result of
-/// that graph_op is not loadable, such that this op cannot be included in the
+/// that graph_op is not loadable, such that this op won't be included in the
 /// extracted graph). In that case, we can still run this graph_op via eager op
 /// dispatch.
 ///
@@ -2318,7 +2318,6 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
     auto argumentValue = argument.getSingleArgument();
     auto argumentTy = argumentValue->getType();
     auto argumentNameAndLowering = argument.getArgumentNameAndLowering();
-    auto argumentLoc = getUserSourceLocation(argumentValue);
 
     // Collect and validate input arguments.
     if (std::get<1>(argumentNameAndLowering) ==
@@ -2341,11 +2340,8 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
             element = copyAddr->getSrc();
 
           if (!element) {
-            diagnoseInvalid(argumentLoc,
-                            "argument of type '" + elementType->getString() +
-                            "' is not a TensorFlow value or an aggregate of "
-                            "TensorFlow values");
-            return;
+            noClustering = true;
+            break;
           }
 
           if (unpackTensorAggregates(context, origInst->getLoc(), B, element,
@@ -2355,6 +2351,9 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
             break;
           }
         }
+        // TODO: even if we cannot deabstraction one input list elt, try and
+        // deabstract the others still. Create a unit test on #tfop("SomeOp", a,
+        // b), where a cannot be deabstracted, but b can.
         if (noClustering)
           opBuilder.addArgument(argumentValue);
         else
