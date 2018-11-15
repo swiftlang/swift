@@ -2410,15 +2410,16 @@ internal func _resolveKeyPathGenericArgReference(_ reference: UnsafeRawPointer,
 
   // If we have a symbolic reference to an accessor, call it.
   let first = referenceStart.load(as: UInt8.self)
-  if first == 9 {
+  if first == 255 && reference.load(as: UInt8.self) == 9 {
     typealias MetadataAccessor =
       @convention(c) (UnsafeRawPointer) -> UnsafeRawPointer
 
     // Unaligned load of the offset.
+    let pointerReference = reference + 1
     var offset: Int32 = 0
-    _memcpy(dest: &offset, src: reference, size: 4)
+    _memcpy(dest: &offset, src: pointerReference, size: 4)
 
-    let accessorPtr = _resolveRelativeAddress(reference, offset)
+    let accessorPtr = _resolveRelativeAddress(pointerReference, offset)
     let accessor = unsafeBitCast(accessorPtr, to: MetadataAccessor.self)
     return accessor(arguments)
   }

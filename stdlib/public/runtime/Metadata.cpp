@@ -4212,6 +4212,9 @@ static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
 
 
   // Extract the mangled name itself.
+  if (*mangledNameBase == '\xFF')
+    ++mangledNameBase;
+
   StringRef mangledName =
     Demangle::makeSymbolicMangledNameStringRef(mangledNameBase);
 

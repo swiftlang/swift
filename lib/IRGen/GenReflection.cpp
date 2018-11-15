@@ -217,6 +217,7 @@ llvm::Constant *IRGenModule::getMangledAssociatedConformance(
   ConstantInitBuilder B(*this);
   auto S = B.beginStruct();
   S.setPacked(true);
+  S.add(llvm::ConstantInt::get(Int8Ty, 255));
   S.add(llvm::ConstantInt::get(Int8Ty, kind));
   S.addRelativeAddress(accessor);
 
