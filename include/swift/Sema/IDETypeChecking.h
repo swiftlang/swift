@@ -98,19 +98,15 @@ namespace swift {
                    Expr *&parsedExpr,
                    ConcreteDeclRef &referencedDecl);
 
-  /// Typecheck the sequence expression \p parsedExpr for code completion.
+  /// Resolve type of operator function with \c opName appending it to \c LHS.
   ///
-  /// This requires that \p parsedExpr is a SequenceExpr and that it contains:
-  ///   * ... leading sequence  LHS
-  ///   * UnresolvedDeclRefExpr operator
-  ///   * CodeCompletionExpr    RHS
-  ///
-  /// On success, returns false, and replaces parsedExpr with the binary
-  /// expression corresponding to the operator.  The type of the operator and
-  /// RHS are also set, but the rest of the expression may not be typed
-  ///
-  /// The LHS should already be type-checked or this will be very slow.
-  bool typeCheckCompletionSequence(DeclContext *DC, Expr *&parsedExpr);
+  /// For \p refKind, use \c DeclRefKind::PostfixOperator for postfix operator,
+  /// or \c DeclRefKind::BinaryOperator for infix operator.
+  /// On success, returns resolved function type of the operator. The LHS should
+  /// already be type-checked. This function guarantees LHS not to be modified.
+  Type getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
+                                   Identifier opName, DeclRefKind refKind,
+                                   ConcreteDeclRef &referencedDecl);
 
   /// Typecheck the given expression.
   bool typeCheckExpression(DeclContext *DC, Expr *&parsedExpr);

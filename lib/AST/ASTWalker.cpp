@@ -1072,6 +1072,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  Expr *visitFixedTypeExpr(FixedTypeExpr *E) { return E; }
+
   //===--------------------------------------------------------------------===//
   //                           Everything Else
   //===--------------------------------------------------------------------===//

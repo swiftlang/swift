@@ -3111,6 +3111,10 @@ namespace {
       return tv;
     }
 
+    Type visitFixedTypeExpr(FixedTypeExpr *E) {
+      return E->getType();
+    }
+
     enum class TypeOperation { None,
                                Join,
                                JoinInout,

@@ -2662,6 +2662,11 @@ public:
     printRec(E->getBody(), E->getVar()->getDeclContext()->getASTContext());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+
+  void visitFixedTypeExpr(FixedTypeExpr *E) {
+    printCommon(E, "fixed_type_expr");
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
 };
 
 } // end anonymous namespace
