@@ -62,20 +62,11 @@ namespace swift {
         std::unordered_map<std::string, NodesByKey> nodesBySwiftDepsFile;
         
         std::unordered_map<NodeDependencyKey, std::unordered_map<std::string, DriverNode*>> nodesByDependencyKey;
+        
+        std::unordered_map<NodeDependencyKey, std::unordered_set<NodeDependencyKey>> dependersByDependee;
 
-        //TODO template next 2
-//        DriverNode* findNode(StringRef depsFilename, const NodeDependencyKey &k) {
-//          auto iter = nodesBySwiftDepsFile.find(depsFilename);
-//          return iter == nodesBySwiftDepsFile.end() ? nullptr
-//          : findPointer(iter->second, k);
-//        }
-//        DriverNode* findNode(const NodeDependencyKey &k, StringRef depsFilename) {
-//          auto iter = nodesByDependencyKey.find(k);
-//          return iter == nodesByDependencyKey.end() ? nullptr
-//          : findPointer(iter->second, depsFilename);
-//        }
         template <typename Key1, typename Key2>
-          DriverNode* findNode(std::unordered_map<Key1,
+          DriverNode* findNodeInTwoStageMap(std::unordered_map<Key1,
                                std::unordered_map<Key2,
                                DriverNode*>>
                                &mapmap,
@@ -117,8 +108,9 @@ namespace swift {
        
         void integrateHereNode(const FrontendNode *integrand, const std::string &depsFilename, NodesByKey &nodesInFile, NodesByKey &nodesToRemove);
         void integrateElsewhereNode(const FrontendNode *integrand);
-        void addExistingLinksTo(DriverNode* n);
         void rememberToPropagateChangesFrom(DriverNode* n);
+        
+        void updateDependersByDependeesFor(const FrontendNode* n, const FrontendGraph& g);
         
         void addNode(StringRef swiftDeps, DriverNode *n);
         void removeNode(StringRef swiftDeps, DriverNode *n);

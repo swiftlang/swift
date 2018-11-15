@@ -62,7 +62,9 @@ LoadResult DriverGraph::integrate(const FrontendGraph &g) {
   auto nodesToRemove = nodesInFile;
 
   g.forEachHereNode([&](const FrontendNode *integrand) {
-    integrateHereNode(integrand, depsFilename, nodesInFile, nodesToRemove);});
+    updateDependersByDependeesFor(integrand, g);
+    integrateHereNode(integrand, depsFilename, nodesInFile, nodesToRemove);
+  });
   
   g.forEachElsewhereNode([&](const FrontendNode *integrand) {
     integrateElsewhereNode(integrand);});
@@ -78,7 +80,7 @@ LoadResult DriverGraph::integrate(const FrontendGraph &g) {
 void DriverGraph::integrateHereNode(const FrontendNode *integrand, const std::string &depsFilename, NodesByKey &nodesInFile, NodesByKey &nodesToRemove) {
   assert(integrand->isHere());
   const auto &key = integrand->getDependencyKey();
-  auto *oldNode = findNode(nodesBySwiftDepsFile, depsFilename, key);
+  auto *oldNode = findNodeInTwoStageMap(nodesBySwiftDepsFile, depsFilename, key);
   if (oldNode)
     nodesToRemove.erase(key);
   else {
@@ -105,18 +107,27 @@ void DriverGraph::integrateElsewhereNode(const FrontendNode *integrand) {
   assert(!integrand->isHere());
   auto key = integrand->getDependencyKey();
   assert(integrand->getFingerprint() == "" && "unimplemented");
-  DriverNode* oldNode = findNode(nodesBySwiftDepsFile, std::string(), key);
+  DriverNode* oldNode = findNodeInTwoStageMap(nodesBySwiftDepsFile, std::string(), key);
   if (oldNode)
     return;
   DriverNode *newNode = new DriverNode(key, integrand->getFingerprint());
   addNode("", newNode);
 };
 
+
+void DriverGraph::updateDependersByDependeesFor(const FrontendNode* n, const FrontendGraph& g) {
+  const auto &dependee = n->getDependencyKey();
+  auto &dependers = dependersByDependee[dependee];
+  g.forEachDependerOn(n, [&](const NodeDependencyKey &depender) {
+    dependers.insert(depender);
+  });
+}
+
 void DriverGraph::addNode(StringRef swiftDeps, DriverNode *n) {
   auto const &key = n->getDependencyKey();
   nodesBySwiftDepsFile[swiftDeps].insert(std::make_pair(key, n));
   nodesByDependencyKey[key].insert(std::make_pair(swiftDeps, n));
-  addExistingLinksTo(n);
+  rememberToPropagateChangesFrom(n);
 }
 
 void DriverGraph::removeNode(StringRef swiftDeps, DriverNode *n) {
@@ -126,9 +137,9 @@ void DriverGraph::removeNode(StringRef swiftDeps, DriverNode *n) {
   delete n;
 }
 
-void DriverGraph::addExistingLinksTo(DriverNode* n) {
-  abort();
-}
+
+
+
 void DriverGraph::rememberToPropagateChangesFrom(DriverNode* n) {
   abort();
 }

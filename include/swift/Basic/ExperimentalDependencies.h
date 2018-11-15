@@ -235,6 +235,12 @@ namespace experimental_dependencies {
       for (size_t i = hereNodeCount;  i < allNodes.size();  ++i)
         fn(allNodes[i]);
     }
+    
+    template <typename FnT>
+    void forEachDependerOn(const FrontendNode *n, FnT fn) const {
+      for (const size_t dependerIndex: n->getDependers())
+        fn(allNodes[dependerIndex]->getDependencyKey());
+    }
 
     FrontendNode* addNode(NodeDependencyKey key,
                           StringRef fingerprint,
