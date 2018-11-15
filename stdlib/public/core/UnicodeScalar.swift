@@ -191,7 +191,6 @@ extension Unicode.Scalar :
   /// - Parameter forceASCII: Pass `true` if you need the result to use only
   ///   ASCII characters; otherwise, pass `false`.
   /// - Returns: A string representation of the scalar.
-  @inlinable // FIXME(sil-serialize-all)
   public func escaped(asASCII forceASCII: Bool) -> String {
     func lowNibbleAsHex(_ v: UInt32) -> String {
       let nibble = v & 15
@@ -264,19 +263,12 @@ extension Unicode.Scalar :
   ///     // Prints "ñ false 241"
   ///     // Prints "ó false 243"
   ///     // Prints "n true 110"
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var isASCII: Bool {
     return value <= 127
   }
 
-  // FIXME: Is there a similar term of art in Unicode?
-  @inlinable // FIXME(sil-serialize-all)
-  public var _isASCIIDigit: Bool {
-    return self >= "0" && self <= "9"
-  }
-
   // FIXME: Unicode makes this interesting.
-  @inlinable // FIXME(sil-serialize-all)
   internal var _isPrintableASCII: Bool {
     return (self >= Unicode.Scalar(0o040) && self <= Unicode.Scalar(0o176))
   }
@@ -442,16 +434,7 @@ extension Unicode.Scalar.UTF16View : RandomAccessCollection {
   }
 }
 
-/// Returns c as a UTF16.CodeUnit.  Meant to be used as _ascii16("x").
-@inlinable // FIXME(sil-serialize-all)
-public // SPI(SwiftExperimental)
-func _ascii16(_ c: Unicode.Scalar) -> UTF16.CodeUnit {
-  _sanityCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")
-  return UTF16.CodeUnit(c.value)
-}
-
 extension Unicode.Scalar {
-  @inlinable // FIXME(sil-serialize-all)
   internal static var _replacementCharacter: Unicode.Scalar {
     return Unicode.Scalar(_value: UTF32._replacementCodeUnit)
   }
