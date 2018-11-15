@@ -239,7 +239,8 @@ public:
   /// that occur within a mangled name, using the generic arguments from
   /// the given metadata.
   ///
-  /// Use with \c _getTypeByMangledName to decode potentially-generic types.
+  /// Use with \c swift__getTypeByMangledName to decode potentially-generic
+  /// types.
   class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromMetadata {
     const Metadata *base;
 
