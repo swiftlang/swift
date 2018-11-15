@@ -620,13 +620,12 @@ AutoDiffFunctionInst::getAutoDiffType(SILValue originalFunction,
 }
 
 AutoDiffFunctionInst::AutoDiffFunctionInst(
-    SILModule &module, SILDebugLocation debugLoc, bool isLegacyReverseMode,
+    SILModule &module, SILDebugLocation debugLoc,
     const SmallBitVector &parameterIndices, unsigned differentiationOrder,
     SILValue originalFunction, ArrayRef<SILValue> associatedFunctions)
     : InstructionBaseWithTrailingOperands(originalFunction, associatedFunctions,
           debugLoc, getAutoDiffType(originalFunction, differentiationOrder,
                                     parameterIndices)),
-      legacyReverseModeFlag(isLegacyReverseMode),
       parameterIndices(parameterIndices),
       differentiationOrder(differentiationOrder),
       numOperands(1 + associatedFunctions.size()) {
@@ -634,38 +633,60 @@ AutoDiffFunctionInst::AutoDiffFunctionInst(
 
 AutoDiffFunctionInst *AutoDiffFunctionInst::create(
     SILModule &module, SILDebugLocation debugLoc,
-    bool isLegacyReverseAD, const SmallBitVector &parameterIndices,
+    const SmallBitVector &parameterIndices,
     unsigned differentiationOrder, SILValue originalFunction,
     ArrayRef<SILValue> associatedFunctions) {
   size_t size = totalSizeToAlloc<Operand>(associatedFunctions.size() + 1);
   void *buffer = module.allocateInst(size, alignof(AutoDiffFunctionInst));
   return ::new (buffer) AutoDiffFunctionInst(module, debugLoc,
-                                             isLegacyReverseAD,
                                              parameterIndices,
                                              differentiationOrder,
                                              originalFunction,
                                              associatedFunctions);
 }
 
-
-ArrayRef<Operand> AutoDiffFunctionInst::
-getAssociatedFunctionList(unsigned differentiationOrder) const {
+std::pair<SILValue, SILValue> AutoDiffFunctionInst::
+getAssociatedFunctionPair(unsigned differentiationOrder) const {
   assert(differentiationOrder > 0 &&
          differentiationOrder <= this->differentiationOrder);
-  auto numAssocFns = autodiff::
-      getNumAutoDiffAssociatedFunctionsPerOrder(isLegacyReverseMode());
-  auto offset = (differentiationOrder - 1) * numAssocFns;
-  return getAssociatedFunctions().slice(offset, numAssocFns);
+  auto offset = (differentiationOrder - 1) * 2;
+  auto assocFns = getAssociatedFunctions();
+  return {assocFns[offset].get(), assocFns[offset+1].get()};
 }
 
 SILValue AutoDiffFunctionInst::
 getAssociatedFunction(unsigned differentiationOrder,
-                      SILAutoDiffAssociatedFunctionKind kind) const {
+                      AutoDiffAssociatedFunctionKind kind) const {
   assert(differentiationOrder > 0 &&
          differentiationOrder <= this->differentiationOrder);
   auto offset = autodiff::getOffsetForAutoDiffAssociatedFunction(
       differentiationOrder, kind);
   return getAssociatedFunctions()[offset].get();
+}
+
+SILType AutoDiffFunctionExtractInst::
+getAssociatedFunctionType(SILValue function,
+                          AutoDiffAssociatedFunctionKind kind,
+                          unsigned differentiationOrder,
+                          SILModule &module) {
+  auto fnTy = function->getType().castTo<SILFunctionType>();
+  assert(fnTy->getExtInfo().isDifferentiable());
+  // FIXME: Get indices from the @autodiff function type.
+  auto assocFnTy = fnTy->getAutoDiffAssociatedFunctionType(SmallBitVector(),
+                                                           differentiationOrder,
+                                                           kind, module);
+  return SILType::getPrimitiveObjectType(assocFnTy);
+}
+
+AutoDiffFunctionExtractInst::AutoDiffFunctionExtractInst(
+    SILModule &module, SILDebugLocation debugLoc,
+    AutoDiffAssociatedFunctionKind associatedFunctionKind,
+    unsigned differentiationOrder, SILValue theFunction)
+    : InstructionBase(debugLoc, getAssociatedFunctionType(
+          theFunction, associatedFunctionKind, differentiationOrder, module)),
+      associatedFunctionKind(associatedFunctionKind),
+      differentiationOrder(differentiationOrder),
+      operands(this, theFunction) {
 }
 
 FunctionRefInst::FunctionRefInst(SILDebugLocation Loc, SILFunction *F)

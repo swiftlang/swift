@@ -1254,7 +1254,22 @@ public:
   }
 
   void checkAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
-    // TODO: Handle this.
+    // FIXME(rxwei): Complete verification.
+    for (auto &op : adfi->getAllOperands())
+      require(op.get()->getType().is<SILFunctionType>(),
+              "All operands must have a function type");
+    auto fnTy = adfi->getOriginalFunction()
+        ->getType().castTo<SILFunctionType>();
+    require(!fnTy->isDifferentiable(),
+            "The original function operand must not be '@autodiff'");
+  }
+  
+  void checkAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *adfei) {
+    // FIXME(rxwei): Complete verification.
+    auto fnTy = adfei->getFunctionOperand()->getType().getAs<SILFunctionType>();
+    require(fnTy, "The function operand must have a function type");
+    require(fnTy->isDifferentiable(),
+            "The function operand must be an '@autodiff' function");
   }
 
   void verifyLLVMIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID) {

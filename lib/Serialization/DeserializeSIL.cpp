@@ -1486,6 +1486,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case SILInstructionKind::AutoDiffFunctionInst: {
     llvm_unreachable("FIXME: Unhandled");
   }
+  case SILInstructionKind::AutoDiffFunctionExtractInst: {
+    llvm_unreachable("FIXME: unhandled");
+  }
   case SILInstructionKind::GraphOperationInst: {
     // TODO(SR-8848): Deserialize attributes.
     auto EndOfArgValues = 3 * NumArguments;

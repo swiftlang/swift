@@ -14,6 +14,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
 
@@ -46,6 +47,15 @@ bool SILAutoDiffIndices::operator==(
   return buffer.none();
 }
 
+AutoDiffAssociatedFunctionKind::
+AutoDiffAssociatedFunctionKind(StringRef string) {
+  Optional<innerty> result =
+      llvm::StringSwitch<Optional<innerty>>(string)
+         .Case("jvp", JVP).Case("vjp", VJP);
+  assert(result && "Invalid string");
+  rawValue = *result;
+}
+
 Differentiability::Differentiability(AutoDiffMode mode,
                                      bool wrtSelf,
                                      llvm::SmallBitVector parameterIndices,
@@ -71,38 +81,7 @@ Differentiability::Differentiability(AutoDiffMode mode,
   resultIndices.set();
 }
 
-unsigned
-autodiff::getNumAutoDiffAssociatedFunctionsPerOrder(bool isLegacyReverseMode) {
-  return isLegacyReverseMode ? 2 : 4;
-}
-
 unsigned autodiff::getOffsetForAutoDiffAssociatedFunction(
-    unsigned order, SILAutoDiffAssociatedFunctionKind kind) {
-  bool isLegacyReverseMode =
-      kind == SILAutoDiffAssociatedFunctionKind::LegacyPrimal ||
-      kind == SILAutoDiffAssociatedFunctionKind::LegacyAdjoint;
-  unsigned numPerOrder =
-      autodiff::getNumAutoDiffAssociatedFunctionsPerOrder(isLegacyReverseMode);
-  unsigned offset;
-  switch (kind) {
-  case SILAutoDiffAssociatedFunctionKind::LegacyPrimal:
-    offset = 0;
-    break;
-  case SILAutoDiffAssociatedFunctionKind::LegacyAdjoint:
-    offset = 1;
-    break;
-  case SILAutoDiffAssociatedFunctionKind::JVP:
-    offset = 0;
-    break;
-  case SILAutoDiffAssociatedFunctionKind::Differential:
-    offset = 1;
-    break;
-  case SILAutoDiffAssociatedFunctionKind::VJP:
-    offset = 2;
-    break;
-  case SILAutoDiffAssociatedFunctionKind::Pullback:
-    offset = 3;
-    break;
-  }
-  return (order - 1) * numPerOrder + offset;
+    unsigned order, AutoDiffAssociatedFunctionKind kind) {
+  return (order - 1) * 2 + kind.rawValue;
 }

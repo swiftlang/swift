@@ -1153,8 +1153,6 @@ public:
   }
 
   void visitAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
-    if (adfi->isLegacyReverseMode())
-      *this << "[legacy_reverse] ";
     if (adfi->getParameterIndices().any()) {
       *this << "[wrt";
       for (auto i : adfi->getParameterIndices().set_bits())
@@ -1167,14 +1165,25 @@ public:
       *this << " with ";
       interleave(range(1, adfi->getDifferentiationOrder() + 1),
                  [&](unsigned order) {
-                   auto list = adfi->getAssociatedFunctionList(order);
-                   *this << '{';
-                   interleave(list, [&](const Operand &op) {
-                     *this << getIDAndType(op.get());
-                   }, [this] { *this << ", "; });
-                   *this << '}';
+                   auto pair = adfi->getAssociatedFunctionPair(order);
+                   *this << '{' << getIDAndType(pair.first) << ", "
+                         << getIDAndType(pair.second) << '}';
                  }, [this] { *this << ", "; });
     }
+  }
+
+  void visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *adfei) {
+    *this << '[';
+    switch (adfei->getAssociatedFunctionKind()) {
+    case swift::AutoDiffAssociatedFunctionKind::JVP:
+      *this << "jvp";
+      break;
+    case swift::AutoDiffAssociatedFunctionKind::VJP:
+      *this << "vjp";
+      break;
+    }
+    *this << "] [order " << adfei->getDifferentiationOrder()
+          << "] " << getIDAndType(adfei->getFunctionOperand());
   }
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {

@@ -956,6 +956,7 @@ public:
   // SWIFT_ENABLE_TENSORFLOW
   void visitGradientInst(GradientInst *i);
   void visitAutoDiffFunctionInst(AutoDiffFunctionInst *i);
+  void visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *i);
   void visitGraphOperationInst(GraphOperationInst *i);
 
   void visitFunctionRefInst(FunctionRefInst *i);
@@ -1977,6 +1978,11 @@ void IRGenSILFunction::visitGradientInst(GradientInst *i) {
 }
 
 void IRGenSILFunction::visitAutoDiffFunctionInst(AutoDiffFunctionInst *i) {
+  llvm_unreachable("FIXME: handle this");
+}
+
+void IRGenSILFunction::
+visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *i) {
   llvm_unreachable("FIXME: handle this");
 }
 

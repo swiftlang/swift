@@ -227,9 +227,7 @@ struct SILAutoDiffConfig {
 
   /// Returns the "master" configuration, which all variants with the same
   /// parameter indices can derive from.
-  static
-  SILAutoDiffConfig getMaster(
-      const SILAutoDiffIndices &indices) {
+  static SILAutoDiffConfig getMaster(const SILAutoDiffIndices &indices) {
     return {
       indices,
       getCanonicalGradientOptions()
@@ -251,54 +249,36 @@ struct SILAutoDiffConfig {
 };
 
 /// The kind of an associated function in the `autodiff_function` and
-/// `autodiff_extract` instructions in SIL.
-enum class SILAutoDiffAssociatedFunctionKind {
-  // The primal function in legacy reverse-mode.
-  LegacyPrimal,
-  // The adjoint function in legacy reverse-mode.
-  LegacyAdjoint,
-  // The vector-Jacobian products operator.
-  JVP,
-  // The differential, the result of JVP except that it has boxed arguments
-  // (closure captures) for partial application within JVP.
-  Differential,
-  // The Jacobian-vector products operator.
-  VJP,
-  // The pullback, the result of JVP except that it has boxed arguments
-  // (closure captures) for partial application within VJP.
-  Pullback
+/// `autodiff_function_extract` instructions in SIL.
+struct AutoDiffAssociatedFunctionKind {
+  enum innerty : uint8_t {
+     // The vector-Jacobian products operator.
+     JVP = 0,
+     // The Jacobian-vector products operator.
+     VJP = 1
+  } rawValue;
+
+  AutoDiffAssociatedFunctionKind() = default;
+  AutoDiffAssociatedFunctionKind(innerty rawValue) : rawValue(rawValue) {}
+  explicit AutoDiffAssociatedFunctionKind(StringRef string);
+  operator innerty() const { return rawValue; }
 };
 
 /// Automatic differentiation utility namespace.
 namespace autodiff {
-
-/// Returns the required number of associated functions per differentiation
-/// order.
-unsigned getNumAutoDiffAssociatedFunctionsPerOrder(bool isLegacyReverseMode);
 
 /// Returns the offset for an associated function at a specific differentiation
 /// order.
 /// This is used for both ordering in the `autodiff_function` instruction and
 /// ABI layout.
 ///
-/// |---------------------------------------------------------------|
-/// | 1. Standard mode.                                             |
-/// |---------------------------------------------------------------|
-/// |              Order 1               Order 2                 ...|
-/// |----------| |-----|----|-----|----| |-----|----|-----|----| ...|
-/// | Original | | JVP | DF | VJP | PB | | JVP | DF | VJP | PB | ...|
-/// |----------| |-----|----|-----|----| |-----|----|-----|----| ...|
-/// |---------------------------------------------------------------|
-/// | 2. Legacy reverse mode.                                       |
-/// |---------------------------------------------------------------|
-/// |              Order 1                                          |
-/// |----------| |--------|---------|                               |
-/// | Original | | Primal | Adjoint |                               |
-/// |----------| |--------|---------|                               |
-/// |---------------------------------------------------------------|
+///                Order 1       Order 2     ...
+/// |----------| |-----|-----| |-----|-----| ...
+/// | Original | | JVP | VJP | | JVP | VJP | ...
+/// |----------| |-----|-----| |-----|-----| ...
 unsigned
 getOffsetForAutoDiffAssociatedFunction(unsigned order,
-                                       SILAutoDiffAssociatedFunctionKind kind);
+                                       AutoDiffAssociatedFunctionKind kind);
 
 } // end namespace autodiff
 
