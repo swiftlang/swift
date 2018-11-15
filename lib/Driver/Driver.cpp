@@ -1758,12 +1758,13 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
   const Arg *ArgRequiringSinglePrimaryCompile =
       Args.getLastArg(options::OPT_enable_source_range_dependencies);
 
-  // AST dump doesn't work in WMO. Since it's not common want to dump the AST,
-  // we assume that's the priority and ignore `-wmo`, but we warn the user about
-  // this decision.
-  if (Args.hasArg(options::OPT_whole_module_optimization) &&
+  // AST dump doesn't work with `-wmo` or `-index-file`. Since it's not common
+  // to want to dump the AST, we assume that's the priority and ignore the
+  // conflicting option, but we warn the user about this decision.
+  if (ArgRequiringSingleCompile &&
       Args.hasArg(options::OPT_dump_ast)) {
-    Diags.diagnose(SourceLoc(), diag::warn_ignoring_wmo);
+    Diags.diagnose(SourceLoc(), diag::warn_ignoring_single_compile,
+                   ArgRequiringSingleCompile->getOption().getPrefixedName());
     return OutputInfo::Mode::StandardCompile;
   }
 
