@@ -47,11 +47,11 @@ bool SILAutoDiffIndices::operator==(
   return buffer.none();
 }
 
-SILAutoDiffAssociatedFunctionKind::
-SILAutoDiffAssociatedFunctionKind(StringRef string) {
+AutoDiffAssociatedFunctionKind::
+AutoDiffAssociatedFunctionKind(StringRef string) {
   Optional<innerty> result =
       llvm::StringSwitch<Optional<innerty>>(string)
-         .Case("vjp", JVP).Case("vjp", VJP);
+         .Case("jvp", JVP).Case("vjp", VJP);
   assert(result && "Invalid string");
   rawValue = *result;
 }
@@ -82,6 +82,6 @@ Differentiability::Differentiability(AutoDiffMode mode,
 }
 
 unsigned autodiff::getOffsetForAutoDiffAssociatedFunction(
-    unsigned order, SILAutoDiffAssociatedFunctionKind kind) {
+    unsigned order, AutoDiffAssociatedFunctionKind kind) {
   return (order - 1) * 2 + kind.rawValue;
 }

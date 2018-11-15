@@ -1175,15 +1175,15 @@ public:
   void visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *adfei) {
     *this << '[';
     switch (adfei->getAssociatedFunctionKind()) {
-    case swift::SILAutoDiffAssociatedFunctionKind::JVP:
+    case swift::AutoDiffAssociatedFunctionKind::JVP:
       *this << "jvp";
       break;
-    case swift::SILAutoDiffAssociatedFunctionKind::VJP:
+    case swift::AutoDiffAssociatedFunctionKind::VJP:
       *this << "vjp";
       break;
     }
-    *this << "] " << getIDAndType(adfei->getFunctionOperand())
-          << " order " << getIDAndType(adfei->getDifferentiationOrderOperand());
+    *this << "] [order " << adfei->getDifferentiationOrder()
+          << "] " << getIDAndType(adfei->getFunctionOperand());
   }
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {

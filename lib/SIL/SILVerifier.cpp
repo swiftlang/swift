@@ -1270,9 +1270,6 @@ public:
     require(fnTy, "The function operand must have a function type");
     require(fnTy->isDifferentiable(),
             "The function operand must be an '@autodiff' function");
-    auto orderSILTy = adfei->getDifferentiationOrderOperand()->getType();
-    require(orderSILTy.is<BuiltinIntegerType>(),
-            "The order operand must have a Builtin.Int<n> type");
   }
 
   void verifyLLVMIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID) {

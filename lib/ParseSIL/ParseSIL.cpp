@@ -3016,9 +3016,11 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
   case SILInstructionKind::AutoDiffFunctionExtractInst: {
     // Parse the rest of the instruction: an associated function kind, a
     // function operand, an order operand and a debug location.
-    SILAutoDiffAssociatedFunctionKind assocFnKind;
+    AutoDiffAssociatedFunctionKind assocFnKind;
     StringRef assocFnKindNames[2] = {"jvp", "vjp"};
-    SILValue functionOperand, orderOperand;
+    unsigned order = 1;
+    SILValue functionOperand;
+    SourceLoc lastLoc;
     if (P.parseToken(tok::l_square,
             diag::sil_inst_autodiff_expected_associated_function_kind_attr) ||
         parseSILIdentifierSwitch(assocFnKind, assocFnKindNames,
@@ -3026,14 +3028,20 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         P.parseToken(tok::r_square,
                      diag::sil_inst_autodiff_attr_expected_rsquare,
                      "associated function kind") ||
-        parseTypedValueRef(functionOperand, B) ||
+        P.parseToken(tok::l_square,
+                     diag::sil_inst_autodiff_expected_order) ||
         P.parseSpecificIdentifier("order",
-            diag::sil_inst_autodiff_expected_order_operand) ||
-        parseTypedValueRef(orderOperand, B) ||
+                                  diag::sil_inst_autodiff_expected_order) ||
+        P.parseUnsignedInteger(order, lastLoc,
+                               diag::sil_inst_autodiff_expected_order) ||
+        P.parseToken(tok::r_square,
+                     diag::sil_inst_autodiff_attr_expected_rsquare,
+                     "differentiation order") ||
+        parseTypedValueRef(functionOperand, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createAutoDiffFunctionExtract(InstLoc, assocFnKind,
-                                                functionOperand, orderOperand);
+    ResultVal = B.createAutoDiffFunctionExtract(InstLoc, assocFnKind, order,
+                                                functionOperand);
     break;
   }
 

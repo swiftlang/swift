@@ -897,8 +897,8 @@ visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *Inst) {
       getBuilder().createAutoDiffFunctionExtract(
           getOpLocation(Inst->getLoc()),
           Inst->getAssociatedFunctionKind(),
-          getOpValue(Inst->getFunctionOperand()),
-          getOpValue(Inst->getDifferentiationOrderOperand())));
+          Inst->getDifferentiationOrder(),
+          getOpValue(Inst->getFunctionOperand())));
 }
 
 template<typename ImplClass>

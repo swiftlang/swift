@@ -7629,7 +7629,7 @@ public:
   getAssociatedFunctionPair(unsigned differentiationOrder) const;
 
   SILValue getAssociatedFunction(unsigned differentiationOrder,
-                                 SILAutoDiffAssociatedFunctionKind kind) const;
+                                 AutoDiffAssociatedFunctionKind kind) const;
 
   static bool classof(const SILNode *N) {
     return N->getKind() == SILNodeKind::AutoDiffFunctionInst;
@@ -7640,25 +7640,29 @@ public:
 /// bundle of the original function and associated functions, extract the
 /// specified function.
 class AutoDiffFunctionExtractInst :
-    public InstructionBase<SILInstructionKind::AutoDiffFunctionInst,
+    public InstructionBase<SILInstructionKind::AutoDiffFunctionExtractInst,
                            SingleValueInstruction> {
 private:
   /// The kind of the associated function to extract.
-  SILAutoDiffAssociatedFunctionKind associatedFunctionKind;
-  /// 2 operands: the `@autodiff` function and the differentiation order.
-  FixedOperandList<2> operands;
+  AutoDiffAssociatedFunctionKind associatedFunctionKind;
+  /// The differentiation order.
+  unsigned differentiationOrder;
+  /// The list containing the `@autodiff` function operand.
+  FixedOperandList<1> operands;
 
-  static CanSILFunctionType
+  static SILType
   getAssociatedFunctionType(SILValue function,
-                            SILAutoDiffAssociatedFunctionKind kind);
+                            AutoDiffAssociatedFunctionKind kind,
+                            unsigned differentiationOrder,
+                            SILModule &module);
 
 public:
   explicit AutoDiffFunctionExtractInst(
       SILModule &module, SILDebugLocation debugLoc,
-      SILAutoDiffAssociatedFunctionKind associatedFunctionKind,
-      SILValue theFunction, SILValue differentiationOrder);
+      AutoDiffAssociatedFunctionKind associatedFunctionKind,
+      unsigned differentiationOrder, SILValue theFunction);
 
-  SILAutoDiffAssociatedFunctionKind getAssociatedFunctionKind() const {
+  AutoDiffAssociatedFunctionKind getAssociatedFunctionKind() const {
     return associatedFunctionKind;
   }
 
@@ -7666,8 +7670,8 @@ public:
     return operands[0].get();
   }
 
-  SILValue getDifferentiationOrderOperand() const {
-    return operands[1].get();
+  unsigned getDifferentiationOrder() const {
+    return differentiationOrder;
   }
 
   ArrayRef<Operand> getAllOperands() const {

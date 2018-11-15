@@ -250,7 +250,7 @@ struct SILAutoDiffConfig {
 
 /// The kind of an associated function in the `autodiff_function` and
 /// `autodiff_function_extract` instructions in SIL.
-struct SILAutoDiffAssociatedFunctionKind {
+struct AutoDiffAssociatedFunctionKind {
   enum innerty : uint8_t {
      // The vector-Jacobian products operator.
      JVP = 0,
@@ -258,9 +258,9 @@ struct SILAutoDiffAssociatedFunctionKind {
      VJP = 1
   } rawValue;
 
-  SILAutoDiffAssociatedFunctionKind() = default;
-  SILAutoDiffAssociatedFunctionKind(innerty rawValue) : rawValue(rawValue) {}
-  explicit SILAutoDiffAssociatedFunctionKind(StringRef string);
+  AutoDiffAssociatedFunctionKind() = default;
+  AutoDiffAssociatedFunctionKind(innerty rawValue) : rawValue(rawValue) {}
+  explicit AutoDiffAssociatedFunctionKind(StringRef string);
   operator innerty() const { return rawValue; }
 };
 
@@ -278,7 +278,7 @@ namespace autodiff {
 /// |----------| |-----|-----| |-----|-----| ...
 unsigned
 getOffsetForAutoDiffAssociatedFunction(unsigned order,
-                                       SILAutoDiffAssociatedFunctionKind kind);
+                                       AutoDiffAssociatedFunctionKind kind);
 
 } // end namespace autodiff
 

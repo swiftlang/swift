@@ -1520,8 +1520,6 @@ ERROR(sil_inst_autodiff_num_operand_list_order_mismatch,PointsToFirstBadToken,
       "the number of operand lists does not match the order", ())
 ERROR(sil_inst_autodiff_expected_associated_function_kind_attr,PointsToFirstBadToken,
       "expects an assoiacted function kind attribute, e.g. '[jvp]'", ())
-ERROR(sil_inst_autodiff_expected_order_operand,PointsToFirstBadToken,
-      "expects a differentiation order operand, e.g. 'order %x'", ())
 
 // SWIFT_ENABLE_TENSORFLOW
 ERROR(pound_assert_expected,PointsToFirstBadToken,
