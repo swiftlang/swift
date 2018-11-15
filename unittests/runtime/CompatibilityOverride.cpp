@@ -24,6 +24,17 @@ using namespace swift;
 bool EnableOverride;
 bool Ran;
 
+namespace  {
+  template<typename T>
+  T getEmptyValue() {
+    return (T)0;
+  }
+
+  template<>
+  MetadataResponse getEmptyValue<MetadataResponse>() {
+    return MetadataResponse{nullptr, MetadataState::Complete};
+  }
+}
 
 #define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
   static ret name ## Override(COMPATIBILITY_UNPAREN typedArgs,      \
@@ -31,7 +42,7 @@ bool Ran;
     if (!EnableOverride)                                            \
       return originalImpl namedArgs;                                \
     Ran = true;                                                     \
-    return (ret)0;                                                  \
+    return getEmptyValue<ret>();                                    \
   }
 #include "../../stdlib/public/runtime/CompatibilityOverride.def"
 
@@ -162,6 +173,22 @@ TEST_F(CompatibilityOverrideTest,
 TEST_F(CompatibilityOverrideTest, test_swift_conformsToProtocol) {
   auto Result = swift_conformsToProtocol(nullptr, nullptr);
   ASSERT_EQ(Result, nullptr);  
+}
+
+TEST_F(CompatibilityOverrideTest, test_swift_getAssociatedTypeWitnessSlow) {
+  auto Result = swift_getAssociatedTypeWitnessSlow(MetadataState::Complete,
+                                                   nullptr, nullptr,
+                                                   nullptr, nullptr);
+  ASSERT_EQ(Result.Value, nullptr);
+  ASSERT_EQ(Result.State, MetadataState::Complete);
+}
+
+TEST_F(CompatibilityOverrideTest,
+       test_swift_getAssociatedConformanceWitnessSlow) {
+  auto Result = swift_getAssociatedConformanceWitnessSlow(
+                                                   nullptr, nullptr, nullptr,
+                                                   nullptr, nullptr);
+  ASSERT_EQ(Result, nullptr);
 }
 
 #endif
