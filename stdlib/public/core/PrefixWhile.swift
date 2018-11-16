@@ -239,6 +239,8 @@ extension LazyPrefixWhileCollection: Collection {
   }
 }
 
+extension LazyPrefixWhileCollection: LazyCollectionProtocol { }
+
 extension LazyPrefixWhileCollection: BidirectionalCollection
 where Base: BidirectionalCollection {
   @inlinable // lazy-performance
