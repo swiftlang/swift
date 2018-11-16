@@ -1937,7 +1937,8 @@ namespace {
       auto moduleContext =
         normal->getDeclContext()->getModuleScopeContext();
       ConstantReference moduleContextRef =
-        IGM.getAddrOfParentContextDescriptor(moduleContext);
+        IGM.getAddrOfParentContextDescriptor(moduleContext,
+                                             /*fromAnonymousContext=*/false);
       B.addRelativeAddress(moduleContextRef);
     }
 
