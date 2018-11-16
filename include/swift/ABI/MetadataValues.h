@@ -1530,7 +1530,7 @@ public:
 
   constexpr GenericEnvironmentFlags
   withNumGenericRequirements(uint16_t numGenericRequirements) const {
-    return GenericEnvironmentFlags((Value &~ NumGenericParameterLevelsMask)
+    return GenericEnvironmentFlags((Value &~ NumGenericRequirementsMask)
              | (numGenericRequirements << NumGenericRequirementsShift));
   }
 
