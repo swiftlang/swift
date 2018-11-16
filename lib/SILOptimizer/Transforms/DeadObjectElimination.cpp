@@ -50,7 +50,10 @@ STATISTIC(DeadAllocRefEliminated,
           "number of AllocRef instructions removed");
 
 STATISTIC(DeadAllocStackEliminated,
-          "number of AllocStack instructions removed");
+          "number of trivial AllocStack instructions removed");
+
+STATISTIC(DeadNontrivialAllocStackEliminated,
+          "number of nontrivial AllocStack instructions removed");
 
 STATISTIC(DeadAllocApplyEliminated,
           "number of allocating Apply instructions removed");
@@ -193,10 +196,16 @@ removeInstructions(ArrayRef<SILInstruction*> UsersToRemove) {
 
 /// Returns true if the allocation should be subjected to non-trivial dead
 /// object elimination.
-static bool allocationWhitelistedForInterpolation(AllocationInst *Inst) {
+static bool shouldTryNontrivialAllocStackElimination(AllocationInst *Inst) {
   auto silTy = Inst->getType().getObjectType();
 
   auto astTy = silTy.getASTType();
+
+  // FIXME: Currently, enabling this causes some test failures due to bad
+  // releases. Need to debug these.
+#ifdef NONTRIVIAL_ALLOC_STACK_FOR_EVERYONE
+  return astTy && astTy.getStructOrBoundGenericStruct();
+#else
   if (!astTy) return false;
 
   auto decl = astTy.getNominalOrBoundGenericNominal();
@@ -205,6 +214,7 @@ static bool allocationWhitelistedForInterpolation(AllocationInst *Inst) {
   return decl == ctx.getDefaultStringInterpolationDecl()
       || decl == ctx.get_StringGutsDecl()
       || decl == ctx.get_StringObjectDecl();
+#endif
 }
 
 /// Returns true if Apply applies a method with the interpolation.append
@@ -266,7 +276,7 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts) {
 /// Analyze the use graph of AllocRef for any uses that would prevent us from
 /// zapping it completely.
 static bool
-hasUnremovableUsers(AllocationInst *AllocRef, UserList &Users,
+hasUnremovableUsers(SILInstruction *AllocRef, UserList &Users,
                     bool acceptRefCountInsts) {
   SmallVector<SILInstruction *, 16> Worklist;
   Worklist.push_back(AllocRef);
@@ -351,9 +361,6 @@ class DeadObjectAnalysis {
   // Track all stores of refcounted elements per address projection.
   AddressToStoreMap StoredLocations;
 
-  // Any instructions that need to be added to fully remove an object.
-  llvm::SmallVector<SILInstruction *, 4> AdditionalInstructions;
-
   // Are any uses behind a PointerToAddressInst?
   bool SeenPtrToAddr;
 
@@ -367,10 +374,6 @@ public:
     return ArrayRef<SILInstruction*>(AllUsers.begin(), AllUsers.end());
   }
 
-  ArrayRef<SILInstruction*>getAdditionalInstructions() const {
-    return AdditionalInstructions;
-  }
-
   template<typename Visitor>
   void visitStoreLocations(Visitor visitor) {
     visitStoreLocations(visitor, AddressProjectionTrie.get());
@@ -378,7 +381,7 @@ public:
 
 private:
   void addStore(StoreInst *Store, IndexTrieNode *AddressNode);
-  bool explodeStore(IndexTrieNode *AddressNode);
+  bool addChildStoredLocations(IndexTrieNode *AddressNode);
   bool recursivelyCollectInteriorUses(ValueBase *DefInst,
                                       IndexTrieNode *AddressNode,
                                       bool IsInteriorAddress);
@@ -516,7 +519,8 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
           if (isa<IndexAddrInst>(ProjInst)) {
             // Don't support indexing within an interior address.
             if (IsInteriorAddress) {
-              LLVM_DEBUG(llvm::dbgs() << "        Found index into interior address:"
+              LLVM_DEBUG(llvm::dbgs()
+                         << "        Found index into interior address:"
                          << *ProjInst);
               return false;
             }
@@ -529,7 +533,8 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
         }
         else if (IsInteriorAddress) {
           // Don't expect to extract values once we've taken an address.
-          LLVM_DEBUG(llvm::dbgs() << "        Found projection from interior address:"
+          LLVM_DEBUG(llvm::dbgs() <<
+                     "        Found projection from interior address:"
                      << *ProjInst);
           return false;
         }
@@ -548,7 +553,9 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
   return true;
 }
 
-bool DeadObjectAnalysis::explodeStore(IndexTrieNode *AddressNode) {
+/// If possible, add an entry for each subelement of AddressNode to the
+/// StoredLocations table. Returns false if this wasn't possible.
+bool DeadObjectAnalysis::addChildStoredLocations(IndexTrieNode *AddressNode) {
   auto Locations = StoredLocations[AddressNode];
   assert(!Locations.empty());
 
@@ -559,15 +566,22 @@ bool DeadObjectAnalysis::explodeStore(IndexTrieNode *AddressNode) {
 
     SILInstruction *SrcInst = Src->getDefiningInstruction();
 
+    // If we find a way to access the subvalues in Src, we'll put them here.
     Optional<SmallVector<SILValue, 4>> NewSrcs;
 
     if (auto Struct = dyn_cast_or_null<StructInst>(SrcInst)) {
+      // If there's a StructInst, its elements are exactly the values we're
+      // looking for. Use them.
       NewSrcs.emplace();
       for (auto elem : Struct->getElements())
         NewSrcs->push_back(elem);
     }
     else if (auto SVI = dyn_cast_or_null<SingleValueInstruction>(SrcInst)) {
       if (auto structType = SVI->getType().getStructOrBoundGenericStruct()) {
+        // Create an instruction which reads each property in this struct. A lot
+        // of these will be unnecessary, but other passes will clean up the
+        // mess.
+
         SILBuilder accessBuilder(std::next(SVI->getIterator()));
         NewSrcs.emplace();
 
@@ -582,14 +596,16 @@ bool DeadObjectAnalysis::explodeStore(IndexTrieNode *AddressNode) {
     }
 
     if (NewSrcs.hasValue()) {
+      // We found something! Erase the old entry...
       StoredLocations.erase(AddressNode);
 
+      // And add entries for the new values.
       for (auto i : indices(*NewSrcs)) {
         auto NewLocation = std::make_pair((*NewSrcs)[i], Store);
         StoredLocations[AddressNode->getChild(i)].push_back(NewLocation);
       }
     } else {
-      // If we got here, there's trouble.
+      // If we got here, we couldn't figure out how to access the subvalues.
       LLVM_DEBUG(llvm::dbgs() << "          Don't know how to explode:" <<*Src);
       return false;
     }
@@ -609,9 +625,13 @@ bool DeadObjectAnalysis::analyze() {
                                       AddressProjectionTrie.get(), false)) {
     return false;
   }
-  // If all stores are leaves in the AddressProjectionTrie, then we can analyze
-  // the stores that reach the end of the object lifetime. Otherwise bail.
-  // This iteration order is nondeterministic but has no impact.
+  // Find any stores which are not leaves in the AddressProjectionTrie and
+  // project them out if possible. Repeat until we've either created a value for
+  // each entry in AddressProjectionTrie or we hit something we can't split
+  // apart any further. If it's the latter, bail out.
+  //
+  // TODO: Figure out if this is still true: "This iteration order is
+  // nondeterministic but has no impact."
   bool recheck = true;
   while (recheck) {
     recheck = false;
@@ -621,10 +641,13 @@ bool DeadObjectAnalysis::analyze() {
         LLVM_DEBUG(llvm::dbgs() << "        Exploding non-leaf value at "
                                 << address << " in " <<
                                 *AddressToStoresPair.second.front().first);
-        if (!explodeStore(address)) {
+        if (!addChildStoredLocations(address)) {
           LLVM_DEBUG(llvm::dbgs() << "        Can't explode, bailing out\n");
           return false;
         }
+
+        // We've modified StoredLocations, so bail out of the loop and start
+        // over.
         recheck = true;
         break;
       }
@@ -794,8 +817,8 @@ class DeadObjectElimination : public SILFunctionTransform {
   bool processAllocStack(AllocStackInst *ASI);
   bool processAllocBox(AllocBoxInst *ABI){ return false;}
   bool processAllocApply(ApplyInst *AI, DeadEndBlocks &DEBlocks);
-  bool processInterpolationAllocStack(AllocStackInst* ASI,
-                                      DeadEndBlocks &DEBlocks);
+  bool processNontrivialAllocStack(AllocStackInst* ASI,
+                                   DeadEndBlocks &DEBlocks);
 
   bool processFunction(SILFunction &Fn) {
     DeadEndBlocks DEBlocks(&Fn);
@@ -808,7 +831,7 @@ class DeadObjectElimination : public SILFunctionTransform {
         Changed |= processAllocRef(A);
       else if (auto *A = dyn_cast<AllocStackInst>(II))
         Changed |= processAllocStack(A)
-                || processInterpolationAllocStack(A, DEBlocks);
+                || processNontrivialAllocStack(A, DEBlocks);
       else if (auto *A = dyn_cast<AllocBoxInst>(II))
         Changed |= processAllocBox(A);
       else if (auto *A = dyn_cast<ApplyInst>(II))
@@ -933,9 +956,9 @@ static bool getDeadInstsAfterInitializerRemoved(
 }
 
 bool
-DeadObjectElimination::processInterpolationAllocStack(AllocStackInst *ASI,
+DeadObjectElimination::processNontrivialAllocStack(AllocStackInst *ASI,
                                                       DeadEndBlocks &DEBlocks) {
-  if (!allocationWhitelistedForInterpolation(ASI))
+  if (!shouldTryNontrivialAllocStackElimination(ASI))
     return false;
 
   DeadObjectAnalysis deadInterpolation(ASI);
@@ -967,6 +990,7 @@ DeadObjectElimination::processInterpolationAllocStack(AllocStackInst *ASI,
   recursivelyDeleteTriviallyDeadInstructions(ASI, true);
 
   LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating alloc_stack.\n");
+  DeadNontrivialAllocStackEliminated++;
   return true;
 }
 
