@@ -179,12 +179,3 @@ func parentheticalInout2(_ fn: (((inout Int)), Int) -> ()) {
   var value = 0
   fn(&value, 0)
 }
-
-//===--- Function declaration with uninhabited parameter type
-                                   
-func foo(baz: Never) -> Int { // expected-warning{{will never be executed}}
-  print("I can't be called!")
-  return 0
-}
-
-func bar(baz: Never) -> Int {} // ok
