@@ -44,11 +44,6 @@ using namespace tf;
 static llvm::cl::opt<bool> TFEnsureSingleLoopExit(
     "tf-ensure-single-loop-exit", llvm::cl::init(true),
     llvm::cl::desc("Transform loops to have a single exit from header."));
-static llvm::cl::opt<bool> TFNoUndefsInSESE(
-    "tf-no-undefs-in-sese", llvm::cl::init(true),
-    llvm::cl::desc(
-        "Try to eliminate undefs in when performing "
-        "sese canonicalization of loops (intended  for debugging)."));
 
 //===----------------------------------------------------------------------===//
 // SESERegionTree Implementation
@@ -725,9 +720,7 @@ void SingleExitLoopTransformer::initialize() {
   }
 
   // Compute common exit block if needed.
-  if (TFNoUndefsInSESE) {
-    ensureSingleExitBlock();
-  }
+  ensureSingleExitBlock();
 
   // Initialize Exit Blocks
   {
@@ -737,15 +730,13 @@ void SingleExitLoopTransformer::initialize() {
     loop->getExitBlocks(exitBlockList);
     exitBlocks.insert(exitBlockList.begin(), exitBlockList.end());
     assert(!exitBlocks.empty() && "A loop has no exit blocks.");
-    if (TFNoUndefsInSESE) {
-      SmallPtrSet<SILValue, 8> exitArgs;
-      for (const SILBasicBlock *bb : exitBlocks) {
-        for (auto arg : bb->getArguments()) {
-          exitArgs.insert(arg);
-        }
+    SmallPtrSet<SILValue, 8> exitArgs;
+    for (const SILBasicBlock *bb : exitBlocks) {
+      for (auto arg : bb->getArguments()) {
+        exitArgs.insert(arg);
       }
-      exitArgSubstMap = getPreheaderSubstMap(exitArgs);
     }
+    exitArgSubstMap = getPreheaderSubstMap(exitArgs);
   }
 
   // All the exiting edges need to be rewired.
@@ -976,9 +967,6 @@ SingleExitLoopTransformer::getPreheaderSubstMap(
   for (const SILValue value : values) {
     result[value] = getUndef(value->getType());
   }
-  // Do not eliminate undefs unless requested for.
-  if (!TFNoUndefsInSESE) return result;
-
   // Replace undef with an equivalent value that is available at preheader.
   for (auto &kv : result) {
     const SILValue &escapingValue = kv.first;
@@ -1080,14 +1068,12 @@ SingleExitLoopTransformer::createNewHeader() {
       use->set(newValue);
     }
   }
-  if (TFNoUndefsInSESE) {
-    // Add arguments in the new header corresponding to exit block arguments.
-    for (const auto &kv : exitArgSubstMap) {
-      SILValue arg = kv.first;
-      SILValue newValue =
-        newHeader->createPhiArgument(arg->getType(), arg.getOwnershipKind());
-      exitArgHeaderArgMap[kv.first] = newValue;
-    }
+  // Add arguments in the new header corresponding to exit block arguments.
+  for (const auto &kv : exitArgSubstMap) {
+    SILValue arg = kv.first;
+    SILValue newValue =
+      newHeader->createPhiArgument(arg->getType(), arg.getOwnershipKind());
+    exitArgHeaderArgMap[kv.first] = newValue;
   }
   // An integer to identify the exit edge.
   SILValue exitIndexArg = newHeader->createPhiArgument(
@@ -1133,11 +1119,9 @@ void SingleExitLoopTransformer::patchPreheader(SILBasicBlock *newHeader) {
     hasUndefsAtPreheader |= isa<SILUndef>(kv.second);
     newArgs.push_back(kv.second);
   }
-  if (TFNoUndefsInSESE) {
-    for (const auto &kv : exitArgSubstMap) {
-      hasUndefsAtPreheader |= isa<SILUndef>(kv.second);
-      newArgs.push_back(kv.second);
-    }
+  for (const auto &kv : exitArgSubstMap) {
+    hasUndefsAtPreheader |= isa<SILUndef>(kv.second);
+    newArgs.push_back(kv.second);
   }
   // `exitIndex` to identify the block to which we exit from the loop.
   newArgs.push_back(createTFIntegerConst(*deviceInfo, builder, location,
@@ -1187,7 +1171,7 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
     // to the exit nodes in the loop header.
     //
     llvm::DenseMap<SILValue, SILValue> exitArgIncomingValue;
-    if (TFNoUndefsInSESE && !stayInLoop && tgt->getNumArguments() != 0) {
+    if (!stayInLoop && tgt->getNumArguments() != 0) {
       auto *termInst = src->getTerminator();
       auto *branch = dyn_cast<BranchInst>(termInst);
       assert(branch && "Critical edges should have been split.");
@@ -1220,21 +1204,19 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
       }
       ++argIndex;
     }
-    if (TFNoUndefsInSESE) {
-      //  Let p0, p1, ..pn be the arguments at new header corresponding to exit
-      // arguments a0, a1, a2, ..., an. For a exit edge
-      //      br exit_i(x, y) ->  exit_i(a2, a3)`,
-      // change the source as br new_latch(p0, p1, x, y, p4, ..., pn)
-      for (const auto &kv : exitArgSubstMap) {
-        const SILValue exitArg = kv.first;
-        auto iter = exitArgIncomingValue.find(exitArg);
-        if (iter != exitArgIncomingValue.end()) {
-          newArgs.push_back(iter->second);
-        } else {
-          newArgs.push_back(newHeader->getArgument(argIndex));
-        }
-        ++argIndex;
+    //  Let p0, p1, ..pn be the arguments at new header corresponding to exit
+    // arguments a0, a1, a2, ..., an. For a exit edge
+    //      br exit_i(x, y) ->  exit_i(a2, a3)`,
+    // change the source as br new_latch(p0, p1, x, y, p4, ..., pn)
+    for (const auto &kv : exitArgSubstMap) {
+      const SILValue exitArg = kv.first;
+      auto iter = exitArgIncomingValue.find(exitArg);
+      if (iter != exitArgIncomingValue.end()) {
+        newArgs.push_back(iter->second);
+      } else {
+        newArgs.push_back(newHeader->getArgument(argIndex));
       }
+      ++argIndex;
     }
 
     // `exitIndex` to identify the block to which we exit from the loop.
@@ -1321,17 +1303,14 @@ SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
     builder.createCondBranch(headerLocation, condValue->getResults()[0],
                              trueBlock, demuxBlock);
 
-    if (TFNoUndefsInSESE) {
-      remapExitArguments(newBlock, trueBlock);
-      remapExitArguments(newBlock, demuxBlock);
-    }
+    remapExitArguments(newBlock, trueBlock);
+    remapExitArguments(newBlock, demuxBlock);
     demuxBlock = newBlock;
   }
   builder.setInsertionPoint(newExitBlock);
   builder.createBranch(headerLocation, demuxBlock);
-  if (TFNoUndefsInSESE) {
-    remapExitArguments(newExitBlock, demuxBlock);
-  }
+  remapExitArguments(newExitBlock, demuxBlock);
+
   return newExitBlock;
 }
 
@@ -1392,12 +1371,10 @@ bool SingleExitLoopTransformer::transform() {
   // Update the loop header to newHeader.
   loop->moveToHeader(newHeader);
 
-  if (TFNoUndefsInSESE) {
-    // If we still have undefs at preheader, simply clone the loop body once
-    // before the actual loop.
-    if (hasUndefsAtPreheader) {
-      unrollLoopBodyOnce();
-    }
+  // If we still have undefs at preheader, simply clone the loop body once
+  // before the actual loop.
+  if (hasUndefsAtPreheader) {
+    unrollLoopBodyOnce();
   }
 
   return true;
