@@ -2245,7 +2245,7 @@ internal var keyPathObjectHeaderSize: Int {
 }
 
 internal var keyPathPatternHeaderSize: Int {
-  return 12
+  return 16
 }
 
 // Runtime entry point to instantiate a key path object.
@@ -2323,7 +2323,7 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
   }
 
   // Adopt the KVC string from the pattern.
-  let kvcStringBase = patternPtr.advanced(by: 8)
+  let kvcStringBase = patternPtr.advanced(by: 12)
   let kvcStringOffset = kvcStringBase.load(as: Int32.self)
 
   if kvcStringOffset == 0 {
@@ -2465,9 +2465,10 @@ internal struct KeyPathPatternComputedArguments {
 }
 
 internal protocol KeyPathPatternVisitor {
-  mutating func visitHeader(rootMetadataRef: MetadataReference,
+  mutating func visitHeader(genericEnvironment: UnsafeRawPointer?,
+                            rootMetadataRef: MetadataReference,
                             leafMetadataRef: MetadataReference,
-                            kvcCompatibilityString: UnsafeRawPointer)
+                            kvcCompatibilityString: UnsafeRawPointer?)
   mutating func visitStoredComponent(kind: KeyPathStructOrClass,
                                      mutable: Bool,
                                      offset: KeyPathPatternStoredOffset)
@@ -2517,14 +2518,17 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
                                   _ pattern: UnsafeRawPointer,
                                   walker: inout W) {
   // Visit the header.
-  let rootMetadataRef = _loadRelativeAddress(at: pattern,
+  let genericEnvironment = _loadRelativeAddress(at: pattern,
+                                                as: UnsafeRawPointer.self)
+  let rootMetadataRef = _loadRelativeAddress(at: pattern, fromByteOffset: 4,
                                              as: MetadataReference.self)
-  let leafMetadataRef = _loadRelativeAddress(at: pattern, fromByteOffset: 4,
+  let leafMetadataRef = _loadRelativeAddress(at: pattern, fromByteOffset: 8,
                                              as: MetadataReference.self)
-  let kvcString = _loadRelativeAddress(at: pattern, fromByteOffset: 8,
+  let kvcString = _loadRelativeAddress(at: pattern, fromByteOffset: 12,
                                        as: UnsafeRawPointer.self)
 
-  walker.visitHeader(rootMetadataRef: rootMetadataRef,
+  walker.visitHeader(genericEnvironment: genericEnvironment,
+                     rootMetadataRef: rootMetadataRef,
                      leafMetadataRef: leafMetadataRef,
                      kvcCompatibilityString: kvcString)
 
@@ -2803,9 +2807,10 @@ internal struct GetKeyPathClassAndInstanceSizeFromPattern
     size = MemoryLayout<Int>._roundingUpToAlignment(size)
   }
 
-  mutating func visitHeader(rootMetadataRef: MetadataReference,
+  mutating func visitHeader(genericEnvironment: UnsafeRawPointer?,
+                            rootMetadataRef: MetadataReference,
                             leafMetadataRef: MetadataReference,
-                            kvcCompatibilityString: UnsafeRawPointer) {
+                            kvcCompatibilityString: UnsafeRawPointer?) {
     // Get the root and leaf type metadata so we can form the class type
     // for the entire key path.
     root = _resolveKeyPathMetadataReference(rootMetadataRef,
@@ -3035,9 +3040,10 @@ internal struct InstantiateKeyPathBuffer : KeyPathPatternVisitor {
     return oldValue
   }
 
-  mutating func visitHeader(rootMetadataRef: MetadataReference,
+  mutating func visitHeader(genericEnvironment: UnsafeRawPointer?,
+                            rootMetadataRef: MetadataReference,
                             leafMetadataRef: MetadataReference,
-                            kvcCompatibilityString: UnsafeRawPointer) {
+                            kvcCompatibilityString: UnsafeRawPointer?) {
   }
 
   mutating func visitStoredComponent(kind: KeyPathStructOrClass,
@@ -3261,13 +3267,16 @@ internal struct ValidatingInstantiateKeyPathBuffer: KeyPathPatternVisitor {
     origDest = self.instantiateVisitor.destData.baseAddress.unsafelyUnwrapped
   }
 
-  mutating func visitHeader(rootMetadataRef: MetadataReference,
+  mutating func visitHeader(genericEnvironment: UnsafeRawPointer?,
+                            rootMetadataRef: MetadataReference,
                             leafMetadataRef: MetadataReference,
-                            kvcCompatibilityString: UnsafeRawPointer) {
-    sizeVisitor.visitHeader(rootMetadataRef: rootMetadataRef,
+                            kvcCompatibilityString: UnsafeRawPointer?) {
+    sizeVisitor.visitHeader(genericEnvironment: genericEnvironment,
+                            rootMetadataRef: rootMetadataRef,
                             leafMetadataRef: leafMetadataRef,
                             kvcCompatibilityString: kvcCompatibilityString)
-    instantiateVisitor.visitHeader(rootMetadataRef: rootMetadataRef,
+    instantiateVisitor.visitHeader(genericEnvironment: genericEnvironment,
+                                 rootMetadataRef: rootMetadataRef,
                                  leafMetadataRef: leafMetadataRef,
                                  kvcCompatibilityString: kvcCompatibilityString)
   }

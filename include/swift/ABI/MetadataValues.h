@@ -1508,6 +1508,45 @@ enum class GenericRequirementLayoutKind : uint32_t {
   Class = 0,
 };
 
+class GenericEnvironmentFlags {
+  uint32_t Value;
+
+  enum : uint32_t {
+    NumGenericParameterLevelsMask = 0xFFF,
+    NumGenericRequirementsShift = 12,
+    NumGenericRequirementsMask = 0xFFFF << NumGenericRequirementsShift,
+  };
+
+  constexpr explicit GenericEnvironmentFlags(uint32_t value) : Value(value) { }
+
+public:
+  constexpr GenericEnvironmentFlags() : Value(0) { }
+
+  constexpr GenericEnvironmentFlags
+  withNumGenericParameterLevels(uint16_t numGenericParameterLevels) const {
+    return GenericEnvironmentFlags((Value &~ NumGenericParameterLevelsMask)
+                                   | numGenericParameterLevels);
+  }
+
+  constexpr GenericEnvironmentFlags
+  withNumGenericRequirements(uint16_t numGenericRequirements) const {
+    return GenericEnvironmentFlags((Value &~ NumGenericParameterLevelsMask)
+             | (numGenericRequirements << NumGenericRequirementsShift));
+  }
+
+  constexpr unsigned getNumGenericParameterLevels() const {
+    return Value & NumGenericParameterLevelsMask;
+  }
+
+  constexpr unsigned getNumGenericRequirements() const {
+    return (Value & NumGenericRequirementsMask) >> NumGenericRequirementsShift;
+  }
+
+  constexpr uint32_t getIntValue() const {
+    return Value;
+  }
+};
+
 /// Flags used by generic metadata patterns.
 class GenericMetadataPatternFlags : public FlagSet<uint32_t> {
   enum {

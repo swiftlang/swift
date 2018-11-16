@@ -657,7 +657,7 @@ emitGeneratorForKeyPath(IRGenModule &IGM,
                         ArrayRef<GenericRequirement> requirements,
                         llvm::function_ref<void(IRGenFunction&,CanType)> emit) {
 
-  return IGM.getAddrOfStringForMetadataRef(name,
+  return IGM.getAddrOfStringForMetadataRef(name, /*alignment=*/2,
       /*shouldSetLowBit=*/true,
       [&](ConstantInitBuilder &B) {
         // Build a stub that loads the necessary bindings from the key path's
@@ -1171,6 +1171,9 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
     fields.addInt32(0);
   }
 
+  // Add the generic environment.
+  fields.addRelativeAddressOrNull(
+    getAddrOfGenericEnvironment(pattern->getGenericSignature()));
   // Store type references for the root and leaf.
   fields.addRelativeAddress(
     emitMetadataGeneratorForKeyPath(*this, rootTy, genericEnv, requirements));

@@ -1032,6 +1032,7 @@ public:
   ///
   /// \param symbolName The name of the symbol that describes the metadata
   /// being referenced.
+  /// \param alignment If non-zero, the alignment of the requested variable.
   /// \param shouldSetLowBit Whether to set the low bit of the result
   /// constant, which is used by some clients to indicate that the result is
   /// a mangled name.
@@ -1041,6 +1042,7 @@ public:
   /// \returns the address of the global variable describing this metadata.
   llvm::Constant *getAddrOfStringForMetadataRef(
       StringRef symbolName,
+      unsigned alignment,
       bool shouldSetLowBit,
       llvm::function_ref<ConstantInitFuture(ConstantInitBuilder &)> body);
 
@@ -1276,6 +1278,7 @@ public:
   llvm::Constant *getAddrOfObjCModuleContextDescriptor();
   llvm::Constant *getAddrOfClangImporterModuleContextDescriptor();
   ConstantReference getAddrOfParentContextDescriptor(DeclContext *from);
+  llvm::Constant *getAddrOfGenericEnvironment(CanGenericSignature signature);
   llvm::Constant *getAddrOfProtocolRequirementsBaseDescriptor(
                                                   ProtocolDecl *proto);
   llvm::GlobalValue *defineProtocolRequirementsBaseDescriptor(

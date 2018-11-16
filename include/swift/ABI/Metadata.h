@@ -2611,6 +2611,57 @@ public:
 using GenericRequirementDescriptor =
   TargetGenericRequirementDescriptor<InProcess>;
 
+template<typename Runtime>
+class TargetGenericEnvironment
+    : public swift::ABI::TrailingObjects<TargetGenericEnvironment<Runtime>,
+               uint16_t, GenericParamDescriptor,
+               TargetGenericRequirementDescriptor<Runtime>> {
+  using GenericRequirementDescriptor =
+    TargetGenericRequirementDescriptor<Runtime>;
+  using TrailingObjects =
+     swift::ABI::TrailingObjects<TargetGenericEnvironment<Runtime>,
+       uint16_t, GenericParamDescriptor, GenericRequirementDescriptor>;
+  friend TrailingObjects;
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+  size_t numTrailingObjects(OverloadToken<uint16_t>) const {
+    return Flags.getNumGenericParameterLevels();
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericParamDescriptor>) const {
+    return getGenericParameterCounts().back();
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericRequirementDescriptor>) const {
+    return Flags.getNumGenericRequirements();
+  }
+
+  GenericEnvironmentFlags Flags;
+
+public:
+  /// Retrieve the cumulative generic parameter counts at each level of genericity.
+  ArrayRef<uint16_t> getGenericParameterCounts() const {
+    return ArrayRef<uint16_t>(this->template getTrailingObjects<uint16_t>(),
+                              Flags.getNumGenericParameterLevels());
+  }
+
+  /// Retrieve the generic parameters descriptors.
+  ArrayRef<GenericParamDescriptor> getGenericParameters() const {
+    return ArrayRef<GenericParamDescriptor>(
+             this->template getTrailingObjects<GenericParamDescriptor>(),
+             getGenericParameterCounts().back());
+  }
+
+  /// Retrieve the generic requirements.
+  ArrayRef<GenericRequirementDescriptor> getGenericRequirements() const {
+    return ArrayRef<GenericRequirementDescriptor>(
+             this->template getTrailingObjects<GenericRequirementDescriptor>(),
+             Flags.getNumGenericRequirements());
+  }
+};
+
 /// CRTP class for a context descriptor that includes trailing generic
 /// context description.
 template<class Self,

@@ -195,6 +195,7 @@ sil_vtable C2 {}
 // -- %j: Gen<A>.y
 // CHECK: [[KP_J:@keypath(\..*)?]] = private global <{ {{.*}} }> <{
 // CHECK-SAME: i32 0
+// CHECK-SAME: @"generic environment l"
 // CHECK-SAME: @"keypath_get_type
 // CHECK-SAME: @"keypath_get_type
 //             -- size 8
@@ -203,6 +204,9 @@ sil_vtable C2 {}
 // CHECK-SAME: <i32 0x01fffffe>,
 // CHECK-32-SAME: i32 20 }>
 // CHECK-64-SAME: i32 36 }>
+
+// CHECK-LABEL: @"generic environment SHRzSHR_r0_l" = linkonce_odr hidden constant
+// CHECK-SAME: i32 8192, i16 2, i8 -128, i8 -128, i32 128
 
 // -- %t
 // CHECK: [[KP_T:@keypath(\..*)?]] = private global <{ {{.*}} }> <{ {{.*}} i32 1, {{.*}} @"got.$s8keypaths1GV1xxvpMV"
