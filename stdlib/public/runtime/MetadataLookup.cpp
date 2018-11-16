@@ -155,14 +155,14 @@ namespace {
   struct NominalTypeDescriptorCacheEntry {
   private:
     std::string Name;
-    const TypeContextDescriptor *Description;
+    const ContextDescriptor *Description;
 
   public:
     NominalTypeDescriptorCacheEntry(const llvm::StringRef name,
-                                    const TypeContextDescriptor *description)
+                                    const ContextDescriptor *description)
       : Name(name.str()), Description(description) {}
 
-    const TypeContextDescriptor *getDescription() {
+    const ContextDescriptor *getDescription() {
       return Description;
     }
 
@@ -223,12 +223,12 @@ swift::swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
   _registerTypeMetadataRecords(T, begin, end);
 }
 
-static const TypeContextDescriptor *
+static const ContextDescriptor *
 _findNominalTypeDescriptor(Demangle::NodePointer node,
                            Demangle::Demangler &Dem);
 
 /// Find the context descriptor for the type extended by the given extension.
-static const TypeContextDescriptor *
+static const ContextDescriptor *
 _findExtendedTypeContextDescriptor(const ExtensionContextDescriptor *extension,
                                    Demangle::NodePointer *demangledNode
                                      = nullptr) {
@@ -576,10 +576,10 @@ _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
   return nullptr;
 }
 
-static const TypeContextDescriptor *
+static const ContextDescriptor *
 _findNominalTypeDescriptor(Demangle::NodePointer node,
                            Demangle::Demangler &Dem) {
-  const TypeContextDescriptor *foundNominal = nullptr;
+  const ContextDescriptor *foundNominal = nullptr;
   auto &T = TypeMetadataRecords.get();
 
   // If we have a symbolic reference to a context, resolve it immediately.
@@ -936,7 +936,7 @@ public:
       substWitnessTable(substWitnessTable) { }
 
   using BuiltType = const Metadata *;
-  using BuiltNominalTypeDecl = const TypeContextDescriptor *;
+  using BuiltNominalTypeDecl = const ContextDescriptor *;
   using BuiltProtocolDecl = ProtocolDescriptorRef;
 
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
@@ -991,9 +991,17 @@ public:
     return createBoundGenericType(metadataOrTypeDecl, { }, parent);
   }
 
-  BuiltType createBoundGenericType(BuiltNominalTypeDecl typeDecl,
+  BuiltType createBoundGenericType(BuiltNominalTypeDecl anyTypeDecl,
                                    const ArrayRef<BuiltType> genericArgs,
                                    const BuiltType parent) const {
+    auto typeDecl = dyn_cast<TypeContextDescriptor>(anyTypeDecl);
+    if (!typeDecl) {
+      if (auto protocol = dyn_cast<ProtocolDescriptor>(anyTypeDecl))
+        return _getSimpleProtocolTypeMetadata(protocol);
+
+      return BuiltType();
+    }
+
     // Figure out the various levels of generic parameters we have in
     // this type.
     std::vector<unsigned> genericParamCounts;
