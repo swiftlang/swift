@@ -37,6 +37,7 @@ public let ObjectiveCBridgingStubs = [
   BenchmarkInfo(name: "ObjectiveCBridgeStringRangeOfString", runFunction: run_ObjectiveCBridgeStringRangeOfString, tags: [.validation, .String, .bridging], setUpFunction: setup_StringBridgeBenchmark),
   BenchmarkInfo(name: "ObjectiveCBridgeStringHash", runFunction: run_ObjectiveCBridgeStringHash, tags: [.validation, .String, .bridging], setUpFunction: setup_StringBridgeBenchmark),
   BenchmarkInfo(name: "ObjectiveCBridgeStringUTF8String", runFunction: run_ObjectiveCBridgeStringUTF8String, tags: [.validation, .String, .bridging], setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringCStringUsingEncoding", runFunction: run_ObjectiveCBridgeStringCStringUsingEncoding, tags: [.validation, .String, .bridging], setUpFunction: setup_StringBridgeBenchmark),
 ]
 
 var b:BridgeTester! = nil
@@ -382,6 +383,17 @@ public func run_ObjectiveCBridgeStringUTF8String(N: Int) {
   for _ in 0 ..< N {
     autoreleasepool {
       b.testUTF8String()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringCStringUsingEncoding(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testCStringUsingEncoding()
     }
   }
   #endif

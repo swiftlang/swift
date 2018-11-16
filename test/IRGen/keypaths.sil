@@ -7,35 +7,35 @@
 sil_stage canonical
 import Swift
 
-struct S: Hashable {
-  var x: Int
-  let y: String
-  var z: C
-  var reabstracted: () -> ()
+public struct S: Hashable {
+  public var x: Int
+  public let y: String
+  public var z: C
+  public var reabstracted: () -> ()
 
-  var hashValue: Int { get }
-  static func ==(_: S, _: S) -> Bool
+  public var hashValue: Int { get }
+  public static func ==(_: S, _: S) -> Bool
 }
-class C: Hashable {
-  final var x: Int
-  final let y: String
-  final var z: S
-  var w: Int { get set }
+public class C: Hashable {
+  public final var x: Int
+  public final let y: String
+  public final var z: S
+  public var w: Int { get set }
 
-  init()
+  public init()
 
-  var hashValue: Int { get }
-  static func ==(_: C, _: C) -> Bool
-}
-
-struct G<T> {
-  var x: T { get set }
-  subscript<U: Hashable>(x: U) -> T { get set }
+  public var hashValue: Int { get }
+  public static func ==(_: C, _: C) -> Bool
 }
 
-class C1: C { }
-class C2: C1 {
-  var reabstracted: () -> ()
+public struct G<T> {
+  public var x: T { get set }
+  public subscript<U: Hashable>(x: U) -> T { get set }
+}
+
+public class C1: C { }
+public class C2: C1 {
+  public var reabstracted: () -> ()
 }
 
 sil_vtable C {}
