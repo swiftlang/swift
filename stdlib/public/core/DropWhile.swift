@@ -158,4 +158,4 @@ where Base: BidirectionalCollection {
   }
 }
 
-extension LazyDropWhileCollection: _LazyCollectionProtocol { }
+extension LazyDropWhileCollection: LazyCollectionProtocol { }

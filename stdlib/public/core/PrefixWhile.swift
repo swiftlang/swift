@@ -239,7 +239,7 @@ extension LazyPrefixWhileCollection: Collection {
   }
 }
 
-extension LazyPrefixWhileCollection: _LazyCollectionProtocol { }
+extension LazyPrefixWhileCollection: LazyCollectionProtocol { }
 
 extension LazyPrefixWhileCollection: BidirectionalCollection
 where Base: BidirectionalCollection {
