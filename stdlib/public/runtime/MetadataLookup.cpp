@@ -1326,6 +1326,9 @@ buildEnvironmentPath(
   unsigned totalKeyParamCount = 0;
   auto genericParams = environment->getGenericParameters();
   for (unsigned numLocalParams : environment->getGenericParameterCounts()) {
+    // Adkjust totalParamCount so we have the # of local parameters.
+    numLocalParams -= totalParamCount;
+
     // Get the local generic parameters.
     auto localGenericParams = genericParams.slice(0, numLocalParams);
     genericParams = genericParams.slice(numLocalParams);
