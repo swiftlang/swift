@@ -626,3 +626,38 @@ bb2(%7 : ${ var Int }):
 bb3(%result : $Int):
   return %result : $Int
 }
+
+// Make sure findAccessedStorage returns a valid storage object for an address-phi
+// that feeds ref_element_addr instructions. The ref_element_addr's need to have the
+// same base object and same field id.
+// <rdar://problem/46114512> SIL verification failed: Unknown formal access pattern: storage
+class BaseClass {
+  var f: Float = 0.0
+}
+
+class SubClass : BaseClass {}
+
+// CHECK-LABEL: @testElementAddressPhiAccess
+// CHECK: [read] [no_nested_conflict] Class %{{.*}} = upcast %0 : $SubClass to $BaseClass
+// CHECK: Field: @_hasInitialValue var f: Float
+sil @testElementAddressPhiAccess : $@convention(thin) (@guaranteed SubClass) -> () {
+bb0(%0 : $SubClass):
+  %base = upcast %0 : $SubClass to $BaseClass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %ref1 = ref_element_addr %base : $BaseClass, #BaseClass.f
+  br bb3(%ref1 : $*Float)
+
+bb2:
+  %ref2 = ref_element_addr %base : $BaseClass, #BaseClass.f
+  br bb3(%ref2 : $*Float)
+
+bb3(%phi : $*Float):
+  %access = begin_access [read] [dynamic] [no_nested_conflict] %phi : $*Float
+  %addr = struct_element_addr %access : $*Float, #Float._value
+  %val = load %addr : $*Builtin.FPIEEE32
+  end_access %access : $*Float
+  %v = tuple ()
+  return %v : $()
+}
