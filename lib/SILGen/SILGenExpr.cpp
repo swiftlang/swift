@@ -3420,50 +3420,27 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
       return KeyPathPatternComponent::forStoredProperty(var, componentTy);
     }
 
-    switch (strategy.getKind()) {
-    case AccessStrategy::BehaviorStorage:
-      llvm_unreachable("key path for behavior storage?");
-    case AccessStrategy::Storage: {
-      // If the stored value would need to be reabstracted in fully opaque
-      // context, then we have to treat the component as computed.
-      auto componentObjTy = componentTy->getWithoutSpecifierType();
-      if (genericEnv)
-        componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
-      auto storageTy = Types.getSubstitutedStorageType(var, componentObjTy);
-      auto opaqueTy = Types
-        .getLoweredType(AbstractionPattern::getOpaque(), componentObjTy);
-      
-      if (storageTy.getAddressType() == opaqueTy.getAddressType()) {
-        return KeyPathPatternComponent::forStoredProperty(var, componentTy);
-      }
-      LLVM_FALLTHROUGH;
-    }
-    case AccessStrategy::MaterializeToTemporary:
-    case AccessStrategy::DirectToAccessor:
-    case AccessStrategy::DispatchToAccessor: {
-      // We need thunks to bring the getter and setter to the right signature
-      // expected by the key path runtime.
-      auto id = getIdForKeyPathComponentComputedProperty(*this, var,
-                                                         strategy);
-      auto getter = getOrCreateKeyPathGetter(*this, loc,
-               var, subs,
-               needsGenericContext ? genericEnv : nullptr,
-               expansion, {}, baseTy, componentTy);
-      
-      if (isSettableInComponent()) {
-        auto setter = getOrCreateKeyPathSetter(*this, loc,
-               var, subs,
-               needsGenericContext ? genericEnv : nullptr,
-               expansion, {}, baseTy, componentTy);
-        return KeyPathPatternComponent::forComputedSettableProperty(id,
-            getter, setter, {}, nullptr, nullptr,
-            externalDecl, externalSubs, componentTy);
-      } else {
-        return KeyPathPatternComponent::forComputedGettableProperty(id,
-            getter, {}, nullptr, nullptr,
-            externalDecl, externalSubs, componentTy);
-      }
-    }
+    // We need thunks to bring the getter and setter to the right signature
+    // expected by the key path runtime.
+    auto id = getIdForKeyPathComponentComputedProperty(*this, var,
+                                                       strategy);
+    auto getter = getOrCreateKeyPathGetter(*this, loc,
+             var, subs,
+             needsGenericContext ? genericEnv : nullptr,
+             expansion, {}, baseTy, componentTy);
+    
+    if (isSettableInComponent()) {
+      auto setter = getOrCreateKeyPathSetter(*this, loc,
+             var, subs,
+             needsGenericContext ? genericEnv : nullptr,
+             expansion, {}, baseTy, componentTy);
+      return KeyPathPatternComponent::forComputedSettableProperty(id,
+          getter, setter, {}, nullptr, nullptr,
+          externalDecl, externalSubs, componentTy);
+    } else {
+      return KeyPathPatternComponent::forComputedGettableProperty(id,
+          getter, {}, nullptr, nullptr,
+          externalDecl, externalSubs, componentTy);
     }
   }
   
