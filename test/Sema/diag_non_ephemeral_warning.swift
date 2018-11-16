@@ -151,14 +151,11 @@ takesRaw(&C.staticStoredProperty.storedProperty)
 takesRaw(&FinalC.staticStoredProperty.storedProperty)
 takesRaw(&metatypeOfC.staticStoredProperty.storedProperty)
 takesRaw(&type(of: topLevelC).staticStoredProperty.storedProperty)
-takesRaw(&topLevelFinalC.storedProperty)
 takesRaw(&topLevelS.storedProperty)
-takesRaw(&topLevelS.storedFinalC.storedProperty)
 takesRaw(&globalS.storedProperty)
 takesRaw(&topLevelTupleOfS.0)
 takesRaw(&topLevelTupleOfS.0.storedProperty)
 takesRaw(&topLevelFragileS.storedProperty)
-takesRaw(&topLevelFragileFinalC.storedProperty)
 
 extension C {
   static func bar() {
@@ -172,9 +169,21 @@ takesRaw(&topLevelOptOfS!.storedProperty)
 takesRaw(&topLevelOptOfResilientS!)
 
 // But we cannot do the same for:
-//   - Non-final class bases
+//   - Class bases
 
 takesMutableRaw(&topLevelC.storedProperty, 5) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesMutableRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw'}}
+// expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
+
+takesMutableRaw(&topLevelFinalC.storedProperty, 5) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesMutableRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw'}}
+// expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
+
+takesMutableRaw(&topLevelFragileFinalC.storedProperty, 5) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesMutableRaw'}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw'}}
+// expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
+
+takesMutableRaw(&topLevelS.storedFinalC.storedProperty, 5) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'takesMutableRaw'}}
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw'}}
 // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
