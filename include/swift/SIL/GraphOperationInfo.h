@@ -119,8 +119,8 @@ public:
     };
 
   public:
-   StructuredArgument(StructuredArgumentKind Kind, StringRef Name,
-                      SILValue SingleArgument)
+    StructuredArgument(StructuredArgumentKind Kind, StringRef Name,
+                       SILValue SingleArgument)
         : Kind(Kind), Name(Name), SingleArgument(SingleArgument) {}
     StructuredArgument(StructuredArgumentKind Kind, StringRef Name,
                       ArrayRef<Operand> ArgumentList)

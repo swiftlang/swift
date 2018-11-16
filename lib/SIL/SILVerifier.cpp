@@ -25,6 +25,8 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/SIL/GraphOperationInfo.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -1519,6 +1521,35 @@ public:
       require(attributeNames.insert(attr.name).second,
               "Duplicate attribute name '" + attr.name.str() + "'");
       require(attr.value.isConstant(), "Invalid graph operation attribute");
+    }
+    auto conformsToProtocol = [&](SILType type,
+                                  KnownProtocolKind kind) -> bool {
+      auto inputType = type.getASTType();
+      auto *proto = inputType->getASTContext().getProtocol(kind);
+      auto *nom = inputType.getAnyNominal();
+      if (!nom) return false;
+      return nom->getParentModule()
+          ->lookupConformance(inputType, proto).hasValue();
+    };
+    // All inputs must conform to `TensorArrayProtocol`.
+    tf::GraphOperationInfo opInfo(GI);
+    for (auto &sa : opInfo.getStructuredArguments()) {
+      if (sa.getArgumentNameAndLowering().second !=
+              tf::GraphOperationInfo::ArgumentLowering::Input)
+        continue;
+      switch (sa.getKind()) {
+      case tf::GraphOperationInfo::SAK_Single:
+        require(conformsToProtocol(sa.getSingleArgument()->getType(),
+                                   KnownProtocolKind::TensorArrayProtocol),
+                "graph_op operands must conform to TensorArrayProtocol");
+        break;
+      case tf::GraphOperationInfo::SAK_List:
+        for (auto arg : sa.getArgumentList())
+          require(conformsToProtocol(arg->getType(),
+                                     KnownProtocolKind::TensorArrayProtocol),
+                  "graph_op operands must conform to TensorArrayProtocol");
+        break;
+      }
     }
   }
 
