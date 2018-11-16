@@ -1197,21 +1197,21 @@ public:
 
 }
 
-TypeInfo
-swift::_getTypeByMangledNode(Demangler &demangler,
-                             Demangle::NodePointer node,
-                             SubstGenericParameterFn substGenericParam,
-                             SubstDependentWitnessTableFn substWitnessTable) {
+static TypeInfo swift_getTypeByMangledNodeImpl(
+                              Demangler &demangler,
+                              Demangle::NodePointer node,
+                              SubstGenericParameterFn substGenericParam,
+                              SubstDependentWitnessTableFn substWitnessTable) {
   DecodedMetadataBuilder builder(demangler, substGenericParam,
                                  substWitnessTable);
   auto type = Demangle::decodeMangledType(builder, node);
   return {type, builder.getReferenceOwnership()};
 }
 
-TypeInfo
-swift::_getTypeByMangledName(StringRef typeName,
-                             SubstGenericParameterFn substGenericParam,
-                             SubstDependentWitnessTableFn substWitnessTable) {
+TypeInfo swift_getTypeByMangledNameImpl(
+                              StringRef typeName,
+                              SubstGenericParameterFn substGenericParam,
+                              SubstDependentWitnessTableFn substWitnessTable) {
   auto demangler = getDemanglerForRuntimeTypeResolution();
   NodePointer node;
 
@@ -1256,8 +1256,8 @@ swift::_getTypeByMangledName(StringRef typeName,
       return TypeInfo();
   }
 
-  return _getTypeByMangledNode(demangler, node, substGenericParam,
-                               substWitnessTable);
+  return swift_getTypeByMangledNode(demangler, node, substGenericParam,
+                                    substWitnessTable);
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
@@ -1266,7 +1266,7 @@ swift_stdlib_getTypeByMangledName(const char *typeNameStart,
                                   size_t typeNameLength) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
   auto metadata =
-    _getTypeByMangledName(
+    swift_getTypeByMangledName(
       typeName,
       [](unsigned depth, unsigned index) { return nullptr; },
       [](const Metadata *type, unsigned index) { return nullptr; });
@@ -1487,8 +1487,8 @@ void swift::gatherWrittenGenericArgs(
       SubstGenericParametersFromWrittenArgs substitutions(allGenericArgs,
                                                           genericParamCounts);
       allGenericArgs[*lhsFlatIndex] =
-          _getTypeByMangledName(req.getMangledTypeName(), substitutions,
-                                substitutions);
+          swift_getTypeByMangledName(req.getMangledTypeName(), substitutions,
+                                     substitutions);
       continue;
     }
 

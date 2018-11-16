@@ -34,6 +34,11 @@ namespace  {
   MetadataResponse getEmptyValue<MetadataResponse>() {
     return MetadataResponse{nullptr, MetadataState::Complete};
   }
+
+  template<>
+  TypeInfo getEmptyValue<TypeInfo>() {
+    return TypeInfo();
+  }
 }
 
 #define OVERRIDE(name, ret, attrs, namespace, typedArgs, namedArgs) \
@@ -161,6 +166,18 @@ TEST_F(CompatibilityOverrideTest,
 TEST_F(CompatibilityOverrideTest, test_swift_conformsToProtocol) {
   auto Result = swift_conformsToProtocol(nullptr, nullptr);
   ASSERT_EQ(Result, nullptr);  
+}
+
+TEST_F(CompatibilityOverrideTest, test_swift_getTypeByMangledNode) {
+  Demangler demangler;
+  auto Result = swift_getTypeByMangledNode(demangler, nullptr, nullptr,
+                                           nullptr);
+  ASSERT_EQ((const Metadata *)Result, nullptr);
+}
+
+TEST_F(CompatibilityOverrideTest, test_swift_getTypeByMangledName) {
+  auto Result = swift_getTypeByMangledName("", nullptr, nullptr);
+  ASSERT_EQ((const Metadata *)Result, nullptr);
 }
 
 TEST_F(CompatibilityOverrideTest, test_swift_getAssociatedTypeWitnessSlow) {

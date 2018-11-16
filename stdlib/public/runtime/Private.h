@@ -289,7 +289,7 @@ public:
   /// given a particular generic parameter specified by depth/index.
   /// \p substWitnessTable Function that provides witness tables given a
   /// particular dependent conformance index.
-  TypeInfo _getTypeByMangledNode(
+  TypeInfo swift_getTypeByMangledNode(
                                Demangler &demangler,
                                Demangle::NodePointer node,
                                SubstGenericParameterFn substGenericParam,
@@ -301,7 +301,7 @@ public:
   /// given a particular generic parameter specified by depth/index.
   /// \p substWitnessTable Function that provides witness tables given a
   /// particular dependent conformance index.
-  TypeInfo _getTypeByMangledName(
+  TypeInfo swift_getTypeByMangledName(
                                StringRef typeName,
                                SubstGenericParameterFn substGenericParam,
                                SubstDependentWitnessTableFn substWitnessTable);

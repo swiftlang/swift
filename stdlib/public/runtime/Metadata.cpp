@@ -2552,7 +2552,7 @@ swift::swift_initClassMetadata(ClassMetadata *self,
       Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
     SubstGenericParametersFromMetadata substitutions(self);
     const Metadata *superclass =
-      _getTypeByMangledName(superclassName, substitutions, substitutions);
+      swift_getTypeByMangledName(superclassName, substitutions, substitutions);
     if (!superclass) {
       fatalError(0,
                  "failed to demangle superclass of %s from mangled name '%s'\n",
@@ -2642,7 +2642,7 @@ swift::swift_updateClassMetadata(ClassMetadata *self,
       Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
     SubstGenericParametersFromMetadata substitutions(self);
     const Metadata *superclass =
-      _getTypeByMangledName(superclassName, substitutions, substitutions);
+      swift_getTypeByMangledName(superclassName, substitutions, substitutions);
     if (!superclass) {
       fatalError(0,
                  "failed to demangle superclass of %s from mangled name '%s'\n",
@@ -4110,7 +4110,7 @@ swift_getAssociatedTypeWitnessSlowImpl(
     // The protocol's Self is the only generic parameter that can occur in the
     // type.
     assocTypeMetadata =
-      _getTypeByMangledName(mangledName,
+      swift_getTypeByMangledName(mangledName,
         [conformingType](unsigned depth, unsigned index) -> const Metadata * {
           if (depth == 0 && index == 0)
             return conformingType;
@@ -4137,8 +4137,8 @@ swift_getAssociatedTypeWitnessSlowImpl(
     auto originalConformingType = findConformingSuperclass(conformingType,
                                                            conformance);
     SubstGenericParametersFromMetadata substitutions(originalConformingType);
-    assocTypeMetadata = _getTypeByMangledName(mangledName, substitutions,
-                                              substitutions);
+    assocTypeMetadata = swift_getTypeByMangledName(mangledName, substitutions,
+                                                   substitutions);
   }
 
   if (!assocTypeMetadata) {
@@ -4875,7 +4875,8 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
   
   auto mangledName = Demangle::mangleNode(node);
   auto result =
-    _getTypeByMangledName(mangledName,
+    swift_getTypeByMangledName(
+                          mangledName,
                           [](unsigned, unsigned){ return nullptr; },
                           [](const Metadata *, unsigned) { return nullptr; });
   if (metadata != result)

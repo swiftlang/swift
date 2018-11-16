@@ -134,6 +134,18 @@ OVERRIDE_KEYPATH(getKeyPath, const HeapObject *, , swift::,
                  (const void *pattern, const void *arguments),
                  (pattern, arguments))
 
+OVERRIDE_METADATALOOKUP(getTypeByMangledNode, TypeInfo, , swift::,
+                        (Demangler &demangler,
+                         Demangle::NodePointer node,
+                         SubstGenericParameterFn substGenericParam,
+                         SubstDependentWitnessTableFn substWitnessTable),
+                        (demangler, node, substGenericParam, substWitnessTable))
+OVERRIDE_METADATALOOKUP(getTypeByMangledName, TypeInfo, , swift::,
+                        (StringRef typeName,
+                         SubstGenericParameterFn substGenericParam,
+                         SubstDependentWitnessTableFn substWitnessTable),
+                        (typeName, substGenericParam, substWitnessTable))
+
 OVERRIDE_WITNESSTABLE(getAssociatedTypeWitnessSlow, MetadataResponse,
                       SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL, swift::,
                       (MetadataRequest request, WitnessTable *wtable,
