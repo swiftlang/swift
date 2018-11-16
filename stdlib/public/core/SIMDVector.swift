@@ -424,6 +424,41 @@ public extension SIMD where Scalar : FixedWidthInteger {
     var g = SystemRandomNumberGenerator()
     return Self.random(in: range, using: &g)
   }
+  
+  @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&+' instead")
+  static func +(lhs: Self, rhs: Self) -> Self { fatalError() }
+  @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&-' instead")
+  static func -(lhs: Self, rhs: Self) -> Self { fatalError() }
+  @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&*' instead")
+  static func *(lhs: Self, rhs: Self) -> Self { fatalError() }
+  
+  @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&+' instead")
+  static func +(lhs: Self, rhs: Scalar) -> Self { fatalError() }
+  @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&-' instead")
+  static func -(lhs: Self, rhs: Scalar) -> Self { fatalError() }
+  @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&*' instead")
+  static func *(lhs: Self, rhs: Scalar) -> Self { fatalError() }
+  
+  @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&+' instead")
+  static func +(lhs: Scalar, rhs: Self) -> Self { fatalError() }
+  @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&-' instead")
+  static func -(lhs: Scalar, rhs: Self) -> Self { fatalError() }
+  @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&*' instead")
+  static func *(lhs: Scalar, rhs: Self) -> Self { fatalError() }
+  
+  @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&+=' instead")
+  static func +=(lhs: inout Self, rhs: Self) { fatalError() }
+  @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&-=' instead")
+  static func -=(lhs: inout Self, rhs: Self) { fatalError() }
+  @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&*=' instead")
+  static func *=(lhs: inout Self, rhs: Self) { fatalError() }
+  
+  @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&+=' instead")
+  static func +=(lhs: inout Self, rhs: Scalar) { fatalError() }
+  @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&-=' instead")
+  static func -=(lhs: inout Self, rhs: Scalar) { fatalError() }
+  @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&*=' instead")
+  static func *=(lhs: inout Self, rhs: Scalar) { fatalError() }
 }
 
 public extension SIMD where Scalar : FloatingPoint {
