@@ -212,7 +212,7 @@ std::string LinkEntity::mangleAsString() const {
 
   case Kind::ProtocolConformanceDescriptor:
     return mangler.mangleProtocolConformanceDescriptor(
-                   cast<NormalProtocolConformance>(getProtocolConformance()));
+                                                  getRootProtocolConformance());
 
   case Kind::EnumCase:
     return mangler.mangleEnumCase(getDecl());
@@ -353,7 +353,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   // For when `this` is a protocol conformance of some kind.
   auto getLinkageAsConformance = [&] {
     return getLinkageForProtocolConformance(
-        getProtocolConformance()->getRootNormalConformance(), forDefinition);
+        getProtocolConformance()->getRootConformance(), forDefinition);
   };
 
   switch (getKind()) {

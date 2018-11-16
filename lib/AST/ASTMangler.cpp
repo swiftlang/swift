@@ -201,10 +201,7 @@ std::string ASTMangler::mangleWitnessThunk(
   beginMangling();
   // Concrete witness thunks get a special mangling.
   if (Conformance) {
-    if (auto selfConformance = dyn_cast<SelfProtocolConformance>(Conformance)) {
-      auto protocol = cast<SelfProtocolConformance>(Conformance)->getProtocol();
-      appendProtocolName(protocol);
-    } else {
+    if (!isa<SelfProtocolConformance>(Conformance)) {
       appendProtocolConformance(Conformance);
     }
   }
