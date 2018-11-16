@@ -835,10 +835,10 @@ private:
 class ProjectionTree {
   friend class ProjectionTreeNode;
 
-  SILModule &Mod;
+  SILModule *Mod;
 
   /// The allocator we use to allocate ProjectionTreeNodes in the tree.
-  llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> &Allocator;
+  llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> *Allocator;
 
   // A common pattern is a 3 field struct.
   llvm::SmallVector<ProjectionTreeNode *, 4> ProjectionTreeNodes;
@@ -854,7 +854,7 @@ public:
   /// initialized by initializeWithExistingTree.
   ProjectionTree(SILModule &Mod,
                  llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> &Allocator)
-      : Mod(Mod), Allocator(Allocator) {}
+      : Mod(&Mod), Allocator(&Allocator) {}
   ~ProjectionTree();
   ProjectionTree(const ProjectionTree &) = delete;
   ProjectionTree(ProjectionTree &&) = default;
@@ -876,7 +876,7 @@ public:
                                              LeafValueMapTy &LeafValues);
 
   /// Return the module associated with this tree.
-  SILModule &getModule() const { return Mod; }
+  SILModule &getModule() const { return *Mod; }
 
   llvm::ArrayRef<ProjectionTreeNode *> getProjectionTreeNodes() {
     return llvm::makeArrayRef(ProjectionTreeNodes);
@@ -960,7 +960,7 @@ private:
   void createRoot(SILType BaseTy) {
     assert(ProjectionTreeNodes.empty() &&
            "Should only create root when ProjectionTreeNodes is empty");
-    auto *Node = new (Allocator.Allocate()) ProjectionTreeNode(BaseTy);
+    auto *Node = new (Allocator->Allocate()) ProjectionTreeNode(BaseTy);
     ProjectionTreeNodes.push_back(Node);
   }
 
@@ -968,8 +968,8 @@ private:
                                      SILType BaseTy,
                                      const Projection &P) {
     unsigned Index = ProjectionTreeNodes.size();
-    auto *Node = new (Allocator.Allocate()) ProjectionTreeNode(Parent, Index,
-                                                               BaseTy, P);
+    auto *Node = new (Allocator->Allocate()) ProjectionTreeNode(Parent, Index,
+                                                                BaseTy, P);
     ProjectionTreeNodes.push_back(Node);
     return ProjectionTreeNodes[Index];
   }
