@@ -535,6 +535,13 @@ bool SILFunction::shouldVerifyOwnership() const {
   return !hasSemanticsAttr("verify.ownership.sil.never");
 }
 
+unsigned SILFunction::codeSize() const {
+  unsigned size = 0;
+  for (auto &BB : *this)
+    size += BB.codeSize();
+  return size;
+}
+
 // See swift/Basic/Statistic.h for declaration: this enables tracing
 // SILFunctions, is defined here to avoid too much layering violation / circular
 // linkage dependency.
