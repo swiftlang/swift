@@ -2810,38 +2810,7 @@ namespace {
     }
 
     Expr *visitOptionalTryExpr(OptionalTryExpr *expr) {
-      // Prior to Swift 5, 'try?' simply wraps the type of its sub-expression
-      // in an Optional, regardless of the sub-expression type.
-      //
-      // In Swift 5+, the type of a 'try?' expression of static type T is:
-      //  - Equal to T if T is optional
-      //  - Equal to T? if T is not optional
-      //
-      // The result is that in Swift 5, 'try?' avoids producing nested optionals.
-      
-      if (!cs.getTypeChecker().getLangOpts().isSwiftVersionAtLeast(5)) {
-        // Nothing to do for Swift 4 and earlier!
-        return simplifyExprType(expr);
-      }
-      
-      Type subExprType = cs.getType(expr->getSubExpr());
-      Type targetType = simplifyType(subExprType);
-      
-      // If the subexpression is not optional, wrap it in
-      // an InjectIntoOptionalExpr. Then use the type of the
-      // subexpression as the type of the 'try?' expr
-      bool subExprIsOptional = (bool) subExprType->getOptionalObjectType();
-      
-      if (!subExprIsOptional) {
-        targetType = OptionalType::get(targetType);
-        auto subExpr = coerceToType(expr->getSubExpr(), targetType,
-                                    cs.getConstraintLocator(expr));
-        if (!subExpr) return nullptr;
-        expr->setSubExpr(subExpr);
-      }
-      
-      cs.setType(expr, targetType);
-      return expr;
+      return simplifyExprType(expr);
     }
 
     Expr *visitParenExpr(ParenExpr *expr) {

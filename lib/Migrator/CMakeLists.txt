@@ -48,7 +48,6 @@ add_swift_host_library(swiftMigrator STATIC
   FixitApplyDiagnosticConsumer.cpp
   Migrator.cpp
   MigrationState.cpp
-  OptionalTryMigratorPass.cpp
   RewriteBufferEditsReceiver.cpp
   LINK_LIBRARIES swiftSyntax swiftIDE)
 

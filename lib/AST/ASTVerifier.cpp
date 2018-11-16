@@ -1958,21 +1958,15 @@ public:
     void verifyChecked(OptionalTryExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying OptionalTryExpr", E);
 
-      if (Ctx.LangOpts.isSwiftVersionAtLeast(5)) {
-        checkSameType(E->getType(), E->getSubExpr()->getType(),
-                      "OptionalTryExpr and sub-expression");
+      Type unwrappedType = E->getType()->getOptionalObjectType();
+      if (!unwrappedType) {
+        Out << "OptionalTryExpr result type is not optional\n";
+        abort();
       }
-      else {
-        Type unwrappedType = E->getType()->getOptionalObjectType();
-        if (!unwrappedType) {
-          Out << "OptionalTryExpr result type is not optional\n";
-          abort();
-        }
-        
-        checkSameType(unwrappedType, E->getSubExpr()->getType(),
-                      "OptionalTryExpr and sub-expression");
-      }
-      
+
+      checkSameType(unwrappedType, E->getSubExpr()->getType(),
+                    "OptionalTryExpr and sub-expression");
+
       verifyCheckedBase(E);
     }
 
