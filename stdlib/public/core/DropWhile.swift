@@ -157,3 +157,5 @@ where Base: BidirectionalCollection {
     return _base.index(before: i)
   }
 }
+
+extension LazyDropWhileCollection: _LazyCollectionProtocol { }

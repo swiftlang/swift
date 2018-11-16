@@ -294,6 +294,8 @@ extension LazyFilterCollection: Collection {
   }
 }
 
+extension LazyFilterCollection: _LazyCollectionProtocol { }
+
 extension LazyFilterCollection : BidirectionalCollection
   where Base : BidirectionalCollection {
 

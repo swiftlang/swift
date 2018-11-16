@@ -10,8 +10,32 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(swift, deprecated: 5.0, renamed: "LazySequence")
-public typealias LazyCollectionProtocol = LazySequenceProtocol
+public protocol _LazyCollectionProtocol: Collection, LazySequenceProtocol {		
+   /// A `Collection` that can contain the same elements as this one,		
+   /// possibly with a simpler type.		
+   ///		
+   /// - See also: `elements`		
+   associatedtype Elements : Collection = Self		
+}
+
+extension _LazyCollectionProtocol {		
+   // Lazy things are already lazy		
+   @inlinable // protocol-only		
+   public var lazy: LazyCollection<Elements> {		
+     return elements.lazy		
+   }		
+ }		
+		
+ extension _LazyCollectionProtocol where Elements: _LazyCollectionProtocol {		
+   // Lazy things are already lazy		
+   @inlinable // protocol-only		
+   public var lazy: Elements {		
+     return elements		
+   }		
+ }
+
+@available(swift, deprecated: 5.0, message: "Prefer LazySequence where Self (or Elements): Collection")
+public typealias LazyCollectionProtocol = _LazyCollectionProtocol
 
 /// A collection containing the same elements as a `Base` collection,
 /// but on which some operations such as `map` and `filter` are
@@ -127,8 +151,9 @@ extension LazyCollection : Collection {
   public func distance(from start: Index, to end: Index) -> Int {
     return _base.distance(from:start, to: end)
   }
-
 }
+
+extension LazyCollection: _LazyCollectionProtocol { }
 
 extension LazyCollection : BidirectionalCollection
   where Base : BidirectionalCollection {
