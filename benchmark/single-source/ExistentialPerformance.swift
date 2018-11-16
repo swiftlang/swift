@@ -131,113 +131,113 @@ public let ExistentialPerformance: [BenchmarkInfo] = [
   BenchmarkInfo(name: "Existential.MutatingAndNonMutating.Val4",
     runFunction: run_MutatingAndNonMutatingVal4, tags: t),
   BenchmarkInfo(name: "Existential.Array.init.Ref1",
-    runFunction: run_Array_initRef1, tags: ta, setUpFunction: caRef1),
+    runFunction: run_Array_initRef1, tags: ta),
   BenchmarkInfo(name: "Existential.Array.init.Ref2",
-    runFunction: run_Array_initRef2, tags: ta, setUpFunction: caRef2),
+    runFunction: run_Array_initRef2, tags: ta),
   BenchmarkInfo(name: "Existential.Array.init.Ref3",
-    runFunction: run_Array_initRef3, tags: ta, setUpFunction: caRef3),
+    runFunction: run_Array_initRef3, tags: ta),
   BenchmarkInfo(name: "Existential.Array.init.Ref4",
-    runFunction: run_Array_initRef4, tags: ta, setUpFunction: caRef4),
+    runFunction: run_Array_initRef4, tags: ta),
   BenchmarkInfo(name: "Existential.Array.init.Val0",
-    runFunction: run_Array_initVal0, tags: ta, setUpFunction: caVal0),
+    runFunction: run_Array_initVal0, tags: ta),
   BenchmarkInfo(name: "Existential.Array.init.Val1",
-    runFunction: run_Array_initVal1, tags: ta, setUpFunction: caVal1),
+    runFunction: run_Array_initVal1, tags: ta),
   BenchmarkInfo(name: "Existential.Array.init.Val2",
-    runFunction: run_Array_initVal2, tags: ta, setUpFunction: caVal2),
+    runFunction: run_Array_initVal2, tags: ta),
   BenchmarkInfo(name: "Existential.Array.init.Val3",
-    runFunction: run_Array_initVal3, tags: ta, setUpFunction: caVal3),
+    runFunction: run_Array_initVal3, tags: ta),
   BenchmarkInfo(name: "Existential.Array.init.Val4",
-    runFunction: run_Array_initVal4, tags: ta, setUpFunction: caVal4),
+    runFunction: run_Array_initVal4, tags: ta),
   BenchmarkInfo(name: "Existential.Array.method.1x.Ref1",
-    runFunction: run_Array_method1xRef1, tags: ta, setUpFunction: caRef1),
+    runFunction: run_Array_method1x, tags: ta, setUpFunction: caRef1),
   BenchmarkInfo(name: "Existential.Array.method.1x.Ref2",
-    runFunction: run_Array_method1xRef2, tags: ta, setUpFunction: caRef2),
+    runFunction: run_Array_method1x, tags: ta, setUpFunction: caRef2),
   BenchmarkInfo(name: "Existential.Array.method.1x.Ref3",
-    runFunction: run_Array_method1xRef3, tags: ta, setUpFunction: caRef3),
+    runFunction: run_Array_method1x, tags: ta, setUpFunction: caRef3),
   BenchmarkInfo(name: "Existential.Array.method.1x.Ref4",
-    runFunction: run_Array_method1xRef4, tags: ta, setUpFunction: caRef4),
+    runFunction: run_Array_method1x, tags: ta, setUpFunction: caRef4),
   BenchmarkInfo(name: "Existential.Array.method.1x.Val0",
-    runFunction: run_Array_method1xVal0, tags: ta, setUpFunction: caVal0),
+    runFunction: run_Array_method1x, tags: ta, setUpFunction: caVal0),
   BenchmarkInfo(name: "Existential.Array.method.1x.Val1",
-    runFunction: run_Array_method1xVal1, tags: ta, setUpFunction: caVal1),
+    runFunction: run_Array_method1x, tags: ta, setUpFunction: caVal1),
   BenchmarkInfo(name: "Existential.Array.method.1x.Val2",
-    runFunction: run_Array_method1xVal2, tags: ta, setUpFunction: caVal2),
+    runFunction: run_Array_method1x, tags: ta, setUpFunction: caVal2),
   BenchmarkInfo(name: "Existential.Array.method.1x.Val3",
-    runFunction: run_Array_method1xVal3, tags: ta, setUpFunction: caVal3),
+    runFunction: run_Array_method1x, tags: ta, setUpFunction: caVal3),
   BenchmarkInfo(name: "Existential.Array.method.1x.Val4",
-    runFunction: run_Array_method1xVal4, tags: ta, setUpFunction: caVal4),
+    runFunction: run_Array_method1x, tags: ta, setUpFunction: caVal4),
   BenchmarkInfo(name: "Existential.Array.method.2x.Ref1",
-    runFunction: run_Array_method2xRef1, tags: ta, setUpFunction: caRef1),
+    runFunction: run_Array_method2x, tags: ta, setUpFunction: caRef1),
   BenchmarkInfo(name: "Existential.Array.method.2x.Ref2",
-    runFunction: run_Array_method2xRef2, tags: ta, setUpFunction: caRef2),
+    runFunction: run_Array_method2x, tags: ta, setUpFunction: caRef2),
   BenchmarkInfo(name: "Existential.Array.method.2x.Ref3",
-    runFunction: run_Array_method2xRef3, tags: ta, setUpFunction: caRef3),
+    runFunction: run_Array_method2x, tags: ta, setUpFunction: caRef3),
   BenchmarkInfo(name: "Existential.Array.method.2x.Ref4",
-    runFunction: run_Array_method2xRef4, tags: ta, setUpFunction: caRef4),
+    runFunction: run_Array_method2x, tags: ta, setUpFunction: caRef4),
   BenchmarkInfo(name: "Existential.Array.method.2x.Val0",
-    runFunction: run_Array_method2xVal0, tags: ta, setUpFunction: caVal0),
+    runFunction: run_Array_method2x, tags: ta, setUpFunction: caVal0),
   BenchmarkInfo(name: "Existential.Array.method.2x.Val1",
-    runFunction: run_Array_method2xVal1, tags: ta, setUpFunction: caVal1),
+    runFunction: run_Array_method2x, tags: ta, setUpFunction: caVal1),
   BenchmarkInfo(name: "Existential.Array.method.2x.Val2",
-    runFunction: run_Array_method2xVal2, tags: ta, setUpFunction: caVal2),
+    runFunction: run_Array_method2x, tags: ta, setUpFunction: caVal2),
   BenchmarkInfo(name: "Existential.Array.method.2x.Val3",
-    runFunction: run_Array_method2xVal3, tags: ta, setUpFunction: caVal3),
+    runFunction: run_Array_method2x, tags: ta, setUpFunction: caVal3),
   BenchmarkInfo(name: "Existential.Array.method.2x.Val4",
-    runFunction: run_Array_method2xVal4, tags: ta, setUpFunction: caVal4),
+    runFunction: run_Array_method2x, tags: ta, setUpFunction: caVal4),
   BenchmarkInfo(name: "Existential.Array.Mutating.Ref1",
-    runFunction: run_ArrayMutatingRef1, tags: ta, setUpFunction: caRef1),
+    runFunction: run_ArrayMutating, tags: ta, setUpFunction: caRef1),
   BenchmarkInfo(name: "Existential.Array.Mutating.Ref2",
-    runFunction: run_ArrayMutatingRef2, tags: ta, setUpFunction: caRef2),
+    runFunction: run_ArrayMutating, tags: ta, setUpFunction: caRef2),
   BenchmarkInfo(name: "Existential.Array.Mutating.Ref3",
-    runFunction: run_ArrayMutatingRef3, tags: ta, setUpFunction: caRef3),
+    runFunction: run_ArrayMutating, tags: ta, setUpFunction: caRef3),
   BenchmarkInfo(name: "Existential.Array.Mutating.Ref4",
-    runFunction: run_ArrayMutatingRef4, tags: ta, setUpFunction: caRef4),
+    runFunction: run_ArrayMutating, tags: ta, setUpFunction: caRef4),
   BenchmarkInfo(name: "Existential.Array.Mutating.Val0",
-    runFunction: run_ArrayMutatingVal0, tags: ta, setUpFunction: caVal0),
+    runFunction: run_ArrayMutating, tags: ta, setUpFunction: caVal0),
   BenchmarkInfo(name: "Existential.Array.Mutating.Val1",
-    runFunction: run_ArrayMutatingVal1, tags: ta, setUpFunction: caVal1),
+    runFunction: run_ArrayMutating, tags: ta, setUpFunction: caVal1),
   BenchmarkInfo(name: "Existential.Array.Mutating.Val2",
-    runFunction: run_ArrayMutatingVal2, tags: ta, setUpFunction: caVal2),
+    runFunction: run_ArrayMutating, tags: ta, setUpFunction: caVal2),
   BenchmarkInfo(name: "Existential.Array.Mutating.Val3",
-    runFunction: run_ArrayMutatingVal3, tags: ta, setUpFunction: caVal3),
+    runFunction: run_ArrayMutating, tags: ta, setUpFunction: caVal3),
   BenchmarkInfo(name: "Existential.Array.Mutating.Val4",
-    runFunction: run_ArrayMutatingVal4, tags: ta, setUpFunction: caVal4),
+    runFunction: run_ArrayMutating, tags: ta, setUpFunction: caVal4),
   BenchmarkInfo(name: "Existential.Array.Shift.Ref1",
-    runFunction: run_ArrayShiftRef1, tags: ta, setUpFunction: caRef1),
+    runFunction: run_ArrayShift, tags: ta, setUpFunction: caRef1),
   BenchmarkInfo(name: "Existential.Array.Shift.Ref2",
-    runFunction: run_ArrayShiftRef2, tags: ta, setUpFunction: caRef2),
+    runFunction: run_ArrayShift, tags: ta, setUpFunction: caRef2),
   BenchmarkInfo(name: "Existential.Array.Shift.Ref3",
-    runFunction: run_ArrayShiftRef3, tags: ta, setUpFunction: caRef3),
+    runFunction: run_ArrayShift, tags: ta, setUpFunction: caRef3),
   BenchmarkInfo(name: "Existential.Array.Shift.Ref4",
-    runFunction: run_ArrayShiftRef4, tags: ta, setUpFunction: caRef4),
+    runFunction: run_ArrayShift, tags: ta, setUpFunction: caRef4),
   BenchmarkInfo(name: "Existential.Array.Shift.Val0",
-    runFunction: run_ArrayShiftVal0, tags: ta, setUpFunction: caVal0),
+    runFunction: run_ArrayShift, tags: ta, setUpFunction: caVal0),
   BenchmarkInfo(name: "Existential.Array.Shift.Val1",
-    runFunction: run_ArrayShiftVal1, tags: ta, setUpFunction: caVal1),
+    runFunction: run_ArrayShift, tags: ta, setUpFunction: caVal1),
   BenchmarkInfo(name: "Existential.Array.Shift.Val2",
-    runFunction: run_ArrayShiftVal2, tags: ta, setUpFunction: caVal2),
+    runFunction: run_ArrayShift, tags: ta, setUpFunction: caVal2),
   BenchmarkInfo(name: "Existential.Array.Shift.Val3",
-    runFunction: run_ArrayShiftVal3, tags: ta, setUpFunction: caVal3),
+    runFunction: run_ArrayShift, tags: ta, setUpFunction: caVal3),
   BenchmarkInfo(name: "Existential.Array.Shift.Val4",
-    runFunction: run_ArrayShiftVal4, tags: ta, setUpFunction: caVal4),
+    runFunction: run_ArrayShift, tags: ta, setUpFunction: caVal4),
   BenchmarkInfo(name: "Existential.Array.ConditionalShift.Ref1",
-    runFunction: run_ArrayConditionalShiftRef1, tags: ta, setUpFunction: caRef1),
+    runFunction: run_ArrayConditionalShift, tags: ta, setUpFunction: caRef1),
   BenchmarkInfo(name: "Existential.Array.ConditionalShift.Ref2",
-    runFunction: run_ArrayConditionalShiftRef2, tags: ta, setUpFunction: caRef2),
+    runFunction: run_ArrayConditionalShift, tags: ta, setUpFunction: caRef2),
   BenchmarkInfo(name: "Existential.Array.ConditionalShift.Ref3",
-    runFunction: run_ArrayConditionalShiftRef3, tags: ta, setUpFunction: caRef3),
+    runFunction: run_ArrayConditionalShift, tags: ta, setUpFunction: caRef3),
   BenchmarkInfo(name: "Existential.Array.ConditionalShift.Ref4",
-    runFunction: run_ArrayConditionalShiftRef4, tags: ta, setUpFunction: caRef4),
+    runFunction: run_ArrayConditionalShift, tags: ta, setUpFunction: caRef4),
   BenchmarkInfo(name: "Existential.Array.ConditionalShift.Val0",
-    runFunction: run_ArrayConditionalShiftVal0, tags: ta, setUpFunction: caVal0),
+    runFunction: run_ArrayConditionalShift, tags: ta, setUpFunction: caVal0),
   BenchmarkInfo(name: "Existential.Array.ConditionalShift.Val1",
-    runFunction: run_ArrayConditionalShiftVal1, tags: ta, setUpFunction: caVal1),
+    runFunction: run_ArrayConditionalShift, tags: ta, setUpFunction: caVal1),
   BenchmarkInfo(name: "Existential.Array.ConditionalShift.Val2",
-    runFunction: run_ArrayConditionalShiftVal2, tags: ta, setUpFunction: caVal2),
+    runFunction: run_ArrayConditionalShift, tags: ta, setUpFunction: caVal2),
   BenchmarkInfo(name: "Existential.Array.ConditionalShift.Val3",
-    runFunction: run_ArrayConditionalShiftVal3, tags: ta, setUpFunction: caVal3),
+    runFunction: run_ArrayConditionalShift, tags: ta, setUpFunction: caVal3),
   BenchmarkInfo(name: "Existential.Array.ConditionalShift.Val4",
-    runFunction: run_ArrayConditionalShiftVal4, tags: ta, setUpFunction: caVal4),
+    runFunction: run_ArrayConditionalShift, tags: ta, setUpFunction: caVal4),
 ]
 
 // To exclude the setup overhead of existential array initialization,
@@ -529,7 +529,7 @@ func run_Array_init<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   }
 }
 
-func run_Array_method1x<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
+func run_Array_method1x(_ N: Int) {
   let existentialArray = grabArray()
   for _ in 0 ..< N * 100 {
     for elt in existentialArray {
@@ -540,7 +540,7 @@ func run_Array_method1x<T: Existential>(withType: T.Type, numberOfTimes N: Int) 
   }
 }
 
-func run_Array_method2x<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
+func run_Array_method2x(_ N: Int) {
   let existentialArray = grabArray()
   for _ in 0 ..< N * 100 {
     for elt in existentialArray {
@@ -551,7 +551,7 @@ func run_Array_method2x<T: Existential>(withType: T.Type, numberOfTimes N: Int) 
   }
 }
 
-func run_ArrayMutating<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
+func run_ArrayMutating(_ N: Int) {
   var existentialArray = grabArray()
   for _ in 0 ..< N * 100 {
     for i in 0 ..< existentialArray.count {
@@ -562,7 +562,7 @@ func run_ArrayMutating<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   }
 }
 
-func run_ArrayShift<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
+func run_ArrayShift(_ N: Int) {
   var existentialArray = grabArray()
   for _ in 0 ..< N * 10 {
     for i in 0 ..< existentialArray.count-1 {
@@ -571,7 +571,7 @@ func run_ArrayShift<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   }
 }
 
-func run_ArrayConditionalShift<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
+func run_ArrayConditionalShift(_ N: Int) {
   var existentialArray = grabArray()
   for _ in 0 ..< N * 10 {
     for i in 0 ..< existentialArray.count-1 {
@@ -584,7 +584,7 @@ func run_ArrayConditionalShift<T: Existential>(withType: T.Type, numberOfTimes N
   }
 }
 
-// method.1x.
+// method.1x
 public func run_method1xVal0(_ N: Int) {
   run_method1x(withType: Val0.self, numberOfTimes: N)
 }
@@ -613,7 +613,7 @@ public func run_method1xRef4(_ N: Int) {
   run_method1x(withType: Ref4.self, numberOfTimes: N)
 }
 
-// method.2x.
+// method.2x
 public func run_method2xVal0(_ N: Int) {
   run_method2x(withType: Val0.self, numberOfTimes: N)
 }
@@ -642,7 +642,7 @@ public func run_method2xRef4(_ N: Int) {
   run_method2x(withType: Ref4.self, numberOfTimes: N)
 }
 
-// Pass.method.1x.
+// Pass.method.1x
 public func run_Pass_method1xVal0(_ N: Int) {
   run_Pass_method1x(withType: Val0.self, numberOfTimes: N)
 }
@@ -671,7 +671,7 @@ public func run_Pass_method1xRef4(_ N: Int) {
   run_Pass_method1x(withType: Ref4.self, numberOfTimes: N)
 }
 
-// Pass.method.2x.
+// Pass.method.2x
 public func run_Pass_method2xVal0(_ N: Int) {
   run_Pass_method2x(withType: Val0.self, numberOfTimes: N)
 }
@@ -700,7 +700,7 @@ public func run_Pass_method2xRef4(_ N: Int) {
   run_Pass_method2x(withType: Ref4.self, numberOfTimes: N)
 }
 
-// Mutating.
+// Mutating
 public func run_MutatingVal0(_ N: Int) {
   run_Mutating(withType: Val0.self, numberOfTimes: N)
 }
@@ -729,7 +729,7 @@ public func run_MutatingRef4(_ N: Int) {
   run_Mutating(withType: Ref4.self, numberOfTimes: N)
 }
 
-// MutatingAndNonMutating.
+// MutatingAndNonMutating
 public func run_MutatingAndNonMutatingVal0(_ N: Int) {
   run_MutatingAndNonMutating(withType: Val0.self, numberOfTimes: N)
 }
@@ -758,7 +758,7 @@ public func run_MutatingAndNonMutatingRef4(_ N: Int) {
   run_MutatingAndNonMutating(withType: Ref4.self, numberOfTimes: N)
 }
 
-// Array.init.
+// Array.init
 public func run_Array_initVal0(_ N: Int) {
   run_Array_init(withType: Val0.self, numberOfTimes: N)
 }
@@ -785,151 +785,6 @@ public func run_Array_initRef3(_ N: Int) {
 }
 public func run_Array_initRef4(_ N: Int) {
   run_Array_init(withType: Ref4.self, numberOfTimes: N)
-}
-
-// Array.method.1x.
-public func run_Array_method1xVal0(_ N: Int) {
-  run_Array_method1x(withType: Val0.self, numberOfTimes: N)
-}
-public func run_Array_method1xVal1(_ N: Int) {
-  run_Array_method1x(withType: Val1.self, numberOfTimes: N)
-}
-public func run_Array_method1xVal2(_ N: Int) {
-  run_Array_method1x(withType: Val2.self, numberOfTimes: N)
-}
-public func run_Array_method1xVal3(_ N: Int) {
-  run_Array_method1x(withType: Val3.self, numberOfTimes: N)
-}
-public func run_Array_method1xVal4(_ N: Int) {
-  run_Array_method1x(withType: Val4.self, numberOfTimes: N)
-}
-public func run_Array_method1xRef1(_ N: Int) {
-  run_Array_method1x(withType: Ref1.self, numberOfTimes: N)
-}
-public func run_Array_method1xRef2(_ N: Int) {
-  run_Array_method1x(withType: Ref2.self, numberOfTimes: N)
-}
-public func run_Array_method1xRef3(_ N: Int) {
-  run_Array_method1x(withType: Ref3.self, numberOfTimes: N)
-}
-public func run_Array_method1xRef4(_ N: Int) {
-  run_Array_method1x(withType: Ref4.self, numberOfTimes: N)
-}
-
-// Array.method.2x.
-public func run_Array_method2xVal0(_ N: Int) {
-  run_Array_method2x(withType: Val0.self, numberOfTimes: N)
-}
-public func run_Array_method2xVal1(_ N: Int) {
-  run_Array_method2x(withType: Val1.self, numberOfTimes: N)
-}
-public func run_Array_method2xVal2(_ N: Int) {
-  run_Array_method2x(withType: Val2.self, numberOfTimes: N)
-}
-public func run_Array_method2xVal3(_ N: Int) {
-  run_Array_method2x(withType: Val3.self, numberOfTimes: N)
-}
-public func run_Array_method2xVal4(_ N: Int) {
-  run_Array_method2x(withType: Val4.self, numberOfTimes: N)
-}
-public func run_Array_method2xRef1(_ N: Int) {
-  run_Array_method2x(withType: Ref1.self, numberOfTimes: N)
-}
-public func run_Array_method2xRef2(_ N: Int) {
-  run_Array_method2x(withType: Ref2.self, numberOfTimes: N)
-}
-public func run_Array_method2xRef3(_ N: Int) {
-  run_Array_method2x(withType: Ref3.self, numberOfTimes: N)
-}
-public func run_Array_method2xRef4(_ N: Int) {
-  run_Array_method2x(withType: Ref4.self, numberOfTimes: N)
-}
-
-// Array.Mutating.
-public func run_ArrayMutatingVal0(_ N: Int) {
-  run_ArrayMutating(withType: Val0.self, numberOfTimes: N)
-}
-public func run_ArrayMutatingVal1(_ N: Int) {
-  run_ArrayMutating(withType: Val1.self, numberOfTimes: N)
-}
-public func run_ArrayMutatingVal2(_ N: Int) {
-  run_ArrayMutating(withType: Val2.self, numberOfTimes: N)
-}
-public func run_ArrayMutatingVal3(_ N: Int) {
-  run_ArrayMutating(withType: Val3.self, numberOfTimes: N)
-}
-public func run_ArrayMutatingVal4(_ N: Int) {
-  run_ArrayMutating(withType: Val4.self, numberOfTimes: N)
-}
-public func run_ArrayMutatingRef1(_ N: Int) {
-  run_ArrayMutating(withType: Ref1.self, numberOfTimes: N)
-}
-public func run_ArrayMutatingRef2(_ N: Int) {
-  run_ArrayMutating(withType: Ref2.self, numberOfTimes: N)
-}
-public func run_ArrayMutatingRef3(_ N: Int) {
-  run_ArrayMutating(withType: Ref3.self, numberOfTimes: N)
-}
-public func run_ArrayMutatingRef4(_ N: Int) {
-  run_ArrayMutating(withType: Ref4.self, numberOfTimes: N)
-}
-
-// Array.Shift.
-public func run_ArrayShiftVal0(_ N: Int) {
-  run_ArrayShift(withType: Val0.self, numberOfTimes: N)
-}
-public func run_ArrayShiftVal1(_ N: Int) {
-  run_ArrayShift(withType: Val1.self, numberOfTimes: N)
-}
-public func run_ArrayShiftVal2(_ N: Int) {
-  run_ArrayShift(withType: Val2.self, numberOfTimes: N)
-}
-public func run_ArrayShiftVal3(_ N: Int) {
-  run_ArrayShift(withType: Val3.self, numberOfTimes: N)
-}
-public func run_ArrayShiftVal4(_ N: Int) {
-  run_ArrayShift(withType: Val4.self, numberOfTimes: N)
-}
-public func run_ArrayShiftRef1(_ N: Int) {
-  run_ArrayShift(withType: Ref1.self, numberOfTimes: N)
-}
-public func run_ArrayShiftRef2(_ N: Int) {
-  run_ArrayShift(withType: Ref2.self, numberOfTimes: N)
-}
-public func run_ArrayShiftRef3(_ N: Int) {
-  run_ArrayShift(withType: Ref3.self, numberOfTimes: N)
-}
-public func run_ArrayShiftRef4(_ N: Int) {
-  run_ArrayShift(withType: Ref4.self, numberOfTimes: N)
-}
-
-// Array.ConditionalShift.
-public func run_ArrayConditionalShiftVal0(_ N: Int) {
-  run_ArrayConditionalShift(withType: Val0.self, numberOfTimes: N)
-}
-public func run_ArrayConditionalShiftVal1(_ N: Int) {
-  run_ArrayConditionalShift(withType: Val1.self, numberOfTimes: N)
-}
-public func run_ArrayConditionalShiftVal2(_ N: Int) {
-  run_ArrayConditionalShift(withType: Val2.self, numberOfTimes: N)
-}
-public func run_ArrayConditionalShiftVal3(_ N: Int) {
-  run_ArrayConditionalShift(withType: Val3.self, numberOfTimes: N)
-}
-public func run_ArrayConditionalShiftVal4(_ N: Int) {
-  run_ArrayConditionalShift(withType: Val4.self, numberOfTimes: N)
-}
-public func run_ArrayConditionalShiftRef1(_ N: Int) {
-  run_ArrayConditionalShift(withType: Ref1.self, numberOfTimes: N)
-}
-public func run_ArrayConditionalShiftRef2(_ N: Int) {
-  run_ArrayConditionalShift(withType: Ref2.self, numberOfTimes: N)
-}
-public func run_ArrayConditionalShiftRef3(_ N: Int) {
-  run_ArrayConditionalShift(withType: Ref3.self, numberOfTimes: N)
-}
-public func run_ArrayConditionalShiftRef4(_ N: Int) {
-  run_ArrayConditionalShift(withType: Ref4.self, numberOfTimes: N)
 }
 
 // Local Variables:

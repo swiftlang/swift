@@ -106,8 +106,11 @@ Workloads = [
 Vars = [(0, 0), (1, 3), (2, 7), (3, 13)]
 Refs = ['Ref' + str(i) for i in range(1, 5)]
 Vals = ['Val' + str(i) for i in range(0, 5)]
-Names = [group + '.' + variant
+Names = [(group + '.' + variant, group, variant)
          for (group, _, _, _) in Workloads for variant in Refs + Vals]
+
+def typed_variants(name):
+ return 'Array' not in name or 'Array.init' in name
 
 import re
 
@@ -122,12 +125,13 @@ def run_function_name(benchmark_name):
         '', benchmark_name)))
 }%
 public let ExistentialPerformance: [BenchmarkInfo] = [
-% for Name in Names:
+% for (Name, Group, Variant) in Names:
   BenchmarkInfo(name: "Existential.${Name}",
     runFunction: ${
-    run_function_name(Name)}, tags: ${
+    run_function_name(Name) if typed_variants(Group) else
+    run_function_name(Group)}, tags: ${
     'ta' if 'Array' in Name else 't'}${
-    (', setUpFunction: ca' + Name.split('.')[-1]) if 'Array' in Name else '' }),
+    (', setUpFunction: ca' + Variant) if not typed_variants(Group) else '' }),
 % end
 ]
 
@@ -242,22 +246,30 @@ func passExistentialTwiceTwoMethodCalls(_ e0: Existential, _ e1: Existential)
   -> Bool {
   return e0.doIt() && e1.doIt() && e0.reallyDoIt() && e1.reallyDoIt()
 }
-% for (name, setup, multiple, workload) in Workloads:
+%{
+def type(name):
+  return (
+    '<T: Existential>(withType: T.Type, numberOfTimes' if typed_variants(name)
+    else '(_')
+}%
+% for (group, setup, multiple, workload) in Workloads:
 ${"""
-func {0}<T: Existential>(withType: T.Type, numberOfTimes N: Int) {{
+func {0}{4} N: Int) {{
 {1}
   for _ in 0 ..< N * {2} {{{3}  }}
-}}""".format(run_function_name(name), setup, multiple, workload)}
+}}""".format(run_function_name(group), setup, multiple, workload, type(group))}
 % end
 
-% for (Name, _, _, _) in Workloads:
-// ${Name}.
-%   for Variant in Vals + Refs:
-public func ${run_function_name(Name + '.' + Variant)}(_ N: Int) {
-  ${run_function_name(Name)}(withType: ${Variant}.self, numberOfTimes: N)
+% for (Group, _, _, _) in Workloads:
+%   if typed_variants(Group):
+// ${Group}
+%     for Variant in Vals + Refs:
+public func ${run_function_name(Group + '.' + Variant)}(_ N: Int) {
+  ${run_function_name(Group)}(withType: ${Variant}.self, numberOfTimes: N)
 }
-%   end
+%     end
 
+%   end
 % end
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
