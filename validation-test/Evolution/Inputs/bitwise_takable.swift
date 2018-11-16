@@ -14,9 +14,9 @@ public var s5 = Subject(5)
 
 public struct Container : Reporter {
 #if BEFORE
-  public var v : Subject
+  var v : Subject
 #else
-  weak public var v : Subject?
+  weak var v : Subject?
 #endif
   public init(_ s: Subject) {
     v = s
