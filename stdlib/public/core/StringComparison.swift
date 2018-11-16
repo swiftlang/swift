@@ -124,11 +124,11 @@ internal func _stringCompare(
 
   // Back up to nearest scalar boundary and check if normal and end of segment.
   // If so, we have our answer.
-  while _isContinuation(left[idx]) && idx > 0 { idx &-= 1 }
+  while _isContinuation(left[_unchecked: idx]) && idx > 0 { idx &-= 1 }
 
   // TODO: Refactor this into a function, handle these boundary condition as
   // early returns...
-  if !_isContinuation(right[idx]) {
+  if !_isContinuation(right[_unchecked: idx]) {
     let (leftScalar, leftLen) = _decodeScalar(left, startingAt: idx)
     let (rightScalar, rightLen) = _decodeScalar(right, startingAt: idx)
     _internalInvariant(leftScalar != rightScalar)

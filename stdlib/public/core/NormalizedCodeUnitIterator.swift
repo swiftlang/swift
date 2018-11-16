@@ -132,7 +132,7 @@ extension UnsafeBufferPointer where Element == UInt8 {
       return true
     }
 
-    assert(!_isContinuation(self[index]))
+    assert(!_isContinuation(self[_unchecked: index]))
 
     let cu = _decodeScalar(self, startingAt: index).0
     return cu._hasNormalizationBoundaryBefore

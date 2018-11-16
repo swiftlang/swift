@@ -281,6 +281,23 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
 %end
   }
 
+  // Skip all debug and runtime checks
+  @inlinable // unsafe-performance
+  internal subscript(_unchecked i: Int) -> Element {
+    get {
+      _internalInvariant(i >= 0)
+      _internalInvariant(i < endIndex)
+      return _position._unsafelyUnwrappedUnchecked[i]
+    }
+%if Mutable:
+    nonmutating _modify {
+      _internalInvariant(i >= 0)
+      _internalInvariant(i < endIndex)
+      yield &_position._unsafelyUnwrappedUnchecked[i]
+    }
+%end
+  }
+
   /// Accesses a contiguous subrange of the buffer's elements.
   ///
   /// The accessed slice uses the same indices for the same elements as the

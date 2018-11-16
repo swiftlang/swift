@@ -74,7 +74,7 @@ extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
         let bufPtr = UnsafeBufferPointer(
           start: rawPtr.baseAddress!.assumingMemoryBound(to: T.self),
           count: count)
-        return bufPtr[i]
+        return bufPtr[_unchecked: i]
       }
       return res
     }
@@ -82,7 +82,7 @@ extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
     set {
       _internalInvariant(i >= 0 && i < count)
       self.withUnsafeMutableBufferPointer { buffer in
-        buffer[i] = newValue
+        buffer[_unchecked: i] = newValue
       }
     }
   }
