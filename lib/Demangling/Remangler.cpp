@@ -1720,7 +1720,7 @@ void Remangler::mangleProtocolRequirementsBaseDescriptor(Node *node) {
 }
 
 void Remangler::mangleProtocolSelfConformanceDescriptor(Node *node) {
-  mangleProtocol(node->getChild(0));
+  manglePureProtocol(node->getChild(0));
   Buffer << "MS";
 }
 

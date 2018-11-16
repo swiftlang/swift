@@ -2424,6 +2424,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // decl blocks and sil blocks.
   registerSILAbbr<decls_block::AbstractProtocolConformanceLayout>();
   registerSILAbbr<decls_block::NormalProtocolConformanceLayout>();
+  registerSILAbbr<decls_block::SelfProtocolConformanceLayout>();
   registerSILAbbr<decls_block::SpecializedProtocolConformanceLayout>();
   registerSILAbbr<decls_block::InheritedProtocolConformanceLayout>();
   registerSILAbbr<decls_block::NormalProtocolConformanceIdLayout>();

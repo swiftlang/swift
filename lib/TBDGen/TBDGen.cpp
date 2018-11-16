@@ -132,19 +132,15 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
                                     ValueDecl *witnessDecl) {
       auto witnessLinkage = SILDeclRef(witnessDecl).getLinkage(ForDefinition);
       if (conformanceIsFixed &&
-          fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage)) {
+          (isa<SelfProtocolConformance>(rootConformance) ||
+           fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage))) {
         Mangle::ASTMangler Mangler;
         addSymbol(
             Mangler.mangleWitnessThunk(rootConformance, requirementDecl));
       }
     };
 
-    // FIXME: skipping witnesses for self-conformances?
-    auto normalConformance =
-      dyn_cast<NormalProtocolConformance>(rootConformance);
-    if (!normalConformance) continue;
-
-    normalConformance->forEachValueWitness(
+    rootConformance->forEachValueWitness(
         nullptr, [&](ValueDecl *valueReq, Witness witness) {
           auto witnessDecl = witness.getDecl();
           if (isa<AbstractFunctionDecl>(valueReq)) {
@@ -464,6 +460,9 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
           addAssociatedTypeDescriptor(assocType);
       }
     }
+
+    // Include the self-conformance.
+    addConformances(PD);
   }
 
 #ifndef NDEBUG

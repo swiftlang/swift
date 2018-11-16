@@ -364,6 +364,33 @@ public:
   ConcreteDeclRef getWitnessDeclRef(ValueDecl *requirement,
                                     LazyResolver *resolver) const;
 
+  /// Apply the given function object to each value witness within this
+  /// protocol conformance.
+  ///
+  /// The function object should accept a \c ValueDecl* for the requirement
+  /// followed by the \c Witness for the witness. Note that a generic
+  /// witness will only be specialized if the conformance came from the current
+  /// file.
+  template<typename F>
+  void forEachValueWitness(LazyResolver *resolver, F f) const {
+    const ProtocolDecl *protocol = getProtocol();
+    for (auto req : protocol->getMembers()) {
+      auto valueReq = dyn_cast<ValueDecl>(req);
+      if (!valueReq || isa<AssociatedTypeDecl>(valueReq) ||
+          valueReq->isInvalid())
+        continue;
+
+      if (!valueReq->isProtocolRequirement())
+        continue;
+
+      // If we don't have and cannot resolve witnesses, skip it.
+      if (!resolver && !hasWitness(valueReq))
+        continue;
+
+      f(valueReq, getWitness(valueReq, resolver));
+    }
+  }
+
   static bool classof(const ProtocolConformance *conformance) {
     return conformance->getKind() == ProtocolConformanceKind::Normal ||
            conformance->getKind() == ProtocolConformanceKind::Self;
@@ -638,33 +665,6 @@ public:
 
   /// Set the witness for the given requirement.
   void setWitness(ValueDecl *requirement, Witness witness) const;
-
-  /// Apply the given function object to each value witness within this
-  /// protocol conformance.
-  ///
-  /// The function object should accept a \c ValueDecl* for the requirement
-  /// followed by the \c Witness for the witness. Note that a generic
-  /// witness will only be specialized if the conformance came from the current
-  /// file.
-  template<typename F>
-  void forEachValueWitness(LazyResolver *resolver, F f) const {
-    const ProtocolDecl *protocol = getProtocol();
-    for (auto req : protocol->getMembers()) {
-      auto valueReq = dyn_cast<ValueDecl>(req);
-      if (!valueReq || isa<AssociatedTypeDecl>(valueReq) ||
-          valueReq->isInvalid())
-        continue;
-
-      if (!valueReq->isProtocolRequirement())
-        continue;
-
-      // If we don't have and cannot resolve witnesses, skip it.
-      if (!resolver && !hasWitness(valueReq))
-        continue;
-
-      f(valueReq, getWitness(valueReq, resolver));
-    }
-  }
 
   /// Retrieve the protocol conformances that satisfy the requirements of the
   /// protocol, which line up with the conformance constraints in the
