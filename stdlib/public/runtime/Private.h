@@ -218,7 +218,7 @@ public:
   _contextDescriptorMatchesMangling(const ContextDescriptor *context,
                                     Demangle::NodePointer node);
   
-  const TypeContextDescriptor *
+  const ContextDescriptor *
   _searchConformancesByMangledTypeName(Demangle::NodePointer node);
 
   Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type,
@@ -470,6 +470,10 @@ public:
                            const Metadata *type,
                            ProtocolDescriptorRef protocol,
                            const WitnessTable **conformance);
+
+  /// Construct type metadata for the given protocol.
+  const Metadata *
+  _getSimpleProtocolTypeMetadata(const ProtocolDescriptor *protocol);
 
   /// Given a type that we know can be used with the given conformance, find
   /// the superclass that introduced the conformance.

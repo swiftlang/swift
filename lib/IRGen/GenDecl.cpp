@@ -2530,22 +2530,30 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
 }
 
 static TypeEntityReference
-getTypeContextDescriptorEntityReference(IRGenModule &IGM,
-                                        NominalTypeDecl *decl) {
-  // A reference to a concrete type.
+getContextDescriptorEntityReference(IRGenModule &IGM, const LinkEntity &entity){
   // TODO: consider using a symbolic reference (i.e. a symbol string
   // to be looked up dynamically) for types defined outside the module.
-  auto kind = TypeReferenceKind::DirectNominalTypeDescriptor;
-  auto entity = LinkEntity::forNominalTypeDescriptor(decl);
-
-  IGM.IRGen.noteUseOfTypeContextDescriptor(decl, DontRequireMetadata);
   auto ref = IGM.getAddrOfLLVMVariableOrGOTEquivalent(entity);
-
-  if (ref.isIndirect()) {
-    kind = TypeReferenceKind::IndirectNominalTypeDescriptor;
-  }
-
+  auto kind = ref.isIndirect()
+                ? TypeReferenceKind::IndirectTypeDescriptor
+                : TypeReferenceKind::DirectTypeDescriptor;
   return TypeEntityReference(kind, ref.getValue());
+}
+
+static TypeEntityReference
+getTypeContextDescriptorEntityReference(IRGenModule &IGM,
+                                        NominalTypeDecl *decl) {
+  auto entity = LinkEntity::forNominalTypeDescriptor(decl);
+  IGM.IRGen.noteUseOfTypeContextDescriptor(decl, DontRequireMetadata);
+  return getContextDescriptorEntityReference(IGM, entity);
+}
+
+static TypeEntityReference
+getProtocolDescriptorEntityReference(IRGenModule &IGM, ProtocolDecl *protocol) {
+  assert(!protocol->isObjC() &&
+         "objc protocols don't have swift protocol descriptors");
+  auto entity = LinkEntity::forProtocolDescriptor(protocol);
+  return getContextDescriptorEntityReference(IGM, entity);
 }
 
 static TypeEntityReference
@@ -2577,6 +2585,11 @@ getRuntimeOnlyClassEntityReference(IRGenModule &IGM, ClassDecl *cls) {
 
 TypeEntityReference
 IRGenModule::getTypeEntityReference(NominalTypeDecl *decl) {
+  if (auto protocol = dyn_cast<ProtocolDecl>(decl)) {
+    assert(!protocol->isObjC() && "imported protocols not handled here");
+    return getProtocolDescriptorEntityReference(*this, protocol);
+  }
+
   auto clas = dyn_cast<ClassDecl>(decl);
   if (!clas) {
     return getTypeContextDescriptorEntityReference(*this, decl);

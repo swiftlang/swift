@@ -98,7 +98,7 @@ static ClassMetadataBounds
 computeMetadataBoundsForSuperclass(const void *ref,
                                    TypeReferenceKind refKind) {
   switch (refKind) {
-  case TypeReferenceKind::IndirectNominalTypeDescriptor: {
+  case TypeReferenceKind::IndirectTypeDescriptor: {
     auto description = *reinterpret_cast<const ClassDescriptor * const *>(ref);
     if (!description) {
       swift::fatalError(0, "instantiating class metadata for class with "
@@ -107,7 +107,7 @@ computeMetadataBoundsForSuperclass(const void *ref,
     return description->getMetadataBounds();
   }
 
-  case TypeReferenceKind::DirectNominalTypeDescriptor: {
+  case TypeReferenceKind::DirectTypeDescriptor: {
     auto description = reinterpret_cast<const ClassDescriptor *>(ref);
     return description->getMetadataBounds();
   }
@@ -3390,6 +3390,17 @@ static bool anyProtocolIsClassBound(
 }
 #endif
 
+const Metadata *
+swift::_getSimpleProtocolTypeMetadata(const ProtocolDescriptor *protocol) {
+  auto protocolRef = ProtocolDescriptorRef::forSwift(protocol);
+  auto constraint =
+    protocol->getProtocolContextDescriptorFlags().getClassConstraint();
+  return swift_getExistentialTypeMetadata(constraint,
+                                          /*superclass bound*/ nullptr,
+                                          /*num protocols*/ 1,
+                                          &protocolRef);
+}
+
 /// \brief Fetch a uniqued metadata for an existential type. The array
 /// referenced by \c protocols will be sorted in-place.
 const ExistentialTypeMetadata *
@@ -4007,8 +4018,11 @@ swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
         if (!candidate || !conformance->isSynthesizedNonUnique())
           return candidate;
 
+        auto conformingType =
+          cast<TypeContextDescriptor>(conformance->getTypeDescriptor());
+
         return _getForeignWitnessTable(candidate,
-                                       conformance->getTypeContextDescriptor(),
+                                       conformingType,
                                        conformance->getProtocol());
       };
 

@@ -380,12 +380,12 @@ enum : unsigned {
 /// Kinds of type metadata/protocol conformance records.
 enum class TypeReferenceKind : unsigned {
   /// The conformance is for a nominal type referenced directly;
-  /// getNominalTypeDescriptor() points to the nominal type descriptor.
-  DirectNominalTypeDescriptor = 0x00,
+  /// getTypeDescriptor() points to the type context descriptor.
+  DirectTypeDescriptor = 0x00,
 
   /// The conformance is for a nominal type referenced indirectly;
-  /// getNominalTypeDescriptor() points to the nominal type descriptor.
-  IndirectNominalTypeDescriptor = 0x01,
+  /// getTypeDescriptor() points to the type context descriptor.
+  IndirectTypeDescriptor = 0x01,
 
   /// The conformance is for an Objective-C class that should be looked up
   /// by class name.
@@ -402,7 +402,7 @@ enum class TypeReferenceKind : unsigned {
 
   // We only reserve three bits for this in the various places we store it.
 
-  First_Kind = DirectNominalTypeDescriptor,
+  First_Kind = DirectTypeDescriptor,
   Last_Kind = IndirectObjCClass,
 };
 
