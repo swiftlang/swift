@@ -180,6 +180,9 @@ void *$ss32_getErrorEmbeddedNSErrorIndirectyyXlSgSPyxGs0B0RzlF(void *) {
 SWIFT_RUNTIME_STDLIB_INTERNAL
 const long long $SkMp[1] = {0};
 
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSHMp[1] = {0};
+
 // Array
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
@@ -190,10 +193,16 @@ const long long $sSaMn[1] = {0};
 SWIFT_RUNTIME_STDLIB_INTERNAL
 const long long $ssSdVMn[1] = {0};
 
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSDMn[1] = {0};
+
 // Set
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 const long long $ssSeVMn[1] = {0};
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sShMn[1] = {0};
 
 // Mirror
 
@@ -270,4 +279,9 @@ SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift) swift_closure
 MANGLE_SYM(s20_playgroundPrintHookySScSgvg)() {
   return {nullptr, nullptr};
 }
+
+// ObjectiveC Bridgeable
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $ss21_ObjectiveCBridgeableMp[1] = {0};
 
