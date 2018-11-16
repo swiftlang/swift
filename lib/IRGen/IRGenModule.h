@@ -1277,7 +1277,8 @@ public:
                                       ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfObjCModuleContextDescriptor();
   llvm::Constant *getAddrOfClangImporterModuleContextDescriptor();
-  ConstantReference getAddrOfParentContextDescriptor(DeclContext *from);
+  ConstantReference getAddrOfParentContextDescriptor(DeclContext *from,
+                                                     bool fromAnonymousContext);
   llvm::Constant *getAddrOfGenericEnvironment(CanGenericSignature signature);
   llvm::Constant *getAddrOfProtocolRequirementsBaseDescriptor(
                                                   ProtocolDecl *proto);
