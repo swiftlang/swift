@@ -230,7 +230,6 @@ Var Hasher._core has declared type change from _BufferingHasher<Hasher._Core> to
 Var Hasher._Core._buffer is added to a non-resilient type
 Var Hasher._Core._state in a non-resilient type changes position from 0 to 1
 
-Class _AbstractStringStorage has been removed
 Constructor _StringGuts.init(_:) has been removed
 Constructor _StringObject.init(_:) has been removed
 Constructor _StringStorage.init() has been removed
@@ -517,3 +516,15 @@ Func LazyCollectionProtocol.reversed() has been removed
 Var LazyCollectionProtocol.lazy has declared type change from LazyCollection<τ_0_0.Elements> to LazySequence<τ_0_0.Elements>
 
 Class __SwiftNativeNSString has been removed
+
+Class _AbstractStringStorage has been changed to a Protocol
+Class _AbstractStringStorage has generic signature change from to <τ_0_0 : _NSCopying>
+Class _AbstractStringStorage has removed conformance to _NSCopying
+Class _AbstractStringStorage has removed conformance to _NSStringCore
+Class _AbstractStringStorage has removed conformance to _ShadowProtocol
+Class _AbstractStringStorage is now without @_fixed_layout
+Class _SharedStringStorage has changed its super class from _AbstractStringStorage to __SwiftNativeNSString
+Class _StringStorage has changed its super class from _AbstractStringStorage to __SwiftNativeNSString
+Constructor _AbstractStringStorage.init() has been removed
+Func _AbstractStringStorage.copy(with:) has been removed
+Func _AbstractStringStorage.getOrComputeBreadcrumbs() has been removed

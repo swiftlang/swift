@@ -182,6 +182,7 @@ extension String.UTF16View: BidirectionalCollection {
 
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     // TODO(String performance) known-ASCII fast path
+    
     if _slowPath(_guts.isForeign) {
       return _foreignIndex(i, offsetBy: n)
     }
@@ -461,10 +462,12 @@ extension String.UTF16View {
     // Trivial and common: start
     if idx == startIndex { return 0 }
 
+    if _guts.isASCII { return idx.encodedOffset }
+    
     if idx.encodedOffset < _shortHeuristic || !_guts.hasBreadcrumbs {
       return _distance(from: startIndex, to: idx)
     }
-
+    
     // Simple and common: endIndex aka `length`.
     let breadcrumbsPtr = _guts.getBreadcrumbsPtr()
     if idx == endIndex { return breadcrumbsPtr.pointee.utf16Length }
@@ -480,7 +483,7 @@ extension String.UTF16View {
   internal func _nativeGetIndex(for offset: Int) -> Index {
     // Trivial and common: start
     if offset == 0 { return startIndex }
-
+    
     if offset < _shortHeuristic || !_guts.hasBreadcrumbs {
       return _index(startIndex, offsetBy: offset)
     }
