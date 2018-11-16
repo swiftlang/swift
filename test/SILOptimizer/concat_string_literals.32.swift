@@ -4,6 +4,9 @@
 // We have a separate test for 64-bit architectures.
 // REQUIRES: PTRSIZE=32
 
+// rdar://problem/46096829 - stdlib-DebugAssert builds fail this test
+// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+
 // NOTE: 25185.byteSwapped = 0x62 'a', 0x61 'b'
 // CHECK-LABEL: test_ascii_scalar_scalar2
 // CHECK: insertvalue { i32, i32, i32 } { i32 25185,
