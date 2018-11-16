@@ -452,17 +452,6 @@ public:
   /// Emit a property descriptor for the given storage decl if it needs one.
   void tryEmitPropertyDescriptor(AbstractStorageDecl *decl);
 
-  /// SWIFT_ENABLE_TENSORFLOW
-  /// Get the range of corresponding SIL parameter indices for the given Swift
-  /// parameter index. For example,
-  ///   func foo(x: (Float, Float), y: Float) -> Float
-  ///            ^ index 0
-  ///   sil @foo : $@convention(thin) (Float, Float, Float) -> Float
-  ///                                  ^      ^ 
-  ///                                  corresponding indices 0...1
-  IntRange<unsigned>
-  getLoweredFunctionParameterIndex(unsigned paramIndex, AnyFunctionType *ty);
-
   /// Get or create the shared profiler instance for a type's constructors.
   /// This takes care to create separate profilers for extensions, which may
   /// reside in a different file than the one where the base type is defined.

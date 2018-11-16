@@ -4085,3 +4085,69 @@ Type TypeBase::openAnyExistentialType(ArchetypeType *&opened) {
   opened = ArchetypeType::getOpened(this);
   return opened;
 }
+
+// SWIFT_ENABLE_TENSORFLOW
+AnyFunctionType *AnyFunctionType::getAutoDiffAdjointFunctionType(
+    const AutoDiffParameterIndices &indices, const TupleType *primalResultTy) {
+  assert(!indices.isEmpty() && "there must be at least one wrt index");
+
+  // Makes a function with the same generic signature as `copy`, but with
+  // `params` parameters and `retTy` return type.
+  auto makeFunctionType = [&](AnyFunctionType *copy,
+                              ArrayRef<AnyFunctionType::Param> params,
+                              Type retTy) -> AnyFunctionType * {
+    if (auto *genFunctionType = copy->getAs<GenericFunctionType>()) {
+      return GenericFunctionType::get(genFunctionType->getGenericSignature(),
+                                      params, retTy);
+    }
+    return FunctionType::get(params, retTy);
+  };
+
+  // Compute the return type of the adjoint.
+  SmallVector<TupleTypeElt, 8> retElts;
+  SmallVector<Type, 8> wrtParamTypes;
+  indices.getSubsetParameterTypes(this, wrtParamTypes);
+  for (auto wrtParamType : wrtParamTypes)
+    retElts.push_back(wrtParamType);
+
+  // If collected `retElts` has only 1 element, use that element as adjoint's
+  // return type. Otherwise, make a tuple out of `retElts` as adjoint's return
+  // type.
+  Type retTy = retElts.size() > 1
+      ? TupleType::get(retElts, getASTContext())
+      : retElts[0].getType();
+
+  // If this is a method, unwrap the function type so that we can see the
+  // non-self parameters.
+  AnyFunctionType *unwrapped = this;
+  if (indices.isMethod())
+    unwrapped = unwrapped->getResult()->castTo<AnyFunctionType>();
+
+  // Compute the adjoint parameters.
+  SmallVector<AnyFunctionType::Param, 8> adjointParams;
+
+  // The first parameters are the same as those of the original function.
+  for (auto &param : unwrapped->getParams())
+    adjointParams.push_back(param);
+
+  // If the primal exists, the checkpoints type is the primal result type.
+  if (primalResultTy) {
+    auto checkpointsTy = primalResultTy->getElement(0).getType();
+    adjointParams.push_back(AnyFunctionType::Param(checkpointsTy));
+  }
+
+  // The original result and the seed have the same type as the original
+  // return type.
+  adjointParams.append(2, AnyFunctionType::Param(unwrapped->getResult()));
+
+  // Build the adjoint type.
+  AnyFunctionType *adjoint = makeFunctionType(unwrapped, adjointParams,
+                                              retTy);
+
+  // If this is a method, wrap the adjoint type in an additional "(Self) ->"
+  // curry level.
+  if (indices.isMethod())
+    adjoint = makeFunctionType(this, getParams(), adjoint);
+
+  return adjoint;
+}

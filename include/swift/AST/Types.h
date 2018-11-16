@@ -3047,6 +3047,9 @@ public:
   Differentiability getDifferentiability() const {
     return getExtInfo().getDifferentiability();
   }
+
+  AnyFunctionType *getAutoDiffAdjointFunctionType(
+      const AutoDiffParameterIndices &indices, const TupleType *primalResultTy);
   
   /// \brief True if this type allows an implicit conversion from a function
   /// argument expression of type T to a function of type () -> T.

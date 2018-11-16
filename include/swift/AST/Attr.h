@@ -1338,6 +1338,8 @@ private:
   FuncDecl *PrimalFunction = nullptr;
   /// The adjoint function, to be resolved by the type checker.
   FuncDecl *AdjointFunction = nullptr;
+  /// Checked parameter indices, to be resolved by the type checker.
+  AutoDiffParameterIndices *CheckedParameterIndices = nullptr;
 
   explicit DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
                               AutoDiffMode mode, SourceLoc modeLoc,
@@ -1359,6 +1361,13 @@ public:
   SourceLoc getModeLoc() const { return ModeLoc; }
   Optional<DeclNameWithLoc> getPrimal() const { return Primal; }
   Optional<DeclNameWithLoc> getAdjoint() const { return Adjoint; }
+
+  AutoDiffParameterIndices *getCheckedParameterIndices() const {
+    return CheckedParameterIndices;
+  }
+  void setCheckedParameterIndices(AutoDiffParameterIndices *pi) {
+    CheckedParameterIndices = pi;
+  }
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }
 

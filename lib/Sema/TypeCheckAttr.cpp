@@ -2114,8 +2114,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // '@differentiable' attribute is OnFunc only, rejected by the early checker.
   auto *original = cast<FuncDecl>(D);
   auto isInstanceMethod = original->isInstanceMember();
-  auto selfDecl = original->getImplicitSelfDecl();
   auto &ctx = original->getASTContext();
+  auto *originalFnTy = original->getInterfaceType()->castTo<AnyFunctionType>();
 
   // If the original function has no parameters or returns the empty tuple
   // type, there's nothing to differentiate from or with-respect-to.
@@ -2290,63 +2290,29 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     attr->setPrimalFunction(primal);
   }
 
-  // Compute the return type of the adjoint function.
-  auto wrtParams = attr->getParameters();
-  SmallVector<TupleTypeElt, 8> retElts;
+  // Validate the 'wrt:' parameters.
 
-  // If `type` is not allowed as a wrt type, diagnoses and returns true.
-  auto checkAndDiagnoseWrtType = [&](SourceLoc loc, Type type) -> bool {
-    if (type->isAnyClassReferenceType() || type->isExistentialType()) {
-      TC.diagnose(
-          loc,
-          diag::differentiable_attr_cannot_diff_wrt_objects_or_existentials,
-          type);
-      return true;
-    }
-    return false;
-  };
+  // These are the wrt param indices specified by the user, which have not yet
+  // been checked.
+  auto uncheckedWrtParams = attr->getParameters();
 
-  // If the self type of `original` is allowed as a wrt param, appends the
-  // corresponding return type to `retElts` and returns false. Otherwise,
-  // returns true and diagnoses.
-  auto addWrtSelfRetTyOrDiagnose = [&](SourceLoc loc) -> bool {
-    auto parent = original->getParent();
-    if (checkAndDiagnoseWrtType(loc, parent->getSelfTypeInContext()))
-      return true;
-    retElts.push_back(parent->getSelfInterfaceType());
-    return false;
-  };
+  // We will put the checked wrt param indices here.
+  auto *checkedWrtParamIndices = AutoDiffParameterIndices::create(
+      ctx, originalFnTy,
+      /*isMethod*/original->getImplicitSelfDecl() ? true : false);
 
-  // If `param` is allowed as a wrt param, appends the corresponding return type
-  // to `retElts` and returns false. Otherwise, returns true and diagnoses.
-  auto addWrtParamRetTyOrDiagnose = [&](SourceLoc loc,
-                                        const ParamDecl *param) -> bool {
-    if (checkAndDiagnoseWrtType(loc, param->getType()))
-      return true;
-    retElts.push_back(param->getInterfaceType());
-    return false;
-  };
-
-  // When 'wrt:' is not specified, the adjoint's return type is the type of all
-  // of original's parameters. The self parameter is intentionally excluded.
-  if (wrtParams.empty()) {
-    auto attrLoc = attr->getLocation();
-    for (auto *param : originalParams)
-      if (addWrtParamRetTyOrDiagnose(attrLoc, param))
-        return;
-  }
-  // If 'wrt:' is specified, make sure it's valid and compute the corresponding
-  // adjoint return type.
-  else {
-    // This helps determine if the parameter indices are ascending.
+  if (uncheckedWrtParams.empty()) {
+    // If 'wrt:' is not specified, the wrt parameters are all the parameters in
+    // the main parameter group. Self is intentionally excluded.
+    checkedWrtParamIndices->setAllNonSelfParameters();
+  } else {
+    // 'wrt:' is specified. Validate and collect the selected parameters.
     int lastIndex = -1;
-    // Verify each parameter in 'wrt:' list and collect return types to
-    // `retElts`.
-    for (size_t i = 0; i < wrtParams.size(); i++) {
-      auto paramLoc = wrtParams[i].getLoc();
-      switch (wrtParams[i].getKind()) {
+    for (size_t i = 0; i < uncheckedWrtParams.size(); i++) {
+      auto paramLoc = uncheckedWrtParams[i].getLoc();
+      switch (uncheckedWrtParams[i].getKind()) {
       case AutoDiffParameter::Kind::Index: {
-        unsigned index = wrtParams[i].getIndex();
+        unsigned index = uncheckedWrtParams[i].getIndex();
         if ((int)index <= lastIndex) {
           TC.diagnose(paramLoc,
                       diag::differentiable_attr_wrt_indices_must_be_ascending);
@@ -2358,8 +2324,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                       diag::differentiable_attr_wrt_index_out_of_bounds);
           return;
         }
-        if (addWrtParamRetTyOrDiagnose(paramLoc, originalParams[index]))
-          return;
+        checkedWrtParamIndices->setNonSelfParameter(index);
         lastIndex = index;
         break;
       }
@@ -2376,8 +2341,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                       diag::differentiable_attr_wrt_self_must_be_first);
           return;
         }
-        if (addWrtSelfRetTyOrDiagnose(paramLoc))
-          return;
+        checkedWrtParamIndices->setSelfParameter();
         break;
       }
       }
@@ -2387,7 +2351,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // This can happen when someone puts the attribute on an instance method with
   // no paramters (other than the self parameter), and does not specify a wrt
   // list.
-  if (retElts.size() == 0) {
+  if (checkedWrtParamIndices->isEmpty()) {
     TC.diagnose(attr->getLocation(), diag::differentiable_attr_wrt_nothing,
                 original->getName())
         .highlight(original->getSourceRange());
@@ -2395,55 +2359,30 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return;
   }
 
-  // If collected `retElts` has only 1 element, use that element as adjoint's
-  // return type. Otherwise, make a tuple out of `retElts` as adjoint's return
-  // type.
-  Type retTy = retElts.size() > 1
-      ? TupleType::get(retElts, ctx)
-      : retElts[0].getType();
-
-  // Compute parameters of the adjoint function.
-  SmallVector<FunctionType::Param, 8> paramTypes;
-  // The first parameters are the same as those of the original function.
-  for (auto *param : originalParams)
-    paramTypes.push_back(FunctionType::Param(param->getInterfaceType()));
-
-  // The remaining parameters are the checkpoints data structure (optional), the
-  // original result, and the seed.
-  //
-  // If the primal exists, the checkpoints type is the primal result type.
-  if (primal) {
-    auto *primResultTy = primal->getResultInterfaceType()->getAs<TupleType>();
-    auto checkpointsTy = primResultTy->getElement(0).getType();
-    paramTypes.push_back(FunctionType::Param(checkpointsTy));
+  // Check that the user has only selected wrt params with allowed types.
+  SmallVector<Type, 4> wrtParamTypes;
+  checkedWrtParamIndices->getSubsetParameterTypes(originalFnTy, wrtParamTypes);
+  for (unsigned i : range(wrtParamTypes.size())) {
+    auto wrtParamType = original->mapTypeIntoContext(wrtParamTypes[i]);
+    SourceLoc loc;
+    if (uncheckedWrtParams.empty()) {
+      loc = attr->getLocation();
+    } else {
+      loc = uncheckedWrtParams[i].getLoc();
+    }
+    if (wrtParamType->isAnyClassReferenceType() ||
+        wrtParamType->isExistentialType()) {
+      TC.diagnose(
+          loc,
+          diag::differentiable_attr_cannot_diff_wrt_objects_or_existentials,
+          wrtParamType);
+      attr->setInvalid();
+      return;
+    }
   }
-  // The original result and the seed have the same type as the original return
-  // type.
-  paramTypes.append(2, FunctionType::Param(original->getResultInterfaceType()));
 
-  // Compute the expected adjoint function type, using the same generic
-  // signature as the original function.
-  AnyFunctionType *expectedAdjointFnTy = nullptr;
-
-  auto getFunctionType = [&](GenericSignature *genSig,
-                             ArrayRef<AnyFunctionType::Param> params,
-                             Type result) -> AnyFunctionType * {
-    AnyFunctionType::ExtInfo extInfo;
-    if (genSig)
-      return GenericFunctionType::get(genSig, params, result, extInfo);
-    return FunctionType::get(params, result, extInfo);
-  };
-
-  auto originalGenSig = original->getGenericSignature();
-  if (!selfDecl) {
-    expectedAdjointFnTy = getFunctionType(originalGenSig, paramTypes, retTy);
-  } else {
-    expectedAdjointFnTy =
-      FunctionType::get(paramTypes, retTy, FunctionType::ExtInfo());
-    FunctionType::Param selfParam(selfDecl->getInterfaceType());
-    expectedAdjointFnTy = getFunctionType(originalGenSig, { selfParam },
-                                          expectedAdjointFnTy);
-  }
+  // Memorize the checked parameter indices in the attribute.
+  attr->setCheckedParameterIndices(checkedWrtParamIndices);
 
   // Resolve the adjoint declaration.
   FuncDecl *adjoint = nullptr;
@@ -2451,7 +2390,14 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // If the adjoint is not specified, back out.
   if (!adjointSpecifier)
     return;
-  
+
+  TupleType *primalResultTy = primal ?
+      primal->getResultInterfaceType()->getAs<TupleType>() :
+      nullptr;
+  AnyFunctionType *expectedAdjointFnTy =
+      originalFnTy->getAutoDiffAdjointFunctionType(*checkedWrtParamIndices,
+                                                   primalResultTy);
+
   auto adjointNameLoc = adjointSpecifier->Loc.getBaseNameLoc();
   auto adjointOverloadDiagnostic = [&]() {
     TC.diagnose(adjointNameLoc,

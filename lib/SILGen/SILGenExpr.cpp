@@ -2737,22 +2737,8 @@ static RValue emitGradientInst(RValueEmitter &RVE, const SGFContext &C,
   auto *origExpr = E->getOriginalExpr();
   auto origTy = origExpr->getType()->getAs<AnyFunctionType>();
   ManagedValue origVal = RVE.visit(origExpr, C).getAsSingleValue(RVE.SGF, loc);
-  // Lower Swift parameters to SIL parameters.
-  auto diffParams = E->getParameters();
-  SmallVector<AutoDiffIndexParameter, 4> allParamIndices;
-  // If no differentiation parameters are specified, differentiation is done
-  // with respect to all of original's parameters.
-  if (E->getParameters().empty()) {
-    for (unsigned i : range(origTy->getNumParams()))
-      allParamIndices.push_back({ E->getStartLoc(), i });
-    diffParams = allParamIndices;
-  }
-  SmallVector<unsigned, 8> loweredParamIndices;
-  for (auto param : diffParams) {
-    auto silParamIndices =
-      RVE.SGF.SGM.getLoweredFunctionParameterIndex(param.index, origTy);
-    loweredParamIndices.append(silParamIndices.begin(), silParamIndices.end());
-  }
+  auto loweredParamIndices =
+      E->getCheckedParameterIndices()->getLowered(origTy);
   SILAutoDiffConfig config(
       {E->getResultIndex(), loweredParamIndices}, options);
   auto gradInst =
