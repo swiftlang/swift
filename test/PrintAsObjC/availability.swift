@@ -177,10 +177,10 @@
 // CHECK-NEXT: - (void)deprecatedOnMacOSMethodInDeprecatedClassWithPrimitiveParametersWithFirst:(NSInteger)first second:(NSInteger)second
 // CHECK-SAME: SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'deprecatedOnMacOSMethodInDeprecatedClassWithPrimitiveParameters' has been renamed to 'ReplacementAvailable.methodReplacingInReplacementClassWithPrimitiveParameters(first:second:)': use method in another class instead");
 
-// CHECK-NEXT: - (void)deprecatedMethodInDeprecatedClassWithSuperclassObjectParametersWithFirst:(SWTReplacementAvailable * _Nonnull)first second:(SWTReplacementAvailable * _Nonnull)second
-// CHECK-SAME: SWIFT_DEPRECATED_MSG("use method in another class instead", "ReplacementAvailable.methodReplacingInReplacementClassWithSuperclassObjectParameters(first:second:)")
-// CHECK-NEXT: - (void)deprecatedOnMacOSMethodInDeprecatedClassWithSuperclassObjectParametersWithFirst:(SWTReplacementAvailable * _Nonnull)first second:(SWTReplacementAvailable * _Nonnull)second
-// CHECK-SAME: SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'deprecatedOnMacOSMethodInDeprecatedClassWithSuperclassObjectParameters' has been renamed to 'ReplacementAvailable.methodReplacingInReplacementClassWithSuperclassObjectParameters(first:second:)': use method in another class instead");
+// CHECK-NEXT: - (void)deprecatedMethodInDeprecatedClassWithClassObjectParametersWithFirst:(SWTReplacementAvailable * _Nonnull)first second:(SWTReplacementAvailable * _Nonnull)second
+// CHECK-SAME: SWIFT_DEPRECATED_MSG("use method in another class instead", "ReplacementAvailable.methodReplacingInReplacementClassWithClassObjectParameters(first:second:)")
+// CHECK-NEXT: - (void)deprecatedOnMacOSMethodInDeprecatedClassWithClassObjectParametersWithFirst:(SWTReplacementAvailable * _Nonnull)first second:(SWTReplacementAvailable * _Nonnull)second
+// CHECK-SAME: SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'deprecatedOnMacOSMethodInDeprecatedClassWithClassObjectParameters' has been renamed to 'ReplacementAvailable.methodReplacingInReplacementClassWithClassObjectParameters(first:second:)': use method in another class instead");
 
 // CHECK-NEXT: @end
 
@@ -194,44 +194,19 @@
 
 // CHECK-LABEL: @interface SWTReplacementAvailable
 // CHECK-NEXT: - (void)replacingMethodInReplacementClassWithPrimitiveParametersWithFirst:(NSInteger)first second:(NSInteger)second;
-// CHECK-NEXT: - (void)replacingMethodInReplacementClassWithSuperclassObjectParametersWithFirst:(SWTSubclassOfReplacementAvailable * _Nonnull)first second:(SWTSubclassOfReplacementAvailable * _Nonnull)second;
+// CHECK-NEXT: - (void)replacingMethodInReplacementClassWithClassObjectParametersWithFirst:(SWTReplacementAvailable * _Nonnull)first second:(SWTReplacementAvailable * _Nonnull)second;
 // CHECK-NEXT: - (void)deprecatedMethodReplacingInReplacementClassWithPrimitiveParametersWithFirst:(NSInteger)first second:(NSInteger)second
 // CHECK-SAME: SWIFT_DEPRECATED_MSG("Deprecated method with the Context name in the renamed attribute - ContextName is self",
 // CHECK-SAME: "replacingMethodInReplacementClassWithPrimitiveParametersWithFirst:second:")
-// CHECK-NEXT: - (void)deprecatedmethodReplacingInReplacementClassWithSuperclassObjectParametersWithFirst:(SWTReplacementAvailable * _Nonnull)first second:(SWTReplacementAvailable * _Nonnull)second
+// CHECK-NEXT: - (void)deprecatedmethodReplacingInReplacementClassWithClassObjectParametersWithFirst:(SWTReplacementAvailable * _Nonnull)first second:(SWTReplacementAvailable * _Nonnull)second
 // CHECK-SAME: SWIFT_DEPRECATED_MSG("Deprecated method with the Context name in the renamed attribute - ContextName is self",
-// CHECK-SAME: "replacingMethodInReplacementClassWithSuperclassObjectParametersWithFirst:second:")
+// CHECK-SAME: "replacingMethodInReplacementClassWithClassObjectParametersWithFirst:second:")
 // CHECK-NEXT: @end
 
 // CHECK-LABEL: @protocol SWTReplacementAvailableProtocol
 // CHECK-NEXT: - (void)replacingMethodInReplacementProtocolWithFirst:(NSInteger)first second:(NSInteger)second;
 // CHECK-NEXT: @end
 
-
-// CHECK-LABEL: @interface SWTSubclassOfReplacementAvailable : SWTReplacementAvailable
-// CHECK-NEXT: - (void)deprecatedMethodInSubclassOfReplacedInSuperclassWithPrimitiveParametersWithFirst:(NSInteger)first second:(NSInteger)second
-// CHECK-SAME: SWIFT_DEPRECATED_MSG("Deprecated method with the Context name in the renamed attribute - Rename to superclass's method", "replacingMethodInReplacementClassWithPrimitiveParametersWithFirst:second:");
-// CHECK-NEXT: - (void)deprecatedMethodInSubclassOfReplacedInSubclassButUnavilableWithPrimitiveParametersWithFirst:(NSInteger)first second:(NSInteger)second
-// CHECK-SAME: SWIFT_DEPRECATED_MSG("Deprecated method with the Context name in the renamed attribute - Rename to unavilable subclass's method",
-// CHECK-SAME: "SubclassOfSubclassOfReplacementAvailable.methodReplacingInSubclassOfSubclassOfReplacementClassWithPrimitiveParameters(first:second:)")
-// CHECK-NEXT: - (void)deprecatedMethodInSubclassOfReplacedInSubclassButAvilableWithPrimitiveParametersWithFirst:(NSInteger)first second:(NSInteger)second
-// CHECK-SAME: SWIFT_DEPRECATED_MSG("Deprecated method with the Context name in the renamed attribute - Rename to available subclass's method",
-// CHECK-SAME: "replacingMethodInReplacementClassWithPrimitiveParametersWithFirst:second:")
-
-// CHECK-NEXT: - (void)deprecatedMethodInSubclassOfReplacedInSuperclassWithSuperclassObjectParametersWithFirst:(SWTReplacementAvailable * _Nonnull)first second:(SWTReplacementAvailable * _Nonnull)second
-// CHECK-SAME: SWIFT_DEPRECATED_MSG("Deprecated method with the Context name in the renamed attribute - Rename to superclass's method", "replacingMethodInReplacementClassWithSuperclassObjectParametersWithFirst:second:");
-// CHECK-NEXT: - (void)deprecatedMethodInSubclassOfReplacedInSubclassButUnavilableWithSuperclassObjectParametersWithFirst:(SWTReplacementAvailable * _Nonnull)first second:(SWTReplacementAvailable * _Nonnull)second
-// CHECK-SAME: SWIFT_DEPRECATED_MSG("Deprecated method with the Context name in the renamed attribute - Rename to unavilable subclass's method",
-// CHECK-SAME: "SubclassOfSubclassOfReplacementAvailable.methodReplacingInSubclassOfSubclassOfObjectClass(first:second:)")
-// CHECK-NEXT: - (void)deprecatedMethodInSubclassOfReplacedInSubclassButAvilableWithSuperclassObjectParametersWithFirst:(SWTReplacementAvailable * _Nonnull)first second:(SWTReplacementAvailable * _Nonnull)second
-// CHECK-SAME: SWIFT_DEPRECATED_MSG("Deprecated method with the Context name in the renamed attribute - Rename to available subclass's method",
-// CHECK-SAME: "replacingMethodInReplacementClassWithSuperclassObjectParametersWithFirst:second:")
-
-// CHECK-NEXT: @end
-
-// CHECK-LABEL: @interface SWTSubclassOfSubclassOfReplacementAvailable : SWTSubclassOfReplacementAvailable
-// CHECK-NEXT: - (void)methodReplacingInSubclassOfSubclassOfReplacementClassWithFirst:(NSInteger)first second:(NSInteger)second;
-// CHECK-NEXT: @end
 
 // CHECK-LABEL: SWIFT_AVAILABILITY(macos,unavailable,message="'UnavailableAvailability' has been renamed to 'SWTReplacementAvailable'")
 // CHECK-LABEL: @interface UnavailableAvailability
@@ -240,10 +215,10 @@
 // CHECK-NEXT: - (void)unavailableOnMacOSMethodInUnavailableClassWithPrimitiveParametersWithFirst:(NSInteger)first second:(NSInteger)second
 // CHECK-SAME: SWIFT_AVAILABILITY(macos,unavailable,message="'unavailableOnMacOSMethodInUnavailableClassWithPrimitiveParameters' has been renamed to 'ReplacementAvailable.methodReplacingInReplacementClassWithPrimitiveParameters(first:second:)': use method in another class instead");
 
-// CHECK-NEXT: - (void)unavailableMethodInUnavailableClassWithSuperclassObjectParametersWithFirst:(SWTReplacementAvailable * _Nonnull)first second:(SWTReplacementAvailable * _Nonnull)second
-// CHECK-SAME: SWIFT_UNAVAILABLE_MSG("'unavailableMethodInUnavailableClassWithSuperclassObjectParameters' has been renamed to 'ReplacementAvailable.methodReplacingInReplacementClassWithSuperclassObjectParameters(first:second:)': use method in another class instead")
-// CHECK-NEXT: - (void)unavailableOnMacOSMethodInUnavailableClassWithSuperclassObjectParametersWithFirst:(SWTReplacementAvailable * _Nonnull)first second:(SWTReplacementAvailable * _Nonnull)second
-// CHECK-SAME: SWIFT_AVAILABILITY(macos,unavailable,message="'unavailableOnMacOSMethodInUnavailableClassWithSuperclassObjectParameters' has been renamed to 'ReplacementAvailable.methodReplacingInReplacementClassWithSuperclassObjectParameters(first:second:)': use method in another class instead");
+// CHECK-NEXT: - (void)unavailableMethodInUnavailableClassWithClassObjectParametersWithFirst:(SWTReplacementAvailable * _Nonnull)first second:(SWTReplacementAvailable * _Nonnull)second
+// CHECK-SAME: SWIFT_UNAVAILABLE_MSG("'unavailableMethodInUnavailableClassWithClassObjectParameters' has been renamed to 'ReplacementAvailable.methodReplacingInReplacementClassWithClassObjectParameters(first:second:)': use method in another class instead")
+// CHECK-NEXT: - (void)unavailableOnMacOSMethodInUnavailableClassWithClassObjectParametersWithFirst:(SWTReplacementAvailable * _Nonnull)first second:(SWTReplacementAvailable * _Nonnull)second
+// CHECK-SAME: SWIFT_AVAILABILITY(macos,unavailable,message="'unavailableOnMacOSMethodInUnavailableClassWithClassObjectParameters' has been renamed to 'ReplacementAvailable.methodReplacingInReplacementClassWithClassObjectParameters(first:second:)': use method in another class instead");
 // CHECK-NEXT: @end
 
 // CHECK-LABEL: SWIFT_AVAILABILITY(macos,unavailable,message="'UnavailableAvailabilityProtocol' has been renamed to 'SWTReplacementAvailableProtocol'")
@@ -598,8 +573,8 @@ extension Availability {
     @objc(replacingMethodInReplacementClassWithPrimitiveParametersWithFirst:second:)
     func methodReplacingInReplacementClassWithPrimitiveParameters(first: Int, second: Int) -> Void {}
     
-    @objc(replacingMethodInReplacementClassWithSuperclassObjectParametersWithFirst:second:)
-    func methodReplacingInReplacementClassWithClassObjectParameters(first: SubclassOfReplacementAvailable, second: SubclassOfReplacementAvailable) -> Void {}
+    @objc(replacingMethodInReplacementClassWithClassObjectParametersWithFirst:second:)
+    func methodReplacingInReplacementClassWithClassObjectParameters(first: ReplacementAvailable, second: ReplacementAvailable) -> Void {}
     
     @available(*, deprecated,
     message: "Deprecated method with the Context name in the renamed attribute - ContextName is self",
@@ -609,39 +584,7 @@ extension Availability {
     @available(*, deprecated,
     message: "Deprecated method with the Context name in the renamed attribute - ContextName is self",
     renamed: "ReplacementAvailable.methodReplacingInReplacementClassWithClassObjectParameters(first:second:)")
-    @objc func deprecatedmethodReplacingInReplacementClassWithSuperclassObjectParameters(first: ReplacementAvailable, second: ReplacementAvailable) -> Void {}
-}
-
-@objc(SWTSubclassOfReplacementAvailable) class SubclassOfReplacementAvailable : ReplacementAvailable {
-    @available(*, deprecated,
-    message: "Deprecated method with the Context name in the renamed attribute - Rename to superclass's method",
-    renamed: "ReplacementAvailable.methodReplacingInReplacementClassWithPrimitiveParameters(first:second:)")
-    @objc func deprecatedMethodInSubclassOfReplacedInSuperclassWithPrimitiveParameters(first: Int, second: Int) -> Void {}
-    @available(*, deprecated,
-    message: "Deprecated method with the Context name in the renamed attribute - Rename to unavilable subclass's method",
-    renamed: "SubclassOfSubclassOfReplacementAvailable.methodReplacingInSubclassOfSubclassOfReplacementClassWithPrimitiveParameters(first:second:)")
-    @objc func deprecatedMethodInSubclassOfReplacedInSubclassButUnavilableWithPrimitiveParameters(first: Int, second: Int) -> Void {}
-    @available(*, deprecated,
-    message: "Deprecated method with the Context name in the renamed attribute - Rename to available subclass's method",
-    renamed: "SubclassOfSubclassOfReplacementAvailable.methodReplacingInReplacementClassWithPrimitiveParameters(first:second:)")
-    @objc func deprecatedMethodInSubclassOfReplacedInSubclassButAvilableWithPrimitiveParameters(first: Int, second: Int) -> Void {}
-    
-    @available(*, deprecated,
-    message: "Deprecated method with the Context name in the renamed attribute - Rename to superclass's method",
-    renamed: "ReplacementAvailable.methodReplacingInReplacementClassWithClassObjectParameters(first:second:)")
-    @objc func deprecatedMethodInSubclassOfReplacedInSuperclassWithSuperclassObjectParameters(first: ReplacementAvailable, second: ReplacementAvailable) -> Void {}
-    @available(*, deprecated,
-    message: "Deprecated method with the Context name in the renamed attribute - Rename to unavilable subclass's method",
-    renamed: "SubclassOfSubclassOfReplacementAvailable.methodReplacingInSubclassOfSubclassOfObjectClass(first:second:)")
-    @objc func deprecatedMethodInSubclassOfReplacedInSubclassButUnavilableWithSuperclassObjectParameters(first: ReplacementAvailable, second: ReplacementAvailable) -> Void {}
-    @available(*, deprecated,
-    message: "Deprecated method with the Context name in the renamed attribute - Rename to available subclass's method",
-    renamed: "SubclassOfSubclassOfReplacementAvailable.methodReplacingInReplacementClassWithClassObjectParameters(first:second:)")
-    @objc func deprecatedMethodInSubclassOfReplacedInSubclassButAvilableWithSuperclassObjectParameters(first: ReplacementAvailable, second: ReplacementAvailable) -> Void {}
-}
-
-@objc(SWTSubclassOfSubclassOfReplacementAvailable) class SubclassOfSubclassOfReplacementAvailable : SubclassOfReplacementAvailable {
-  @objc func methodReplacingInSubclassOfSubclassOfReplacementClass(first: Int, second: Int) -> Void {}
+    @objc func deprecatedmethodReplacingInReplacementClassWithClassObjectParameters(first: ReplacementAvailable, second: ReplacementAvailable) -> Void {}
 }
 
 @available(macOS, deprecated, renamed: "ReplacementAvailable")
@@ -654,11 +597,11 @@ extension Availability {
     @objc func deprecatedOnMacOSMethodInDeprecatedClassWithPrimitiveParameters(first: Int, second: Int) -> Void {}
   
     @available(*, deprecated, message: "use method in another class instead",
-    renamed: "ReplacementAvailable.methodReplacingInReplacementClassWithSuperclassObjectParameters(first:second:)")
-    @objc func deprecatedMethodInDeprecatedClassWithSuperclassObjectParameters(first: ReplacementAvailable, second: ReplacementAvailable) -> Void {}
+    renamed: "ReplacementAvailable.methodReplacingInReplacementClassWithClassObjectParameters(first:second:)")
+    @objc func deprecatedMethodInDeprecatedClassWithClassObjectParameters(first: ReplacementAvailable, second: ReplacementAvailable) -> Void {}
     @available(macOS, deprecated, message: "use method in another class instead",
-    renamed: "ReplacementAvailable.methodReplacingInReplacementClassWithSuperclassObjectParameters(first:second:)")
-    @objc func deprecatedOnMacOSMethodInDeprecatedClassWithSuperclassObjectParameters(first: ReplacementAvailable, second: ReplacementAvailable) -> Void {}
+    renamed: "ReplacementAvailable.methodReplacingInReplacementClassWithClassObjectParameters(first:second:)")
+    @objc func deprecatedOnMacOSMethodInDeprecatedClassWithClassObjectParameters(first: ReplacementAvailable, second: ReplacementAvailable) -> Void {}
 }
 
 @available(macOS, unavailable, renamed: "ReplacementAvailable")
@@ -668,10 +611,10 @@ extension Availability {
     @available(macOS, unavailable, message: "use method in another class instead", renamed: "ReplacementAvailable.methodReplacingInReplacementClassWithPrimitiveParameters(first:second:)")
     @objc func unavailableOnMacOSMethodInUnavailableClassWithPrimitiveParameters(first: Int, second: Int) -> Void {}
   
-    @available(*, unavailable, message: "use method in another class instead", renamed: "ReplacementAvailable.methodReplacingInReplacementClassWithSuperclassObjectParameters(first:second:)")
-    @objc func unavailableMethodInUnavailableClassWithSuperclassObjectParameters(first: ReplacementAvailable, second: ReplacementAvailable) -> Void {}
-    @available(macOS, unavailable, message: "use method in another class instead", renamed: "ReplacementAvailable.methodReplacingInReplacementClassWithSuperclassObjectParameters(first:second:)")
-    @objc func unavailableOnMacOSMethodInUnavailableClassWithSuperclassObjectParameters(first: ReplacementAvailable, second: ReplacementAvailable) -> Void {}
+    @available(*, unavailable, message: "use method in another class instead", renamed: "ReplacementAvailable.methodReplacingInReplacementClassWithClassObjectParameters(first:second:)")
+    @objc func unavailableMethodInUnavailableClassWithClassObjectParameters(first: ReplacementAvailable, second: ReplacementAvailable) -> Void {}
+    @available(macOS, unavailable, message: "use method in another class instead", renamed: "ReplacementAvailable.methodReplacingInReplacementClassWithClassObjectParameters(first:second:)")
+    @objc func unavailableOnMacOSMethodInUnavailableClassWithClassObjectParameters(first: ReplacementAvailable, second: ReplacementAvailable) -> Void {}
 }
 
 @objc(SWTReplacementAvailableProtocol) protocol ReplacementAvailableProtocol {

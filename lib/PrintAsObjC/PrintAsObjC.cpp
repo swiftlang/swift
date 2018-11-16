@@ -936,24 +936,8 @@ private:
         if (!specificTypeLookup.getSingleTypeResult()) {
           return nullptr;
         }
-
-        if (typeDecl->getDeclaredInterfaceType()->matches(
-                specificTypeLookup.getSingleTypeResult()
-                    ->getDeclaredInterfaceType(),
-                TypeMatchFlags::AllowOverride)) {
-          // If the Context Name contain the name of the subclass then we would
-          // find the renamed in the superclass instead
-          typeDecl = specificTypeLookup.getSingleTypeResult();
-        } else if (!specificTypeLookup.getSingleTypeResult()
-                        ->getDeclaredInterfaceType()
-                        ->matches(typeDecl->getDeclaredInterfaceType(),
-                                  TypeMatchFlags::AllowOverride)) {
-          // Failed and print the raw renamed attributed when there is no
-          // relationship between those 2 types
-          return nullptr;
-        }
       }
-
+        
       const ValueDecl *renamedDecl = nullptr;
       SmallVector<ValueDecl *, 4> lookupResults;
       declContext->lookupQualified(typeDecl, renamedDeclName,
@@ -978,8 +962,7 @@ private:
           for (auto index : indices(*cParams)) {
             auto cParamsType = cParams->get(index)->getType();
             auto dParamsType = dParams->get(index)->getType();
-            if (!cParamsType->matchesParameter(dParamsType,
-                                               TypeMatchFlags::AllowOverride)) {
+            if (!cParamsType->matchesParameter(dParamsType, TypeMatchOptions())) {
               hasSameParameterTypes = false;
               break;
             }
