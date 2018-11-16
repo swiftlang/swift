@@ -41,10 +41,6 @@
 using namespace swift;
 using namespace tf;
 
-static llvm::cl::opt<bool> TFEnsureSingleLoopExit(
-    "tf-ensure-single-loop-exit", llvm::cl::init(true),
-    llvm::cl::desc("Transform loops to have a single exit from header."));
-
 //===----------------------------------------------------------------------===//
 // SESERegionTree Implementation
 //===----------------------------------------------------------------------===//
@@ -188,9 +184,7 @@ namespace {
       // We also need to ensure the following invariants for lowering:
       //   - The header is the only block from which loop is exited.
       //   - There is a single exit block.
-      if (TFEnsureSingleLoopExit) {
-        ensureSingleExitFromLoops();
-      }
+      ensureSingleExitFromLoops();
 
       for (auto *loop : LI)
         processLoop(loop);
