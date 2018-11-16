@@ -88,10 +88,10 @@ private func _measureCharacterStrideICU(
   // ubrk_following returns -1 (UBRK_DONE) when it hits the end of the buffer.
   if _fastPath(offset != -1) {
     // The offset into our buffer is the distance.
-    _sanityCheck(offset > i, "zero-sized grapheme?")
+    _internalInvariant(offset > i, "zero-sized grapheme?")
     return Int(truncatingIfNeeded: offset) &- i
   }
-  _sanityCheck(utf8.count > i)
+  _internalInvariant(utf8.count > i)
   return utf8.count &- i
 }
 
@@ -106,7 +106,7 @@ private func _measureCharacterStrideICU(
   // ubrk_following returns -1 (UBRK_DONE) when it hits the end of the buffer.
   if _fastPath(offset != -1) {
     // The offset into our buffer is the distance.
-    _sanityCheck(offset > i, "zero-sized grapheme?")
+    _internalInvariant(offset > i, "zero-sized grapheme?")
     return Int(truncatingIfNeeded: offset) &- i
   }
   return utf16.count &- i
@@ -123,7 +123,7 @@ private func _measureCharacterStrideICU(
   // ubrk_following returns -1 (UBRK_DONE) when it hits the end of the buffer.
   if _fastPath(offset != -1) {
     // The offset into our buffer is the distance.
-    _sanityCheck(offset < i, "zero-sized grapheme?")
+    _internalInvariant(offset < i, "zero-sized grapheme?")
     return i &- Int(truncatingIfNeeded: offset)
   }
   return i &- utf8.count
@@ -140,7 +140,7 @@ private func _measureCharacterStrideICU(
   // ubrk_following returns -1 (UBRK_DONE) when it hits the end of the buffer.
   if _fastPath(offset != -1) {
     // The offset into our buffer is the distance.
-    _sanityCheck(offset < i, "zero-sized grapheme?")
+    _internalInvariant(offset < i, "zero-sized grapheme?")
     return i &- Int(truncatingIfNeeded: offset)
   }
   return i &- utf16.count
@@ -187,7 +187,7 @@ extension _StringGuts {
   @_effects(releasenone)
   private func _foreignOpaqueCharacterStride(startingAt i: Int) -> Int {
 #if _runtime(_ObjC)
-    _sanityCheck(isForeign)
+    _internalInvariant(isForeign)
 
     // TODO(String performance): Faster to do it from a pointer directly
     let count = _object.largeCount
@@ -253,7 +253,7 @@ extension _StringGuts {
   @_effects(releasenone)
   private func _foreignOpaqueCharacterStride(endingAt i: Int) -> Int {
 #if _runtime(_ObjC)
-    _sanityCheck(isForeign)
+    _internalInvariant(isForeign)
 
     // TODO(String performance): Faster to do it from a pointer directly
     let count = _object.largeCount

@@ -259,7 +259,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
       if let x = self {
         return x
       }
-      _sanityCheckFailure("_unsafelyUnwrappedUnchecked of nil optional")
+      _internalInvariantFailure("_unsafelyUnwrappedUnchecked of nil optional")
     }
   }
 }

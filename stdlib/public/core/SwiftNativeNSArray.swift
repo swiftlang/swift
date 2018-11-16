@@ -56,7 +56,7 @@ internal class __SwiftNativeNSArrayWithContiguousStorage
   internal func withUnsafeBufferOfObjects<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
-    _sanityCheckFailure(
+    _internalInvariantFailure(
       "Must override withUnsafeBufferOfObjects in derived classes")
   }
 }
@@ -267,10 +267,10 @@ internal class __ContiguousArrayStorageBase
   @usableFromInline
   final var countAndCapacity: _ArrayBody
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @nonobjc
   internal init(_doNotCallMeBase: ()) {
-    _sanityCheckFailure("creating instance of __ContiguousArrayStorageBase")
+    _internalInvariantFailure("creating instance of __ContiguousArrayStorageBase")
   }
   
 #if _runtime(_ObjC)
@@ -280,7 +280,7 @@ internal class __ContiguousArrayStorageBase
     if let result = try _withVerbatimBridgedUnsafeBuffer(body) {
       return result
     }
-    _sanityCheckFailure(
+    _internalInvariantFailure(
       "Can't use a buffer of non-verbatim-bridged elements as an NSArray")
   }
 
@@ -290,38 +290,38 @@ internal class __ContiguousArrayStorageBase
   internal func _withVerbatimBridgedUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R? {
-    _sanityCheckFailure(
+    _internalInvariantFailure(
       "Concrete subclasses must implement _withVerbatimBridgedUnsafeBuffer")
   }
 
   @nonobjc
   internal func _getNonVerbatimBridgedCount() -> Int {
-    _sanityCheckFailure(
+    _internalInvariantFailure(
       "Concrete subclasses must implement _getNonVerbatimBridgedCount")
   }
 
   internal func _getNonVerbatimBridgingBuffer() -> _BridgingBuffer {
-    _sanityCheckFailure(
+    _internalInvariantFailure(
       "Concrete subclasses must implement _getNonVerbatimBridgingBuffer")
   }
 #endif
 
-  @inlinable // FIXME(sil-serialize-all)
+@inlinable
   internal func canStoreElements(ofDynamicType _: Any.Type) -> Bool {
-    _sanityCheckFailure(
+    _internalInvariantFailure(
       "Concrete subclasses must implement canStoreElements(ofDynamicType:)")
   }
 
   /// A type that every element in the array is.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal var staticElementType: Any.Type {
-    _sanityCheckFailure(
+    _internalInvariantFailure(
       "Concrete subclasses must implement staticElementType")
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   deinit {
-    _sanityCheck(
+    _internalInvariant(
       self !== _emptyArrayStorage, "Deallocating empty array storage?!")
   }
 }

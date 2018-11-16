@@ -45,7 +45,7 @@ extension _SmallBuffer {
 
   internal subscript(i: Int) -> T {
     get {
-      _sanityCheck(i >= 0 && i < capacity)
+      _internalInvariant(i >= 0 && i < capacity)
       let capacity = self.capacity
       return withUnsafeBytes(of: _inlineStorage) {
         let rawPtr = $0.baseAddress._unsafelyUnwrappedUnchecked
@@ -55,7 +55,7 @@ extension _SmallBuffer {
       }
     }
     set {
-      _sanityCheck(i >= 0 && i < capacity)
+      _internalInvariant(i >= 0 && i < capacity)
       let capacity = self.capacity
       withUnsafeMutableBytes(of: &_inlineStorage) {
         let rawPtr = $0.baseAddress._unsafelyUnwrappedUnchecked
@@ -73,9 +73,9 @@ extension _SmallBuffer {
  #else
  @usableFromInline @inline(never) @_effects(releasenone)
  internal mutating func _invariantCheck() {
-   _sanityCheck(MemoryLayout<_SmallBuffer<Int>>.stride == byteCapacity)
-   _sanityCheck(capacity * stride == byteCapacity)
-   _sanityCheck(_isPOD(T.self))
+   _internalInvariant(MemoryLayout<_SmallBuffer<Int>>.stride == byteCapacity)
+   _internalInvariant(capacity * stride == byteCapacity)
+   _internalInvariant(_isPOD(T.self))
  }
  #endif // INTERNAL_CHECKS_ENABLED
 }

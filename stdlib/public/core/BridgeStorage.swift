@@ -40,7 +40,7 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
     // Note: Some platforms provide more than one spare bit, but the minimum is
     // a single bit.
 
-    _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
+    _internalInvariant(_usesNativeSwiftReferenceCounting(NativeClass.self))
 
     rawValue = _makeNativeBridgeObject(
       native,
@@ -50,14 +50,14 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
   @inlinable
   @inline(__always)
   internal init(objC: ObjC) {
-    _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
+    _internalInvariant(_usesNativeSwiftReferenceCounting(NativeClass.self))
     rawValue = _makeObjCBridgeObject(objC)
   }
 
   @inlinable
   @inline(__always)
   internal init(native: Native) {
-    _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
+    _internalInvariant(_usesNativeSwiftReferenceCounting(NativeClass.self))
     rawValue = Builtin.reinterpretCast(native)
   }
 
@@ -110,7 +110,7 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
   @inlinable
   internal var nativeInstance: Native {
     @inline(__always) get {
-      _sanityCheck(isNative)
+      _internalInvariant(isNative)
       return Builtin.castReferenceFromBridgeObject(rawValue)
     }
   }
@@ -118,8 +118,8 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
   @inlinable
   internal var unflaggedNativeInstance: Native {
     @inline(__always) get {
-      _sanityCheck(isNative)
-      _sanityCheck(_nonPointerBits(rawValue) == 0)
+      _internalInvariant(isNative)
+      _internalInvariant(_nonPointerBits(rawValue) == 0)
       return Builtin.reinterpretCast(rawValue)
     }
   }
@@ -127,14 +127,14 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
   @inlinable
   @inline(__always)
   internal mutating func isUniquelyReferencedUnflaggedNative() -> Bool {
-    _sanityCheck(isNative)
+    _internalInvariant(isNative)
     return _isUnique_native(&rawValue)
   }
 
   @inlinable
   internal var objCInstance: ObjC {
     @inline(__always) get {
-      _sanityCheck(isObjC)
+      _internalInvariant(isObjC)
       return Builtin.castReferenceFromBridgeObject(rawValue)
     }
   }

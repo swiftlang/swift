@@ -88,9 +88,9 @@ internal struct _SliceBuffer<Element>
   internal func _invariantCheck() {
     let isNative = _hasNativeBuffer
     let isNativeStorage: Bool = owner is __ContiguousArrayStorageBase
-    _sanityCheck(isNativeStorage == isNative)
+    _internalInvariant(isNativeStorage == isNative)
     if isNative {
-      _sanityCheck(count <= nativeBuffer.count)
+      _internalInvariant(count <= nativeBuffer.count)
     }
   }
 
@@ -101,14 +101,14 @@ internal struct _SliceBuffer<Element>
 
   @inlinable
   internal var nativeBuffer: NativeBuffer {
-    _sanityCheck(_hasNativeBuffer)
+    _internalInvariant(_hasNativeBuffer)
     return NativeBuffer(
       owner as? __ContiguousArrayStorageBase ?? _emptyArrayStorage)
   }
 
   @inlinable
   internal var nativeOwner: AnyObject {
-    _sanityCheck(_hasNativeBuffer, "Expect a native array")
+    _internalInvariant(_hasNativeBuffer, "Expect a native array")
     return owner
   }
 
@@ -126,10 +126,10 @@ internal struct _SliceBuffer<Element>
   ) where C : Collection, C.Element == Element {
 
     _invariantCheck()
-    _sanityCheck(insertCount <= numericCast(newValues.count))
+    _internalInvariant(insertCount <= numericCast(newValues.count))
 
-    _sanityCheck(_hasNativeBuffer)
-    _sanityCheck(isUniquelyReferenced())
+    _internalInvariant(_hasNativeBuffer)
+    _internalInvariant(isUniquelyReferenced())
 
     let eraseCount = subrange.count
     let growth = insertCount - eraseCount
@@ -138,7 +138,7 @@ internal struct _SliceBuffer<Element>
     var native = nativeBuffer
     let hiddenElementCount = firstElementAddress - native.firstElementAddress
 
-    _sanityCheck(native.count + growth <= native.capacity)
+    _internalInvariant(native.count + growth <= native.capacity)
 
     let start = subrange.lowerBound - startIndex + hiddenElementCount
     let end = subrange.upperBound - startIndex + hiddenElementCount
@@ -246,9 +246,9 @@ internal struct _SliceBuffer<Element>
     initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {
     _invariantCheck()
-    _sanityCheck(bounds.lowerBound >= startIndex)
-    _sanityCheck(bounds.upperBound >= bounds.lowerBound)
-    _sanityCheck(bounds.upperBound <= endIndex)
+    _internalInvariant(bounds.lowerBound >= startIndex)
+    _internalInvariant(bounds.upperBound >= bounds.lowerBound)
+    _internalInvariant(bounds.upperBound <= endIndex)
     let c = bounds.count
     target.initialize(from: subscriptBaseAddress + bounds.lowerBound, count: c)
     return target + c
@@ -304,8 +304,8 @@ internal struct _SliceBuffer<Element>
 
   @inlinable
   internal func getElement(_ i: Int) -> Element {
-    _sanityCheck(i >= startIndex, "slice index is out of range (before startIndex)")
-    _sanityCheck(i < endIndex, "slice index is out of range")
+    _internalInvariant(i >= startIndex, "slice index is out of range (before startIndex)")
+    _internalInvariant(i < endIndex, "slice index is out of range")
     return subscriptBaseAddress[i]
   }
 
@@ -319,8 +319,8 @@ internal struct _SliceBuffer<Element>
       return getElement(position)
     }
     nonmutating set {
-      _sanityCheck(position >= startIndex, "slice index is out of range (before startIndex)")
-      _sanityCheck(position < endIndex, "slice index is out of range")
+      _internalInvariant(position >= startIndex, "slice index is out of range (before startIndex)")
+      _internalInvariant(position < endIndex, "slice index is out of range")
       subscriptBaseAddress[position] = newValue
     }
   }
@@ -328,9 +328,9 @@ internal struct _SliceBuffer<Element>
   @inlinable
   internal subscript(bounds: Range<Int>) -> _SliceBuffer {
     get {
-      _sanityCheck(bounds.lowerBound >= startIndex)
-      _sanityCheck(bounds.upperBound >= bounds.lowerBound)
-      _sanityCheck(bounds.upperBound <= endIndex)
+      _internalInvariant(bounds.lowerBound >= startIndex)
+      _internalInvariant(bounds.upperBound >= bounds.lowerBound)
+      _internalInvariant(bounds.upperBound <= endIndex)
       return _SliceBuffer(
         owner: owner,
         subscriptBaseAddress: subscriptBaseAddress,
@@ -387,7 +387,7 @@ internal struct _SliceBuffer<Element>
 
   @inlinable
   internal func unsafeCastElements<T>(to type: T.Type) -> _SliceBuffer<T> {
-    _sanityCheck(_isClassOrObjCExistential(T.self))
+    _internalInvariant(_isClassOrObjCExistential(T.self))
     let baseAddress = UnsafeMutableRawPointer(self.subscriptBaseAddress)
       .assumingMemoryBound(to: T.self)
     return _SliceBuffer<T>(

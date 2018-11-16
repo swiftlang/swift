@@ -457,7 +457,7 @@ extension Unicode.Scalar {
     var codeUnits: (UInt16, UInt16) = (self.utf16[0], 0)
     let utf16Count = self.utf16.count
     if utf16Count > 1 {
-      _sanityCheck(utf16Count == 2)
+      _internalInvariant(utf16Count == 2)
       codeUnits.1 = self.utf16[1]
     }
     return try Swift.withUnsafePointer(to: &codeUnits) {
