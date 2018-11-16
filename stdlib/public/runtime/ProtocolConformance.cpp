@@ -619,15 +619,16 @@ swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
 bool swift::_checkGenericRequirements(
                       llvm::ArrayRef<GenericRequirementDescriptor> requirements,
                       std::vector<const void *> &extraArguments,
-                      SubstFlatGenericParameterFn substFlatGenericParam,
-                      SubstGenericParameterFn substGenericParam) {
+                      SubstGenericParameterFn substGenericParam,
+                      SubstDependentWitnessTableFn substWitnessTable) {
   for (const auto &req : requirements) {
     // Make sure we understand the requirement we're dealing with.
     if (!req.hasKnownKind()) return true;
 
     // Resolve the subject generic parameter.
     const Metadata *subjectType =
-      _getTypeByMangledName(req.getParam(), substGenericParam);
+      swift_getTypeByMangledName(req.getParam(), substGenericParam,
+                                 substWitnessTable);
     if (!subjectType)
       return true;
 
@@ -651,7 +652,8 @@ bool swift::_checkGenericRequirements(
     case GenericRequirementKind::SameType: {
       // Demangle the second type under the given substitutions.
       auto otherType =
-        _getTypeByMangledName(req.getMangledTypeName(), substGenericParam);
+        swift_getTypeByMangledName(req.getMangledTypeName(), substGenericParam,
+                                   substWitnessTable);
       if (!otherType) return true;
 
       assert(!req.getFlags().hasExtraArgument());
@@ -677,7 +679,8 @@ bool swift::_checkGenericRequirements(
     case GenericRequirementKind::BaseClass: {
       // Demangle the base type under the given substitutions.
       auto baseType =
-        _getTypeByMangledName(req.getMangledTypeName(), substGenericParam);
+        swift_getTypeByMangledName(req.getMangledTypeName(), substGenericParam,
+                                   substWitnessTable);
       if (!baseType) return true;
 
       // Check whether it's dynamically castable, which works as a superclass

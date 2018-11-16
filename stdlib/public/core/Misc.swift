@@ -82,39 +82,15 @@ func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
 /// names is stabilized, this is limited to top-level class names (Foo.bar).
 public // SPI(Foundation)
 func _typeByName(_ name: String) -> Any.Type? {
-  return _typeByMangledName(name);
-}
-
-@_silgen_name("swift_getTypeByMangledName")
-internal func _getTypeByMangledName(
-  _ name: UnsafePointer<UInt8>,
-  _ nameLength: UInt,
-  _ numberOfLevels: UInt,
-  _ parametersPerLevel: UnsafePointer<UInt>,
-  _ substitutions: UnsafePointer<Any.Type>)
-  -> Any.Type?
-
-/// Lookup a class given a mangled name. This is a placeholder while we bring
-/// up this functionality.
-public  // TEMPORARY
-func _typeByMangledName(_ name: String,
-                        substitutions: [[Any.Type]] = []) -> Any.Type? {
-  // Map the substitutions to a flat representation that's easier to thread
-  // through to the runtime.
-  let numberOfLevels = UInt(substitutions.count)
-  var parametersPerLevel = [UInt]()
-  var flatSubstitutions = [Any.Type]()
-  for level in substitutions {
-    parametersPerLevel.append(UInt(level.count))
-    flatSubstitutions.append(contentsOf: level)
-  }
-
   let nameUTF8 = Array(name.utf8)
   return nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
     return  _getTypeByMangledName(nameUTF8.baseAddress!,
-                                  UInt(nameUTF8.endIndex),
-                                  numberOfLevels,
-                                  parametersPerLevel,
-                                  flatSubstitutions)
+                                  UInt(nameUTF8.endIndex))
   }
 }
+
+@_silgen_name("swift_stdlib_getTypeByMangledName")
+internal func _getTypeByMangledName(
+  _ name: UnsafePointer<UInt8>,
+  _ nameLength: UInt)
+  -> Any.Type?

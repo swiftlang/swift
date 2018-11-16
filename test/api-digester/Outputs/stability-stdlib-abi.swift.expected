@@ -14,6 +14,7 @@ Struct _Buffer72 has been removed
 Func _int64ToString(_:radix:uppercase:) has been removed
 Func _int64ToStringImpl(_:_:_:_:_:) has been removed
 Func _uint64ToStringImpl(_:_:_:_:_:) has been removed
+Func _typeByMangledName(_:substitutions:) has been removed
 Func _withUninitializedString(_:) has been removed
 
 Func Optional.unwrappedOrError() has been removed

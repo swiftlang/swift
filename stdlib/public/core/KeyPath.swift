@@ -2427,10 +2427,7 @@ internal func _resolveKeyPathGenericArgReference(_ reference: UnsafeRawPointer,
   let namePtr = referenceStart.bindMemory(to: UInt8.self,
                                           capacity: nameLength + 1)
   // FIXME: Could extract this information from the mangled name.
-  let parametersPerLevel: [UInt] = []
-  let substitutions: [Any.Type] = []
-  guard let result = _getTypeByMangledName(namePtr, UInt(nameLength), 0,
-                                           parametersPerLevel, substitutions)
+  guard let result = _getTypeByMangledName(namePtr, UInt(nameLength))
     else {
       let nameStr = String._fromUTF8Repairing(
         UnsafeBufferPointer(start: namePtr, count: nameLength)
