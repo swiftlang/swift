@@ -429,6 +429,8 @@ public extension SIMD where Scalar : FixedWidthInteger {
 public extension SIMD where Scalar : FloatingPoint {
   @_transparent static var zero: Self { return Self() }
   
+  @_transparent static prefix func -(rhs: Self) -> Self { return 0 - rhs }
+  
   @_transparent static func +(lhs: Scalar, rhs: Self) -> Self { return Self(repeating: lhs) + rhs }
   @_transparent static func -(lhs: Scalar, rhs: Self) -> Self { return Self(repeating: lhs) - rhs }
   @_transparent static func *(lhs: Scalar, rhs: Self) -> Self { return Self(repeating: lhs) * rhs }
