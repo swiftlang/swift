@@ -12,7 +12,7 @@ typealias CGFloat = Double
 #endif
 
 func my_printf(_ format: String, _ arguments: CVarArg...) {
-  withVaList(arguments) {
+  _ = withVaList(arguments) {
     vprintf(format, $0)
   }
 }
@@ -36,7 +36,7 @@ func test_varArgs1() {
   }
   
   // CHECK: dig it: 0  0 -1  1 -2  2 -3  3 -4  4 -5  5 -6  6 -7  7 -8  8 -9  9 -10 10 -11 11
-  withVaList(args) {
+  _ = withVaList(args) {
     vprintf(format + "\n", $0)
   }
 }
@@ -60,7 +60,7 @@ func test_varArgs3() {
 #endif
 
   // CHECK: {{pointers: '(0x)?0*12345670' '(0x)?0*12345671' '(0x)?0*12345672' '(0x)?0*12345673' '(0x)?0*12345674'}}
-  withVaList(args) {
+  _ = withVaList(args) {
     vprintf(format, $0)
   }
 }
