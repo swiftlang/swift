@@ -31,22 +31,20 @@ using namespace swift::driver;
 using namespace swift::driver::experimental_dependencies;
 
 
-using LoadResult = driver::experimental_dependencies::DependencyGraphImpl::LoadResult;
-
-LoadResult DriverGraph::loadFromPath(const Job* Cmd, StringRef path) {
+DependencyLoadResult DriverGraph::loadFromPath(const Job* Cmd, StringRef path) {
   auto buffer = llvm::MemoryBuffer::getFile(path);
   if (!buffer)
-    return LoadResult::HadError;
+    return DependencyLoadResult::hadError();
   return loadFromBuffer(Cmd, *buffer.get());
 }
 
-LoadResult
+DependencyLoadResult
 DriverGraph::loadFromBuffer(const void *node,
                                    llvm::MemoryBuffer &buffer) {
 
   Optional<FrontendGraph> fg = FrontendGraph::loadFromBuffer(buffer);
   if (!fg)
-    return DependencyGraphImpl::LoadResult::HadError;
+    return DependencyLoadResult::hadError();
   
   return integrate(fg.getValue());
 }
@@ -56,7 +54,7 @@ DriverGraph::loadFromBuffer(const void *node,
 
 
 
-LoadResult DriverGraph::integrate(const FrontendGraph &g) {
+DependencyLoadResult DriverGraph::integrate(const FrontendGraph &g) {
   StringRef depsFilename = g.getSourceFileProvideNode()->getNameForDependencies();
   NodesByKey &nodesInFile = nodesBySwiftDepsFile[depsFilename];
   NodesByKey &expats = nodesBySwiftDepsFile[""];

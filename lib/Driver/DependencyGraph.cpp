@@ -47,12 +47,11 @@ DependencyGraphImpl::MarkTracerImpl::MarkTracerImpl(UnifiedStatsReporter *Stats)
   : Stats(Stats) {}
 DependencyGraphImpl::MarkTracerImpl::~MarkTracerImpl() = default;
 
-using LoadResult = DependencyGraphImpl::LoadResult;
 using DependencyKind = DependencyGraphImpl::DependencyKind;
-using DependencyCallbackTy = LoadResult(StringRef, DependencyKind, bool);
-using InterfaceHashCallbackTy = LoadResult(StringRef);
+using DependencyCallbackTy = DependencyLoadResult(StringRef, DependencyKind, bool);
+using InterfaceHashCallbackTy = DependencyLoadResult(StringRef);
 
-static LoadResult
+static DependencyLoadResult
 parseDependencyFile(llvm::MemoryBuffer &buffer,
                     llvm::function_ref<DependencyCallbackTy> providesCallback,
                     llvm::function_ref<DependencyCallbackTy> dependsCallback,
@@ -64,28 +63,28 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
   yaml::Stream stream(buffer.getMemBufferRef(), SM);
   auto I = stream.begin();
   if (I == stream.end() || !I->getRoot())
-    return LoadResult::HadError;
+    return DependencyLoadResult::hadError();
 
   auto *topLevelMap = dyn_cast<yaml::MappingNode>(I->getRoot());
   if (!topLevelMap) {
     if (isa<yaml::NullNode>(I->getRoot()))
-      return LoadResult::UpToDate;
-    return LoadResult::HadError;
+      return DependencyLoadResult::upToDate();
+    return DependencyLoadResult::hadError();
   }
 
-  LoadResult result = LoadResult::UpToDate;
+  DependencyLoadResult result = DependencyLoadResult::upToDate();
   SmallString<64> scratch;
 
   // After an entry, we know more about the node as a whole.
   // Update the "result" variable above.
   // This is a macro rather than a lambda because it contains a return.
-#define UPDATE_RESULT(update) switch (update) {\
-    case LoadResult::HadError: \
-      return LoadResult::HadError; \
-    case LoadResult::UpToDate: \
+#define UPDATE_RESULT(update) switch (update.kind) {\
+    case DependencyLoadResult::Kind::HadError: \
+      return DependencyLoadResult::hadError(); \
+    case DependencyLoadResult::Kind::UpToDate: \
       break; \
-    case LoadResult::AffectsDownstream: \
-      result = LoadResult::AffectsDownstream; \
+    case DependencyLoadResult::Kind::AffectsDownstream: \
+      result = DependencyLoadResult::affectsDownstream(); \
       break; \
     } \
 
@@ -97,7 +96,7 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
 
     auto *key = dyn_cast<yaml::ScalarNode>(i->getKey());
     if (!key)
-      return LoadResult::HadError;
+      return DependencyLoadResult::hadError();
     StringRef keyString = key->getValue(scratch);
 
     using namespace reference_dependency_keys;
@@ -105,7 +104,7 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
     if (keyString == interfaceHash) {
       auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
       if (!value)
-        return LoadResult::HadError;
+        return DependencyLoadResult::hadError();
 
       StringRef valueString = value->getValue(scratch);
       UPDATE_RESULT(interfaceHashCallback(valueString));
@@ -148,11 +147,11 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
         .Default(std::make_pair(DependencyKind(),
                                 DependencyDirection::Depends));
       if (dirAndKind.first == DependencyKind())
-        return LoadResult::HadError;
+        return DependencyLoadResult::hadError();
 
       auto *entries = dyn_cast<yaml::SequenceNode>(i->getValue());
       if (!entries)
-        return LoadResult::HadError;
+        return DependencyLoadResult::hadError();
 
       if (dirAndKind.first == DependencyKind::NominalTypeMember) {
         // Handle member dependencies specially. Rather than being a single
@@ -162,17 +161,17 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
 
           auto *entry = dyn_cast<yaml::SequenceNode>(&rawEntry);
           if (!entry)
-            return LoadResult::HadError;
+            return DependencyLoadResult::hadError();
 
           auto iter = entry->begin();
           auto *base = dyn_cast<yaml::ScalarNode>(&*iter);
           if (!base)
-            return LoadResult::HadError;
+            return DependencyLoadResult::hadError();
           ++iter;
 
           auto *member = dyn_cast<yaml::ScalarNode>(&*iter);
           if (!member)
-            return LoadResult::HadError;
+            return DependencyLoadResult::hadError();
           ++iter;
 
           // FIXME: LLVM's YAML support doesn't implement == correctly for end
@@ -196,7 +195,7 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
         for (const yaml::Node &rawEntry : *entries) {
           auto *entry = dyn_cast<yaml::ScalarNode>(&rawEntry);
           if (!entry)
-            return LoadResult::HadError;
+            return DependencyLoadResult::hadError();
 
           bool isDepends = dirAndKind.second == DependencyDirection::Depends;
           auto &callback = isDepends ? dependsCallback : providesCallback;
@@ -211,25 +210,25 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
   return result;
 }
 
-LoadResult DependencyGraphImpl::loadFromPath(const void *node, StringRef path) {
+DependencyLoadResult DependencyGraphImpl::loadFromPath(const void *node, StringRef path) {
   auto buffer = llvm::MemoryBuffer::getFile(path);
   if (!buffer)
-    return LoadResult::HadError;
+    return DependencyLoadResult::hadError();
   return loadFromBuffer(node, *buffer.get());
 }
 
-LoadResult
+DependencyLoadResult
 DependencyGraphImpl::loadFromString(const void *node, StringRef data) {
   auto buffer = llvm::MemoryBuffer::getMemBuffer(data);
   return loadFromBuffer(node, *buffer);
 }
 
-LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
+DependencyLoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
                                                llvm::MemoryBuffer &buffer) {
   auto &provides = Provides[node];
 
   auto dependsCallback = [this, node](StringRef name, DependencyKind kind,
-                                      bool isCascading) -> LoadResult {
+                                      bool isCascading) -> DependencyLoadResult {
     if (kind == DependencyKind::ExternalFile)
       ExternalDependencies.insert(name);
 
@@ -251,13 +250,13 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
     }
 
     if (isCascading && (entries.second & kind))
-      return LoadResult::AffectsDownstream;
-    return LoadResult::UpToDate;
+      return DependencyLoadResult::affectsDownstream();
+    return DependencyLoadResult::upToDate();
   };
 
   auto providesCallback =
       [&provides](StringRef name, DependencyKind kind,
-                              bool isCascading) -> LoadResult {
+                              bool isCascading) -> DependencyLoadResult {
     assert(isCascading);
     auto iter = std::find_if(provides.begin(), provides.end(),
                              [name](const ProvidesEntryTy &entry) -> bool {
@@ -269,25 +268,25 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
     else
       iter->kindMask |= kind;
 
-    return LoadResult::UpToDate;
+    return DependencyLoadResult::upToDate();
   };
 
-  auto interfaceHashCallback = [this, node](StringRef hash) -> LoadResult {
+  auto interfaceHashCallback = [this, node](StringRef hash) -> DependencyLoadResult {
     auto insertResult = InterfaceHashes.insert(std::make_pair(node, hash));
 
     if (insertResult.second) {
       // Treat a newly-added hash as up-to-date. This includes the initial
       // load of the file.
-      return LoadResult::UpToDate;
+      return DependencyLoadResult::upToDate();
     }
 
     auto iter = insertResult.first;
     if (hash != iter->second) {
       iter->second = hash;
-      return LoadResult::AffectsDownstream;
+      return DependencyLoadResult::affectsDownstream();
     }
 
-    return LoadResult::UpToDate;
+    return DependencyLoadResult::upToDate();
   };
 
   return parseDependencyFile(buffer, providesCallback, dependsCallback,

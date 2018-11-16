@@ -34,6 +34,27 @@ namespace llvm {
 namespace swift {
 
 class UnifiedStatsReporter;
+  
+  /// Describes the result of loading a dependency file for a particular node.
+  struct DependencyLoadResult {
+    enum class Kind {
+      /// There was an error loading the file; the entire graph should be
+      /// considered suspect.
+      HadError,
+      
+      /// The file was loaded successfully; with current information the node
+      /// does not need to be rebuilt.
+      UpToDate,
+      
+      /// The file was loaded successfully; anything that depends on the node
+      /// should be considered out of date.
+      AffectsDownstream
+    } kind;
+    static DependencyLoadResult hadError() { return {Kind::HadError}; }
+    static DependencyLoadResult upToDate() { return {Kind::UpToDate}; }
+    static DependencyLoadResult affectsDownstream() { return {Kind::AffectsDownstream}; }
+  };
+
 
 /// The non-templated implementation of DependencyGraph.
 ///
@@ -45,21 +66,6 @@ public:
   /// Clients of DependencyGraph should have no reason to use this type.
   /// It is only used in the implementation.
   enum class DependencyKind : uint8_t;
-
-  /// Describes the result of loading a dependency file for a particular node.
-  enum class LoadResult {
-    /// There was an error loading the file; the entire graph should be
-    /// considered suspect.
-    HadError,
-
-    /// The file was loaded successfully; with current information the node
-    /// does not need to be rebuilt.
-    UpToDate,
-
-    /// The file was loaded successfully; anything that depends on the node
-    /// should be considered out of date.
-    AffectsDownstream
-  };
 
   /// The non-templated implementation of DependencyGraph::MarkTracer.
   ///
@@ -141,11 +147,11 @@ private:
   /// \sa SourceFile::getInterfaceHash
   llvm::DenseMap<const void *, std::string> InterfaceHashes;
 
-  LoadResult loadFromBuffer(const void *node, llvm::MemoryBuffer &buffer);
+  DependencyLoadResult loadFromBuffer(const void *node, llvm::MemoryBuffer &buffer);
 
 protected:
-  LoadResult loadFromString(const void *node, StringRef data);
-  LoadResult loadFromPath(const void *node, StringRef path);
+  DependencyLoadResult loadFromString(const void *node, StringRef data);
+  DependencyLoadResult loadFromPath(const void *node, StringRef path);
 
   void addIndependentNode(const void *node) {
     bool newlyInserted = Provides.insert({node, {}}).second;
@@ -228,7 +234,7 @@ public:
   /// ("depends") are not cleared; new dependencies are considered additive.
   ///
   /// If \p node has already been marked, only its outgoing edges are updated.
-  LoadResult loadFromPath(T node, StringRef path) {
+  DependencyLoadResult loadFromPath(T node, StringRef path) {
     return DependencyGraphImpl::loadFromPath(Traits::getAsVoidPointer(node),
                                              path);
   }
@@ -238,7 +244,7 @@ public:
   /// This is only intended for testing purposes.
   ///
   /// \sa loadFromPath
-  LoadResult loadFromString(T node, StringRef data) {
+  DependencyLoadResult loadFromString(T node, StringRef data) {
     return DependencyGraphImpl::loadFromString(Traits::getAsVoidPointer(node),
                                                data);
   }

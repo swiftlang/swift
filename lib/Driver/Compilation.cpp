@@ -414,18 +414,18 @@ namespace driver {
         if (ReturnCode == EXIT_SUCCESS || ReturnCode == EXIT_FAILURE) {
           bool wasCascading = DepGraph.isMarked(FinishedCmd);
 
-          switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
-          case DependencyGraphImpl::LoadResult::HadError:
+          switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile).kind) {
+          case DependencyLoadResult::Kind::HadError:
             if (ReturnCode == EXIT_SUCCESS) {
               dependencyLoadFailed(DependenciesFile);
               Dependents.clear();
             } // else, let the next build handle it.
             break;
-          case DependencyGraphImpl::LoadResult::UpToDate:
+          case DependencyLoadResult::Kind::UpToDate:
             if (!wasCascading)
               break;
             LLVM_FALLTHROUGH;
-          case DependencyGraphImpl::LoadResult::AffectsDownstream:
+          case DependencyLoadResult::Kind::AffectsDownstream:
             DepGraph.markTransitive(Dependents, FinishedCmd,
                                     IncrementalTracer);
             break;
@@ -723,13 +723,13 @@ namespace driver {
             DepGraph.addIndependentNode(Cmd);
           } else {
             switch (DepGraph.loadFromPath(Cmd, DependenciesFile)) {
-            case DependencyGraphImpl::LoadResult::HadError:
+            case DependencyLoadResult::Kind::HadError:
               dependencyLoadFailed(DependenciesFile, /*Warn=*/false);
               break;
-            case DependencyGraphImpl::LoadResult::UpToDate:
+            case DependencyLoadResult::Kind::UpToDate:
               Condition = Cmd->getCondition();
               break;
-            case DependencyGraphImpl::LoadResult::AffectsDownstream:
+            case DependencyLoadResult::Kind::AffectsDownstream:
               llvm_unreachable("we haven't marked anything in this graph yet");
             }
           }

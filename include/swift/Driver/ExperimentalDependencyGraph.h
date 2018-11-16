@@ -51,11 +51,6 @@ namespace swift {
       };
       
       
-      class DependencyGraphImpl {
-      public:
-        using LoadResult = typename swift::DependencyGraphImpl::LoadResult;
-      };
-
       class DriverGraph {
         using NodesByKey = std::unordered_map<NodeDependencyKey, DriverNode*>;
         // empty string for no file
@@ -86,7 +81,7 @@ namespace swift {
       public:
         DriverGraph() = default;
         
-        DependencyGraphImpl::LoadResult loadFromPath(const Job* Cmd, StringRef path);
+        DependencyLoadResult loadFromPath(const Job* Cmd, StringRef path);
         
         bool isMarked(const Job* Cmd) const;//XXX
         
@@ -100,11 +95,11 @@ namespace swift {
                           StringRef externalDependency);
         
       private:
-        DependencyGraphImpl::LoadResult loadFromBuffer(const void *node,
+        DependencyLoadResult loadFromBuffer(const void *node,
                                                        llvm::MemoryBuffer &buffer);
       
        
-        DependencyGraphImpl::LoadResult integrate(const FrontendGraph &);
+        DependencyLoadResult integrate(const FrontendGraph &);
         
         struct IntegrationResult {
           DriverNode *const node;
