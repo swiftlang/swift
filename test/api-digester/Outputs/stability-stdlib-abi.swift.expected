@@ -341,7 +341,6 @@ Func _SequenceBox._prefix(while:) has return type change from _AnySequenceBox<τ
 Func _SequenceBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
 Func _SequenceBox._suffix(_:) has return type change from _AnySequenceBox<τ_0_0.Element> to Array<τ_0_0.Element>
 Protocol Collection has generic signature change from <τ_0_0 : Sequence, τ_0_0.Index : Comparable, τ_0_0.Index == τ_0_0.Indices.Element, τ_0_0.Indices : Collection, τ_0_0.Indices == τ_0_0.Indices.SubSequence, τ_0_0.SubSequence : Collection, τ_0_0.Indices.Element == τ_0_0.Indices.Index, τ_0_0.Indices.Index == τ_0_0.SubSequence.Index, τ_0_0.SubSequence.Index == τ_0_0.Indices.Indices.Element, τ_0_0.Indices.Indices.Element == τ_0_0.Indices.Indices.Index, τ_0_0.Indices.Indices.Index == τ_0_0.SubSequence.Indices.Element, τ_0_0.SubSequence.Indices.Element == τ_0_0.SubSequence.Indices.Index, τ_0_0.SubSequence.Indices.Index == τ_0_0.SubSequence.Indices.Indices.Element, τ_0_0.SubSequence.Indices.Indices.Element == τ_0_0.SubSequence.Indices.Indices.Index> to <τ_0_0 : Sequence, τ_0_0.Element == τ_0_0.SubSequence.Element, τ_0_0.Index : Comparable, τ_0_0.Index == τ_0_0.Indices.Element, τ_0_0.Indices : Collection, τ_0_0.Indices == τ_0_0.Indices.SubSequence, τ_0_0.SubSequence : Collection, τ_0_0.SubSequence == τ_0_0.SubSequence.SubSequence, τ_0_0.Indices.Element == τ_0_0.Indices.Index, τ_0_0.Indices.Index == τ_0_0.SubSequence.Index, τ_0_0.SubSequence.Index == τ_0_0.Indices.Indices.Element, τ_0_0.Indices.Indices.Element == τ_0_0.Indices.Indices.Index, τ_0_0.Indices.Indices.Index == τ_0_0.SubSequence.Indices.Element, τ_0_0.SubSequence.Indices.Element == τ_0_0.SubSequence.Indices.Index, τ_0_0.SubSequence.Indices.Index == τ_0_0.SubSequence.Indices.Indices.Element, τ_0_0.SubSequence.Indices.Indices.Element == τ_0_0.SubSequence.Indices.Indices.Index>
-Protocol LazyCollectionProtocol has been removed
 Protocol Sequence has generic signature change from <τ_0_0.Element == τ_0_0.Iterator.Element, τ_0_0.Iterator : IteratorProtocol, τ_0_0.SubSequence : Sequence, τ_0_0.SubSequence == τ_0_0.SubSequence.SubSequence, τ_0_0.Iterator.Element == τ_0_0.SubSequence.Element, τ_0_0.SubSequence.Element == τ_0_0.SubSequence.Iterator.Element> to <τ_0_0.Element == τ_0_0.Iterator.Element, τ_0_0.Iterator : IteratorProtocol>
 Protocol _SequenceWrapper has been removed
 Struct AnySequence has removed conformance to Sequence
@@ -487,3 +486,15 @@ Protocol _ShadowProtocol has been removed
 Func ManagedBufferPointer._sanityCheckValidBufferClass(_:creating:) has been removed
 Func _sanityCheck(_:_:file:line:) has been removed
 Func _sanityCheckFailure(_:file:line:) has been removed
+
+AssociatedType LazyCollectionProtocol.Elements has been removed
+Func LazyCollectionProtocol.compactMap(_:) has been removed
+Func LazyCollectionProtocol.drop(while:) has been removed
+Func LazyCollectionProtocol.filter(_:) has been removed
+Func LazyCollectionProtocol.flatMap(_:) has been removed
+Func LazyCollectionProtocol.flatMap(_:) has been removed (deprecated)
+Func LazyCollectionProtocol.joined() has been removed
+Func LazyCollectionProtocol.map(_:) has been removed
+Func LazyCollectionProtocol.prefix(while:) has been removed
+Func LazyCollectionProtocol.reversed() has been removed
+Var LazyCollectionProtocol.lazy has declared type change from LazyCollection<τ_0_0.Elements> to LazySequence<τ_0_0.Elements>
