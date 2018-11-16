@@ -942,43 +942,56 @@ private:
       SmallVector<ValueDecl *, 4> lookupResults;
       declContext->lookupQualified(typeDecl, renamedDeclName,
                                    NL_QualifiedDefault, lookupResults);
-      for (auto candidate : lookupResults) {
+      
+      if (lookupResults.size() == 1) {
+        auto candidate = lookupResults[0];
         if (!shouldInclude(candidate))
-          continue;
-
+          return nullptr;
         if (candidate->getKind() != D->getKind() ||
             (candidate->isInstanceMember() !=
              cast<ValueDecl>(D)->isInstanceMember()))
-          continue;
+          return nullptr;
 
-        if (isa<FuncDecl>(candidate)) {
-          auto cParams = cast<FuncDecl>(candidate)->getParameters();
-          auto dParams = cast<FuncDecl>(D)->getParameters();
-
-          if (cParams->size() != dParams->size())
+        renamedDecl = candidate;
+      } else {
+        for (auto candidate : lookupResults) {
+          if (!shouldInclude(candidate))
             continue;
-
-          bool hasSameParameterTypes = true;
-          for (auto index : indices(*cParams)) {
-            auto cParamsType = cParams->get(index)->getType();
-            auto dParamsType = dParams->get(index)->getType();
-            if (!cParamsType->matchesParameter(dParamsType, TypeMatchOptions())) {
-              hasSameParameterTypes = false;
-              break;
+          
+          if (candidate->getKind() != D->getKind() ||
+              (candidate->isInstanceMember() !=
+               cast<ValueDecl>(D)->isInstanceMember()))
+            continue;
+          
+          if (isa<FuncDecl>(candidate)) {
+            auto cParams = cast<FuncDecl>(candidate)->getParameters();
+            auto dParams = cast<FuncDecl>(D)->getParameters();
+            
+            if (cParams->size() != dParams->size())
+              continue;
+            
+            bool hasSameParameterTypes = true;
+            for (auto index : indices(*cParams)) {
+              auto cParamsType = cParams->get(index)->getType();
+              auto dParamsType = dParams->get(index)->getType();
+              if (!cParamsType->matchesParameter(dParamsType, TypeMatchOptions())) {
+                hasSameParameterTypes = false;
+                break;
+              }
+            }
+            
+            if (!hasSameParameterTypes) {
+              continue;
             }
           }
-
-          if (!hasSameParameterTypes) {
-            continue;
+          
+          if (renamedDecl) {
+            // If we found a duplicated candidate then we would silently fail.
+            renamedDecl = nullptr;
+            break;
           }
+          renamedDecl = candidate;
         }
-
-        if (renamedDecl) {
-          // If we found a duplicated candidate then we would silently fail.
-          renamedDecl = nullptr;
-          break;
-        }
-        renamedDecl = candidate;
       }
       return renamedDecl;
     }
