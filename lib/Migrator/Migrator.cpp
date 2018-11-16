@@ -197,6 +197,8 @@ bool Migrator::performSyntacticPasses() {
 
   runAPIDiffMigratorPass(Editor, StartInstance->getPrimarySourceFile(),
                          getMigratorOptions());
+  runOptionalTryMigratorPass(Editor, StartInstance->getPrimarySourceFile(),
+                        getMigratorOptions());
 
   Edits.commit(Editor.getEdits());
 
