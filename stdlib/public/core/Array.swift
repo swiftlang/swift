@@ -1296,14 +1296,14 @@ extension Array: RangeReplaceableCollection {
 // checker speed up cases where there is a large number of uses of the
 // operator in the same expression.
 extension Array {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public static func + (lhs: Array, rhs: Array) -> Array {
     var lhs = lhs
     lhs.append(contentsOf: rhs)
     return lhs
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public static func += (lhs: inout Array, rhs: Array) {
     lhs.append(contentsOf: rhs)
   }
