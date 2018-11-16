@@ -21,6 +21,7 @@ import TestsUtils
 
 let t: [BenchmarkCategory] = []
 let ta: [BenchmarkCategory] = [.api, .Array]
+
 %{
 Setup = """
   let existential = initExistential(withType: T.self)
@@ -122,7 +123,8 @@ def run_function_name(benchmark_name):
 }%
 public let ExistentialPerformance: [BenchmarkInfo] = [
 % for Name in Names:
-  BenchmarkInfo(name: "Existential.${Name}", runFunction: ${
+  BenchmarkInfo(name: "Existential.${Name}",
+    runFunction: ${
     run_function_name(Name)}, tags: ${
     'ta' if 'Array' in Name else 't'}${
     (', setUpFunction: ca' + Name.split('.')[-1]) if 'Array' in Name else '' }),
@@ -224,17 +226,20 @@ func initExistential<T: Existential>(withType: T.Type) -> Existential {
 }
 
 @inline(never)
-func initExistentialArray<T: Existential>(withType: T.Type, count c: Int) -> [Existential] {
+func initExistentialArray<T: Existential>(withType: T.Type, count c: Int)
+  -> [Existential] {
   return [T](repeating: T(), count: c)
 }
 
 @inline(never)
-func passExistentialTwiceOneMethodCall(_ e0: Existential, _ e1: Existential) -> Bool {
+func passExistentialTwiceOneMethodCall(_ e0: Existential, _ e1: Existential)
+  -> Bool {
   return e0.doIt() && e1.doIt()
 }
 
 @inline(never)
-func passExistentialTwiceTwoMethodCalls(_ e0: Existential, _ e1: Existential) -> Bool {
+func passExistentialTwiceTwoMethodCalls(_ e0: Existential, _ e1: Existential)
+  -> Bool {
   return e0.doIt() && e1.doIt() && e0.reallyDoIt() && e1.reallyDoIt()
 }
 % for (name, setup, multiple, workload) in Workloads:
