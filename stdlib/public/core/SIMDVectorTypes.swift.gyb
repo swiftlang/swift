@@ -137,7 +137,10 @@ extension ${Self} : SIMDScalar {
   public typealias SIMDMaskScalar = ${Mask}
 
 % for n in storagescalarCounts:
-  @_fixed_layout public struct SIMD${n}Storage : SIMDStorage {
+%  bytes = n * self_type.bits / 8
+  @_fixed_layout
+  @_alignment(${bytes if bytes <= 16 else 16})
+  public struct SIMD${n}Storage : SIMDStorage {
 
     public var _value: Builtin.Vec${n}x${BuiltinName}
 
@@ -178,7 +181,10 @@ extension ${Self} : SIMDScalar {
   public typealias SIMDMaskScalar = Int${bits}
 
 % for n in storagescalarCounts:
-  @_fixed_layout public struct SIMD${n}Storage : SIMDStorage {
+%  bytes = n * bits / 8
+  @_fixed_layout
+  @_alignment(${bytes if bytes <= 16 else 16})
+  public struct SIMD${n}Storage : SIMDStorage {
 
     public var _value: Builtin.Vec${n}xFPIEEE${bits}
 
