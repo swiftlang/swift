@@ -93,6 +93,33 @@ internal func _cocoaHashASCIIBytes(
   return _swift_stdlib_CFStringHashCString(bytes, length)
 }
 
+// These "trampolines" are effectively objc_msgSend_super.
+// They bypass our implementations to use NSString's
+
+@_effects(readonly)
+internal func _cocoaCStringUsingEncodingTrampoline(
+  _ string: _CocoaString,
+  _ encoding: UInt)
+  -> UnsafePointer<UInt8>? {
+    return _swift_stdlib_NSStringCStringUsingEncodingTrampoline(
+      string,
+      encoding)
+}
+
+
+@_effects(releasenone)
+internal func _cocoaGetCStringTrampoline(
+                             _ string: _CocoaString,
+                             _ buffer: UnsafeMutablePointer<UInt8>,
+                             _ maxLength: Int,
+                             _ encoding: UInt)
+  -> Int8 {
+    return Int8(_swift_stdlib_NSStringGetCStringTrampoline(string,
+                                                    buffer,
+                                                    maxLength,
+                                                    encoding))
+}
+
 //
 // Conversion from NSString to Swift's native representation
 //

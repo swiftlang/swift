@@ -21,6 +21,7 @@
 #if SWIFT_OBJC_INTEROP
 #import <CoreFoundation/CoreFoundation.h>
 #include "../SwiftShims/CoreFoundationShims.h"
+#import <objc/runtime.h>
 
 using namespace swift;
 
@@ -146,6 +147,32 @@ _swift_shims_CFHashCode
 swift::_swift_stdlib_CFStringHashCString(const _swift_shims_UInt8 * _Nonnull bytes,
                                   _swift_shims_CFIndex length) {
   return CFStringHashCString(bytes, length);
+}
+
+const __swift_uint8_t *
+swift::_swift_stdlib_NSStringCStringUsingEncodingTrampoline(id _Nonnull obj,
+                                                  unsigned long encoding) {
+  typedef __swift_uint8_t * _Nullable (*cStrImplPtr)(id, SEL, unsigned long);
+  cStrImplPtr imp = (cStrImplPtr)class_getMethodImplementation([obj superclass],
+                                                               @selector(cStringUsingEncoding:));
+  return imp(obj, @selector(cStringUsingEncoding:), encoding);
+}
+
+__swift_uint8_t
+swift::_swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
+                                         _swift_shims_UInt8 *buffer,
+                                         _swift_shims_CFIndex maxLength,
+                                         unsigned long encoding) {
+  typedef __swift_uint8_t (*getCStringImplPtr)(id,
+                                             SEL,
+                                             _swift_shims_UInt8 *,
+                                             _swift_shims_CFIndex,
+                                             unsigned long);
+  SEL sel = @selector(getCString:maxLength:encoding:);
+  getCStringImplPtr imp = (getCStringImplPtr)class_getMethodImplementation([obj superclass], sel);
+  
+  return imp(obj, sel, buffer, maxLength, encoding);
+
 }
 
 

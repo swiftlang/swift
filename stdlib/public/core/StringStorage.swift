@@ -19,7 +19,8 @@ internal class _AbstractStringStorage: __SwiftNativeNSString, _NSCopying {
   internal var asGuts: _StringGuts { @_effects(readonly) get { Builtin.unreachable() } }
   final internal var asString: String { @_effects(readonly) get { return String(asGuts) } }
   internal var count: Int { @_effects(readonly) get { Builtin.unreachable() } }
-  
+  fileprivate var isASCII: Bool { @_effects(readonly) get { Builtin.unreachable() } }
+
   //Having these in an extension creates an ObjC category, which we don't want
   //in UTF16 code units
   @objc(length) internal var length: Int { @_effects(readonly) get { Builtin.unreachable() } }
@@ -41,6 +42,7 @@ internal class _AbstractStringStorage: __SwiftNativeNSString {
   internal var asGuts: _StringGuts { @_effects(readonly) get { Builtin.unreachable() } }
   final internal var asString: String { @_effects(readonly) get { return String(asGuts) } }
   internal var count: Int { @_effects(readonly) get { Builtin.unreachable() } }
+  fileprivate var isASCII: Bool { @_effects(readonly) get { Builtin.unreachable() } }
 }
 
 #endif
@@ -48,7 +50,6 @@ internal class _AbstractStringStorage: __SwiftNativeNSString {
 // ObjC interfaces
 #if _runtime(_ObjC)
 
-@inline(__always)
 @_effects(releasenone)
 private func _getCharacters<T:_AbstractStringStorage>(_ this:T,
    _ buffer: UnsafeMutablePointer<UInt16>,
@@ -64,6 +65,31 @@ private func _getCharacters<T:_AbstractStringStorage>(_ this:T,
   str._copyUTF16CodeUnits(
     into: UnsafeMutableBufferPointer(start: buffer, count: range.count),
     range: range)
+}
+
+@_effects(releasenone)
+private func _getCString<T:_AbstractStringStorage>(
+  _ this: T,
+  _ utf8: String.UTF8View,
+  _ outputPtr: UnsafeMutablePointer<UInt8>,
+  _ maxLength: Int,
+  _ encoding: UInt)
+  -> Int8 {
+    switch (encoding, this.isASCII) {
+    case (_cocoaASCIIEncoding, true):
+      fallthrough
+    case (_cocoaUTF8Encoding, _):
+      guard maxLength >= this.count + 1 else { return 0 }
+      let buffer = UnsafeMutableBufferPointer(start: outputPtr, count: maxLength)
+      let (_, end) = utf8._copyContents(initializing: buffer)
+      buffer[end] = 0
+      return 1
+    default:
+      return  _cocoaGetCStringTrampoline(this,
+                                         outputPtr,
+                                         maxLength,
+                                         encoding)
+    }
 }
 
 @inline(never) //hide the shim call so we can use @_effects
@@ -134,6 +160,10 @@ private func _isEqual<T:_AbstractStringStorage>(_ this:T, _ other:AnyObject?)
   return _cocoaStringCompare(this, other) == 0 ? 1 : 0
 }
 
+internal let _cocoaASCIIEncoding:UInt = 1 /* NSASCIIStringEncoding */
+internal let _cocoaUTF8Encoding:UInt = 4 /* NSUTF8StringEncoding */
+
+
 #endif // _runtime(_ObjC)
 
 #if arch(i386) || arch(arm)
@@ -186,6 +216,14 @@ final internal class _StringStorage: _AbstractStringStorage {
   }
 #endif
 
+  fileprivate final override var isASCII: Bool {
+#if arch(i386) || arch(arm)
+    return _flags.isASCII
+#else
+    return _countAndFlags.isASCII
+#endif
+  }
+
   override final internal var asGuts: _StringGuts {
     @inline(__always) @_effects(readonly) get {
       return _StringGuts(self)
@@ -237,14 +275,42 @@ final internal class _StringStorage: _AbstractStringStorage {
 
     return nil
   }
+  
+  @objc(UTF8String)
+  @_effects(readonly)
+  final internal func _utf8String() -> UnsafePointer<UInt8>? {
+    return start
+  }
+
+  @objc(cStringUsingEncoding:)
+  @_effects(readonly)
+  final internal func _cString(encoding: UInt) -> UnsafePointer<UInt8>? {
+    switch (encoding, isASCII) {
+    case (_cocoaASCIIEncoding, true):
+      fallthrough
+    case (_cocoaUTF8Encoding, _):
+      return start
+    default:
+      return _cocoaCStringUsingEncodingTrampoline(self, encoding)
+    }
+  }
+  
+  @objc(getCString:maxLength:encoding:)
+  @_effects(releasenone)
+  final internal func getCString(_ outputPtr: UnsafeMutablePointer<UInt8>,
+                               maxLength: Int,
+                               encoding: UInt)
+    -> Int8 {
+    return _getCString(self, asString.utf8, outputPtr, maxLength, encoding)
+  }
 
   @objc
-  final internal var fastestEncoding: Int {
+  final internal var fastestEncoding: UInt {
     @_effects(readonly) get {
       if isASCII {
-        return 1 /* NSASCIIStringEncoding */
+        return _cocoaASCIIEncoding
       }
-      return 4 /* NSUTF8StringEncoding */
+      return _cocoaUTF8Encoding
     }
   }
 
@@ -397,14 +463,6 @@ extension _StringStorage {
     @inline(__always) get {
       return UnsafeBufferPointer(start: start, count: count)
     }
-  }
-
-  fileprivate var isASCII: Bool {
-#if arch(i386) || arch(arm)
-    return _flags.isASCII
-#else
-    return _countAndFlags.isASCII
-#endif
   }
 
   // @opaque
@@ -657,7 +715,7 @@ final internal class _SharedStringStorage: _AbstractStringStorage {
     self._invariantCheck()
   }
   
-  fileprivate var isASCII: Bool {
+  fileprivate final override var isASCII: Bool {
     #if arch(i386) || arch(arm)
     return _flags.isASCII
     #else
@@ -708,12 +766,12 @@ final internal class _SharedStringStorage: _AbstractStringStorage {
   }
   
   @objc
-  final internal var fastestEncoding: Int {
+  final internal var fastestEncoding: UInt {
     @_effects(readonly) get {
       if isASCII {
-        return 1 /* NSASCIIStringEncoding */
+        return _cocoaASCIIEncoding
       }
-      return 4 /* NSUTF8StringEncoding */
+      return _cocoaUTF8Encoding
     }
   }
   
@@ -725,6 +783,34 @@ final internal class _SharedStringStorage: _AbstractStringStorage {
     }
     
     return nil
+  }
+  
+  @objc(UTF8String)
+  @_effects(readonly)
+  final internal func _utf8String() -> UnsafePointer<UInt8>? {
+    return start
+  }
+
+  @objc(cStringUsingEncoding:)
+  @_effects(readonly)
+  final internal func _cString(encoding: UInt) -> UnsafePointer<UInt8>? {
+    switch (encoding, isASCII) {
+    case (_cocoaASCIIEncoding, true):
+      fallthrough
+    case (_cocoaUTF8Encoding, _):
+      return start
+    default:
+      return _cocoaCStringUsingEncodingTrampoline(self, encoding)
+    }
+  }
+  
+  @objc(getCString:maxLength:encoding:)
+  @_effects(releasenone)
+  final internal func getCString(_ outputPtr: UnsafeMutablePointer<UInt8>,
+                               maxLength: Int,
+                               encoding: UInt)
+    -> Int8 {
+    return _getCString(self, asString.utf8, outputPtr, maxLength, encoding)
   }
 
   @objc(isEqualToString:)
