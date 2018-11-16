@@ -1,6 +1,6 @@
 // RUN: %target-run-stdlib-swift -parse-stdlib %s | %FileCheck %s
 // REQUIRES: executable_test
-// REQUIRES: rdar45654446
+
 import Swift
 
 #if _runtime(_ObjC)
@@ -117,26 +117,30 @@ func test_varArgs5() {
   }
 
   // CHECK: rdar-32547102: 0.0 1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0 11.0
-  withVaList(args) {
+  _ = withVaList(args) {
     vprintf(format + "\n", $0)
   }
 }
 test_varArgs5()
 
-#if !os(Windows) && (arch(i386) || arch(x86_64))
 func test_varArgs6() {
   // Verify alignment of va_list contents when `Float80` is present.
   let  i8 = Int8(1)
   let f32 = Float(1.1)
   let f64 = Double(2.2)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
   let f80 = Float80(4.5)
   my_printf("a %g %d %g %d %Lg %d %g a\n",            f32, i8, f64, i8, f80, i8, f32)
   my_printf("b %d %g %d %g %d %Lg %d %g b\n",     i8, f32, i8, f64, i8, f80, i8, f32)
+#else // just a dummy to make FileCheck happy, since it ignores `#if`s
+  let dummy = Double(4.5)
+  my_printf("a %g %d %g %d %g %d %g a\n",            f32, i8, f64, i8, dummy, i8, f32)
+  my_printf("b %d %g %d %g %d %g %d %g b\n",     i8, f32, i8, f64, i8, dummy, i8, f32)
+#endif
   // CHECK: a 1.1 1 2.2 1 4.5 1 1.1 a
   // CHECK: b 1 1.1 1 2.2 1 4.5 1 1.1 b
 }
 test_varArgs6()
-#endif
 
 
 // CHECK: done.
