@@ -5890,9 +5890,14 @@ Type EnumElementDecl::getArgumentInterfaceType() const {
 
   auto funcTy = interfaceType->castTo<AnyFunctionType>();
   funcTy = funcTy->getResult()->castTo<FunctionType>();
-  return AnyFunctionType::composeInput(funcTy->getASTContext(),
-                                       funcTy->getParams(),
-                                       /*canonicalVararg=*/false);
+
+  auto &ctx = getASTContext();
+  SmallVector<TupleTypeElt, 4> elements;
+  for (const auto &param : funcTy->getParams()) {
+    Type eltType = param.getParameterType(/*canonicalVararg=*/false, &ctx);
+    elements.emplace_back(eltType, param.getLabel());
+  }
+  return TupleType::get(elements, ctx);
 }
 
 EnumCaseDecl *EnumElementDecl::getParentCase() const {
