@@ -267,7 +267,7 @@ internal class __ContiguousArrayStorageBase
   @usableFromInline
   final var countAndCapacity: _ArrayBody
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @nonobjc
   internal init(_doNotCallMeBase: ()) {
     _internalInvariantFailure("creating instance of __ContiguousArrayStorageBase")
@@ -306,17 +306,20 @@ internal class __ContiguousArrayStorageBase
   }
 #endif
 
+@inlinable
   internal func canStoreElements(ofDynamicType _: Any.Type) -> Bool {
     _internalInvariantFailure(
       "Concrete subclasses must implement canStoreElements(ofDynamicType:)")
   }
 
   /// A type that every element in the array is.
+  @inlinable
   internal var staticElementType: Any.Type {
     _internalInvariantFailure(
       "Concrete subclasses must implement staticElementType")
   }
 
+  @inlinable
   deinit {
     _internalInvariant(
       self !== _emptyArrayStorage, "Deallocating empty array storage?!")

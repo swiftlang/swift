@@ -482,3 +482,7 @@ Protocol _NSCopying has been removed
 Protocol _NSEnumerator has been removed
 Protocol _NSFastEnumeration has been removed
 Protocol _ShadowProtocol has been removed
+
+Func ManagedBufferPointer._sanityCheckValidBufferClass(_:creating:) has been removed
+Func _sanityCheck(_:_:file:line:) has been removed
+Func _sanityCheckFailure(_:file:line:) has been removed
