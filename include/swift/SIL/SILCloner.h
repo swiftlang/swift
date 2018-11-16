@@ -67,6 +67,10 @@ private:
   /// Set of basic blocks where unreachable was inserted.
   SmallPtrSet<SILBasicBlock *, 32> BlocksWithUnreachables;
 
+  // Keep track of the last cloned block in function order. For single block
+  // regions, this will be the start block.
+  SILBasicBlock *lastClonedBB = nullptr;
+
 public:
   using SILInstructionVisitor<ImplClass>::asImpl;
 
@@ -101,6 +105,10 @@ public:
   }
 
   SILBuilder &getBuilder() { return Builder; }
+
+  // After cloning, returns a non-null pointer to the last cloned block in
+  // function order. For single block regions, this will be the start block.
+  SILBasicBlock *getLastClonedBB() { return lastClonedBB; }
 
   /// Visit all blocks reachable from the given `StartBB` and all instructions
   /// in those blocks.
@@ -655,7 +663,7 @@ void SILCloner<ImplClass>::visitBlocksDepthFirst(SILBasicBlock *startBB) {
   // order they are created, which differs from the order they are
   // cloned. Blocks are created in BFS order but cloned in DFS preorder (when no
   // critical edges are present).
-  SILBasicBlock *lastClonedBB = BBMap[startBB];
+  lastClonedBB = BBMap[startBB];
   while (!dfsWorklist.empty()) {
     auto *BB = dfsWorklist.pop_back_val();
     preorderBlocks.push_back(BB);
