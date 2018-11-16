@@ -691,6 +691,7 @@ emitGeneratorForKeyPath(IRGenModule &IGM,
         // Form the mangled name with its relative reference.
         auto S = B.beginStruct();
         S.setPacked(true);
+        S.add(llvm::ConstantInt::get(IGM.Int8Ty, 255));
         S.add(llvm::ConstantInt::get(IGM.Int8Ty, 9));
         S.addRelativeAddress(accessorThunk);
 
