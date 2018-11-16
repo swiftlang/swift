@@ -83,22 +83,14 @@ func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
 public // SPI(Foundation)
 func _typeByName(_ name: String) -> Any.Type? {
   let nameUTF8 = Array(name.utf8)
-  let parametersPerLevel = [UInt]()
-  let flatSubstitutions = [Any.Type]()
   return nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
     return  _getTypeByMangledName(nameUTF8.baseAddress!,
-                                  UInt(nameUTF8.endIndex),
-                                  0,
-                                  parametersPerLevel,
-                                  flatSubstitutions)
+                                  UInt(nameUTF8.endIndex))
   }
 }
 
-@_silgen_name("swift_getTypeByMangledName")
+@_silgen_name("swift_stdlib_getTypeByMangledName")
 internal func _getTypeByMangledName(
   _ name: UnsafePointer<UInt8>,
-  _ nameLength: UInt,
-  _ numberOfLevels: UInt,
-  _ parametersPerLevel: UnsafePointer<UInt>,
-  _ substitutions: UnsafePointer<Any.Type>)
+  _ nameLength: UInt)
   -> Any.Type?

@@ -1260,27 +1260,16 @@ swift::_getTypeByMangledName(StringRef typeName,
                                substWitnessTable);
 }
 
-static const Metadata * _Nullable
-swift_getTypeByMangledNameImpl(const char *typeNameStart, size_t typeNameLength,
-                           size_t numberOfLevels,
-                           size_t *parametersPerLevel,
-                           const Metadata * const *flatSubstitutions) {
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+const Metadata * _Nullable
+swift_stdlib_getTypeByMangledName(const char *typeNameStart,
+                                  size_t typeNameLength) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
-  auto metadata = _getTypeByMangledName(typeName,
-    [&](unsigned depth, unsigned index) -> const Metadata * {
-      if (depth >= numberOfLevels)
-        return nullptr;
-
-      if (index >= parametersPerLevel[depth])
-        return nullptr;
-
-      unsigned flatIndex = index;
-      for (unsigned i = 0; i < depth; ++i)
-        flatIndex += parametersPerLevel[i];
-
-      return flatSubstitutions[flatIndex];
-    },
-    [](const Metadata *type, unsigned index) { return nullptr; });
+  auto metadata =
+    _getTypeByMangledName(
+      typeName,
+      [](unsigned depth, unsigned index) { return nullptr; },
+      [](const Metadata *type, unsigned index) { return nullptr; });
 
   if (!metadata) return nullptr;
 

@@ -69,16 +69,6 @@
 #  endif
 #endif
 
-OVERRIDE_METADATALOOKUP(getTypeByMangledName, const Metadata *,
-                        SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL, ,
-                        (const char *typeNameStart, size_t typeNameLength,
-                         size_t numberOfLevels,
-                         size_t *parametersPerLevel,
-                         const Metadata * const *flatSubstitutions),
-                        (typeNameStart, typeNameLength, numberOfLevels,
-                         parametersPerLevel, flatSubstitutions))
-
-
 OVERRIDE_CASTING(dynamicCast, bool, , swift::,
                  (OpaqueValue *dest, OpaqueValue *src,
                   const Metadata *srcType,

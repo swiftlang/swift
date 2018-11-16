@@ -62,13 +62,6 @@ OverrideSection Overrides __attribute__((section("__DATA,__swift_hooks"))) = {
 #include "../../stdlib/public/runtime/CompatibilityOverride.def"
 };
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-const Metadata * _Nullable
-swift_getTypeByMangledName(const char *typeNameStart, size_t typeNameLength,
-                           size_t numberOfLevels,
-                           size_t *parametersPerLevel,
-                           const Metadata * const *flatSubstitutions);
-
 class CompatibilityOverrideTest : public ::testing::Test {
 protected:
   virtual void SetUp() {
@@ -87,11 +80,6 @@ protected:
     ASSERT_TRUE(Ran);
   }
 };
-
-TEST_F(CompatibilityOverrideTest, test_swift_getTypeByMangledName) {
-  auto Result = swift_getTypeByMangledName("", 0, 0, nullptr, nullptr);
-  ASSERT_EQ(Result, nullptr);
-}
 
 TEST_F(CompatibilityOverrideTest, test_swift_dynamicCast) {
   auto Result = swift_dynamicCast(nullptr, nullptr, nullptr, nullptr,
