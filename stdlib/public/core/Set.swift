@@ -1124,7 +1124,8 @@ extension Set {
   public func isDisjoint(with other: Set<Element>) -> Bool {
     return _isDisjoint(with: other)
   }
-
+    
+  @inlinable
   internal func _isDisjoint<S: Sequence>(with other: S) -> Bool
   where S.Element == Element {
     for member in other {
