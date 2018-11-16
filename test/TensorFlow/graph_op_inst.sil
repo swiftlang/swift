@@ -4,76 +4,74 @@ sil_stage raw
 
 import Builtin
 import Swift
+import TensorFlow
 
-// Dummy struct mimicking the real `Tensor` type.
-struct Tensor<Scalar> {}
-
-sil @attribute_test : $@convention(thin) () -> Tensor<Float> {
+sil @attribute_test : $@convention(thin) () -> TensorHandle<Float> {
 bb0:
-  %0 = graph_op [no_clustering] "tf.Dummy"() {int1: i32 -3, int2: i8 4, int3: i64 42} : $Tensor<Float>
-  %1 = graph_op "tf.Dummy"() {hex1: f64 0x40091EB851EB851F, hex2: f32 0x4048F5C3} : $Tensor<Float>
-  %2 = graph_op "tf.Dummy"() {float1: f64 3.14, float2: f32 -3.14} : $Tensor<Float>
-  %3 = graph_op "tf.Dummy"() {string1: "hello", string2: "world"} : $Tensor<Float>
-  %4 = graph_op "tf.Dummy"() {metatype1: $Float, metatype2: $Tensor<Float>} : $Tensor<Float>
-  %5 = graph_op "tf.Dummy"() {function1: @chained_op_test : $@convention(thin) (Tensor<Float>, Tensor<Float>) -> Tensor<Float> (N)} : $Tensor<Float>
-  %6 = graph_op "tf.Dummy"() {function1: @chained_op_test : $@convention(thin) (Tensor<Float>, Tensor<Float>) -> Tensor<Float> (W)} : $Tensor<Float>
-  %7 = graph_op "tf.Dummy"() {aggregate: ((i8 1, i32 -2), (f32 -1.0, $Float))} : $Tensor<Float>
-  %8 = graph_op "tf.Smarty"() {array: [$Int: i32 -2, i32 97]} : $Tensor<Float>
-  return %0 : $Tensor<Float>
+  %0 = graph_op [no_clustering] "tf.Dummy"() {int1: i32 -3, int2: i8 4, int3: i64 42} : $TensorHandle<Float>
+  %1 = graph_op "tf.Dummy"() {hex1: f64 0x40091EB851EB851F, hex2: f32 0x4048F5C3} : $TensorHandle<Float>
+  %2 = graph_op "tf.Dummy"() {float1: f64 3.14, float2: f32 -3.14} : $TensorHandle<Float>
+  %3 = graph_op "tf.Dummy"() {string1: "hello", string2: "world"} : $TensorHandle<Float>
+  %4 = graph_op "tf.Dummy"() {metatype1: $Float, metatype2: $TensorHandle<Float>} : $TensorHandle<Float>
+  %5 = graph_op "tf.Dummy"() {function1: @chained_op_test : $@convention(thin) (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> (N)} : $TensorHandle<Float>
+  %6 = graph_op "tf.Dummy"() {function1: @chained_op_test : $@convention(thin) (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> (W)} : $TensorHandle<Float>
+  %7 = graph_op "tf.Dummy"() {aggregate: ((i8 1, i32 -2), (f32 -1.0, $Float))} : $TensorHandle<Float>
+  %8 = graph_op "tf.Smarty"() {array: [$Int: i32 -2, i32 97]} : $TensorHandle<Float>
+  return %0 : $TensorHandle<Float>
 }
 
-// CHECK-LABEL: sil @attribute_test : $@convention(thin) () -> Tensor<Float> {
+// CHECK-LABEL: sil @attribute_test : $@convention(thin) () -> TensorHandle<Float> {
 // CHECK: bb0:
-// CHECK-NEXT:   %0 = graph_op [no_clustering] "tf.Dummy"() {int1: i32 -3, int2: i8 4, int3: i64 42} : $Tensor<Float>
-// CHECK-NEXT:   %1 = graph_op "tf.Dummy"() {hex1: f64 0x40091EB851EB851F /* 3.1400000000000001 */, hex2: f32 0x4048F5C3 /* 3.1400001 */} : $Tensor<Float>
-// CHECK-NEXT:   %2 = graph_op "tf.Dummy"() {float1: f64 0x40091EB851EB851F /* 3.1400000000000001 */, float2: f32 0xC048F5C3 /* -3.1400001 */} : $Tensor<Float>
-// CHECK-NEXT:   %3 = graph_op "tf.Dummy"() {string1: "hello", string2: "world"} : $Tensor<Float>
-// CHECK-NEXT:   %4 = graph_op "tf.Dummy"() {metatype1: $Float, metatype2: $Tensor<Float>} : $Tensor<Float>
-// CHECK-NEXT:   %5 = graph_op "tf.Dummy"() {function1: @chained_op_test : $@convention(thin) (Tensor<Float>, Tensor<Float>) -> Tensor<Float> (N)} : $Tensor<Float>
-// CHECK-NEXT:   %6 = graph_op "tf.Dummy"() {function1: @chained_op_test : $@convention(thin) (Tensor<Float>, Tensor<Float>) -> Tensor<Float> (W)} : $Tensor<Float>
-// CHECK-NEXT:   %7 = graph_op "tf.Dummy"() {aggregate: ((i8 1, i32 -2), (f32 0xBF800000 /* -1 */, $Float))} : $Tensor<Float>
-// CHECK-NEXT:   %8 = graph_op "tf.Smarty"() {array: [$Int: i32 -2, i32 97]} : $Tensor<Float>
-// CHECK-NEXT:   return %0 : $Tensor<Float>
+// CHECK-NEXT:   %0 = graph_op [no_clustering] "tf.Dummy"() {int1: i32 -3, int2: i8 4, int3: i64 42} : $TensorHandle<Float>
+// CHECK-NEXT:   %1 = graph_op "tf.Dummy"() {hex1: f64 0x40091EB851EB851F /* 3.1400000000000001 */, hex2: f32 0x4048F5C3 /* 3.1400001 */} : $TensorHandle<Float>
+// CHECK-NEXT:   %2 = graph_op "tf.Dummy"() {float1: f64 0x40091EB851EB851F /* 3.1400000000000001 */, float2: f32 0xC048F5C3 /* -3.1400001 */} : $TensorHandle<Float>
+// CHECK-NEXT:   %3 = graph_op "tf.Dummy"() {string1: "hello", string2: "world"} : $TensorHandle<Float>
+// CHECK-NEXT:   %4 = graph_op "tf.Dummy"() {metatype1: $Float, metatype2: $TensorHandle<Float>} : $TensorHandle<Float>
+// CHECK-NEXT:   %5 = graph_op "tf.Dummy"() {function1: @chained_op_test : $@convention(thin) (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> (N)} : $TensorHandle<Float>
+// CHECK-NEXT:   %6 = graph_op "tf.Dummy"() {function1: @chained_op_test : $@convention(thin) (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> (W)} : $TensorHandle<Float>
+// CHECK-NEXT:   %7 = graph_op "tf.Dummy"() {aggregate: ((i8 1, i32 -2), (f32 0xBF800000 /* -1 */, $Float))} : $TensorHandle<Float>
+// CHECK-NEXT:   %8 = graph_op "tf.Smarty"() {array: [$Int: i32 -2, i32 97]} : $TensorHandle<Float>
+// CHECK-NEXT:   return %0 : $TensorHandle<Float>
 // CHECK-NEXT: }
 
-sil @chained_op_test : $@convention(thin) (Tensor<Float>, Tensor<Float>) -> Tensor<Float> {
-bb0(%0 : @trivial $Tensor<Float>, %1 : @trivial $Tensor<Float>):
-  %2 = graph_op "tf.Add"(%0 : $Tensor<Float>, %1 : $Tensor<Float>) {T: $Float} : $Tensor<Float>
-  %3 = graph_op "tf.Mul"(%2 : $Tensor<Float>, %2 : $Tensor<Float>) {T: $Float} : $Tensor<Float>
-  return %3 : $Tensor<Float>
+sil @chained_op_test : $@convention(thin) (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
+bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Float>):
+  %2 = graph_op "tf.Add"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {T: $Float} : $TensorHandle<Float>
+  %3 = graph_op "tf.Mul"(%2 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) {T: $Float} : $TensorHandle<Float>
+  return %3 : $TensorHandle<Float>
 }
 
-// CHECK-LABEL: sil @chained_op_test : $@convention(thin) (Tensor<Float>, Tensor<Float>) -> Tensor<Float> {
-// CHECK: bb0(%0 : @trivial $Tensor<Float>, %1 : @trivial $Tensor<Float>):
-// CHECK-NEXT:   %2 = graph_op "tf.Add"(%0 : $Tensor<Float>, %1 : $Tensor<Float>) {T: $Float} : $Tensor<Float>
-// CHECK-NEXT:   %3 = graph_op "tf.Mul"(%2 : $Tensor<Float>, %2 : $Tensor<Float>) {T: $Float} : $Tensor<Float>
-// CHECK-NEXT:   return %3 : $Tensor<Float>
+// CHECK-LABEL: sil @chained_op_test : $@convention(thin) (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
+// CHECK: bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Float>):
+// CHECK-NEXT:   %2 = graph_op "tf.Add"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {T: $Float} : $TensorHandle<Float>
+// CHECK-NEXT:   %3 = graph_op "tf.Mul"(%2 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) {T: $Float} : $TensorHandle<Float>
+// CHECK-NEXT:   return %3 : $TensorHandle<Float>
 // CHECK-NEXT: }
 
-sil @single_result_op_test : $@convention(thin) (Tensor<Float>, Tensor<Float>) -> Tensor<Float> {
-bb0(%0 : @trivial $Tensor<Float>, %1 : @trivial $Tensor<Float>):
-  %2 = graph_op "tf.Add"(%0 : $Tensor<Float>, %1 : $Tensor<Float>) {T: $Float} : $Tensor<Float>
-  return %2 : $Tensor<Float>
+sil @single_result_op_test : $@convention(thin) (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
+bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Float>):
+  %2 = graph_op "tf.Add"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {T: $Float} : $TensorHandle<Float>
+  return %2 : $TensorHandle<Float>
 }
 
-// CHECK-LABEL: sil @single_result_op_test : $@convention(thin) (Tensor<Float>, Tensor<Float>) -> Tensor<Float> {
-// CHECK: bb0(%0 : @trivial $Tensor<Float>, %1 : @trivial $Tensor<Float>):
-// CHECK-NEXT:   %2 = graph_op "tf.Add"(%0 : $Tensor<Float>, %1 : $Tensor<Float>) {T: $Float} : $Tensor<Float>
-// CHECK-NEXT:   return %2 : $Tensor<Float>
+// CHECK-LABEL: sil @single_result_op_test : $@convention(thin) (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
+// CHECK: bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Float>):
+// CHECK-NEXT:   %2 = graph_op "tf.Add"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {T: $Float} : $TensorHandle<Float>
+// CHECK-NEXT:   return %2 : $TensorHandle<Float>
 // CHECK-NEXT: }
 
-sil @multiple_result_op_test : $@convention(thin) (Tensor<Float>, Tensor<Float>) -> (Tensor<Float>, Tensor<Float>) {
-bb0(%0 : @trivial $Tensor<Float>, %1 : @trivial $Tensor<Float>):
-  (%2, %3) = graph_op "tf.Dummy"(%0 : $Tensor<Float>, %1 : $Tensor<Float>) {T: $Float} : $Tensor<Float>, $Tensor<Float>
-  %4 = tuple (%2 : $Tensor<Float>, %3 : $Tensor<Float>)
-  return %4 : $(Tensor<Float>, Tensor<Float>)
+sil @multiple_result_op_test : $@convention(thin) (TensorHandle<Float>, TensorHandle<Float>) -> (TensorHandle<Float>, TensorHandle<Float>) {
+bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Float>):
+  (%2, %3) = graph_op "tf.Dummy"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {T: $Float} : $TensorHandle<Float>, $TensorHandle<Float>
+  %4 = tuple (%2 : $TensorHandle<Float>, %3 : $TensorHandle<Float>)
+  return %4 : $(TensorHandle<Float>, TensorHandle<Float>)
 }
 
-// CHECK-LABEL: sil @multiple_result_op_test : $@convention(thin) (Tensor<Float>, Tensor<Float>) -> (Tensor<Float>, Tensor<Float>) {
-// CHECK: bb0(%0 : @trivial $Tensor<Float>, %1 : @trivial $Tensor<Float>):
-// CHECK-NEXT:   (%2, %3) = graph_op "tf.Dummy"(%0 : $Tensor<Float>, %1 : $Tensor<Float>) {T: $Float} : $Tensor<Float>, $Tensor<Float>
-// CHECK-NEXT:   %4 = tuple (%2 : $Tensor<Float>, %3 : $Tensor<Float>)
-// CHECK-NEXT:   return %4 : $(Tensor<Float>, Tensor<Float>)
+// CHECK-LABEL: sil @multiple_result_op_test : $@convention(thin) (TensorHandle<Float>, TensorHandle<Float>) -> (TensorHandle<Float>, TensorHandle<Float>) {
+// CHECK: bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Float>):
+// CHECK-NEXT:   (%2, %3) = graph_op "tf.Dummy"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {T: $Float} : $TensorHandle<Float>, $TensorHandle<Float>
+// CHECK-NEXT:   %4 = tuple (%2 : $TensorHandle<Float>, %3 : $TensorHandle<Float>)
+// CHECK-NEXT:   return %4 : $(TensorHandle<Float>, TensorHandle<Float>)
 // CHECK-NEXT: }
 
 sil @operand_test : $@convention(thin) () -> () {
@@ -83,29 +81,29 @@ bb0:
   %1 = integer_literal $Builtin.Int64, 1
   %2 = integer_literal $Builtin.Int64, 2
 
-  %3 = graph_op "Dummy1"(%0 : $Builtin.Int64) : $Tensor<Float>
-  // CHECK: %3 = graph_op "Dummy1"(%0 : $Builtin.Int64) : $Tensor<Float>
+  %3 = graph_op "Dummy1"(%0 : $Builtin.Int64) : $TensorHandle<Float>
+  // CHECK: %3 = graph_op "Dummy1"(%0 : $Builtin.Int64) : $TensorHandle<Float>
 
-  %4 = graph_op "Dummy2"(named$something %0 : $Builtin.Int64) : $Tensor<Float>
-  // CHECK-NEXT: %4 = graph_op "Dummy2"(named$something %0 : $Builtin.Int64) : $Tensor<Float>
+  %4 = graph_op "Dummy2"(named$tensor %0 : $Builtin.Int64) : $TensorHandle<Float>
+  // CHECK-NEXT: %4 = graph_op "Dummy2"(named$tensor %0 : $Builtin.Int64) : $TensorHandle<Float>
 
-  %5 = graph_op "Dummy3"([%0 : $Builtin.Int64, %1 : $Builtin.Int64]) : $Tensor<Float>
-  // CHECK-NEXT: %5 = graph_op "Dummy3"([%0 : $Builtin.Int64, %1 : $Builtin.Int64]) : $Tensor<Float>
+  %5 = graph_op "Dummy3"([%0 : $Builtin.Int64, %1 : $Builtin.Int64]) : $TensorHandle<Float>
+  // CHECK-NEXT: %5 = graph_op "Dummy3"([%0 : $Builtin.Int64, %1 : $Builtin.Int64]) : $TensorHandle<Float>
 
-  %6 = graph_op "Dummy4"(named$something [%0 : $Builtin.Int64, %1 : $Builtin.Int64]) : $Tensor<Float>
-  // CHECK-NEXT: %6 = graph_op "Dummy4"(named$something [%0 : $Builtin.Int64, %1 : $Builtin.Int64]) : $Tensor<Float>
+  %6 = graph_op "Dummy4"(named$tensor [%0 : $Builtin.Int64, %1 : $Builtin.Int64]) : $TensorHandle<Float>
+  // CHECK-NEXT: %6 = graph_op "Dummy4"(named$tensor [%0 : $Builtin.Int64, %1 : $Builtin.Int64]) : $TensorHandle<Float>
 
-  %7 = graph_op "Dummy5"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Tensor<Float>
-  // CHECK-NEXT: %7 = graph_op "Dummy5"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Tensor<Float>
+  %7 = graph_op "Dummy5"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $TensorHandle<Float>
+  // CHECK-NEXT: %7 = graph_op "Dummy5"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $TensorHandle<Float>
 
-  %8 = graph_op "Dummy6"(%0 : $Builtin.Int64, [%1 : $Builtin.Int64, %2 : $Builtin.Int64]) : $Tensor<Float>
-  // CHECK-NEXT: %8 = graph_op "Dummy6"(%0 : $Builtin.Int64, [%1 : $Builtin.Int64, %2 : $Builtin.Int64]) : $Tensor<Float>
+  %8 = graph_op "Dummy6"(%0 : $Builtin.Int64, [%1 : $Builtin.Int64, %2 : $Builtin.Int64]) : $TensorHandle<Float>
+  // CHECK-NEXT: %8 = graph_op "Dummy6"(%0 : $Builtin.Int64, [%1 : $Builtin.Int64, %2 : $Builtin.Int64]) : $TensorHandle<Float>
 
-  %9 = graph_op "Dummy7"(named$something %0 : $Builtin.Int64, [%1 : $Builtin.Int64, %2 : $Builtin.Int64]) : $Tensor<Float>
-  // CHECK-NEXT: 9 = graph_op "Dummy7"(named$something %0 : $Builtin.Int64, [%1 : $Builtin.Int64, %2 : $Builtin.Int64]) : $Tensor<Float>
+  %9 = graph_op "Dummy7"(named$tensor %0 : $Builtin.Int64, [%1 : $Builtin.Int64, %2 : $Builtin.Int64]) : $TensorHandle<Float>
+  // CHECK-NEXT: 9 = graph_op "Dummy7"(named$tensor %0 : $Builtin.Int64, [%1 : $Builtin.Int64, %2 : $Builtin.Int64]) : $TensorHandle<Float>
 
-  %10 = graph_op "Dummy8"(named$something %0 : $Builtin.Int64, named$somethingelse [%1 : $Builtin.Int64, %2 : $Builtin.Int64]) : $Tensor<Float>
-  // CHECK-NEXT: %10 = graph_op "Dummy8"(named$something %0 : $Builtin.Int64, named$somethingelse [%1 : $Builtin.Int64, %2 : $Builtin.Int64]) : $Tensor<Float>
+  %10 = graph_op "Dummy8"(named$tensor %0 : $Builtin.Int64, named$tensor [%1 : $Builtin.Int64, %2 : $Builtin.Int64]) : $TensorHandle<Float>
+  // CHECK-NEXT: %10 = graph_op "Dummy8"(named$tensor %0 : $Builtin.Int64, named$tensor [%1 : $Builtin.Int64, %2 : $Builtin.Int64]) : $TensorHandle<Float>
 
   return undef : $()
 }

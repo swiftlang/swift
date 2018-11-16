@@ -2,7 +2,7 @@
 
 import Builtin
 import Swift
-struct TensorCore<Element> {}
+import TensorFlow
 
 /* This corresponds to this input code:
   var a = <<opaque>>
@@ -24,38 +24,38 @@ struct TensorCore<Element> {}
 // CHECK-NEXT:   block bb1]
 // CHECK-NEXT: --- XLA CFG Canonicalize end
 
-sil private @testLoop : $@callee_owned (TensorCore<Float>) -> (TensorCore<Float>, TensorCore<Float>) {
+sil private @testLoop : $@callee_owned (TensorHandle<Float>) -> (TensorHandle<Float>, TensorHandle<Float>) {
 // %0                                             // users: %1, %1
-bb0(%0 : $TensorCore<Float>):
-  %1 = graph_op "Sub"(%0 : $TensorCore<Float>, %0 : $TensorCore<Float>) : $TensorCore<Float> // users: %6, %6
+bb0(%0 : $TensorHandle<Float>):
+  %1 = graph_op "Sub"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float> // users: %6, %6
   %2 = integer_literal $Builtin.Int64, 0          // user: %3
-  %3 = graph_op "Const"(value$tensor %2 : $Builtin.Int64) : $TensorCore<Builtin.Int64> // user: %10
+  %3 = graph_op "Const"(value$tensor %2 : $Builtin.Int64) : $TensorHandle<Builtin.Int64> // user: %10
   %4 = integer_literal $Builtin.Int64, 100        // user: %5
-  %5 = graph_op "Const"(value$tensor %4 : $Builtin.Int64) : $TensorCore<Builtin.Int64> // user: %17
-  %6 = graph_op "Add"(%1 : $TensorCore<Float>, %1 : $TensorCore<Float>) : $TensorCore<Float> // users: %7, %7
-  %7 = graph_op "Add"(%6 : $TensorCore<Float>, %6 : $TensorCore<Float>) : $TensorCore<Float> // user: %10
+  %5 = graph_op "Const"(value$tensor %4 : $Builtin.Int64) : $TensorHandle<Builtin.Int64> // user: %17
+  %6 = graph_op "Add"(%1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float> // users: %7, %7
+  %7 = graph_op "Add"(%6 : $TensorHandle<Float>, %6 : $TensorHandle<Float>) : $TensorHandle<Float> // user: %10
   %8 = integer_literal $Builtin.Int64, 1          // user: %9
-  %9 = graph_op "Const"(value$tensor %8 : $Builtin.Int64) : $TensorCore<Builtin.Int64> // user: %16
-  br bb2(%3 : $TensorCore<Builtin.Int64>, %7 : $TensorCore<Float>) // id: %10
+  %9 = graph_op "Const"(value$tensor %8 : $Builtin.Int64) : $TensorHandle<Builtin.Int64> // user: %16
+  br bb2(%3 : $TensorHandle<Builtin.Int64>, %7 : $TensorHandle<Float>) // id: %10
 
 bb1:                                              // Preds: bb2
-  %11 = graph_op "Sub"(%20 : $TensorCore<Float>, %20 : $TensorCore<Float>) : $TensorCore<Float> // user: %12
-  %12 = tuple (%20 : $TensorCore<Float>, %11 : $TensorCore<Float>) // user: %13
-  return %12 : $(TensorCore<Float>, TensorCore<Float>) // id: %13
+  %11 = graph_op "Sub"(%20 : $TensorHandle<Float>, %20 : $TensorHandle<Float>) : $TensorHandle<Float> // user: %12
+  %12 = tuple (%20 : $TensorHandle<Float>, %11 : $TensorHandle<Float>) // user: %13
+  return %12 : $(TensorHandle<Float>, TensorHandle<Float>) // id: %13
 
 // %14                                            // user: %16
 // %15                                            // users: %18, %18
-bb2(%14 : $TensorCore<Builtin.Int64>, %15 : $TensorCore<Float>): // Preds: bb3 bb0
-  %16 = graph_op "Add"(%14 : $TensorCore<Builtin.Int64>, %9 : $TensorCore<Builtin.Int64>) : $TensorCore<Builtin.Int64> // users: %23, %17
-  %17 = graph_op "Equal"(%16 : $TensorCore<Builtin.Int64>, %5 : $TensorCore<Builtin.Int64>) : $TensorCore<Builtin.Int1> // user: %21
-  %18 = graph_op "Add"(%15 : $TensorCore<Float>, %15 : $TensorCore<Float>) : $TensorCore<Float> // user: %19
-  %19 = graph_op "tensorflowSend"(%18 : $TensorCore<Float>) : $()
-  %20 = graph_op "tensorflowReceive"() : $TensorCore<Float> // users: %12, %23, %11, %11
-  %21 = graph_op "tf_tensor_to_i1"(%17 : $TensorCore<Builtin.Int1>) : $Builtin.Int1 // user: %22
+bb2(%14 : $TensorHandle<Builtin.Int64>, %15 : $TensorHandle<Float>): // Preds: bb3 bb0
+  %16 = graph_op "Add"(%14 : $TensorHandle<Builtin.Int64>, %9 : $TensorHandle<Builtin.Int64>) : $TensorHandle<Builtin.Int64> // users: %23, %17
+  %17 = graph_op "Equal"(%16 : $TensorHandle<Builtin.Int64>, %5 : $TensorHandle<Builtin.Int64>) : $TensorHandle<Builtin.Int1> // user: %21
+  %18 = graph_op "Add"(%15 : $TensorHandle<Float>, %15 : $TensorHandle<Float>) : $TensorHandle<Float> // user: %19
+  %19 = graph_op "tensorflowSend"(%18 : $TensorHandle<Float>) : $()
+  %20 = graph_op "tensorflowReceive"() : $TensorHandle<Float> // users: %12, %23, %11, %11
+  %21 = graph_op "tf_tensor_to_i1"(%17 : $TensorHandle<Builtin.Int1>) : $Builtin.Int1 // user: %22
   cond_br %21, bb1, bb3                           // id: %22
 
 bb3:                                              // Preds: bb2
-  br bb2(%16 : $TensorCore<Builtin.Int64>, %20 : $TensorCore<Float>) // id: %23
+  br bb2(%16 : $TensorHandle<Builtin.Int64>, %20 : $TensorHandle<Float>) // id: %23
 }
 
 /* This is a simple if diamond, corresponding to this Swift code:
@@ -79,25 +79,25 @@ bb3:                                              // Preds: bb2
 // CHECK-NEXT:     block bb2}
 // CHECK-NEXT:   block bb3]
 // CHECK-NEXT: --- XLA CFG Canonicalize end
-sil private @testIf : $@callee_owned (TensorCore<Float>, Builtin.Int1) -> TensorCore<Float> {
+sil private @testIf : $@callee_owned (TensorHandle<Float>, Builtin.Int1) -> TensorHandle<Float> {
 // %0                                             // users: %2, %2
 // %1                                             // user: %4
-bb0(%0 : $TensorCore<Float>, %1 : $Builtin.Int1):
-  %2 = graph_op "Sub"(%0 : $TensorCore<Float>, %0 : $TensorCore<Float>) : $TensorCore<Float> // users: %3, %5, %5
+bb0(%0 : $TensorHandle<Float>, %1 : $Builtin.Int1):
+  %2 = graph_op "Sub"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float> // users: %3, %5, %5
   cond_br %1, bb1, bb2                            // id: %4
 
 bb1:                                              // Preds: bb0
-  %5 = graph_op "Sub"(%2 : $TensorCore<Float>, %2 : $TensorCore<Float>) : $TensorCore<Float> // user: %6
-  br bb3(%5 : $TensorCore<Float>)                 // id: %6
+  %5 = graph_op "Sub"(%2 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float> // user: %6
+  br bb3(%5 : $TensorHandle<Float>)                 // id: %6
 
 bb2:                                              // Preds: bb0
-  %7 = graph_op "Add"(%2 : $TensorCore<Float>, %2 : $TensorCore<Float>) : $TensorCore<Float>
-  br bb3(%7 : $TensorCore<Float>)                 // id: %8
+  %7 = graph_op "Add"(%2 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
+  br bb3(%7 : $TensorHandle<Float>)                 // id: %8
 
 // %9                                             // users: %10, %11, %11
-bb3(%9 : $TensorCore<Float>):                     // Preds: bb2 bb1
-  %11 = graph_op "Sub"(%9 : $TensorCore<Float>, %9 : $TensorCore<Float>) : $TensorCore<Float> // user: %12
-  return %11 : $TensorCore<Float>                 // id: %12
+bb3(%9 : $TensorHandle<Float>):                     // Preds: bb2 bb1
+  %11 = graph_op "Sub"(%9 : $TensorHandle<Float>, %9 : $TensorHandle<Float>) : $TensorHandle<Float> // user: %12
+  return %11 : $TensorHandle<Float>                 // id: %12
 }
 
 /* This CFG generates a merge block with three predecessors.  It corresponds
@@ -129,31 +129,31 @@ bb3(%9 : $TensorCore<Float>):                     // Preds: bb2 bb1
 // CHECK-NEXT:   block bb5]
 // CHECK-NEXT: --- XLA CFG Canonicalize end
 //
-sil private @testIfIf : $@callee_owned (TensorCore<Float>, TensorCore<Builtin.Int1>, TensorCore<Builtin.Int1>) -> TensorCore<Float> {
+sil private @testIfIf : $@callee_owned (TensorHandle<Float>, TensorHandle<Builtin.Int1>, TensorHandle<Builtin.Int1>) -> TensorHandle<Float> {
 // %0                                             // users: %1, %1
-bb0(%0 : $TensorCore<Float>, %3: $TensorCore<Builtin.Int1>, %7: $TensorCore<Builtin.Int1>):
-  %1 = graph_op "Sub"(%0 : $TensorCore<Float>, %0 : $TensorCore<Float>) : $TensorCore<Float>
-  %4 = graph_op "tf_tensor_to_i1"(%3 : $TensorCore<Builtin.Int1>) : $Builtin.Int1
+bb0(%0 : $TensorHandle<Float>, %3: $TensorHandle<Builtin.Int1>, %7: $TensorHandle<Builtin.Int1>):
+  %1 = graph_op "Sub"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float>
+  %4 = graph_op "tf_tensor_to_i1"(%3 : $TensorHandle<Builtin.Int1>) : $Builtin.Int1
   cond_br %4, bb1, bb4                            // id: %5
 
 bb1:                                              // Preds: bb0
-  %6 = graph_op "Add"(%1 : $TensorCore<Float>, %1 : $TensorCore<Float>) : $TensorCore<Float>
-  %8 = graph_op "tf_tensor_to_i1"(%7 : $TensorCore<Builtin.Int1>) : $Builtin.Int1 // user: %9
+  %6 = graph_op "Add"(%1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>
+  %8 = graph_op "tf_tensor_to_i1"(%7 : $TensorHandle<Builtin.Int1>) : $Builtin.Int1 // user: %9
   cond_br %8, bb3, bb2                            // id: %9
 
 bb2:                                              // Preds: bb1
-  br bb5(%6 : $TensorCore<Float>)                 // id: %10
+  br bb5(%6 : $TensorHandle<Float>)                 // id: %10
 
 bb3:                                              // Preds: bb1
-  %11 = graph_op "Add"(%6 : $TensorCore<Float>, %6 : $TensorCore<Float>) : $TensorCore<Float> // user: %12
-  br bb5(%11 : $TensorCore<Float>)                // id: %12
+  %11 = graph_op "Add"(%6 : $TensorHandle<Float>, %6 : $TensorHandle<Float>) : $TensorHandle<Float> // user: %12
+  br bb5(%11 : $TensorHandle<Float>)                // id: %12
 
 bb4:                                              // Preds: bb0
-  %13 = graph_op "Add"(%1 : $TensorCore<Float>, %1 : $TensorCore<Float>) : $TensorCore<Float>
-  br bb5(%13 : $TensorCore<Float>)                // id: %14
+  %13 = graph_op "Add"(%1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>
+  br bb5(%13 : $TensorHandle<Float>)                // id: %14
 
 // %15                                            // users: %16, %17, %17
-bb5(%15 : $TensorCore<Float>):                    // Preds: bb4 bb2 bb3
-  %17 = graph_op "Sub"(%15 : $TensorCore<Float>, %15 : $TensorCore<Float>) : $TensorCore<Float> // user: %18
-  return %17 : $TensorCore<Float>                 // id: %18
+bb5(%15 : $TensorHandle<Float>):                    // Preds: bb4 bb2 bb3
+  %17 = graph_op "Sub"(%15 : $TensorHandle<Float>, %15 : $TensorHandle<Float>) : $TensorHandle<Float> // user: %18
+  return %17 : $TensorHandle<Float>                 // id: %18
 }

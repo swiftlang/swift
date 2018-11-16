@@ -5,19 +5,17 @@
 // RUN: %target-sil-opt %t/tmp.2.sib -module-name graph_op | %FileCheck %s
 
 import Swift
-
-// Dummy struct mimicking the real `Tensor` type.
-struct Tensor<Scalar> {}
+import TensorFlow
 
 sil [serialized] @test_func : $@convention(thin) () -> () {
 // CHECK-LABEL: sil [serialized] @test_func
 bb0:
 // CHECK-NEXT: bb0
-  %0 = graph_op "Dummy1"() : $Tensor<Float>
-  // CHECK-NEXT: %0 = graph_op "Dummy1"() : $Tensor<Float>
-  %1 = graph_op "Dummy2"(%0 : $Tensor<Float>) : $Tensor<Float>
-  // CHECK-NEXT: %1 = graph_op "Dummy2"(%0 : $Tensor<Float>) : $Tensor<Float>
-  (%2, %3) = graph_op "Dummy3"(%0 : $Tensor<Float>, %1 : $Tensor<Float>) : $Tensor<Float>, $Tensor<Float>
-  // CHECK-NEXT: (%2, %3) = graph_op "Dummy3"(%0 : $Tensor<Float>, %1 : $Tensor<Float>) : $Tensor<Float>, $Tensor<Float>
+  %0 = graph_op "Dummy1"() : $TensorHandle<Float>
+  // CHECK-NEXT: %0 = graph_op "Dummy1"() : $TensorHandle<Float>
+  %1 = graph_op "Dummy2"(%0 : $TensorHandle<Float>) : $TensorHandle<Float>
+  // CHECK-NEXT: %1 = graph_op "Dummy2"(%0 : $TensorHandle<Float>) : $TensorHandle<Float>
+  (%2, %3) = graph_op "Dummy3"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>, $TensorHandle<Float>
+  // CHECK-NEXT: (%2, %3) = graph_op "Dummy3"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) : $TensorHandle<Float>, $TensorHandle<Float>
   return undef : $()
 }

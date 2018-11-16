@@ -1538,17 +1538,26 @@ public:
               tf::GraphOperationInfo::ArgumentLowering::Input)
         continue;
       switch (sa.getKind()) {
-      case tf::GraphOperationInfo::SAK_Single:
-        require(conformsToProtocol(sa.getSingleArgument()->getType(),
-                                   KnownProtocolKind::TensorArrayProtocol),
-                "graph_op operands must conform to TensorArrayProtocol");
+      case tf::GraphOperationInfo::SAK_Single: {
+        auto argTy = sa.getSingleArgument()->getType();
+        if (tf::isTensorFlowValue(argTy) || argTy.is<BuiltinType>())
+          continue;
+        require(
+            conformsToProtocol(argTy, KnownProtocolKind::TensorArrayProtocol),
+            "graph_op operands must conform to TensorArrayProtocol");
         break;
-      case tf::GraphOperationInfo::SAK_List:
-        for (auto arg : sa.getArgumentList())
-          require(conformsToProtocol(arg->getType(),
-                                     KnownProtocolKind::TensorArrayProtocol),
-                  "graph_op operands must conform to TensorArrayProtocol");
+      }
+      case tf::GraphOperationInfo::SAK_List: {
+        for (auto arg : sa.getArgumentList()) {
+          auto argTy = arg->getType();
+          if (tf::isTensorFlowValue(argTy) || argTy.is<BuiltinType>())
+            continue;
+          require(
+              conformsToProtocol(argTy, KnownProtocolKind::TensorArrayProtocol),
+              "graph_op operands must conform to TensorArrayProtocol");
+        }
         break;
+      }
       }
     }
   }
