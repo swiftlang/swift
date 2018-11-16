@@ -5183,10 +5183,9 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   using namespace decls_block;
 
   PrettyStackTraceModuleFile traceModule("While reading from", *this);
-  PrettyStackTraceType trace(getAssociatedModule()->getASTContext(),
-                             "finishing conformance for",
-                             conformance->getType());
-  PrettyStackTraceDecl traceTo("... to", conformance->getProtocol());
+  PrettyStackTraceConformance trace(getAssociatedModule()->getASTContext(),
+                                    "finishing conformance for",
+                                    conformance);
   ++NumNormalProtocolConformancesCompleted;
 
   assert(conformance->isComplete());

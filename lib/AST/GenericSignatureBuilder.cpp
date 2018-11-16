@@ -3543,11 +3543,11 @@ GenericSignatureBuilder::Implementation::getRewriteTreeRootIfPresent(
 RewriteTreeNode *
 GenericSignatureBuilder::Implementation::getOrCreateRewriteTreeRoot(
                                           CanType anchor) {
-  auto known = RewriteTreeRoots.find(anchor);
-  if (known != RewriteTreeRoots.end()) return known->second.get();
+  if (auto *root = getRewriteTreeRootIfPresent(anchor))
+    return root;
 
   auto &root = RewriteTreeRoots[anchor];
-  root = std::unique_ptr<RewriteTreeNode>(new RewriteTreeNode(nullptr));
+  root = llvm::make_unique<RewriteTreeNode>(nullptr);
   return root.get();
 }
 
@@ -4929,14 +4929,10 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
   };
 
   // Consider the second equivalence class to be modified.
-  if (equivClass2)
-    equivClass->modified(*this);
-
-  // Same-type requirements, delayed requirements.
+  // Transfer Same-type requirements and delayed requirements.
   if (equivClass2) {
-    Impl->DelayedRequirements.append(equivClass2->delayedRequirements.begin(),
-                                     equivClass2->delayedRequirements.end());
-
+    // Mark as modified and transfer deplayed requirements to the primary queue.
+    equivClass2->modified(*this);
     equivClass->sameTypeConstraints.insert(
                                    equivClass->sameTypeConstraints.end(),
                                    equivClass2->sameTypeConstraints.begin(),
@@ -4944,20 +4940,14 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
   }
 
   // Combine the rewrite rules.
-  if (auto rewriteRoot2 = Impl->getOrCreateRewriteTreeRoot(anchor2)) {
-    if (auto rewriteRoot1 = Impl->getOrCreateRewriteTreeRoot(anchor1)) {
-      // Merge the second rewrite tree into the first.
-      if (rewriteRoot2->mergeInto(rewriteRoot1))
-        ++Impl->RewriteGeneration;
-      Impl->RewriteTreeRoots.erase(anchor2);
-    } else {
-      // Take the second rewrite tree and make it the first.
-      auto root2Entry = Impl->RewriteTreeRoots.find(anchor2);
-      auto root2Ptr = std::move(root2Entry->second);
-      Impl->RewriteTreeRoots.erase(root2Entry);
-      (void)Impl->RewriteTreeRoots.insert({anchor1, std::move(root2Ptr)});
-    }
-  }
+  auto *rewriteRoot1 = Impl->getOrCreateRewriteTreeRoot(anchor1);
+  auto *rewriteRoot2 = Impl->getOrCreateRewriteTreeRoot(anchor2);
+  assert(rewriteRoot1 && rewriteRoot2 &&
+         "Couldn't create/retrieve rewrite tree root");
+  // Merge the second rewrite tree into the first.
+  if (rewriteRoot2->mergeInto(rewriteRoot1))
+    ++Impl->RewriteGeneration;
+  Impl->RewriteTreeRoots.erase(anchor2);
 
   // Add a rewrite rule to map the anchor of T2 down to the anchor of T1.
   if (addSameTypeRewriteRule(anchor2, anchor1))

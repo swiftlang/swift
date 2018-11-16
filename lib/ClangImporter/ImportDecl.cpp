@@ -7788,9 +7788,8 @@ void ClangImporter::Implementation::finishNormalConformance(
   (void)unused;
 
   auto *proto = conformance->getProtocol();
-  PrettyStackTraceType trace(SwiftContext, "completing conformance for",
-                             conformance->getType());
-  PrettyStackTraceDecl traceTo("... to", proto);
+  PrettyStackTraceConformance trace(SwiftContext, "completing import of",
+                                    conformance);
 
   if (!proto->isRequirementSignatureComputed())
     proto->computeRequirementSignature();
