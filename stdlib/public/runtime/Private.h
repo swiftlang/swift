@@ -241,7 +241,13 @@ public:
   /// Use with \c _getTypeByMangledName to decode potentially-generic
   /// types.
   class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromMetadata {
-    const Metadata *base;
+    /// Whether the source is metadata (vs. a generic environment);
+    const bool sourceIsMetadata;
+
+    union {
+      const Metadata *base;
+      const TargetGenericEnvironment<InProcess> *environment;
+    };
 
     /// The generic arguments.
     const void * const *genericArgs;
@@ -277,15 +283,27 @@ public:
     /// the path up to this point.
     unsigned buildDescriptorPath(const ContextDescriptor *context) const;
 
+    /// Builds a path from the generic environment.
+    unsigned buildEnvironmentPath(
+               const TargetGenericEnvironment<InProcess> *environment) const;
+
     // Set up the state we need to compute substitutions.
     void setup() const;
 
   public:
     /// Produce substitutions entirely from the given metadata.
     explicit SubstGenericParametersFromMetadata(const Metadata *base)
-      : base(base),
+      : sourceIsMetadata(true), base(base),
         genericArgs(base ? (const void * const *)base->getGenericArgs()
                          : nullptr) { }
+
+    /// Produce substitutions from the given instantiation arguments for the
+    /// given generic environment.
+    explicit SubstGenericParametersFromMetadata(
+               const TargetGenericEnvironment<InProcess> *environment,
+               const void * const *arguments)
+      : sourceIsMetadata(false), environment(environment),
+        genericArgs(arguments) { }
 
     const Metadata *operator()(unsigned depth, unsigned index) const;
     const WitnessTable *operator()(const Metadata *type, unsigned index) const;

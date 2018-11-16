@@ -256,7 +256,9 @@ const long long $ss12_ClassMirrorVMa[1] = {0};
 // KeyPath
 
 SWIFT_RUNTIME_STDLIB_SPI
-const HeapObject *swift_getKeyPathImpl(const void *p, const void *a) {
+const HeapObject *swift_getKeyPathImpl(const void *p,
+                                       const void *e,
+                                       const void *a) {
   abort();
 }
 

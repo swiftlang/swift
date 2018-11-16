@@ -1270,15 +1270,15 @@ TypeInfo swift_getTypeByMangledNameImpl(
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 const Metadata * _Nullable
-swift_stdlib_getTypeByMangledName(const char *typeNameStart,
-                                  size_t typeNameLength) {
+swift_stdlib_getTypeByMangledName(
+                        const char *typeNameStart,
+                        size_t typeNameLength,
+                        const TargetGenericEnvironment<InProcess> *environment,
+                        const void * const *genericArgs) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
-  auto metadata =
-    swift_getTypeByMangledName(
-      typeName,
-      [](unsigned depth, unsigned index) { return nullptr; },
-      [](const Metadata *type, unsigned index) { return nullptr; });
-
+  SubstGenericParametersFromMetadata substitutions(environment, genericArgs);
+  auto metadata = swift_getTypeByMangledName(typeName, substitutions,
+                                             substitutions);
   if (!metadata) return nullptr;
 
   return swift_checkMetadataState(MetadataState::Complete, metadata).Value;
@@ -1318,12 +1318,58 @@ buildDescriptorPath(const ContextDescriptor *context) const {
   return numKeyGenericParamsInParent + numKeyGenericParamsHere;
 }
 
+  /// Builds a path from the generic environment.
+unsigned SubstGenericParametersFromMetadata::
+buildEnvironmentPath(
+    const TargetGenericEnvironment<InProcess> *environment) const {
+  unsigned totalParamCount = 0;
+  unsigned totalKeyParamCount = 0;
+  auto genericParams = environment->getGenericParameters();
+  for (unsigned numLocalParams : environment->getGenericParameterCounts()) {
+    // Get the local generic parameters.
+    auto localGenericParams = genericParams.slice(0, numLocalParams);
+    genericParams = genericParams.slice(numLocalParams);
+
+    // Count the parameters.
+    unsigned numKeyGenericParamsInParent = totalKeyParamCount;
+    unsigned numKeyGenericParamsHere = 0;
+    bool hasNonKeyGenericParams = false;
+    for (const auto &genericParam : localGenericParams) {
+      if (genericParam.hasKeyArgument())
+        ++numKeyGenericParamsHere;
+      else
+        hasNonKeyGenericParams = true;
+    }
+
+    // Update totals.
+    totalParamCount += numLocalParams;
+    totalKeyParamCount += numKeyGenericParamsHere;
+
+    // Add to the descriptor path.
+    descriptorPath.push_back(PathElement{localGenericParams,
+                                         totalParamCount,
+                                         numKeyGenericParamsInParent,
+                                         numKeyGenericParamsHere,
+                                         hasNonKeyGenericParams});
+  }
+
+  return totalKeyParamCount;
+}
+
 void SubstGenericParametersFromMetadata::setup() const {
-  if (!descriptorPath.empty() || !base)
+  if (!descriptorPath.empty())
     return;
 
-  auto descriptor = base->getTypeContextDescriptor();
-  numKeyGenericParameters = buildDescriptorPath(descriptor);
+  if (sourceIsMetadata && base) {
+    auto descriptor = base->getTypeContextDescriptor();
+    numKeyGenericParameters = buildDescriptorPath(descriptor);
+    return;
+  }
+
+  if (!sourceIsMetadata && environment) {
+    numKeyGenericParameters = buildEnvironmentPath(environment);
+    return;
+  }
 }
 
 const Metadata *
