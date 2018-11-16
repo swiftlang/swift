@@ -585,6 +585,15 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   // existential to an archetype parameter, so for now we restrict this to
   // @objc protocols.
   if (!layout.isObjC()) {
+    // There's a specific exception for protocols with self-conforming
+    // witness tables, but the existential has to be *exactly* that type.
+    // TODO: synthesize witness tables on-demand for protocol compositions
+    // that can satisfy the requirement.
+    if (protocol->requiresSelfConformanceWitnessTable() &&
+        type->is<ProtocolType>() &&
+        type->castTo<ProtocolType>()->getDecl() == protocol)
+      return ProtocolConformanceRef(protocol);
+
     return None;
   }
 
@@ -676,7 +685,7 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
   auto nominal = type->getAnyNominal();
 
   // If we don't have a nominal type, there are no conformances.
-  if (!nominal) return None;
+  if (!nominal || isa<ProtocolDecl>(nominal)) return None;
 
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;

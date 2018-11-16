@@ -2847,16 +2847,23 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   // If we don't have concrete conformance information, the type must be
   // an archetype and the conformance must be via one of the protocol
   // requirements of the archetype. Look at what's locally bound.
+  ProtocolConformance *concreteConformance;
   if (conformance.isAbstract()) {
-    auto archetype = cast<ArchetypeType>(srcType);
-    return emitArchetypeWitnessTableRef(IGF, archetype, proto);
-  }
+    if (auto archetype = dyn_cast<ArchetypeType>(srcType))
+      return emitArchetypeWitnessTableRef(IGF, archetype, proto);
+
+    // Otherwise, this must be a self-conformance.
+    assert(proto->requiresSelfConformanceWitnessTable());
+    assert(cast<ProtocolType>(srcType)->getDecl() == proto);
+    concreteConformance = IGF.IGM.Context.getSelfConformance(proto);
 
   // All other source types should be concrete enough that we have
   // conformance info for them.  However, that conformance info might be
   // more concrete than we're expecting.
   // TODO: make a best effort to devirtualize, maybe?
-  auto concreteConformance = conformance.getConcrete();
+  } else {
+    concreteConformance = conformance.getConcrete();
+  }
   assert(concreteConformance->getProtocol() == proto);
 
   auto cacheKind =
