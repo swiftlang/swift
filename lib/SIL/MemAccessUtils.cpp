@@ -206,10 +206,10 @@ static bool isUnsafePointerExtraction(StructExtractInst *SEI) {
     || decl == C.getUnsafePointerDecl();
 }
 
-// Given an address base is a block argument, verify that it is actually a box
-// projected from a switch_enum. This is a valid pattern at any SIL stage
-// resulting in a block-type phi. In later SIL stages, the optimizer may form
-// address-type phis, causing this assert if called on those cases.
+// Given a block argument address base, check if it is actually a box projected
+// from a switch_enum. This is a valid pattern at any SIL stage resulting in a
+// block-type phi. In later SIL stages, the optimizer may form address-type
+// phis, causing this assert if called on those cases.
 static void checkSwitchEnumBlockArg(SILPhiArgument *arg) {
   assert(!arg->getType().isAddress());
   SILBasicBlock *Pred = arg->getParent()->getSinglePredecessorBlock();
@@ -289,22 +289,21 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
 
     case ValueKind::SILPhiArgument: {
       auto *phiArg = cast<SILPhiArgument>(address);
-      bool allValsMatch = true;
-      SmallVector<SILValue, 8> incomingPhis;
-      phiArg->getIncomingPhiValues(incomingPhis);
-      if (!incomingPhis.empty()) {
-        auto firstVal = incomingPhis.front();
-        for (auto val : incomingPhis) {
-          if (val != firstVal) {
-            allValsMatch = false;
-            break;
-          }
+      if (phiArg->isPhiArgument()) {
+        SmallVector<SILValue, 8> incomingValues;
+        phiArg->getIncomingPhiValues(incomingValues);
+        if (incomingValues.empty())
+          return AccessedStorage();
+
+        auto storage = findAccessedStorage(incomingValues.pop_back_val());
+        for (auto val : incomingValues) {
+          auto otherStorage = findAccessedStorage(val);
+          if (!accessingIdenticalLocations(storage, otherStorage))
+            return AccessedStorage();
         }
-        if (allValsMatch) {
-          return findAccessedStorage(firstVal);
-        }
+        return storage;
       }
-      // A block argument may be a box value projected out of
+      // A non-phi block argument may be a box value projected out of
       // switch_enum. Address-type block arguments are not allowed.
       if (address->getType().isAddress())
         return AccessedStorage();
