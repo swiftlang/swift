@@ -146,9 +146,10 @@ public:
   /// Indicates that the input(s) should be parsed as the Swift stdlib.
   bool ParseStdlib = false;
 
-  /// If set, emitted module files will always contain options for the
-  /// debugger to use.
-  bool AlwaysSerializeDebuggingOptions = false;
+  /// When true, emitted module files will always contain options for the
+  /// debugger to use. When unset, the options will only be present if the
+  /// module appears to not be a public module.
+  Optional<bool> SerializeOptionsForDebugging;
 
   /// If set, inserts instrumentation useful for testing the debugger.
   bool DebuggerTestingTransform = false;
@@ -196,6 +197,12 @@ public:
   ///
   /// \see ModuleDecl::arePrivateImportsEnabled
   bool EnablePrivateImports = false;
+
+
+  /// Indicates whether we add implicit dynamic.
+  ///
+  /// \see ModuleDecl::isImplicitDynamicEnabled
+  bool EnableImplicitDynamic = false;
 
   /// Enables the "fully resilient" resilience strategy.
   ///

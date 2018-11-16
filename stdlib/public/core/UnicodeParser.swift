@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 extension Unicode {
   /// The result of attempting to parse a `T` from some input.
-  @_frozen // FIXME(sil-serialize-all)
+  @_frozen
   public enum ParseResult<T> {
   /// A `T` was parsed successfully
   case valid(T)
@@ -22,17 +22,16 @@ extension Unicode {
   /// An encoding error was detected.
   ///
   /// `length` is the number of underlying code units consumed by this
-  /// error (the length of the longest prefix of a valid encoding
-  /// sequence that could be recognized).
+  /// error, guaranteed to be greater than 0.
   case error(length: Int)
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     internal var _valid: T? {
       if case .valid(let result) = self { return result }
       return nil
     }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     internal var _error: Int? {
       if case .error(let result) = self { return result }
       return nil

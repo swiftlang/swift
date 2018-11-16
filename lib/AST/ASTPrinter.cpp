@@ -2357,12 +2357,12 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
   printDocumentationComment(decl);
-  // Print @sil_stored when the attribute is not already
+  // Print @_hasStorage when the attribute is not already
   // on, decl has storage and it is on a class.
   if (Options.PrintForSIL && decl->hasStorage() &&
       isStructOrClassContext(decl->getDeclContext()) &&
-      !decl->getAttrs().hasAttribute<SILStoredAttr>())
-    Printer << "@sil_stored ";
+      !decl->getAttrs().hasAttribute<HasStorageAttr>())
+    Printer << "@_hasStorage ";
   printAttributes(decl);
   printAccess(decl);
   if (!Options.SkipIntroducerKeywords) {
@@ -4355,6 +4355,12 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
     auto normal = cast<NormalProtocolConformance>(this);
     os << normal->getProtocol()->getName()
        << " module " << normal->getDeclContext()->getParentModule()->getName();
+    break;
+  }
+  case ProtocolConformanceKind::Self: {
+    auto self = cast<SelfProtocolConformance>(this);
+    os << self->getProtocol()->getName()
+       << " module " << self->getDeclContext()->getParentModule()->getName();
     break;
   }
   case ProtocolConformanceKind::Specialized: {

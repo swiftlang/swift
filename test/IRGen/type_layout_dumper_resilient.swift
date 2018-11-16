@@ -19,7 +19,7 @@ import type_layout_dumper_other
 // CHECK-NEXT:   - Name:            24type_layout_dumper_other21ConcreteResilientEnumO
 // CHECK-NEXT:     Size:            9
 // CHECK-NEXT:     Alignment:       8
-// CHECK-NEXT:     ExtraInhabitants: 0
+// CHECK-NEXT:     ExtraInhabitants: 254
 // CHECK-NEXT:   - Name:            24type_layout_dumper_other22DependentResilientEnumO09NestedNonefG0O
 // CHECK-NEXT:     Size:            8
 // CHECK-NEXT:     Alignment:       8

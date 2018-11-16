@@ -23,8 +23,6 @@
 /// * `s.joined()` does not create new storage
 /// * `s.joined().map(f)` maps eagerly and returns a new array
 /// * `s.lazy.joined().map(f)` maps lazily and returns a `LazyMapSequence`
-///
-/// - See also: `FlattenCollection`
 @_fixed_layout // lazy-performance
 public struct FlattenSequence<Base: Sequence> where Base.Element: Sequence {
 
@@ -136,41 +134,9 @@ extension LazySequenceProtocol where Element : Sequence {
   }
 }
 
-/// A flattened view of a base collection of collections.
-///
-/// The elements of this view are a concatenation of the elements of
-/// each collection in the base.
-///
-/// The `joined` method is always lazy, but does not implicitly
-/// confer laziness on algorithms applied to its result.  In other
-/// words, for ordinary collections `c`:
-///
-/// * `c.joined()` does not create new storage
-/// * `c.joined().map(f)` maps eagerly and returns a new array
-/// * `c.lazy.joined().map(f)` maps lazily and returns a `LazyMapCollection`
-///
-/// - Note: The performance of accessing `startIndex`, `first`, any methods
-///   that depend on `startIndex`, or of advancing an `Index`
-///   depends on how many empty subcollections are found in the base
-///   collection, and may not offer the usual performance given by `Collection`
-///   or `Index`. Be aware, therefore, that general operation on
-///   `FlattenCollection` instances may not have the documented complexity.
-///
-/// - See also: `FlattenSequence`
-@_fixed_layout // lazy-performance
-public struct FlattenCollection<Base>
-  where Base : Collection, Base.Element : Collection {
-  @usableFromInline // lazy-performance
-  internal var _base: Base
+public typealias FlattenCollection<T: Collection> = FlattenSequence<T> where T.Element: Collection
 
-  /// Creates a flattened view of `base`.
-  @inlinable // lazy-performance
-  public init(_ base: Base) {
-    self._base = base
-  }
-}
-
-extension FlattenCollection {
+extension FlattenSequence where Base: Collection, Base.Element: Collection {
   /// A position in a FlattenCollection
   @_fixed_layout // lazy-performance
   public struct Index {
@@ -195,7 +161,7 @@ extension FlattenCollection {
   }
 }
 
-extension FlattenCollection.Index : Equatable {
+extension FlattenSequence.Index : Equatable where Base: Collection, Base.Element: Collection {
   @inlinable // lazy-performance
   public static func == (
     lhs: FlattenCollection<Base>.Index,
@@ -205,7 +171,7 @@ extension FlattenCollection.Index : Equatable {
   }
 }
 
-extension FlattenCollection.Index : Comparable {
+extension FlattenSequence.Index : Comparable where Base: Collection, Base.Element: Collection {
   @inlinable // lazy-performance
   public static func < (
     lhs: FlattenCollection<Base>.Index,
@@ -229,8 +195,8 @@ extension FlattenCollection.Index : Comparable {
   }
 }
 
-extension FlattenCollection.Index : Hashable
-  where Base.Index : Hashable, Base.Element.Index : Hashable {
+extension FlattenSequence.Index : Hashable
+  where Base: Collection, Base.Element: Collection, Base.Index : Hashable, Base.Element.Index : Hashable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
@@ -243,45 +209,7 @@ extension FlattenCollection.Index : Hashable
   }
 }
 
-extension FlattenCollection : Sequence {
-  public typealias Iterator = FlattenSequence<Base>.Iterator
-  public typealias SubSequence = Slice<FlattenCollection>
-
-  /// Returns an iterator over the elements of this sequence.
-  ///
-  /// - Complexity: O(1).
-  @inlinable // lazy-performance
-  public __consuming func makeIterator() -> Iterator {
-    return Iterator(_base: _base.makeIterator())
-  }
-
-  // To return any estimate of the number of elements, we have to start
-  // evaluating the collections.  That is a bad default for `flatMap()`, so
-  // just return zero.
-  public var underestimatedCount: Int { return 0 }
-
-  @inlinable // lazy-performance
-  public __consuming func _copyToContiguousArray() -> ContiguousArray<Base.Element.Element> {
-    // The default implementation of `_copyToContiguousArray` queries the
-    // `count` property, which materializes every inner collection.  This is a
-    // bad default for `flatMap()`.  So we treat `self` as a sequence and only
-    // rely on underestimated count.
-    return _copySequenceToContiguousArray(self)
-  }
-
-  // TODO: swift-3-indexing-model - add docs
-  @inlinable // lazy-performance
-  public func forEach(
-    _ body: (Base.Element.Element) throws -> Void
-  ) rethrows {
-    // FIXME: swift-3-indexing-model: tests.
-    for innerCollection in _base {
-      try innerCollection.forEach(body)
-    }
-  }
-}
-
-extension FlattenCollection : Collection {
+extension FlattenCollection: Collection {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
@@ -391,7 +319,7 @@ extension FlattenCollection : Collection {
   @inline(__always)
   @inlinable // lazy-performance
   internal func _advanceIndex(_ i: inout Index, step: Int) {
-    _sanityCheck(-1...1 ~= step, "step should be within the -1...1 range")
+    _internalInvariant(-1...1 ~= step, "step should be within the -1...1 range")
     i = step < 0 ? _index(before: i) : _index(after: i)
   }
 
@@ -486,44 +414,5 @@ extension FlattenCollection : BidirectionalCollection
   @inlinable // lazy-performance
   public func formIndex(before i: inout Index) {
     i = index(before: i)
-  }
-}
-
-extension Collection where Element : Collection {
-  /// Returns the elements of this collection of collections, concatenated.
-  ///
-  /// In this example, an array of three ranges is flattened so that the
-  /// elements of each range can be iterated in turn.
-  ///
-  ///     let ranges = [0..<3, 8..<10, 15..<17]
-  ///
-  ///     // A for-in loop over 'ranges' accesses each range:
-  ///     for range in ranges {
-  ///       print(range)
-  ///     }
-  ///     // Prints "0..<3"
-  ///     // Prints "8..<10"
-  ///     // Prints "15..<17"
-  ///
-  ///     // Use 'joined()' to access each element of each range:
-  ///     for index in ranges.joined() {
-  ///         print(index, terminator: " ")
-  ///     }
-  ///     // Prints: "0 1 2 8 9 15 16"
-  ///
-  /// - Returns: A flattened view of the elements of this
-  ///   collection of collections.
-  @inlinable // lazy-performance
-  public __consuming func joined() -> FlattenCollection<Self> {
-    return FlattenCollection(self)
-  }
-}
-
-extension LazyCollectionProtocol
-  where Self : Collection, Element : Collection {
-  /// A concatenation of the elements of `self`.
-  @inlinable // lazy-performance
-  public __consuming func joined() -> LazyCollection<FlattenCollection<Elements>> {
-    return FlattenCollection(elements).lazy
   }
 }

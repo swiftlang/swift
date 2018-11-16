@@ -29,6 +29,23 @@
 // RUN: %target-codesign %t/main %t/libModule1.%target-dylib-extension %t/libModule2.%target-dylib-extension
 // RUN: %target-run %t/main %t/libModule1.%target-dylib-extension %t/libModule2.%target-dylib-extension
 
+// Test the -enable-implicit-dynamic flag.
+
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/libModule1.%target-dylib-extension) -DMODULENODYNAMIC -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift -Xfrontend -enable-implicit-dynamic
+// RUN: %target-build-swift-dylib(%t/libModule2.%target-dylib-extension) -I%t -L%t -lModule1 -Xlinker -rpath -Xlinker %t -DMODULE2 -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
+// RUN: %target-build-swift -I%t -L%t -lModule1 -DMAIN -o %t/main -Xlinker -rpath -Xlinker %t %s -swift-version 5
+// RUN: %target-codesign %t/main %t/libModule1.%target-dylib-extension %t/libModule2.%target-dylib-extension
+// RUN: %target-run %t/main %t/libModule1.%target-dylib-extension %t/libModule2.%target-dylib-extension
+
+// Test the -enable-implicit-dynamic flag in optimized wholemodule mode.
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/libModule1.%target-dylib-extension) -O -wmo -DMODULENODYNAMIC -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift -Xfrontend -enable-implicit-dynamic
+// RUN: %target-build-swift-dylib(%t/libModule2.%target-dylib-extension) -O -wmo -I%t -L%t -lModule1 -Xlinker -rpath -Xlinker %t -DMODULE2 -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_module.swift
+// RUN: %target-build-swift -O -wmo -I%t -L%t -lModule1 -DMAIN -o %t/main -Xlinker -rpath -Xlinker %t %s -swift-version 5
+// RUN: %target-codesign %t/main %t/libModule1.%target-dylib-extension %t/libModule2.%target-dylib-extension
+// RUN: %target-run %t/main %t/libModule1.%target-dylib-extension %t/libModule2.%target-dylib-extension
+
 
 // REQUIRES: executable_test
 
@@ -55,6 +72,8 @@ func expectedResult(_ forOriginalLibrary: Bool,  _ expectedOriginalString: Strin
 }
 
 func checkExpectedResults(forOriginalLibrary useOrig: Bool) {
+ expectTrue(public_global_var == expectedResult(useOrig, "public_global_var"))
+
  expectTrue(public_global_func() ==
             expectedResult(useOrig, "public_global_func"))
  expectTrue(public_global_generic_func(Int.self) ==

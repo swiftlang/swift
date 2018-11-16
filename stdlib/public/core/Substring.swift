@@ -130,7 +130,7 @@ extension Substring {
     @inline(__always) get {
       let start = _slice.startIndex
       let end = _slice.endIndex
-      _sanityCheck(start.transcodedOffset == 0 && end.transcodedOffset == 0)
+      _internalInvariant(start.transcodedOffset == 0 && end.transcodedOffset == 0)
 
       return Range(uncheckedBounds: (start.encodedOffset, end.encodedOffset))
     }
@@ -329,9 +329,9 @@ extension Substring : LosslessStringConvertible {
 }
 
 extension Substring {
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @_fixed_layout
   public struct UTF8View {
-    @usableFromInline // FIXME(sil-serialize-all)
+    @usableFromInline
     internal var _slice: Slice<String.UTF8View>
   }
 }
@@ -390,12 +390,12 @@ extension Substring.UTF8View : BidirectionalCollection {
     return _slice.distance(from: start, to: end)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
     _slice._failEarlyRangeCheck(index, bounds: bounds)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func _failEarlyRangeCheck(
     _ range: Range<Index>, bounds: Range<Index>
   ) {

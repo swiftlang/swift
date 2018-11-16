@@ -23,7 +23,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
 }
 
 class TestArrayStorage {
-  @sil_stored var count: Int32
+  @_hasStorage var count: Int32
   init()
 }
 

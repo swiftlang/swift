@@ -72,7 +72,7 @@ extension UnsafeBufferPointer.Iterator: IteratorProtocol {
     guard let start = _position else {
       return nil
     }
-    _sanityCheck(_end != nil, "inconsistent _position, _end pointers")
+    _internalInvariant(_end != nil, "inconsistent _position, _end pointers")
 
     if start == _end._unsafelyUnwrappedUnchecked { return nil }
 

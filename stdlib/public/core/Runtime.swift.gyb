@@ -214,7 +214,7 @@ internal func _float${bits}ToStringImpl(
 internal func _float${bits}ToString(
   _ value: Float${bits}, debug: Bool
 ) -> (buffer: _Buffer32, length: Int) {
-  _sanityCheck(MemoryLayout<_Buffer32>.size == 32)
+  _internalInvariant(MemoryLayout<_Buffer32>.size == 32)
   var buffer = _Buffer32()
   let length = buffer.withBytes { (bufferPtr) in
     Int(_float${bits}ToStringImpl(bufferPtr, 32, value, debug))
@@ -312,57 +312,50 @@ internal func _rawPointerToString(_ value: Builtin.RawPointer) -> String {
 // coexist, so they were renamed. The old names must not be used in the
 // new runtime.
 
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
+@_fixed_layout
+@usableFromInline
 @objc @_swift_native_objc_runtime_base(__SwiftNativeNSArrayBase)
 internal class __SwiftNativeNSArray {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @nonobjc
   internal init() {}
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   deinit {}
 }
 
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
+@_fixed_layout
+@usableFromInline
 @objc @_swift_native_objc_runtime_base(__SwiftNativeNSDictionaryBase)
 internal class __SwiftNativeNSDictionary {
-  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal init() {}
-  @inlinable // FIXME(sil-serialize-all)
   deinit {}
 }
 
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
+@_fixed_layout
+@usableFromInline
 @objc @_swift_native_objc_runtime_base(__SwiftNativeNSSetBase)
 internal class __SwiftNativeNSSet {
-  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal init() {}
-  @inlinable // FIXME(sil-serialize-all)
   deinit {}
 }
 
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
-@objc @_swift_native_objc_runtime_base(__SwiftNativeNSEnumeratorBase)
+@objc
+@_swift_native_objc_runtime_base(__SwiftNativeNSEnumeratorBase)
 internal class __SwiftNativeNSEnumerator {
-  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal init() {}
-  @inlinable // FIXME(sil-serialize-all)
   deinit {}
 }
 
 // FIXME(ABI)#60 : move into the Foundation overlay and remove 'open'
-@_fixed_layout // FIXME(sil-serialize-all)
+@_fixed_layout
 @objc @_swift_native_objc_runtime_base(__SwiftNativeNSDataBase)
 open class __SwiftNativeNSData {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @objc public init() {}
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   deinit {}
 }
 
@@ -405,28 +398,28 @@ public func _stdlib_initializeReturnAutoreleased() {
 }
 #else
 
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
+@_fixed_layout
+@usableFromInline
 internal class __SwiftNativeNSArray {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal init() {}
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   deinit {}
 }
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
+@_fixed_layout
+@usableFromInline
 internal class __SwiftNativeNSDictionary {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal init() {}
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   deinit {}
 }
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
+@_fixed_layout
+@usableFromInline
 internal class __SwiftNativeNSSet {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal init() {}
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   deinit {}
 }
 

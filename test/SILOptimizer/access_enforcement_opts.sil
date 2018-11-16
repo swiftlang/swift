@@ -9,7 +9,7 @@ import c_layout
 
 
 struct X {
-  @sil_stored var i: Int64 { get set }
+  @_hasStorage var i: Int64 { get set }
   init(i: Int64)
   init()
 }
@@ -1515,4 +1515,43 @@ bb0:
   return %10 : $()
 }
 
+// public func testPhiArgs() {
+// Check that we can merge scopes with Phi args - avoiding a crash we've seen in the past
+//
+// CHECK-LABEL: sil @testPhiArgs : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK: cond_br {{.*}}, bb1, bb2
+// CHECK: bb1
+// CHECK: br bb3([[GLOBAL]] : $*X)
+// CHECK: bb2
+// CHECK: br bb3([[GLOBAL]] : $*X)
+// CHECK: bb3([[GLOBALPHI:%.*]] : $*X):
+// CHECK: [[BEGIN:%.*]] = begin_access [read] [dynamic] [[GLOBALPHI]] : $*X
+// CHECK-NEXT: load
+// CHECK-NEXT: load
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NOT: begin_access
+// CHECK-LABEL: } // end sil function 'testPhiArgs'
+sil @testPhiArgs : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %cond = integer_literal $Builtin.Int1, 1
+  cond_br %cond, bb1, bb2
+  
+bb1:
+  br bb3(%0 : $*X)
+  
+bb2:
+  br bb3(%0 : $*X)
+  
+bb3(%1 : $*X):
+  %2 = begin_access [read] [dynamic] %1 : $*X
+  %3 = load %2 : $*X
+  end_access %2 : $*X
+  %4 = begin_access [read] [dynamic] %0 : $*X
+  %5 = load %4 : $*X
+  end_access %4 : $*X
+  %10 = tuple ()
+  return %10 : $()
+}
 

@@ -264,7 +264,7 @@ namespace {
         return true;
       }
 
-      Result = ValueOwnershipKind(*Iter);
+      Result = T(*Iter);
       return false;
     }
 
@@ -5224,6 +5224,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
     F->setUnqualifiedOwnership();
   }
   B.setInsertionPoint(BB);
+  B.setHasOwnership(F->hasQualifiedOwnership());
   do {
     if (parseSILInstruction(B))
       return true;
@@ -6156,8 +6157,9 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
                                                     nullptr);
   WitnessState.ContextGenericEnv = witnessEnv;
 
-  NormalProtocolConformance *theConformance = conf ?
-      dyn_cast<NormalProtocolConformance>(conf) : nullptr;
+  // FIXME: support parsing a self-conformance here.
+  auto theConformance
+    = dyn_cast_or_null<RootProtocolConformance>(conf);
 
   SILWitnessTable *wt = nullptr;
   if (theConformance) {

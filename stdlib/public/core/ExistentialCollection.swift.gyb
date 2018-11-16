@@ -221,13 +221,6 @@ internal class _AnyRandomAccessCollectionBox<Element>
   }
 
   @inlinable
-  internal func __preprocessingPass<R>(
-    _ preprocess: () throws -> R
-  ) rethrows -> R? {
-    _abstract()
-  }
-
-  @inlinable
   internal func __copyToContiguousArray() -> ContiguousArray<Element> {
     _abstract()
   }
@@ -244,16 +237,51 @@ internal class _AnyRandomAccessCollectionBox<Element>
   @inlinable // FIXME(sil-serialize-all)
   deinit {}
 
-%   override = 'override' if Kind != 'Sequence' else ''
+%   if Kind == 'Sequence':
   @inlinable
-  internal ${override} func _drop(
+  internal func _drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> _AnySequenceBox<Element> {
+    _abstract()
+  }
+
+  @inlinable
+  internal func _dropFirst(_ n: Int) -> _AnySequenceBox<Element> {
+    _abstract()
+  }
+
+  @inlinable
+  internal func _dropLast(_ n: Int) -> [Element] {
+    _abstract()
+  }
+
+  @inlinable
+  internal func _prefix(_ maxLength: Int) -> _AnySequenceBox<Element> {
+    _abstract()
+  }
+
+  @inlinable
+  internal func _prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> [Element] {
+    _abstract()
+  }
+
+  @inlinable
+  internal func _suffix(_ maxLength: Int) -> [Element] {
+    _abstract()
+  }
+%   else:
+%     override = 'override' if Kind != 'Collection' else ''
+  @inlinable
+  internal override func _drop(
     while predicate: (Element) throws -> Bool
   ) rethrows -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
   @inlinable
-  internal ${override} func _dropFirst(_ n: Int) -> _Any${Kind}Box<Element> {
+  internal override func _dropFirst(_ n: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
@@ -263,7 +291,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
   }
 
   @inlinable
-  internal ${override} func _prefix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
+  internal override func _prefix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
@@ -278,14 +306,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
   internal ${override} func _suffix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
-
-  @inlinable
-  internal func _split(
-    maxSplits: Int, omittingEmptySubsequences: Bool,
-    whereSeparator isSeparator: (Element) throws -> Bool
-  ) rethrows -> [Any${Kind}<Element>] {
-    _abstract()
-  }
+%   end
 
 %   if Kind == 'Collection':
   @inlinable
@@ -443,12 +464,6 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Element>
     return _base._customContainsEquatableElement(element)
   }
   @inlinable
-  internal override func __preprocessingPass<R>(
-    _ preprocess: () throws -> R
-  ) rethrows -> R? {
-    return try _base._preprocessingPass(preprocess)
-  }
-  @inlinable
   internal override func __copyToContiguousArray() -> ContiguousArray<Element> {
     return _base._copyToContiguousArray()
   }
@@ -458,6 +473,36 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Element>
     let (it,idx) = _base._copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
+%   if Kind == 'Sequence':
+  @inlinable
+  internal override func _dropFirst(_ n: Int) -> _AnySequenceBox<Element> {
+    return _SequenceBox<DropFirstSequence<S>>(_base: _base.dropFirst(n))
+  }
+  @inlinable
+  internal override func _drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> _Any${Kind}Box<Element> {
+    return try _SequenceBox<DropWhileSequence<S>>(_base: _base.drop(while: predicate))
+  }
+  @inlinable
+  internal override func _dropLast(_ n: Int) -> [Element] {
+    return _base.dropLast(n)
+  }
+  @inlinable
+  internal override func _prefix(_ n: Int) -> _AnySequenceBox<Element> {
+    return _SequenceBox<PrefixSequence<S>>(_base: _base.prefix(n))
+  }
+  @inlinable
+  internal override func _prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> [Element] {
+    return try _base.prefix(while: predicate)
+  }
+  @inlinable
+  internal override func _suffix(_ maxLength: Int) -> [Element] {
+    return _base.suffix(maxLength)
+  }
+%   else:
   @inlinable
   internal override func _drop(
     while predicate: (Element) throws -> Bool
@@ -485,20 +530,6 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Element>
   @inlinable
   internal override func _suffix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.suffix(maxLength))
-  }
-%   for ResultKind in EqualAndWeakerKinds:
-  @inlinable
-  internal override func _split(
-    maxSplits: Int, omittingEmptySubsequences: Bool,
-    whereSeparator isSeparator: (Element) throws -> Bool
-  ) rethrows -> [Any${ResultKind}<Element>] {
-    return try _base.split(
-      maxSplits: maxSplits,
-      omittingEmptySubsequences: omittingEmptySubsequences,
-      whereSeparator: isSeparator)
-      .map {
-        Any${ResultKind}(_box: _${Kind}Box<S.SubSequence>(_base: $0))
-      }
   }
 %   end
 
@@ -694,14 +725,47 @@ extension  AnySequence: Sequence {
 extension Any${Kind} {
 %   if Kind == 'Sequence':
   /// Returns an iterator over the elements of this sequence.
-%   else:
-  /// Returns an iterator over the elements of this collection.
-%   end
   @inline(__always)
   @inlinable
   public __consuming func makeIterator() -> Iterator {
     return _box._makeIterator()
   }
+  @inlinable
+  public __consuming func dropLast(_ n: Int = 1) -> [Element] {
+    return _box._dropLast(n)
+  }
+  @inlinable
+  public __consuming func prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> [Element] {
+    return try _box._prefix(while: predicate)
+  }
+  @inlinable
+  public __consuming func suffix(_ maxLength: Int) -> [Element] {
+    return _box._suffix(maxLength)
+  }
+%   else:
+  /// Returns an iterator over the elements of this collection.
+  @inline(__always)
+  @inlinable
+  public __consuming func makeIterator() -> Iterator {
+    return _box._makeIterator()
+  }
+  @inlinable
+  public __consuming func dropLast(_ n: Int = 1) -> Any${Kind}<Element> {
+    return Any${Kind}(_box: _box._dropLast(n))
+  }
+  @inlinable
+  public __consuming func prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> Any${Kind}<Element> {
+    return try Any${Kind}(_box: _box._prefix(while: predicate))
+  }
+  @inlinable
+  public __consuming func suffix(_ maxLength: Int) -> Any${Kind}<Element> {
+    return Any${Kind}(_box: _box._suffix(maxLength))
+  }
+%   end
 
   @inlinable
   public var underestimatedCount: Int {
@@ -737,42 +801,13 @@ extension Any${Kind} {
   }
 
   @inlinable
-  public __consuming func dropFirst(_ n: Int) -> Any${Kind}<Element> {
+  public __consuming func dropFirst(_ n: Int = 1) -> Any${Kind}<Element> {
     return Any${Kind}(_box: _box._dropFirst(n))
   }
 
   @inlinable
-  public __consuming func dropLast(_ n: Int) -> Any${Kind}<Element> {
-    return Any${Kind}(_box: _box._dropLast(n))
-  }
-
-  @inlinable
-  public __consuming func prefix(
-    while predicate: (Element) throws -> Bool
-  ) rethrows -> Any${Kind}<Element> {
-    return try Any${Kind}(_box: _box._prefix(while: predicate))
-  }
-
-  @inlinable
-  public __consuming func prefix(_ maxLength: Int) -> Any${Kind}<Element> {
+  public __consuming func prefix(_ maxLength: Int = 1) -> Any${Kind}<Element> {
     return Any${Kind}(_box: _box._prefix(maxLength))
-  }
-
-  @inlinable
-  public __consuming func suffix(_ maxLength: Int) -> Any${Kind}<Element> {
-    return Any${Kind}(_box: _box._suffix(maxLength))
-  }
-
-  @inlinable
-  public __consuming func split(
-    maxSplits: Int = Int.max,
-    omittingEmptySubsequences: Bool = true,
-    whereSeparator isSeparator: (Element) throws -> Bool
-  ) rethrows -> [Any${Kind}<Element>] {
-    return try _box._split(
-      maxSplits: maxSplits,
-      omittingEmptySubsequences: omittingEmptySubsequences,
-      whereSeparator: isSeparator)
   }
 
   @inlinable
@@ -780,13 +815,6 @@ extension Any${Kind} {
     _ element: Element
   ) -> Bool? {
     return _box.__customContainsEquatableElement(element)
-  }
-
-  @inlinable
-  public func _preprocessingPass<R>(
-    _ preprocess: () throws -> R
-  ) rethrows -> R? {
-    return try _box.__preprocessingPass(preprocess)
   }
 
   @inlinable

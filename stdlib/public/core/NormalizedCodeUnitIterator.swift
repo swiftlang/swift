@@ -29,7 +29,7 @@ extension Unicode.Scalar {
 
   // Whether this scalar value always has a normalization boundary before it.
   internal var _hasNormalizationBoundaryBefore: Bool {
-    _sanityCheck(Int32(exactly: self.value) != nil, "top bit shouldn't be set")
+    _internalInvariant(Int32(exactly: self.value) != nil, "top bit shouldn't be set")
     let value = Int32(bitPattern: self.value)
     return 0 != __swift_stdlib_unorm2_hasBoundaryBefore(
       _Normalization._nfcNormalizer, value)
@@ -148,7 +148,7 @@ internal struct _NormalizedUTF8CodeUnitIterator: IteratorProtocol {
   var bufferCount = 0
 
   internal init(foreign guts: _StringGuts, range: Range<String.Index>) {
-    _sanityCheck(guts.isForeign)
+    _internalInvariant(guts.isForeign)
     utf16Iterator = _NormalizedUTF16CodeUnitIterator(guts, range)
   }
 
@@ -177,8 +177,8 @@ internal struct _NormalizedUTF8CodeUnitIterator: IteratorProtocol {
       let iterator = array.makeIterator()
       _ = transcode(iterator, from: UTF16.self, to: UTF8.self,
         stoppingOnError: false) { codeUnit in
-          _sanityCheck(bufferCount < 4)
-          _sanityCheck(bufferIndex < 4)
+          _internalInvariant(bufferCount < 4)
+          _internalInvariant(bufferIndex < 4)
 
           utf8Buffer[bufferIndex] = codeUnit
           bufferIndex += 1
@@ -412,7 +412,7 @@ struct _NormalizedUTF16CodeUnitIterator: IteratorProtocol {
     }
 
     //exactly one of the buffers should have code units for us to return
-    _sanityCheck((segmentBufferCount == 0)
+    _internalInvariant((segmentBufferCount == 0)
               != ((overflowBuffer?.count ?? 0) == 0))
 
     if segmentBufferIndex < segmentBufferCount {
@@ -420,7 +420,7 @@ struct _NormalizedUTF16CodeUnitIterator: IteratorProtocol {
       segmentBufferIndex += 1
       return segmentBuffer[index]
     } else if overflowBufferIndex < overflowBufferCount {
-      _sanityCheck(overflowBufferIndex < overflowBuffer!.count)
+      _internalInvariant(overflowBufferIndex < overflowBuffer!.count)
       let index = overflowBufferIndex
       overflowBufferIndex += 1
       return overflowBuffer![index]
@@ -494,13 +494,13 @@ extension _NormalizedUTF8CodeUnitIterator_2 {
       }
       fill()
       if _slowPath(outputBufferEmpty) {
-        //_sanityCheck(inputBufferEmpty)
+        //_internalInvariant(inputBufferEmpty)
         return nil
       }
     }
-    _sanityCheck(!outputBufferEmpty)
+    _internalInvariant(!outputBufferEmpty)
 
-    _sanityCheck(outputPosition < outputBufferCount)
+    _internalInvariant(outputPosition < outputBufferCount)
     let result = outputBuffer[outputPosition]
     outputPosition &+= 1
     return result
@@ -534,7 +534,7 @@ extension _NormalizedUTF8CodeUnitIterator_2 {
 
           // Check scalar-based fast-paths
           let (scalar, len) = _decodeScalar(utf8, startingAt: inputCount)
-          _sanityCheck(inputCount &+ len <= inputEnd)
+          _internalInvariant(inputCount &+ len <= inputEnd)
 
           if _slowPath(
                !utf8.hasNormalizationBoundary(before: inputCount &+ len)
@@ -549,7 +549,7 @@ extension _NormalizedUTF8CodeUnitIterator_2 {
             outputCount &+= 1
           }
 
-          _sanityCheck(inputCount == outputCount,
+          _internalInvariant(inputCount == outputCount,
             "non-normalizing UTF-8 fast path should be 1-to-1 in code units")
         }
       }
@@ -559,7 +559,7 @@ extension _NormalizedUTF8CodeUnitIterator_2 {
           offsetBy: inputCount)
         let (scalar, len) = gutsSlice.foreignErrorCorrectedScalar(
           startingAt: startIdx)
-        _sanityCheck(inputCount &+ len <= inputEnd)
+        _internalInvariant(inputCount &+ len <= inputEnd)
 
         if _slowPath(
              !gutsSlice.foreignHasNormalizationBoundary(
@@ -575,7 +575,7 @@ extension _NormalizedUTF8CodeUnitIterator_2 {
           outputCount &+= 1
         }
 
-        _sanityCheck(inputCount <= outputCount,
+        _internalInvariant(inputCount <= outputCount,
           "non-normalizing UTF-16 fast path shoule be 1-to-many in code units")
       }
     }
@@ -584,7 +584,7 @@ extension _NormalizedUTF8CodeUnitIterator_2 {
 
   @_effects(releasenone)
   private mutating func fill() {
-    _sanityCheck(outputBufferEmpty)
+    _internalInvariant(outputBufferEmpty)
 
     let priorInputCount = gutsSlice._offsetRange.count
 
@@ -594,11 +594,11 @@ extension _NormalizedUTF8CodeUnitIterator_2 {
 
     // Check if we filled in any, and adjust our scanning range appropriately
     if inputCount > 0 {
-      _sanityCheck(outputCount > 0)
+      _internalInvariant(outputCount > 0)
       gutsSlice._offsetRange = Range(uncheckedBounds: (
         gutsSlice._offsetRange.lowerBound + inputCount,
         gutsSlice._offsetRange.upperBound))
-      _sanityCheck(gutsSlice._offsetRange.count >= 0)
+      _internalInvariant(gutsSlice._offsetRange.count >= 0)
       return
     }
 
@@ -612,15 +612,15 @@ extension _NormalizedUTF8CodeUnitIterator_2 {
     }
 
     if !(outputBufferCount == 0 || remaining < priorInputCount) {
-      // TODO: _sanityCheck(outputBufferCount == 0 || remaining < priorInputCount)
+      // TODO: _internalInvariant(outputBufferCount == 0 || remaining < priorInputCount)
     }
 
     gutsSlice._offsetRange = Range(uncheckedBounds: (
       gutsSlice._offsetRange.lowerBound + (priorInputCount - remaining),
       gutsSlice._offsetRange.upperBound))
 
-    _sanityCheck(outputBufferFull || gutsSlice._offsetRange.isEmpty)
-    _sanityCheck(gutsSlice._offsetRange.count >= 0)
+    _internalInvariant(outputBufferFull || gutsSlice._offsetRange.isEmpty)
+    _internalInvariant(gutsSlice._offsetRange.count >= 0)
   }
 
   @_effects(readonly)

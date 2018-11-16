@@ -6,23 +6,23 @@ import Builtin
 import Swift
 
 struct MyInt {
-  @sil_stored var _value: Builtin.Int64
+  @_hasStorage var _value: Builtin.Int64
 }
 
 struct MyBool {}
 struct _MyDependenceToken {}
 
 struct _MyBridgeStorage {
-  @sil_stored var rawValue : Builtin.BridgeObject
+  @_hasStorage var rawValue : Builtin.BridgeObject
 }
 
 struct _MyArrayBuffer<T> {
-  @sil_stored var _storage : _MyBridgeStorage
+  @_hasStorage var _storage : _MyBridgeStorage
 }
 
 
 struct MyArray<T> {
-  @sil_stored var _buffer : _MyArrayBuffer<T>
+  @_hasStorage var _buffer : _MyArrayBuffer<T>
 }
 
 sil @swift_bufferAllocate : $@convention(thin)() -> @owned AnyObject

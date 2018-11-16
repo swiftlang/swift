@@ -2083,10 +2083,10 @@ public:
   const TargetTypeContextDescriptor<Runtime> *
   getTypeContextDescriptor() const {
     switch (getTypeKind()) {
-    case TypeReferenceKind::DirectNominalTypeDescriptor:
+    case TypeReferenceKind::DirectTypeDescriptor:
       return DirectNominalTypeDescriptor.getPointer();
 
-    case TypeReferenceKind::IndirectNominalTypeDescriptor:
+    case TypeReferenceKind::IndirectTypeDescriptor:
       return *IndirectNominalTypeDescriptor.getPointer();
 
     // These types (and any others we might add to TypeReferenceKind
@@ -2172,14 +2172,14 @@ public:
 template <typename Runtime>
 struct TargetTypeReference {
   union {
-    /// A direct reference to a nominal type descriptor.
-    RelativeDirectPointer<TargetTypeContextDescriptor<Runtime>>
-      DirectNominalTypeDescriptor;
+    /// A direct reference to a TypeContextDescriptor or ProtocolDescriptor.
+    RelativeDirectPointer<TargetContextDescriptor<Runtime>>
+      DirectTypeDescriptor;
 
-    /// An indirect reference to a nominal type descriptor.
+    /// An indirect reference to a TypeContextDescriptor or ProtocolDescriptor.
     RelativeDirectPointer<
-        ConstTargetMetadataPointer<Runtime, TargetTypeContextDescriptor>>
-      IndirectNominalTypeDescriptor;
+        ConstTargetMetadataPointer<Runtime, TargetContextDescriptor>>
+      IndirectTypeDescriptor;
 
     /// An indirect reference to an Objective-C class.
     RelativeDirectPointer<
@@ -2191,14 +2191,14 @@ struct TargetTypeReference {
       DirectObjCClassName;
   };
 
-  const TargetTypeContextDescriptor<Runtime> *
-  getTypeContextDescriptor(TypeReferenceKind kind) const {
+  const TargetContextDescriptor<Runtime> *
+  getTypeDescriptor(TypeReferenceKind kind) const {
     switch (kind) {
-    case TypeReferenceKind::DirectNominalTypeDescriptor:
-      return DirectNominalTypeDescriptor;
+    case TypeReferenceKind::DirectTypeDescriptor:
+      return DirectTypeDescriptor;
 
-    case TypeReferenceKind::IndirectNominalTypeDescriptor:
-      return *IndirectNominalTypeDescriptor;
+    case TypeReferenceKind::IndirectTypeDescriptor:
+      return *IndirectTypeDescriptor;
 
     case TypeReferenceKind::DirectObjCClassName:
     case TypeReferenceKind::IndirectObjCClass:
@@ -2305,8 +2305,8 @@ public:
     return TypeRef.getIndirectObjCClass(getTypeKind());
   }
   
-  const TargetTypeContextDescriptor<Runtime> *getTypeContextDescriptor() const {
-    return TypeRef.getTypeContextDescriptor(getTypeKind());
+  const TargetContextDescriptor<Runtime> *getTypeDescriptor() const {
+    return TypeRef.getTypeDescriptor(getTypeKind());
   }
 
   /// Retrieve the context of a retroactive conformance.
@@ -4143,6 +4143,8 @@ class DynamicReplacementDescriptor {
   RelativeDirectPointer<DynamicReplacementChainEntry, false> chainEntry;
   uint32_t flags;
 
+  enum : uint32_t { EnableChainingMask = 0x1 };
+
 public:
   /// Enable this replacement by changing the function's replacement chain's
   /// root entry.
@@ -4159,6 +4161,8 @@ public:
   void disableReplacement() const;
 
   uint32_t getFlags() const { return flags; }
+
+  bool shouldChain() const { return (flags & EnableChainingMask); }
 };
 
 /// A collection of dynamic replacement records.

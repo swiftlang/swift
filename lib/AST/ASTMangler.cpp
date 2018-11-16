@@ -183,19 +183,28 @@ std::string ASTMangler::mangleConstructorVTableThunk(
   return finalize();
 }
 
-std::string ASTMangler::mangleWitnessTable(const NormalProtocolConformance *C) {
+std::string ASTMangler::mangleWitnessTable(const RootProtocolConformance *C) {
   beginMangling();
-  appendProtocolConformance(C);
-  appendOperator("WP");
+  if (isa<NormalProtocolConformance>(C)) {
+    appendProtocolConformance(C);
+    appendOperator("WP");
+  } else {
+    appendProtocolName(cast<SelfProtocolConformance>(C)->getProtocol());
+    appendOperator("WS");
+  }
   return finalize();
 }
 
-std::string ASTMangler::mangleWitnessThunk(const ProtocolConformance *Conformance,
+std::string ASTMangler::mangleWitnessThunk(
+                                     const ProtocolConformance *Conformance,
                                            const ValueDecl *Requirement) {
   beginMangling();
   // Concrete witness thunks get a special mangling.
-  if (Conformance)
-    appendProtocolConformance(Conformance);
+  if (Conformance) {
+    if (!isa<SelfProtocolConformance>(Conformance)) {
+      appendProtocolConformance(Conformance);
+    }
+  }
 
   if (auto ctor = dyn_cast<ConstructorDecl>(Requirement)) {
     appendConstructorEntity(ctor, /*isAllocating=*/true);
@@ -204,8 +213,9 @@ std::string ASTMangler::mangleWitnessThunk(const ProtocolConformance *Conformanc
     appendEntity(cast<FuncDecl>(Requirement));
   }
 
-  if (Conformance)
-    appendOperator("TW");
+  if (Conformance) {
+    appendOperator(isa<SelfProtocolConformance>(Conformance) ? "TS" : "TW");
+  }
   return finalize();
 }
 
@@ -1099,8 +1109,13 @@ void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
 /// Determine whether the given protocol conformance is itself retroactive,
 /// meaning that there might be multiple conflicting conformances of the
 /// same type to the same protocol.
-static bool isRetroactiveConformance(
-                               const NormalProtocolConformance *conformance) {
+static bool isRetroactiveConformance(const RootProtocolConformance *root) {
+  auto conformance = dyn_cast<NormalProtocolConformance>(root);
+  if (!conformance) {
+    assert(isa<SelfProtocolConformance>(root));
+    return false; // self-conformances are never retroactive.
+  }
+
   /// Non-retroactive conformances are... never retroactive.
   if (!conformance->isRetroactive())
     return false;
@@ -1123,7 +1138,7 @@ static bool containsRetroactiveConformance(
                                       const ProtocolConformance *conformance,
                                       ModuleDecl *module) {
   // If the root conformance is retroactive, it's retroactive.
-  if (isRetroactiveConformance(conformance->getRootNormalConformance()))
+  if (isRetroactiveConformance(conformance->getRootConformance()))
     return true;
 
   // If any of the substitutions used to form this conformance are retroactive,
@@ -2268,15 +2283,14 @@ ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance) {
 }
 
 void ASTMangler::appendProtocolConformanceRef(
-                                const NormalProtocolConformance *conformance) {
+                                const RootProtocolConformance *conformance) {
   // FIXME: Symbolic reference to the protocol conformance descriptor.
   appendProtocolName(conformance->getProtocol());
 
   // For retroactive conformances, add a reference to the module in which the
   // conformance resides. For @objc protocols, there is no point: conformances
   // are global anyway.
-  if (conformance->isRetroactive() && !conformance->isSynthesizedNonUnique() &&
-      !conformance->getProtocol()->isObjC())
+  if (isRetroactiveConformance(conformance))
     appendModule(conformance->getDeclContext()->getParentModule());
 }
 
@@ -2360,7 +2374,7 @@ void ASTMangler::appendConcreteProtocolConformance(
   appendType(conformingType->getCanonicalType());
 
   // Protocol conformance reference.
-  appendProtocolConformanceRef(conformance->getRootNormalConformance());
+  appendProtocolConformanceRef(conformance->getRootConformance());
 
   // Conditional conformance requirements.
   bool firstRequirement = true;

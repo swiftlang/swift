@@ -285,7 +285,7 @@ public:
   void visitAccessControlAttr(AccessControlAttr *attr);
   void visitSetterAccessAttr(SetterAccessAttr *attr);
   bool visitAbstractAccessControlAttr(AbstractAccessControlAttr *attr);
-  void visitSILStoredAttr(SILStoredAttr *attr);
+  void visitHasStorageAttr(HasStorageAttr *attr);
   void visitObjCMembersAttr(ObjCMembersAttr *attr);
 };
 } // end anonymous namespace
@@ -428,7 +428,7 @@ void AttributeEarlyChecker::visitGKInspectableAttr(GKInspectableAttr *attr) {
                                  attr->getAttrName());
 }
 
-void AttributeEarlyChecker::visitSILStoredAttr(SILStoredAttr *attr) {
+void AttributeEarlyChecker::visitHasStorageAttr(HasStorageAttr *attr) {
   auto *VD = cast<VarDecl>(D);
   if (VD->getDeclContext()->getSelfClassDecl())
     return;
@@ -819,6 +819,7 @@ public:
     IGNORED_ATTR(Exported)
     IGNORED_ATTR(ForbidSerializingReference)
     IGNORED_ATTR(GKInspectable)
+    IGNORED_ATTR(HasStorage)
     IGNORED_ATTR(IBDesignable)
     IGNORED_ATTR(IBInspectable)
     IGNORED_ATTR(IBOutlet) // checked early.
@@ -846,7 +847,6 @@ public:
     IGNORED_ATTR(Semantics)
     IGNORED_ATTR(ShowInInterface)
     IGNORED_ATTR(SILGenName)
-    IGNORED_ATTR(SILStored)
     IGNORED_ATTR(StaticInitializeObjCMetadata)
     IGNORED_ATTR(SynthesizedProtocol)
     IGNORED_ATTR(Testable)
@@ -949,11 +949,11 @@ static bool isRelaxedIBAction(TypeChecker &TC) {
   return isiOS(TC) || iswatchOS(TC);
 }
 
-/// Returns true if a method is an valid implementation of a @dynamicCallable
-/// attribute requirement. The method is given to be defined as one of the
-/// following: `dynamicallyCall(withArguments:)` or
+/// Returns true if the given method is an valid implementation of a
+/// @dynamicCallable attribute requirement. The method is given to be defined
+/// as one of the following: `dynamicallyCall(withArguments:)` or
 /// `dynamicallyCall(withKeywordArguments:)`.
-bool swift::isValidDynamicCallableMethod(FuncDecl *funcDecl, DeclContext *DC,
+bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
                                          TypeChecker &TC,
                                          bool hasKeywordArguments) {
   // There are two cases to check.
@@ -967,8 +967,8 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *funcDecl, DeclContext *DC,
   //    `ExpressibleByStringLiteral`.
   //    `D.Value` and the return type can be arbitrary.
 
-  TC.validateDeclForNameLookup(funcDecl);
-  auto paramList = funcDecl->getParameters();
+  TC.validateDeclForNameLookup(decl);
+  auto paramList = decl->getParameters();
   if (paramList->size() != 1 || paramList->get(0)->isVariadic()) return false;
   auto argType = paramList->get(0)->getType();
 
@@ -998,8 +998,8 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *funcDecl, DeclContext *DC,
                                ConformanceCheckOptions()).hasValue();
 }
 
-/// Returns true if a declaration has a valid implementation of a
-/// @dynamicCallable attribute requirement.
+/// Returns true if the given nominal type has a valid implementation of a
+/// @dynamicCallable attribute requirement with the given argument name.
 static bool hasValidDynamicCallableMethod(TypeChecker &TC,
                                           NominalTypeDecl *decl,
                                           Identifier argumentName,
@@ -1041,23 +1041,23 @@ visitDynamicCallableAttr(DynamicCallableAttr *attr) {
   }
 }
 
-/// Given a subscript defined as "subscript(dynamicMember:)->T", return true if
-/// it is an acceptable implementation of the @dynamicMemberLookup attribute's
-/// requirement.
-bool swift::isAcceptableDynamicMemberLookupSubscript(SubscriptDecl *decl,
-                                                     DeclContext *DC,
-                                                     TypeChecker &TC) {
-  // The only thing that we care about is that the index list has exactly one
-  // non-variadic entry.  The type must conform to ExpressibleByStringLiteral.
+/// Returns true if the given subscript method is an valid implementation of
+/// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
+/// The method is given to be defined as `subscript(dynamicMember:)`.
+bool swift::isValidDynamicMemberLookupSubscript(SubscriptDecl *decl,
+                                                DeclContext *DC,
+                                                TypeChecker &TC) {
+  // There are two requirements:
+  // - The subscript method has exactly one, non-variadic parameter.
+  // - The parameter type conforms to `ExpressibleByStringLiteral`.
   auto indices = decl->getIndices();
-  
-  auto EBSL =
+
+  auto stringLitProto =
     TC.Context.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
   
-  return indices->size() == 1 &&
-    !indices->get(0)->isVariadic() &&
+  return indices->size() == 1 && !indices->get(0)->isVariadic() &&
     TC.conformsToProtocol(indices->get(0)->getType(),
-                          EBSL, DC, ConformanceCheckOptions());
+                          stringLitProto, DC, ConformanceCheckOptions());
 }
 
 /// The @dynamicMemberLookup attribute is only allowed on types that have at
@@ -1066,45 +1066,38 @@ bool swift::isAcceptableDynamicMemberLookupSubscript(SubscriptDecl *decl,
 /// subscript<KeywordType: ExpressibleByStringLiteral, LookupValue>
 ///   (dynamicMember name: KeywordType) -> LookupValue { get }
 ///
-/// ... but doesn't care about the mutating'ness of the getter/setter.  We just
-/// manually check the requirements here.
-///
+/// ... but doesn't care about the mutating'ness of the getter/setter.
+/// We just manually check the requirements here.
 void AttributeChecker::
 visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   // This attribute is only allowed on nominal types.
   auto decl = cast<NominalTypeDecl>(D);
   auto type = decl->getDeclaredType();
   
-  // Lookup our subscript.
-  auto subscriptName =
-    DeclName(TC.Context, DeclBaseName::createSubscript(),
-             TC.Context.Id_dynamicMember);
+  // Look up `subscript(dynamicMember:)` candidates.
+  auto subscriptName = DeclName(TC.Context, DeclBaseName::createSubscript(),
+                                TC.Context.Id_dynamicMember);
+  auto candidates = TC.lookupMember(decl, type, subscriptName);
   
-  auto lookupOptions = defaultMemberTypeLookupOptions;
-  lookupOptions -= NameLookupFlags::PerformConformanceCheck;
-  
-  // Lookup the implementations of our subscript.
-  auto candidates = TC.lookupMember(decl, type, subscriptName, lookupOptions);
-  
-  // If we have none, then there is no attribute.
+  // If there are no candidates, then the attribute is invalid.
   if (candidates.empty()) {
-    TC.diagnose(attr->getLocation(), diag::type_invalid_dml, type);
+    TC.diagnose(attr->getLocation(), diag::invalid_dynamic_member_lookup_type,
+                type);
     attr->setInvalid();
     return;
   }
 
-  
-  // If none of the ones we find are acceptable, then reject one.
+  // If no candidates are valid, then reject one.
   auto oneCandidate = candidates.front();
   candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
     auto cand = cast<SubscriptDecl>(entry.getValueDecl());
     TC.validateDeclForNameLookup(cand);
-    return isAcceptableDynamicMemberLookupSubscript(cand, decl, TC);
+    return isValidDynamicMemberLookupSubscript(cand, decl, TC);
   });
 
   if (candidates.empty()) {
     TC.diagnose(oneCandidate.getValueDecl()->getLoc(),
-                diag::type_invalid_dml, type);
+                diag::invalid_dynamic_member_lookup_type, type);
     attr->setInvalid();
   }
 }
@@ -2182,7 +2175,7 @@ void TypeChecker::checkDynamicReplacementAttribute(ValueDecl *D) {
     return;
   }
 
-  if (D->isDynamic() && !D->isObjC()) {
+  if (D->isNativeDynamic()) {
     diagnose(attr->getLocation(), diag::dynamic_replacement_must_not_be_dynamic,
              D->getBaseName());
     attr->setInvalid();
@@ -2458,7 +2451,7 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
 }
 
 void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
-  if (!getLangOpts().EnableImplicitDynamic)
+  if (!D->getModuleContext()->isImplicitDynamicEnabled())
     return;
 
   // Add the attribute if the decl kind allows it and it is not an accessor
@@ -2467,7 +2460,27 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
       isa<AccessorDecl>(D))
     return;
 
-  if (!D->getAttrs().hasAttribute<DynamicAttr>()) {
+  if (D->getAttrs().hasAttribute<FinalAttr>() ||
+      D->getAttrs().hasAttribute<NonObjCAttr>() ||
+      D->getAttrs().hasAttribute<TransparentAttr>() ||
+      D->getAttrs().hasAttribute<InlinableAttr>())
+    return;
+
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    // Don't turn stored into computed properties. This could conflict with
+    // exclusivity checking.
+    if (VD->hasStorage())
+      return;
+    // Don't add dynamic to local variables.
+    if (VD->getDeclContext()->isLocalContext())
+      return;
+    // Don't add to implicit variables.
+    if (VD->isImplicit())
+      return;
+  }
+
+  if (!D->getAttrs().hasAttribute<DynamicAttr>() &&
+      !D->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
     auto attr = new (D->getASTContext()) DynamicAttr(/*implicit=*/true);
     D->getAttrs().add(attr);
   }

@@ -7,7 +7,7 @@ import resilient_global
 
 public struct MyEmptyStruct {}
 
-// CHECK-LABEL: sil_global @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvp : $MyEmptyStruct
+// CHECK-LABEL: sil_global private @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvp : $MyEmptyStruct
 
 public var myEmptyGlobal = MyEmptyStruct()
 

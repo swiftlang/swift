@@ -215,6 +215,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableOperatorDesignatedTypes |=
       Args.hasArg(OPT_enable_operator_designated_types);
 
+  // Always enable operator designated types for the standard library.
+  Opts.EnableOperatorDesignatedTypes |= FrontendOpts.ParseStdlib;
+
   Opts.SolverEnableOperatorDesignatedTypes |=
       Args.hasArg(OPT_solver_enable_operator_designated_types);
 
@@ -271,7 +274,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
-  Opts.EnableImplicitDynamic |= Args.hasArg(OPT_enable_implicit_dynamic);
 
   if (Args.hasArg(OPT_verify_syntax_tree)) {
     Opts.BuildSyntaxTree = true;
@@ -740,7 +742,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.AssumeUnqualifiedOwnershipWhenParsing
     |= Args.hasArg(OPT_assume_parsing_unqualified_ownership_sil);
   Opts.EnableMandatorySemanticARCOpts |=
-      !Args.hasArg(OPT_disable_mandatory_semantic_arc_opts);
+      Args.hasArg(OPT_enable_mandatory_semantic_arc_opts);
   Opts.EnableLargeLoadableTypes |= Args.hasArg(OPT_enable_large_loadable_types);
 
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_path))
@@ -989,6 +991,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
 
+  Opts.EnableDynamicReplacementChaining |=
+      Args.hasArg(OPT_enable_dynamic_replacement_chaining);
+
   Opts.UseSwiftCall = Args.hasArg(OPT_enable_swiftcall);
 
   // This is set to true by default.
@@ -1053,6 +1058,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_resilience_bypass)) {
     Opts.EnableResilienceBypass = true;
   }
+
+  // PE/COFF cannot deal with the cross-module reference to the metadata parent
+  // (e.g. NativeObject).  Force the lazy initialization of the VWT always.
+  Opts.LazyInitializeClassMetadata = Triple.isOSBinFormatCOFF();
 
   if (const Arg *A = Args.getLastArg(OPT_read_type_info_path_EQ)) {
     Opts.ReadTypeInfoPath = A->getValue();

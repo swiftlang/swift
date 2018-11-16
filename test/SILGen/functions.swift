@@ -1,4 +1,3 @@
-
 // RUN: %target-swift-emit-silgen -module-name functions -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -enable-sil-ownership %s | %FileCheck %s
 
 import Swift // just for Optional
@@ -421,27 +420,6 @@ func applyTransparent(_ x: Bool) -> Bool {
 // CHECK-LABEL: sil hidden [noinline] @$s9functions15noinline_calleeyyF : $@convention(thin) () -> ()
 @inline(never)
 func noinline_callee() {}
-
-// CHECK-LABEL: sil hidden [always_inline] @$s9functions20always_inline_calleeyyF : $@convention(thin) () -> ()
-@inline(__always)
-func always_inline_callee() {}
-
-// CHECK-LABEL: sil [serialized] [always_inline] @$s9functions27public_always_inline_calleeyyF : $@convention(thin) () -> ()
-@inline(__always)
-public func public_always_inline_callee() {}
-
-protocol AlwaysInline {
-  func alwaysInlined()
-}
-
-// CHECK-LABEL: sil hidden [always_inline] @$s9functions19AlwaysInlinedMemberV06alwaysC0{{[_0-9a-zA-Z]*}}F : $@convention(method) (AlwaysInlinedMember) -> () {
-
-// protocol witness for functions.AlwaysInline.alwaysInlined <A : functions.AlwaysInline>(functions.AlwaysInline.Self)() -> () in conformance functions.AlwaysInlinedMember : functions.AlwaysInline in functions
-// CHECK-LABEL: sil private [transparent] [thunk] [always_inline] @$s9functions19AlwaysInlinedMemberVAA0B6InlineA2aDP06alwaysC0{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method: AlwaysInline) (@in_guaranteed AlwaysInlinedMember) -> () {
-struct AlwaysInlinedMember : AlwaysInline {
-  @inline(__always)
-  func alwaysInlined() {}
-}
 
 // CHECK-LABEL: sil hidden [Onone] @$s9functions10onone_funcyyF : $@convention(thin) () -> ()
 @_optimize(none)

@@ -40,15 +40,15 @@ internal func _isASCII(_ x: UInt8) -> Bool {
 @inlinable
 @inline(__always)
 internal func _decodeUTF8(_ x: UInt8) -> Unicode.Scalar {
-  _sanityCheck(_isASCII(x))
+  _internalInvariant(_isASCII(x))
   return Unicode.Scalar(_unchecked: UInt32(x))
 }
 
 @inlinable
 @inline(__always)
 internal func _decodeUTF8(_ x: UInt8, _ y: UInt8) -> Unicode.Scalar {
-  _sanityCheck(_utf8ScalarLength(x) == 2)
-  _sanityCheck(_isContinuation(y))
+  _internalInvariant(_utf8ScalarLength(x) == 2)
+  _internalInvariant(_isContinuation(y))
   let x = UInt32(x)
   let value = ((x & 0b0001_1111) &<< 6) | _continuationPayload(y)
   return Unicode.Scalar(_unchecked: value)
@@ -59,8 +59,8 @@ internal func _decodeUTF8(_ x: UInt8, _ y: UInt8) -> Unicode.Scalar {
 internal func _decodeUTF8(
   _ x: UInt8, _ y: UInt8, _ z: UInt8
 ) -> Unicode.Scalar {
-  _sanityCheck(_utf8ScalarLength(x) == 3)
-  _sanityCheck(_isContinuation(y) && _isContinuation(z))
+  _internalInvariant(_utf8ScalarLength(x) == 3)
+  _internalInvariant(_isContinuation(y) && _isContinuation(z))
   let x = UInt32(x)
   let value = ((x & 0b0000_1111) &<< 12)
             | (_continuationPayload(y) &<< 6)
@@ -73,8 +73,8 @@ internal func _decodeUTF8(
 internal func _decodeUTF8(
   _ x: UInt8, _ y: UInt8, _ z: UInt8, _ w: UInt8
 ) -> Unicode.Scalar {
-  _sanityCheck(_utf8ScalarLength(x) == 4)
-  _sanityCheck(
+  _internalInvariant(_utf8ScalarLength(x) == 4)
+  _internalInvariant(
     _isContinuation(y) && _isContinuation(z) && _isContinuation(w))
   let x = UInt32(x)
   let value = ((x & 0b0000_1111) &<< 18)
@@ -106,13 +106,13 @@ internal func _decodeScalar(
 ) -> (Unicode.Scalar, scalarLength: Int) {
   let len = _utf8ScalarLength(utf8, endingAt: i)
   let (scalar, scalarLen) = _decodeScalar(utf8, startingAt: i &- len)
-  _sanityCheck(len == scalarLen)
+  _internalInvariant(len == scalarLen)
   return (scalar, len)
 }
 
 @inlinable @inline(__always)
 internal func _utf8ScalarLength(_ x: UInt8) -> Int {
-  _sanityCheck(!_isContinuation(x))
+  _internalInvariant(!_isContinuation(x))
   if _isASCII(x) { return 1 }
   // TODO(String micro-performance): check codegen
   return (~x).leadingZeroBitCount
@@ -126,7 +126,7 @@ internal func _utf8ScalarLength(
   while _isContinuation(utf8[i &- len]) {
     len += 1
   }
-  _sanityCheck(len == _utf8ScalarLength(utf8[i &- len]))
+  _internalInvariant(len == _utf8ScalarLength(utf8[i &- len]))
   return len
 }
 
@@ -145,11 +145,11 @@ internal func _continuationPayload(_ x: UInt8) -> UInt32 {
 internal func _decodeSurrogatePair(
   leading high: UInt16, trailing low: UInt16
 ) -> UInt32 {
-  _sanityCheck(_isLeadingSurrogate(high) && _isTrailingSurrogate(low))
+  _internalInvariant(_isLeadingSurrogate(high) && _isTrailingSurrogate(low))
   let hi10: UInt32 = UInt32(high) &- UInt32(_leadingSurrogateBias)
-  _sanityCheck(hi10 < 1<<10, "I said high 10. Not high, like, 20 or something")
+  _internalInvariant(hi10 < 1<<10, "I said high 10. Not high, like, 20 or something")
   let lo10: UInt32 = UInt32(low) &- UInt32(_trailingSurrogateBias)
-  _sanityCheck(lo10 < 1<<10, "I said low 10. Not low, like, 20 or something")
+  _internalInvariant(lo10 < 1<<10, "I said low 10. Not low, like, 20 or something")
 
   return ((hi10 &<< 10) | lo10) &+ 0x1_00_00
 }
@@ -172,7 +172,8 @@ internal func _numUTF16CodeUnits(_ scalar: Unicode.Scalar) -> Int {
 // Scalar helpers
 //
 extension _StringGuts {
-  @usableFromInline @inline(__always) // fast-path: fold common fastUTF8 check
+  @inlinable // FIXME(inline-always) was usableFromInline
+   @inline(__always) // fast-path: fold common fastUTF8 check
   internal func scalarAlign(_ idx: Index) -> Index {
     // TODO(String performance): isASCII check
 
@@ -188,7 +189,7 @@ extension _StringGuts {
       var i = idx.encodedOffset
       while _slowPath(_isContinuation(utf8[i])) {
         i -= 1
-        _sanityCheck(
+        _internalInvariant(
           i >= 0, "Malformed contents: starts with continuation byte")
       }
       // If no alignment is performed, keep grapheme cache
@@ -202,31 +203,31 @@ extension _StringGuts {
 
   @inlinable
   internal func fastUTF8ScalarLength(startingAt i: Int) -> Int {
-    _sanityCheck(isFastUTF8)
+    _internalInvariant(isFastUTF8)
     let len = _utf8ScalarLength(self.withFastUTF8 { $0[i] })
-    _sanityCheck((1...4) ~= len)
+    _internalInvariant((1...4) ~= len)
     return len
   }
 
   @inlinable
   internal func fastUTF8ScalarLength(endingAt i: Int) -> Int {
-    _sanityCheck(isFastUTF8)
+    _internalInvariant(isFastUTF8)
 
     return self.withFastUTF8 { utf8 in
-      _sanityCheck(i == utf8.count || !_isContinuation(utf8[i]))
+      _internalInvariant(i == utf8.count || !_isContinuation(utf8[i]))
       var len = 1
       while _isContinuation(utf8[i - len]) {
-        _sanityCheck(i - len > 0)
+        _internalInvariant(i - len > 0)
         len += 1
       }
-      _sanityCheck(len <= 4)
+      _internalInvariant(len <= 4)
       return len
     }
   }
 
   @inlinable
   internal func fastUTF8Scalar(startingAt i: Int) -> Unicode.Scalar {
-    _sanityCheck(isFastUTF8)
+    _internalInvariant(isFastUTF8)
     return self.withFastUTF8 { _decodeScalar($0, startingAt: i).0 }
   }
 
@@ -262,12 +263,13 @@ extension _StringGuts {
 #endif
   }
 
+  @usableFromInline
   @_effects(releasenone)
   internal func foreignErrorCorrectedScalar(
     startingAt idx: String.Index
   ) -> (Unicode.Scalar, scalarLength: Int) {
-    _sanityCheck(idx.transcodedOffset == 0)
-    _sanityCheck(idx.encodedOffset < self.count)
+    _internalInvariant(idx.transcodedOffset == 0)
+    _internalInvariant(idx.encodedOffset < self.count)
 
     let start = idx.encodedOffset
     let leading = _getForeignCodeUnit(at: start)
@@ -299,9 +301,9 @@ extension _StringGuts {
   internal func foreignErrorCorrectedScalar(
     endingAt idx: String.Index
   ) -> (Unicode.Scalar, scalarLength: Int) {
-    _sanityCheck(idx.transcodedOffset == 0)
-    _sanityCheck(idx.encodedOffset <= self.count)
-    _sanityCheck(idx.encodedOffset > 0)
+    _internalInvariant(idx.transcodedOffset == 0)
+    _internalInvariant(idx.encodedOffset <= self.count)
+    _internalInvariant(idx.encodedOffset > 0)
 
     let end = idx.encodedOffset
     let trailing = _getForeignCodeUnit(at: end &- 1)
@@ -332,8 +334,8 @@ extension _StringGuts {
   internal func foreignErrorCorrectedUTF16CodeUnit(
     at idx: String.Index
   ) -> UInt16 {
-    _sanityCheck(idx.transcodedOffset == 0)
-    _sanityCheck(idx.encodedOffset < self.count)
+    _internalInvariant(idx.transcodedOffset == 0)
+    _internalInvariant(idx.encodedOffset < self.count)
 
     let start = idx.encodedOffset
     let cu = _getForeignCodeUnit(at: start)
@@ -364,14 +366,75 @@ extension _StringGuts {
   @usableFromInline @inline(never) // slow-path
   @_effects(releasenone)
   internal func foreignScalarAlign(_ idx: Index) -> Index {
-    _sanityCheck(idx.encodedOffset < self.count)
+    _internalInvariant(idx.encodedOffset < self.count)
 
     let ecCU = foreignErrorCorrectedUTF16CodeUnit(at: idx)
     if _fastPath(!_isTrailingSurrogate(ecCU)) {
       return idx
     }
-    _sanityCheck(idx.encodedOffset > 0,
+    _internalInvariant(idx.encodedOffset > 0,
       "Error-correction shouldn't give trailing surrogate at position zero")
     return String.Index(encodedOffset: idx.encodedOffset &- 1)
+  }
+
+  @usableFromInline @inline(never)
+  @_effects(releasenone)
+  internal func foreignErrorCorrectedGrapheme(
+    startingAt start: Int, endingAt end: Int
+  ) -> Character {
+#if _runtime(_ObjC)
+    _internalInvariant(self.isForeign)
+
+    // Both a fast-path for single-code-unit graphemes and validation:
+    //   ICU treats isolated surrogates as isolated graphemes
+    let count = end &- start
+    if start &- end == 1 {
+      return Character(String(self.foreignErrorCorrectedScalar(
+        startingAt: String.Index(encodedOffset: start)
+      ).0))
+    }
+
+    // TODO(String performance): Stack buffer if small enough
+    var cus = Array<UInt16>(repeating: 0, count: count)
+    cus.withUnsafeMutableBufferPointer {
+      _cocoaStringCopyCharacters(
+        from: self._object.cocoaObject,
+        range: start..<end,
+        into: $0.baseAddress._unsafelyUnwrappedUnchecked)
+    }
+    return cus.withUnsafeBufferPointer {
+      return Character(String._uncheckedFromUTF16($0))
+    }
+#else
+    fatalError("No foreign strings on Linux in this version of Swift")
+#endif
+  }
+}
+
+// Higher level aggregate operations. These should only be called when the
+// result is the sole operation done by a caller, otherwise it's always more
+// efficient to use `withFastUTF8` in the caller.
+extension _StringGuts {
+  @inlinable @inline(__always)
+  internal func errorCorrectedScalar(
+    startingAt i: Int
+  ) -> (Unicode.Scalar, scalarLength: Int) {
+    if _fastPath(isFastUTF8) {
+      return withFastUTF8 { _decodeScalar($0, startingAt: i) }
+    }
+    return foreignErrorCorrectedScalar(
+      startingAt: String.Index(encodedOffset: i))
+  }
+  @inlinable @inline(__always)
+  internal func errorCorrectedCharacter(
+    startingAt start: Int, endingAt end: Int
+  ) -> Character {
+    if _fastPath(isFastUTF8) {
+      return withFastUTF8(range: start..<end) { utf8 in
+        return Character(unchecked: String._uncheckedFromUTF8(utf8))
+      }
+    }
+
+    return foreignErrorCorrectedGrapheme(startingAt: start, endingAt: end)
   }
 }

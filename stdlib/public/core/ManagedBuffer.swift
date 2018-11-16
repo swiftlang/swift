@@ -45,7 +45,7 @@ open class ManagedBuffer<Header, Element> {
   public final var header: Header
 
   internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("Only initialize these by calling create")
+    _internalInvariantFailure("Only initialize these by calling create")
   }
 }
 
@@ -263,7 +263,7 @@ public struct ManagedBufferPointer<Header, Element> {
   /// it in this specialized constructor.
   @inlinable
   internal init(_uncheckedUnsafeBufferObject buffer: AnyObject) {
-    ManagedBufferPointer._sanityCheckValidBufferClass(type(of: buffer))
+    ManagedBufferPointer._internalInvariantValidBufferClass(type(of: buffer))
     self._nativeBuffer = Builtin.unsafeCastToNativeObject(buffer)
   }
 
@@ -299,8 +299,8 @@ public struct ManagedBufferPointer<Header, Element> {
     _uncheckedBufferClass: AnyClass,
     minimumCapacity: Int
   ) {
-    ManagedBufferPointer._sanityCheckValidBufferClass(_uncheckedBufferClass, creating: true)
-    _sanityCheck(
+    ManagedBufferPointer._internalInvariantValidBufferClass(_uncheckedBufferClass, creating: true)
+    _internalInvariant(
       minimumCapacity >= 0,
       "ManagedBufferPointer must have non-negative capacity")
 
@@ -421,10 +421,10 @@ extension ManagedBufferPointer {
   }
 
   @inlinable
-  internal static func _sanityCheckValidBufferClass(
+  internal static func _internalInvariantValidBufferClass(
     _ bufferClass: AnyClass, creating: Bool = false
   ) {
-    _sanityCheck(
+    _internalInvariant(
       _class_getInstancePositiveExtentSize(bufferClass) == MemoryLayout<_HeapObject>.size
       || (
         (!creating || bufferClass is ManagedBuffer<Header, Element>.Type)
@@ -432,7 +432,7 @@ extension ManagedBufferPointer {
           == _headerOffset + MemoryLayout<Header>.size),
       "ManagedBufferPointer buffer class has illegal stored properties"
     )
-    _sanityCheck(
+    _internalInvariant(
       _usesNativeSwiftReferenceCounting(bufferClass),
       "ManagedBufferPointer buffer class must be non-@objc"
     )

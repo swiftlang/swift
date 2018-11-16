@@ -1,4 +1,6 @@
 #if MODULE
+public dynamic var public_global_var = "public_global_var"
+
 public dynamic func public_global_func() -> String {
   return "public_global_func"
 }
@@ -63,12 +65,83 @@ public enum PublicEnumeration<Q> {
     return "public_enum_generic_func"
   }
 }
+#elseif MODULENODYNAMIC
+public dynamic var public_global_var = "public_global_var"
 
+public func public_global_func() -> String {
+  return "public_global_func"
+}
+
+public func public_global_generic_func<T>(_ t: T.Type) -> String {
+  return "public_global_generic_func"
+}
+
+public class PublicClass {
+  public var str : String = ""
+  public init() {}
+  public init(x: Int) { str = "public_class_init" }
+
+  public func function() -> String {
+    return "public_class_func"
+  }
+  public func genericFunction<T>(_ t: T.Type) -> String {
+    return "public_class_generic_func"
+  }
+}
+
+public struct PublicStruct {
+  public var str = ""
+  public init() {}
+
+  public init(x: Int) { str = "public_struct_init" }
+
+  public func function() -> String {
+    return "public_struct_func"
+  }
+  public func genericFunction<T>(_ t: T.Type) -> String {
+    return "public_struct_generic_func"
+  }
+  dynamic public var public_stored_property : String = "public_stored_property"
+
+  public subscript(_ x: Int) -> String {
+    get {
+      return "public_subscript_get"
+    }
+    set {
+      str = newValue
+    }
+  }
+  public subscript(y x: Int) -> String {
+    _read {
+      yield "public_subscript_get_modify_read"
+    }
+    _modify {
+      yield &str
+    }
+  }
+}
+
+public enum PublicEnumeration<Q> {
+  case A
+  case B
+
+  public func function() -> String {
+    return "public_enum_func"
+  }
+  public func genericFunction<T>(_ t: T.Type) -> String {
+    return "public_enum_generic_func"
+  }
+}
 #elseif MODULE2
 
 import Module1
 
 /// Public global functions, struct, class, and enum.
+
+@_dynamicReplacement(for: public_global_var)
+public var replacement_for_public_global_var : String {
+  return "replacement of public_global_var"
+}
 
 @_dynamicReplacement(for: public_global_func())
 public func replacement_for_public_global_func() -> String {

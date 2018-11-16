@@ -25,6 +25,7 @@ public struct _DependenceToken {
 /// This function is referenced by the compiler to allocate array literals.
 ///
 /// - Precondition: `storage` is `_ContiguousArrayStorage`.
+@inlinable // FIXME(inline-always)
 @inline(__always)
 public // COMPILER_INTRINSIC
 func _allocateUninitializedArray<Element>(_  builtinCount: Builtin.Word)
@@ -177,9 +178,9 @@ extension _ArrayBufferProtocol {
     countForBuffer: Int, minNewCapacity: Int,
     requiredCapacity: Int
   ) -> _ContiguousArrayBuffer<Element> {
-    _sanityCheck(countForBuffer >= 0)
-    _sanityCheck(requiredCapacity >= countForBuffer)
-    _sanityCheck(minNewCapacity >= countForBuffer)
+    _internalInvariant(countForBuffer >= 0)
+    _internalInvariant(requiredCapacity >= countForBuffer)
+    _internalInvariant(minNewCapacity >= countForBuffer)
 
     let minimumCapacity = Swift.max(requiredCapacity,
       minNewCapacity > capacity
@@ -206,17 +207,17 @@ extension _ArrayBufferProtocol {
     _ newCount: Int,  // Number of new elements to insert
     _ initializeNewElements: 
         ((UnsafeMutablePointer<Element>, _ count: Int) -> ()) = { ptr, count in
-      _sanityCheck(count == 0)
+      _internalInvariant(count == 0)
     }
   ) {
 
-    _sanityCheck(headCount >= 0)
-    _sanityCheck(newCount >= 0)
+    _internalInvariant(headCount >= 0)
+    _internalInvariant(newCount >= 0)
 
     // Count of trailing source elements to copy/move
     let sourceCount = self.count
     let tailCount = dest.count - headCount - newCount
-    _sanityCheck(headCount + tailCount <= sourceCount)
+    _internalInvariant(headCount + tailCount <= sourceCount)
 
     let oldCount = sourceCount - headCount - tailCount
     let destStart = dest.firstElementAddress
@@ -292,7 +293,7 @@ extension _ArrayBufferProtocol {
     
     // this function is only ever called from append(contentsOf:)
     // which should always have exhausted its capacity before calling
-    _sanityCheck(count == capacity)
+    _internalInvariant(count == capacity)
     var newCount = self.count
 
     // there might not be any elements to append remaining,

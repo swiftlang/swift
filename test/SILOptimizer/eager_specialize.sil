@@ -18,13 +18,13 @@ public protocol HasElt {
 }
 
 struct X : AnElt {
-  @sil_stored var i: Int { get set }
+  @_hasStorage var i: Int { get set }
   init(i: Int)
 }
 
 struct S : HasElt {
   typealias Elt = X
-  @sil_stored var e: X { get set }
+  @_hasStorage var e: X { get set }
   init(e: Elt)
 }
 

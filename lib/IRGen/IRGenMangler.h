@@ -218,12 +218,7 @@ public:
   }
 
   std::string mangleProtocolConformanceDescriptor(
-                                 const ProtocolConformance *Conformance) {
-    beginMangling();
-    appendProtocolConformance(Conformance);
-    appendOperator("Mc");
-    return finalize();
-  }
+                                   const RootProtocolConformance *conformance);
   
   std::string manglePropertyDescriptor(const AbstractStorageDecl *storage) {
     beginMangling();
@@ -244,10 +239,6 @@ public:
     appendEntity(Decl);
     appendOperator("WC");
     return finalize();
-  }
-
-  std::string mangleDirectProtocolWitnessTable(const ProtocolConformance *C) {
-    return mangleConformanceSymbol(Type(), C, "WP");
   }
 
   std::string mangleProtocolWitnessTablePattern(const ProtocolConformance *C) {
@@ -413,6 +404,18 @@ public:
   std::string mangleSymbolNameForSymbolicMangling(
                                               const SymbolicMangling &mangling,
                                               MangledTypeRefRole role);
+
+  std::string mangleSymbolNameForAssociatedConformanceWitness(
+                                  const NormalProtocolConformance *conformance,
+                                  CanType associatedType,
+                                  const ProtocolDecl *proto);
+
+  std::string mangleSymbolNameForKeyPathMetadata(
+                                           const char *kind,
+                                           CanGenericSignature genericSig,
+                                           CanType type,
+                                           ProtocolConformanceRef conformance);
+
 protected:
   SymbolicMangling
   withSymbolicReferences(IRGenModule &IGM,

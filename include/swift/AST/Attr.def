@@ -183,7 +183,7 @@ SIMPLE_DECL_ATTR(unsafe_no_objc_tagged_pointer, UnsafeNoObjCTaggedPointer,
   UserInaccessible,
   19)
 DECL_ATTR(inline, Inline,
-  OnFunc | OnAccessor | OnConstructor,
+  OnVar | OnSubscript | OnAbstractFunction,
   20)
 DECL_ATTR(_semantics, Semantics,
   OnAbstractFunction | OnSubscript |
@@ -249,9 +249,9 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(override, Override,
   OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor | OnAssociatedType |
   DeclModifier |
   NotSerialized, 44)
-SIMPLE_DECL_ATTR(sil_stored, SILStored,
+SIMPLE_DECL_ATTR(_hasStorage, HasStorage,
   OnVar |
-  SILOnly |
+  UserInaccessible |
   NotSerialized, 45)
 DECL_ATTR(private, AccessControl,
   OnFunc | OnAccessor | OnExtension | OnGenericType | OnVar | OnSubscript |

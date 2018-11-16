@@ -1719,6 +1719,11 @@ void Remangler::mangleProtocolRequirementsBaseDescriptor(Node *node) {
   Buffer << "TL";
 }
 
+void Remangler::mangleProtocolSelfConformanceDescriptor(Node *node) {
+  manglePureProtocol(node->getChild(0));
+  Buffer << "MS";
+}
+
 void Remangler::mangleProtocolConformanceDescriptor(Node *node) {
   mangleProtocolConformance(node->getChild(0));
   Buffer << "Mc";
@@ -1758,9 +1763,19 @@ void Remangler::mangleProtocolListWithAnyObject(Node *node) {
   mangleProtocolList(node->getChild(0), nullptr, true);
 }
 
+void Remangler::mangleProtocolSelfConformanceWitness(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "TS";
+}
+
 void Remangler::mangleProtocolWitness(Node *node) {
   mangleChildNodes(node);
   Buffer << "TW";
+}
+
+void Remangler::mangleProtocolSelfConformanceWitnessTable(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "WS";
 }
 
 void Remangler::mangleProtocolWitnessTable(Node *node) {

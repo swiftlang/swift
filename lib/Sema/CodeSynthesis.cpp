@@ -2042,6 +2042,11 @@ void swift::maybeAddAccessorsToStorage(TypeChecker &TC,
     return;
 
   if (!dc->isTypeContext()) {
+    // dynamic globals need accessors.
+    if (dc->isModuleScopeContext() && storage->isNativeDynamic()) {
+      addTrivialAccessorsToStorage(storage, TC);
+      return;
+    }
     // Fixed-layout global variables don't get accessors.
     if (!storage->isResilient())
       return;
@@ -2482,11 +2487,12 @@ configureInheritedDesignatedInitAttributes(TypeChecker &tc,
   }
 
   // Wire up the overrides.
-  ctor->getAttrs().add(new (ctx) OverrideAttr(/*IsImplicit=*/true));
   ctor->setOverriddenDecl(superclassCtor);
 
   if (superclassCtor->isRequired())
-    ctor->getAttrs().add(new (ctx) RequiredAttr(/*IsImplicit=*/true));
+    ctor->getAttrs().add(new (ctx) RequiredAttr(/*IsImplicit=*/false));
+  else
+    ctor->getAttrs().add(new (ctx) OverrideAttr(/*IsImplicit=*/false));
 
   // If the superclass constructor is @objc but the subclass constructor is
   // not representable in Objective-C, add @nonobjc implicitly.

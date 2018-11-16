@@ -1214,6 +1214,9 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, decl))
     return false;
 
+  // Add dynamic if -enable-implicit-dynamic was requested.
+  TypeChecker::addImplicitDynamicAttribute(decl);
+
   // If 'dynamic' was explicitly specified, check it.
   if (decl->getAttrs().hasAttribute<DynamicAttr>()) {
     if (decl->getASTContext().LangOpts.isSwiftVersionAtLeast(5))
@@ -2541,25 +2544,6 @@ public:
       }
     }
 
-    // Reject variable if it is a stored property with an uninhabited type
-    if (VD->hasStorage() && 
-        VD->getInterfaceType()->isStructurallyUninhabited()) {
-      auto uninhabitedTypeDiag = diag::pattern_no_uninhabited_type;
-      
-      if (VD->getInterfaceType()->is<TupleType>()) {
-        uninhabitedTypeDiag = diag::pattern_no_uninhabited_tuple_type;
-      } else {
-        assert((VD->getInterfaceType()->is<EnumType>() || 
-                VD->getInterfaceType()->is<BoundGenericEnumType>()) && 
-          "unknown structurally uninhabited type");
-      }
-          
-      TC.diagnose(VD->getLoc(), uninhabitedTypeDiag, VD->isLet(),
-                  VD->isInstanceMember(), VD->getName(),
-                  VD->getInterfaceType());
-      VD->markInvalid();
-    }
-
     if (!checkOverrides(VD)) {
       // If a property has an override attribute but does not override
       // anything, complain.
@@ -2745,8 +2729,6 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
-    TC.addImplicitDynamicAttribute(SD);
-
     TC.validateDecl(SD);
 
     if (!SD->isInvalid()) {
@@ -3216,8 +3198,6 @@ public:
   }
 
   void visitVarDecl(VarDecl *VD) {
-    TC.addImplicitDynamicAttribute(VD);
-
     // Delay type-checking on VarDecls until we see the corresponding
     // PatternBindingDecl.
 
@@ -3269,8 +3249,6 @@ public:
   }
 
   void visitFuncDecl(FuncDecl *FD) {
-    TC.addImplicitDynamicAttribute(FD);
-
     TC.validateDecl(FD);
 
     if (!FD->isInvalid()) {
@@ -3387,7 +3365,6 @@ public:
   }
 
   void visitConstructorDecl(ConstructorDecl *CD) {
-    TC.addImplicitDynamicAttribute(CD);
     TC.validateDecl(CD);
 
     if (!CD->isInvalid()) {

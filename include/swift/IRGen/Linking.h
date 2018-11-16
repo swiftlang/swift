@@ -262,8 +262,8 @@ class LinkEntity {
     // These next few are protocol-conformance kinds.
 
     /// A direct protocol witness table. The secondary pointer is a
-    /// ProtocolConformance*.
-    DirectProtocolWitnessTable,
+    /// RootProtocolConformance*.
+    ProtocolWitnessTable,
 
     /// A protocol witness table pattern. The secondary pointer is a
     /// ProtocolConformance*.
@@ -284,7 +284,7 @@ class LinkEntity {
     ReflectionAssociatedTypeDescriptor,
 
     /// The protocol conformance descriptor for a conformance.
-    /// The pointer is a NormalProtocolConformance*.
+    /// The pointer is a RootProtocolConformance*.
     ProtocolConformanceDescriptor,
 
     // These are both type kinds and protocol-conformance kinds.
@@ -350,8 +350,13 @@ class LinkEntity {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
   }
 
+  static bool isRootProtocolConformanceKind(Kind k) {
+    return (k == Kind::ProtocolConformanceDescriptor ||
+            k == Kind::ProtocolWitnessTable);
+  }
+
   static bool isProtocolConformanceKind(Kind k) {
-    return (k >= Kind::DirectProtocolWitnessTable &&
+    return (k >= Kind::ProtocolWitnessTable &&
             k <= Kind::ProtocolWitnessTableLazyCacheVariable);
   }
 
@@ -671,6 +676,7 @@ public:
   }
 
   static LinkEntity forPropertyDescriptor(AbstractStorageDecl *decl) {
+    assert(decl->exportsPropertyDescriptor());
     LinkEntity entity;
     entity.setForDecl(Kind::PropertyDescriptor, decl);
     return entity;
@@ -746,10 +752,9 @@ public:
     return entity;
   }
 
-  static LinkEntity
-  forDirectProtocolWitnessTable(const ProtocolConformance *C) {
+  static LinkEntity forProtocolWitnessTable(const RootProtocolConformance *C) {
     LinkEntity entity;
-    entity.setForProtocolConformance(Kind::DirectProtocolWitnessTable, C);
+    entity.setForProtocolConformance(Kind::ProtocolWitnessTable, C);
     return entity;
   }
 
@@ -848,10 +853,9 @@ public:
   }
 
   static LinkEntity
-  forProtocolConformanceDescriptor(const NormalProtocolConformance *C) {
+  forProtocolConformanceDescriptor(const RootProtocolConformance *C) {
     LinkEntity entity;
-    entity.setForProtocolConformance(
-        Kind::ProtocolConformanceDescriptor, C);
+    entity.setForProtocolConformance(Kind::ProtocolConformanceDescriptor, C);
     return entity;
   }
 
@@ -936,6 +940,11 @@ public:
     assert(getKind() == Kind::SILGlobalVariable);
     return reinterpret_cast<SILGlobalVariable*>(Pointer);
   }
+
+  const RootProtocolConformance *getRootProtocolConformance() const {
+    assert(isRootProtocolConformanceKind(getKind()));
+    return cast<RootProtocolConformance>(getProtocolConformance());
+  }
   
   const ProtocolConformance *getProtocolConformance() const {
     assert(isProtocolConformanceKind(getKind()));
@@ -1012,6 +1021,9 @@ struct IRLinkage {
   llvm::GlobalValue::LinkageTypes Linkage;
   llvm::GlobalValue::VisibilityTypes Visibility;
   llvm::GlobalValue::DLLStorageClassTypes DLLStorage;
+
+  static const IRLinkage InternalLinkOnceODR;
+  static const IRLinkage Internal;
 };
 
 class ApplyIRLinkage {

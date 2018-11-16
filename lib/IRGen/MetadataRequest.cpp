@@ -218,6 +218,52 @@ MetadataDependency MetadataDependencyCollector::finish(IRGenFunction &IGF) {
 }
 
 
+llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
+    StringRef symbolName,
+    bool shouldSetLowBit,
+    llvm::function_ref<ConstantInitFuture (ConstantInitBuilder &)> body) {
+  // Call this to form the return value.
+  auto returnValue = [&](llvm::Constant *addr) {
+    if (!shouldSetLowBit)
+      return addr;
+
+    auto bitConstant = llvm::ConstantInt::get(IntPtrTy, 1);
+    return llvm::ConstantExpr::getGetElementPtr(nullptr, addr, bitConstant);
+  };
+
+  // Check whether we already have an entry with this name.
+  auto &entry = StringsForTypeRef[symbolName];
+  if (entry.second) {
+    return returnValue(entry.second);
+  }
+
+  // Construct the initializer.
+  ConstantInitBuilder builder(*this);
+  auto finished = body(builder);
+
+  auto var = new llvm::GlobalVariable(Module, finished.getType(),
+                                      /*constant*/ true,
+                                      llvm::GlobalValue::LinkOnceODRLinkage,
+                                      nullptr,
+                                      symbolName);
+
+  ApplyIRLinkage({llvm::GlobalValue::LinkOnceODRLinkage,
+    llvm::GlobalValue::HiddenVisibility,
+    llvm::GlobalValue::DefaultStorageClass})
+  .to(var);
+  var->setAlignment(2);
+  setTrueConstGlobal(var);
+  var->setSection(getReflectionTypeRefSectionName());
+
+  finished.installInGlobal(var);
+
+  // Drill down to the i8* at the beginning of the constant.
+  auto addr = llvm::ConstantExpr::getBitCast(var, Int8PtrTy);
+  StringsForTypeRef[symbolName] = { var, addr };
+
+  return returnValue(addr);
+}
+
 llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef str,
                                                        MangledTypeRefRole role){
   return getAddrOfStringForTypeRef(SymbolicMangling{str, {}}, role);
@@ -317,10 +363,7 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
                                       llvm::GlobalValue::LinkOnceODRLinkage,
                                       nullptr,
                                       symbolName);
-  ApplyIRLinkage({llvm::GlobalValue::LinkOnceODRLinkage,
-                  llvm::GlobalValue::HiddenVisibility,
-                  llvm::GlobalValue::DefaultStorageClass})
-      .to(var);
+  ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(var);
   var->setAlignment(2);
   setTrueConstGlobal(var);
   var->setSection(getReflectionTypeRefSectionName());

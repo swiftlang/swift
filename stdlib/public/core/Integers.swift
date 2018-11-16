@@ -3049,6 +3049,7 @@ extension FixedWidthInteger {
   ///     // 'y' has a binary representation of 11111111_11101011
   ///
   /// - Parameter source: An integer to convert to this type.
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public init<T : BinaryInteger>(truncatingIfNeeded source: T) {
     if Self.bitWidth <= Int.bitWidth {
@@ -3290,6 +3291,7 @@ extension UnsignedInteger {
   /// to find an absolute value. In addition, because `abs(_:)` always returns
   /// a value of the same type, even in a generic context, using the function
   /// instead of the `magnitude` property is encouraged.
+  @inlinable // FIXME(inline-always)
   public var magnitude: Self {
     @inline(__always)
     get { return self }
@@ -3298,6 +3300,7 @@ extension UnsignedInteger {
   /// A Boolean value indicating whether this type is a signed integer type.
   ///
   /// This property is always `false` for unsigned integer types.
+  @inlinable // FIXME(inline-always)
   public static var isSigned: Bool {
     @inline(__always)
     get { return false }
@@ -3325,6 +3328,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
   /// - Parameter source: A value to convert to this type of integer. The value
   ///   passed as `source` must be representable in this type.
   @_semantics("optimize.sil.specialize.generic.partial.never")
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public init<T : BinaryInteger>(_ source: T) {
     // This check is potentially removable by the optimizer
@@ -3355,6 +3359,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
   ///
   /// - Parameter source: A value to convert to this type of integer.
   @_semantics("optimize.sil.specialize.generic.partial.never")
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public init?<T : BinaryInteger>(exactly source: T) {
     // This check is potentially removable by the optimizer
@@ -3399,6 +3404,7 @@ extension SignedInteger {
   /// A Boolean value indicating whether this type is a signed integer type.
   ///
   /// This property is always `true` for signed integer types.
+  @inlinable // FIXME(inline-always)
   public static var isSigned: Bool {
     @inline(__always)
     get { return true }
@@ -3426,6 +3432,7 @@ extension SignedInteger where Self : FixedWidthInteger {
   /// - Parameter source: A value to convert to this type of integer. The value
   ///   passed as `source` must be representable in this type.
   @_semantics("optimize.sil.specialize.generic.partial.never")
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public init<T : BinaryInteger>(_ source: T) {
     // This check is potentially removable by the optimizer
@@ -3458,6 +3465,7 @@ extension SignedInteger where Self : FixedWidthInteger {
   ///
   /// - Parameter source: A value to convert to this type of integer.
   @_semantics("optimize.sil.specialize.generic.partial.never")
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public init?<T : BinaryInteger>(exactly source: T) {
     // This check is potentially removable by the optimizer

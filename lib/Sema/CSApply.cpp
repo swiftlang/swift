@@ -393,20 +393,20 @@ diagnoseInvalidDynamicConstructorReferences(ConstraintSystem &cs,
 }
 
 /// Form a type checked expression for the index of a @dynamicMemberLookup
-/// subscript index expression.  This will have tuple type of (dynamicMember:T).
-static Expr *getDMLIndexExpr(StringRef name, Type ty, SourceLoc loc,
-                             DeclContext *dc, ConstraintSystem &cs) {
+/// subscript index parameter.
+/// The index expression will have a tuple type of `(dynamicMember: T)`.
+static Expr *buildDynamicMemberLookupIndexExpr(StringRef name, Type ty,
+                                               SourceLoc loc, DeclContext *dc,
+                                               ConstraintSystem &cs) {
   auto &ctx = cs.TC.Context;
   
   // Build and type check the string literal index value to the specific
   // string type expected by the subscript.
-  Expr *nameExpr = new (ctx)
-    StringLiteralExpr(name, loc, /*implicit*/true);
-  
-  
-  // Build a tuple so that argument has a label.
-  Expr *tuple = TupleExpr::create(ctx, loc, nameExpr, ctx.Id_dynamicMember, loc,
-                                  loc, /*hasTrailingClosure*/false,
+  Expr *nameExpr = new (ctx) StringLiteralExpr(name, loc, /*implicit*/true);
+
+  // Build a tuple so that the argument has a label.
+  Expr *tuple = TupleExpr::create(ctx, loc, nameExpr, ctx.Id_dynamicMember,
+                                  loc, loc, /*hasTrailingClosure*/false,
                                   /*implicit*/true);
   (void)cs.TC.typeCheckExpression(tuple, dc, TypeLoc::withoutLoc(ty),
                                   CTP_CallArgument);
@@ -1524,8 +1524,7 @@ namespace {
       // Check whether the base is 'super'.
       bool isSuper = base->isSuperExpr();
 
-      // Use the correct kind of locator depending on how this subscript came
-      // to be.
+      // Use the correct locator kind based on the subscript kind.
       auto locatorKind = ConstraintLocator::SubscriptMember;
       if (choice.getKind() == OverloadChoiceKind::DynamicMemberLookup)
         locatorKind = ConstraintLocator::Member;
@@ -1630,6 +1629,8 @@ namespace {
         solution.computeSubstitutions(ctor->getGenericSignature(), locator);
 
       auto ref = ConcreteDeclRef(ctor, substitutions);
+
+      tc.requestMemberLayout(ctor);
 
       // The constructor was opened with the allocating type, not the
       // initializer type. Map the former into the latter.
@@ -2769,7 +2770,8 @@ namespace {
         // Build and type check the string literal index value to the specific
         // string type expected by the subscript.
         auto fieldName = selected.choice.getName().getBaseIdentifier().str();
-        auto index = getDMLIndexExpr(fieldName, tupleTy, loc, dc, cs);
+        auto index =
+          buildDynamicMemberLookupIndexExpr(fieldName, tupleTy, loc, dc, cs);
 
         // Build and return a subscript that uses this string as the index.
         return buildSubscript(base, index, ctx.Id_dynamicMember,
@@ -4388,16 +4390,17 @@ namespace {
           // through the subscript(dynamicMember:) member, restore the
           // openedType and origComponent to its full reference as if the user
           // wrote out the subscript manually.
-          if (foundDecl->choice.getKind()
-                                  == OverloadChoiceKind::DynamicMemberLookup) {
+          if (foundDecl->choice.getKind() ==
+              OverloadChoiceKind::DynamicMemberLookup) {
             foundDecl->openedType = foundDecl->openedFullType
-                  ->castTo<AnyFunctionType>()->getResult();
+                ->castTo<AnyFunctionType>()->getResult();
 
             auto &ctx = cs.TC.Context;
             auto loc = origComponent.getLoc();
             auto fieldName =
                 foundDecl->choice.getName().getBaseIdentifier().str();
-            auto index = getDMLIndexExpr(fieldName, indexType, loc, dc, cs);
+            auto index = buildDynamicMemberLookupIndexExpr(fieldName, indexType,
+                                                           loc, dc, cs);
             
             origComponent = KeyPathExpr::Component::
               forUnresolvedSubscript(ctx, loc, index, {}, loc, loc,

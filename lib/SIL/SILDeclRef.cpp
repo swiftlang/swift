@@ -528,26 +528,47 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   return IsNotSerialized;
 }
 
-/// \brief True if the function has noinline attribute.
+/// \brief True if the function has an @inline(never) attribute.
 bool SILDeclRef::isNoinline() const {
   if (!hasDecl())
     return false;
-  if (auto InlineA = getDecl()->getAttrs().getAttribute<InlineAttr>())
-    if (InlineA->getKind() == InlineKind::Never)
+
+  auto *decl = getDecl();
+  if (auto *attr = decl->getAttrs().getAttribute<InlineAttr>())
+    if (attr->getKind() == InlineKind::Never)
       return true;
-  if (auto *semanticsA = getDecl()->getAttrs().getAttribute<SemanticsAttr>())
-    if (semanticsA->Value.equals("keypath.entry"))
+
+  if (auto *accessorDecl = dyn_cast<AccessorDecl>(decl)) {
+    auto *storage = accessorDecl->getStorage();
+    if (auto *attr = storage->getAttrs().getAttribute<InlineAttr>())
+      if (attr->getKind() == InlineKind::Never)
+        return true;
+  }
+
+  if (auto *attr = decl->getAttrs().getAttribute<SemanticsAttr>())
+    if (attr->Value.equals("keypath.entry"))
       return true;
+
   return false;
 }
 
-/// \brief True if the function has noinline attribute.
+/// \brief True if the function has the @inline(__always) attribute.
 bool SILDeclRef::isAlwaysInline() const {
   if (!hasDecl())
     return false;
-  if (auto InlineA = getDecl()->getAttrs().getAttribute<InlineAttr>())
-    if (InlineA->getKind() == InlineKind::Always)
+
+  auto *decl = getDecl();
+  if (auto attr = decl->getAttrs().getAttribute<InlineAttr>())
+    if (attr->getKind() == InlineKind::Always)
       return true;
+
+  if (auto *accessorDecl = dyn_cast<AccessorDecl>(decl)) {
+    auto *storage = accessorDecl->getStorage();
+    if (auto *attr = storage->getAttrs().getAttribute<InlineAttr>())
+      if (attr->getKind() == InlineKind::Always)
+        return true;
+  }
+
   return false;
 }
 
@@ -872,10 +893,14 @@ SubclassScope SILDeclRef::getSubclassScope() const {
     return SubclassScope::NotApplicable;
 
   // If this declaration is a function which goes into a vtable, then it's
-  // symbol must be as visible as its class. Derived classes even have to put
+  // symbol must be as visible as its class, because derived classes have to put
   // all less visible methods of the base class into their vtables.
 
-  auto *FD = dyn_cast<AbstractFunctionDecl>(getDecl());
+  if (auto *CD = dyn_cast<ConstructorDecl>(getDecl()))
+    if (!CD->isRequired())
+      return SubclassScope::NotApplicable;
+
+  auto *FD = dyn_cast<FuncDecl>(getDecl());
   if (!FD)
     return SubclassScope::NotApplicable;
 
@@ -903,6 +928,9 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   assert(FD->getEffectiveAccess() <= classType->getEffectiveAccess() &&
          "class must be as visible as its members");
 
+  if (classType->isResilient())
+    return SubclassScope::Resilient;
+
   switch (classType->getEffectiveAccess()) {
   case AccessLevel::Private:
   case AccessLevel::FilePrivate:
@@ -911,8 +939,6 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   case AccessLevel::Public:
     return SubclassScope::Internal;
   case AccessLevel::Open:
-    if (classType->isResilient())
-      return SubclassScope::Internal;
     return SubclassScope::External;
   }
 
@@ -943,7 +969,8 @@ bool SILDeclRef::isDynamicallyReplaceable() const {
     return false;
 
   if (kind == SILDeclRef::Kind::Destroyer ||
-      kind == SILDeclRef::Kind::Initializer) {
+      kind == SILDeclRef::Kind::Initializer ||
+      kind == SILDeclRef::Kind::GlobalAccessor) {
     return false;
   }
 
@@ -951,5 +978,5 @@ bool SILDeclRef::isDynamicallyReplaceable() const {
     return false;
 
   auto decl = getDecl();
-  return decl->isDynamic() && !decl->isObjC();
+  return decl->isNativeDynamic();
 }

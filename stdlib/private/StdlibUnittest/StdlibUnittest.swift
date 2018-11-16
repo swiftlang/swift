@@ -499,8 +499,7 @@ public func expectMutableSliceType<X : MutableCollection>(
 /// to be.
 public func expectSequenceAssociatedTypes<X : Sequence>(
   sequenceType: X.Type,
-  iteratorType: X.Iterator.Type,
-  subSequenceType: X.SubSequence.Type
+  iteratorType: X.Iterator.Type
 ) {}
 
 /// Check that all associated types of a `Collection` are what we expect them

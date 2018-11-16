@@ -122,7 +122,6 @@ set(SWIFTLIB_ESSENTIAL
   SipHash.swift
   Sequence.swift
   SequenceAlgorithms.swift
-  SequenceWrapper.swift
   Set.swift
   SetAlgebra.swift
   SetAnyHashableExtensions.swift
@@ -176,6 +175,7 @@ set(SWIFTLIB_ESSENTIAL
   UnicodeHelpers.swift
   UnicodeParser.swift
   UnicodeScalarProperties.swift
+  CharacterProperties.swift # ORDER DEPENDENCY: UnicodeScalarProperties.swift
   Unmanaged.swift
   UnmanagedOpaqueString.swift
   UnmanagedString.swift

@@ -113,31 +113,34 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
     if (!needsWTable)
       continue;
 
-    // Only normal conformances get symbols; the others get any public symbols
-    // from their parent normal conformance.
-    auto normalConformance = dyn_cast<NormalProtocolConformance>(conformance);
-    if (!normalConformance)
+    // Only root conformances get symbols; the others get any public symbols
+    // from their parent conformances.
+    auto rootConformance = dyn_cast<RootProtocolConformance>(conformance);
+    if (!rootConformance) {
       continue;
+    }
 
-    addSymbol(LinkEntity::forDirectProtocolWitnessTable(normalConformance));
-    addSymbol(LinkEntity::forProtocolConformanceDescriptor(normalConformance));
+    addSymbol(LinkEntity::forProtocolWitnessTable(rootConformance));
+    addSymbol(LinkEntity::forProtocolConformanceDescriptor(rootConformance));
 
     // FIXME: the logic around visibility in extensions is confusing, and
     // sometimes witness thunks need to be manually made public.
 
     auto conformanceIsFixed = SILWitnessTable::conformanceIsSerialized(
-        normalConformance);
+        rootConformance);
     auto addSymbolIfNecessary = [&](ValueDecl *requirementDecl,
                                     ValueDecl *witnessDecl) {
       auto witnessLinkage = SILDeclRef(witnessDecl).getLinkage(ForDefinition);
       if (conformanceIsFixed &&
-          fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage)) {
+          (isa<SelfProtocolConformance>(rootConformance) ||
+           fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage))) {
         Mangle::ASTMangler Mangler;
         addSymbol(
-            Mangler.mangleWitnessThunk(normalConformance, requirementDecl));
+            Mangler.mangleWitnessThunk(rootConformance, requirementDecl));
       }
     };
-    normalConformance->forEachValueWitness(
+
+    rootConformance->forEachValueWitness(
         nullptr, [&](ValueDecl *valueReq, Witness witness) {
           auto witnessDecl = witness.getDecl();
           if (isa<AbstractFunctionDecl>(valueReq)) {
@@ -165,7 +168,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   addSymbol(SILDeclRef(AFD));
 
   // Add the global function pointer for a dynamically replaceable function.
-  if (AFD->isDynamic() && ! AFD->isObjC()) {
+  if (AFD->isNativeDynamic()) {
     addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(AFD));
     addSymbol(LinkEntity::forDynamicallyReplaceableFunctionImpl(AFD));
     addSymbol(LinkEntity::forDynamicallyReplaceableFunctionKey(AFD));
@@ -217,27 +220,30 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
 }
 
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
-  // Non-global variables might have an explicit initializer symbol, in
-  // non-resilient modules.
-  if (VD->getAttrs().hasAttribute<HasInitialValueAttr>() &&
-      SwiftModule->getResilienceStrategy() == ResilienceStrategy::Default &&
-      !isGlobalOrStaticVar(VD)) {
-    auto declRef = SILDeclRef(VD, SILDeclRef::Kind::StoredPropertyInitializer);
-    // Stored property initializers for public properties are currently
-    // public.
-    addSymbol(declRef);
-  }
-
-  // statically/globally stored variables have some special handling.
-  if (VD->hasStorage() && isGlobalOrStaticVar(VD)) {
-    if (getDeclLinkage(VD) == FormalLinkage::PublicUnique) {
-      // The actual variable has a symbol.
-      Mangle::ASTMangler mangler;
-      addSymbol(mangler.mangleEntity(VD, false));
+  // Variables inside non-resilient modules have some additional symbols.
+  if (!VD->isResilient()) {
+    // Non-global variables might have an explicit initializer symbol, in
+    // non-resilient modules.
+    if (VD->getAttrs().hasAttribute<HasInitialValueAttr>() &&
+        !isGlobalOrStaticVar(VD)) {
+      auto declRef = SILDeclRef(VD, SILDeclRef::Kind::StoredPropertyInitializer);
+      // Stored property initializers for public properties are currently
+      // public.
+      addSymbol(declRef);
     }
 
-    if (VD->isLazilyInitializedGlobal())
-      addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
+    // statically/globally stored variables have some special handling.
+    if (VD->hasStorage() &&
+        isGlobalOrStaticVar(VD)) {
+      if (getDeclLinkage(VD) == FormalLinkage::PublicUnique) {
+        // The actual variable has a symbol.
+        Mangle::ASTMangler mangler;
+        addSymbol(mangler.mangleEntity(VD, false));
+      }
+
+      if (VD->isLazilyInitializedGlobal())
+        addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
+    }
   }
 
   visitAbstractStorageDecl(VD);
@@ -454,6 +460,9 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
           addAssociatedTypeDescriptor(assocType);
       }
     }
+
+    // Include the self-conformance.
+    addConformances(PD);
   }
 
 #ifndef NDEBUG

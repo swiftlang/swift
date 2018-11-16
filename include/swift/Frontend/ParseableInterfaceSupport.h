@@ -29,7 +29,7 @@ struct ParseableInterfaceOptions {
   std::string ParseableInterfaceFlags;
 };
 
-llvm::Regex getSwiftInterfaceToolsVersionRegex();
+llvm::Regex getSwiftInterfaceFormatVersionRegex();
 llvm::Regex getSwiftInterfaceModuleFlagsRegex();
 
 /// Emit a stable, parseable interface for \p M, which can be used by a client

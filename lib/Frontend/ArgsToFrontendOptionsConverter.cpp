@@ -69,6 +69,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
   Opts.EnablePrivateImports |= Args.hasArg(OPT_enable_private_imports);
   Opts.EnableResilience |= Args.hasArg(OPT_enable_resilience);
+  Opts.EnableImplicitDynamic |= Args.hasArg(OPT_enable_implicit_dynamic);
 
   Opts.TrackSystemDeps |= Args.hasArg(OPT_track_system_dependencies);
 
@@ -148,8 +149,12 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_module_link_name))
     Opts.ModuleLinkName = A->getValue();
 
-  Opts.AlwaysSerializeDebuggingOptions |=
-      Args.hasArg(OPT_serialize_debugging_options);
+  if (const Arg *A = Args.getLastArg(OPT_serialize_debugging_options,
+                                     OPT_no_serialize_debugging_options)) {
+    Opts.SerializeOptionsForDebugging =
+        A->getOption().matches(OPT_serialize_debugging_options);
+  }
+
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
   Opts.ImportUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
   Opts.EnableParseableModuleInterface |=

@@ -906,6 +906,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::NORMAL_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::SELF_PROTOCOL_CONFORMANCE);
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::SPECIALIZED_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::INHERITED_PROTOCOL_CONFORMANCE);
@@ -1053,9 +1055,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   }
 
   for (auto const &dep : options.Dependencies) {
-    FileDependency.emit(ScratchRecord, dep.Size,
-                        llvm::sys::toTimeT(dep.LastModTime),
-                        dep.Path);
+    FileDependency.emit(ScratchRecord, dep.Size, dep.Hash, dep.Path);
   }
 
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;
@@ -1634,6 +1634,15 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
         addDeclRef(normal->getType()->getAnyNominal()),
         addModuleRef(normal->getDeclContext()->getParentModule()));
     }
+    break;
+  }
+
+  case ProtocolConformanceKind::Self: {
+    auto self = cast<SelfProtocolConformance>(conformance);
+    unsigned abbrCode = abbrCodes[SelfProtocolConformanceLayout::Code];
+    auto protocolID = addDeclRef(self->getProtocol());
+    SelfProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                              protocolID);
     break;
   }
 
@@ -4130,6 +4139,7 @@ void Serializer::writeAllDeclsAndTypes() {
 
   registerDeclTypeAbbr<AbstractProtocolConformanceLayout>();
   registerDeclTypeAbbr<NormalProtocolConformanceLayout>();
+  registerDeclTypeAbbr<SelfProtocolConformanceLayout>();
   registerDeclTypeAbbr<SpecializedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InheritedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InvalidProtocolConformanceLayout>();

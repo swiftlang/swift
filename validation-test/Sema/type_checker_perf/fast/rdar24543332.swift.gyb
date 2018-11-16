@@ -1,4 +1,4 @@
-// RUN: %scale-test --invert-result --begin 5 --end 20 --step 1 --select NumLeafScopes %s
+// RUN: %scale-test --begin 5 --end 20 --step 1 --select NumLeafScopes %s
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 

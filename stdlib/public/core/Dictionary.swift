@@ -414,8 +414,8 @@ public struct Dictionary<Key: Hashable, Value> {
   ///   are reference types).
   @inlinable
   public // SPI(Foundation)
-  init(_immutableCocoaDictionary: __owned _NSDictionary) {
-    _sanityCheck(
+  init(_immutableCocoaDictionary: __owned AnyObject) {
+    _internalInvariant(
       _isBridgedVerbatimToObjectiveC(Key.self) &&
       _isBridgedVerbatimToObjectiveC(Value.self),
       """
@@ -481,7 +481,10 @@ public struct Dictionary<Key: Hashable, Value> {
     var native = _NativeDictionary<Key, Value>(
       capacity: keysAndValues.underestimatedCount)
     // '_MergeError.keyCollision' is caught and handled with an appropriate
-    // error message one level down, inside native.merge(_:...).
+    // error message one level down, inside native.merge(_:...). We throw an
+    // error instead of calling fatalError() directly because we want the
+    // message to include the duplicate key, and the closure only has access to
+    // the conflicting values.
     try! native.merge(
       keysAndValues,
       isUnique: true,
@@ -618,6 +621,8 @@ extension Dictionary {
 }
 
 extension Dictionary: Collection {
+  public typealias SubSequence = Slice<Dictionary>
+  
   /// The position of the first element in a nonempty dictionary.
   ///
   /// If the collection is empty, `startIndex` is equal to `endIndex`.
@@ -1321,6 +1326,7 @@ extension Dictionary {
     : Collection, Equatable,
       CustomStringConvertible, CustomDebugStringConvertible {
     public typealias Element = Key
+    public typealias SubSequence = Slice<Dictionary.Keys>
 
     @usableFromInline
     internal var _variant: Dictionary<Key, Value>._Variant
@@ -2022,7 +2028,7 @@ extension Dictionary.Iterator {
         return nativeIterator
 #if _runtime(_ObjC)
       case .cocoa:
-        _sanityCheckFailure("internal error: does not contain a native index")
+        _internalInvariantFailure("internal error: does not contain a native index")
 #endif
       }
     }
@@ -2037,7 +2043,7 @@ extension Dictionary.Iterator {
     get {
       switch _variant {
       case .native:
-        _sanityCheckFailure("internal error: does not contain a Cocoa index")
+        _internalInvariantFailure("internal error: does not contain a Cocoa index")
       case .cocoa(let cocoa):
         return cocoa
       }
@@ -2126,7 +2132,7 @@ extension Dictionary {
   public // FIXME(reserveCapacity): Should be inlinable
   mutating func reserveCapacity(_ minimumCapacity: Int) {
     _variant.reserveCapacity(minimumCapacity)
-    _sanityCheck(self.capacity >= minimumCapacity)
+    _internalInvariant(self.capacity >= minimumCapacity)
   }
 }
 

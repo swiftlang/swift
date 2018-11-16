@@ -9,7 +9,7 @@ import Swift
 sil_global private @globalinit_token0 : $Builtin.Word
 
 class TestArrayStorage {
-  @sil_stored var count: Int32
+  @_hasStorage var count: Int32
   init()
 }
 
@@ -1622,7 +1622,7 @@ bb0(%0 : $(Builtin.NativeObject, Builtin.Int32), %1 : $TestArray2):
 }
 
 class A {
-  @sil_stored var property: Any { get set }
+  @_hasStorage var property: Any { get set }
   deinit
   init()
 }

@@ -185,6 +185,75 @@ llvm::Constant *IRGenModule::getTypeRef(CanType type, MangledTypeRefRole role) {
   return getAddrOfStringForTypeRef(SymbolicName, role);
 }
 
+llvm::Constant *IRGenModule::getMangledAssociatedConformance(
+                                  const NormalProtocolConformance *conformance,
+                                  const AssociatedConformance &requirement) {
+  // Figure out the name of the symbol to be used for the conformance.
+  IRGenMangler mangler;
+  auto symbolName =
+    mangler.mangleSymbolNameForAssociatedConformanceWitness(
+      conformance, requirement.getAssociation(),
+      requirement.getAssociatedRequirement());
+
+  // See if we emitted the constant already.
+  auto &entry = StringsForTypeRef[symbolName];
+  if (entry.second) {
+    return entry.second;
+  }
+
+  // Get the accessor for this associated conformance.
+  llvm::Function *accessor;
+  unsigned char kind;
+  if (conformance) {
+    kind = 7;
+    accessor = getAddrOfAssociatedTypeWitnessTableAccessFunction(conformance,
+                                                                requirement);
+  } else {
+    kind = 8;
+    accessor = getAddrOfDefaultAssociatedConformanceAccessor(requirement);
+  }
+
+  // Form the mangled name with its relative reference.
+  ConstantInitBuilder B(*this);
+  auto S = B.beginStruct();
+  S.setPacked(true);
+  S.add(llvm::ConstantInt::get(Int8Ty, 255));
+  S.add(llvm::ConstantInt::get(Int8Ty, kind));
+  S.addRelativeAddress(accessor);
+
+  // And a null terminator!
+  S.addInt(Int8Ty, 0);
+
+  auto finished = S.finishAndCreateFuture();
+  auto var = new llvm::GlobalVariable(Module, finished.getType(),
+                                      /*constant*/ true,
+                                      llvm::GlobalValue::LinkOnceODRLinkage,
+                                      nullptr,
+                                      symbolName);
+  ApplyIRLinkage({llvm::GlobalValue::LinkOnceODRLinkage,
+                  llvm::GlobalValue::HiddenVisibility,
+                  llvm::GlobalValue::DefaultStorageClass})
+      .to(var);
+  var->setAlignment(2);
+  setTrueConstGlobal(var);
+  var->setSection(getReflectionTypeRefSectionName());
+
+  finished.installInGlobal(var);
+
+  // Drill down to the i8* at the beginning of the constant.
+  auto addr = llvm::ConstantExpr::getBitCast(var, Int8PtrTy);
+
+  // Set the low bit.
+  unsigned bit = ProtocolRequirementFlags::AssociatedTypeMangledNameBit;
+  auto bitConstant = llvm::ConstantInt::get(IntPtrTy, bit);
+  addr = llvm::ConstantExpr::getGetElementPtr(nullptr, addr, bitConstant);
+
+  // Update the entry.
+  entry = {var, addr};
+
+  return addr;
+}
+
 class ReflectionMetadataBuilder {
 protected:
   IRGenModule &IGM;
@@ -892,7 +961,11 @@ IRGenModule::getAddrOfCaptureDescriptor(SILFunction &Caller,
 }
 
 void IRGenModule::
-emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance) {
+emitAssociatedTypeMetadataRecord(const RootProtocolConformance *conformance) {
+  auto normalConf = dyn_cast<NormalProtocolConformance>(conformance);
+  if (!normalConf)
+    return;
+
   if (!IRGen.Opts.EnableReflectionMetadata)
     return;
 
@@ -908,14 +981,14 @@ emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance) {
     return false;
   };
 
-  Conformance->forEachTypeWitness(/*resolver*/ nullptr, collectTypeWitness);
+  normalConf->forEachTypeWitness(/*resolver*/ nullptr, collectTypeWitness);
 
   // If there are no associated types, don't bother emitting any
   // metadata.
   if (AssociatedTypes.empty())
     return;
 
-  AssociatedTypeMetadataBuilder builder(*this, Conformance, AssociatedTypes);
+  AssociatedTypeMetadataBuilder builder(*this, normalConf, AssociatedTypes);
   builder.emit();
 }
 
@@ -980,10 +1053,7 @@ void IRGenModule::emitReflectionMetadataVersion() {
                                           llvm::GlobalValue::LinkOnceODRLinkage,
                                           Init,
                                           "__swift_reflection_version");
-  ApplyIRLinkage({llvm::GlobalValue::LinkOnceODRLinkage,
-                  llvm::GlobalValue::HiddenVisibility,
-                  llvm::GlobalValue::DefaultStorageClass})
-      .to(Version);
+  ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(Version);
   addUsedGlobal(Version);
 }
 

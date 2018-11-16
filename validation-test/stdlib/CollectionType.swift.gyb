@@ -670,16 +670,6 @@ extension Collection {
 }
 
 //===----------------------------------------------------------------------===//
-// Collection.split()
-//===----------------------------------------------------------------------===//
-
-CollectionTypeTests.test("Collection/split/dispatch") {
-  let tester = CollectionLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.split { $0.value == 1 }
-  expectCustomizable(tester, tester.log.split)
-}
-
-//===----------------------------------------------------------------------===//
 // MutableCollection
 //===----------------------------------------------------------------------===//
 

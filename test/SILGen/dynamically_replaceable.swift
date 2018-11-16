@@ -1,5 +1,10 @@
 // RUN: %target-swift-emit-silgen -enable-sil-ownership -swift-version 5 %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -swift-version 5 %s -enable-implicit-dynamic | %FileCheck %s --check-prefix=IMPLICIT
 
+// CHECK-LABEL: sil hidden @$s23dynamically_replaceable014maybe_dynamic_B0yyF : $@convention(thin) () -> () {
+// IMPLICIT-LABEL: sil hidden [dynamically_replacable] @$s23dynamically_replaceable014maybe_dynamic_B0yyF : $@convention(thin) () -> () {
+func maybe_dynamic_replaceable() {
+}
 
 // CHECK-LABEL: sil hidden [dynamically_replacable] @$s23dynamically_replaceable08dynamic_B0yyF : $@convention(thin) () -> () {
 dynamic func dynamic_replaceable() {
@@ -265,4 +270,15 @@ extension GenericS {
       self[y] = newValue
     }
   }
+}
+
+dynamic var globalX = 0
+// CHECK-LABEL: sil hidden [dynamically_replacable] @$s23dynamically_replaceable7globalXSivg : $@convention(thin) () -> Int
+// CHECK-LABEL: sil hidden [dynamically_replacable] @$s23dynamically_replaceable7globalXSivs : $@convention(thin) (Int) -> ()
+// CHECK-LABEL: sil hidden @$s23dynamically_replaceable7getsetXyS2iF
+// CHECK: dynamic_function_ref @$s23dynamically_replaceable7globalXSivs
+// CHECK: dynamic_function_ref @$s23dynamically_replaceable7globalXSivg
+func getsetX(_ x: Int) -> Int {
+  globalX = x
+  return globalX
 }

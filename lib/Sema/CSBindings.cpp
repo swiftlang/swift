@@ -177,6 +177,9 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
   if (!isViable(binding))
     return;
 
+  if (binding.isDefaultableBinding())
+    ++NumDefaultableBindings;
+
   Bindings.push_back(std::move(binding));
 }
 
@@ -373,6 +376,20 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentConversion:
     case ConstraintKind::OptionalObject: {
+      // If there is a `bind param` constraint associated with
+      // current type variable, result should be aware of that
+      // fact. Binding set might be incomplete until
+      // this constraint is resolved, because we currently don't
+      // look-through constraints expect to `subtype` to try and
+      // find related bindings.
+      // This only affects type variable that appears one the
+      // right-hand side of the `bind param` constraint and
+      // represents result type of the closure body, because
+      // left-hand side gets types from overload choices.
+      if (constraint->getKind() == ConstraintKind::BindParam &&
+          constraint->getSecondType()->isEqual(typeVar))
+        result.PotentiallyIncomplete = true;
+
       auto binding = getPotentialBindingForRelationalConstraint(
           result, constraint, hasDependentMemberRelationalConstraints,
           hasNonDependentMemberRelationalConstraints,
@@ -646,7 +663,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     if (!exactTypes.insert(type->getCanonicalType()).second)
       continue;
 
-    ++result.NumDefaultableBindings;
     result.addPotentialBinding({type, AllowedBindingKind::Exact,
                                 constraint->getKind(), nullptr,
                                 constraint->getLocator()});

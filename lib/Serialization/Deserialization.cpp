@@ -473,6 +473,14 @@ ProtocolConformanceRef ModuleFile::readConformance(
     return ProtocolConformanceRef(proto);
   }
 
+  case SELF_PROTOCOL_CONFORMANCE: {
+    DeclID protoID;
+    SelfProtocolConformanceLayout::readRecord(scratch, protoID);
+    auto proto = cast<ProtocolDecl>(getDecl(protoID));
+    auto conformance = getContext().getSelfConformance(proto);
+    return ProtocolConformanceRef(conformance);
+  }
+
   case SPECIALIZED_PROTOCOL_CONFORMANCE: {
     TypeID conformingTypeID;
     SubstitutionMapID substitutionMapID;
@@ -2222,6 +2230,15 @@ ModuleFile::getDeclChecked(DeclID DID) {
   return deserialized;
 }
 
+template <typename DERIVED>
+static bool attributeChainContains(DeclAttribute *attr) {
+  DeclAttributes tempAttrs;
+  tempAttrs.setRawAttributeChain(attr);
+  static_assert(std::is_trivially_destructible<DeclAttributes>::value,
+                "must not try to destroy the attribute chain");
+  return tempAttrs.hasAttribute<DERIVED>();
+}
+
 Expected<Decl *>
 ModuleFile::getDeclCheckedImpl(DeclID DID) {
   if (DID == 0)
@@ -2892,8 +2909,15 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
       ctor->setStubImplementation(true);
     if (initKind.hasValue())
       ctor->setInitKind(initKind.getValue());
-    ctor->setOverriddenDecl(cast_or_null<ConstructorDecl>(overridden.get()));
     ctor->setNeedsNewVTableEntry(needsNewVTableEntry);
+
+    ctor->setOverriddenDecl(cast_or_null<ConstructorDecl>(overridden.get()));
+    if (auto *overridden = ctor->getOverriddenDecl()) {
+      if (!attributeChainContains<RequiredAttr>(DAttrs) ||
+          !overridden->isRequired()) {
+        AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
+      }
+    }
 
     if (auto defaultArgumentResilienceExpansion = getActualResilienceExpansion(
             rawDefaultArgumentResilienceExpansion)) {
@@ -5164,10 +5188,9 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   using namespace decls_block;
 
   PrettyStackTraceModuleFile traceModule("While reading from", *this);
-  PrettyStackTraceType trace(getAssociatedModule()->getASTContext(),
-                             "finishing conformance for",
-                             conformance->getType());
-  PrettyStackTraceDecl traceTo("... to", conformance->getProtocol());
+  PrettyStackTraceConformance trace(getAssociatedModule()->getASTContext(),
+                                    "finishing conformance for",
+                                    conformance);
   ++NumNormalProtocolConformancesCompleted;
 
   assert(conformance->isComplete());

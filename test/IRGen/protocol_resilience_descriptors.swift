@@ -19,7 +19,7 @@
 
 // Protocol descriptor
 // CHECK-DEFINITION-LABEL: @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsMp" ={{( protected)?}} constant
-// CHECK-DEFINITION-SAME: @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2AC_AA014OtherResilientC0TN"
+// CHECK-DEFINITION-SAME: @"default associated conformance2T218resilient_protocol29ProtocolWithAssocTypeDefaultsP_AB014OtherResilientD0"
 
 // Associated type default + flags
 // CHECK-DEFINITION-SAME: [[INT]] add
@@ -64,7 +64,7 @@ extension Y: OtherResilientProtocol { }
 
 // CHECK-USAGE: @"$s31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAAMc" =
 // CHECK-USAGE-SAME: $s18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2AC_AA014OtherResilientC0Tn
-// CHECK-USAGE-SAME: $s31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAA2T2AdEP_AD014OtherResilientI0PWT
+// CHECK-USAGE-SAME: @"associated conformance 31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAA2T2AdEP_AD014OtherResilientI0"
 public struct ConformsWithAssocRequirements : ProtocolWithAssocTypeDefaults {
 }
 

@@ -870,6 +870,14 @@ public:
   /// Check for unsupported protocol types in the given statement.
   void checkUnsupportedProtocolType(Stmt *stmt);
 
+  /// Check for unsupported protocol types in the given generic requirement
+  /// list.
+  void checkUnsupportedProtocolType(TrailingWhereClause *whereClause);
+
+  /// Check for unsupported protocol types in the given generic requirement
+  /// list.
+  void checkUnsupportedProtocolType(GenericParamList *genericParams);
+
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
   GenericEnvironment *handleSILGenericParams(GenericParamList *genericParams,
                                              DeclContext *DC);
@@ -1095,7 +1103,7 @@ public:
   void typeCheckDecl(Decl *D);
 
   void checkDeclAttributesEarly(Decl *D);
-  void addImplicitDynamicAttribute(Decl *D);
+  static void addImplicitDynamicAttribute(Decl *D);
   void checkDeclAttributes(Decl *D);
   void checkDynamicReplacementAttribute(ValueDecl *D);
   void checkTypeModifyingDeclAttributes(VarDecl *var);
@@ -1755,7 +1763,8 @@ public:
   void checkConformance(NormalProtocolConformance *conformance);
 
   /// Check the requirement signature of the given conformance.
-  void checkConformanceRequirements(NormalProtocolConformance *conformance);
+  void checkConformanceRequirements(NormalProtocolConformance *conformance)
+         override ;
 
   /// Check all of the conformances in the given context.
   void checkConformancesInContext(DeclContext *dc,
@@ -1955,7 +1964,6 @@ public:
   /// Used in diagnostic %selects.
   enum class FragileFunctionKind : unsigned {
     Transparent,
-    InlineAlways,
     Inlinable,
     DefaultArgument,
     PropertyInitializer
@@ -2167,19 +2175,18 @@ public:
   const StringRef Message;
 };
 
-/// Returns true if a method is an valid implementation of a @dynamicCallable
-/// attribute requirement. The method is given to be defined as one of the
-/// following: `dynamicallyCall(withArguments:)` or
+/// Returns true if the given method is an valid implementation of a
+/// @dynamicCallable attribute requirement. The method is given to be defined
+/// as one of the following: `dynamicallyCall(withArguments:)` or
 /// `dynamicallyCall(withKeywordArguments:)`.
-bool isValidDynamicCallableMethod(FuncDecl *funcDecl, DeclContext *DC,
+bool isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
                                   TypeChecker &TC, bool hasKeywordArguments);
 
-/// Given a subscript defined as "subscript(dynamicMember:)->T", return true if
-/// it is an acceptable implementation of the @dynamicMemberLookup attribute's
-/// requirement.
-bool isAcceptableDynamicMemberLookupSubscript(SubscriptDecl *decl,
-                                              DeclContext *DC,
-                                              TypeChecker &TC);
+/// Returns true if the given subscript method is an valid implementation of
+/// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
+/// The method is given to be defined as `subscript(dynamicMember:)`.
+bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, DeclContext *DC,
+                                         TypeChecker &TC);
 
 /// Whether an overriding declaration requires the 'override' keyword.
 enum class OverrideRequiresKeyword {

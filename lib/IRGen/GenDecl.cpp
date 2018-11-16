@@ -50,6 +50,7 @@
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
 #include "Callee.h"
+#include "ConformanceDescription.h"
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
@@ -991,7 +992,7 @@ void IRGenerator::emitGlobalTopLevel(bool emitForParallelEmission) {
 
   // Ensure that relative symbols are collocated in the same LLVM module.
   for (SILWitnessTable &wt : PrimaryIGM->getSILModule().getWitnessTableList()) {
-    CurrentIGMPtr IGM = getGenModule(wt.getConformance()->getDeclContext());
+    CurrentIGMPtr IGM = getGenModule(wt.getDeclContext());
     if (emitForParallelEmission)
       IGM->ensureRelativeSymbolCollocation(wt);
   }
@@ -1024,7 +1025,7 @@ void IRGenerator::emitGlobalTopLevel(bool emitForParallelEmission) {
 
   // Emit witness tables.
   for (SILWitnessTable &wt : PrimaryIGM->getSILModule().getWitnessTableList()) {
-    CurrentIGMPtr IGM = getGenModule(wt.getConformance()->getDeclContext());
+    CurrentIGMPtr IGM = getGenModule(wt.getDeclContext());
     if (!canEmitWitnessTableLazily(&wt)) {
       IGM->emitSILWitnessTable(&wt);
     }
@@ -1138,7 +1139,7 @@ void IRGenerator::emitLazyDefinitions() {
     }
     while (!LazyWitnessTables.empty()) {
       SILWitnessTable *wt = LazyWitnessTables.pop_back_val();
-      CurrentIGMPtr IGM = getGenModule(wt->getConformance()->getDeclContext());
+      CurrentIGMPtr IGM = getGenModule(wt->getDeclContext());
       IGM->emitSILWitnessTable(wt);
     }
 
@@ -1288,7 +1289,7 @@ void IRGenerator::emitDynamicReplacements() {
   //     RelativeIndirectablePointer<KeyEntry, false> replacedFunctionKey;
   //     RelativeDirectPointer<void> newFunction;
   //     RelativeDirectPointer<LinkEntry> replacement;
-  //     uint32_t flags; // unused.
+  //     uint32_t flags; // shouldChain.
   //   }[0]
   // };
   ConstantInitBuilder builder(IGM);
@@ -1315,7 +1316,8 @@ void IRGenerator::emitDynamicReplacements() {
     replacement.addRelativeAddress(newFnPtr); // direct relative reference.
     replacement.addRelativeAddress(
         replacementLinkEntry); // direct relative reference.
-    replacement.addInt32(0); // unused flags.
+    replacement.addInt32(
+        Opts.EnableDynamicReplacementChaining ? 1 : 0);
     replacement.finishAndAddTo(replacementsArray);
   }
   replacementsArray.finishAndAddTo(replacementScope);
@@ -2528,22 +2530,30 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
 }
 
 static TypeEntityReference
-getTypeContextDescriptorEntityReference(IRGenModule &IGM,
-                                        NominalTypeDecl *decl) {
-  // A reference to a concrete type.
+getContextDescriptorEntityReference(IRGenModule &IGM, const LinkEntity &entity){
   // TODO: consider using a symbolic reference (i.e. a symbol string
   // to be looked up dynamically) for types defined outside the module.
-  auto kind = TypeReferenceKind::DirectNominalTypeDescriptor;
-  auto entity = LinkEntity::forNominalTypeDescriptor(decl);
-
-  IGM.IRGen.noteUseOfTypeContextDescriptor(decl, DontRequireMetadata);
   auto ref = IGM.getAddrOfLLVMVariableOrGOTEquivalent(entity);
-
-  if (ref.isIndirect()) {
-    kind = TypeReferenceKind::IndirectNominalTypeDescriptor;
-  }
-
+  auto kind = ref.isIndirect()
+                ? TypeReferenceKind::IndirectTypeDescriptor
+                : TypeReferenceKind::DirectTypeDescriptor;
   return TypeEntityReference(kind, ref.getValue());
+}
+
+static TypeEntityReference
+getTypeContextDescriptorEntityReference(IRGenModule &IGM,
+                                        NominalTypeDecl *decl) {
+  auto entity = LinkEntity::forNominalTypeDescriptor(decl);
+  IGM.IRGen.noteUseOfTypeContextDescriptor(decl, DontRequireMetadata);
+  return getContextDescriptorEntityReference(IGM, entity);
+}
+
+static TypeEntityReference
+getProtocolDescriptorEntityReference(IRGenModule &IGM, ProtocolDecl *protocol) {
+  assert(!protocol->isObjC() &&
+         "objc protocols don't have swift protocol descriptors");
+  auto entity = LinkEntity::forProtocolDescriptor(protocol);
+  return getContextDescriptorEntityReference(IGM, entity);
 }
 
 static TypeEntityReference
@@ -2575,6 +2585,11 @@ getRuntimeOnlyClassEntityReference(IRGenModule &IGM, ClassDecl *cls) {
 
 TypeEntityReference
 IRGenModule::getTypeEntityReference(NominalTypeDecl *decl) {
+  if (auto protocol = dyn_cast<ProtocolDecl>(decl)) {
+    assert(!protocol->isObjC() && "imported protocols not handled here");
+    return getProtocolDescriptorEntityReference(*this, protocol);
+  }
+
   auto clas = dyn_cast<ClassDecl>(decl);
   if (!clas) {
     return getTypeContextDescriptorEntityReference(*this, decl);
@@ -2704,8 +2719,7 @@ llvm::Constant *IRGenModule::emitSwiftProtocols() {
   return var;
 }
 
-void IRGenModule::addProtocolConformance(
-                                ConformanceDescription record) {
+void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
   // Add this protocol conformance.
   ProtocolConformances.push_back(std::move(record));
 }
@@ -3520,7 +3534,7 @@ llvm::GlobalValue *IRGenModule::defineAssociatedConformanceDescriptor(
 }
 
 llvm::Constant *IRGenModule::getAddrOfProtocolConformanceDescriptor(
-                                const NormalProtocolConformance *conformance,
+                                const RootProtocolConformance *conformance,
                                 ConstantInit definition) {
   auto entity = LinkEntity::forProtocolConformanceDescriptor(conformance);
   return getAddrOfLLVMVariable(entity, definition,
@@ -3913,6 +3927,8 @@ IRGenModule::getAddrOfWitnessTableLazyAccessFunction(
   Signature signature(fnType, llvm::AttributeList(), DefaultCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
+  ApplyIRLinkage({link.getLinkage(), link.getVisibility(), link.getDLLStorage()})
+      .to(entry);
   return entry;
 }
 
@@ -3943,11 +3959,11 @@ IRGenModule::getAddrOfWitnessTableLazyCacheVariable(
 ///
 /// This can only be used with non-dependent conformances.
 llvm::Constant*
-IRGenModule::getAddrOfWitnessTable(const NormalProtocolConformance *conf,
+IRGenModule::getAddrOfWitnessTable(const RootProtocolConformance *conf,
                                    ConstantInit definition) {
   IRGen.addLazyWitnessTable(conf);
 
-  auto entity = LinkEntity::forDirectProtocolWitnessTable(conf);
+  auto entity = LinkEntity::forProtocolWitnessTable(conf);
   return getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
 }
 
@@ -4025,10 +4041,7 @@ static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
   if (!def) return nullptr;
   if (!def->empty()) return nullptr;
 
-  ApplyIRLinkage({llvm::GlobalValue::LinkOnceODRLinkage,
-                 llvm::GlobalValue::HiddenVisibility,
-                 llvm::GlobalValue::DefaultStorageClass})
-      .to(def);
+  ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(def);
   def->setDoesNotThrow();
   def->setCallingConv(IGM.DefaultCC);
   if (setIsNoInline)

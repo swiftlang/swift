@@ -4673,7 +4673,7 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   }
 
   // Reject accessors on 'let's after parsing them (for better recovery).
-  if (PrimaryVar->isLet() && !Attributes.hasAttribute<SILStoredAttr>()) {
+  if (PrimaryVar->isLet() && !Attributes.hasAttribute<HasStorageAttr>()) {
     Diag<> DiagID;
     if (accessors.WillSet || accessors.DidSet)
       DiagID = diag::let_cannot_be_observing_property;
@@ -4936,9 +4936,9 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
     readWriteImpl = ReadWriteImplKind::Immutable;
   }
 
-  // Allow the sil_stored attribute to override all the accessors we parsed
+  // Allow the _hasStorage attribute to override all the accessors we parsed
   // when making the final classification.
-  if (attrs.hasAttribute<SILStoredAttr>()) {
+  if (attrs.hasAttribute<HasStorageAttr>()) {
     return StorageImplInfo::getSimpleStored(StorageIsMutable_t(Set != nullptr));
   }
 
