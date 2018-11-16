@@ -722,7 +722,7 @@ namespace driver {
           if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
             DepGraph.addIndependentNode(Cmd);
           } else {
-            switch (DepGraph.loadFromPath(Cmd, DependenciesFile)) {
+            switch (DepGraph.loadFromPath(Cmd, DependenciesFile).kind) {
             case DependencyLoadResult::Kind::HadError:
               dependencyLoadFailed(DependenciesFile, /*Warn=*/false);
               break;
