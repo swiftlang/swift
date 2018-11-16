@@ -18,106 +18,108 @@
 
 import TestsUtils
 
-public let ExistentialPerformance = [
-  BenchmarkInfo(name: "ExistentialTestOneMethodCall_ClassValueBuffer1", runFunction: run_ExistentialTestOneMethodCall_ClassValueBuffer1, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestOneMethodCall_ClassValueBuffer2", runFunction: run_ExistentialTestOneMethodCall_ClassValueBuffer2, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestOneMethodCall_ClassValueBuffer3", runFunction: run_ExistentialTestOneMethodCall_ClassValueBuffer3, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestOneMethodCall_ClassValueBuffer4", runFunction: run_ExistentialTestOneMethodCall_ClassValueBuffer4, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestOneMethodCall_IntValueBuffer0", runFunction: run_ExistentialTestOneMethodCall_IntValueBuffer0, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestOneMethodCall_IntValueBuffer1", runFunction: run_ExistentialTestOneMethodCall_IntValueBuffer1, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestOneMethodCall_IntValueBuffer2", runFunction: run_ExistentialTestOneMethodCall_IntValueBuffer2, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestOneMethodCall_IntValueBuffer3", runFunction: run_ExistentialTestOneMethodCall_IntValueBuffer3, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestOneMethodCall_IntValueBuffer4", runFunction: run_ExistentialTestOneMethodCall_IntValueBuffer4, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_ClassValueBuffer1", runFunction: run_ExistentialTestTwoMethodCalls_ClassValueBuffer1, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_ClassValueBuffer2", runFunction: run_ExistentialTestTwoMethodCalls_ClassValueBuffer2, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_ClassValueBuffer3", runFunction: run_ExistentialTestTwoMethodCalls_ClassValueBuffer3, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_ClassValueBuffer4", runFunction: run_ExistentialTestTwoMethodCalls_ClassValueBuffer4, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_IntValueBuffer0", runFunction: run_ExistentialTestTwoMethodCalls_IntValueBuffer0, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_IntValueBuffer1", runFunction: run_ExistentialTestTwoMethodCalls_IntValueBuffer1, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_IntValueBuffer2", runFunction: run_ExistentialTestTwoMethodCalls_IntValueBuffer2, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_IntValueBuffer3", runFunction: run_ExistentialTestTwoMethodCalls_IntValueBuffer3, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestTwoMethodCalls_IntValueBuffer4", runFunction: run_ExistentialTestTwoMethodCalls_IntValueBuffer4, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer1", runFunction: run_ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer1, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer2", runFunction: run_ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer2, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer3", runFunction: run_ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer3, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer4", runFunction: run_ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer4, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestPassExistentialOneMethodCall_IntValueBuffer0", runFunction: run_ExistentialTestPassExistentialOneMethodCall_IntValueBuffer0, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestPassExistentialOneMethodCall_IntValueBuffer1", runFunction: run_ExistentialTestPassExistentialOneMethodCall_IntValueBuffer1, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestPassExistentialOneMethodCall_IntValueBuffer2", runFunction: run_ExistentialTestPassExistentialOneMethodCall_IntValueBuffer2, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestPassExistentialOneMethodCall_IntValueBuffer3", runFunction: run_ExistentialTestPassExistentialOneMethodCall_IntValueBuffer3, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestPassExistentialOneMethodCall_IntValueBuffer4", runFunction: run_ExistentialTestPassExistentialOneMethodCall_IntValueBuffer4, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestPassExistentialTwoMethodCalls_ClassValueBuffer1", runFunction: run_ExistentialTestPassExistentialTwoMethodCalls_ClassValueBuffer1, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestPassExistentialTwoMethodCalls_ClassValueBuffer2", runFunction: run_ExistentialTestPassExistentialTwoMethodCalls_ClassValueBuffer2, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestPassExistentialTwoMethodCalls_ClassValueBuffer3", runFunction: run_ExistentialTestPassExistentialTwoMethodCalls_ClassValueBuffer3, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestPassExistentialTwoMethodCalls_ClassValueBuffer4", runFunction: run_ExistentialTestPassExistentialTwoMethodCalls_ClassValueBuffer4, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer0", runFunction: run_ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer0, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer1", runFunction: run_ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer1, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer2", runFunction: run_ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer2, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer3", runFunction: run_ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer3, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer4", runFunction: run_ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer4, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutating_ClassValueBuffer1", runFunction: run_ExistentialTestMutating_ClassValueBuffer1, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutating_ClassValueBuffer2", runFunction: run_ExistentialTestMutating_ClassValueBuffer2, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutating_ClassValueBuffer3", runFunction: run_ExistentialTestMutating_ClassValueBuffer3, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutating_ClassValueBuffer4", runFunction: run_ExistentialTestMutating_ClassValueBuffer4, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutating_IntValueBuffer0", runFunction: run_ExistentialTestMutating_IntValueBuffer0, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutating_IntValueBuffer1", runFunction: run_ExistentialTestMutating_IntValueBuffer1, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutating_IntValueBuffer2", runFunction: run_ExistentialTestMutating_IntValueBuffer2, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutating_IntValueBuffer3", runFunction: run_ExistentialTestMutating_IntValueBuffer3, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutating_IntValueBuffer4", runFunction: run_ExistentialTestMutating_IntValueBuffer4, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_ClassValueBuffer1", runFunction: run_ExistentialTestMutatingAndNonMutating_ClassValueBuffer1, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_ClassValueBuffer2", runFunction: run_ExistentialTestMutatingAndNonMutating_ClassValueBuffer2, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_ClassValueBuffer3", runFunction: run_ExistentialTestMutatingAndNonMutating_ClassValueBuffer3, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_ClassValueBuffer4", runFunction: run_ExistentialTestMutatingAndNonMutating_ClassValueBuffer4, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_IntValueBuffer0", runFunction: run_ExistentialTestMutatingAndNonMutating_IntValueBuffer0, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_IntValueBuffer1", runFunction: run_ExistentialTestMutatingAndNonMutating_IntValueBuffer1, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_IntValueBuffer2", runFunction: run_ExistentialTestMutatingAndNonMutating_IntValueBuffer2, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_IntValueBuffer3", runFunction: run_ExistentialTestMutatingAndNonMutating_IntValueBuffer3, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestMutatingAndNonMutating_IntValueBuffer4", runFunction: run_ExistentialTestMutatingAndNonMutating_IntValueBuffer4, tags: [.unstable]),
-  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_ClassValueBuffer1", runFunction: run_ExistentialTestArrayOneMethodCall_ClassValueBuffer1, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_ClassValueBuffer2", runFunction: run_ExistentialTestArrayOneMethodCall_ClassValueBuffer2, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_ClassValueBuffer3", runFunction: run_ExistentialTestArrayOneMethodCall_ClassValueBuffer3, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_ClassValueBuffer4", runFunction: run_ExistentialTestArrayOneMethodCall_ClassValueBuffer4, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_IntValueBuffer0", runFunction: run_ExistentialTestArrayOneMethodCall_IntValueBuffer0, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_IntValueBuffer1", runFunction: run_ExistentialTestArrayOneMethodCall_IntValueBuffer1, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_IntValueBuffer2", runFunction: run_ExistentialTestArrayOneMethodCall_IntValueBuffer2, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_IntValueBuffer3", runFunction: run_ExistentialTestArrayOneMethodCall_IntValueBuffer3, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayOneMethodCall_IntValueBuffer4", runFunction: run_ExistentialTestArrayOneMethodCall_IntValueBuffer4, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_ClassValueBuffer1", runFunction: run_ExistentialTestArrayTwoMethodCalls_ClassValueBuffer1, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_ClassValueBuffer2", runFunction: run_ExistentialTestArrayTwoMethodCalls_ClassValueBuffer2, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_ClassValueBuffer3", runFunction: run_ExistentialTestArrayTwoMethodCalls_ClassValueBuffer3, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_ClassValueBuffer4", runFunction: run_ExistentialTestArrayTwoMethodCalls_ClassValueBuffer4, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_IntValueBuffer0", runFunction: run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer0, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_IntValueBuffer1", runFunction: run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer1, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_IntValueBuffer2", runFunction: run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer2, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_IntValueBuffer3", runFunction: run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer3, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayTwoMethodCalls_IntValueBuffer4", runFunction: run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer4, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayMutating_ClassValueBuffer1", runFunction: run_ExistentialTestArrayMutating_ClassValueBuffer1, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayMutating_ClassValueBuffer2", runFunction: run_ExistentialTestArrayMutating_ClassValueBuffer2, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayMutating_ClassValueBuffer3", runFunction: run_ExistentialTestArrayMutating_ClassValueBuffer3, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayMutating_ClassValueBuffer4", runFunction: run_ExistentialTestArrayMutating_ClassValueBuffer4, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayMutating_IntValueBuffer0", runFunction: run_ExistentialTestArrayMutating_IntValueBuffer0, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayMutating_IntValueBuffer1", runFunction: run_ExistentialTestArrayMutating_IntValueBuffer1, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayMutating_IntValueBuffer2", runFunction: run_ExistentialTestArrayMutating_IntValueBuffer2, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayMutating_IntValueBuffer3", runFunction: run_ExistentialTestArrayMutating_IntValueBuffer3, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayMutating_IntValueBuffer4", runFunction: run_ExistentialTestArrayMutating_IntValueBuffer4, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayShift_ClassValueBuffer1", runFunction: run_ExistentialTestArrayShift_ClassValueBuffer1, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayShift_ClassValueBuffer2", runFunction: run_ExistentialTestArrayShift_ClassValueBuffer2, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayShift_ClassValueBuffer3", runFunction: run_ExistentialTestArrayShift_ClassValueBuffer3, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayShift_ClassValueBuffer4", runFunction: run_ExistentialTestArrayShift_ClassValueBuffer4, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayShift_IntValueBuffer0", runFunction: run_ExistentialTestArrayShift_IntValueBuffer0, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayShift_IntValueBuffer1", runFunction: run_ExistentialTestArrayShift_IntValueBuffer1, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayShift_IntValueBuffer2", runFunction: run_ExistentialTestArrayShift_IntValueBuffer2, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayShift_IntValueBuffer3", runFunction: run_ExistentialTestArrayShift_IntValueBuffer3, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayShift_IntValueBuffer4", runFunction: run_ExistentialTestArrayShift_IntValueBuffer4, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_ClassValueBuffer1", runFunction: run_ExistentialTestArrayConditionalShift_ClassValueBuffer1, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_ClassValueBuffer2", runFunction: run_ExistentialTestArrayConditionalShift_ClassValueBuffer2, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_ClassValueBuffer3", runFunction: run_ExistentialTestArrayConditionalShift_ClassValueBuffer3, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_ClassValueBuffer4", runFunction: run_ExistentialTestArrayConditionalShift_ClassValueBuffer4, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_IntValueBuffer0", runFunction: run_ExistentialTestArrayConditionalShift_IntValueBuffer0, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_IntValueBuffer1", runFunction: run_ExistentialTestArrayConditionalShift_IntValueBuffer1, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_IntValueBuffer2", runFunction: run_ExistentialTestArrayConditionalShift_IntValueBuffer2, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_IntValueBuffer3", runFunction: run_ExistentialTestArrayConditionalShift_IntValueBuffer3, tags: [.unstable, .api, .Array]),
-  BenchmarkInfo(name: "ExistentialTestArrayConditionalShift_IntValueBuffer4", runFunction: run_ExistentialTestArrayConditionalShift_IntValueBuffer4, tags: [.unstable, .api, .Array]),
+let t: [BenchmarkCategory] = []
+let ta: [BenchmarkCategory] = [.api, .Array]
+public let ExistentialPerformance: [BenchmarkInfo] = [
+  BenchmarkInfo(name: "Existential.method.1x.Ref1", runFunction: run_method1xRef1, tags: t),
+  BenchmarkInfo(name: "Existential.method.1x.Ref2", runFunction: run_method1xRef2, tags: t),
+  BenchmarkInfo(name: "Existential.method.1x.Ref3", runFunction: run_method1xRef3, tags: t),
+  BenchmarkInfo(name: "Existential.method.1x.Ref4", runFunction: run_method1xRef4, tags: t),
+  BenchmarkInfo(name: "Existential.method.1x.Val0", runFunction: run_method1xVal0, tags: t),
+  BenchmarkInfo(name: "Existential.method.1x.Val1", runFunction: run_method1xVal1, tags: t),
+  BenchmarkInfo(name: "Existential.method.1x.Val2", runFunction: run_method1xVal2, tags: t),
+  BenchmarkInfo(name: "Existential.method.1x.Val3", runFunction: run_method1xVal3, tags: t),
+  BenchmarkInfo(name: "Existential.method.1x.Val4", runFunction: run_method1xVal4, tags: t),
+  BenchmarkInfo(name: "Existential.method.2x.Ref1", runFunction: run_method2xRef1, tags: t),
+  BenchmarkInfo(name: "Existential.method.2x.Ref2", runFunction: run_method2xRef2, tags: t),
+  BenchmarkInfo(name: "Existential.method.2x.Ref3", runFunction: run_method2xRef3, tags: t),
+  BenchmarkInfo(name: "Existential.method.2x.Ref4", runFunction: run_method2xRef4, tags: t),
+  BenchmarkInfo(name: "Existential.method.2x.Val0", runFunction: run_method2xVal0, tags: t),
+  BenchmarkInfo(name: "Existential.method.2x.Val1", runFunction: run_method2xVal1, tags: t),
+  BenchmarkInfo(name: "Existential.method.2x.Val2", runFunction: run_method2xVal2, tags: t),
+  BenchmarkInfo(name: "Existential.method.2x.Val3", runFunction: run_method2xVal3, tags: t),
+  BenchmarkInfo(name: "Existential.method.2x.Val4", runFunction: run_method2xVal4, tags: t),
+  BenchmarkInfo(name: "Existential.Pass.method.1x.Ref1", runFunction: run_Pass_method1xRef1, tags: t),
+  BenchmarkInfo(name: "Existential.Pass.method.1x.Ref2", runFunction: run_Pass_method1xRef2, tags: t),
+  BenchmarkInfo(name: "Existential.Pass.method.1x.Ref3", runFunction: run_Pass_method1xRef3, tags: t),
+  BenchmarkInfo(name: "Existential.Pass.method.1x.Ref4", runFunction: run_Pass_method1xRef4, tags: t),
+  BenchmarkInfo(name: "Existential.Pass.method.1x.Val0", runFunction: run_Pass_method1xVal0, tags: t),
+  BenchmarkInfo(name: "Existential.Pass.method.1x.Val1", runFunction: run_Pass_method1xVal1, tags: t),
+  BenchmarkInfo(name: "Existential.Pass.method.1x.Val2", runFunction: run_Pass_method1xVal2, tags: t),
+  BenchmarkInfo(name: "Existential.Pass.method.1x.Val3", runFunction: run_Pass_method1xVal3, tags: t),
+  BenchmarkInfo(name: "Existential.Pass.method.1x.Val4", runFunction: run_Pass_method1xVal4, tags: t),
+  BenchmarkInfo(name: "Existential.Pass.method.2x.Ref1", runFunction: run_Pass_method2xRef1, tags: t),
+  BenchmarkInfo(name: "Existential.Pass.method.2x.Ref2", runFunction: run_Pass_method2xRef2, tags: t),
+  BenchmarkInfo(name: "Existential.Pass.method.2x.Ref3", runFunction: run_Pass_method2xRef3, tags: t),
+  BenchmarkInfo(name: "Existential.Pass.method.2x.Ref4", runFunction: run_Pass_method2xRef4, tags: t),
+  BenchmarkInfo(name: "Existential.Pass.method.2x.Val0", runFunction: run_Pass_method2xVal0, tags: t),
+  BenchmarkInfo(name: "Existential.Pass.method.2x.Val1", runFunction: run_Pass_method2xVal1, tags: t),
+  BenchmarkInfo(name: "Existential.Pass.method.2x.Val2", runFunction: run_Pass_method2xVal2, tags: t),
+  BenchmarkInfo(name: "Existential.Pass.method.2x.Val3", runFunction: run_Pass_method2xVal3, tags: t),
+  BenchmarkInfo(name: "Existential.Pass.method.2x.Val4", runFunction: run_Pass_method2xVal4, tags: t),
+  BenchmarkInfo(name: "Existential.Mutating.Ref1", runFunction: run_MutatingRef1, tags: t),
+  BenchmarkInfo(name: "Existential.Mutating.Ref2", runFunction: run_MutatingRef2, tags: t),
+  BenchmarkInfo(name: "Existential.Mutating.Ref3", runFunction: run_MutatingRef3, tags: t),
+  BenchmarkInfo(name: "Existential.Mutating.Ref4", runFunction: run_MutatingRef4, tags: t),
+  BenchmarkInfo(name: "Existential.Mutating.Val0", runFunction: run_MutatingVal0, tags: t),
+  BenchmarkInfo(name: "Existential.Mutating.Val1", runFunction: run_MutatingVal1, tags: t),
+  BenchmarkInfo(name: "Existential.Mutating.Val2", runFunction: run_MutatingVal2, tags: t),
+  BenchmarkInfo(name: "Existential.Mutating.Val3", runFunction: run_MutatingVal3, tags: t),
+  BenchmarkInfo(name: "Existential.Mutating.Val4", runFunction: run_MutatingVal4, tags: t),
+  BenchmarkInfo(name: "Existential.MutatingAndNonMutating.Ref1", runFunction: run_MutatingAndNonMutatingRef1, tags: t),
+  BenchmarkInfo(name: "Existential.MutatingAndNonMutating.Ref2", runFunction: run_MutatingAndNonMutatingRef2, tags: t),
+  BenchmarkInfo(name: "Existential.MutatingAndNonMutating.Ref3", runFunction: run_MutatingAndNonMutatingRef3, tags: t),
+  BenchmarkInfo(name: "Existential.MutatingAndNonMutating.Ref4", runFunction: run_MutatingAndNonMutatingRef4, tags: t),
+  BenchmarkInfo(name: "Existential.MutatingAndNonMutating.Val0", runFunction: run_MutatingAndNonMutatingVal0, tags: t),
+  BenchmarkInfo(name: "Existential.MutatingAndNonMutating.Val1", runFunction: run_MutatingAndNonMutatingVal1, tags: t),
+  BenchmarkInfo(name: "Existential.MutatingAndNonMutating.Val2", runFunction: run_MutatingAndNonMutatingVal2, tags: t),
+  BenchmarkInfo(name: "Existential.MutatingAndNonMutating.Val3", runFunction: run_MutatingAndNonMutatingVal3, tags: t),
+  BenchmarkInfo(name: "Existential.MutatingAndNonMutating.Val4", runFunction: run_MutatingAndNonMutatingVal4, tags: t),
+  BenchmarkInfo(name: "Existential.Array.method.1x.Ref1", runFunction: run_Array_method1xRef1, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.method.1x.Ref2", runFunction: run_Array_method1xRef2, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.method.1x.Ref3", runFunction: run_Array_method1xRef3, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.method.1x.Ref4", runFunction: run_Array_method1xRef4, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.method.1x.Val0", runFunction: run_Array_method1xVal0, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.method.1x.Val1", runFunction: run_Array_method1xVal1, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.method.1x.Val2", runFunction: run_Array_method1xVal2, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.method.1x.Val3", runFunction: run_Array_method1xVal3, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.method.1x.Val4", runFunction: run_Array_method1xVal4, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.method.2x.Ref1", runFunction: run_Array_method2xRef1, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.method.2x.Ref2", runFunction: run_Array_method2xRef2, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.method.2x.Ref3", runFunction: run_Array_method2xRef3, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.method.2x.Ref4", runFunction: run_Array_method2xRef4, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.method.2x.Val0", runFunction: run_Array_method2xVal0, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.method.2x.Val1", runFunction: run_Array_method2xVal1, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.method.2x.Val2", runFunction: run_Array_method2xVal2, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.method.2x.Val3", runFunction: run_Array_method2xVal3, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.method.2x.Val4", runFunction: run_Array_method2xVal4, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.Mutating.Ref1", runFunction: run_ArrayMutatingRef1, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.Mutating.Ref2", runFunction: run_ArrayMutatingRef2, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.Mutating.Ref3", runFunction: run_ArrayMutatingRef3, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.Mutating.Ref4", runFunction: run_ArrayMutatingRef4, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.Mutating.Val0", runFunction: run_ArrayMutatingVal0, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.Mutating.Val1", runFunction: run_ArrayMutatingVal1, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.Mutating.Val2", runFunction: run_ArrayMutatingVal2, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.Mutating.Val3", runFunction: run_ArrayMutatingVal3, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.Mutating.Val4", runFunction: run_ArrayMutatingVal4, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.Shift.Ref1", runFunction: run_ArrayShiftRef1, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.Shift.Ref2", runFunction: run_ArrayShiftRef2, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.Shift.Ref3", runFunction: run_ArrayShiftRef3, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.Shift.Ref4", runFunction: run_ArrayShiftRef4, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.Shift.Val0", runFunction: run_ArrayShiftVal0, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.Shift.Val1", runFunction: run_ArrayShiftVal1, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.Shift.Val2", runFunction: run_ArrayShiftVal2, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.Shift.Val3", runFunction: run_ArrayShiftVal3, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.Shift.Val4", runFunction: run_ArrayShiftVal4, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.ConditionalShift.Ref1", runFunction: run_ArrayConditionalShiftRef1, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.ConditionalShift.Ref2", runFunction: run_ArrayConditionalShiftRef2, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.ConditionalShift.Ref3", runFunction: run_ArrayConditionalShiftRef3, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.ConditionalShift.Ref4", runFunction: run_ArrayConditionalShiftRef4, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.ConditionalShift.Val0", runFunction: run_ArrayConditionalShiftVal0, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.ConditionalShift.Val1", runFunction: run_ArrayConditionalShiftVal1, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.ConditionalShift.Val2", runFunction: run_ArrayConditionalShiftVal2, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.ConditionalShift.Val3", runFunction: run_ArrayConditionalShiftVal3, tags: ta),
+  BenchmarkInfo(name: "Existential.Array.ConditionalShift.Val4", runFunction: run_ArrayConditionalShiftVal4, tags: ta),
 ]
 
 protocol Existential {
@@ -131,7 +133,7 @@ func next(_ x: inout Int, upto mod: Int) {
   x = (x + 1) % (mod + 1)
 }
 
-struct IntValueBuffer0 : Existential {
+struct Val0 : Existential {
   func doIt() -> Bool {
     return true
 	}
@@ -143,7 +145,7 @@ struct IntValueBuffer0 : Existential {
 	}
 }
 
-struct IntValueBuffer1 : Existential {
+struct Val1 : Existential {
 	var f0: Int = 0
 
   func doIt() -> Bool {
@@ -158,7 +160,7 @@ struct IntValueBuffer1 : Existential {
 	}
 }
 
-struct IntValueBuffer2 : Existential {
+struct Val2 : Existential {
 	var f0: Int = 0
 	var f1: Int = 3
 
@@ -175,7 +177,7 @@ struct IntValueBuffer2 : Existential {
 	}
 }
 
-struct IntValueBuffer3 : Existential {
+struct Val3 : Existential {
 	var f0: Int = 0
 	var f1: Int = 3
 	var f2: Int = 7
@@ -194,7 +196,7 @@ struct IntValueBuffer3 : Existential {
 	}
 }
 
-struct IntValueBuffer4 : Existential {
+struct Val4 : Existential {
 	var f0: Int = 0
 	var f1: Int = 3
 	var f2: Int = 7
@@ -232,7 +234,7 @@ class Klazz { // body same as Val2
 	}
 }
 
-struct ClassValueBuffer1 : Existential {
+struct Ref1 : Existential {
 	var f0: Klazz = Klazz()
 
   func doIt() -> Bool {
@@ -246,7 +248,7 @@ struct ClassValueBuffer1 : Existential {
   }
 }
 
-struct ClassValueBuffer2 : Existential {
+struct Ref2 : Existential {
 	var f0: Klazz = Klazz()
 	var f1: Klazz = Klazz()
 
@@ -261,7 +263,7 @@ struct ClassValueBuffer2 : Existential {
   }
 }
 
-struct ClassValueBuffer3 : Existential {
+struct Ref3 : Existential {
 	var f0: Klazz = Klazz()
 	var f1: Klazz = Klazz()
 	var f2: Klazz = Klazz()
@@ -277,7 +279,7 @@ struct ClassValueBuffer3 : Existential {
   }
 }
 
-struct ClassValueBuffer4 : Existential {
+struct Ref4 : Existential {
 	var f0: Klazz = Klazz()
 	var f1: Klazz = Klazz()
 	var f2: Klazz = Klazz()
@@ -315,7 +317,7 @@ func passExistentialTwiceTwoMethodCalls(_ e0: Existential, _ e1: Existential) ->
   return e0.doIt() && e1.doIt() && e0.reallyDoIt() && e1.reallyDoIt()
 }
 
-func runTestOneMethodCall<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
+func run_method1x<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   let existential = initExistential(withType: T.self)
   for _ in 0 ..< N * 20_000 {
     if !existential.doIt() {
@@ -324,7 +326,7 @@ func runTestOneMethodCall<T: Existential>(withType: T.Type, numberOfTimes N: Int
   }
 }
 
-func runTestTwoMethodCalls<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
+func run_method2x<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   let existential = initExistential(withType: T.self)
   for _ in 0 ..< N * 20_000 {
     if !existential.doIt()  || !existential.reallyDoIt() {
@@ -333,7 +335,7 @@ func runTestTwoMethodCalls<T: Existential>(withType: T.Type, numberOfTimes N: In
   }
 }
 
-func runTestPassExistentialOneMethodCall<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
+func run_Pass_method1x<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   let existential = initExistential(withType: T.self)
   let existential2 = initExistential(withType: T.self)
   for _ in 0 ..< N * 20_000 {
@@ -343,7 +345,7 @@ func runTestPassExistentialOneMethodCall<T: Existential>(withType: T.Type, numbe
   }
 }
 
-func runTestPassExistentialTwoMethodCalls<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
+func run_Pass_method2x<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   let existential = initExistential(withType: T.self)
   let existential2 = initExistential(withType: T.self)
   for _ in 0 ..< N * 20_000 {
@@ -353,7 +355,7 @@ func runTestPassExistentialTwoMethodCalls<T: Existential>(withType: T.Type, numb
   }
 }
 
-func runTestMutating<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
+func run_Mutating<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   var existential = initExistential(withType: T.self)
   for _ in 0 ..< N * 10_000 {
     if !existential.mutateIt()  {
@@ -362,7 +364,7 @@ func runTestMutating<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   }
 }
 
-func runTestMutatingAndNonMutating<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
+func run_MutatingAndNonMutating<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   var existential = initExistential(withType: T.self)
   for _ in 0 ..< N * 10_000 {
     let _ = existential.doIt()
@@ -372,7 +374,7 @@ func runTestMutatingAndNonMutating<T: Existential>(withType: T.Type, numberOfTim
   }
 }
 
-func runTestArrayOneMethodCall<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
+func run_Array_method1x<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   let existentialArray = initExistentialArray(withType: T.self, count: 128)
   for _ in 0 ..< N * 100 {
     for elt in existentialArray {
@@ -383,7 +385,7 @@ func runTestArrayOneMethodCall<T: Existential>(withType: T.Type, numberOfTimes N
   }
 }
 
-func runTestArrayTwoMethodCalls<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
+func run_Array_method2x<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   let existentialArray = initExistentialArray(withType: T.self, count: 128)
   for _ in 0 ..< N * 100 {
     for elt in existentialArray {
@@ -394,7 +396,7 @@ func runTestArrayTwoMethodCalls<T: Existential>(withType: T.Type, numberOfTimes 
   }
 }
 
-func runTestArrayMutating<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
+func run_ArrayMutating<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   var existentialArray = initExistentialArray(withType: T.self, count: 128)
   for _ in 0 ..< N * 100 {
     for i in 0 ..< existentialArray.count {
@@ -405,7 +407,7 @@ func runTestArrayMutating<T: Existential>(withType: T.Type, numberOfTimes N: Int
   }
 }
 
-func runTestArrayShift<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
+func run_ArrayShift<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   var existentialArray = initExistentialArray(withType: T.self, count: 128)
   for _ in 0 ..< N * 10 {
     for i in 0 ..< existentialArray.count-1 {
@@ -414,7 +416,7 @@ func runTestArrayShift<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   }
 }
 
-func runTestArrayConditionalShift<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
+func run_ArrayConditionalShift<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   var existentialArray = initExistentialArray(withType: T.self, count: 128)
   for _ in 0 ..< N * 10 {
     for i in 0 ..< existentialArray.count-1 {
@@ -427,323 +429,323 @@ func runTestArrayConditionalShift<T: Existential>(withType: T.Type, numberOfTime
   }
 }
 
-// TestOneMethodCall.
-public func run_ExistentialTestOneMethodCall_IntValueBuffer0(_ N: Int) {
-  runTestOneMethodCall(withType: IntValueBuffer0.self, numberOfTimes: N)
+// method.1x.
+public func run_method1xVal0(_ N: Int) {
+  run_method1x(withType: Val0.self, numberOfTimes: N)
 }
-public func run_ExistentialTestOneMethodCall_IntValueBuffer1(_ N: Int) {
-  runTestOneMethodCall(withType: IntValueBuffer1.self, numberOfTimes: N)
+public func run_method1xVal1(_ N: Int) {
+  run_method1x(withType: Val1.self, numberOfTimes: N)
 }
-public func run_ExistentialTestOneMethodCall_IntValueBuffer2(_ N: Int) {
-  runTestOneMethodCall(withType: IntValueBuffer2.self, numberOfTimes: N)
+public func run_method1xVal2(_ N: Int) {
+  run_method1x(withType: Val2.self, numberOfTimes: N)
 }
-public func run_ExistentialTestOneMethodCall_IntValueBuffer3(_ N: Int) {
-  runTestOneMethodCall(withType: IntValueBuffer3.self, numberOfTimes: N)
+public func run_method1xVal3(_ N: Int) {
+  run_method1x(withType: Val3.self, numberOfTimes: N)
 }
-public func run_ExistentialTestOneMethodCall_IntValueBuffer4(_ N: Int) {
-  runTestOneMethodCall(withType: IntValueBuffer4.self, numberOfTimes: N)
+public func run_method1xVal4(_ N: Int) {
+  run_method1x(withType: Val4.self, numberOfTimes: N)
 }
-public func run_ExistentialTestOneMethodCall_ClassValueBuffer1(_ N: Int) {
-  runTestOneMethodCall(withType: ClassValueBuffer1.self, numberOfTimes: N)
+public func run_method1xRef1(_ N: Int) {
+  run_method1x(withType: Ref1.self, numberOfTimes: N)
 }
-public func run_ExistentialTestOneMethodCall_ClassValueBuffer2(_ N: Int) {
-  runTestOneMethodCall(withType: ClassValueBuffer2.self, numberOfTimes: N)
+public func run_method1xRef2(_ N: Int) {
+  run_method1x(withType: Ref2.self, numberOfTimes: N)
 }
-public func run_ExistentialTestOneMethodCall_ClassValueBuffer3(_ N: Int) {
-  runTestOneMethodCall(withType: ClassValueBuffer3.self, numberOfTimes: N)
+public func run_method1xRef3(_ N: Int) {
+  run_method1x(withType: Ref3.self, numberOfTimes: N)
 }
-public func run_ExistentialTestOneMethodCall_ClassValueBuffer4(_ N: Int) {
-  runTestOneMethodCall(withType: ClassValueBuffer4.self, numberOfTimes: N)
-}
-
-// TestTwoMethodCalls.
-public func run_ExistentialTestTwoMethodCalls_IntValueBuffer0(_ N: Int) {
-  runTestTwoMethodCalls(withType: IntValueBuffer0.self, numberOfTimes: N)
-}
-public func run_ExistentialTestTwoMethodCalls_IntValueBuffer1(_ N: Int) {
-  runTestTwoMethodCalls(withType: IntValueBuffer1.self, numberOfTimes: N)
-}
-public func run_ExistentialTestTwoMethodCalls_IntValueBuffer2(_ N: Int) {
-  runTestTwoMethodCalls(withType: IntValueBuffer2.self, numberOfTimes: N)
-}
-public func run_ExistentialTestTwoMethodCalls_IntValueBuffer3(_ N: Int) {
-  runTestTwoMethodCalls(withType: IntValueBuffer3.self, numberOfTimes: N)
-}
-public func run_ExistentialTestTwoMethodCalls_IntValueBuffer4(_ N: Int) {
-  runTestTwoMethodCalls(withType: IntValueBuffer4.self, numberOfTimes: N)
-}
-public func run_ExistentialTestTwoMethodCalls_ClassValueBuffer1(_ N: Int) {
-  runTestTwoMethodCalls(withType: ClassValueBuffer1.self, numberOfTimes: N)
-}
-public func run_ExistentialTestTwoMethodCalls_ClassValueBuffer2(_ N: Int) {
-  runTestTwoMethodCalls(withType: ClassValueBuffer2.self, numberOfTimes: N)
-}
-public func run_ExistentialTestTwoMethodCalls_ClassValueBuffer3(_ N: Int) {
-  runTestTwoMethodCalls(withType: ClassValueBuffer3.self, numberOfTimes: N)
-}
-public func run_ExistentialTestTwoMethodCalls_ClassValueBuffer4(_ N: Int) {
-  runTestTwoMethodCalls(withType: ClassValueBuffer4.self, numberOfTimes: N)
+public func run_method1xRef4(_ N: Int) {
+  run_method1x(withType: Ref4.self, numberOfTimes: N)
 }
 
-// TestPassExistentialOneMethodCall.
-public func run_ExistentialTestPassExistentialOneMethodCall_IntValueBuffer0(_ N: Int) {
-  runTestPassExistentialOneMethodCall(withType: IntValueBuffer0.self, numberOfTimes: N)
+// method.2x.
+public func run_method2xVal0(_ N: Int) {
+  run_method2x(withType: Val0.self, numberOfTimes: N)
 }
-public func run_ExistentialTestPassExistentialOneMethodCall_IntValueBuffer1(_ N: Int) {
-  runTestPassExistentialOneMethodCall(withType: IntValueBuffer1.self, numberOfTimes: N)
+public func run_method2xVal1(_ N: Int) {
+  run_method2x(withType: Val1.self, numberOfTimes: N)
 }
-public func run_ExistentialTestPassExistentialOneMethodCall_IntValueBuffer2(_ N: Int) {
-  runTestPassExistentialOneMethodCall(withType: IntValueBuffer2.self, numberOfTimes: N)
+public func run_method2xVal2(_ N: Int) {
+  run_method2x(withType: Val2.self, numberOfTimes: N)
 }
-public func run_ExistentialTestPassExistentialOneMethodCall_IntValueBuffer3(_ N: Int) {
-  runTestPassExistentialOneMethodCall(withType: IntValueBuffer3.self, numberOfTimes: N)
+public func run_method2xVal3(_ N: Int) {
+  run_method2x(withType: Val3.self, numberOfTimes: N)
 }
-public func run_ExistentialTestPassExistentialOneMethodCall_IntValueBuffer4(_ N: Int) {
-  runTestPassExistentialOneMethodCall(withType: IntValueBuffer4.self, numberOfTimes: N)
+public func run_method2xVal4(_ N: Int) {
+  run_method2x(withType: Val4.self, numberOfTimes: N)
 }
-public func run_ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer1(_ N: Int) {
-  runTestPassExistentialOneMethodCall(withType: ClassValueBuffer1.self, numberOfTimes: N)
+public func run_method2xRef1(_ N: Int) {
+  run_method2x(withType: Ref1.self, numberOfTimes: N)
 }
-public func run_ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer2(_ N: Int) {
-  runTestPassExistentialOneMethodCall(withType: ClassValueBuffer2.self, numberOfTimes: N)
+public func run_method2xRef2(_ N: Int) {
+  run_method2x(withType: Ref2.self, numberOfTimes: N)
 }
-public func run_ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer3(_ N: Int) {
-  runTestPassExistentialOneMethodCall(withType: ClassValueBuffer3.self, numberOfTimes: N)
+public func run_method2xRef3(_ N: Int) {
+  run_method2x(withType: Ref3.self, numberOfTimes: N)
 }
-public func run_ExistentialTestPassExistentialOneMethodCall_ClassValueBuffer4(_ N: Int) {
-  runTestPassExistentialOneMethodCall(withType: ClassValueBuffer4.self, numberOfTimes: N)
-}
-
-// TestPassExistentialTwoMethodCalls.
-public func run_ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer0(_ N: Int) {
-  runTestPassExistentialTwoMethodCalls(withType: IntValueBuffer0.self, numberOfTimes: N)
-}
-public func run_ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer1(_ N: Int) {
-  runTestPassExistentialTwoMethodCalls(withType: IntValueBuffer1.self, numberOfTimes: N)
-}
-public func run_ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer2(_ N: Int) {
-  runTestPassExistentialTwoMethodCalls(withType: IntValueBuffer2.self, numberOfTimes: N)
-}
-public func run_ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer3(_ N: Int) {
-  runTestPassExistentialTwoMethodCalls(withType: IntValueBuffer3.self, numberOfTimes: N)
-}
-public func run_ExistentialTestPassExistentialTwoMethodCalls_IntValueBuffer4(_ N: Int) {
-  runTestPassExistentialTwoMethodCalls(withType: IntValueBuffer4.self, numberOfTimes: N)
-}
-public func run_ExistentialTestPassExistentialTwoMethodCalls_ClassValueBuffer1(_ N: Int) {
-  runTestPassExistentialTwoMethodCalls(withType: ClassValueBuffer1.self, numberOfTimes: N)
-}
-public func run_ExistentialTestPassExistentialTwoMethodCalls_ClassValueBuffer2(_ N: Int) {
-  runTestPassExistentialTwoMethodCalls(withType: ClassValueBuffer2.self, numberOfTimes: N)
-}
-public func run_ExistentialTestPassExistentialTwoMethodCalls_ClassValueBuffer3(_ N: Int) {
-  runTestPassExistentialTwoMethodCalls(withType: ClassValueBuffer3.self, numberOfTimes: N)
-}
-public func run_ExistentialTestPassExistentialTwoMethodCalls_ClassValueBuffer4(_ N: Int) {
-  runTestPassExistentialTwoMethodCalls(withType: ClassValueBuffer4.self, numberOfTimes: N)
+public func run_method2xRef4(_ N: Int) {
+  run_method2x(withType: Ref4.self, numberOfTimes: N)
 }
 
-// TestMutating.
-public func run_ExistentialTestMutating_IntValueBuffer0(_ N: Int) {
-  runTestMutating(withType: IntValueBuffer0.self, numberOfTimes: N)
+// Pass.method.1x.
+public func run_Pass_method1xVal0(_ N: Int) {
+  run_Pass_method1x(withType: Val0.self, numberOfTimes: N)
 }
-public func run_ExistentialTestMutating_IntValueBuffer1(_ N: Int) {
-  runTestMutating(withType: IntValueBuffer1.self, numberOfTimes: N)
+public func run_Pass_method1xVal1(_ N: Int) {
+  run_Pass_method1x(withType: Val1.self, numberOfTimes: N)
 }
-public func run_ExistentialTestMutating_IntValueBuffer2(_ N: Int) {
-  runTestMutating(withType: IntValueBuffer2.self, numberOfTimes: N)
+public func run_Pass_method1xVal2(_ N: Int) {
+  run_Pass_method1x(withType: Val2.self, numberOfTimes: N)
 }
-public func run_ExistentialTestMutating_IntValueBuffer3(_ N: Int) {
-  runTestMutating(withType: IntValueBuffer3.self, numberOfTimes: N)
+public func run_Pass_method1xVal3(_ N: Int) {
+  run_Pass_method1x(withType: Val3.self, numberOfTimes: N)
 }
-public func run_ExistentialTestMutating_IntValueBuffer4(_ N: Int) {
-  runTestMutating(withType: IntValueBuffer4.self, numberOfTimes: N)
+public func run_Pass_method1xVal4(_ N: Int) {
+  run_Pass_method1x(withType: Val4.self, numberOfTimes: N)
 }
-public func run_ExistentialTestMutating_ClassValueBuffer1(_ N: Int) {
-  runTestMutating(withType: ClassValueBuffer1.self, numberOfTimes: N)
+public func run_Pass_method1xRef1(_ N: Int) {
+  run_Pass_method1x(withType: Ref1.self, numberOfTimes: N)
 }
-public func run_ExistentialTestMutating_ClassValueBuffer2(_ N: Int) {
-  runTestMutating(withType: ClassValueBuffer2.self, numberOfTimes: N)
+public func run_Pass_method1xRef2(_ N: Int) {
+  run_Pass_method1x(withType: Ref2.self, numberOfTimes: N)
 }
-public func run_ExistentialTestMutating_ClassValueBuffer3(_ N: Int) {
-  runTestMutating(withType: ClassValueBuffer3.self, numberOfTimes: N)
+public func run_Pass_method1xRef3(_ N: Int) {
+  run_Pass_method1x(withType: Ref3.self, numberOfTimes: N)
 }
-public func run_ExistentialTestMutating_ClassValueBuffer4(_ N: Int) {
-  runTestMutating(withType: ClassValueBuffer4.self, numberOfTimes: N)
-}
-
-// TestMutatingAndNonMutating.
-public func run_ExistentialTestMutatingAndNonMutating_IntValueBuffer0(_ N: Int) {
-  runTestMutatingAndNonMutating(withType: IntValueBuffer0.self, numberOfTimes: N)
-}
-public func run_ExistentialTestMutatingAndNonMutating_IntValueBuffer1(_ N: Int) {
-  runTestMutatingAndNonMutating(withType: IntValueBuffer1.self, numberOfTimes: N)
-}
-public func run_ExistentialTestMutatingAndNonMutating_IntValueBuffer2(_ N: Int) {
-  runTestMutatingAndNonMutating(withType: IntValueBuffer2.self, numberOfTimes: N)
-}
-public func run_ExistentialTestMutatingAndNonMutating_IntValueBuffer3(_ N: Int) {
-  runTestMutatingAndNonMutating(withType: IntValueBuffer3.self, numberOfTimes: N)
-}
-public func run_ExistentialTestMutatingAndNonMutating_IntValueBuffer4(_ N: Int) {
-  runTestMutatingAndNonMutating(withType: IntValueBuffer4.self, numberOfTimes: N)
-}
-public func run_ExistentialTestMutatingAndNonMutating_ClassValueBuffer1(_ N: Int) {
-  runTestMutatingAndNonMutating(withType: ClassValueBuffer1.self, numberOfTimes: N)
-}
-public func run_ExistentialTestMutatingAndNonMutating_ClassValueBuffer2(_ N: Int) {
-  runTestMutatingAndNonMutating(withType: ClassValueBuffer2.self, numberOfTimes: N)
-}
-public func run_ExistentialTestMutatingAndNonMutating_ClassValueBuffer3(_ N: Int) {
-  runTestMutatingAndNonMutating(withType: ClassValueBuffer3.self, numberOfTimes: N)
-}
-public func run_ExistentialTestMutatingAndNonMutating_ClassValueBuffer4(_ N: Int) {
-  runTestMutatingAndNonMutating(withType: ClassValueBuffer4.self, numberOfTimes: N)
+public func run_Pass_method1xRef4(_ N: Int) {
+  run_Pass_method1x(withType: Ref4.self, numberOfTimes: N)
 }
 
-// TestArrayOneMethodCall.
-public func run_ExistentialTestArrayOneMethodCall_IntValueBuffer0(_ N: Int) {
-  runTestArrayOneMethodCall(withType: IntValueBuffer0.self, numberOfTimes: N)
+// Pass.method.2x.
+public func run_Pass_method2xVal0(_ N: Int) {
+  run_Pass_method2x(withType: Val0.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayOneMethodCall_IntValueBuffer1(_ N: Int) {
-  runTestArrayOneMethodCall(withType: IntValueBuffer1.self, numberOfTimes: N)
+public func run_Pass_method2xVal1(_ N: Int) {
+  run_Pass_method2x(withType: Val1.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayOneMethodCall_IntValueBuffer2(_ N: Int) {
-  runTestArrayOneMethodCall(withType: IntValueBuffer2.self, numberOfTimes: N)
+public func run_Pass_method2xVal2(_ N: Int) {
+  run_Pass_method2x(withType: Val2.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayOneMethodCall_IntValueBuffer3(_ N: Int) {
-  runTestArrayOneMethodCall(withType: IntValueBuffer3.self, numberOfTimes: N)
+public func run_Pass_method2xVal3(_ N: Int) {
+  run_Pass_method2x(withType: Val3.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayOneMethodCall_IntValueBuffer4(_ N: Int) {
-  runTestArrayOneMethodCall(withType: IntValueBuffer4.self, numberOfTimes: N)
+public func run_Pass_method2xVal4(_ N: Int) {
+  run_Pass_method2x(withType: Val4.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayOneMethodCall_ClassValueBuffer1(_ N: Int) {
-  runTestArrayOneMethodCall(withType: ClassValueBuffer1.self, numberOfTimes: N)
+public func run_Pass_method2xRef1(_ N: Int) {
+  run_Pass_method2x(withType: Ref1.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayOneMethodCall_ClassValueBuffer2(_ N: Int) {
-  runTestArrayOneMethodCall(withType: ClassValueBuffer2.self, numberOfTimes: N)
+public func run_Pass_method2xRef2(_ N: Int) {
+  run_Pass_method2x(withType: Ref2.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayOneMethodCall_ClassValueBuffer3(_ N: Int) {
-  runTestArrayOneMethodCall(withType: ClassValueBuffer3.self, numberOfTimes: N)
+public func run_Pass_method2xRef3(_ N: Int) {
+  run_Pass_method2x(withType: Ref3.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayOneMethodCall_ClassValueBuffer4(_ N: Int) {
-  runTestArrayOneMethodCall(withType: ClassValueBuffer4.self, numberOfTimes: N)
-}
-
-// TestArrayTwoMethodCalls.
-public func run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer0(_ N: Int) {
-  runTestArrayTwoMethodCalls(withType: IntValueBuffer0.self, numberOfTimes: N)
-}
-public func run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer1(_ N: Int) {
-  runTestArrayTwoMethodCalls(withType: IntValueBuffer1.self, numberOfTimes: N)
-}
-public func run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer2(_ N: Int) {
-  runTestArrayTwoMethodCalls(withType: IntValueBuffer2.self, numberOfTimes: N)
-}
-public func run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer3(_ N: Int) {
-  runTestArrayTwoMethodCalls(withType: IntValueBuffer3.self, numberOfTimes: N)
-}
-public func run_ExistentialTestArrayTwoMethodCalls_IntValueBuffer4(_ N: Int) {
-  runTestArrayTwoMethodCalls(withType: IntValueBuffer4.self, numberOfTimes: N)
-}
-public func run_ExistentialTestArrayTwoMethodCalls_ClassValueBuffer1(_ N: Int) {
-  runTestArrayTwoMethodCalls(withType: ClassValueBuffer1.self, numberOfTimes: N)
-}
-public func run_ExistentialTestArrayTwoMethodCalls_ClassValueBuffer2(_ N: Int) {
-  runTestArrayTwoMethodCalls(withType: ClassValueBuffer2.self, numberOfTimes: N)
-}
-public func run_ExistentialTestArrayTwoMethodCalls_ClassValueBuffer3(_ N: Int) {
-  runTestArrayTwoMethodCalls(withType: ClassValueBuffer3.self, numberOfTimes: N)
-}
-public func run_ExistentialTestArrayTwoMethodCalls_ClassValueBuffer4(_ N: Int) {
-  runTestArrayTwoMethodCalls(withType: ClassValueBuffer4.self, numberOfTimes: N)
+public func run_Pass_method2xRef4(_ N: Int) {
+  run_Pass_method2x(withType: Ref4.self, numberOfTimes: N)
 }
 
-// TestArrayMutating.
-public func run_ExistentialTestArrayMutating_IntValueBuffer0(_ N: Int) {
-  runTestArrayMutating(withType: IntValueBuffer0.self, numberOfTimes: N)
+// Mutating.
+public func run_MutatingVal0(_ N: Int) {
+  run_Mutating(withType: Val0.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayMutating_IntValueBuffer1(_ N: Int) {
-  runTestArrayMutating(withType: IntValueBuffer1.self, numberOfTimes: N)
+public func run_MutatingVal1(_ N: Int) {
+  run_Mutating(withType: Val1.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayMutating_IntValueBuffer2(_ N: Int) {
-  runTestArrayMutating(withType: IntValueBuffer2.self, numberOfTimes: N)
+public func run_MutatingVal2(_ N: Int) {
+  run_Mutating(withType: Val2.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayMutating_IntValueBuffer3(_ N: Int) {
-  runTestArrayMutating(withType: IntValueBuffer3.self, numberOfTimes: N)
+public func run_MutatingVal3(_ N: Int) {
+  run_Mutating(withType: Val3.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayMutating_IntValueBuffer4(_ N: Int) {
-  runTestArrayMutating(withType: IntValueBuffer4.self, numberOfTimes: N)
+public func run_MutatingVal4(_ N: Int) {
+  run_Mutating(withType: Val4.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayMutating_ClassValueBuffer1(_ N: Int) {
-  runTestArrayMutating(withType: ClassValueBuffer1.self, numberOfTimes: N)
+public func run_MutatingRef1(_ N: Int) {
+  run_Mutating(withType: Ref1.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayMutating_ClassValueBuffer2(_ N: Int) {
-  runTestArrayMutating(withType: ClassValueBuffer2.self, numberOfTimes: N)
+public func run_MutatingRef2(_ N: Int) {
+  run_Mutating(withType: Ref2.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayMutating_ClassValueBuffer3(_ N: Int) {
-  runTestArrayMutating(withType: ClassValueBuffer3.self, numberOfTimes: N)
+public func run_MutatingRef3(_ N: Int) {
+  run_Mutating(withType: Ref3.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayMutating_ClassValueBuffer4(_ N: Int) {
-  runTestArrayMutating(withType: ClassValueBuffer4.self, numberOfTimes: N)
-}
-
-// TestArrayShift.
-public func run_ExistentialTestArrayShift_IntValueBuffer0(_ N: Int) {
-  runTestArrayShift(withType: IntValueBuffer0.self, numberOfTimes: N)
-}
-public func run_ExistentialTestArrayShift_IntValueBuffer1(_ N: Int) {
-  runTestArrayShift(withType: IntValueBuffer1.self, numberOfTimes: N)
-}
-public func run_ExistentialTestArrayShift_IntValueBuffer2(_ N: Int) {
-  runTestArrayShift(withType: IntValueBuffer2.self, numberOfTimes: N)
-}
-public func run_ExistentialTestArrayShift_IntValueBuffer3(_ N: Int) {
-  runTestArrayShift(withType: IntValueBuffer3.self, numberOfTimes: N)
-}
-public func run_ExistentialTestArrayShift_IntValueBuffer4(_ N: Int) {
-  runTestArrayShift(withType: IntValueBuffer4.self, numberOfTimes: N)
-}
-public func run_ExistentialTestArrayShift_ClassValueBuffer1(_ N: Int) {
-  runTestArrayShift(withType: ClassValueBuffer1.self, numberOfTimes: N)
-}
-public func run_ExistentialTestArrayShift_ClassValueBuffer2(_ N: Int) {
-  runTestArrayShift(withType: ClassValueBuffer2.self, numberOfTimes: N)
-}
-public func run_ExistentialTestArrayShift_ClassValueBuffer3(_ N: Int) {
-  runTestArrayShift(withType: ClassValueBuffer3.self, numberOfTimes: N)
-}
-public func run_ExistentialTestArrayShift_ClassValueBuffer4(_ N: Int) {
-  runTestArrayShift(withType: ClassValueBuffer4.self, numberOfTimes: N)
+public func run_MutatingRef4(_ N: Int) {
+  run_Mutating(withType: Ref4.self, numberOfTimes: N)
 }
 
-// TestArrayConditionalShift.
-public func run_ExistentialTestArrayConditionalShift_IntValueBuffer0(_ N: Int) {
-  runTestArrayConditionalShift(withType: IntValueBuffer0.self, numberOfTimes: N)
+// MutatingAndNonMutating.
+public func run_MutatingAndNonMutatingVal0(_ N: Int) {
+  run_MutatingAndNonMutating(withType: Val0.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayConditionalShift_IntValueBuffer1(_ N: Int) {
-  runTestArrayConditionalShift(withType: IntValueBuffer1.self, numberOfTimes: N)
+public func run_MutatingAndNonMutatingVal1(_ N: Int) {
+  run_MutatingAndNonMutating(withType: Val1.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayConditionalShift_IntValueBuffer2(_ N: Int) {
-  runTestArrayConditionalShift(withType: IntValueBuffer2.self, numberOfTimes: N)
+public func run_MutatingAndNonMutatingVal2(_ N: Int) {
+  run_MutatingAndNonMutating(withType: Val2.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayConditionalShift_IntValueBuffer3(_ N: Int) {
-  runTestArrayConditionalShift(withType: IntValueBuffer3.self, numberOfTimes: N)
+public func run_MutatingAndNonMutatingVal3(_ N: Int) {
+  run_MutatingAndNonMutating(withType: Val3.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayConditionalShift_IntValueBuffer4(_ N: Int) {
-  runTestArrayConditionalShift(withType: IntValueBuffer4.self, numberOfTimes: N)
+public func run_MutatingAndNonMutatingVal4(_ N: Int) {
+  run_MutatingAndNonMutating(withType: Val4.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayConditionalShift_ClassValueBuffer1(_ N: Int) {
-  runTestArrayConditionalShift(withType: ClassValueBuffer1.self, numberOfTimes: N)
+public func run_MutatingAndNonMutatingRef1(_ N: Int) {
+  run_MutatingAndNonMutating(withType: Ref1.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayConditionalShift_ClassValueBuffer2(_ N: Int) {
-  runTestArrayConditionalShift(withType: ClassValueBuffer2.self, numberOfTimes: N)
+public func run_MutatingAndNonMutatingRef2(_ N: Int) {
+  run_MutatingAndNonMutating(withType: Ref2.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayConditionalShift_ClassValueBuffer3(_ N: Int) {
-  runTestArrayConditionalShift(withType: ClassValueBuffer3.self, numberOfTimes: N)
+public func run_MutatingAndNonMutatingRef3(_ N: Int) {
+  run_MutatingAndNonMutating(withType: Ref3.self, numberOfTimes: N)
 }
-public func run_ExistentialTestArrayConditionalShift_ClassValueBuffer4(_ N: Int) {
-  runTestArrayConditionalShift(withType: ClassValueBuffer4.self, numberOfTimes: N)
+public func run_MutatingAndNonMutatingRef4(_ N: Int) {
+  run_MutatingAndNonMutating(withType: Ref4.self, numberOfTimes: N)
+}
+
+// Array.method.1x.
+public func run_Array_method1xVal0(_ N: Int) {
+  run_Array_method1x(withType: Val0.self, numberOfTimes: N)
+}
+public func run_Array_method1xVal1(_ N: Int) {
+  run_Array_method1x(withType: Val1.self, numberOfTimes: N)
+}
+public func run_Array_method1xVal2(_ N: Int) {
+  run_Array_method1x(withType: Val2.self, numberOfTimes: N)
+}
+public func run_Array_method1xVal3(_ N: Int) {
+  run_Array_method1x(withType: Val3.self, numberOfTimes: N)
+}
+public func run_Array_method1xVal4(_ N: Int) {
+  run_Array_method1x(withType: Val4.self, numberOfTimes: N)
+}
+public func run_Array_method1xRef1(_ N: Int) {
+  run_Array_method1x(withType: Ref1.self, numberOfTimes: N)
+}
+public func run_Array_method1xRef2(_ N: Int) {
+  run_Array_method1x(withType: Ref2.self, numberOfTimes: N)
+}
+public func run_Array_method1xRef3(_ N: Int) {
+  run_Array_method1x(withType: Ref3.self, numberOfTimes: N)
+}
+public func run_Array_method1xRef4(_ N: Int) {
+  run_Array_method1x(withType: Ref4.self, numberOfTimes: N)
+}
+
+// Array.method.2x.
+public func run_Array_method2xVal0(_ N: Int) {
+  run_Array_method2x(withType: Val0.self, numberOfTimes: N)
+}
+public func run_Array_method2xVal1(_ N: Int) {
+  run_Array_method2x(withType: Val1.self, numberOfTimes: N)
+}
+public func run_Array_method2xVal2(_ N: Int) {
+  run_Array_method2x(withType: Val2.self, numberOfTimes: N)
+}
+public func run_Array_method2xVal3(_ N: Int) {
+  run_Array_method2x(withType: Val3.self, numberOfTimes: N)
+}
+public func run_Array_method2xVal4(_ N: Int) {
+  run_Array_method2x(withType: Val4.self, numberOfTimes: N)
+}
+public func run_Array_method2xRef1(_ N: Int) {
+  run_Array_method2x(withType: Ref1.self, numberOfTimes: N)
+}
+public func run_Array_method2xRef2(_ N: Int) {
+  run_Array_method2x(withType: Ref2.self, numberOfTimes: N)
+}
+public func run_Array_method2xRef3(_ N: Int) {
+  run_Array_method2x(withType: Ref3.self, numberOfTimes: N)
+}
+public func run_Array_method2xRef4(_ N: Int) {
+  run_Array_method2x(withType: Ref4.self, numberOfTimes: N)
+}
+
+// Array.Mutating.
+public func run_ArrayMutatingVal0(_ N: Int) {
+  run_ArrayMutating(withType: Val0.self, numberOfTimes: N)
+}
+public func run_ArrayMutatingVal1(_ N: Int) {
+  run_ArrayMutating(withType: Val1.self, numberOfTimes: N)
+}
+public func run_ArrayMutatingVal2(_ N: Int) {
+  run_ArrayMutating(withType: Val2.self, numberOfTimes: N)
+}
+public func run_ArrayMutatingVal3(_ N: Int) {
+  run_ArrayMutating(withType: Val3.self, numberOfTimes: N)
+}
+public func run_ArrayMutatingVal4(_ N: Int) {
+  run_ArrayMutating(withType: Val4.self, numberOfTimes: N)
+}
+public func run_ArrayMutatingRef1(_ N: Int) {
+  run_ArrayMutating(withType: Ref1.self, numberOfTimes: N)
+}
+public func run_ArrayMutatingRef2(_ N: Int) {
+  run_ArrayMutating(withType: Ref2.self, numberOfTimes: N)
+}
+public func run_ArrayMutatingRef3(_ N: Int) {
+  run_ArrayMutating(withType: Ref3.self, numberOfTimes: N)
+}
+public func run_ArrayMutatingRef4(_ N: Int) {
+  run_ArrayMutating(withType: Ref4.self, numberOfTimes: N)
+}
+
+// Array.Shift.
+public func run_ArrayShiftVal0(_ N: Int) {
+  run_ArrayShift(withType: Val0.self, numberOfTimes: N)
+}
+public func run_ArrayShiftVal1(_ N: Int) {
+  run_ArrayShift(withType: Val1.self, numberOfTimes: N)
+}
+public func run_ArrayShiftVal2(_ N: Int) {
+  run_ArrayShift(withType: Val2.self, numberOfTimes: N)
+}
+public func run_ArrayShiftVal3(_ N: Int) {
+  run_ArrayShift(withType: Val3.self, numberOfTimes: N)
+}
+public func run_ArrayShiftVal4(_ N: Int) {
+  run_ArrayShift(withType: Val4.self, numberOfTimes: N)
+}
+public func run_ArrayShiftRef1(_ N: Int) {
+  run_ArrayShift(withType: Ref1.self, numberOfTimes: N)
+}
+public func run_ArrayShiftRef2(_ N: Int) {
+  run_ArrayShift(withType: Ref2.self, numberOfTimes: N)
+}
+public func run_ArrayShiftRef3(_ N: Int) {
+  run_ArrayShift(withType: Ref3.self, numberOfTimes: N)
+}
+public func run_ArrayShiftRef4(_ N: Int) {
+  run_ArrayShift(withType: Ref4.self, numberOfTimes: N)
+}
+
+// Array.ConditionalShift.
+public func run_ArrayConditionalShiftVal0(_ N: Int) {
+  run_ArrayConditionalShift(withType: Val0.self, numberOfTimes: N)
+}
+public func run_ArrayConditionalShiftVal1(_ N: Int) {
+  run_ArrayConditionalShift(withType: Val1.self, numberOfTimes: N)
+}
+public func run_ArrayConditionalShiftVal2(_ N: Int) {
+  run_ArrayConditionalShift(withType: Val2.self, numberOfTimes: N)
+}
+public func run_ArrayConditionalShiftVal3(_ N: Int) {
+  run_ArrayConditionalShift(withType: Val3.self, numberOfTimes: N)
+}
+public func run_ArrayConditionalShiftVal4(_ N: Int) {
+  run_ArrayConditionalShift(withType: Val4.self, numberOfTimes: N)
+}
+public func run_ArrayConditionalShiftRef1(_ N: Int) {
+  run_ArrayConditionalShift(withType: Ref1.self, numberOfTimes: N)
+}
+public func run_ArrayConditionalShiftRef2(_ N: Int) {
+  run_ArrayConditionalShift(withType: Ref2.self, numberOfTimes: N)
+}
+public func run_ArrayConditionalShiftRef3(_ N: Int) {
+  run_ArrayConditionalShift(withType: Ref3.self, numberOfTimes: N)
+}
+public func run_ArrayConditionalShiftRef4(_ N: Int) {
+  run_ArrayConditionalShift(withType: Ref4.self, numberOfTimes: N)
 }
 
 // Local Variables:
