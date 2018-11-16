@@ -5458,11 +5458,7 @@ void GenericSignatureBuilder::inferRequirements(
 
 void GenericSignatureBuilder::inferRequirements(
                                           ModuleDecl &module,
-                                          ParameterList *params,
-                                          GenericParamList *genericParams) {
-  if (genericParams == nullptr)
-    return;
-
+                                          ParameterList *params) {
   for (auto P : *params) {
     inferRequirements(module, P->getTypeLoc().getType(),
                       P->getTypeLoc().getTypeRepr(),
