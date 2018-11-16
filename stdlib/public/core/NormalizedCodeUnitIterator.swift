@@ -361,20 +361,15 @@ struct _NormalizedUTF16CodeUnitIterator: IteratorProtocol {
       segmentBufferCount = normalizeFromSource()
     }
 
-    //exactly one of the buffers should have code units for us to return
-    _internalInvariant((segmentBufferCount == 0)
-              != ((overflowBuffer?.count ?? 0) == 0))
+    guard segmentBufferIndex < segmentBufferCount else { return nil }
+    
 
     if segmentBufferIndex < segmentBufferCount {
-      defer { segmentBufferIndex += 1 }
-      if _slowPath(segmentHeapBuffer != nil) {
-        return segmentHeapBuffer![segmentBufferIndex]
-      } else {
-        return segmentBuffer[segmentBufferIndex]
-      }
-    } else {
-      return nil
+    defer { segmentBufferIndex += 1 }
+    if _slowPath(segmentHeapBuffer != nil) {
+      return segmentHeapBuffer![segmentBufferIndex]
     }
+    return segmentBuffer[segmentBufferIndex]
   }
   
   mutating func normalizeFromSource() -> Int {
@@ -387,32 +382,40 @@ struct _NormalizedUTF16CodeUnitIterator: IteratorProtocol {
         into: &segmentBuffer
       ) {
         return count
-      } else {
-        return normalizeWithHeapBuffers(filled)
       }
-    } else {
-      return normalizeWithHeapBuffers()
+      return normalizeWithHeapBuffers(filled)
     }
+    return normalizeWithHeapBuffers()
   }
   
+  //This handles normalization from an intermediate buffer to the heap segment
+  //buffer. This can get called in 3 situations:
+  //* We've already transitioned to heap buffers
+  //* We attempted to fill the pre-normal stack buffer but there was not enough
+  //. room, so we need to promote both and then attempt the fill again.
+  //* The fill for the stack buffer succeeded, but the normalization didn't. In
+  //  this case, we want to first copy the contents of the stack buffer that
+  //  we filled into the new heap buffer. The stackBufferCount
+  //  parameter signals that we need to do this copy, thus skipping the fill
+  //  that we would normally do before normalization.
   mutating func normalizeWithHeapBuffers(
-    _ copyFromNormalizationBuffer: Int? = nil
+    _ stackBufferCount: Int? = nil
   ) -> Int {
     if segmentHeapBuffer == nil {
       _sanityCheck(normalizationHeapBuffer == nil)
-      let extraInBuffer = copyFromNormalizationBuffer ?? 0
-      let size = (source.remaining + extraInBuffer) 
+      let preFilledBufferCount = stackBufferCount ?? 0
+      let size = (source.remaining + preFilledBufferCount) 
                  * _Normalization._maxNFCExpansionFactor
       segmentHeapBuffer = Array(repeating: 0, count: size)
       normalizationHeapBuffer = Array(repeating:0, count: size)
-      for i in 0..<extraInBuffer {
+      for i in 0..<preFilledBufferCount {
         normalizationHeapBuffer![i] = normalizationBuffer[i]
       }
     }
     
     guard let count = normalizationHeapBuffer!.withUnsafeMutableBufferPointer({
       (normalizationHeapBufferPtr) -> Int? in
-      guard let filled = copyFromNormalizationBuffer ??
+      guard let filled = stackBufferCount ??
         source.tryFill(into: normalizationHeapBufferPtr)
       else {
         fatalError("Invariant broken, buffer should have space")
@@ -636,22 +639,19 @@ extension _NormalizedUTF8CodeUnitIterator_2 {
         let result = _lexicographicalCompare(cu, otherCU)
         if result == .equal {
           continue
-        } else {
-          return result
         }
-      } else {
-        //other returned nil, we are greater
-        return .greater
+        return result
       }
+      //other returned nil, we are greater
+      return .greater
     }
 
     //we ran out of code units, either we are equal, or only we ran out and
     //other is greater
     if let _ = mutableOther.next() {
       return .less
-    } else {
-      return .equal
     }
+    return .equal
   }
 }
 
