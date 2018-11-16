@@ -1290,6 +1290,25 @@ extension Array: RangeReplaceableCollection {
   }
 }
 
+// Implementations of + and += for same-type arrays. This combined
+// with the operator declarations for these operators designating this
+// type as a place to prefer this operator help the expression type
+// checker speed up cases where there is a large number of uses of the
+// operator in the same expression.
+extension Array {
+  @inlinable
+  public static func + (lhs: Array, rhs: Array) -> Array {
+    var lhs = lhs
+    lhs.append(contentsOf: rhs)
+    return lhs
+  }
+
+  @inlinable
+  public static func += (lhs: inout Array, rhs: Array) {
+    lhs.append(contentsOf: rhs)
+  }
+}
+
 extension Array: CustomReflectable {
   /// A mirror that reflects the array.
   public var customMirror: Mirror {

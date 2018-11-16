@@ -420,7 +420,7 @@ infix operator   & : MultiplicationPrecedence, BinaryInteger
 
 // "Additive"
 
-infix operator   + : AdditionPrecedence, AdditiveArithmetic, String, Strideable
+infix operator   + : AdditionPrecedence, AdditiveArithmetic, String, Array, Strideable
 infix operator  &+ : AdditionPrecedence, FixedWidthInteger
 infix operator   - : AdditionPrecedence, AdditiveArithmetic, Strideable
 infix operator  &- : AdditionPrecedence, FixedWidthInteger
@@ -474,7 +474,7 @@ infix operator   *= : AssignmentPrecedence, Numeric
 infix operator  &*= : AssignmentPrecedence, FixedWidthInteger
 infix operator   /= : AssignmentPrecedence, BinaryInteger
 infix operator   %= : AssignmentPrecedence, BinaryInteger
-infix operator   += : AssignmentPrecedence, AdditiveArithmetic, String, Strideable
+infix operator   += : AssignmentPrecedence, AdditiveArithmetic, String, Array, Strideable
 infix operator  &+= : AssignmentPrecedence, FixedWidthInteger
 infix operator   -= : AssignmentPrecedence, AdditiveArithmetic, Strideable
 infix operator  &-= : AssignmentPrecedence, FixedWidthInteger
