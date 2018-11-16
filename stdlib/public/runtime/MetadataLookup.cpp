@@ -1270,15 +1270,15 @@ TypeInfo swift_getTypeByMangledNameImpl(
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 const Metadata * _Nullable
-swift_stdlib_getTypeByMangledName(const char *typeNameStart,
-                                  size_t typeNameLength) {
+swift_stdlib_getTypeByMangledName(
+                        const char *typeNameStart,
+                        size_t typeNameLength,
+                        const TargetGenericEnvironment<InProcess> *environment,
+                        const void * const *genericArgs) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
-  auto metadata =
-    swift_getTypeByMangledName(
-      typeName,
-      [](unsigned depth, unsigned index) { return nullptr; },
-      [](const Metadata *type, unsigned index) { return nullptr; });
-
+  SubstGenericParametersFromMetadata substitutions(environment, genericArgs);
+  auto metadata = swift_getTypeByMangledName(typeName, substitutions,
+                                             substitutions);
   if (!metadata) return nullptr;
 
   return swift_checkMetadataState(MetadataState::Complete, metadata).Value;
@@ -1290,7 +1290,7 @@ buildDescriptorPath(const ContextDescriptor *context) const {
   if (!context)
     return 0;
 
-  // Add the parent's contributino to the descriptor path.
+  // Add the parent's contribution to the descriptor path.
   unsigned numKeyGenericParamsInParent =
     buildDescriptorPath(context->Parent.get());
 
@@ -1301,7 +1301,8 @@ buildDescriptorPath(const ContextDescriptor *context) const {
   // Count the number of key generic params at this level.
   unsigned numKeyGenericParamsHere = 0;
   bool hasNonKeyGenericParams = false;
-  for (const auto &genericParam : getLocalGenericParams(context)) {
+  auto localGenericParams = getLocalGenericParams(context);
+  for (const auto &genericParam : localGenericParams) {
     if (genericParam.hasKeyArgument())
       ++numKeyGenericParamsHere;
     else
@@ -1309,18 +1310,69 @@ buildDescriptorPath(const ContextDescriptor *context) const {
   }
 
   // Form the path element.
-  descriptorPath.push_back(PathElement{context, numKeyGenericParamsInParent,
+  descriptorPath.push_back(PathElement{localGenericParams,
+                                       context->getNumGenericParams(),
+                                       numKeyGenericParamsInParent,
                                        numKeyGenericParamsHere,
                                        hasNonKeyGenericParams});
   return numKeyGenericParamsInParent + numKeyGenericParamsHere;
 }
 
+  /// Builds a path from the generic environment.
+unsigned SubstGenericParametersFromMetadata::
+buildEnvironmentPath(
+    const TargetGenericEnvironment<InProcess> *environment) const {
+  unsigned totalParamCount = 0;
+  unsigned totalKeyParamCount = 0;
+  auto genericParams = environment->getGenericParameters();
+  for (unsigned numLocalParams : environment->getGenericParameterCounts()) {
+    // Adkjust totalParamCount so we have the # of local parameters.
+    numLocalParams -= totalParamCount;
+
+    // Get the local generic parameters.
+    auto localGenericParams = genericParams.slice(0, numLocalParams);
+    genericParams = genericParams.slice(numLocalParams);
+
+    // Count the parameters.
+    unsigned numKeyGenericParamsInParent = totalKeyParamCount;
+    unsigned numKeyGenericParamsHere = 0;
+    bool hasNonKeyGenericParams = false;
+    for (const auto &genericParam : localGenericParams) {
+      if (genericParam.hasKeyArgument())
+        ++numKeyGenericParamsHere;
+      else
+        hasNonKeyGenericParams = true;
+    }
+
+    // Update totals.
+    totalParamCount += numLocalParams;
+    totalKeyParamCount += numKeyGenericParamsHere;
+
+    // Add to the descriptor path.
+    descriptorPath.push_back(PathElement{localGenericParams,
+                                         totalParamCount,
+                                         numKeyGenericParamsInParent,
+                                         numKeyGenericParamsHere,
+                                         hasNonKeyGenericParams});
+  }
+
+  return totalKeyParamCount;
+}
+
 void SubstGenericParametersFromMetadata::setup() const {
-  if (!descriptorPath.empty() || !base)
+  if (!descriptorPath.empty())
     return;
 
-  auto descriptor = base->getTypeContextDescriptor();
-  numKeyGenericParameters = buildDescriptorPath(descriptor);
+  if (sourceIsMetadata && base) {
+    auto descriptor = base->getTypeContextDescriptor();
+    numKeyGenericParameters = buildDescriptorPath(descriptor);
+    return;
+  }
+
+  if (!sourceIsMetadata && environment) {
+    numKeyGenericParameters = buildEnvironmentPath(environment);
+    return;
+  }
 }
 
 const Metadata *
@@ -1335,10 +1387,9 @@ SubstGenericParametersFromMetadata::operator()(
 
   /// Retrieve the descriptor path element at this depth.
   auto &pathElement = descriptorPath[depth];
-  auto currentContext = pathElement.context;
 
   // Check whether the index is clearly out of bounds.
-  if (index >= currentContext->getNumGenericParams())
+  if (index >= pathElement.numTotalGenericParams)
     return nullptr;
 
   // Compute the flat index.
@@ -1346,7 +1397,7 @@ SubstGenericParametersFromMetadata::operator()(
   if (pathElement.hasNonKeyGenericParams > 0) {
     // We have non-key generic parameters at this level, so the index needs to
     // be checked more carefully.
-    auto genericParams = getLocalGenericParams(currentContext);
+    auto genericParams = pathElement.localGenericParams;
 
     // Make sure that the requested parameter itself has a key argument.
     if (!genericParams[index].hasKeyArgument())
@@ -1362,7 +1413,7 @@ SubstGenericParametersFromMetadata::operator()(
     flatIndex += index;
   }
 
-  return base->getGenericArgs()[flatIndex];
+  return (const Metadata *)genericArgs[flatIndex];
 }
 
 const WitnessTable *
@@ -1371,8 +1422,7 @@ SubstGenericParametersFromMetadata::operator()(const Metadata *type,
   // On first access, compute the descriptor path.
   setup();
 
-  return (const WitnessTable *)base->getGenericArgs()[
-                                              index + numKeyGenericParameters];
+  return (const WitnessTable *)genericArgs[index + numKeyGenericParameters];
 }
 
 const Metadata *SubstGenericParametersFromWrittenArgs::operator()(

@@ -294,3 +294,11 @@ std::string IRGenMangler::mangleSymbolNameForKeyPathMetadata(
     assert(conformance.isInvalid() && "Unknown protocol conformance");
   return finalize();
 }
+
+std::string IRGenMangler::mangleSymbolNameForGenericEnvironment(
+                                              CanGenericSignature genericSig) {
+  beginManglingWithoutPrefix();
+  Buffer << "generic environment ";
+  appendGenericSignature(genericSig);
+  return finalize();
+}
