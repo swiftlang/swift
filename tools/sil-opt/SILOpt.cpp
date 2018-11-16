@@ -168,6 +168,11 @@ SILInlineThreshold("sil-inline-threshold", llvm::cl::Hidden,
                    llvm::cl::init(-1));
 
 static llvm::cl::opt<bool>
+SILExistentialSpecializer("enable-sil-existential-specializer", 
+                          llvm::cl::Hidden,
+                          llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 EnableSILVerifyAll("enable-sil-verify-all",
                    llvm::cl::Hidden,
                    llvm::cl::init(true),
@@ -328,6 +333,7 @@ int main(int argc, char **argv) {
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();
   SILOpts.InlineThreshold = SILInlineThreshold;
+  SILOpts.ExistentialSpecializer = SILExistentialSpecializer;
   SILOpts.VerifyAll = EnableSILVerifyAll;
   SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
   SILOpts.AssertConfig = AssertConfId;
