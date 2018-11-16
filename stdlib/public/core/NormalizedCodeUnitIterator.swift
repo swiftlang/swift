@@ -363,8 +363,6 @@ struct _NormalizedUTF16CodeUnitIterator: IteratorProtocol {
 
     guard segmentBufferIndex < segmentBufferCount else { return nil }
     
-
-    if segmentBufferIndex < segmentBufferCount {
     defer { segmentBufferIndex += 1 }
     if _slowPath(segmentHeapBuffer != nil) {
       return segmentHeapBuffer![segmentBufferIndex]
@@ -402,7 +400,7 @@ struct _NormalizedUTF16CodeUnitIterator: IteratorProtocol {
     _ stackBufferCount: Int? = nil
   ) -> Int {
     if segmentHeapBuffer == nil {
-      _sanityCheck(normalizationHeapBuffer == nil)
+      _internalInvariant(normalizationHeapBuffer == nil)
       let preFilledBufferCount = stackBufferCount ?? 0
       let size = (source.remaining + preFilledBufferCount) 
                  * _Normalization._maxNFCExpansionFactor
