@@ -623,9 +623,6 @@ class ConformanceChecker : public WitnessChecker {
   void checkNonFinalClassWitness(ValueDecl *requirement,
                                  ValueDecl *witness);
 
-  /// Resolve the (non-type) witness as requiring dynamic dispatch.
-  ResolveWitnessResult resolveWitnessAsOpaque(ValueDecl *requirement);
-
   /// Resolve a (non-type) witness via name lookup.
   ResolveWitnessResult resolveWitnessViaLookup(ValueDecl *requirement);
 
