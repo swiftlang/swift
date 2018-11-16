@@ -243,10 +243,16 @@ public:
   class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromMetadata {
     const Metadata *base;
 
+    /// The generic arguments.
+    const void * const *genericArgs;
+
     /// An element in the descriptor path.
     struct PathElement {
-      /// The context described by this path element.
-      const ContextDescriptor *context;
+      /// The generic parameters local to this element.
+      ArrayRef<GenericParamDescriptor> localGenericParams;
+
+      /// The total number of generic parameters.
+      unsigned numTotalGenericParams;
 
       /// The number of key parameters in the parent.
       unsigned numKeyGenericParamsInParent;
@@ -277,7 +283,9 @@ public:
   public:
     /// Produce substitutions entirely from the given metadata.
     explicit SubstGenericParametersFromMetadata(const Metadata *base)
-      : base(base) { }
+      : base(base),
+        genericArgs(base ? (const void * const *)base->getGenericArgs()
+                         : nullptr) { }
 
     const Metadata *operator()(unsigned depth, unsigned index) const;
     const WitnessTable *operator()(const Metadata *type, unsigned index) const;

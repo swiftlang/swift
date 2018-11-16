@@ -1290,7 +1290,7 @@ buildDescriptorPath(const ContextDescriptor *context) const {
   if (!context)
     return 0;
 
-  // Add the parent's contributino to the descriptor path.
+  // Add the parent's contribution to the descriptor path.
   unsigned numKeyGenericParamsInParent =
     buildDescriptorPath(context->Parent.get());
 
@@ -1301,7 +1301,8 @@ buildDescriptorPath(const ContextDescriptor *context) const {
   // Count the number of key generic params at this level.
   unsigned numKeyGenericParamsHere = 0;
   bool hasNonKeyGenericParams = false;
-  for (const auto &genericParam : getLocalGenericParams(context)) {
+  auto localGenericParams = getLocalGenericParams(context);
+  for (const auto &genericParam : localGenericParams) {
     if (genericParam.hasKeyArgument())
       ++numKeyGenericParamsHere;
     else
@@ -1309,7 +1310,9 @@ buildDescriptorPath(const ContextDescriptor *context) const {
   }
 
   // Form the path element.
-  descriptorPath.push_back(PathElement{context, numKeyGenericParamsInParent,
+  descriptorPath.push_back(PathElement{localGenericParams,
+                                       context->getNumGenericParams(),
+                                       numKeyGenericParamsInParent,
                                        numKeyGenericParamsHere,
                                        hasNonKeyGenericParams});
   return numKeyGenericParamsInParent + numKeyGenericParamsHere;
@@ -1335,10 +1338,9 @@ SubstGenericParametersFromMetadata::operator()(
 
   /// Retrieve the descriptor path element at this depth.
   auto &pathElement = descriptorPath[depth];
-  auto currentContext = pathElement.context;
 
   // Check whether the index is clearly out of bounds.
-  if (index >= currentContext->getNumGenericParams())
+  if (index >= pathElement.numTotalGenericParams)
     return nullptr;
 
   // Compute the flat index.
@@ -1346,7 +1348,7 @@ SubstGenericParametersFromMetadata::operator()(
   if (pathElement.hasNonKeyGenericParams > 0) {
     // We have non-key generic parameters at this level, so the index needs to
     // be checked more carefully.
-    auto genericParams = getLocalGenericParams(currentContext);
+    auto genericParams = pathElement.localGenericParams;
 
     // Make sure that the requested parameter itself has a key argument.
     if (!genericParams[index].hasKeyArgument())
@@ -1362,7 +1364,7 @@ SubstGenericParametersFromMetadata::operator()(
     flatIndex += index;
   }
 
-  return base->getGenericArgs()[flatIndex];
+  return (const Metadata *)genericArgs[flatIndex];
 }
 
 const WitnessTable *
@@ -1371,8 +1373,7 @@ SubstGenericParametersFromMetadata::operator()(const Metadata *type,
   // On first access, compute the descriptor path.
   setup();
 
-  return (const WitnessTable *)base->getGenericArgs()[
-                                              index + numKeyGenericParameters];
+  return (const WitnessTable *)genericArgs[index + numKeyGenericParameters];
 }
 
 const Metadata *SubstGenericParametersFromWrittenArgs::operator()(
