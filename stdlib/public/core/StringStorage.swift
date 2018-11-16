@@ -12,159 +12,160 @@
 
 import SwiftShims
 
+//Having @objc stuff in an extension creates an ObjC category, which we don't want
 #if _runtime(_ObjC)
 
-internal class _AbstractStringStorage: __SwiftNativeNSString, _NSCopying {
-  // Abstract interface
-  internal var asGuts: _StringGuts { @_effects(readonly) get { Builtin.unreachable() } }
-  final internal var asString: String { @_effects(readonly) get { return String(asGuts) } }
-  internal var count: Int { @_effects(readonly) get { Builtin.unreachable() } }
-  fileprivate var isASCII: Bool { @_effects(readonly) get { Builtin.unreachable() } }
-
-  //Having these in an extension creates an ObjC category, which we don't want
+internal protocol _AbstractStringStorage : _NSCopying {
+  var asString: String { get }
+  var count: Int { get }
+  var isASCII: Bool { get }
+  var start: UnsafePointer<UInt8> { get }
   //in UTF16 code units
-  @objc(length) internal var length: Int { @_effects(readonly) get { Builtin.unreachable() } }
-  
-  @objc(copyWithZone:)
-  final internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
-    // While _StringStorage instances aren't immutable in general,
-    // mutations may only occur when instances are uniquely referenced.
-    // Therefore, it is safe to return self here; any outstanding Objective-C
-    // reference will make the instance non-unique.
-    return self
-  }
-}
-
-#else
-
-internal class _AbstractStringStorage: __SwiftNativeNSString {
-  // Abstract interface
-  internal var asGuts: _StringGuts { @_effects(readonly) get { Builtin.unreachable() } }
-  final internal var asString: String { @_effects(readonly) get { return String(asGuts) } }
-  internal var count: Int { @_effects(readonly) get { Builtin.unreachable() } }
-  fileprivate var isASCII: Bool { @_effects(readonly) get { Builtin.unreachable() } }
-}
-
-#endif
-
-// ObjC interfaces
-#if _runtime(_ObjC)
-
-@_effects(releasenone)
-private func _getCharacters<T:_AbstractStringStorage>(_ this:T,
-   _ buffer: UnsafeMutablePointer<UInt16>,
-   _ aRange: _SwiftNSRange) {
-  _precondition(aRange.location >= 0 && aRange.length >= 0,
-    "Range out of bounds")
-  _precondition(aRange.location + aRange.length <= Int(this.count),
-    "Range out of bounds")
-
-  let range = Range(
-    uncheckedBounds: (aRange.location, aRange.location+aRange.length))
-  let str = this.asString
-  str._copyUTF16CodeUnits(
-    into: UnsafeMutableBufferPointer(start: buffer, count: range.count),
-    range: range)
-}
-
-@_effects(releasenone)
-private func _getCString<T:_AbstractStringStorage>(
-  _ this: T,
-  _ utf8: String.UTF8View,
-  _ outputPtr: UnsafeMutablePointer<UInt8>,
-  _ maxLength: Int,
-  _ encoding: UInt)
-  -> Int8 {
-    switch (encoding, this.isASCII) {
-    case (_cocoaASCIIEncoding, true):
-      fallthrough
-    case (_cocoaUTF8Encoding, _):
-      guard maxLength >= this.count + 1 else { return 0 }
-      let buffer = UnsafeMutableBufferPointer(start: outputPtr, count: maxLength)
-      let (_, end) = utf8._copyContents(initializing: buffer)
-      buffer[end] = 0
-      return 1
-    default:
-      return  _cocoaGetCStringTrampoline(this,
-                                         outputPtr,
-                                         maxLength,
-                                         encoding)
-    }
-}
-
-@inline(never) //hide the shim call so we can use @_effects
-@_effects(readonly)
-private func _isNSString(_ str:AnyObject) -> UInt8 {
-  return _swift_stdlib_isNSString(str)
-}
-
-//This used to be on _AbstractStringStorage, which meant it went through the
-//dynamic version of asString.
-//Making it generic and calling it from the subclasses lets us avoid that.
-@_effects(readonly)
-private func _isEqual<T:_AbstractStringStorage>(_ this:T, _ other:AnyObject?)
-  -> Int8 {
-  guard let other = other else {
-    return 0
-  }
-
-  if this === other {
-    return 1
-  }
- 
-  let ourGuts = this.asGuts
-  defer { _fixLifetime(ourGuts) }
-
-  //Handle the case where both strings were bridged from Swift.
-  //We can't use String.== because it doesn't match NSString semantics.
-  if let otherGuts = (other as? _AbstractStringStorage)?.asGuts {
-    if otherGuts.count != ourGuts.count {
-      return 0
-    }
-    return ourGuts.withFastUTF8 { ourBytes in
-      return otherGuts.withFastUTF8 { otherBytes in
-        return (ourBytes.baseAddress == otherBytes.baseAddress ||
-          (memcmp(ourBytes.baseAddress!, otherBytes.baseAddress!, ourBytes.count) == 0)) ? 1 : 0
-      }
-    }
-  }
-  
-  //we're allowed to crash, but for compatibility reasons NSCFString allows non-strings here
-  if _isNSString(other) != 1 {
-    return 0
-  }
-  
-  //At this point we've proven that it is an NSString of some sort, but not one of ours
-  if this.length != _stdlib_binary_CFStringGetLength(other) {
-    return 0
-  }
-  
-  defer {
-    _fixLifetime(other)
-  }
-
-  //CFString will only give us ASCII bytes here, but that's fine
-  //We already handled non-ASCII UTF8 strings earlier since they're Swift
-  if let otherBytes = _cocoaUTF8Pointer(other) {
-    return ourGuts.withFastUTF8 { ourBytes in
-      return (ourBytes.baseAddress == otherBytes ||
-        (memcmp(ourBytes.baseAddress!, otherBytes, ourBytes.count) == 0)) ? 1 : 0
-    }
-  }
-  
-  /*
-  The abstract implementation of -isEqualToString: falls back to -compare:
-  immediately, so when we run out of fast options to try, do the same.
-  We can likely be more clever here if need be
-  */
-  return _cocoaStringCompare(this, other) == 0 ? 1 : 0
+  var length: Int { get }
 }
 
 internal let _cocoaASCIIEncoding:UInt = 1 /* NSASCIIStringEncoding */
 internal let _cocoaUTF8Encoding:UInt = 4 /* NSUTF8StringEncoding */
 
+@_effects(readonly)
+private func _isNSString(_ str:AnyObject) -> UInt8 {
+  return _swift_stdlib_isNSString(str)
+}
 
-#endif // _runtime(_ObjC)
+#else
+
+internal protocol _AbstractStringStorage {
+  var asString: String { get }
+  var count: Int { get }
+  var isASCII: Bool { get }
+  var start: UnsafePointer<UInt8> { get }
+}
+
+#endif
+
+extension _AbstractStringStorage {
+
+  // ObjC interfaces
+  #if _runtime(_ObjC)
+  
+  @inline(__always)
+  @_effects(releasenone)
+  internal func _getCharacters(
+    _ buffer: UnsafeMutablePointer<UInt16>,
+    _ aRange: _SwiftNSRange
+    ) {
+    _precondition(aRange.location >= 0 && aRange.length >= 0,
+                  "Range out of bounds")
+    _precondition(aRange.location + aRange.length <= Int(count),
+                  "Range out of bounds")
+    
+    let range = Range(
+      uncheckedBounds: (aRange.location, aRange.location+aRange.length))
+    let str = asString
+    str._copyUTF16CodeUnits(
+      into: UnsafeMutableBufferPointer(start: buffer, count: range.count),
+      range: range)
+  }
+
+  @inline(__always)
+  @_effects(releasenone)
+  internal func _getCString(
+    _ outputPtr: UnsafeMutablePointer<UInt8>,
+    _ maxLength: Int,
+    _ encoding: UInt)
+    -> Int8 {
+      switch (encoding, isASCII) {
+      case (_cocoaASCIIEncoding, true):
+        fallthrough
+      case (_cocoaUTF8Encoding, _):
+        guard maxLength >= count + 1 else { return 0 }
+        let buffer = UnsafeMutableBufferPointer(start: outputPtr, count: maxLength)
+        buffer.initialize(from: UnsafeBufferPointer(start: start, count: count))
+        buffer[count] = 0
+        return 1
+      default:
+        return  _cocoaGetCStringTrampoline(self,
+                                           outputPtr,
+                                           maxLength,
+                                           encoding)
+      }
+  }
+
+  @inline(__always)
+  @_effects(readonly)
+  internal func _cString(encoding: UInt) -> UnsafePointer<UInt8>? {
+    switch (encoding, isASCII) {
+    case (_cocoaASCIIEncoding, true):
+      fallthrough
+    case (_cocoaUTF8Encoding, _):
+      return start
+    default:
+      return _cocoaCStringUsingEncodingTrampoline(self, encoding)
+    }
+  }
+  
+  @_effects(readonly)
+  internal func _nativeIsEqual<T:_AbstractStringStorage>(_ nativeOther: T) -> Int8 {
+    if count != nativeOther.count {
+      return 0
+    }
+    return (start == nativeOther.start || (memcmp(start, nativeOther.start, count) == 0)) ? 1 : 0
+  }
+
+  @inline(__always)
+  @_effects(readonly)
+  internal func _isEqual(_ other:AnyObject?)
+    -> Int8 {
+      guard let other = other else {
+        return 0
+      }
+      
+      if self === other {
+        return 1
+      }
+      
+      // Handle the case where both strings were bridged from Swift.
+      // We can't use String.== because it doesn't match NSString semantics.
+      let knownOther = _KnownCocoaString(other)
+      switch knownOther {
+        case .storage:
+          return _nativeIsEqual(_unsafeUncheckedDowncast(other, to: _StringStorage.self))
+        case .shared:
+          return _nativeIsEqual(_unsafeUncheckedDowncast(other, to: _SharedStringStorage.self))
+#if !(arch(i386) || arch(arm))
+        case .tagged:
+          fallthrough
+#endif
+        case .cocoa:
+          //we're allowed to crash, but for compatibility reasons NSCFString allows non-strings here
+          if _isNSString(other) != 1 {
+            return 0
+          }
+          
+          //At this point we've proven that it is an NSString of some sort, but not one of ours
+          if length != _stdlib_binary_CFStringGetLength(other) {
+            return 0
+          }
+          
+          defer { _fixLifetime(other) }
+          
+          //CFString will only give us ASCII bytes here, but that's fine
+          //We already handled non-ASCII UTF8 strings earlier since they're Swift
+          if let otherStart = _cocoaUTF8Pointer(other) {
+            return (start == otherStart || (memcmp(start, otherStart, count) == 0)) ? 1 : 0
+          }
+          
+          /*
+           The abstract implementation of -isEqualToString: falls back to -compare:
+           immediately, so when we run out of fast options to try, do the same.
+           We can likely be more clever here if need be
+           */
+          return _cocoaStringCompare(self, other) == 0 ? 1 : 0
+      }
+  }
+  
+  #endif //_runtime(_ObjC)
+}
 
 #if arch(i386) || arch(arm)
 private typealias Flags = _StringObject.Flags
@@ -177,7 +178,7 @@ private typealias CountAndFlags = _StringObject.CountAndFlags
 // Optional<_StringBreadcrumbs>.
 //
 
-final internal class _StringStorage: _AbstractStringStorage {
+final internal class _StringStorage: __SwiftNativeNSString, _AbstractStringStorage {
 #if arch(i386) || arch(arm)
   // The total allocated storage capacity. Note that this includes the required
   // nul-terminator
@@ -189,7 +190,7 @@ final internal class _StringStorage: _AbstractStringStorage {
 
   internal var _reserved: UInt16
 
-  override internal var count: Int {
+  internal var count: Int {
     @inline(__always) get { return _count }
     @inline(__always) set { _count = newValue }
   }
@@ -200,7 +201,7 @@ final internal class _StringStorage: _AbstractStringStorage {
 
   internal var _countAndFlags: _StringObject.CountAndFlags
 
-  override internal var count: Int {
+  internal var count: Int {
     @inline(__always) get { return _countAndFlags.count }
     @inline(__always) set { _countAndFlags.count = newValue }
   }
@@ -215,29 +216,28 @@ final internal class _StringStorage: _AbstractStringStorage {
   }
 #endif
 
-  fileprivate final override var isASCII: Bool {
-#if arch(i386) || arch(arm)
-    return _flags.isASCII
-#else
-    return _countAndFlags.isASCII
-#endif
+  internal final var isASCII: Bool {
+    @inline(__always) get {
+  #if arch(i386) || arch(arm)
+      return _flags.isASCII
+  #else
+      return _countAndFlags.isASCII
+  #endif
+    }
   }
 
-  override final internal var asGuts: _StringGuts {
-    @inline(__always) @_effects(readonly) get {
-      return _StringGuts(self)
+  final internal var asString: String {
+    @_effects(readonly) @inline(__always) get {
+      return String(_StringGuts(self))
     }
   }
 
 #if _runtime(_ObjC)
   
   @objc(length)
-  override final internal var length: Int {
+  final internal var length: Int {
     @_effects(readonly) @inline(__always) get {
-      if isASCII {
-        return count
-      }
-      return asString.utf16.count
+      return asString.utf16.count //UTF16View special-cases ASCII for us
     }
   }
 
@@ -262,7 +262,7 @@ final internal class _StringStorage: _AbstractStringStorage {
   final internal func getCharacters(
    _ buffer: UnsafeMutablePointer<UInt16>,
    range aRange: _SwiftNSRange) {
-    _getCharacters(self, buffer, aRange)
+    _getCharacters(buffer, aRange)
   }
 
   @objc(_fastCStringContents:)
@@ -283,15 +283,8 @@ final internal class _StringStorage: _AbstractStringStorage {
 
   @objc(cStringUsingEncoding:)
   @_effects(readonly)
-  final internal func _cString(encoding: UInt) -> UnsafePointer<UInt8>? {
-    switch (encoding, isASCII) {
-    case (_cocoaASCIIEncoding, true):
-      fallthrough
-    case (_cocoaUTF8Encoding, _):
-      return start
-    default:
-      return _cocoaCStringUsingEncodingTrampoline(self, encoding)
-    }
+  final internal func cString(encoding: UInt) -> UnsafePointer<UInt8>? {
+    return _cString(encoding: encoding)
   }
   
   @objc(getCString:maxLength:encoding:)
@@ -300,7 +293,7 @@ final internal class _StringStorage: _AbstractStringStorage {
                                maxLength: Int,
                                encoding: UInt)
     -> Int8 {
-    return _getCString(self, asString.utf8, outputPtr, maxLength, encoding)
+    return _getCString(outputPtr, maxLength, encoding)
   }
 
   @objc
@@ -316,7 +309,16 @@ final internal class _StringStorage: _AbstractStringStorage {
   @objc(isEqualToString:)
   @_effects(readonly)
   final internal func isEqual(to other:AnyObject?) -> Int8 {
-    return _isEqual(self, other)
+    return _isEqual(other)
+  }
+  
+  @objc(copyWithZone:)
+  final internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
+    // While _StringStorage instances aren't immutable in general,
+    // mutations may only occur when instances are uniquely referenced.
+    // Therefore, it is safe to return self here; any outstanding Objective-C
+    // reference will make the instance non-unique.
+    return self
   }
 
 #endif // _runtime(_ObjC)
@@ -666,10 +668,10 @@ extension _StringStorage {
 }
 
 // For shared storage and bridging literals
-final internal class _SharedStringStorage: _AbstractStringStorage {
+final internal class _SharedStringStorage: __SwiftNativeNSString, _AbstractStringStorage {
   internal var _owner: AnyObject?
 
-  internal var _start: UnsafePointer<UInt8>
+  internal var start: UnsafePointer<UInt8>
 
 #if arch(i386) || arch(arm)
   internal var _count: Int
@@ -688,14 +690,14 @@ final internal class _SharedStringStorage: _AbstractStringStorage {
 
   internal var _breadcrumbs: _StringBreadcrumbs? = nil
 
-  internal var start: UnsafePointer<UInt8> { return _start }
-
-  override internal var count: Int {
-#if arch(i386) || arch(arm)
-    return _count
-#else
-    return _countAndFlags.count
-#endif
+  internal var count: Int {
+    @_effects(readonly) @inline(__always) get {
+      #if arch(i386) || arch(arm)
+          return _count
+      #else
+          return _countAndFlags.count
+      #endif
+    }
   }
 
   internal init(
@@ -703,7 +705,7 @@ final internal class _SharedStringStorage: _AbstractStringStorage {
     countAndFlags: _StringObject.CountAndFlags
   ) {
     self._owner = nil
-    self._start = ptr
+    self.start = ptr
 #if arch(i386) || arch(arm)
     self._count = countAndFlags.count
     self._flags = countAndFlags.flags
@@ -714,29 +716,28 @@ final internal class _SharedStringStorage: _AbstractStringStorage {
     self._invariantCheck()
   }
   
-  fileprivate final override var isASCII: Bool {
-    #if arch(i386) || arch(arm)
-    return _flags.isASCII
-    #else
-    return _countAndFlags.isASCII
-    #endif
+  internal final var isASCII: Bool {
+    @inline(__always) get {
+      #if arch(i386) || arch(arm)
+      return _flags.isASCII
+      #else
+      return _countAndFlags.isASCII
+      #endif
+    }
   }
 
-  override final internal var asGuts: _StringGuts {
-    @_effects(readonly) get {
-      return _StringGuts(self)
+  final internal var asString: String {
+    @_effects(readonly) @inline(__always) get {
+      return String(_StringGuts(self))
     }
   }
 
 #if _runtime(_ObjC)
   
   @objc(length)
-  override final internal var length: Int {
+  final internal var length: Int {
     @_effects(readonly) get {
-      if isASCII {
-        return count
-      }
-      return asString.utf16.count
+      return asString.utf16.count //UTF16View special-cases ASCII for us
     }
   }
   
@@ -761,7 +762,7 @@ final internal class _SharedStringStorage: _AbstractStringStorage {
   final internal func getCharacters(
     _ buffer: UnsafeMutablePointer<UInt16>,
     range aRange: _SwiftNSRange) {
-    _getCharacters(self, buffer, aRange)
+    _getCharacters(buffer, aRange)
   }
   
   @objc
@@ -792,15 +793,8 @@ final internal class _SharedStringStorage: _AbstractStringStorage {
 
   @objc(cStringUsingEncoding:)
   @_effects(readonly)
-  final internal func _cString(encoding: UInt) -> UnsafePointer<UInt8>? {
-    switch (encoding, isASCII) {
-    case (_cocoaASCIIEncoding, true):
-      fallthrough
-    case (_cocoaUTF8Encoding, _):
-      return start
-    default:
-      return _cocoaCStringUsingEncodingTrampoline(self, encoding)
-    }
+  final internal func cString(encoding: UInt) -> UnsafePointer<UInt8>? {
+    return _cString(encoding: encoding)
   }
   
   @objc(getCString:maxLength:encoding:)
@@ -809,13 +803,22 @@ final internal class _SharedStringStorage: _AbstractStringStorage {
                                maxLength: Int,
                                encoding: UInt)
     -> Int8 {
-    return _getCString(self, asString.utf8, outputPtr, maxLength, encoding)
+    return _getCString(outputPtr, maxLength, encoding)
   }
 
   @objc(isEqualToString:)
   @_effects(readonly)
   final internal func isEqual(to other:AnyObject?) -> Int8 {
-    return _isEqual(self, other)
+    return _isEqual(other)
+  }
+  
+  @objc(copyWithZone:)
+  final internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
+    // While _StringStorage instances aren't immutable in general,
+    // mutations may only occur when instances are uniquely referenced.
+    // Therefore, it is safe to return self here; any outstanding Objective-C
+    // reference will make the instance non-unique.
+    return self
   }
 
 #endif // _runtime(_ObjC)
