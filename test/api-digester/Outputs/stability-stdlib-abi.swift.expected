@@ -483,6 +483,8 @@ Protocol _NSEnumerator has been removed
 Protocol _NSFastEnumeration has been removed
 Protocol _ShadowProtocol has been removed
 
+Var _StringObject.discriminator has been renamed to Var _StringObject._discriminator
+
 Func ManagedBufferPointer._sanityCheckValidBufferClass(_:creating:) has been removed
 Func _sanityCheck(_:_:file:line:) has been removed
 Func _sanityCheckFailure(_:file:line:) has been removed
