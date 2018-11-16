@@ -507,7 +507,7 @@ uint16_t SILGenFunction::emitProlog(ParameterList *paramList,
       emitter.emitParam(param);
   if (selfParam)
     emitter.emitParam(selfParam);
-  
+
   // Record the ArgNo of the artificial $error inout argument. 
   unsigned ArgNo = emitter.getNumArgs();
   if (throws) {
