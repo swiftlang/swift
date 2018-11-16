@@ -237,7 +237,9 @@ bool MissingConformanceFailure::diagnoseAsError() {
     }
   }
 
-  if (nonConformingType->isExistentialType()) {
+  if (TypeChecker::shouldDiagnoseSelfNonConformance(nonConformingType,
+                               protocolType->castTo<ProtocolType>()->getDecl(),
+                                                    getDC())) {
     auto diagnostic = diag::protocol_does_not_conform_objc;
     if (nonConformingType->isObjCExistentialType())
       diagnostic = diag::protocol_does_not_conform_static;

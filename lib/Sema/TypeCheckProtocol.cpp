@@ -3926,9 +3926,7 @@ static void diagnoseConformanceFailure(Type T,
 
   // If we're checking conformance of an existential type to a protocol,
   // do a little bit of extra work to produce a better diagnostic.
-  if (T->isExistentialType() &&
-      TypeChecker::containsProtocol(T, Proto, DC, None)) {
-
+  if (TypeChecker::shouldDiagnoseSelfNonConformance(T, Proto, DC)) {
     if (!T->isObjCExistentialType()) {
       diags.diagnose(ComplainLoc, diag::protocol_does_not_conform_objc,
                      T, Proto->getDeclaredType());
@@ -4020,6 +4018,21 @@ void ConformanceChecker::emitDelayedDiags() {
         return diag.Callback();
     });
   }
+}
+
+bool TypeChecker::shouldDiagnoseSelfNonConformance(Type type,
+                                                   ProtocolDecl *protocol,
+                                                   DeclContext *dc) {
+  // Don't diagnose if the type is not an existential type.
+  if (!type->isExistentialType())
+    return false;
+
+  // Don't diagnose if the protocol does actually conform to itself.
+  if (protocol->existentialConformsToSelf())
+    return false;
+
+  // Check that the existential type actually contains the protocol.
+  return containsProtocol(type, protocol, dc, None).hasValue();
 }
 
 Optional<ProtocolConformanceRef> TypeChecker::containsProtocol(

@@ -1707,6 +1707,9 @@ public:
                                              DeclContext *DC,
                                              ConformanceCheckOptions options);
 
+  static bool shouldDiagnoseSelfNonConformance(Type type, ProtocolDecl *proto,
+                                               DeclContext *dc);
+
   /// \brief Determine whether the given type conforms to the given protocol.
   ///
   /// Unlike subTypeOfProtocol(), this will return false for existentials of
