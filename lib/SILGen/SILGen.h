@@ -343,6 +343,9 @@ public:
 
   SILDeclRef getAccessorDeclRef(AccessorDecl *accessor);
 
+  bool canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
+                                           ResilienceExpansion expansion);
+
   KeyPathPatternComponent
   emitKeyPathComponentForDecl(SILLocation loc,
                               GenericEnvironment *genericEnv,

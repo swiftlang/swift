@@ -3356,16 +3356,17 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
   /// subscript should be externally referenced.
   auto shouldUseExternalKeyPathComponent =
     [&]() -> bool {
-      return getASTContext().LangOpts.EnableKeyPathResilience
-        && !forPropertyDescriptor
-        && storage->getModuleContext() != SwiftModule
-        // Protocol requirements don't have nor need property descriptors.
-        && !isa<ProtocolDecl>(storage->getDeclContext())
-        // Properties that only dispatch via ObjC lookup do not have nor need
-        // property descriptors, since the selector identifies the storage.
-        && (!storage->hasAnyAccessors()
-            || !getAccessorDeclRef(getRepresentativeAccessorForKeyPath(storage))
-                  .isForeign);
+    return (!forPropertyDescriptor &&
+            (storage->getModuleContext() != SwiftModule ||
+             storage->isResilient(SwiftModule, expansion)) &&
+            // Protocol requirements don't have nor need property descriptors.
+            !isa<ProtocolDecl>(storage->getDeclContext()) &&
+            // Properties that only dispatch via ObjC lookup do not have nor
+            // need property descriptors, since the selector identifies the
+            // storage.
+            (!storage->hasAnyAccessors() ||
+             !getAccessorDeclRef(getRepresentativeAccessorForKeyPath(storage))
+             .isForeign));
     };
   
   auto strategy = storage->getAccessStrategy(AccessSemantics::Ordinary,
@@ -3416,7 +3417,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                       genericEnv ? genericEnv->getGenericSignature() : nullptr);
     }
   
-    if (Types.canStorageUseStoredKeyPathComponent(var)) {
+    if (canStorageUseStoredKeyPathComponent(var, expansion)) {
       return KeyPathPatternComponent::forStoredProperty(var, componentTy);
     }
 
