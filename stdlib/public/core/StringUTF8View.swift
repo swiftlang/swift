@@ -214,7 +214,7 @@ extension String.UTF8View: BidirectionalCollection {
     @inline(__always) get {
       String(_guts)._boundsCheck(i)
       if _fastPath(_guts.isFastUTF8) {
-        return _guts.withFastUTF8 { utf8 in utf8[i.encodedOffset] }
+        return _guts.withFastUTF8 { utf8 in utf8[_unchecked: i.encodedOffset] }
       }
 
       return _foreignSubscript(position: i)
