@@ -23,13 +23,13 @@ let t: [BenchmarkCategory] = []
 let ta: [BenchmarkCategory] = [.api, .Array]
 %{
 Setup = """
-  let existentialArray = initExistentialArray(withType: T.self, count: 128)
   let existential = initExistential(withType: T.self)
   let existential2 = initExistential(withType: T.self)
   var existential = initExistential(withType: T.self)
-  var existentialArray = initExistentialArray(withType: T.self, count: 128)
-""".splitlines()[1:]
-Setup = [Setup[0], Setup[1], '\n'.join(Setup[1:3]), Setup[3], Setup[4]]
+  let existentialArray = grabArray()
+  var existentialArray = grabArray()
+""".splitlines()
+Setup = [Setup[0], Setup[1], '\n'.join(Setup[1:3]), Setup[3], Setup[4], Setup[5]]
 
 Workloads = [
   ('method.1x', Setup[1], '20_000', """
@@ -63,33 +63,36 @@ Workloads = [
       fatalError("expected true")
     }
 """),
-  ('Array.method.1x', Setup[0], '100', """
+  ('Array.init', Setup[0], '20', """
+    blackHole(initExistentialArray(withType: T.self, count: 128))
+"""),
+  ('Array.method.1x', Setup[4], '100', """
     for elt in existentialArray {
       if !elt.doIt()  {
         fatalError("expected true")
       }
     }
 """),
-  ('Array.method.2x', Setup[0], '100', """
+  ('Array.method.2x', Setup[4], '100', """
     for elt in existentialArray {
       if !elt.doIt() || !elt.reallyDoIt() {
         fatalError("expected true")
       }
     }
 """),
-  ('Array.Mutating', Setup[4], '100', """
+  ('Array.Mutating', Setup[5], '100', """
     for i in 0 ..< existentialArray.count {
       if !existentialArray[i].mutateIt()  {
         fatalError("expected true")
       }
     }
 """),
-  ('Array.Shift', Setup[4], '10', """
+  ('Array.Shift', Setup[5], '10', """
     for i in 0 ..< existentialArray.count-1 {
       existentialArray.swapAt(i, i+1)
     }
 """),
-  ('Array.ConditionalShift', Setup[4], '10', """
+  ('Array.ConditionalShift', Setup[5], '10', """
     for i in 0 ..< existentialArray.count-1 {
       let curr = existentialArray[i]
       if curr.doIt() {
@@ -121,9 +124,31 @@ public let ExistentialPerformance: [BenchmarkInfo] = [
 % for Name in Names:
   BenchmarkInfo(name: "Existential.${Name}", runFunction: ${
     run_function_name(Name)}, tags: ${
-    'ta' if 'Array' in Name else 't'}),
+    'ta' if 'Array' in Name else 't'}${
+    (', setUpFunction: ca' + Name.split('.')[-1]) if 'Array' in Name else '' }),
 % end
 ]
+
+// To exclude the setup overhead of existential array initialization,
+// these are setup functions that **create array** for each variant type.
+var array: [Existential]!
+func ca<T: Existential>(_: T.Type) {
+  array = initExistentialArray(withType: T.self, count: 128)
+}
+% for Variant in Vals + Refs:
+func ca${Variant}() { ca(${Variant}.self) }
+% end
+@inline(never)
+func grabArray() -> [Existential] { // transfer array ownership to caller
+  // FIXME: This is causing Illegal Instruction: 4 crash
+  // defer { array = nil }
+  // return array
+  // This doesn't work either:
+  // let a = array!
+  // array = nil
+  // return a
+  return array!
+}
 
 protocol Existential {
   init()
