@@ -46,8 +46,8 @@ extension Unicode.UTF16 : Unicode.Encoding {
     _ lead: CodeUnit,
     _ trail: CodeUnit
   ) -> Unicode.Scalar {
-    _sanityCheck(isLeadSurrogate(lead))
-    _sanityCheck(isTrailSurrogate(trail))
+    _internalInvariant(isLeadSurrogate(lead))
+    _internalInvariant(isTrailSurrogate(trail))
     return Unicode.Scalar(
       _unchecked: 0x10000 +
         (UInt32(lead & 0x03ff) &<< 10 | UInt32(trail & 0x03ff)))
@@ -59,7 +59,7 @@ extension Unicode.UTF16 : Unicode.Encoding {
     if _fastPath(source._bitCount == 16) {
       return Unicode.Scalar(_unchecked: bits & 0xffff)
     }
-    _sanityCheck(source._bitCount == 32)
+    _internalInvariant(source._bitCount == 32)
     let lower: UInt32 = bits >> 16 & 0x03ff
     let upper: UInt32 = (bits & 0x03ff) << 10
     let value = 0x10000 + (lower | upper)
@@ -147,7 +147,7 @@ extension UTF16.ReverseParser : Unicode.Parser, _UTFParser {
 
   @inlinable
   public func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
-    _sanityCheck(  // this case handled elsewhere
+    _internalInvariant(  // this case handled elsewhere
       !Encoding._isScalar(UInt16(truncatingIfNeeded: _buffer._storage)))
     if _fastPath(_buffer._storage & 0xFC00_FC00 == 0xD800_DC00) {
       return (true, 2*16)
@@ -170,7 +170,7 @@ extension Unicode.UTF16.ForwardParser : Unicode.Parser, _UTFParser {
   
   @inlinable
   public func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
-    _sanityCheck(  // this case handled elsewhere
+    _internalInvariant(  // this case handled elsewhere
       !Encoding._isScalar(UInt16(truncatingIfNeeded: _buffer._storage)))
     if _fastPath(_buffer._storage & 0xFC00_FC00 == 0xDC00_D800) {
       return (true, 2*16)

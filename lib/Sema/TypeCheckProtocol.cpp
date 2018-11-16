@@ -1322,6 +1322,13 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
     return RequirementCheck(kind, getRequiredAccessScope());
   }
 
+  if (isUsableFromInlineRequired()) {
+    bool witnessIsUsableFromInline = match.Witness->getFormalAccessScope(
+        DC, /*usableFromInlineAsPublic*/true).isPublic();
+    if (!witnessIsUsableFromInline)
+      return CheckKind::UsableFromInline;
+  }
+
   auto requiredAvailability = AvailabilityContext::alwaysAvailable();
   if (checkWitnessAvailability(requirement, match.Witness,
                                &requiredAvailability)) {
@@ -3067,6 +3074,10 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       break;
     }
 
+    case CheckKind::UsableFromInline:
+      diagnoseOrDefer(requirement, false, DiagnoseUsableFromInline(witness));
+      break;
+
     case CheckKind::Availability: {
       diagnoseOrDefer(requirement, false,
         [witness, requirement, check](
@@ -4321,9 +4332,7 @@ void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
 }
 
 void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
-  PrettyStackTraceType trace1(Context, "checking conformance of",
-                              conformance->getType());
-  PrettyStackTraceDecl trace2("...to", conformance->getProtocol());
+  PrettyStackTraceConformance trace(Context, "type-checking", conformance);
 
   MultiConformanceChecker checker(*this);
   checker.addConformance(conformance);
@@ -4336,9 +4345,8 @@ void TypeChecker::checkConformanceRequirements(
   if (conformance->isInvalid())
     return;
 
-  PrettyStackTraceType trace1(Context, "checking conformance requirements of",
-                              conformance->getType());
-  PrettyStackTraceDecl trace2("...to", conformance->getProtocol());
+  PrettyStackTraceConformance trace(Context, "checking requirements of",
+                                    conformance);
 
   conformance->setSignatureConformances({ });
 

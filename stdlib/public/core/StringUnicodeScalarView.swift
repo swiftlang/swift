@@ -110,7 +110,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   /// - Precondition: The next location exists.
   @inlinable @inline(__always)
   public func index(after i: Index) -> Index {
-    _sanityCheck(i < endIndex)
+    _internalInvariant(i < endIndex)
     // TODO(String performance): isASCII fast-path
 
     if _fastPath(_guts.isFastUTF8) {
@@ -133,7 +133,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
       let len = _guts.withFastUTF8 { utf8 -> Int in
         return _utf8ScalarLength(utf8, endingAt: i.encodedOffset)
       }
-      _sanityCheck(len <= 4, "invalid UTF8")
+      _internalInvariant(len <= 4, "invalid UTF8")
       return i.encoded(offsetBy: -len)
     }
 
@@ -415,7 +415,7 @@ extension String.UnicodeScalarView {
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func _foreignIndex(after i: Index) -> Index {
-    _sanityCheck(_guts.isForeign)
+    _internalInvariant(_guts.isForeign)
     let cu = _guts.foreignErrorCorrectedUTF16CodeUnit(at: i)
     let len = _isLeadingSurrogate(cu) ? 2 : 1
 
@@ -425,7 +425,7 @@ extension String.UnicodeScalarView {
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func _foreignIndex(before i: Index) -> Index {
-    _sanityCheck(_guts.isForeign)
+    _internalInvariant(_guts.isForeign)
     let priorIdx = i.priorEncoded
     let cu = _guts.foreignErrorCorrectedUTF16CodeUnit(at: priorIdx)
     let len = _isTrailingSurrogate(cu) ? 2 : 1

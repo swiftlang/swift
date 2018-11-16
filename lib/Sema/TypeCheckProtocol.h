@@ -252,6 +252,9 @@ enum class CheckKind : unsigned {
   /// requirement.
   AccessOfSetter,
 
+  /// The witness needs to be @usableFromInline.
+  UsableFromInline,
+
   /// The witness is less available than the requirement.
   Availability,
 

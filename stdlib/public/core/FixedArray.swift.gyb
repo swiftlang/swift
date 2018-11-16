@@ -66,11 +66,11 @@ extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
     @inline(__always)
     get {
       let count = self.count // for exclusive access
-      _sanityCheck(i >= 0 && i < count)
+      _internalInvariant(i >= 0 && i < count)
       let res: T = withUnsafeBytes(of: storage) {
         (rawPtr : UnsafeRawBufferPointer) -> T in
         let stride = MemoryLayout<T>.stride
-        _sanityCheck(rawPtr.count == ${N}*stride, "layout mismatch?")
+        _internalInvariant(rawPtr.count == ${N}*stride, "layout mismatch?")
         let bufPtr = UnsafeBufferPointer(
           start: rawPtr.baseAddress!.assumingMemoryBound(to: T.self),
           count: count)
@@ -80,7 +80,7 @@ extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
     }
     @inline(__always)
     set {
-      _sanityCheck(i >= 0 && i < count)
+      _internalInvariant(i >= 0 && i < count)
       self.withUnsafeMutableBufferPointer { buffer in
         buffer[i] = newValue
       }
@@ -100,7 +100,7 @@ extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
 
 extension _FixedArray${N} {
   internal mutating func append(_ newElement: T) {
-    _sanityCheck(count < capacity)
+    _internalInvariant(count < capacity)
     _count += 1
     self[count-1] = newElement
   }
@@ -109,7 +109,7 @@ extension _FixedArray${N} {
 extension _FixedArray${N} where T : ExpressibleByIntegerLiteral {
   @inline(__always)
   internal init(count: Int) {
-    _sanityCheck(count >= 0 && count <= _FixedArray${N}.capacity)
+    _internalInvariant(count >= 0 && count <= _FixedArray${N}.capacity)
     self.storage = (
 % for i in range(0, N-1):
     0,
@@ -136,7 +136,7 @@ extension _FixedArray${N} {
   ) rethrows -> R {
     let count = self.count // for exclusive access
     return try withUnsafeMutableBytes(of: &storage) { rawBuffer in
-      _sanityCheck(rawBuffer.count == ${N}*MemoryLayout<T>.stride,
+      _internalInvariant(rawBuffer.count == ${N}*MemoryLayout<T>.stride,
         "layout mismatch?")
       let buffer = UnsafeMutableBufferPointer<Element>(
         start: rawBuffer.baseAddress._unsafelyUnwrappedUnchecked
@@ -151,7 +151,7 @@ extension _FixedArray${N} {
   ) rethrows -> R {
     let count = self.count // for exclusive access
     return try withUnsafeBytes(of: &storage) { rawBuffer in
-      _sanityCheck(rawBuffer.count == ${N}*MemoryLayout<T>.stride,
+      _internalInvariant(rawBuffer.count == ${N}*MemoryLayout<T>.stride,
         "layout mismatch?")
       let buffer = UnsafeBufferPointer<Element>(
         start: rawBuffer.baseAddress._unsafelyUnwrappedUnchecked

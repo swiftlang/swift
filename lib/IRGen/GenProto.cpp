@@ -1001,8 +1001,15 @@ static bool hasDependentTypeWitness(const RootProtocolConformance *root) {
 }
 
 static bool isDependentConformance(
-              const NormalProtocolConformance *conformance,
+              const RootProtocolConformance *rootConformance,
               llvm::SmallPtrSet<const NormalProtocolConformance *, 4> &visited){
+  // Self-conformances are never dependent.
+  auto conformance = dyn_cast<NormalProtocolConformance>(rootConformance);
+  if (!conformance)
+    return false;
+
+  // Check whether we've visited this conformance already.  If so,
+  // optimistically assume it's fine --- we want the maximal fixed point.
   if (!visited.insert(conformance).second)
     return false;
 
@@ -1024,7 +1031,7 @@ static bool isDependentConformance(
       conformance->getAssociatedConformance(req.getFirstType(), assocProtocol);
     if (assocConformance.isAbstract() ||
         isDependentConformance(assocConformance.getConcrete()
-                                 ->getRootNormalConformance(),
+                                 ->getRootConformance(),
                                visited))
       return true;
   }
@@ -1040,16 +1047,9 @@ static bool isDependentConformance(
 
 /// Is there anything about the given conformance that requires witness
 /// tables to be dependently-generated?
-static bool isDependentConformance(
-                                const NormalProtocolConformance *conformance) {
+static bool isDependentConformance(const RootProtocolConformance *conformance) {
   llvm::SmallPtrSet<const NormalProtocolConformance *, 4> visited;
   return ::isDependentConformance(conformance, visited);
-}
-
-static bool isDependentConformance(const RootProtocolConformance *conformance) {
-  if (auto normal = dyn_cast<NormalProtocolConformance>(conformance))
-    return isDependentConformance(normal);
-  return false;
 }
 
 static bool isSynthesizedNonUnique(const RootProtocolConformance *conformance) {
@@ -2203,9 +2203,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     return;
 
   auto conf = wt->getConformance();
-  PrettyStackTraceType stackTraceRAII(Context, "emitting witness table for",
-                                      conf->getType());
-  PrettyStackTraceDecl stackTraceRAII2("...conforming to", conf->getProtocol());
+  PrettyStackTraceConformance _st(Context, "emitting witness table for", conf);
 
   // Build the witness table.
   ConstantInitBuilder builder(*this);

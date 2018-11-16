@@ -249,6 +249,30 @@
   }
 }
 
+- (void)testCStringUsingEncoding {
+  for (NSString *str1 in bridgedStrings) {
+    @autoreleasepool {
+      for (int i = 0; i < 100; i++) {
+        (void)[str1 cStringUsingEncoding: NSASCIIStringEncoding];
+      }
+    }
+  }
+  for (NSString *str1 in bridgedStrings) {
+    @autoreleasepool {
+      for (int i = 0; i < 100; i++) {
+        (void)[str1 cStringUsingEncoding: NSUTF8StringEncoding];
+      }
+    }
+  }
+  for (NSString *str1 in bridgedStrings) {
+    @autoreleasepool {
+      for (int i = 0; i < 100; i++) {
+        (void)[str1 cStringUsingEncoding: NSUnicodeStringEncoding];
+      }
+    }
+  }
+}
+
 - (void)testGetUTF8Contents {
   for (NSString *str1 in bridgedStrings) {
     for (int i = 0; i < 200; i++) {

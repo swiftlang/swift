@@ -32,7 +32,7 @@ public func readLine(strippingNewline: Bool = true) -> String? {
   if readBytes == -1 {
     return nil
   }
-  _sanityCheck(readBytes >= 0,
+  _internalInvariant(readBytes >= 0,
     "unexpected return value from swift_stdlib_readLine_stdin")
   if readBytes == 0 {
     return ""

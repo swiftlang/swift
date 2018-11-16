@@ -41,8 +41,7 @@ LocalTypeDataKind LocalTypeDataKind::getCachingKind() const {
 
   // Map protocol conformances to their root normal conformance.
   auto conformance = getConcreteProtocolConformance();
-  return forConcreteProtocolWitnessTable(
-                                     conformance->getRootNormalConformance());
+  return forConcreteProtocolWitnessTable(conformance->getRootConformance());
 }
 
 LocalTypeDataCache &IRGenFunction::getOrCreateLocalTypeData() {

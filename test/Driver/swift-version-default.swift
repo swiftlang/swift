@@ -30,7 +30,19 @@ aoeu // expected-error {{use of unresolved identifier}}
 htn 
 #endif
 
+#if swift(>=4.2)
+aoeu // expected-error {{use of unresolved identifier}}
+#else
+htn 
+#endif
+
 #if swift(>=5)
+aoeu // expected-error {{use of unresolved identifier}}
+#else
+htn 
+#endif
+
+#if swift(>=6)
 aoeu
 #else
 htn // expected-error {{use of unresolved identifier}}

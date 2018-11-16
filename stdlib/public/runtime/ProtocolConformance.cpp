@@ -80,9 +80,9 @@ template<> void ProtocolConformanceDescriptor::dump() const {
            class_getName(*getIndirectObjCClass()));
     break;
 
-  case TypeReferenceKind::DirectNominalTypeDescriptor:
-  case TypeReferenceKind::IndirectNominalTypeDescriptor:
-    printf("unique nominal type descriptor %s", symbolName(getTypeContextDescriptor()));
+  case TypeReferenceKind::DirectTypeDescriptor:
+  case TypeReferenceKind::IndirectTypeDescriptor:
+    printf("unique nominal type descriptor %s", symbolName(getTypeDescriptor()));
     break;
   }
   
@@ -112,8 +112,8 @@ const ClassMetadata *TypeReference::getObjCClass(TypeReferenceKind kind) const {
     return reinterpret_cast<const ClassMetadata *>(
               objc_lookUpClass(getDirectObjCClassName(kind)));
 
-  case TypeReferenceKind::DirectNominalTypeDescriptor:
-  case TypeReferenceKind::IndirectNominalTypeDescriptor:
+  case TypeReferenceKind::DirectTypeDescriptor:
+  case TypeReferenceKind::IndirectTypeDescriptor:
     return nullptr;
   }
 
@@ -139,12 +139,16 @@ ProtocolConformanceDescriptor::getCanonicalTypeMetadata() const {
 #endif
     return nullptr;
 
-  case TypeReferenceKind::DirectNominalTypeDescriptor:
-  case TypeReferenceKind::IndirectNominalTypeDescriptor: {
-    auto type = getTypeContextDescriptor();
-    if (!type->isGeneric()) {
-      if (auto accessFn = type->getAccessFunction())
-        return accessFn(MetadataState::Abstract).Value;
+  case TypeReferenceKind::DirectTypeDescriptor:
+  case TypeReferenceKind::IndirectTypeDescriptor: {
+    auto anyType = getTypeDescriptor();
+    if (auto type = dyn_cast<TypeContextDescriptor>(anyType)) {
+      if (!type->isGeneric()) {
+        if (auto accessFn = type->getAccessFunction())
+          return accessFn(MetadataState::Abstract).Value;
+      }
+    } else if (auto protocol = dyn_cast<ProtocolDescriptor>(anyType)) {
+      return _getSimpleProtocolTypeMetadata(protocol);
     }
 
     return nullptr;
@@ -475,7 +479,7 @@ namespace {
         return;
       }
 
-      if (auto description = conformance.getTypeContextDescriptor()) {
+      if (auto description = conformance.getTypeDescriptor()) {
         candidate = description;
         candidateIsMetadata = false;
         return;
@@ -500,7 +504,7 @@ namespace {
       if (!candidateIsMetadata) {
         const auto *description = conformingType->getTypeContextDescriptor();
         auto candidateDescription =
-          static_cast<const TypeContextDescriptor *>(candidate);
+          static_cast<const ContextDescriptor *>(candidate);
         if (description && equalContexts(description, candidateDescription))
           return true;
       }
@@ -601,13 +605,13 @@ swift_conformsToProtocolImpl(const Metadata * const type,
   }
 }
 
-const TypeContextDescriptor *
+const ContextDescriptor *
 swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
   auto &C = Conformances.get();
 
   for (auto &section : C.SectionsToScan.snapshot()) {
     for (const auto &record : section) {
-      if (auto ntd = record->getTypeContextDescriptor()) {
+      if (auto ntd = record->getTypeDescriptor()) {
         if (_contextDescriptorMatchesMangling(ntd, node))
           return ntd;
       }
@@ -619,15 +623,16 @@ swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
 bool swift::_checkGenericRequirements(
                       llvm::ArrayRef<GenericRequirementDescriptor> requirements,
                       std::vector<const void *> &extraArguments,
-                      SubstFlatGenericParameterFn substFlatGenericParam,
-                      SubstGenericParameterFn substGenericParam) {
+                      SubstGenericParameterFn substGenericParam,
+                      SubstDependentWitnessTableFn substWitnessTable) {
   for (const auto &req : requirements) {
     // Make sure we understand the requirement we're dealing with.
     if (!req.hasKnownKind()) return true;
 
     // Resolve the subject generic parameter.
     const Metadata *subjectType =
-      _getTypeByMangledName(req.getParam(), substGenericParam);
+      swift_getTypeByMangledName(req.getParam(), substGenericParam,
+                                 substWitnessTable);
     if (!subjectType)
       return true;
 
@@ -651,7 +656,8 @@ bool swift::_checkGenericRequirements(
     case GenericRequirementKind::SameType: {
       // Demangle the second type under the given substitutions.
       auto otherType =
-        _getTypeByMangledName(req.getMangledTypeName(), substGenericParam);
+        swift_getTypeByMangledName(req.getMangledTypeName(), substGenericParam,
+                                   substWitnessTable);
       if (!otherType) return true;
 
       assert(!req.getFlags().hasExtraArgument());
@@ -677,7 +683,8 @@ bool swift::_checkGenericRequirements(
     case GenericRequirementKind::BaseClass: {
       // Demangle the base type under the given substitutions.
       auto baseType =
-        _getTypeByMangledName(req.getMangledTypeName(), substGenericParam);
+        swift_getTypeByMangledName(req.getMangledTypeName(), substGenericParam,
+                                   substWitnessTable);
       if (!baseType) return true;
 
       // Check whether it's dynamically castable, which works as a superclass

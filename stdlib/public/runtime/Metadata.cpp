@@ -98,7 +98,7 @@ static ClassMetadataBounds
 computeMetadataBoundsForSuperclass(const void *ref,
                                    TypeReferenceKind refKind) {
   switch (refKind) {
-  case TypeReferenceKind::IndirectNominalTypeDescriptor: {
+  case TypeReferenceKind::IndirectTypeDescriptor: {
     auto description = *reinterpret_cast<const ClassDescriptor * const *>(ref);
     if (!description) {
       swift::fatalError(0, "instantiating class metadata for class with "
@@ -107,7 +107,7 @@ computeMetadataBoundsForSuperclass(const void *ref,
     return description->getMetadataBounds();
   }
 
-  case TypeReferenceKind::DirectNominalTypeDescriptor: {
+  case TypeReferenceKind::DirectTypeDescriptor: {
     auto description = reinterpret_cast<const ClassDescriptor *>(ref);
     return description->getMetadataBounds();
   }
@@ -2552,7 +2552,7 @@ swift::swift_initClassMetadata(ClassMetadata *self,
       Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
     SubstGenericParametersFromMetadata substitutions(self);
     const Metadata *superclass =
-      _getTypeByMangledName(superclassName, substitutions);
+      swift_getTypeByMangledName(superclassName, substitutions, substitutions);
     if (!superclass) {
       fatalError(0,
                  "failed to demangle superclass of %s from mangled name '%s'\n",
@@ -2642,7 +2642,7 @@ swift::swift_updateClassMetadata(ClassMetadata *self,
       Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
     SubstGenericParametersFromMetadata substitutions(self);
     const Metadata *superclass =
-      _getTypeByMangledName(superclassName, substitutions);
+      swift_getTypeByMangledName(superclassName, substitutions, substitutions);
     if (!superclass) {
       fatalError(0,
                  "failed to demangle superclass of %s from mangled name '%s'\n",
@@ -3390,6 +3390,17 @@ static bool anyProtocolIsClassBound(
 }
 #endif
 
+const Metadata *
+swift::_getSimpleProtocolTypeMetadata(const ProtocolDescriptor *protocol) {
+  auto protocolRef = ProtocolDescriptorRef::forSwift(protocol);
+  auto constraint =
+    protocol->getProtocolContextDescriptorFlags().getClassConstraint();
+  return swift_getExistentialTypeMetadata(constraint,
+                                          /*superclass bound*/ nullptr,
+                                          /*num protocols*/ 1,
+                                          &protocolRef);
+}
+
 /// \brief Fetch a uniqued metadata for an existential type. The array
 /// referenced by \c protocols will be sorted in-place.
 const ExistentialTypeMetadata *
@@ -4007,8 +4018,11 @@ swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
         if (!candidate || !conformance->isSynthesizedNonUnique())
           return candidate;
 
+        auto conformingType =
+          cast<TypeContextDescriptor>(conformance->getTypeDescriptor());
+
         return _getForeignWitnessTable(candidate,
-                                       conformance->getTypeContextDescriptor(),
+                                       conformingType,
                                        conformance->getProtocol());
       };
 
@@ -4110,13 +4124,24 @@ swift_getAssociatedTypeWitnessSlowImpl(
     // The protocol's Self is the only generic parameter that can occur in the
     // type.
     assocTypeMetadata =
-      _getTypeByMangledName(mangledName,
-         [conformingType](unsigned depth, unsigned index) -> const Metadata * {
-        if (depth == 0 && index == 0)
-          return conformingType;
+      swift_getTypeByMangledName(mangledName,
+        [conformingType](unsigned depth, unsigned index) -> const Metadata * {
+          if (depth == 0 && index == 0)
+            return conformingType;
 
-        return nullptr;
-      });
+          return nullptr;
+        },
+        [&](const Metadata *type, unsigned index) -> const WitnessTable * {
+          auto requirements = protocol->getRequirements();
+          auto dependentDescriptor = requirements.data() + index;
+          if (dependentDescriptor < requirements.begin() ||
+              dependentDescriptor >= requirements.end())
+            return nullptr;
+
+          return swift_getAssociatedConformanceWitness(wtable, conformingType,
+                                                       type, reqBase,
+                                                       dependentDescriptor);
+        });
   } else {
     // The generic parameters in the associated type name are those of the
     // conforming type.
@@ -4126,7 +4151,8 @@ swift_getAssociatedTypeWitnessSlowImpl(
     auto originalConformingType = findConformingSuperclass(conformingType,
                                                            conformance);
     SubstGenericParametersFromMetadata substitutions(originalConformingType);
-    assocTypeMetadata = _getTypeByMangledName(mangledName, substitutions);
+    assocTypeMetadata = swift_getTypeByMangledName(mangledName, substitutions,
+                                                   substitutions);
   }
 
   if (!assocTypeMetadata) {
@@ -4191,8 +4217,11 @@ static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
     assert(assocConformance >= requirements.begin() &&
            assocConformance < requirements.end());
     assert(reqBase == requirements.data() - WitnessTableFirstRequirementOffset);
-    assert(assocConformance->Flags.getKind() ==
-           ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction);
+    assert(
+      assocConformance->Flags.getKind() ==
+        ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction ||
+      assocConformance->Flags.getKind() ==
+        ProtocolRequirementFlags::Kind::BaseProtocol);
   }
 #endif
 
@@ -4212,6 +4241,9 @@ static const WitnessTable *swift_getAssociatedConformanceWitnessSlowImpl(
 
 
   // Extract the mangled name itself.
+  if (*mangledNameBase == '\xFF')
+    ++mangledNameBase;
+
   StringRef mangledName =
     Demangle::makeSymbolicMangledNameStringRef(mangledNameBase);
 
@@ -4859,8 +4891,11 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
     return;
   
   auto mangledName = Demangle::mangleNode(node);
-  auto result = _getTypeByMangledName(mangledName,
-                                      [](unsigned, unsigned){ return nullptr; });
+  auto result =
+    swift_getTypeByMangledName(
+                          mangledName,
+                          [](unsigned, unsigned){ return nullptr; },
+                          [](const Metadata *, unsigned) { return nullptr; });
   if (metadata != result)
     swift::warning(RuntimeErrorFlagNone,
                    "Metadata mangled name failed to roundtrip: %p -> %s -> %p\n",

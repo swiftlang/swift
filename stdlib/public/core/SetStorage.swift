@@ -73,7 +73,7 @@ internal class _RawSetStorage: __SwiftNativeNSSet {
   // But we still need to have an init to satisfy the compiler.
   @nonobjc
   internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("This class cannot be directly initialized")
+    _internalInvariantFailure("This class cannot be directly initialized")
   }
 
   @inlinable
@@ -109,13 +109,13 @@ internal class _RawSetStorage: __SwiftNativeNSSet {
 internal class _EmptySetSingleton: _RawSetStorage {
   @nonobjc
   override internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("This class cannot be directly initialized")
+    _internalInvariantFailure("This class cannot be directly initialized")
   }
 
 #if _runtime(_ObjC)
   @objc
   internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
-    _sanityCheckFailure("This class cannot be directly initialized")
+    _internalInvariantFailure("This class cannot be directly initialized")
   }
 #endif
 }
@@ -182,7 +182,7 @@ final internal class _SetStorage<Element: Hashable>
   // But we still need to have an init to satisfy the compiler.
   @nonobjc
   override internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("This class cannot be directly initialized")
+    _internalInvariantFailure("This class cannot be directly initialized")
   }
 
   deinit {
@@ -211,7 +211,7 @@ final internal class _SetStorage<Element: Hashable>
 #if _runtime(_ObjC)
   @objc
   internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
-    _sanityCheckFailure("don't call this designated initializer")
+    _internalInvariantFailure("don't call this designated initializer")
   }
 
   @objc(copyWithZone:)
@@ -329,7 +329,7 @@ extension _SetStorage {
   ) -> _SetStorage {
     // The entry count must be representable by an Int value; hence the scale's
     // peculiar upper bound.
-    _sanityCheck(scale >= 0 && scale < Int.bitWidth - 1)
+    _internalInvariant(scale >= 0 && scale < Int.bitWidth - 1)
 
     let bucketCount = (1 as Int) &<< scale
     let wordCount = _UnsafeBitset.wordCount(forCapacity: bucketCount)
