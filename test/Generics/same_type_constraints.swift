@@ -351,11 +351,11 @@ func intercomponentSameComponents<T: P10>(_: T)
         T.B == T.A { } // expected-note{{previous same-type constraint 'T.B' == 'T.A' written here}}
 
 func intercomponentMoreThanSpanningTree<T: P10>(_: T)
-  where T.A == T.B,
+  where T.A == T.B, // expected-note {{previous same-type constraint 'T.A' == 'T.B' written here}}
         T.B == T.C,
-        T.D == T.E, // expected-note{{previous same-type constraint 'T.D' == 'T.E' written here}}
+        T.D == T.E, // expected-warning {{redundant same-type constraint 'T.D' == 'T.E'}}
         T.D == T.B,
-        T.E == T.B  // expected-warning{{redundant same-type constraint 'T.E' == 'T.B'}}
+        T.E == T.B
         { }
 
 func trivialRedundancy<T: P10>(_: T) where T.A == T.A { } // expected-warning{{redundant same-type constraint 'T.A' == 'T.A'}}
