@@ -534,7 +534,7 @@ internal struct _CocoaFastEnumerationStackBuf {
     _item14 = _item0
     _item15 = _item0
 
-    _sanityCheck(MemoryLayout.size(ofValue: self) >=
+    _internalInvariant(MemoryLayout.size(ofValue: self) >=
                    MemoryLayout<Optional<UnsafeRawPointer>>.size * count)
   }
 }

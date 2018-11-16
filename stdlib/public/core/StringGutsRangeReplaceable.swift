@@ -76,7 +76,7 @@ extension _StringGuts {
   internal mutating func grow(_ n: Int) {
     defer { self._invariantCheck() }
 
-    _sanityCheck(
+    _internalInvariant(
       self.uniqueNativeCapacity == nil || self.uniqueNativeCapacity! < n)
 
     let growthTarget = Swift.max(n, (self.uniqueNativeCapacity ?? 0) * 2)
@@ -112,9 +112,9 @@ extension _StringGuts {
     otherUTF8Count otherCount: Int
   ) {
     defer {
-      _sanityCheck(self.uniqueNativeUnusedCapacity != nil,
+      _internalInvariant(self.uniqueNativeUnusedCapacity != nil,
         "growth should produce uniqueness")
-      _sanityCheck(self.uniqueNativeUnusedCapacity! >= otherCount,
+      _internalInvariant(self.uniqueNativeUnusedCapacity! >= otherCount,
         "growth should produce enough capacity")
     }
 
@@ -195,8 +195,8 @@ extension _StringGuts {
 
   @inline(never) // slow-path
   private mutating func _foreignAppendInPlace(_ other: _StringGutsSlice) {
-    _sanityCheck(!other.isFastUTF8)
-    _sanityCheck(self.uniqueNativeUnusedCapacity != nil)
+    _internalInvariant(!other.isFastUTF8)
+    _internalInvariant(self.uniqueNativeUnusedCapacity != nil)
 
     var iter = Substring(other).utf8.makeIterator()
     self._object.nativeStorage.appendInPlace(&iter, isASCII: other.isASCII)
@@ -220,8 +220,8 @@ extension _StringGuts {
   internal mutating func remove(from lower: Index, to upper: Index) {
     let lowerOffset = lower.encodedOffset
     let upperOffset = upper.encodedOffset
-    _sanityCheck(lower.transcodedOffset == 0 && upper.transcodedOffset == 0)
-    _sanityCheck(lowerOffset <= upperOffset && upperOffset <= self.count)
+    _internalInvariant(lower.transcodedOffset == 0 && upper.transcodedOffset == 0)
+    _internalInvariant(lowerOffset <= upperOffset && upperOffset <= self.count)
 
     if isUniqueNative {
       _object.nativeStorage.remove(from: lowerOffset, to: upperOffset)
@@ -283,8 +283,8 @@ extension _StringGuts {
       + codeUnits.count + (self.count - bounds.upperBound.encodedOffset)
     reserveCapacity(neededCapacity)
 
-    _sanityCheck(bounds.lowerBound.transcodedOffset == 0)
-    _sanityCheck(bounds.upperBound.transcodedOffset == 0)
+    _internalInvariant(bounds.lowerBound.transcodedOffset == 0)
+    _internalInvariant(bounds.upperBound.transcodedOffset == 0)
 
     _object.nativeStorage.replace(
       from: bounds.lowerBound.encodedOffset,
@@ -304,8 +304,8 @@ extension _StringGuts {
       + replCount + (self.count - bounds.upperBound.encodedOffset)
     reserveCapacity(neededCapacity)
 
-    _sanityCheck(bounds.lowerBound.transcodedOffset == 0)
-    _sanityCheck(bounds.upperBound.transcodedOffset == 0)
+    _internalInvariant(bounds.lowerBound.transcodedOffset == 0)
+    _internalInvariant(bounds.upperBound.transcodedOffset == 0)
 
     _object.nativeStorage.replace(
       from: bounds.lowerBound.encodedOffset,

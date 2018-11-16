@@ -78,7 +78,7 @@ internal class _RawDictionaryStorage: __SwiftNativeNSDictionary {
   // But we still need to have an init to satisfy the compiler.
   @nonobjc
   internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("This class cannot be directly initialized")
+    _internalInvariantFailure("This class cannot be directly initialized")
   }
 
   @inlinable
@@ -114,7 +114,7 @@ internal class _RawDictionaryStorage: __SwiftNativeNSDictionary {
 internal class _EmptyDictionarySingleton: _RawDictionaryStorage {
   @nonobjc
   internal override init(_doNotCallMe: ()) {
-    _sanityCheckFailure("This class cannot be directly initialized")
+    _internalInvariantFailure("This class cannot be directly initialized")
   }
 
 #if _runtime(_ObjC)
@@ -124,7 +124,7 @@ internal class _EmptyDictionarySingleton: _RawDictionaryStorage {
     forKeys: UnsafeRawPointer,
     count: Int
   ) {
-    _sanityCheckFailure("This class cannot be directly initialized")
+    _internalInvariantFailure("This class cannot be directly initialized")
   }
 #endif
 }
@@ -199,7 +199,7 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
   // But we still need to have an init to satisfy the compiler.
   @nonobjc
   override internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("This class cannot be directly initialized")
+    _internalInvariantFailure("This class cannot be directly initialized")
   }
 
   deinit {
@@ -247,7 +247,7 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     forKeys: UnsafeRawPointer,
     count: Int
   ) {
-    _sanityCheckFailure("This class cannot be directly initialized")
+    _internalInvariantFailure("This class cannot be directly initialized")
   }
 
   @objc(copyWithZone:)
@@ -405,7 +405,7 @@ extension _DictionaryStorage {
   ) -> _DictionaryStorage {
     // The entry count must be representable by an Int value; hence the scale's
     // peculiar upper bound.
-    _sanityCheck(scale >= 0 && scale < Int.bitWidth - 1)
+    _internalInvariant(scale >= 0 && scale < Int.bitWidth - 1)
 
     let bucketCount = (1 as Int) &<< scale
     let wordCount = _UnsafeBitset.wordCount(forCapacity: bucketCount)

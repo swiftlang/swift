@@ -49,7 +49,7 @@ extension Unicode.UTF8 : _UnicodeEncoding {
       value    |= (bits & 0b0________________________________0000_1111) &<< 12
       return Unicode.Scalar(_unchecked: value)
     default:
-      _sanityCheck(source.count == 4)
+      _internalInvariant(source.count == 4)
       let bits = source._biasedBits &- 0x01010101
       var value = (bits & 0b0_11_1111__0000_0000__0000_0000__0000_0000) &>> 24
       value    |= (bits & 0b0____________11_1111__0000_0000__0000_0000) &>> 10
@@ -144,7 +144,7 @@ extension UTF8.ReverseParser : Unicode.Parser, _UTFParser {
   @inline(__always)
   @inlinable
   public func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
-    _sanityCheck(_buffer._storage & 0x80 != 0) // this case handled elsewhere
+    _internalInvariant(_buffer._storage & 0x80 != 0) // this case handled elsewhere
     if _buffer._storage                & 0b0__1110_0000__1100_0000
                                       == 0b0__1100_0000__1000_0000 {
       // 2-byte sequence.  Top 4 bits of decoded result must be nonzero
@@ -221,7 +221,7 @@ extension Unicode.UTF8.ForwardParser : Unicode.Parser, _UTFParser {
   @inline(__always)
   @inlinable
   public func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
-    _sanityCheck(_buffer._storage & 0x80 != 0) // this case handled elsewhere
+    _internalInvariant(_buffer._storage & 0x80 != 0) // this case handled elsewhere
     
     if _buffer._storage & 0b0__1100_0000__1110_0000
                        == 0b0__1000_0000__1100_0000 {

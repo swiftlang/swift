@@ -478,7 +478,7 @@ internal func _findNextRun<C: RandomAccessCollection>(
   from start: C.Index,
   by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
 ) rethrows -> (end: C.Index, descending: Bool) {
-  _sanityCheck(start < elements.endIndex)
+  _internalInvariant(start < elements.endIndex)
 
   var previous = start
   var current = elements.index(after: start)
@@ -519,7 +519,7 @@ extension UnsafeMutableBufferPointer {
     buffer: UnsafeMutablePointer<Element>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) rethrows -> Bool {
-    _sanityCheck(runs[i - 1].upperBound == runs[i].lowerBound)
+    _internalInvariant(runs[i - 1].upperBound == runs[i].lowerBound)
     let low = runs[i - 1].lowerBound
     let middle = runs[i].lowerBound
     let high = runs[i].upperBound

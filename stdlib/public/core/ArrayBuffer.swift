@@ -34,7 +34,7 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
 
   @inlinable
   internal init(nsArray: AnyObject) {
-    _sanityCheck(_isClassOrObjCExistential(Element.self))
+    _internalInvariant(_isClassOrObjCExistential(Element.self))
     _storage = _ArrayBridgeStorage(objC: nsArray)
   }
 
@@ -44,8 +44,8 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
   ///   is a class or `@objc` existential.
   @inlinable
   __consuming internal func cast<U>(toBufferOf _: U.Type) -> _ArrayBuffer<U> {
-    _sanityCheck(_isClassOrObjCExistential(Element.self))
-    _sanityCheck(_isClassOrObjCExistential(U.self))
+    _internalInvariant(_isClassOrObjCExistential(Element.self))
+    _internalInvariant(_isClassOrObjCExistential(U.self))
     return _ArrayBuffer<U>(storage: _storage)
   }
 
@@ -58,12 +58,12 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
   __consuming internal func downcast<U>(
     toBufferWithDeferredTypeCheckOf _: U.Type
   ) -> _ArrayBuffer<U> {
-    _sanityCheck(_isClassOrObjCExistential(Element.self))
-    _sanityCheck(_isClassOrObjCExistential(U.self))
+    _internalInvariant(_isClassOrObjCExistential(Element.self))
+    _internalInvariant(_isClassOrObjCExistential(U.self))
     
     // FIXME: can't check that U is derived from Element pending
     // <rdar://problem/20028320> generic metatype casting doesn't work
-    // _sanityCheck(U.self is Element.Type)
+    // _internalInvariant(U.self is Element.Type)
 
     return _ArrayBuffer<U>(
       storage: _ArrayBridgeStorage(native: _native._storage, isFlagged: true))
@@ -89,7 +89,7 @@ extension _ArrayBuffer {
   /// Adopt the storage of `source`.
   @inlinable
   internal init(_buffer source: NativeBuffer, shiftedToStartIndex: Int) {
-    _sanityCheck(shiftedToStartIndex == 0, "shiftedToStartIndex must be 0")
+    _internalInvariant(shiftedToStartIndex == 0, "shiftedToStartIndex must be 0")
     _storage = _ArrayBridgeStorage(native: source._storage)
   }
 
@@ -244,7 +244,7 @@ extension _ArrayBuffer {
   /// - Precondition: The elements are known to be stored contiguously.
   @inlinable
   internal var firstElementAddress: UnsafeMutablePointer<Element> {
-    _sanityCheck(_isNative, "must be a native buffer")
+    _internalInvariant(_isNative, "must be a native buffer")
     return _native.firstElementAddress
   }
 
@@ -261,7 +261,7 @@ extension _ArrayBuffer {
       return _fastPath(_isNative) ? _native.count : _nonNative.count
     }
     set {
-      _sanityCheck(_isNative, "attempting to update count of Cocoa array")
+      _internalInvariant(_isNative, "attempting to update count of Cocoa array")
       _native.count = newValue
     }
   }
@@ -322,7 +322,7 @@ extension _ArrayBuffer {
   @inline(never)
   @inlinable // @specializable
   internal func _getElementSlowPath(_ i: Int) -> AnyObject {
-    _sanityCheck(
+    _internalInvariant(
       _isClassOrObjCExistential(Element.self),
       "Only single reference elements can be indexed here.")
     let element: AnyObject
@@ -398,7 +398,7 @@ extension _ArrayBuffer {
   internal mutating func withUnsafeMutableBufferPointer<R>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
-    _sanityCheck(
+    _internalInvariant(
       _isNative || count == 0,
       "Array is bridging an opaque NSArray; can't get a pointer to the elements"
     )
@@ -418,7 +418,7 @@ extension _ArrayBuffer {
   /// - Precondition: This buffer is backed by a `_ContiguousArrayBuffer`.
   @inlinable
   internal var nativeOwner: AnyObject {
-    _sanityCheck(_isNative, "Expect a native array")
+    _internalInvariant(_isNative, "Expect a native array")
     return _native._storage
   }
 
@@ -504,7 +504,7 @@ extension _ArrayBuffer {
   internal var _nonNative: _CocoaArrayWrapper {
     @inline(__always)
     get {
-      _sanityCheck(_isClassOrObjCExistential(Element.self))
+      _internalInvariant(_isClassOrObjCExistential(Element.self))
       return _CocoaArrayWrapper(_storage.objCInstance)
     }
   }

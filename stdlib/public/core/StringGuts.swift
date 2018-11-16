@@ -143,7 +143,7 @@ extension _StringGuts {
   internal func withFastUTF8<R>(
     _ f: (UnsafeBufferPointer<UInt8>) throws -> R
   ) rethrows -> R {
-    _sanityCheck(isFastUTF8)
+    _internalInvariant(isFastUTF8)
 
     if self.isSmall { return try _SmallString(_object).withUTF8(f) }
 
@@ -187,12 +187,12 @@ extension _StringGuts {
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
     #if arch(i386) || arch(arm)
-    _sanityCheck(MemoryLayout<String>.size == 12, """
+    _internalInvariant(MemoryLayout<String>.size == 12, """
     the runtime is depending on this, update Reflection.mm and \
     this if you change it
     """)
     #else
-    _sanityCheck(MemoryLayout<String>.size == 16, """
+    _internalInvariant(MemoryLayout<String>.size == 16, """
     the runtime is depending on this, update Reflection.mm and \
     this if you change it
     """)
@@ -223,7 +223,7 @@ extension _StringGuts {
   internal func _slowWithCString<Result>(
     _ body: (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
-    _sanityCheck(!_object.isFastZeroTerminated)
+    _internalInvariant(!_object.isFastZeroTerminated)
     return try String(self).utf8CString.withUnsafeBufferPointer {
       let ptr = $0.baseAddress._unsafelyUnwrappedUnchecked
       return try body(ptr)

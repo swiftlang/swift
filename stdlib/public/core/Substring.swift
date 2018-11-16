@@ -130,7 +130,7 @@ extension Substring {
     @inline(__always) get {
       let start = _slice.startIndex
       let end = _slice.endIndex
-      _sanityCheck(start.transcodedOffset == 0 && end.transcodedOffset == 0)
+      _internalInvariant(start.transcodedOffset == 0 && end.transcodedOffset == 0)
 
       return Range(uncheckedBounds: (start.encodedOffset, end.encodedOffset))
     }

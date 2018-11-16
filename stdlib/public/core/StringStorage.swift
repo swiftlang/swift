@@ -257,7 +257,7 @@ final internal class _StringStorage: _AbstractStringStorage {
 #endif // _runtime(_ObjC)
 
   private init(_doNotCallMe: ()) {
-    _sanityCheckFailure("Use the create method")
+    _internalInvariantFailure("Use the create method")
   }
 
   deinit {
@@ -280,18 +280,18 @@ private func determineCodeUnitCapacity(_ desiredCapacity: Int) -> Int {
   let bias = Int(bitPattern: _StringObject.nativeBias)
   let minimum = bias + desiredCapacity + 1
   let size = (minimum + 3) & ~3
-  _sanityCheck(size % 4 == 0)
+  _internalInvariant(size % 4 == 0)
   let capacity = size - bias
-  _sanityCheck(capacity > desiredCapacity)
+  _internalInvariant(capacity > desiredCapacity)
   return capacity
 #else
   // Bigger than _SmallString, and we need 1 extra for nul-terminator
   let minCap = 1 + Swift.max(desiredCapacity, _SmallString.capacity)
-  _sanityCheck(minCap < 0x1_0000_0000_0000, "max 48-bit length")
+  _internalInvariant(minCap < 0x1_0000_0000_0000, "max 48-bit length")
 
   // Round up to the nearest multiple of 8 that isn't also a multiple of 16
   let capacity = ((minCap + 7) & -16) + 8
-  _sanityCheck(
+  _internalInvariant(
     capacity > desiredCapacity && capacity % 8 == 0 && capacity % 16 != 0)
   return capacity
 #endif
@@ -329,10 +329,10 @@ extension _StringStorage {
   private static func create(
     capacity: Int, countAndFlags: CountAndFlags
   ) -> _StringStorage {
-    _sanityCheck(capacity >= countAndFlags.count)
+    _internalInvariant(capacity >= countAndFlags.count)
 
     let realCapacity = determineCodeUnitCapacity(capacity)
-    _sanityCheck(realCapacity > capacity)
+    _internalInvariant(realCapacity > capacity)
     return _StringStorage.create(
       realCodeUnitCapacity: realCapacity, countAndFlags: countAndFlags)
   }
@@ -349,7 +349,7 @@ extension _StringStorage {
 #else
     let countAndFlags = CountAndFlags(count: bufPtr.count, isASCII: isASCII)
 #endif
-    _sanityCheck(capacity >= bufPtr.count)
+    _internalInvariant(capacity >= bufPtr.count)
     let storage = _StringStorage.create(
       capacity: capacity, countAndFlags: countAndFlags)
     let addr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
@@ -446,11 +446,11 @@ extension _StringStorage {
   internal func _invariantCheck() {
     let rawSelf = UnsafeRawPointer(Builtin.bridgeToRawPointer(self))
     let rawStart = UnsafeRawPointer(start)
-    _sanityCheck(unusedCapacity >= 0)
-    _sanityCheck(count <= capacity)
-    _sanityCheck(rawSelf + Int(_StringObject.nativeBias) == rawStart)
-    _sanityCheck(self._realCapacity > self.count, "no room for nul-terminator")
-    _sanityCheck(self.terminator.pointee == 0, "not nul terminated")
+    _internalInvariant(unusedCapacity >= 0)
+    _internalInvariant(count <= capacity)
+    _internalInvariant(rawSelf + Int(_StringObject.nativeBias) == rawStart)
+    _internalInvariant(self._realCapacity > self.count, "no room for nul-terminator")
+    _internalInvariant(self.terminator.pointee == 0, "not nul terminated")
 
 #if arch(i386) || arch(arm)
     _flags._invariantCheck()
@@ -458,7 +458,7 @@ extension _StringStorage {
     _countAndFlags._invariantCheck()
 #endif
     if isASCII {
-      _sanityCheck(_allASCII(self.codeUnits))
+      _internalInvariant(_allASCII(self.codeUnits))
     }
     if let crumbs = _breadcrumbsAddress.pointee {
       crumbs._invariantCheck(for: self.asString)
@@ -494,14 +494,14 @@ extension _StringStorage {
     let oldTerminator = self.terminator
     _postRRCAdjust(
       newCount: self.count + appendedCount, newIsASCII: self.isASCII && isASCII)
-    _sanityCheck(oldTerminator + appendedCount == self.terminator)
+    _internalInvariant(oldTerminator + appendedCount == self.terminator)
   }
 
   @_effects(releasenone)
   internal func appendInPlace(
     _ other: UnsafeBufferPointer<UInt8>, isASCII: Bool
   ) {
-    _sanityCheck(self.capacity >= other.count)
+    _internalInvariant(self.capacity >= other.count)
     let srcAddr = other.baseAddress._unsafelyUnwrappedUnchecked
     let srcCount = other.count
     self.mutableEnd.initialize(from: srcAddr, count: srcCount)
@@ -514,7 +514,7 @@ extension _StringStorage {
   ) where Iter.Element == UInt8 {
     var srcCount = 0
     while let cu = other.next() {
-      _sanityCheck(self.unusedCapacity >= 1)
+      _internalInvariant(self.unusedCapacity >= 1)
       unusedStorage[srcCount] = cu
       srcCount += 1
     }
@@ -530,7 +530,7 @@ extension _StringStorage {
 extension _StringStorage {
   @_effects(releasenone)
   internal func remove(from lower: Int, to upper: Int) {
-    _sanityCheck(lower <= upper)
+    _internalInvariant(lower <= upper)
 
     let lowerPtr = mutableStart + lower
     let upperPtr = mutableStart + upper
@@ -548,7 +548,7 @@ extension _StringStorage {
     src: UnsafeMutablePointer<UInt8>,
     dst: UnsafeMutablePointer<UInt8>
   ) -> Int {
-    _sanityCheck(dst >= mutableStart && src <= mutableEnd)
+    _internalInvariant(dst >= mutableStart && src <= mutableEnd)
     let tailCount = mutableEnd - src
     dst.moveInitialize(from: src, count: tailCount)
     return tailCount
@@ -558,9 +558,9 @@ extension _StringStorage {
   internal func replace(
     from lower: Int, to upper: Int, with replacement: UnsafeBufferPointer<UInt8>
   ) {
-    _sanityCheck(lower <= upper)
+    _internalInvariant(lower <= upper)
     let replCount = replacement.count
-    _sanityCheck(replCount - (upper - lower) <= unusedCapacity)
+    _internalInvariant(replCount - (upper - lower) <= unusedCapacity)
 
     // Position the tail
     let lowerPtr = mutableStart + lower
@@ -585,8 +585,8 @@ extension _StringStorage {
     with replacement: C,
     replacementCount replCount: Int
   ) where C.Element == UInt8 {
-    _sanityCheck(lower <= upper)
-    _sanityCheck(replCount - (upper - lower) <= unusedCapacity)
+    _internalInvariant(lower <= upper)
+    _internalInvariant(replCount - (upper - lower) <= unusedCapacity)
 
     // Position the tail
     let lowerPtr = mutableStart + lower
@@ -601,7 +601,7 @@ extension _StringStorage {
       lowerPtr[srcCount] = cu
       srcCount += 1
     }
-    _sanityCheck(srcCount == replCount)
+    _internalInvariant(srcCount == replCount)
 
     _postRRCAdjust(
       newCount: lower + replCount + tailCount, newIsASCII: isASCII)

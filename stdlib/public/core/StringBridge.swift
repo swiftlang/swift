@@ -111,10 +111,10 @@ internal func _bridgeTagged(
   _ cocoa: _CocoaString,
   intoUTF8 bufPtr: UnsafeMutableBufferPointer<UInt8>
 ) -> Int? {
-  _sanityCheck(_isObjCTaggedPointer(cocoa))
+  _internalInvariant(_isObjCTaggedPointer(cocoa))
   let ptr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
   let length = _stdlib_binary_CFStringGetLength(cocoa)
-  _sanityCheck(length <= _SmallString.capacity)
+  _internalInvariant(length <= _SmallString.capacity)
   var count = 0
   let numCharWritten = _swift_stdlib_CFStringGetBytes(
     cocoa, _swift_shims_CFRange(location: 0, length: length),
@@ -228,7 +228,7 @@ extension String {
         countAndFlags: _guts._object._countAndFlags)
     }
 
-    _sanityCheck(_guts._object.hasObjCBridgeableObject,
+    _internalInvariant(_guts._object.hasObjCBridgeableObject,
       "Unknown non-bridgeable object case")
     return _guts._object.objCBridgeableObject
   }
@@ -309,7 +309,7 @@ extension String {
     into buffer: UnsafeMutableBufferPointer<UInt16>,
     range: Range<Int>
   ) {
-    _sanityCheck(buffer.count >= range.count)
+    _internalInvariant(buffer.count >= range.count)
     let indexRange = self._toUTF16Indices(range)
     self._nativeCopyUTF16CodeUnits(into: buffer, range: indexRange)
   }
