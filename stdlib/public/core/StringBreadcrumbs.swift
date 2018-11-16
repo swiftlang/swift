@@ -55,7 +55,7 @@ internal final class _StringBreadcrumbs {
     }
 
     self.utf16Length = i
-    _sanityCheck(self.crumbs.count == 1 + (self.utf16Length / stride))
+    _internalInvariant(self.crumbs.count == 1 + (self.utf16Length / stride))
 
     _invariantCheck(for: str)
   }
@@ -81,8 +81,8 @@ extension _StringBreadcrumbs {
   ) -> (lowerBound: String.Index, offset: Int) {
     var lowerBound = idx.encodedOffset / 3 / stride
     var upperBound = Swift.min(1 + (idx.encodedOffset / stride), crumbs.count)
-    _sanityCheck(crumbs[lowerBound] <= idx)
-    _sanityCheck(upperBound == crumbs.count || crumbs[upperBound] >= idx)
+    _internalInvariant(crumbs[lowerBound] <= idx)
+    _internalInvariant(upperBound == crumbs.count || crumbs[upperBound] >= idx)
 
     while (upperBound &- lowerBound) > 1 {
       let mid = lowerBound + ((upperBound &- lowerBound) / 2)
@@ -90,8 +90,8 @@ extension _StringBreadcrumbs {
     }
 
     let crumb = crumbs[lowerBound]
-    _sanityCheck(crumb <= idx)
-    _sanityCheck(lowerBound == crumbs.count-1 || crumbs[lowerBound+1] > idx)
+    _internalInvariant(crumb <= idx)
+    _internalInvariant(lowerBound == crumbs.count-1 || crumbs[lowerBound+1] > idx)
 
     return (crumb, lowerBound &* stride)
   }
@@ -101,7 +101,7 @@ extension _StringBreadcrumbs {
   #else
   @nonobjc @inline(never) @_effects(releasenone)
   internal func _invariantCheck(for str: String) {
-    _sanityCheck(self.utf16Length == str.utf16._distance(
+    _internalInvariant(self.utf16Length == str.utf16._distance(
       from: str.startIndex, to: str.endIndex),
       "Stale breadcrumbs")
   }
@@ -111,7 +111,7 @@ extension _StringBreadcrumbs {
 extension _StringGuts {
   @_effects(releasenone)
   internal func getBreadcrumbsPtr() -> UnsafePointer<_StringBreadcrumbs> {
-    _sanityCheck(hasBreadcrumbs)
+    _internalInvariant(hasBreadcrumbs)
 
     let mutPtr: UnsafeMutablePointer<_StringBreadcrumbs?>
     if hasNativeStorage {
@@ -125,7 +125,7 @@ extension _StringGuts {
       populateBreadcrumbs(mutPtr)
     }
 
-    _sanityCheck(mutPtr.pointee != nil)
+    _internalInvariant(mutPtr.pointee != nil)
     return UnsafePointer(mutPtr)
   }
 

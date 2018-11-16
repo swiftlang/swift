@@ -85,8 +85,8 @@ extension String.Index {
   internal init(encodedOffset: Int, transcodedOffset: Int) {
     let pos = UInt64(truncatingIfNeeded: encodedOffset)
     let trans = UInt64(truncatingIfNeeded: transcodedOffset)
-    _sanityCheck(pos == pos & 0x0000_FFFF_FFFF_FFFF)
-    _sanityCheck(trans <= 3)
+    _internalInvariant(pos == pos & 0x0000_FFFF_FFFF_FFFF)
+    _internalInvariant(trans <= 3)
 
     self.init((pos &<< 16) | (trans &<< 14))
   }
@@ -106,7 +106,7 @@ extension String.Index {
     self.init(encodedOffset: encodedOffset, transcodedOffset: transcodedOffset)
     if _slowPath(characterStride > 63) { return }
 
-    _sanityCheck(characterStride == characterStride & 0x3F)
+    _internalInvariant(characterStride == characterStride & 0x3F)
     self._rawBits |= UInt64(truncatingIfNeeded: characterStride &<< 8)
     self._invariantCheck()
   }
@@ -121,7 +121,7 @@ extension String.Index {
   #else
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
-    _sanityCheck(encodedOffset >= 0)
+    _internalInvariant(encodedOffset >= 0)
   }
   #endif // INTERNAL_CHECKS_ENABLED
 }
@@ -139,7 +139,7 @@ extension String.Index {
   @inlinable
   internal var nextEncoded: String.Index {
     @inline(__always) get {
-      _sanityCheck(self.transcodedOffset == 0)
+      _internalInvariant(self.transcodedOffset == 0)
       return String.Index(encodedOffset: self.encodedOffset &+ 1)
     }
   }
@@ -147,7 +147,7 @@ extension String.Index {
   @inlinable
   internal var priorEncoded: String.Index {
     @inline(__always) get {
-      _sanityCheck(self.transcodedOffset == 0)
+      _internalInvariant(self.transcodedOffset == 0)
       return String.Index(encodedOffset: self.encodedOffset &- 1)
     }
   }
@@ -179,7 +179,7 @@ extension String.Index {
 
   @inlinable @inline(__always)
   internal func transcoded(withOffset n: Int) -> String.Index {
-    _sanityCheck(self.transcodedOffset == 0)
+    _internalInvariant(self.transcodedOffset == 0)
     return String.Index(encodedOffset: self.encodedOffset, transcodedOffset: n)
   }
 

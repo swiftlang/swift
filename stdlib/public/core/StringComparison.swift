@@ -19,7 +19,7 @@ internal func _stringCompare(
   _ lhs: _StringGuts, _ rhs: _StringGuts,
   expecting: _StringComparisonResult
 ) -> Bool {
-  _sanityCheck(expecting == .equal || expecting == .less)
+  _internalInvariant(expecting == .equal || expecting == .less)
   if lhs.rawBits == rhs.rawBits {
     return expecting == .equal
   }
@@ -32,7 +32,7 @@ internal func _stringCompare(
           if expecting == .equal {
             return cmp == 0
           }
-          _sanityCheck(expecting == .less)
+          _internalInvariant(expecting == .less)
           return cmp < 0
         }
 
@@ -51,7 +51,7 @@ internal func _stringCompare(
   _ rhs: _StringGuts, _ rhsRange: Range<Int>,
   expecting: _StringComparisonResult
 ) -> Bool {
-  _sanityCheck(expecting == .equal || expecting == .less)
+  _internalInvariant(expecting == .equal || expecting == .less)
   if lhs.rawBits == rhs.rawBits && lhsRange == rhsRange {
     return expecting == .equal
   }
@@ -64,7 +64,7 @@ internal func _stringCompare(
           if expecting == .equal {
             return cmp == 0
           }
-          _sanityCheck(expecting == .less)
+          _internalInvariant(expecting == .less)
           return cmp < 0
         }
 
@@ -94,7 +94,7 @@ internal func _stringCompare(
   _ right: UnsafeBufferPointer<UInt8>,
   expecting: _StringComparisonResult
 ) -> Bool {
-  _sanityCheck(expecting == .equal || expecting == .less)
+  _internalInvariant(expecting == .equal || expecting == .less)
 
   if _binaryCompare(left, right) == 0 {
     return expecting == .equal
@@ -111,7 +111,7 @@ internal func _stringCompare(
     guard leftPtr[idx] == rightPtr[idx] else { break }
     idx &+= 1
   }
-  _sanityCheck(idx != left.count || idx != right.count,
+  _internalInvariant(idx != left.count || idx != right.count,
     "should of been cought by prior binary compare")
   if idx == end {
     // We finished one of our inputs.
@@ -131,7 +131,7 @@ internal func _stringCompare(
   if !_isContinuation(right[idx]) {
     let (leftScalar, leftLen) = _decodeScalar(left, startingAt: idx)
     let (rightScalar, rightLen) = _decodeScalar(right, startingAt: idx)
-    _sanityCheck(leftScalar != rightScalar)
+    _internalInvariant(leftScalar != rightScalar)
 
     let nfcQC = leftScalar._isNFCQCYes && rightScalar._isNFCQCYes
     let isSegmentEnd = left.hasNormalizationBoundary(before: idx + leftLen)

@@ -214,7 +214,7 @@ internal func _float${bits}ToStringImpl(
 internal func _float${bits}ToString(
   _ value: Float${bits}, debug: Bool
 ) -> (buffer: _Buffer32, length: Int) {
-  _sanityCheck(MemoryLayout<_Buffer32>.size == 32)
+  _internalInvariant(MemoryLayout<_Buffer32>.size == 32)
   var buffer = _Buffer32()
   let length = buffer.withBytes { (bufferPtr) in
     Int(_float${bits}ToStringImpl(bufferPtr, 32, value, debug))
