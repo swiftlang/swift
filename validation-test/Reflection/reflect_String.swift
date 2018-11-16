@@ -49,7 +49,7 @@ reflect(object: obj)
 // CHECK-32-NEXT:                 (multi_payload_enum size=5 alignment=4 stride=8 num_extra_inhabitants=253 bitwise_takable=1
 // (unstable implementation details omitted)
 // CHECK-32:               (field name=_discriminator offset=9
-// CHECK-32-NEXT:                 (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=128 bitwise_takable=1
+// CHECK-32-NEXT:                 (struct size=1 alignment=1 stride=1 num_extra_inhabitants=0 bitwise_takable=1
 // (unstable implementation details omitted)
 // CHECK-32:               (field name=_flags offset=10
 // CHECK-32-NEXT:                 (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1
