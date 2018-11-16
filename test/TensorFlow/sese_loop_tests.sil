@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -tf-xla-cfg-canonicalize -tf-ensure-single-loop-exit -assume-parsing-unqualified-ownership-sil %s -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt -tf-xla-cfg-canonicalize -assume-parsing-unqualified-ownership-sil %s -o /dev/null | %FileCheck %s
 
 
 import Builtin
