@@ -139,7 +139,7 @@ def test_performance(opt_level, old_dir, new_dir, threshold, num_samples,
     new_lines = ""
 
     # #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),PEAK_MEMORY(B)
-    score_re = re.compile(r"(\d+),(\w+),\d+,(\d+)")
+    score_re = re.compile(r"(\d+),([\w.\-]+),\d+,(\d+)")
 
     while to_test is None or len(to_test) > 0:
         tested_benchmarks = set()

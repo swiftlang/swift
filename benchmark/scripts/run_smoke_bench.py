@@ -96,7 +96,7 @@ def test_opt_level(opt_level, old_dir, new_dir, threshold, num_samples):
     new_logf = open(log_filename(new_dir), 'w')
 
     # #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),PEAK_MEMORY(B)
-    score_re = re.compile(r"(\d+),(\w+),\d+,(\d+)")
+    score_re = re.compile(r"(\d+),([\w.\-]+),\d+,(\d+)")
 
     while to_test is None or len(to_test) > 0:
         tested_benchmarks = set()
