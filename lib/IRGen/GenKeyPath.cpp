@@ -881,7 +881,12 @@ emitKeyPathComponent(IRGenModule &IGM,
     // If the component references an external property, encode that in a
     // header before the local attempt header, so that we can consult the
     // external descriptor at instantiation time.
-    if (auto externalDecl = component.getExternalDecl()) {
+    //
+    // Note that when compiling inlinable functions, we can have external
+    // declarations that point within the same module. Just ignore those.
+    auto externalDecl = component.getExternalDecl();
+    if (externalDecl &&
+        externalDecl->getModuleContext() != IGM.getSwiftModule()) {
       SmallVector<llvm::Constant *, 4> externalSubArgs;
       auto componentSig = externalDecl->getInnermostDeclContext()
         ->getGenericSignatureOfContext();

@@ -1,4 +1,4 @@
-// RUN: %target-resilience-test --no-symbol-diff
+// RUN: %target-resilience-test
 // REQUIRES: executable_test
 
 import StdlibUnittest

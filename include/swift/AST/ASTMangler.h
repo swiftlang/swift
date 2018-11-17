@@ -137,15 +137,19 @@ public:
   std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
                                              GenericSignature *signature,
                                              CanType baseType,
-                                             ArrayRef<CanType> subs);
+                                             SubstitutionMap subs,
+                                             ResilienceExpansion expansion);
   std::string mangleKeyPathSetterThunkHelper(const AbstractStorageDecl *property,
                                              GenericSignature *signature,
                                              CanType baseType,
-                                             ArrayRef<CanType> subs);
+                                             SubstitutionMap subs,
+                                             ResilienceExpansion expansion);
   std::string mangleKeyPathEqualsHelper(ArrayRef<CanType> indices,
-                                        GenericSignature *signature);
+                                        GenericSignature *signature,
+                                        ResilienceExpansion expansion);
   std::string mangleKeyPathHashHelper(ArrayRef<CanType> indices,
-                                      GenericSignature *signature);
+                                      GenericSignature *signature,
+                                      ResilienceExpansion expansion);
 
   std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
 
