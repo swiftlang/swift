@@ -2361,8 +2361,7 @@ function(add_swift_host_tool executable)
   set(ADDSWIFTHOSTTOOL_multiple_parameter_options
         SWIFT_COMPONENT
         COMPILE_FLAGS
-        DEPENDS
-        SWIFT_MODULE_DEPENDS)
+        DEPENDS)
 
   cmake_parse_arguments(
       ADDSWIFTHOSTTOOL # prefix
@@ -2370,15 +2369,6 @@ function(add_swift_host_tool executable)
       "" # single-value args
       "${ADDSWIFTHOSTTOOL_multiple_parameter_options}" # multi-value args
       ${ARGN})
-
-  # Configure variables for this subdirectory.
-  set(VARIANT_SUFFIX "-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
-  set(MODULE_VARIANT_SUFFIX "-swiftmodule${VARIANT_SUFFIX}")
-
-  foreach(mod ${ADDSWIFTHOSTTOOL_SWIFT_MODULE_DEPENDS})
-    list(APPEND ADDSWIFTHOSTTOOL_DEPENDS "swift${mod}${MODULE_VARIANT_SUFFIX}")
-    list(APPEND ADDSWIFTHOSTTOOL_DEPENDS "swift${mod}${VARIANT_SUFFIX}")
-  endforeach()
 
   # Create the executable rule.
   add_swift_executable(
