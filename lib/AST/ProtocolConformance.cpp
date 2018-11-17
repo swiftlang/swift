@@ -114,19 +114,21 @@ ProtocolConformanceRef::subst(Type origType,
 
   auto *proto = getRequirement();
 
+  // If the type is an existential, it must be self-conforming.
+  if (substType->isExistentialType()) {
+    auto optConformance =
+      proto->getModuleContext()->lookupExistentialConformance(substType, proto);
+    assert(optConformance && "existential type didn't self-conform");
+    return *optConformance;
+  }
+
   // Check the conformance map.
   if (auto result = conformances(origType->getCanonicalType(),
                                  substType, proto)) {
     return *result;
   }
 
-  // The only remaining case is that the type is an existential that
-  // self-conforms.
-  assert(substType->isExistentialType());
-  auto optConformance =
-    proto->getModuleContext()->lookupExistentialConformance(substType, proto);
-  assert(optConformance && "existential type didn't self-conform");
-  return *optConformance;
+  llvm_unreachable("Invalid conformance substitution");
 }
 
 Type
