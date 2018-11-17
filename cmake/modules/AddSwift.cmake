@@ -2359,8 +2359,7 @@ endmacro()
 
 function(add_swift_host_tool executable)
   set(ADDSWIFTHOSTTOOL_multiple_parameter_options
-        SWIFT_COMPONENT
-        DEPENDS)
+        SWIFT_COMPONENT)
 
   cmake_parse_arguments(
       ADDSWIFTHOSTTOOL # prefix
@@ -2373,7 +2372,6 @@ function(add_swift_host_tool executable)
   add_swift_executable(
     ${executable} 
     ${ADDSWIFTHOSTTOOL_UNPARSED_ARGUMENTS}
-    DEPENDS ${ADDSWIFTHOSTTOOL_DEPENDS}
   )
 
   # And then create the install rule if we are asked to.
