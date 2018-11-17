@@ -1824,6 +1824,34 @@ bool AbstractStorageDecl::isResilient(ModuleDecl *M,
   llvm_unreachable("bad resilience expansion");
 }
 
+static bool isValidKeyPathComponent(AbstractStorageDecl *decl) {
+  // If this property or subscript is not an override, we can reference it
+  // from a keypath component.
+  auto base = decl->getOverriddenDecl();
+  if (!base)
+    return true;
+
+  // Otherwise, we can only reference it if the type is not ABI-compatible
+  // with the type of the base.
+  //
+  // If the type is ABI compatible with the type of the base, we have to
+  // reference the base instead.
+  auto baseInterfaceTy = base->getInterfaceType();
+  auto derivedInterfaceTy = decl->getInterfaceType();
+
+  auto selfInterfaceTy = decl->getDeclContext()->getDeclaredInterfaceType();
+
+  auto overrideInterfaceTy = selfInterfaceTy->adjustSuperclassMemberDeclType(
+      base, decl, baseInterfaceTy);
+
+  return !derivedInterfaceTy->matches(overrideInterfaceTy,
+                                      TypeMatchFlags::AllowABICompatible);
+}
+
+void AbstractStorageDecl::computeIsValidKeyPathComponent() {
+  setIsValidKeyPathComponent(::isValidKeyPathComponent(this));
+}
+
 bool ValueDecl::isInstanceMember() const {
   DeclContext *DC = getDeclContext();
   if (!DC->isTypeContext())

@@ -3395,6 +3395,18 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
         externalSubs = externalSubs.mapReplacementTypesOutOfContext();
       }
     }
+
+    // ABI-compatible overrides do not have property descriptors, so we need
+    // to reference the overridden declaration instead.
+    auto *baseDecl = externalDecl;
+    if (isa<ClassDecl>(baseDecl->getDeclContext())) {
+      while (!baseDecl->isValidKeyPathComponent())
+        baseDecl = baseDecl->getOverriddenDecl();
+      externalSubs = SubstitutionMap::getOverrideSubstitutions(baseDecl,
+                                                               externalDecl,
+                                                               externalSubs);
+      externalDecl = baseDecl;
+    }
   }
   
   auto isSettableInComponent = [&]() -> bool {
