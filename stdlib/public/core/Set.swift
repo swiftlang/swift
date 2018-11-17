@@ -765,9 +765,9 @@ extension Set: SetAlgebra {
   public func isSuperset<S: Sequence>(of possibleSubset: __owned S) -> Bool
     where S.Element == Element {
     for member in possibleSubset {
-        if !contains(member) {
-            return false
-        }
+      if !contains(member) {
+        return false
+      }
     }
     return true
   }
@@ -1129,9 +1129,9 @@ extension Set {
   internal func _isDisjoint<S: Sequence>(with other: S) -> Bool
   where S.Element == Element {
     for member in other {
-        if contains(member) {
-            return false
-        }
+      if contains(member) {
+        return false
+      }
     }
     return true
   }
