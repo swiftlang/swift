@@ -1608,7 +1608,8 @@ getOpaqueAccessStrategy(const AbstractStorageDecl *storage,
 AccessStrategy
 AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
                                        AccessKind accessKind,
-                                       DeclContext *accessFromDC) const {
+                                       ModuleDecl *module,
+                                       ResilienceExpansion expansion) const {
   switch (semantics) {
   case AccessSemantics::DirectToStorage:
     assert(hasStorage());
@@ -1626,9 +1627,9 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
       if (isNativeDynamic())
         return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ false);
 
-      // If the storage is resilient to the given use DC (perhaps because
-      // it's @_transparent and we have to be careful about it being inlined
-      // across module lines), we cannot use direct access.
+      // If the storage is resilient from the given module and resilience
+      // expansion, we cannot use direct access.
+      //
       // If we end up here with a stored property of a type that's resilient
       // from some resilience domain, we cannot do direct access.
       //
@@ -1640,9 +1641,8 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
       // understanding that the access semantics are with respect to the
       // resilience domain of the accessor's caller.
       bool resilient;
-      if (accessFromDC)
-        resilient = isResilient(accessFromDC->getParentModule(),
-                                accessFromDC->getResilienceExpansion());
+      if (module)
+        resilient = isResilient(module, expansion);
       else
         resilient = isResilient();
 
@@ -1673,7 +1673,7 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
     case AccessKind::Read:
     case AccessKind::ReadWrite:
       return getAccessStrategy(AccessSemantics::Ordinary,
-                               accessKind, accessFromDC);
+                               accessKind, module, expansion);
     }
   }
   llvm_unreachable("bad access semantics");

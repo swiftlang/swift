@@ -2411,7 +2411,9 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &SGF,
   LValue lv;
 
   auto access = getFormalAccessKind(accessKind);
-  auto strategy = var->getAccessStrategy(semantics, access, SGF.FunctionDC);
+  auto strategy = var->getAccessStrategy(semantics, access,
+                                         SGF.SGM.M.getSwiftModule(),
+                                         SGF.F.getResilienceExpansion());
 
   lv.addNonMemberVarComponent(SGF, loc, var, /*be lazy*/ None,
                               options, accessKind, strategy, formalRValueType);
@@ -2845,7 +2847,9 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   auto accessSemantics = e->getAccessSemantics();
   AccessStrategy strategy =
     var->getAccessStrategy(accessSemantics,
-                           getFormalAccessKind(accessKind), SGF.FunctionDC);
+                           getFormalAccessKind(accessKind),
+                           SGF.SGM.M.getSwiftModule(),
+                           SGF.F.getResilienceExpansion());
 
   bool isOnSelfParameter = isCallToSelfOfCurrentFunction(SGF, e);
 
@@ -2864,7 +2868,10 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
             SGF, readAccessor.getAbstractFunctionDecl(), isObjC)) {
       accessSemantics = AccessSemantics::DirectToImplementation;
       strategy = var->getAccessStrategy(
-          accessSemantics, getFormalAccessKind(accessKind), SGF.FunctionDC);
+          accessSemantics,
+          getFormalAccessKind(accessKind),
+          SGF.SGM.M.getSwiftModule(),
+          SGF.F.getResilienceExpansion());
     }
   }
 
@@ -3023,7 +3030,9 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
   auto accessSemantics = e->getAccessSemantics();
   auto strategy =
     decl->getAccessStrategy(accessSemantics,
-                            getFormalAccessKind(accessKind), SGF.FunctionDC);
+                            getFormalAccessKind(accessKind),
+                            SGF.SGM.M.getSwiftModule(),
+                            SGF.F.getResilienceExpansion());
 
   bool isOnSelfParameter = isCallToSelfOfCurrentFunction(SGF, e);
   bool isContextRead = isCurrentFunctionReadAccess(SGF);
@@ -3041,7 +3050,10 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
             SGF, readAccessor.getAbstractFunctionDecl(), isObjC)) {
       accessSemantics = AccessSemantics::DirectToImplementation;
       strategy = decl->getAccessStrategy(
-          accessSemantics, getFormalAccessKind(accessKind), SGF.FunctionDC);
+          accessSemantics,
+          getFormalAccessKind(accessKind),
+          SGF.SGM.M.getSwiftModule(),
+          SGF.F.getResilienceExpansion());
     }
   }
 
@@ -3325,7 +3337,9 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
 
   AccessStrategy strategy =
     ivar->getAccessStrategy(semantics,
-                            getFormalAccessKind(accessKind), FunctionDC);
+                            getFormalAccessKind(accessKind),
+                            SGM.M.getSwiftModule(),
+                            F.getResilienceExpansion());
 
   auto baseAccessKind =
     getBaseAccessKind(SGM, ivar, accessKind, strategy, baseFormalType);
@@ -3906,7 +3920,9 @@ RValue SILGenFunction::emitRValueForStorageLoad(
     AccessSemantics semantics, Type propTy, SGFContext C,
     bool isBaseGuaranteed) {
   AccessStrategy strategy =
-    storage->getAccessStrategy(semantics, AccessKind::Read, FunctionDC);
+    storage->getAccessStrategy(semantics, AccessKind::Read,
+                               SGM.M.getSwiftModule(),
+                               F.getResilienceExpansion());
 
   // If we should call an accessor of some kind, do so.
   if (strategy.getKind() != AccessStrategy::Storage) {

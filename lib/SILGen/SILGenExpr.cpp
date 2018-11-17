@@ -2062,7 +2062,8 @@ public:
     // Check that we have a stored access strategy. If we don't bail.
     AccessStrategy strategy =
       Field->getAccessStrategy(Expr->getAccessSemantics(), AccessKind::Read,
-                               SGF.FunctionDC);
+                               SGF.SGM.M.getSwiftModule(),
+                               SGF.F.getResilienceExpansion());
     if (strategy.getKind() != AccessStrategy::Storage)
       return None;
 
@@ -2921,7 +2922,9 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   }
 
   auto semantics = AccessSemantics::Ordinary;
-  auto strategy = property->getAccessStrategy(semantics, AccessKind::Write);
+  auto strategy = property->getAccessStrategy(semantics, AccessKind::Write,
+                                              SGM.M.getSwiftModule(),
+                                              expansion);
 
   LValueOptions lvOptions;
   lv.addMemberComponent(subSGF, loc, property, subs, lvOptions,
@@ -3373,7 +3376,8 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                                              storage->supportsMutation()
                                                ? AccessKind::ReadWrite
                                                : AccessKind::Read,
-                                             M.getSwiftModule());
+                                             M.getSwiftModule(),
+                                             expansion);
 
   AbstractStorageDecl *externalDecl = nullptr;
   SubstitutionMap externalSubs;

@@ -4503,7 +4503,8 @@ public:
   /// Determine how this storage declaration should actually be accessed.
   AccessStrategy getAccessStrategy(AccessSemantics semantics,
                                    AccessKind accessKind,
-                                   DeclContext *accessFromDC = nullptr) const;
+                                   ModuleDecl *module,
+                                   ResilienceExpansion expansion) const;
 
   /// \brief Should this declaration behave as if it must be accessed
   /// resiliently, even when we're building a non-resilient module?
