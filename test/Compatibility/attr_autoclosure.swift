@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s | %FileCheck %s
-// REQUIRES: SWIFT_VERSION=4
+// RUN: %target-swift-frontend -swift-version 4 -emit-sil -verify %s | %FileCheck %s
 
 do {
   func a(_ x: @autoclosure () -> Int) {}
