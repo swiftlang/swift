@@ -18,8 +18,8 @@
 
 import TestsUtils
 
-let t: [BenchmarkCategory] = []
-let ta: [BenchmarkCategory] = [.api, .Array]
+let t: [BenchmarkCategory] = [.existential]
+let ta: [BenchmarkCategory] = [.api, .Array, .existential]
 
 public let ExistentialPerformance: [BenchmarkInfo] = [
   BenchmarkInfo(name: "Existential.method.1x.Ref1",
