@@ -221,7 +221,8 @@ def get_results(bench_dir, opt_level, num_samples, to_test):
         if to_test:
             args += to_test
         env = {'DYLD_LIBRARY_PATH': os.path.join(bench_dir, 'lib', 'swift',
-               'macos')}
+               'macos'),
+               'SWIFT_DETERMINISTIC_HASHING': '1'}
         output = subprocess.check_output(args, env=env)
     except subprocess.CalledProcessError as e:
         sys.stderr.write(e.output)
