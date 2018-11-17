@@ -4804,8 +4804,7 @@ ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
     ArgumentName(PD->getArgumentName()),
     ArgumentNameLoc(PD->getArgumentNameLoc()),
     SpecifierLoc(PD->getSpecifierLoc()),
-    DefaultValueAndIsVariadic(nullptr, PD->DefaultValueAndIsVariadic.getInt()),
-    IsAutoClosure(PD->isAutoClosure()) {
+    DefaultValueAndFlags(nullptr, PD->DefaultValueAndFlags.getInt()) {
   Bits.ParamDecl.IsTypeLocImplicit = PD->Bits.ParamDecl.IsTypeLocImplicit;
   Bits.ParamDecl.defaultArgumentKind = PD->Bits.ParamDecl.defaultArgumentKind;
   typeLoc = PD->getTypeLoc().clone(PD->getASTContext());
@@ -4901,19 +4900,19 @@ Type ParamDecl::getVarargBaseTy(Type VarArgT) {
 }
 
 void ParamDecl::setDefaultValue(Expr *E) {
-  if (!DefaultValueAndIsVariadic.getPointer()) {
+  if (!DefaultValueAndFlags.getPointer()) {
     if (!E) return;
 
-    DefaultValueAndIsVariadic.setPointer(
-      getASTContext().Allocate<StoredDefaultArgument>());
+    DefaultValueAndFlags.setPointer(
+        getASTContext().Allocate<StoredDefaultArgument>());
   }
 
-  DefaultValueAndIsVariadic.getPointer()->DefaultArg = E;
+  DefaultValueAndFlags.getPointer()->DefaultArg = E;
 }
 
 void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
-  assert(DefaultValueAndIsVariadic.getPointer());
-  DefaultValueAndIsVariadic.getPointer()->InitContext = initContext;
+  assert(DefaultValueAndFlags.getPointer());
+  DefaultValueAndFlags.getPointer()->InitContext = initContext;
 }
 
 StringRef
@@ -4923,10 +4922,9 @@ ParamDecl::getDefaultValueStringRepresentation(
   case DefaultArgumentKind::None:
     llvm_unreachable("called on a ParamDecl with no default value");
   case DefaultArgumentKind::Normal: {
-    assert(DefaultValueAndIsVariadic.getPointer() &&
+    assert(DefaultValueAndFlags.getPointer() &&
            "default value not provided yet");
-    auto existing =
-      DefaultValueAndIsVariadic.getPointer()->StringRepresentation;
+    auto existing = DefaultValueAndFlags.getPointer()->StringRepresentation;
     if (!existing.empty())
       return existing;
     return extractInlinableText(getASTContext().SourceMgr, getDefaultValue(),
@@ -4953,12 +4951,12 @@ ParamDecl::setDefaultValueStringRepresentation(StringRef stringRepresentation) {
   assert(getDefaultArgumentKind() == DefaultArgumentKind::Normal);
   assert(!stringRepresentation.empty());
 
-  if (!DefaultValueAndIsVariadic.getPointer()) {
-    DefaultValueAndIsVariadic.setPointer(
-      getASTContext().Allocate<StoredDefaultArgument>());
+  if (!DefaultValueAndFlags.getPointer()) {
+    DefaultValueAndFlags.setPointer(
+        getASTContext().Allocate<StoredDefaultArgument>());
   }
 
-  DefaultValueAndIsVariadic.getPointer()->StringRepresentation =
+  DefaultValueAndFlags.getPointer()->StringRepresentation =
       stringRepresentation;
 }
 
