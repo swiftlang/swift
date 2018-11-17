@@ -210,3 +210,5 @@ Func LazyCollectionProtocol.map(_:) has been removed
 Func LazyCollectionProtocol.prefix(while:) has been removed
 Func LazyCollectionProtocol.reversed() has been removed
 Var LazyCollectionProtocol.lazy has declared type change from LazyCollection<Self.Elements> to LazySequence<Self.Elements>
+
+Func Strideable....(_:_:) has been removed
