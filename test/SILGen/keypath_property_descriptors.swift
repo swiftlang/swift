@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -enable-key-path-resilience %s | %FileCheck --check-prefix=CHECK --check-prefix=NONRESILIENT %s
-// RUN: %target-swift-emit-silgen -enable-resilience -enable-key-path-resilience %s | %FileCheck --check-prefix=CHECK --check-prefix=RESILIENT %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck --check-prefix=CHECK --check-prefix=NONRESILIENT %s
+// RUN: %target-swift-emit-silgen -enable-resilience %s | %FileCheck --check-prefix=CHECK --check-prefix=RESILIENT %s
 
 // TODO: globals should get descriptors
 public var a: Int = 0
