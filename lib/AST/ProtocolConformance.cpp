@@ -112,12 +112,6 @@ ProtocolConformanceRef::subst(Type origType,
   if (substType->isOpenedExistential())
     return *this;
 
-  // If the substituted type is an existential, we have a self-conforming
-  // existential being substituted in place of itself. There's no
-  // conformance information in this case, so just return.
-  if (substType->isObjCExistentialType())
-    return *this;
-
   auto *proto = getRequirement();
 
   // Check the conformance map.
@@ -126,7 +120,13 @@ ProtocolConformanceRef::subst(Type origType,
     return *result;
   }
 
-  llvm_unreachable("Invalid conformance substitution");
+  // The only remaining case is that the type is an existential that
+  // self-conforms.
+  assert(substType->isExistentialType());
+  auto optConformance =
+    proto->getModuleContext()->lookupExistentialConformance(substType, proto);
+  assert(optConformance && "existential type didn't self-conform");
+  return *optConformance;
 }
 
 Type
