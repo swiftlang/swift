@@ -7,4 +7,4 @@ func foo(baz: Never) -> Int { // expected-note {{the function body will never be
   return 0
 }
 
-func bar(baz: Never) -> Int {} // ok
+func bar(baz: Never) -> Int {} // expected-note {{the function body will never be executed}}
