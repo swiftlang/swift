@@ -1877,10 +1877,12 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
       discriminator = containingFile->getDiscriminatorForPrivateValue(generic);
     }
 
+    bool isProtocolExt = DC->getParent()->getExtendedProtocolDecl();
+
     XRefTypePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                         addDeclBaseNameRef(generic->getName()),
                                         addDeclBaseNameRef(discriminator),
-                                        /*inProtocolExtension*/false,
+                                        isProtocolExt,
                                         generic->hasClangNode());
     break;
   }

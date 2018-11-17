@@ -1406,9 +1406,9 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
         IdentifierID IID;
         IdentifierID privateDiscriminator;
         bool importedFromClang = false;
+        bool inProtocolExt = false;
         XRefTypePathPieceLayout::readRecord(scratch, IID, privateDiscriminator,
-                                            /*inProtocolExt*/None,
-                                            importedFromClang);
+                                            inProtocolExt, importedFromClang);
         if (privateDiscriminator)
           goto giveUpFastPath;
 
@@ -1438,9 +1438,8 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
         if (nestedType) {
           SmallVector<ValueDecl *, 1> singleValueBuffer{nestedType};
           filterValues(/*expectedTy*/Type(), extensionModule, genericSig,
-                       /*isType*/true, /*inProtocolExt*/false,
-                       importedFromClang, /*isStatic*/false, /*ctorInit*/None,
-                       singleValueBuffer);
+                       /*isType*/true, inProtocolExt, importedFromClang,
+                       /*isStatic*/false, /*ctorInit*/None, singleValueBuffer);
           if (!singleValueBuffer.empty()) {
             values.assign({nestedType});
             ++NumNestedTypeShortcuts;
