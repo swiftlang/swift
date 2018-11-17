@@ -1,11 +1,14 @@
 // RUN: %target-swift-emit-silgen %s | %FileCheck %s --check-prefix=CHECK --check-prefix=FRAGILE
 // RUN: %target-swift-emit-silgen -enable-resilience %s | %FileCheck %s --check-prefix=CHECK --check-prefix=RESILIENT
 
+// RUN: %target-swift-frontend -emit-ir -enable-sil-ownership %s
+// RUN: %target-swift-frontend -emit-ir -enable-sil-ownership -enable-resilience %s
+
 public struct KeypathStruct {
   public var stored: Int = 0
-  public var computed: String { get { } set { } }
+  public var computed: String { get { return "" } set { } }
 
-  public subscript(x: Int, y: String) -> Bool { get { } set { } }
+  public subscript(x: Int, y: String) -> Bool { get { return false } set { } }
 }
 
 // CHECK-LABEL: sil [serialized] @$s18keypaths_inlinable11usesKeypathyyF : $@convention(thin) () -> ()
