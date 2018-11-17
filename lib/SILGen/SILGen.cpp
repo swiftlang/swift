@@ -1331,12 +1331,19 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
 }
 
 bool
-TypeConverter::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl) {
+SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
+                                                  ResilienceExpansion expansion) {
+  // If the declaration is resilient, we have to treat the component as
+  // computed.
+  if (decl->isResilient(M.getSwiftModule(), expansion))
+    return false;
+
   auto strategy = decl->getAccessStrategy(AccessSemantics::Ordinary,
                                           decl->supportsMutation()
                                             ? AccessKind::ReadWrite
                                             : AccessKind::Read,
-                                          M.getSwiftModule());
+                                          M.getSwiftModule(),
+                                          expansion);
   switch (strategy.getKind()) {
   case AccessStrategy::Storage: {
     // Keypaths rely on accessors to handle the special behavior of weak or
@@ -1349,9 +1356,9 @@ TypeConverter::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl) {
     if (auto genericEnv =
               decl->getInnermostDeclContext()->getGenericEnvironmentOfContext())
       componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
-    auto storageTy = getSubstitutedStorageType(decl, componentObjTy);
+    auto storageTy = M.Types.getSubstitutedStorageType(decl, componentObjTy);
     auto opaqueTy =
-      getLoweredType(AbstractionPattern::getOpaque(), componentObjTy);
+      M.Types.getLoweredType(AbstractionPattern::getOpaque(), componentObjTy);
     
     return storageTy.getAddressType() == opaqueTy.getAddressType();
   }
@@ -1365,7 +1372,7 @@ TypeConverter::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl) {
   llvm_unreachable("unhandled strategy");
 }
 
-static bool canStorageUseTrivialDescriptor(SILModule &M,
+static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
                                            AbstractStorageDecl *decl) {
   // A property can use a trivial property descriptor if the key path component
   // that an external module would form given publicly-exported information
@@ -1373,10 +1380,11 @@ static bool canStorageUseTrivialDescriptor(SILModule &M,
   // key path.
   // This means that the property isn't stored (without promising to be always
   // stored) and doesn't have a setter with less-than-public visibility.
-  
-  switch (M.getSwiftModule()->getResilienceStrategy()) {
+  auto expansion = ResilienceExpansion::Maximal;
+
+  switch (SGM.M.getSwiftModule()->getResilienceStrategy()) {
   case ResilienceStrategy::Default: {
-    if (M.Types.canStorageUseStoredKeyPathComponent(decl)) {
+    if (SGM.canStorageUseStoredKeyPathComponent(decl, expansion)) {
       // External modules can't directly access storage, unless this is a
       // property in a fixed-layout type.
       return !decl->isFormallyResilient();
@@ -1404,7 +1412,7 @@ static bool canStorageUseTrivialDescriptor(SILModule &M,
     // or a fixed-layout type may not have been.
     // Without availability information, only get-only computed properties
     // can resiliently use trivial descriptors.
-    return !M.Types.canStorageUseStoredKeyPathComponent(decl)
+    return !SGM.canStorageUseStoredKeyPathComponent(decl, expansion)
       && decl->getSetter() == nullptr;
   }
   }
@@ -1412,9 +1420,6 @@ static bool canStorageUseTrivialDescriptor(SILModule &M,
 }
 
 void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
-  if (!M.getASTContext().LangOpts.EnableKeyPathResilience)
-    return;
-  
   // TODO: Key path code emission doesn't handle opaque values properly yet.
   if (!SILModuleConventions(M).useLoweredAddresses())
     return;
@@ -1444,7 +1449,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   unsigned baseOperand = 0;
   bool needsGenericContext = true;
   
-  if (canStorageUseTrivialDescriptor(M, decl)) {
+  if (canStorageUseTrivialDescriptor(*this, decl)) {
     (void)SILProperty::create(M, /*serialized*/ false, decl, None);
     return;
   }
@@ -1455,6 +1460,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   
   auto component = emitKeyPathComponentForDecl(SILLocation(decl),
                                                genericEnv,
+                                               ResilienceExpansion::Maximal,
                                                baseOperand, needsGenericContext,
                                                subs, decl, {},
                                                baseTy->getCanonicalType(),

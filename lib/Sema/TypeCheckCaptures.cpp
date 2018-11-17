@@ -416,10 +416,13 @@ public:
     // If this is a direct reference to underlying storage, then this is a
     // capture of the storage address - not a capture of the getter/setter.
     if (auto var = dyn_cast<VarDecl>(D)) {
+      auto *DC = AFR.getAsDeclContext();
       if (var->getAccessStrategy(DRE->getAccessSemantics(),
                                  var->supportsMutation()
-                                   ? AccessKind::ReadWrite : AccessKind::Read,
-                                 AFR.getAsDeclContext())
+                                   ? AccessKind::ReadWrite
+                                   : AccessKind::Read,
+                                 DC->getParentModule(),
+                                 DC->getResilienceExpansion())
           .getKind() == AccessStrategy::Storage)
         Flags |= CapturedValue::IsDirect;
     }

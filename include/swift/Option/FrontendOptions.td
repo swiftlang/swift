@@ -547,9 +547,6 @@ def enable_verify_exclusivity : Flag<["-"], "enable-verify-exclusivity">,
 def disable_verify_exclusivity : Flag<["-"], "disable-verify-exclusivity">,
   HelpText<"Diable verification of access markers used to enforce exclusivity.">;
 
-def enable_key_path_resilience : Flag<["-"], "enable-key-path-resilience">,
-  HelpText<"Enable key path resilience.">;
-
 def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,
   HelpText<"One of 'all', 'resilient' or 'fragile'">;

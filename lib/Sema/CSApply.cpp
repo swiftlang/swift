@@ -6752,7 +6752,8 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
                                         isSettableFromHere
                                           ? AccessKind::ReadWrite
                                           : AccessKind::Read,
-                                        UseDC);
+                                        UseDC->getParentModule(),
+                                        UseDC->getResilienceExpansion());
   if (baseTy->is<InOutType>() && strategy.getKind() != AccessStrategy::Storage)
     return InOutType::get(baseObjectTy);
 

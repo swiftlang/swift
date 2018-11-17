@@ -209,20 +209,6 @@ sil_vtable C2 {}
 // CHECK-LABEL: @"generic environment SHRzSHR_r0_l" = linkonce_odr hidden constant
 // CHECK-SAME: i32 8193, i16 2, i8 -128, i8 -128, i32 128
 
-// -- %t
-// CHECK: [[KP_T:@keypath(\..*)?]] = private global <{ {{.*}} }> <{ {{.*}} i32 1, {{.*}} @"got.$s8keypaths1GV1xxvpMV"
-// CHECK-SAME:   @"symbolic x"
-//            -- computed get-only property, identified by indirect pointer
-// CHECK-SAME:   <i32 0x0208_0002>
-
-// -- %u
-// CHECK: [[KP_U:@keypath(\..*)?]] = private global <{ {{.*}} }> <{ {{.*}} i32 3, {{.*}} @"got.$s8keypaths1GVyxqd__cSHRd__luipMV"
-// CHECK-SAME:   @"symbolic q_"
-// CHECK-SAME:   @"symbolic x"
-// CHECK-SAME:   @"keypath_get_witness_table
-//            -- computed get-only property, identified by indirect pointer
-// CHECK-SAME:   <i32 0x0208_0002>
-
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @stored_property_fixed_offsets()
 sil @stored_property_fixed_offsets : $@convention(thin) () -> () {
 entry:
@@ -419,30 +405,6 @@ entry(%0 : @trivial $*A, %1 : @trivial $*B, %2 : @trivial $*A, %3 : @trivial $*B
   return undef : $()
 }
 
-sil @generic_external : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed A, @in_guaranteed B, @in_guaranteed A, @in_guaranteed B, @in_guaranteed A, @in_guaranteed B) -> () {
-entry(%0 : @trivial $*A, %1 : @trivial $*B, %2 : @trivial $*A, %3 : @trivial $*B, %4 : @trivial $*A, %5 : @trivial $*B):
-  %t = keypath $KeyPath<G<B>, B>, <Z> (
-    root $G<Z>;
-    gettable_property $Z,
-      id @g_x_get : $@convention(thin) <Z> (@in_guaranteed G<Z>) -> @out Z,
-      getter @g_x_get : $@convention(thin) <Z> (@in_guaranteed G<Z>) -> @out Z,
-      external #G.x<Z>
-  ) <B>
-
-  %u = keypath $KeyPath<G<A>, A>, <X: Hashable, Y: Hashable> (
-    root $G<Y>;
-    gettable_property $Y,
-      id @g_subscript_get : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed G<B>, UnsafeRawPointer) -> @out B,
-      getter @g_subscript_get : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed G<B>, UnsafeRawPointer) -> @out B,
-      indices [%$0 : $X : $*X],
-      indices_equals @s_equals : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer, UnsafeRawPointer) -> Bool,
-      indices_hash @s_hash : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer) -> Int,
-      external #G.subscript<Y, X>
-  ) <B, A> (%1)
-
-  return undef : $()
-}
-
 sil @identity : $@convention(thin) <T> () -> () {
 entry:
   %v = keypath $WritableKeyPath<T, T>, <A> (root $A; objc "self") <T>
@@ -458,6 +420,3 @@ sil @s_hash : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer) -
 
 sil @v_get : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed B, UnsafeRawPointer) -> @out A
 sil @v_set : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed A, @in_guaranteed B, UnsafeRawPointer) -> ()
-
-sil @g_x_get : $@convention(thin) <Z> (@in_guaranteed G<Z>) -> @out Z
-sil @g_subscript_get : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed G<B>, UnsafeRawPointer) -> @out B
