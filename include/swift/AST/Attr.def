@@ -496,6 +496,10 @@ DECL_ATTR(_projectedValueProperty, ProjectedValueProperty,
   OnVar | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   89)
+SIMPLE_DECL_ATTR(_nonEphemeral, NonEphemeral,
+  OnParam | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  90)
 
 SIMPLE_DECL_ATTR(IBSegueAction, IBSegueAction,
   OnFunc |

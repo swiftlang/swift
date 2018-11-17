@@ -1761,13 +1761,14 @@ public:
 /// escaping.
 class ParameterTypeFlags {
   enum ParameterFlags : uint8_t {
-    None        = 0,
-    Variadic    = 1 << 0,
-    AutoClosure = 1 << 1,
-    OwnershipShift = 2,
-    Ownership   = 7 << OwnershipShift,
+    None         = 0,
+    Variadic     = 1 << 0,
+    AutoClosure  = 1 << 1,
+    NonEphemeral = 1 << 2,
+    OwnershipShift = 3,
+    Ownership    = 7 << OwnershipShift,
 
-    NumBits = 5
+    NumBits = 6
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits < 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
@@ -1780,19 +1781,21 @@ public:
     return ParameterTypeFlags(OptionSet<ParameterFlags>(raw));
   }
 
-  ParameterTypeFlags(bool variadic, bool autoclosure,
+  ParameterTypeFlags(bool variadic, bool autoclosure, bool nonEphemeral,
                      ValueOwnership ownership)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
+              (nonEphemeral ? NonEphemeral : 0) |
               uint8_t(ownership) << OwnershipShift) {}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
   fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
-                    ValueOwnership ownership);
+                    bool isNonEphemeral, ValueOwnership ownership);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
   bool isAutoClosure() const { return value.contains(AutoClosure); }
+  bool isNonEphemeral() const { return value.contains(NonEphemeral); }
   bool isInOut() const { return getValueOwnership() == ValueOwnership::InOut; }
   bool isShared() const { return getValueOwnership() == ValueOwnership::Shared;}
   bool isOwned() const { return getValueOwnership() == ValueOwnership::Owned; }
@@ -1830,6 +1833,12 @@ public:
     return ParameterTypeFlags(isAutoClosure
                                   ? value | ParameterTypeFlags::AutoClosure
                                   : value - ParameterTypeFlags::AutoClosure);
+  }
+
+  ParameterTypeFlags withNonEphemeral(bool isNonEphemeral) const {
+    return ParameterTypeFlags(isNonEphemeral
+                                  ? value | ParameterTypeFlags::NonEphemeral
+                                  : value - ParameterTypeFlags::NonEphemeral);
   }
 
   bool operator ==(const ParameterTypeFlags &other) const {
@@ -1898,6 +1907,7 @@ public:
   ParameterTypeFlags asParamFlags() const {
     return ParameterTypeFlags(/*variadic*/ false,
                               /*autoclosure*/ false,
+                              /*nonEphemeral*/ false,
                               getValueOwnership());
   }
 
@@ -2766,6 +2776,9 @@ public:
 
     /// Whether the parameter is marked 'owned'
     bool isOwned() const { return Flags.isOwned(); }
+
+    /// Whether the parameter is marked '@_nonEphemeral'
+    bool isNonEphemeral() const { return Flags.isNonEphemeral(); }
 
     ValueOwnership getValueOwnership() const {
       return Flags.getValueOwnership();
@@ -5562,7 +5575,7 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 /// Create one from what's present in the parameter decl and type
 inline ParameterTypeFlags
 ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
-                                      bool isAutoClosure,
+                                      bool isAutoClosure, bool isNonEphemeral,
                                       ValueOwnership ownership) {
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
@@ -5573,7 +5586,7 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
            ownership == ValueOwnership::InOut);
     ownership = ValueOwnership::InOut;
   }
-  return {isVariadic, isAutoClosure, ownership};
+  return {isVariadic, isAutoClosure, isNonEphemeral, ownership};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {

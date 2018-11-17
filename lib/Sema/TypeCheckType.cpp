@@ -2415,7 +2415,7 @@ bool TypeResolver::resolveASTFunctionTypeParams(
       break;
     }
     auto paramFlags = ParameterTypeFlags::fromParameterType(
-        ty, variadic, autoclosure, ownership);
+        ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership);
     elements.emplace_back(ty, Identifier(), paramFlags);
   }
 

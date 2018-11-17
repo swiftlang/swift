@@ -283,3 +283,30 @@ func unownedOptionals(x: C) {
   _ = y
   _ = y2
 }
+
+// @_nonEphemeral attribute
+struct S1<T> {
+  func foo(@_nonEphemeral _ x: String) {} // expected-error {{@_nonEphemeral attribute currently only applies to pointer types}}
+  func bar(@_nonEphemeral _ x: T) {} // expected-error {{@_nonEphemeral attribute currently only applies to pointer types}}
+
+  func baz<U>(@_nonEphemeral _ x: U) {} // expected-error {{@_nonEphemeral attribute currently only applies to pointer types}}
+
+  func qux(@_nonEphemeral _ x: UnsafeMutableRawPointer) {}
+  func quux(@_nonEphemeral _ x: UnsafeMutablePointer<Int>?) {}
+}
+
+@_nonEphemeral struct S2 {} // expected-error {{@_nonEphemeral may only be used on 'parameter' declarations}}
+
+protocol P {}
+extension P {
+  // Allow @_nonEphemeral on the protocol Self type, as the protocol could be adopted by a pointer type.
+  func foo(@_nonEphemeral _ x: Self) {}
+  func bar(@_nonEphemeral _ x: Self?) {}
+}
+
+enum E1 {
+  case str(@_nonEphemeral _: String) // expected-error {{expected parameter name followed by ':'}}
+  case ptr(@_nonEphemeral _: UnsafeMutableRawPointer) // expected-error {{expected parameter name followed by ':'}}
+
+  func foo() -> @_nonEphemeral UnsafeMutableRawPointer? { return nil } // expected-error {{attribute can only be applied to declarations, not types}}
+}
