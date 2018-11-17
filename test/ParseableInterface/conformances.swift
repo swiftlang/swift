@@ -3,6 +3,8 @@
 // RUN: %FileCheck -check-prefix CHECK-END %s < %t.swiftinterface
 // RUN: %FileCheck -check-prefix NEGATIVE %s < %t.swiftinterface
 
+// NEGATIVE-NOT: BAD
+
 // CHECK-LABEL: public protocol SimpleProto {
 public protocol SimpleProto {
   // CHECK: associatedtype Element
@@ -164,6 +166,20 @@ extension MultiGeneric: PublicProto where U: PrivateProto {}
 
 // CHECK: public struct MultiGeneric<T, U, V> {
 // CHECK-END: extension conformances.MultiGeneric : PublicProto where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary {}
+
+internal struct InternalImpl_BAD: PrivateSubProto {}
+internal struct InternalImplConstrained_BAD<T> {}
+extension InternalImplConstrained_BAD: PublicProto where T: PublicProto {}
+internal struct InternalImplConstrained2_BAD<T> {}
+extension InternalImplConstrained2_BAD: PublicProto where T: PrivateProto {}
+
+public struct WrapperForInternal {
+  internal struct InternalImpl_BAD: PrivateSubProto {}
+  internal struct InternalImplConstrained_BAD<T> {}
+  internal struct InternalImplConstrained2_BAD<T> {}
+}
+extension WrapperForInternal.InternalImplConstrained_BAD: PublicProto where T: PublicProto {}
+extension WrapperForInternal.InternalImplConstrained2_BAD: PublicProto where T: PrivateProto {}
 
 
 // CHECK-END: @usableFromInline
