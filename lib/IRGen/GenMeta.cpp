@@ -513,8 +513,8 @@ namespace {
     }
   
     ConstantReference getParent() {
-      return {IGM.getAddrOfModuleContextDescriptor(DC->getParentModule()),
-              ConstantReference::Direct};
+      return IGM.getAddrOfParentContextDescriptor(
+               DC, /*fromAnonymousContext=*/true);
     }
     
     ContextDescriptorKind getContextKind() {
@@ -565,7 +565,8 @@ namespace {
     }
 
     ConstantReference getParent() {
-      return IGM.getAddrOfParentContextDescriptor(Proto);
+      return IGM.getAddrOfParentContextDescriptor(
+               Proto, /*fromAnonymousContext=*/false);
     }
 
     ContextDescriptorKind getContextKind() {
@@ -1014,7 +1015,8 @@ namespace {
     }
     
     ConstantReference getParent() {
-      return IGM.getAddrOfParentContextDescriptor(Type);
+      return IGM.getAddrOfParentContextDescriptor(
+               Type, /*fromAnonymousContext=*/false);
     }
     
     GenericSignature *getGenericSignature() {
