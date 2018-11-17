@@ -3245,23 +3245,36 @@ AssociatedTypeDecl::getOverriddenDecls() const {
   return assocTypes;
 }
 
-AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
-  auto overridden = getOverriddenDecls();
+namespace {
+static AssociatedTypeDecl *getAssociatedTypeAnchor(
+                      const AssociatedTypeDecl *ATD,
+                      llvm::SmallSet<const AssociatedTypeDecl *, 8> &searched) {
+  auto overridden = ATD->getOverriddenDecls();
 
   // If this declaration does not override any other declarations, it's
   // the anchor.
-  if (overridden.empty()) return const_cast<AssociatedTypeDecl *>(this);
+  if (overridden.empty()) return const_cast<AssociatedTypeDecl *>(ATD);
 
-  // Find the best anchor among the anchors of the overridden decls.
+  // Find the best anchor among the anchors of the overridden decls and avoid
+  // reentrancy when erroneous cyclic protocols exist.
   AssociatedTypeDecl *bestAnchor = nullptr;
   for (auto assocType : overridden) {
-    assert(this != assocType && "AssociatedTypeDecl cannot override itself");
-    auto anchor = assocType->getAssociatedTypeAnchor();
-    if (!bestAnchor || compare(anchor, bestAnchor) < 0)
+    if (!searched.insert(assocType).second)
+      continue;
+    auto anchor = getAssociatedTypeAnchor(assocType, searched);
+    if (!anchor)
+      continue;
+    if (!bestAnchor || AbstractTypeParamDecl::compare(anchor, bestAnchor) < 0)
       bestAnchor = anchor;
   }
 
   return bestAnchor;
+}
+};
+
+AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
+  llvm::SmallSet<const AssociatedTypeDecl *, 8> searched;
+  return ::getAssociatedTypeAnchor(this, searched);
 }
 
 EnumDecl::EnumDecl(SourceLoc EnumLoc,
