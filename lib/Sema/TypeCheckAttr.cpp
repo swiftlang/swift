@@ -241,6 +241,7 @@ public:
   void visitFunctionBuilderAttr(FunctionBuilderAttr *attr);
 
   void visitImplementationOnlyAttr(ImplementationOnlyAttr *attr);
+  void visitNonEphemeralAttr(NonEphemeralAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2667,6 +2668,25 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
   // FIXME: When compiling without library evolution enabled, this should also
   // check whether VD or any of its accessors need a new vtable entry, even if
   // it won't necessarily be able to say why.
+}
+
+void AttributeChecker::visitNonEphemeralAttr(NonEphemeralAttr *attr) {
+  auto *param = cast<ParamDecl>(D);
+  auto type = param->getInterfaceType()->lookThroughSingleOptionalType();
+
+  // Can only be applied to Unsafe[...]Pointer types
+  if (type->getAnyPointerElementType())
+    return;
+
+  // ... or the protocol Self type.
+  auto *outerDC = param->getDeclContext()->getParent();
+  if (outerDC->getSelfProtocolDecl() &&
+      type->isEqual(outerDC->getProtocolSelfType())) {
+    return;
+  }
+
+  diagnose(attr->getLocation(), diag::non_ephemeral_non_pointer_type);
+  attr->setInvalid();
 }
 
 void TypeChecker::checkParameterAttributes(ParameterList *params) {

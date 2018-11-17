@@ -308,6 +308,8 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       auto argElt = elt.castTo<LocatorPathElt::ApplyArgToParam>();
       out << "comparing call argument #" << llvm::utostr(argElt.getArgIdx())
           << " to parameter #" << llvm::utostr(argElt.getParamIdx());
+      if (argElt.getParameterFlags().isNonEphemeral())
+        out << " (non-ephemeral)";
       break;
     }
     case ClosureResult:

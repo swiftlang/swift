@@ -5337,6 +5337,11 @@ public:
                                       : flags - Flags::IsAutoClosure);
   }
 
+  /// Does this parameter reject temporary pointer conversions?
+  bool isNonEphemeral() const {
+    return getAttrs().hasAttribute<NonEphemeralAttr>();
+  }
+
   /// Remove the type of this varargs element designator, without the array
   /// type wrapping it.  A parameter like "Int..." will have formal parameter
   /// type of "[Int]" and this returns "Int".
