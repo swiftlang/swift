@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,15 +19,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-import CPython
-
 //===----------------------------------------------------------------------===//
 // `PyReference` definition
 //===----------------------------------------------------------------------===//
 
 /// Typealias used when passing or returning a `PyObject` pointer with
 /// implied ownership.
-public typealias OwnedPyObjectPointer = UnsafeMutablePointer<PyObject>
+typealias OwnedPyObjectPointer = PyObjectPointer
 
 /// A primitive reference to a Python C API `PyObject`.
 ///
@@ -45,7 +43,7 @@ final class PyReference {
     self.pointer = pointer
   }
 
-  init(borrowing pointer: UnsafeMutablePointer<PyObject>) {
+  init(borrowing pointer: PyObjectPointer) {
     self.pointer = pointer
     Py_IncRef(pointer)
   }
@@ -54,7 +52,7 @@ final class PyReference {
     Py_DecRef(pointer)
   }
 
-  var borrowedPyObject: UnsafeMutablePointer<PyObject> {
+  var borrowedPyObject: PyObjectPointer {
     return pointer
   }
 
@@ -95,16 +93,16 @@ public struct PythonObject {
 
   /// Creates a new instance, taking ownership of the specified `PyObject`
   /// pointer.
-  public init(owning pointer: OwnedPyObjectPointer) {
+  init(owning pointer: OwnedPyObjectPointer) {
     reference = PyReference(owning: pointer)
   }
 
   /// Creates a new instance from the specified `PyObject` pointer.
-  public init(borrowing pointer: UnsafeMutablePointer<PyObject>) {
+  init(borrowing pointer: PyObjectPointer) {
     reference = PyReference(borrowing: pointer)
   }
 
-  fileprivate var borrowedPyObject: UnsafeMutablePointer<PyObject> {
+  fileprivate var borrowedPyObject: PyObjectPointer {
     return reference.borrowedPyObject
   }
 
@@ -127,9 +125,9 @@ extension PythonObject : CustomStringConvertible {
 }
 
 // Make `PythonObject` show up nicely in the Xcode Playground results sidebar.
-extension PythonObject : CustomPlaygroundQuickLookable {
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text(description)
+extension PythonObject : CustomPlaygroundDisplayConvertible {
+  public var playgroundDescription: Any {
+    return description
   }
 }
 
@@ -165,7 +163,7 @@ public extension PythonObject {
 /// Internal helpers to convert `PythonConvertible` values to owned and borrowed
 /// `PyObject` instances. These should not be made public.
 fileprivate extension PythonConvertible {
-  var borrowedPyObject: UnsafeMutablePointer<PyObject> {
+  var borrowedPyObject: PyObjectPointer {
     return pythonObject.borrowedPyObject
   }
 
@@ -229,9 +227,9 @@ extension PythonError : CustomStringConvertible {
 private func throwPythonErrorIfPresent() throws {
   if PyErr_Occurred() == nil { return }
 
-  var type: UnsafeMutablePointer<PyObject>?
-  var value: UnsafeMutablePointer<PyObject>?
-  var traceback: UnsafeMutablePointer<PyObject>?
+  var type: PyObjectPointer?
+  var value: PyObjectPointer?
+  var traceback: PyObjectPointer?
 
   // Fetch the exception and clear the exception state.
   PyErr_Fetch(&type, &value, &traceback)
@@ -657,12 +655,12 @@ public struct PythonInterface {
     return try! attemptImport(name)
   }
 
-  public func updatePath(to path: String) {
+  /*public func updatePath(to path: String) {
     var cStr = path.utf8CString
     cStr.withUnsafeMutableBufferPointer { buffPtr in
       PySys_SetPath(buffPtr.baseAddress)
     }
-  }
+  }*/
 
   public subscript(dynamicMember name: String) -> PythonObject {
     return builtins[name]
@@ -744,9 +742,8 @@ public extension PythonObject {
 /// type descriptor passed in as 'type'.
 private func isType(_ object: PythonObject,
                     type: UnsafeMutableRawPointer) -> Bool {
-  let typePyRef = PythonObject(
-    borrowing: type.assumingMemoryBound(to: PyObject.self)
-  )
+  let typePyRef = PythonObject(borrowing: type)
+  
   let result = Python.isinstance(object, typePyRef)
 
   // We cannot use the normal failable Bool initializer from `PythonObject`
@@ -756,11 +753,6 @@ private func isType(_ object: PythonObject,
 
   // Anything not equal to `Py_ZeroStruct` is truthy.
   return !(pyObject == &_Py_ZeroStruct)
-}
-
-private func == (_ x: UnsafeMutablePointer<PyObject>,
-                 _ y: UnsafeMutableRawPointer) -> Bool {
-  return x == y.assumingMemoryBound(to: PyObject.self)
 }
 
 extension Bool : PythonConvertible {
@@ -1004,7 +996,7 @@ extension Array : PythonConvertible where Element : PythonConvertible {
     let list = PyList_New(count)!
     for (index, element) in enumerated() {
       // `PyList_SetItem` steals the reference of the object stored.
-      PyList_SetItem(list, index, element.ownedPyObject)
+      let _ = PyList_SetItem(list, index, element.ownedPyObject)
     }
     return PythonObject(owning: list)
   }
@@ -1019,8 +1011,8 @@ extension Dictionary : PythonConvertible
 
     // Iterate over the Python dictionary, converting its keys and values to
     // Swift `Key` and `Value` pairs.
-    var key, value: UnsafeMutablePointer<PyObject>?
-    var position: Py_ssize_t = 0
+    var key, value: PyObjectPointer?
+    var position: Int = 0
 
     while PyDict_Next(pythonDict.borrowedPyObject,
                       &position, &key, &value) != 0 {
