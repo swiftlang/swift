@@ -2369,7 +2369,7 @@ function(add_swift_host_tool executable)
     ${ARGN})
 
   # Create the executable rule.
-  add_swift_executable(${executable}
+  add_llvm_executable(${executable}
     ${ASHT_UNPARSED_ARGUMENTS})
 
   # And then create the install rule if we are asked to.
