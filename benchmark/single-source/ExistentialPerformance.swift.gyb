@@ -24,9 +24,9 @@ let ta: [BenchmarkCategory] = [.api, .Array]
 
 %{
 Setup = """
-  let existential = initExistential(withType: T.self)
-  let existential2 = initExistential(withType: T.self)
-  var existential = initExistential(withType: T.self)
+  let existential = existentialType.init()
+  let existential2 = existentialType.init()
+  var existential = existentialType.init()
   let existentialArray = grabArray()
   var existentialArray = grabArray()
 """.splitlines()
@@ -65,7 +65,7 @@ Workloads = [
     }
 """),
   ('Array.init', Setup[0], '20', """
-    blackHole(initExistentialArray(withType: T.self, count: 128))
+    blackHole(Array(repeating: existentialType.init(), count: 128))
 """),
   ('Array.method.1x', Setup[4], '100', """
     for elt in existentialArray {
@@ -109,8 +109,8 @@ Vals = ['Val' + str(i) for i in range(0, 5)]
 Names = [(group + '.' + variant, group, variant)
          for (group, _, _, _) in Workloads for variant in Refs + Vals]
 
-def typed_variants(name):
- return 'Array' not in name or 'Array.init' in name
+def create_array(group):
+  return 'Array' in group and 'Array.init' not in group
 
 import re
 
@@ -127,11 +127,9 @@ def run_function_name(benchmark_name):
 public let ExistentialPerformance: [BenchmarkInfo] = [
 % for (Name, Group, Variant) in Names:
   BenchmarkInfo(name: "Existential.${Name}",
-    runFunction: ${
-    run_function_name(Name) if typed_variants(Group) else
-    run_function_name(Group)}, tags: ${
-    'ta' if 'Array' in Name else 't'}${
-    (', setUpFunction: ca' + Variant) if not typed_variants(Group) else '' }),
+    runFunction: ${run_function_name(Group)
+    }, tags: ${ 'ta' if 'Array' in Name else 't'
+    }, setUpFunction: ${ ('ca' if create_array(Group) else 'et') + Variant }),
 % end
 ]
 
@@ -139,7 +137,7 @@ public let ExistentialPerformance: [BenchmarkInfo] = [
 // these are setup functions that **create array** for each variant type.
 var array: [Existential]!
 func ca<T: Existential>(_: T.Type) {
-  array = initExistentialArray(withType: T.self, count: 128)
+  array = Array(repeating: T(), count: 128)
 }
 % for Variant in Vals + Refs:
 func ca${Variant}() { ca(${Variant}.self) }
@@ -155,6 +153,12 @@ func grabArray() -> [Existential] { // transfer array ownership to caller
   // return a
   return array!
 }
+
+// `setUpFunctions` that determine which existential type will be tested
+var existentialType: Existential.Type!
+% for Variant in Vals + Refs:
+func et${Variant}() { existentialType = ${Variant}.self }
+% end
 
 protocol Existential {
   init()
@@ -225,17 +229,6 @@ struct ${V} : Existential {
 % end
 
 @inline(never)
-func initExistential<T: Existential>(withType: T.Type) -> Existential {
-  return T()
-}
-
-@inline(never)
-func initExistentialArray<T: Existential>(withType: T.Type, count c: Int)
-  -> [Existential] {
-  return [T](repeating: T(), count: c)
-}
-
-@inline(never)
 func passExistentialTwiceOneMethodCall(_ e0: Existential, _ e1: Existential)
   -> Bool {
   return e0.doIt() && e1.doIt()
@@ -246,31 +239,14 @@ func passExistentialTwiceTwoMethodCalls(_ e0: Existential, _ e1: Existential)
   -> Bool {
   return e0.doIt() && e1.doIt() && e0.reallyDoIt() && e1.reallyDoIt()
 }
-%{
-def type(name):
-  return (
-    '<T: Existential>(withType: T.Type, numberOfTimes' if typed_variants(name)
-    else '(_')
-}%
 % for (group, setup, multiple, workload) in Workloads:
 ${"""
-func {0}{4} N: Int) {{
+func {0}(_ N: Int) {{
 {1}
   for _ in 0 ..< N * {2} {{{3}  }}
-}}""".format(run_function_name(group), setup, multiple, workload, type(group))}
+}}""".format(run_function_name(group), setup, multiple, workload)}
 % end
 
-% for (Group, _, _, _) in Workloads:
-%   if typed_variants(Group):
-// ${Group}
-%     for Variant in Vals + Refs:
-public func ${run_function_name(Group + '.' + Variant)}(_ N: Int) {
-  ${run_function_name(Group)}(withType: ${Variant}.self, numberOfTimes: N)
-}
-%     end
-
-%   end
-% end
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

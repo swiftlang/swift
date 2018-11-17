@@ -23,131 +23,131 @@ let ta: [BenchmarkCategory] = [.api, .Array]
 
 public let ExistentialPerformance: [BenchmarkInfo] = [
   BenchmarkInfo(name: "Existential.method.1x.Ref1",
-    runFunction: run_method1xRef1, tags: t),
+    runFunction: run_method1x, tags: t, setUpFunction: etRef1),
   BenchmarkInfo(name: "Existential.method.1x.Ref2",
-    runFunction: run_method1xRef2, tags: t),
+    runFunction: run_method1x, tags: t, setUpFunction: etRef2),
   BenchmarkInfo(name: "Existential.method.1x.Ref3",
-    runFunction: run_method1xRef3, tags: t),
+    runFunction: run_method1x, tags: t, setUpFunction: etRef3),
   BenchmarkInfo(name: "Existential.method.1x.Ref4",
-    runFunction: run_method1xRef4, tags: t),
+    runFunction: run_method1x, tags: t, setUpFunction: etRef4),
   BenchmarkInfo(name: "Existential.method.1x.Val0",
-    runFunction: run_method1xVal0, tags: t),
+    runFunction: run_method1x, tags: t, setUpFunction: etVal0),
   BenchmarkInfo(name: "Existential.method.1x.Val1",
-    runFunction: run_method1xVal1, tags: t),
+    runFunction: run_method1x, tags: t, setUpFunction: etVal1),
   BenchmarkInfo(name: "Existential.method.1x.Val2",
-    runFunction: run_method1xVal2, tags: t),
+    runFunction: run_method1x, tags: t, setUpFunction: etVal2),
   BenchmarkInfo(name: "Existential.method.1x.Val3",
-    runFunction: run_method1xVal3, tags: t),
+    runFunction: run_method1x, tags: t, setUpFunction: etVal3),
   BenchmarkInfo(name: "Existential.method.1x.Val4",
-    runFunction: run_method1xVal4, tags: t),
+    runFunction: run_method1x, tags: t, setUpFunction: etVal4),
   BenchmarkInfo(name: "Existential.method.2x.Ref1",
-    runFunction: run_method2xRef1, tags: t),
+    runFunction: run_method2x, tags: t, setUpFunction: etRef1),
   BenchmarkInfo(name: "Existential.method.2x.Ref2",
-    runFunction: run_method2xRef2, tags: t),
+    runFunction: run_method2x, tags: t, setUpFunction: etRef2),
   BenchmarkInfo(name: "Existential.method.2x.Ref3",
-    runFunction: run_method2xRef3, tags: t),
+    runFunction: run_method2x, tags: t, setUpFunction: etRef3),
   BenchmarkInfo(name: "Existential.method.2x.Ref4",
-    runFunction: run_method2xRef4, tags: t),
+    runFunction: run_method2x, tags: t, setUpFunction: etRef4),
   BenchmarkInfo(name: "Existential.method.2x.Val0",
-    runFunction: run_method2xVal0, tags: t),
+    runFunction: run_method2x, tags: t, setUpFunction: etVal0),
   BenchmarkInfo(name: "Existential.method.2x.Val1",
-    runFunction: run_method2xVal1, tags: t),
+    runFunction: run_method2x, tags: t, setUpFunction: etVal1),
   BenchmarkInfo(name: "Existential.method.2x.Val2",
-    runFunction: run_method2xVal2, tags: t),
+    runFunction: run_method2x, tags: t, setUpFunction: etVal2),
   BenchmarkInfo(name: "Existential.method.2x.Val3",
-    runFunction: run_method2xVal3, tags: t),
+    runFunction: run_method2x, tags: t, setUpFunction: etVal3),
   BenchmarkInfo(name: "Existential.method.2x.Val4",
-    runFunction: run_method2xVal4, tags: t),
+    runFunction: run_method2x, tags: t, setUpFunction: etVal4),
   BenchmarkInfo(name: "Existential.Pass.method.1x.Ref1",
-    runFunction: run_Pass_method1xRef1, tags: t),
+    runFunction: run_Pass_method1x, tags: t, setUpFunction: etRef1),
   BenchmarkInfo(name: "Existential.Pass.method.1x.Ref2",
-    runFunction: run_Pass_method1xRef2, tags: t),
+    runFunction: run_Pass_method1x, tags: t, setUpFunction: etRef2),
   BenchmarkInfo(name: "Existential.Pass.method.1x.Ref3",
-    runFunction: run_Pass_method1xRef3, tags: t),
+    runFunction: run_Pass_method1x, tags: t, setUpFunction: etRef3),
   BenchmarkInfo(name: "Existential.Pass.method.1x.Ref4",
-    runFunction: run_Pass_method1xRef4, tags: t),
+    runFunction: run_Pass_method1x, tags: t, setUpFunction: etRef4),
   BenchmarkInfo(name: "Existential.Pass.method.1x.Val0",
-    runFunction: run_Pass_method1xVal0, tags: t),
+    runFunction: run_Pass_method1x, tags: t, setUpFunction: etVal0),
   BenchmarkInfo(name: "Existential.Pass.method.1x.Val1",
-    runFunction: run_Pass_method1xVal1, tags: t),
+    runFunction: run_Pass_method1x, tags: t, setUpFunction: etVal1),
   BenchmarkInfo(name: "Existential.Pass.method.1x.Val2",
-    runFunction: run_Pass_method1xVal2, tags: t),
+    runFunction: run_Pass_method1x, tags: t, setUpFunction: etVal2),
   BenchmarkInfo(name: "Existential.Pass.method.1x.Val3",
-    runFunction: run_Pass_method1xVal3, tags: t),
+    runFunction: run_Pass_method1x, tags: t, setUpFunction: etVal3),
   BenchmarkInfo(name: "Existential.Pass.method.1x.Val4",
-    runFunction: run_Pass_method1xVal4, tags: t),
+    runFunction: run_Pass_method1x, tags: t, setUpFunction: etVal4),
   BenchmarkInfo(name: "Existential.Pass.method.2x.Ref1",
-    runFunction: run_Pass_method2xRef1, tags: t),
+    runFunction: run_Pass_method2x, tags: t, setUpFunction: etRef1),
   BenchmarkInfo(name: "Existential.Pass.method.2x.Ref2",
-    runFunction: run_Pass_method2xRef2, tags: t),
+    runFunction: run_Pass_method2x, tags: t, setUpFunction: etRef2),
   BenchmarkInfo(name: "Existential.Pass.method.2x.Ref3",
-    runFunction: run_Pass_method2xRef3, tags: t),
+    runFunction: run_Pass_method2x, tags: t, setUpFunction: etRef3),
   BenchmarkInfo(name: "Existential.Pass.method.2x.Ref4",
-    runFunction: run_Pass_method2xRef4, tags: t),
+    runFunction: run_Pass_method2x, tags: t, setUpFunction: etRef4),
   BenchmarkInfo(name: "Existential.Pass.method.2x.Val0",
-    runFunction: run_Pass_method2xVal0, tags: t),
+    runFunction: run_Pass_method2x, tags: t, setUpFunction: etVal0),
   BenchmarkInfo(name: "Existential.Pass.method.2x.Val1",
-    runFunction: run_Pass_method2xVal1, tags: t),
+    runFunction: run_Pass_method2x, tags: t, setUpFunction: etVal1),
   BenchmarkInfo(name: "Existential.Pass.method.2x.Val2",
-    runFunction: run_Pass_method2xVal2, tags: t),
+    runFunction: run_Pass_method2x, tags: t, setUpFunction: etVal2),
   BenchmarkInfo(name: "Existential.Pass.method.2x.Val3",
-    runFunction: run_Pass_method2xVal3, tags: t),
+    runFunction: run_Pass_method2x, tags: t, setUpFunction: etVal3),
   BenchmarkInfo(name: "Existential.Pass.method.2x.Val4",
-    runFunction: run_Pass_method2xVal4, tags: t),
+    runFunction: run_Pass_method2x, tags: t, setUpFunction: etVal4),
   BenchmarkInfo(name: "Existential.Mutating.Ref1",
-    runFunction: run_MutatingRef1, tags: t),
+    runFunction: run_Mutating, tags: t, setUpFunction: etRef1),
   BenchmarkInfo(name: "Existential.Mutating.Ref2",
-    runFunction: run_MutatingRef2, tags: t),
+    runFunction: run_Mutating, tags: t, setUpFunction: etRef2),
   BenchmarkInfo(name: "Existential.Mutating.Ref3",
-    runFunction: run_MutatingRef3, tags: t),
+    runFunction: run_Mutating, tags: t, setUpFunction: etRef3),
   BenchmarkInfo(name: "Existential.Mutating.Ref4",
-    runFunction: run_MutatingRef4, tags: t),
+    runFunction: run_Mutating, tags: t, setUpFunction: etRef4),
   BenchmarkInfo(name: "Existential.Mutating.Val0",
-    runFunction: run_MutatingVal0, tags: t),
+    runFunction: run_Mutating, tags: t, setUpFunction: etVal0),
   BenchmarkInfo(name: "Existential.Mutating.Val1",
-    runFunction: run_MutatingVal1, tags: t),
+    runFunction: run_Mutating, tags: t, setUpFunction: etVal1),
   BenchmarkInfo(name: "Existential.Mutating.Val2",
-    runFunction: run_MutatingVal2, tags: t),
+    runFunction: run_Mutating, tags: t, setUpFunction: etVal2),
   BenchmarkInfo(name: "Existential.Mutating.Val3",
-    runFunction: run_MutatingVal3, tags: t),
+    runFunction: run_Mutating, tags: t, setUpFunction: etVal3),
   BenchmarkInfo(name: "Existential.Mutating.Val4",
-    runFunction: run_MutatingVal4, tags: t),
+    runFunction: run_Mutating, tags: t, setUpFunction: etVal4),
   BenchmarkInfo(name: "Existential.MutatingAndNonMutating.Ref1",
-    runFunction: run_MutatingAndNonMutatingRef1, tags: t),
+    runFunction: run_MutatingAndNonMutating, tags: t, setUpFunction: etRef1),
   BenchmarkInfo(name: "Existential.MutatingAndNonMutating.Ref2",
-    runFunction: run_MutatingAndNonMutatingRef2, tags: t),
+    runFunction: run_MutatingAndNonMutating, tags: t, setUpFunction: etRef2),
   BenchmarkInfo(name: "Existential.MutatingAndNonMutating.Ref3",
-    runFunction: run_MutatingAndNonMutatingRef3, tags: t),
+    runFunction: run_MutatingAndNonMutating, tags: t, setUpFunction: etRef3),
   BenchmarkInfo(name: "Existential.MutatingAndNonMutating.Ref4",
-    runFunction: run_MutatingAndNonMutatingRef4, tags: t),
+    runFunction: run_MutatingAndNonMutating, tags: t, setUpFunction: etRef4),
   BenchmarkInfo(name: "Existential.MutatingAndNonMutating.Val0",
-    runFunction: run_MutatingAndNonMutatingVal0, tags: t),
+    runFunction: run_MutatingAndNonMutating, tags: t, setUpFunction: etVal0),
   BenchmarkInfo(name: "Existential.MutatingAndNonMutating.Val1",
-    runFunction: run_MutatingAndNonMutatingVal1, tags: t),
+    runFunction: run_MutatingAndNonMutating, tags: t, setUpFunction: etVal1),
   BenchmarkInfo(name: "Existential.MutatingAndNonMutating.Val2",
-    runFunction: run_MutatingAndNonMutatingVal2, tags: t),
+    runFunction: run_MutatingAndNonMutating, tags: t, setUpFunction: etVal2),
   BenchmarkInfo(name: "Existential.MutatingAndNonMutating.Val3",
-    runFunction: run_MutatingAndNonMutatingVal3, tags: t),
+    runFunction: run_MutatingAndNonMutating, tags: t, setUpFunction: etVal3),
   BenchmarkInfo(name: "Existential.MutatingAndNonMutating.Val4",
-    runFunction: run_MutatingAndNonMutatingVal4, tags: t),
+    runFunction: run_MutatingAndNonMutating, tags: t, setUpFunction: etVal4),
   BenchmarkInfo(name: "Existential.Array.init.Ref1",
-    runFunction: run_Array_initRef1, tags: ta),
+    runFunction: run_Array_init, tags: ta, setUpFunction: etRef1),
   BenchmarkInfo(name: "Existential.Array.init.Ref2",
-    runFunction: run_Array_initRef2, tags: ta),
+    runFunction: run_Array_init, tags: ta, setUpFunction: etRef2),
   BenchmarkInfo(name: "Existential.Array.init.Ref3",
-    runFunction: run_Array_initRef3, tags: ta),
+    runFunction: run_Array_init, tags: ta, setUpFunction: etRef3),
   BenchmarkInfo(name: "Existential.Array.init.Ref4",
-    runFunction: run_Array_initRef4, tags: ta),
+    runFunction: run_Array_init, tags: ta, setUpFunction: etRef4),
   BenchmarkInfo(name: "Existential.Array.init.Val0",
-    runFunction: run_Array_initVal0, tags: ta),
+    runFunction: run_Array_init, tags: ta, setUpFunction: etVal0),
   BenchmarkInfo(name: "Existential.Array.init.Val1",
-    runFunction: run_Array_initVal1, tags: ta),
+    runFunction: run_Array_init, tags: ta, setUpFunction: etVal1),
   BenchmarkInfo(name: "Existential.Array.init.Val2",
-    runFunction: run_Array_initVal2, tags: ta),
+    runFunction: run_Array_init, tags: ta, setUpFunction: etVal2),
   BenchmarkInfo(name: "Existential.Array.init.Val3",
-    runFunction: run_Array_initVal3, tags: ta),
+    runFunction: run_Array_init, tags: ta, setUpFunction: etVal3),
   BenchmarkInfo(name: "Existential.Array.init.Val4",
-    runFunction: run_Array_initVal4, tags: ta),
+    runFunction: run_Array_init, tags: ta, setUpFunction: etVal4),
   BenchmarkInfo(name: "Existential.Array.method.1x.Ref1",
     runFunction: run_Array_method1x, tags: ta, setUpFunction: caRef1),
   BenchmarkInfo(name: "Existential.Array.method.1x.Ref2",
@@ -244,7 +244,7 @@ public let ExistentialPerformance: [BenchmarkInfo] = [
 // these are setup functions that **create array** for each variant type.
 var array: [Existential]!
 func ca<T: Existential>(_: T.Type) {
-  array = initExistentialArray(withType: T.self, count: 128)
+  array = Array(repeating: T(), count: 128)
 }
 func caVal0() { ca(Val0.self) }
 func caVal1() { ca(Val1.self) }
@@ -266,6 +266,18 @@ func grabArray() -> [Existential] { // transfer array ownership to caller
   // return a
   return array!
 }
+
+// `setUpFunctions` that determine which existential type will be tested
+var existentialType: Existential.Type!
+func etVal0() { existentialType = Val0.self }
+func etVal1() { existentialType = Val1.self }
+func etVal2() { existentialType = Val2.self }
+func etVal3() { existentialType = Val3.self }
+func etVal4() { existentialType = Val4.self }
+func etRef1() { existentialType = Ref1.self }
+func etRef2() { existentialType = Ref2.self }
+func etRef3() { existentialType = Ref3.self }
+func etRef4() { existentialType = Ref4.self }
 
 protocol Existential {
   init()
@@ -443,17 +455,6 @@ struct Ref4 : Existential {
 
 
 @inline(never)
-func initExistential<T: Existential>(withType: T.Type) -> Existential {
-  return T()
-}
-
-@inline(never)
-func initExistentialArray<T: Existential>(withType: T.Type, count c: Int)
-  -> [Existential] {
-  return [T](repeating: T(), count: c)
-}
-
-@inline(never)
 func passExistentialTwiceOneMethodCall(_ e0: Existential, _ e1: Existential)
   -> Bool {
   return e0.doIt() && e1.doIt()
@@ -465,8 +466,8 @@ func passExistentialTwiceTwoMethodCalls(_ e0: Existential, _ e1: Existential)
   return e0.doIt() && e1.doIt() && e0.reallyDoIt() && e1.reallyDoIt()
 }
 
-func run_method1x<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
-  let existential = initExistential(withType: T.self)
+func run_method1x(_ N: Int) {
+  let existential = existentialType.init()
   for _ in 0 ..< N * 20_000 {
     if !existential.doIt() {
       fatalError("expected true")
@@ -474,8 +475,8 @@ func run_method1x<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   }
 }
 
-func run_method2x<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
-  let existential = initExistential(withType: T.self)
+func run_method2x(_ N: Int) {
+  let existential = existentialType.init()
   for _ in 0 ..< N * 20_000 {
     if !existential.doIt()  || !existential.reallyDoIt() {
       fatalError("expected true")
@@ -483,9 +484,9 @@ func run_method2x<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   }
 }
 
-func run_Pass_method1x<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
-  let existential = initExistential(withType: T.self)
-  let existential2 = initExistential(withType: T.self)
+func run_Pass_method1x(_ N: Int) {
+  let existential = existentialType.init()
+  let existential2 = existentialType.init()
   for _ in 0 ..< N * 20_000 {
     if !passExistentialTwiceOneMethodCall(existential, existential2) {
       fatalError("expected true")
@@ -493,9 +494,9 @@ func run_Pass_method1x<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   }
 }
 
-func run_Pass_method2x<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
-  let existential = initExistential(withType: T.self)
-  let existential2 = initExistential(withType: T.self)
+func run_Pass_method2x(_ N: Int) {
+  let existential = existentialType.init()
+  let existential2 = existentialType.init()
   for _ in 0 ..< N * 20_000 {
     if !passExistentialTwiceTwoMethodCalls(existential, existential2) {
       fatalError("expected true")
@@ -503,8 +504,8 @@ func run_Pass_method2x<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   }
 }
 
-func run_Mutating<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
-  var existential = initExistential(withType: T.self)
+func run_Mutating(_ N: Int) {
+  var existential = existentialType.init()
   for _ in 0 ..< N * 10_000 {
     if !existential.mutateIt()  {
       fatalError("expected true")
@@ -512,8 +513,8 @@ func run_Mutating<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
   }
 }
 
-func run_MutatingAndNonMutating<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
-  var existential = initExistential(withType: T.self)
+func run_MutatingAndNonMutating(_ N: Int) {
+  var existential = existentialType.init()
   for _ in 0 ..< N * 10_000 {
     let _ = existential.doIt()
     if !existential.mutateIt()  {
@@ -522,10 +523,10 @@ func run_MutatingAndNonMutating<T: Existential>(withType: T.Type, numberOfTimes 
   }
 }
 
-func run_Array_init<T: Existential>(withType: T.Type, numberOfTimes N: Int) {
+func run_Array_init(_ N: Int) {
 
   for _ in 0 ..< N * 20 {
-    blackHole(initExistentialArray(withType: T.self, count: 128))
+    blackHole(Array(repeating: existentialType.init(), count: 128))
   }
 }
 
@@ -582,209 +583,6 @@ func run_ArrayConditionalShift(_ N: Int) {
       }
     }
   }
-}
-
-// method.1x
-public func run_method1xVal0(_ N: Int) {
-  run_method1x(withType: Val0.self, numberOfTimes: N)
-}
-public func run_method1xVal1(_ N: Int) {
-  run_method1x(withType: Val1.self, numberOfTimes: N)
-}
-public func run_method1xVal2(_ N: Int) {
-  run_method1x(withType: Val2.self, numberOfTimes: N)
-}
-public func run_method1xVal3(_ N: Int) {
-  run_method1x(withType: Val3.self, numberOfTimes: N)
-}
-public func run_method1xVal4(_ N: Int) {
-  run_method1x(withType: Val4.self, numberOfTimes: N)
-}
-public func run_method1xRef1(_ N: Int) {
-  run_method1x(withType: Ref1.self, numberOfTimes: N)
-}
-public func run_method1xRef2(_ N: Int) {
-  run_method1x(withType: Ref2.self, numberOfTimes: N)
-}
-public func run_method1xRef3(_ N: Int) {
-  run_method1x(withType: Ref3.self, numberOfTimes: N)
-}
-public func run_method1xRef4(_ N: Int) {
-  run_method1x(withType: Ref4.self, numberOfTimes: N)
-}
-
-// method.2x
-public func run_method2xVal0(_ N: Int) {
-  run_method2x(withType: Val0.self, numberOfTimes: N)
-}
-public func run_method2xVal1(_ N: Int) {
-  run_method2x(withType: Val1.self, numberOfTimes: N)
-}
-public func run_method2xVal2(_ N: Int) {
-  run_method2x(withType: Val2.self, numberOfTimes: N)
-}
-public func run_method2xVal3(_ N: Int) {
-  run_method2x(withType: Val3.self, numberOfTimes: N)
-}
-public func run_method2xVal4(_ N: Int) {
-  run_method2x(withType: Val4.self, numberOfTimes: N)
-}
-public func run_method2xRef1(_ N: Int) {
-  run_method2x(withType: Ref1.self, numberOfTimes: N)
-}
-public func run_method2xRef2(_ N: Int) {
-  run_method2x(withType: Ref2.self, numberOfTimes: N)
-}
-public func run_method2xRef3(_ N: Int) {
-  run_method2x(withType: Ref3.self, numberOfTimes: N)
-}
-public func run_method2xRef4(_ N: Int) {
-  run_method2x(withType: Ref4.self, numberOfTimes: N)
-}
-
-// Pass.method.1x
-public func run_Pass_method1xVal0(_ N: Int) {
-  run_Pass_method1x(withType: Val0.self, numberOfTimes: N)
-}
-public func run_Pass_method1xVal1(_ N: Int) {
-  run_Pass_method1x(withType: Val1.self, numberOfTimes: N)
-}
-public func run_Pass_method1xVal2(_ N: Int) {
-  run_Pass_method1x(withType: Val2.self, numberOfTimes: N)
-}
-public func run_Pass_method1xVal3(_ N: Int) {
-  run_Pass_method1x(withType: Val3.self, numberOfTimes: N)
-}
-public func run_Pass_method1xVal4(_ N: Int) {
-  run_Pass_method1x(withType: Val4.self, numberOfTimes: N)
-}
-public func run_Pass_method1xRef1(_ N: Int) {
-  run_Pass_method1x(withType: Ref1.self, numberOfTimes: N)
-}
-public func run_Pass_method1xRef2(_ N: Int) {
-  run_Pass_method1x(withType: Ref2.self, numberOfTimes: N)
-}
-public func run_Pass_method1xRef3(_ N: Int) {
-  run_Pass_method1x(withType: Ref3.self, numberOfTimes: N)
-}
-public func run_Pass_method1xRef4(_ N: Int) {
-  run_Pass_method1x(withType: Ref4.self, numberOfTimes: N)
-}
-
-// Pass.method.2x
-public func run_Pass_method2xVal0(_ N: Int) {
-  run_Pass_method2x(withType: Val0.self, numberOfTimes: N)
-}
-public func run_Pass_method2xVal1(_ N: Int) {
-  run_Pass_method2x(withType: Val1.self, numberOfTimes: N)
-}
-public func run_Pass_method2xVal2(_ N: Int) {
-  run_Pass_method2x(withType: Val2.self, numberOfTimes: N)
-}
-public func run_Pass_method2xVal3(_ N: Int) {
-  run_Pass_method2x(withType: Val3.self, numberOfTimes: N)
-}
-public func run_Pass_method2xVal4(_ N: Int) {
-  run_Pass_method2x(withType: Val4.self, numberOfTimes: N)
-}
-public func run_Pass_method2xRef1(_ N: Int) {
-  run_Pass_method2x(withType: Ref1.self, numberOfTimes: N)
-}
-public func run_Pass_method2xRef2(_ N: Int) {
-  run_Pass_method2x(withType: Ref2.self, numberOfTimes: N)
-}
-public func run_Pass_method2xRef3(_ N: Int) {
-  run_Pass_method2x(withType: Ref3.self, numberOfTimes: N)
-}
-public func run_Pass_method2xRef4(_ N: Int) {
-  run_Pass_method2x(withType: Ref4.self, numberOfTimes: N)
-}
-
-// Mutating
-public func run_MutatingVal0(_ N: Int) {
-  run_Mutating(withType: Val0.self, numberOfTimes: N)
-}
-public func run_MutatingVal1(_ N: Int) {
-  run_Mutating(withType: Val1.self, numberOfTimes: N)
-}
-public func run_MutatingVal2(_ N: Int) {
-  run_Mutating(withType: Val2.self, numberOfTimes: N)
-}
-public func run_MutatingVal3(_ N: Int) {
-  run_Mutating(withType: Val3.self, numberOfTimes: N)
-}
-public func run_MutatingVal4(_ N: Int) {
-  run_Mutating(withType: Val4.self, numberOfTimes: N)
-}
-public func run_MutatingRef1(_ N: Int) {
-  run_Mutating(withType: Ref1.self, numberOfTimes: N)
-}
-public func run_MutatingRef2(_ N: Int) {
-  run_Mutating(withType: Ref2.self, numberOfTimes: N)
-}
-public func run_MutatingRef3(_ N: Int) {
-  run_Mutating(withType: Ref3.self, numberOfTimes: N)
-}
-public func run_MutatingRef4(_ N: Int) {
-  run_Mutating(withType: Ref4.self, numberOfTimes: N)
-}
-
-// MutatingAndNonMutating
-public func run_MutatingAndNonMutatingVal0(_ N: Int) {
-  run_MutatingAndNonMutating(withType: Val0.self, numberOfTimes: N)
-}
-public func run_MutatingAndNonMutatingVal1(_ N: Int) {
-  run_MutatingAndNonMutating(withType: Val1.self, numberOfTimes: N)
-}
-public func run_MutatingAndNonMutatingVal2(_ N: Int) {
-  run_MutatingAndNonMutating(withType: Val2.self, numberOfTimes: N)
-}
-public func run_MutatingAndNonMutatingVal3(_ N: Int) {
-  run_MutatingAndNonMutating(withType: Val3.self, numberOfTimes: N)
-}
-public func run_MutatingAndNonMutatingVal4(_ N: Int) {
-  run_MutatingAndNonMutating(withType: Val4.self, numberOfTimes: N)
-}
-public func run_MutatingAndNonMutatingRef1(_ N: Int) {
-  run_MutatingAndNonMutating(withType: Ref1.self, numberOfTimes: N)
-}
-public func run_MutatingAndNonMutatingRef2(_ N: Int) {
-  run_MutatingAndNonMutating(withType: Ref2.self, numberOfTimes: N)
-}
-public func run_MutatingAndNonMutatingRef3(_ N: Int) {
-  run_MutatingAndNonMutating(withType: Ref3.self, numberOfTimes: N)
-}
-public func run_MutatingAndNonMutatingRef4(_ N: Int) {
-  run_MutatingAndNonMutating(withType: Ref4.self, numberOfTimes: N)
-}
-
-// Array.init
-public func run_Array_initVal0(_ N: Int) {
-  run_Array_init(withType: Val0.self, numberOfTimes: N)
-}
-public func run_Array_initVal1(_ N: Int) {
-  run_Array_init(withType: Val1.self, numberOfTimes: N)
-}
-public func run_Array_initVal2(_ N: Int) {
-  run_Array_init(withType: Val2.self, numberOfTimes: N)
-}
-public func run_Array_initVal3(_ N: Int) {
-  run_Array_init(withType: Val3.self, numberOfTimes: N)
-}
-public func run_Array_initVal4(_ N: Int) {
-  run_Array_init(withType: Val4.self, numberOfTimes: N)
-}
-public func run_Array_initRef1(_ N: Int) {
-  run_Array_init(withType: Ref1.self, numberOfTimes: N)
-}
-public func run_Array_initRef2(_ N: Int) {
-  run_Array_init(withType: Ref2.self, numberOfTimes: N)
-}
-public func run_Array_initRef3(_ N: Int) {
-  run_Array_init(withType: Ref3.self, numberOfTimes: N)
-}
-public func run_Array_initRef4(_ N: Int) {
-  run_Array_init(withType: Ref4.self, numberOfTimes: N)
 }
 
 // Local Variables:
