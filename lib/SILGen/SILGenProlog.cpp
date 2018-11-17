@@ -15,6 +15,7 @@
 #include "ManagedValue.h"
 #include "Scope.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 
@@ -432,6 +433,9 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
         SILLocation unreachableLoc(param);
         unreachableLoc.markAsPrologue();
         B.createUnreachable(unreachableLoc);
+        
+        auto &ctx = SGM.M.getASTContext();
+        ctx.Diags.diagnose(TheClosure.getBody()->getStartLoc(), diag::unreachable_code_uninhabited_param_note);
         break;
       }
     }
