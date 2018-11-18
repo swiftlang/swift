@@ -39,14 +39,12 @@ struct PythonLibrary {
       environment variable with the path to the Python Library.
       """)
     }
-    
     self.pythonLibraryHandle = pythonLibraryHandle
     
     // Check if Python is legacy (Python 2)
     isLegacyPython = dlsym(
       pythonLibraryHandle,
       PythonLibrary.pythonLegacySymbolName) != nil
-    
     if isLegacyPython {
       PythonLibrary.log(message:
         "Loaded legacy Python library, using legacy symbols...")
@@ -57,19 +55,15 @@ struct PythonLibrary {
     name: String, legacyName: String? = nil, signature: T.Type
   ) -> T {
     var name = name
-    
     if let legacyName = legacyName, PythonLibrary.shared.isLegacyPython {
       name = legacyName
     }
     
     log(message: "Loading symbol '\(name)' from the Python library...")
-    
-    let symbol = unsafeBitCast(
+    return unsafeBitCast(
       dlsym(PythonLibrary.shared.pythonLibraryHandle, name),
       to: signature
     )
-    
-    return symbol
   }
 }
 
@@ -94,7 +88,6 @@ extension PythonLibrary {
   
   private static let libraryPaths: [String] = {
     var libraryPaths: [String] = []
-    
     for librarySearchPath in librarySearchPaths {
       for libraryName in libraryNames {
         for libraryPathExtension in libraryPathExtensions {
@@ -112,14 +105,12 @@ extension PythonLibrary {
     at path: String, majorVersion: Int, minorVersion: Int? = nil
   ) -> UnsafeMutableRawPointer? {
     var versionString = String(majorVersion)
-    
     if let minorVersion = minorVersion {
       versionString += ".\(minorVersion)"
     }
     
     if let requiredPythonVersion = Environment.version.value {
       let requiredMajorVersion = Int(requiredPythonVersion)
-      
       if requiredPythonVersion != versionString,
         requiredMajorVersion != majorVersion {
         return nil
@@ -128,7 +119,6 @@ extension PythonLibrary {
     
     let path = path.split(separator: libraryPathVersionCharacter)
       .joined(separator: versionString)
-    
     return loadPythonLibrary(at: path)
   }
   
@@ -136,13 +126,11 @@ extension PythonLibrary {
     at path: String
   ) -> UnsafeMutableRawPointer? {
     log(message: "Trying to load library at '\(path)'...")
-    
     let pythonLibraryHandle = dlopen(path, RTLD_LAZY)
     
     if pythonLibraryHandle != nil {
       log(message: "Library at '\(path)' was sucessfully loaded.")
     }
-    
     return pythonLibraryHandle
   }
   
@@ -171,10 +159,7 @@ extension PythonLibrary {
 // Methods of `PythonLibrary` used for logging messages.
 extension PythonLibrary {
   static func log(message: String) {
-    guard Environment.loaderLogging.value != nil else {
-      return
-    }
-    
+    guard Environment.loaderLogging.value != nil else { return }
     fputs(message + "\n", stderr)
   }
 }
