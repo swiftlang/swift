@@ -434,8 +434,10 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
         unreachableLoc.markAsPrologue();
         B.createUnreachable(unreachableLoc);
         
-        auto &ctx = SGM.M.getASTContext();
-        ctx.Diags.diagnose(TheClosure.getBody()->getStartLoc(), diag::unreachable_code_uninhabited_param_note);
+        if (!TheClosure.getBody()->getElements().empty()) {
+          auto &ctx = SGM.M.getASTContext();
+          ctx.Diags.diagnose(TheClosure.getBody()->getStartLoc(), diag::unreachable_code_uninhabited_param_note);
+        }
         break;
       }
     }
