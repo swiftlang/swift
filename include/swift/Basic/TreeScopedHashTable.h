@@ -37,6 +37,11 @@ template <typename K, typename V> class TreeScopedHashTableVal {
   TreeScopedHashTableVal(const K &Key, const V &Val) : Key(Key), Val(Val) {}
 
 public:
+  TreeScopedHashTableVal(const TreeScopedHashTableVal &) = delete;
+  TreeScopedHashTableVal(TreeScopedHashTableVal &&) = delete;
+  TreeScopedHashTableVal &operator=(const TreeScopedHashTableVal &) = delete;
+  TreeScopedHashTableVal &operator=(TreeScopedHashTableVal &&) = delete;
+
   const K &getKey() const { return Key; }
   const V &getValue() const { return Val; }
   V &getValue() { return Val; }
@@ -144,6 +149,11 @@ class TreeScopedHashTableDetachedScope {
   const ImplTy *getImpl() { return DetachedImpl; }
 
 public:
+  TreeScopedHashTableDetachedScope &operator=(
+                            const TreeScopedHashTableDetachedScope &) = default;
+  TreeScopedHashTableDetachedScope &operator=(
+                                 TreeScopedHashTableDetachedScope &&) = default;
+
   TreeScopedHashTableDetachedScope() : DetachedImpl(0) {}
 
   TreeScopedHashTableDetachedScope(TreeScopedHashTableDetachedScope &&Other)

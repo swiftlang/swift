@@ -524,7 +524,6 @@ struct LLVM_LIBRARY_VISIBILITY ExclusiveBorrowFormalAccess : FormalAccess {
   ExclusiveBorrowFormalAccess &
   operator=(ExclusiveBorrowFormalAccess &&) = default;
 
-  ExclusiveBorrowFormalAccess() = default;
   ExclusiveBorrowFormalAccess(SILLocation loc,
                               std::unique_ptr<LogicalPathComponent> &&comp,
                               ManagedValue base,
