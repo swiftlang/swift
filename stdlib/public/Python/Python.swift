@@ -111,7 +111,7 @@ public struct PythonObject {
   }
 }
 
-/// Make `print(python)` print a pretty form of the `PythonObject`.
+// Make `print(python)` print a pretty form of the `PythonObject`.
 extension PythonObject : CustomStringConvertible {
   /// A textual description of this `PythonObject`, produced by `Python.str`.
   public var description: String {
@@ -125,9 +125,9 @@ extension PythonObject : CustomStringConvertible {
 }
 
 // Make `PythonObject` show up nicely in the Xcode Playground results sidebar.
-extension PythonObject : CustomPlaygroundDisplayConvertible {
-  public var playgroundDescription: Any {
-    return description
+extension PythonObject : CustomPlaygroundQuickLookable {
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text(description)
   }
 }
 
@@ -172,7 +172,7 @@ fileprivate extension PythonConvertible {
   }
 }
 
-/// `PythonObject` is trivially `PythonConvertible`.
+// `PythonObject` is trivially `PythonConvertible`.
 extension PythonObject : PythonConvertible {
   public init(_ object: PythonObject) {
     self.init(owning: object.ownedPyObject)
@@ -655,13 +655,6 @@ public struct PythonInterface {
     return try! attemptImport(name)
   }
 
-  /*public func updatePath(to path: String) {
-    var cStr = path.utf8CString
-    cStr.withUnsafeMutableBufferPointer { buffPtr in
-      PySys_SetPath(buffPtr.baseAddress)
-    }
-  }*/
-
   public subscript(dynamicMember name: String) -> PythonObject {
     return builtins[name]
   }
@@ -872,8 +865,8 @@ extension Double : PythonConvertible {
 // `PythonConvertible` conformances for `FixedWidthInteger` and `Float`
 //===----------------------------------------------------------------------===//
 
-/// Any `FixedWidthInteger` type is `PythonConvertible` via the `Int`/`UInt`
-/// implementation.
+// Any `FixedWidthInteger` type is `PythonConvertible` via the `Int`/`UInt`
+// implementation.
 
 extension Int8 : PythonConvertible {
   public init?(_ pythonObject: PythonObject) {
@@ -963,7 +956,7 @@ extension UInt64 : PythonConvertible {
   }
 }
 
-/// `Float` is `PythonConvertible` via the `Double` implementation.
+// `Float` is `PythonConvertible` via the `Double` implementation.
 
 extension Float : PythonConvertible {
   public init?(_ pythonObject: PythonObject) {
@@ -996,7 +989,7 @@ extension Array : PythonConvertible where Element : PythonConvertible {
     let list = PyList_New(count)!
     for (index, element) in enumerated() {
       // `PyList_SetItem` steals the reference of the object stored.
-      let _ = PyList_SetItem(list, index, element.ownedPyObject)
+      _ = PyList_SetItem(list, index, element.ownedPyObject)
     }
     return PythonObject(owning: list)
   }
