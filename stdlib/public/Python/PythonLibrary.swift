@@ -146,7 +146,6 @@ extension PythonLibrary {
             majorVersion: majorVersion, minorVersion: minorVersion) else {
               continue
           }
-          
           return pythonLibraryHandle
         }
       }
@@ -179,10 +178,7 @@ extension PythonLibrary {
     }
     
     var value: String? {
-      guard let value = getenv(key) else {
-        return nil
-      }
-      
+      guard let value = getenv(key) else { return nil }
       return String(cString: value)
     }
   }
