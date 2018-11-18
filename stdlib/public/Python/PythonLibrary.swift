@@ -35,8 +35,8 @@ struct PythonLibrary {
     guard let pythonLibraryHandle =
       PythonLibrary.getPythonLibraryHandle() else {
       fatalError("""
-        Python library not found. Set the \(Environment.library.key) \
-        environment variable with the path to the Python Library.
+      Python library not found. Set the \(Environment.library.key) \
+      environment variable with the path to the Python Library.
       """)
     }
     
