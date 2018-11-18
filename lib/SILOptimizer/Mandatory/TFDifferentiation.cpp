@@ -2411,7 +2411,9 @@ public:
     auto *newTask =
         context.lookUpMinimalDifferentiationTask(calleeOriginalFn, indices);
     if (!newTask) {
-      // If the callee function does not have a primitive declaration that
+      // If the callee function is generic and does not have a primitive
+      // declaration that covers the required indices, we cannot differentiate it
+      // yet so we bail out instead of registering a new differentiation task.
       // covers the required indices and is generic, we cannot differentiate it
       // yet so we bail out instead of registering a new differentiation task.
       if (calleeOriginFnRef->getFunctionType()->getGenericSignature()) {
