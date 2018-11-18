@@ -212,6 +212,7 @@
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2018-10-22-a",
                 "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2018-10-22-a",
                 "compiler-rt": "swift-DEVELOPMENT-SNAPSHOT-2018-10-22-a",
+                "swift-syntax": "master",
                 "swift-corelibs-xctest": "swift-DEVELOPMENT-SNAPSHOT-2018-10-22-a",
                 "swift-corelibs-foundation": "swift-DEVELOPMENT-SNAPSHOT-2018-10-22-a",
                 "swift-corelibs-libdispatch": "swift-DEVELOPMENT-SNAPSHOT-2018-10-22-a",
