@@ -283,7 +283,7 @@ public:
     DynamicMethod,
   };
 
-  const Kind kind;
+  Kind kind;
 
   // Move, don't copy.
   Callee(const Callee &) = delete;
