@@ -1,4 +1,4 @@
-// RUN: %scale-test --begin 0 --end 25000 --step 1000 --typecheck --select incrementConstraintsPerContractionCounter %s
+// RUN: %scale-test --begin 0 --end 25000 --step 1000 --typecheck --select incrementConstraintsPerContractionCounter %s -Xfrontend=-solver-disable-shrink -Xfrontend=-disable-constraint-solver-performance-hacks -Xfrontend=-solver-enable-operator-designated-types
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 
