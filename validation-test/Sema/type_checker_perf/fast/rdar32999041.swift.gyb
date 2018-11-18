@@ -1,4 +1,4 @@
-// RUN: %scale-test --begin 3 --end 8 --step 1 --select NumLeafScopes %s -Xfrontend=-swift-version -Xfrontend=5 -Xfrontend=-solver-disable-shrink -Xfrontend=-disable-constraint-solver-performance-hacks -Xfrontend=-solver-enable-operator-designated-types
+// RUN: %scale-test --begin 3 --end 8 --step 1 --select NumLeafScopes %s -Xfrontend=-solver-disable-shrink -Xfrontend=-disable-constraint-solver-performance-hacks -Xfrontend=-solver-enable-operator-designated-types
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 // FIXME: https://bugs.swift.org/browse/SR-6997

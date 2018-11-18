@@ -1842,8 +1842,7 @@ void ConstraintSystem::partitionDisjunction(
     PartitionBeginning.push_back(0);
   };
 
-  if (!getASTContext().isSwiftVersionAtLeast(5) ||
-      !TC.getLangOpts().SolverEnableOperatorDesignatedTypes ||
+  if (!TC.getLangOpts().SolverEnableOperatorDesignatedTypes ||
       !isOperatorBindOverload(Choices[0])) {
     originalOrdering();
     return;
@@ -1954,7 +1953,8 @@ Constraint *ConstraintSystem::selectDisjunction() {
   // disjunctions that we may not be able to short-circuit, allowing
   // us to eliminate behavior that is exponential in the number of
   // operators in the expression.
-  if (getASTContext().isSwiftVersionAtLeast(5))
+  if (getASTContext().isSwiftVersionAtLeast(5) ||
+      TC.getLangOpts().SolverEnableOperatorDesignatedTypes)
     if (auto *disjunction = selectApplyDisjunction())
       return disjunction;
 
