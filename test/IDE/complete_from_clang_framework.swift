@@ -246,6 +246,7 @@ func testCompleteStructMembers1() {
 // CLANG_STRUCT_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal: ()[#FooStruct1#]{{; name=.+$}}
 // CLANG_STRUCT_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal: ({#x: Int32#}, {#y: Double#})[#FooStruct1#]{{; name=.+$}}
 // CLANG_STRUCT_MEMBERS_1-NEXT: Keyword[self]/CurrNominal: .self[#FooStruct1.Type#]; name=self
+// CLANG_STRUCT_MEMBERS_1-NEXT: Keyword/CurrNominal: .Type[#FooStruct1.Type#]; name=Type
 // CLANG_STRUCT_MEMBERS_1-NEXT: End completions
 }
 
@@ -272,6 +273,7 @@ func testCompleteClassMembers1() {
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     ._internalMeth1()[#Any!#]
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   ._internalMeth1({#self: FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_1-NEXT: Keyword[self]/CurrNominal: .self[#FooClassBase.Type#]; name=self
+// CLANG_CLASS_MEMBERS_1-NEXT: Keyword/CurrNominal: .Type[#FooClassBase.Type#]; name=Type
 // CLANG_CLASS_MEMBERS_1-NEXT: End completions
 }
 
@@ -305,6 +307,7 @@ func testCompleteClassMembers2() {
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[StaticMethod]/Super:           ._internalMeth1()[#Any!#]
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         ._internalMeth1({#self: FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_2-NEXT: Keyword[self]/CurrNominal: .self[#FooClassDerived.Type#]; name=self
+// CLANG_CLASS_MEMBERS_2-NEXT: Keyword/CurrNominal: .Type[#FooClassDerived.Type#]; name=Type
 // CLANG_CLASS_MEMBERS_2-NEXT: End completions
 }
 
