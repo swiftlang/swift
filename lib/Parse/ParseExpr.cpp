@@ -64,8 +64,11 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message,
   
   auto expr = parseExprSequence(Message, isExprBasic,
                                 /*forConditionalDirective*/false);
-  if (expr.hasCodeCompletion())
+  if (expr.hasCodeCompletion()) {
+    if (CodeCompletion)
+      CodeCompletion->setDisabledVars(DisabledVars);
     return expr;
+  }
   if (expr.isNull())
     return nullptr;
   

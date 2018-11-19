@@ -5606,8 +5606,23 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.setPreferFunctionReferencesToCalls();
 
   auto DoPostfixExprBeginning = [&] (){
-    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
-    Lookup.getValueCompletionsInDeclContext(Loc);
+    SourceManager &SM = P.Context.SourceMgr;
+    SourceLoc Loc = SM.getCodeCompletionLoc();
+    llvm::SmallPtrSet<ValueDecl *, 4> disabledVarSet(disabledVars.begin(),
+                                                     disabledVars.end());
+    auto localFilter = [&](ValueDecl *VD, DeclVisibilityKind Kind) -> bool {
+      if (Kind != DeclVisibilityKind::LocalVariable)
+        return true;
+
+      if (disabledVarSet.count(VD))
+        return false;
+      if (isa<TypeDecl>(VD))
+        return true;
+      if (SM.isBeforeInBuffer(VD->getLoc(), Loc))
+        return true;
+      return false;
+    };
+    Lookup.getValueCompletionsInDeclContext(Loc, localFilter);
   };
 
   switch (Kind) {
@@ -5780,7 +5795,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::CaseStmtBeginning: {
     SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
-    Lookup.getValueCompletionsInDeclContext(Loc);
+    DoPostfixExprBeginning();
     Lookup.getTypeContextEnumElementCompletions(Loc);
     break;
   }
@@ -5836,10 +5851,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
   case CompletionKind::AssignmentRHS : {
-    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
     if (auto destType = ParsedExpr->getType())
       Lookup.setExpectedTypes(destType->getRValueType());
-    Lookup.getValueCompletionsInDeclContext(Loc, DefaultFilter);
+    DoPostfixExprBeginning();
     break;
   }
   case CompletionKind::CallArg : {
@@ -5858,9 +5872,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::ReturnStmtExpr : {
-    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
     Lookup.setExpectedTypes(getReturnTypeFromContext(CurDeclContext));
-    Lookup.getValueCompletionsInDeclContext(Loc);
+    DoPostfixExprBeginning();
     break;
   }
 

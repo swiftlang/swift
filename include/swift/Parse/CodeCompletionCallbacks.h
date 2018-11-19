@@ -53,6 +53,7 @@ protected:
   ObjCSelectorContext CompleteExprSelectorContext = ObjCSelectorContext::None;
 
   std::vector<Expr *> leadingSequenceExprs;
+  std::vector<VarDecl *> disabledVars;
 
 public:
   CodeCompletionCallbacks(Parser &P)
@@ -78,6 +79,10 @@ public:
 
   void setLeadingSequenceExprs(ArrayRef<Expr *> exprs) {
     leadingSequenceExprs.assign(exprs.begin(), exprs.end());
+  }
+
+  void setDisabledVars(ArrayRef<VarDecl *> vars) {
+    disabledVars.assign(vars.begin(), vars.end());
   }
 
   class InEnumElementRawValueRAII {
