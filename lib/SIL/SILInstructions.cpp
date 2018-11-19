@@ -649,6 +649,8 @@ std::pair<SILValue, SILValue> AutoDiffFunctionInst::
 getAssociatedFunctionPair(unsigned differentiationOrder) const {
   assert(differentiationOrder > 0 &&
          differentiationOrder <= this->differentiationOrder);
+  assert(!getAssociatedFunctions().empty() &&
+         "Associated functions may not exist in raw SIL");
   auto offset = (differentiationOrder - 1) * 2;
   auto assocFns = getAssociatedFunctions();
   return {assocFns[offset].get(), assocFns[offset+1].get()};
