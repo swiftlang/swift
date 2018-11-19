@@ -2443,82 +2443,111 @@ namespace {
         // single argument case.
         assert(cs.getType(expr->getArg())->isEqual(stringTy) &&
                "single argument should be string");
-        return expr;
+      } else {
+        for (unsigned i = 0, e = args->getNumElements(); i != e; ++i) {
+          auto argExpr = args->getElement(i);
+          auto argType = cs.getType(argExpr);
+
+          // CSGen has already ensured that the first argument is a string, so skip
+          // the first argument.
+          if (i == 0) {
+            assert(argType->isEqual(stringTy) &&
+                   "first argument should be string");
+            continue;
+          }
+
+          auto argLoc = argExpr->getLoc();
+          auto argNameAndLowering = tf::GraphOperationInfo::decodeArgumentName(
+              args->getElementName(i).str());
+          if (!argNameAndLowering) {
+            diagnose(argLoc, "argument name has invalid modifier");
+            return nullptr;
+          }
+          auto argLowering = argNameAndLowering->second;
+          switch (argLowering) {
+          case tf::GraphOperationInfo::ArgumentLowering::Input:
+            // CSGen has already ensured that all inputs conform to
+            // TensorArrayProtocol.
+            break;
+          case tf::GraphOperationInfo::ArgumentLowering::NormalAttribute:
+            if (atc.classifyNormalAttribute(argType) ==
+                tf::AttributeTypeClassifier::Normal::Unsupported) {
+              diagnose(
+                  argLoc,
+                  StringRef("attribute requires ") +
+                      tf::AttributeTypeClassifier::normalSupportedTypesDesc +
+                      ", but got type '" + argType->getString() + "'");
+              return nullptr;
+            }
+            break;
+          case tf::GraphOperationInfo::ArgumentLowering::TensorAttribute:
+            // See the comment on the declaration of the enum case
+            // `GraphOperationInfo::ArgumentLowering::TensorAttribute` for more
+            // information on why these are not allowed in #tfop's.
+            diagnose(argLoc, "$tensor attributes are not allowed in #tfop's");
+            return nullptr;
+          case tf::GraphOperationInfo::ArgumentLowering::ShapeAttribute:
+            if (atc.classifyShapeAttribute(argType) ==
+                tf::AttributeTypeClassifier::Shape::Unsupported) {
+              diagnose(
+                  argLoc,
+                  StringRef("$shape attribute requires ")+
+                      tf::AttributeTypeClassifier::shapeSupportedTypesDesc +
+                      ", but got type '" + argType->getString() + "'");
+              return nullptr;
+            }
+            break;
+          case tf::GraphOperationInfo::ArgumentLowering::TFDataTypeAttribute:
+            if (atc.classifyTFDataTypeAttribute(argType) ==
+                tf::AttributeTypeClassifier::TFDataType::Unsupported) {
+              diagnose(
+                  argLoc,
+                  StringRef("$dtype attribute requires ") +
+                      tf::AttributeTypeClassifier::
+                          tfDataTypeSupportedTypesDesc +
+                      ", but got type '" + argType->getString() + "'");
+              return nullptr;
+            }
+            break;
+          case tf::GraphOperationInfo::ArgumentLowering::Out:
+            // SILGen generates $out attributes. It does not make sense to
+            // specify them in code.
+            diagnose(argLoc, "$out attributes are not allowed in #tfop's");
+            return nullptr;
+          }
+        }
       }
 
-      for (unsigned i = 0, e = args->getNumElements(); i != e; ++i) {
-        auto argExpr = args->getElement(i);
-        auto argType = cs.getType(argExpr);
+      // The result type must conform to TensorGroup or be a tuple of types that
+      // conform to TensorGroup.
 
-        // CSGen has already ensured that the first argument is a string, so skip
-        // the first argument.
-        if (i == 0) {
-          assert(argType->isEqual(stringTy) &&
-                 "first argument should be string");
-          continue;
-        }
+      auto tfModule = ctx.getLoadedModule(ctx.Id_TensorFlow);
+      assert(tfModule && "could not find TensorFlow module");
+      auto tensorGroupProto = ctx.getProtocol(KnownProtocolKind::TensorGroup);
+      assert(tensorGroupProto && "could not find TensorGroup protocol");
 
-        auto argLoc = argExpr->getLoc();
-        auto argNameAndLowering = tf::GraphOperationInfo::decodeArgumentName(
-            args->getElementName(i).str());
-        if (!argNameAndLowering) {
-          diagnose(argLoc, "argument name has invalid modifier");
-          return nullptr;
+      // Diagnoses and returns true if `type` does not conform to TensorGroup.
+      auto checkAndDiagnoseTensorGroup = [&](SourceLoc loc, Type type)
+          -> bool {
+        if (!tfModule->lookupConformance(type, tensorGroupProto)) {
+          diagnose(loc, "#tfop result must conform to TensorGroup or be "
+                        "a tuple of types that conform to TensorGroup");
+          return true;
         }
-        auto argLowering = argNameAndLowering->second;
-        switch (argLowering) {
-        case tf::GraphOperationInfo::ArgumentLowering::Input:
-          // CSGen has already ensured that all inputs conform to
-          // TensorArrayProtocol.
-          break;
-        case tf::GraphOperationInfo::ArgumentLowering::NormalAttribute:
-          if (atc.classifyNormalAttribute(argType) ==
-              tf::AttributeTypeClassifier::Normal::Unsupported) {
-            diagnose(
-                argLoc,
-                StringRef("attribute requires ") +
-                    tf::AttributeTypeClassifier::normalSupportedTypesDesc +
-                    ", but got type '" + argType->getString() + "'");
+        return false;
+      };
+
+      // Check the result type.
+      auto resultType = cs.getType(expr);
+      if (auto *resultTupleType = resultType->getAs<TupleType>()) {
+        for (auto tupleTypeElt : resultTupleType->getElements())
+          if (checkAndDiagnoseTensorGroup(expr->getLoc(),
+                                          tupleTypeElt.getType()))
             return nullptr;
-          }
-          break;
-        case tf::GraphOperationInfo::ArgumentLowering::TensorAttribute:
-          // See the comment on the declaration of the enum case
-          // `GraphOperationInfo::ArgumentLowering::TensorAttribute` for more
-          // information on why these are not allowed in #tfop's.
-          diagnose(argLoc, "$tensor attributes are not allowed in #tfop's");
+      } else {
+        if (checkAndDiagnoseTensorGroup(expr->getLoc(), resultType))
           return nullptr;
-        case tf::GraphOperationInfo::ArgumentLowering::ShapeAttribute:
-          if (atc.classifyShapeAttribute(argType) ==
-              tf::AttributeTypeClassifier::Shape::Unsupported) {
-            diagnose(
-                argLoc,
-                StringRef("$shape attribute requires ")+
-                    tf::AttributeTypeClassifier::shapeSupportedTypesDesc +
-                    ", but got type '" + argType->getString() + "'");
-            return nullptr;
-          }
-          break;
-        case tf::GraphOperationInfo::ArgumentLowering::TFDataTypeAttribute:
-          if (atc.classifyTFDataTypeAttribute(argType) ==
-              tf::AttributeTypeClassifier::TFDataType::Unsupported) {
-            diagnose(
-                argLoc,
-                StringRef("$dtype attribute requires ") +
-                    tf::AttributeTypeClassifier::tfDataTypeSupportedTypesDesc +
-                    ", but got type '" + argType->getString() + "'");
-            return nullptr;
-          }
-          break;
-        case tf::GraphOperationInfo::ArgumentLowering::Out:
-          // SILGen generates $out attributes. It does not make sense to specify
-          // them in code.
-          diagnose(argLoc, "$out attributes are not allowed in #tfop's");
-          return nullptr;
-        }
       }
-
-      // TODO(SR-9428): Check result types.
 
       return expr;
     }
