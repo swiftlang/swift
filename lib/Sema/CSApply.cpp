@@ -4569,10 +4569,6 @@ namespace {
       return E;
     }
 
-    Expr *visitFixedTypeExpr(FixedTypeExpr *E) {
-      return E;
-    }
-
     /// Interface for ExprWalker
     void walkToExprPre(Expr *expr) {
       ExprStack.push_back(expr);

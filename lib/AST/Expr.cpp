@@ -363,7 +363,6 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(KeyPath);
   NO_REFERENCE(KeyPathDot);
   NO_REFERENCE(Tap);
-  NO_REFERENCE(FixedType);
 
 #undef SIMPLE_REFERENCE
 #undef NO_REFERENCE
@@ -671,7 +670,6 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
     return false;
 
   case ExprKind::Tap:
-  case ExprKind::FixedType:
     return true;
   }
 

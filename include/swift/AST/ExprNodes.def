@@ -189,8 +189,7 @@ EXPR(ObjCSelector, Expr)
 EXPR(KeyPath, Expr)
 UNCHECKED_EXPR(KeyPathDot, Expr)
 EXPR(Tap, Expr)
-EXPR(FixedType, Expr)
-LAST_EXPR(FixedType)
+LAST_EXPR(Tap)
 
 #undef EXPR_RANGE
 #undef LITERAL_EXPR

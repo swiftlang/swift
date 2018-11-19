@@ -2229,8 +2229,12 @@ static Type getTypeOfCompletionOperatorImpl(TypeChecker &TC, DeclContext *DC,
                                   "typecheck-completion-operator", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
+  ConstraintSystemOptions options;
+  options |= ConstraintSystemFlags::SuppressDiagnostics;
+  options |= ConstraintSystemFlags::ReusePrecheckedType;
+
   // Construct a constraint system from this expression.
-  ConstraintSystem CS(TC, DC, ConstraintSystemFlags::SuppressDiagnostics);
+  ConstraintSystem CS(TC, DC, options);
   expr = CS.generateConstraints(expr);
   if (!expr)
     return Type();
@@ -2304,7 +2308,6 @@ Type TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
   // Build temporary expression to typecheck.
   // We allocate these expressions on the stack because we know they can't
   // escape and there isn't a better way to allocate scratch Expr nodes.
-  FixedTypeExpr dummyLHS(LHS->getSourceRange(), LHSTy);
   UnresolvedDeclRefExpr UDRE(opName, refKind, DeclNameLoc(Loc));
   auto *opExpr = resolveDeclRefExpr(&UDRE, DC);
 
@@ -2312,10 +2315,10 @@ Type TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 
   case DeclRefKind::PostfixOperator: {
     // (postfix_unary_expr
-    //   (declref_expr name=<operator>)
+    //   (declref_expr name=<opName>)
     //   (paren_expr
     //     (<LHS>)))
-    ParenExpr Args(SourceLoc(), &dummyLHS, SourceLoc(),
+    ParenExpr Args(SourceLoc(), LHS, SourceLoc(),
                    /*hasTrailingClosure=*/false);
     PostfixUnaryExpr postfixExpr(opExpr, &Args);
     return getTypeOfCompletionOperatorImpl(*this, DC, &postfixExpr,
@@ -2330,7 +2333,7 @@ Type TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
     //     (code_completion_expr)))
     CodeCompletionExpr dummyRHS(Loc);
     auto Args = TupleExpr::create(
-        Context, SourceLoc(), {&dummyLHS, &dummyRHS}, {}, {}, SourceLoc(),
+        Context, SourceLoc(), {LHS, &dummyRHS}, {}, {}, SourceLoc(),
         /*hasTrailingClosure=*/false, /*isImplicit=*/true);
     BinaryExpr binaryExpr(opExpr, Args, /*isImplicit=*/true);
 

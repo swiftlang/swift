@@ -60,10 +60,6 @@ public:
     llvm_unreachable("vararg expansion should not appear in this position");
   }
 
-  ExprRetTy visitFixedTypeExpr(FixedTypeExpr *E, Args...AA) {
-    llvm_unreachable("expression kind should not survive to SILGen");
-  }
-
   ExprRetTy visitIdentityExpr(IdentityExpr *E, Args...AA) {
     return static_cast<ImplClass*>(this)->visit(E->getSubExpr(),
                                                 std::forward<Args>(AA)...);

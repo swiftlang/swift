@@ -5221,22 +5221,6 @@ public:
   }
 };
 
-/// Represents opaque expression with fixed type. Used for temporary
-/// type-checking such as code completion.
-class FixedTypeExpr : public Expr {
-  SourceRange Range;
-
-public:
-  FixedTypeExpr(SourceRange Range, Type Ty)
-      : Expr(ExprKind::FixedType, /*isImplicit=*/true, Ty), Range(Range) {}
-
-  SourceRange getSourceRange() const { return Range; }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::FixedType;
-  }
-};
-
 inline bool Expr::isInfixOperator() const {
   return isa<BinaryExpr>(this) || isa<IfExpr>(this) ||
          isa<AssignExpr>(this) || isa<ExplicitCastExpr>(this);
