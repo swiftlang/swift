@@ -272,7 +272,7 @@ UnsafeMutableRawBufferPointerTestSuite.test("changeElementViaBuffer") {
   let uint8Ptr = allocated.initializeMemory(as: UInt8.self, repeating: 1, count: count)
   uint8Ptr[count-1] = UInt8.max
 
-  var buffer = UnsafeMutableRawBufferPointer(start: allocated, count: count - 1)
+  let buffer = UnsafeMutableRawBufferPointer(start: allocated, count: count - 1)
 
   buffer[1] = 0
   expectEqual(1, buffer[0])
@@ -293,6 +293,40 @@ UnsafeMutableRawBufferPointerTestSuite.test("changeElementViaBuffer") {
   expectEqual(1, uint8Ptr[1])
   expectEqual(1, uint8Ptr[2])
   expectEqual(UInt8.max, uint8Ptr[count-1])
+
+  buffer.sort(by: >)
+  expectEqual(1, buffer[0])
+  expectEqual(1, buffer[1])
+  expectEqual(0, buffer[2])
+
+  expectEqual(1, uint8Ptr[0])
+  expectEqual(1, uint8Ptr[1])
+  expectEqual(0, uint8Ptr[2])
+  expectEqual(UInt8.max, uint8Ptr[count-1])
+
+  let p = buffer.partition(by: { $0%2 == 1 })
+  expectEqual(p, 1)
+  expectEqual(0, buffer[0])
+  expectEqual(1, buffer[1])
+  expectEqual(1, buffer[2])
+
+  expectEqual(0, uint8Ptr[0])
+  expectEqual(1, uint8Ptr[1])
+  expectEqual(1, uint8Ptr[2])
+  expectEqual(UInt8.max, uint8Ptr[count-1])
+
+  buffer.reverse()
+  expectEqual(1, buffer[0])
+  expectEqual(1, buffer[1])
+  expectEqual(0, buffer[2])
+
+  expectEqual(1, uint8Ptr[0])
+  expectEqual(1, uint8Ptr[1])
+  expectEqual(0, uint8Ptr[2])
+  expectEqual(UInt8.max, uint8Ptr[count-1])
+
+  buffer[0...1] = buffer[1...]
+  expectEqual(buffer[1], buffer[2])
 }
 
 UnsafeMutableBufferPointerTestSuite.test("changeElementViaBuffer") {
@@ -302,7 +336,7 @@ UnsafeMutableBufferPointerTestSuite.test("changeElementViaBuffer") {
   allocated.initialize(repeating: 1.0, count: count)
   allocated[count-1] = -1.0
 
-  var buffer = UnsafeMutableBufferPointer(start: allocated, count: count - 1)
+  let buffer = UnsafeMutableBufferPointer(start: allocated, count: count - 1)
 
   buffer[1] = 0.0
   expectEqual(1.0, buffer[0])
@@ -323,6 +357,40 @@ UnsafeMutableBufferPointerTestSuite.test("changeElementViaBuffer") {
   expectEqual(1.0, allocated[1])
   expectEqual(1.0, allocated[2])
   expectEqual(-1.0, allocated[count-1])
+
+  buffer.sort(by: >)
+  expectEqual(1.0, buffer[0])
+  expectEqual(1.0, buffer[1])
+  expectEqual(0.0, buffer[2])
+
+  expectEqual(1.0, allocated[0])
+  expectEqual(1.0, allocated[1])
+  expectEqual(0.0, allocated[2])
+  expectEqual(-1.0, allocated[count-1])
+
+  let p = buffer.partition(by: { !$0.isZero })
+  expectEqual(p, 1)
+  expectEqual(0.0, buffer[0])
+  expectEqual(1.0, buffer[1])
+  expectEqual(1.0, buffer[2])
+
+  expectEqual(0.0, allocated[0])
+  expectEqual(1.0, allocated[1])
+  expectEqual(1.0, allocated[2])
+  expectEqual(-1.0, allocated[count-1])
+
+  buffer.reverse()
+  expectEqual(1.0, buffer[0])
+  expectEqual(1.0, buffer[1])
+  expectEqual(0.0, buffer[2])
+
+  expectEqual(1.0, allocated[0])
+  expectEqual(1.0, allocated[1])
+  expectEqual(0.0, allocated[2])
+  expectEqual(-1.0, allocated[count-1])
+
+  buffer[0...1] = buffer[1...]
+  expectEqual(buffer[1], buffer[2])
 }
 
 UnsafeMutableBufferPointerTestSuite.test("_withUnsafeMutableBufferPointerIfSupported") {
@@ -872,11 +940,7 @@ UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/${R
   defer { deallocateFor${Raw}Buffer(
       sliceMemory, count: replacementValues.count) }
 
-% if RangeName == 'range':
   let buffer = SubscriptSetTest.create${SelfName}(from: memory)
-% else:
-  var buffer = SubscriptSetTest.create${SelfName}(from: memory)
-% end
 
 %     if IsRaw:
   // A raw buffer pointer has debug bounds checks on indices, and
@@ -987,6 +1051,19 @@ UnsafeMutableBufferPointerTestSuite.test("nonmutating-swapAt-withARC") {
   expectEqual(Array(buffer), ["2", "1", "0"])
 }
 % end
+
+UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("withUMBPIfSupported") {
+% if IsRaw:
+  let buffer = UnsafeMutableRawBufferPointer.allocate(count: 3)
+% else:
+  let buffer = UnsafeMutableBufferPointer<Int>.allocate(capacity: 3)
+% end
+  defer { buffer.deallocate() }
+
+  if let _ = buffer._withUnsafeMutableBufferPointerIfSupported({ _ in expectUnreachable() }) {
+  expectUnreachable()
+  }
+}
 
 % end # SelfName
 
