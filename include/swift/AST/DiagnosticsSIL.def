@@ -376,6 +376,8 @@ ERROR(autodiff_unsupported_type,none,
       "differentiating '%0' is not supported yet", (Type))
 ERROR(autodiff_function_not_differentiable,none,
       "function is not differentiable", ())
+NOTE(autodiff_function_generic_functions_unsupported,none,
+     "differentiating generic functions is not supported yet", ())
 NOTE(autodiff_value_defined_here,none,
      "value defined here", ())
 NOTE(autodiff_when_differentiating_function_call,none,

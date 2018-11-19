@@ -1062,7 +1062,8 @@ public:
     std::unique_ptr<DifferentiationTask> task(
         new DifferentiationTask(original, std::move(attr), module, invoker));
     differentiationTasks.push_back(std::move(task));
-    enqueuedTaskIndices.insert({{original, indices}, differentiationTasks.size() - 1});
+    enqueuedTaskIndices.insert(
+        {{original, indices}, differentiationTasks.size() - 1});
     return differentiationTasks.back().get();
   }
 
@@ -1995,12 +1996,7 @@ ADContext::createPrimalValueStruct(const DifferentiationTask *task) {
     pvStruct->getAttrs().add(
         new (astCtx) UsableFromInlineAttr(/*implicit*/ true));
   }
-  // If the original function has generic parameters, clone them.
-  auto *genEnv = function->getGenericEnvironment();
-  if (genEnv && genEnv->getGenericSignature()) {
-    auto *genParams = function->getDeclContext()->getGenericParamsOfContext();
-    pvStruct->setGenericParams(genParams->clone(pvStruct));
-  }
+  pvStruct->setGenericEnvironment(task->getOriginal()->getGenericEnvironment());
   file.addVisibleDecl(pvStruct);
   LLVM_DEBUG({
     auto &s = getADDebugStream();
@@ -2394,8 +2390,7 @@ public:
       return;
     }
     // Form expected indices by assuming there's only one result.
-    SILAutoDiffIndices indices(activeResultIndices.front(),
-                                      activeParamIndices);
+    SILAutoDiffIndices indices(activeResultIndices.front(), activeParamIndices);
     // Retrieve the original function being called before conversion.
     auto calleeOrigin = ai->getCalleeOrigin();
     auto *calleeOriginFnRef = dyn_cast<FunctionRefInst>(calleeOrigin);
@@ -2407,7 +2402,6 @@ public:
       errorOccurred = true;
       return;
     }
-    auto calleeOriginType = calleeOriginFnRef->getFunctionType();
     // Find or register a differentiation task for this function.
     auto *newTask = context.lookUpOrRegisterDifferentiationTask(
         calleeOriginFnRef->getReferencedFunction(), indices,
@@ -2458,8 +2452,9 @@ public:
     // These results include direct primal values and direct original results.
     SmallVector<SILValue, 8> primVals, origResults, allDirResults;
     extractAllElements(primalCall, builder, allDirResults);
-    collectPrimalValuesAndOriginalResults(calleeOriginType, primalCall,
-                                          allDirResults, primVals, origResults);
+    collectPrimalValuesAndOriginalResults(calleeOriginFnRef->getFunctionType(),
+                                          primalCall, allDirResults, primVals,
+                                          origResults);
     LLVM_DEBUG({
       auto &s = getADDebugStream();
       s << "All direct results returned by the primal function: \n";
@@ -2530,7 +2525,6 @@ public:
   /// Primal has qualified ownership. We assign load ownership qualified while
   /// cloning the `load` instruction.
   void visitLoadInst(LoadInst *li) {
-
     auto srcTy = li->getOperand()->getType().getASTType();
     auto loc = remapLocation(li->getLoc());
     auto loq = getBufferLOQ(getOpASTType(srcTy), *getPrimal());
@@ -2547,6 +2541,16 @@ bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
   // FIXME: If the original function has multiple basic blocks, bail out since
   // AD does not support control flow yet.
   if (diagnoseUnsupportedControlFlow(context, item.task)) {
+    errorOccurred = true;
+    return true;
+  }
+  // FIXME: Support generics.
+  auto *original = item.original;
+  if (original->getLoweredFunctionType()->getGenericSignature()) {
+    context.diagnose(original->getLocation().getSourceLoc(),
+                     diag::autodiff_function_generic_functions_unsupported);
+    context.diagnose(original->getLocation().getSourceLoc(),
+                     diag::autodiff_function_not_differentiable);
     errorOccurred = true;
     return true;
   }
@@ -2585,7 +2589,7 @@ PrimalGen::createEmptyPrimal(DifferentiationTask *task) {
   auto pvType = primalValueStructDecl->getDeclaredType()->getCanonicalType();
   auto objTy = SILType::getPrimitiveObjectType(pvType);
   auto resultConv = objTy.isLoadable(module) ? ResultConvention::Owned
-                                             : ResultConvention::Unowned;
+                                             : ResultConvention::Indirect;
   auto origResults = original->getLoweredFunctionType()->getResults();
   SmallVector<SILResultInfo, 8> results;
   results.push_back({pvType, resultConv});
@@ -2637,7 +2641,6 @@ bool PrimalGen::run() {
     worklist.pop_back();
     errorOccurred |= performSynthesis(synthesis);
     synthesis.task->getPrimalInfo()->computePrimalValueStructType();
-    LLVM_DEBUG(synthesis.target->verify());
   }
   return errorOccurred;
 }
@@ -2783,7 +2786,6 @@ bool AdjointGen::run() {
     auto synthesis = worklist.back();
     worklist.pop_back();
     errorOccurred |= performSynthesis(synthesis);
-    LLVM_DEBUG(synthesis.target->verify());
   }
   return errorOccurred;
 }
@@ -4453,7 +4455,7 @@ void Differentiation::run() {
     // If `f` has a `[reverse_differentiable]` attribute, it should become a
     // differentiation task.
     for (auto *diffAttr : f.getReverseDifferentiableAttrs()) {
-      if (diffAttr->hasPrimal() == diffAttr->hasAdjoint()){
+      if (diffAttr->hasPrimal() == diffAttr->hasAdjoint()) {
         diffAttrs.push_back({&f, diffAttr});
         continue;
       }
@@ -4494,10 +4496,11 @@ void Differentiation::run() {
   // For every `[reverse_differentiable]` attribute, create a differentiation
   // task. If the attribute has a primal and adjoint, this task will not
   // synthesize anything, but it's still needed as a lookup target.
-  for (auto &fnAndAttr : diffAttrs)
+  for (auto &fnAndAttr : diffAttrs) {
     context.registerDifferentiationTask(
         fnAndAttr.first, fnAndAttr.second->getIndices(),
         DifferentiationInvoker(fnAndAttr.second, fnAndAttr.first));
+  }
 
   // Lower each gradient instruction to a function reference and replaces its
   // uses with a function reference to its gradient.

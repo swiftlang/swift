@@ -21,6 +21,17 @@ func one_to_one_0(_ x: Float) -> Float {
 _ = #gradient(one_to_one_0) // okay!
 
 //===----------------------------------------------------------------------===//
+// Generics
+//===----------------------------------------------------------------------===//
+
+// expected-note @+3 {{differentiating generic functions is not supported yet}}
+// expected-error @+2 {{function is not differentiable}}
+@differentiable(reverse)
+func generic<T: FloatingPoint>(_ x: T) -> T {
+  return x + 1
+}
+
+//===----------------------------------------------------------------------===//
 // Function composition
 //===----------------------------------------------------------------------===//
 
