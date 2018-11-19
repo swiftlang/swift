@@ -33,20 +33,22 @@ benchmark is testing individual method on a concrete type.
 ````
 
 Benchmark names are used to run individual tests when passed as command line
-arguments to the benchmark driver. Special characters that could be interpreted
-by the shell would require quoting. Stick to ASCII letters, numbers and period.
+arguments to the benchmark driver. Stick to ASCII letters, numbers and period.
 Exceptionally:
 
 * Use **`-`** only to denote control flow constructs like `for-in` or `if-let`.
-* Use **`!`** and **`?`** for optional types, conditional or forced downcasting
-and optional chaining.
+* Use **`!`** and **`?`** for optional types, conditional or forced downcasting,
+optional chaining etc.
 
 ````
-✅ OCB.NSArray.AnyObject.as?.Array.NSString
-✅ OCB.NSArray.AnyObject.as!.Array.String
 ✅ Array.append.Array.Int?
 ✅ Flatten.Array.Tuple4.for-in.reserved
+✅ OCB.NSArray.as!.Array.NSString
 ````
+
+Note: Special characters that could be interpreted by the shell require escaping
+(`\!`) or quoting the name, when running such benchmarks individually.
+
 </details><p><!-- spacer --></p></li>
 <li>
 <strong>Use groups and variants</strong> to structure the benchmark family by
@@ -56,7 +58,10 @@ differently sized variants.
 <details>
 
 Benchmarks in a family can be grouped by the tested operation, method or varied
-by types and different workload sizes. It might be necessary to abbreviate some names to fit the size limit, based on the longest combination. Choose consistent names for the components throughout all members in the family, to allow for relative comparison across the different axis of variation.
+by types and different workload sizes. It might be necessary to abbreviate some
+names to fit the size limit, based on the longest combination. Choose consistent
+names for the components throughout all members in the family, to allow for
+relative comparison across the different axis of variation.
 
 ````
 ✅ Seq.dropFirst.Array
@@ -106,7 +111,7 @@ There's no need to be literal with type names. **Be descriptive**:
 
 </details><p><!-- spacer --></p></li>
 <li>
-<strong>Keep it short.</strong> 40 characters at most. Abbreviate if necessary!
+<strong>Keep it short.</strong> 40 characters at most. Abbreviate if necessary.
 <details>
 
 Benchmarking results are reported on GitHub and very long names are causing
@@ -117,7 +122,7 @@ unique and short, than overly descriptive.*
 
 Prefer concise names for potential benchmark family extensions. Leave out the
 nested types from variants if they aren't strictly necessary for disambiguation.
-If there's potentially valuable future variant, like testing `ContinuousArray`,
+If there's potentially valuable future variant, like testing `ContiguousArray`,
 keep the `Array` now, allowing for addition of `ContArr` variants later.
 
 Use **`Val`** and **`Ref`** as short descriptors for variants that compare value
@@ -129,12 +134,13 @@ language prefix/suffix when necessary (`ASCIIChar`). For benchmarks that measure
 [two letter codes](https://en.wikipedia.org/wiki/ISO_639-1) instead of spelling
 out the whole language names.
 
-In a pinch, even C-style naming with two letter prefixes `OC` (for Objective-C)
-or abbreviations like  `Str` and `Arr` are OK, if it helps to fit a system with
-descriptive names into 40 characters:
+*In a pinch*, it's OK to use short C-style naming prefixes like `OCB` (for
+Objective-C Bridging) or consistent abbreviations in the benchmark family like
+`Str` and `Arr`, but *only if* it helps to fit a system with descriptive
+names into 40 characters:
 
 ````
-✅ CharCount.ContArr.Str.kr
+✅ OCB.NSDict.as!.Dictionary.NSString.NSNum
 ✅ Seq.prefixWhile.AnySeq.UnfoldSeq.lazy
 ````
 
