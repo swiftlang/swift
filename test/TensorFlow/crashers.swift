@@ -368,6 +368,20 @@ public func SR8419(iterationCount: Int) {
 struct AggregateStruct {
   let a, b: Tensor<Float>
 }
+extension AggregateStruct : TensorGroup {
+  public func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>?) {
+    fatalError("dummy conformance")
+  }
+  public static var _typeList: [TensorDataType] {
+    fatalError("dummy conformance")
+  }
+  public static var _unknownShapeList: [TensorShape?] {
+    fatalError("dummy conformance")
+  }
+  public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
+    fatalError("dummy conformance")
+  }
+}
 public func inlineDeabstracted_a() -> Tensor<Float> {
   return deabstractedCallee([1, 2, 3])
 }
