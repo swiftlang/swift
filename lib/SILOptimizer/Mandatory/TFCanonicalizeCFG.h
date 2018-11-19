@@ -20,6 +20,7 @@
 #define SWIFT_SILOPTIMIZER_TFCANONICALIZECFG_H
 
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/LoopInfo.h"
 
 namespace swift {

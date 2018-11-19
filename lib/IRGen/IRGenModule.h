@@ -559,9 +559,6 @@ public:
     llvm::PointerType *RelativeAddressPtrTy;
   };
   llvm::IntegerType *Int64Ty;          /// i64
-  // SWIFT_ENABLE_TENSORFLOW
-  llvm::Type *DoubleTy;                /// double
-  llvm::Type *FloatTy;                 /// float
 
   union {
     llvm::IntegerType *SizeTy;         /// usually i32 or i64
