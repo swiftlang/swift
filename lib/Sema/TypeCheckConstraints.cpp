@@ -2220,9 +2220,9 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
   }
 }
 
-static Type getTypeOfCompletionOperatorImpl(TypeChecker &TC, DeclContext *DC,
-                                            Expr *expr,
-                                            ConcreteDeclRef &referencedDecl) {
+static FunctionType *
+getTypeOfCompletionOperatorImpl(TypeChecker &TC, DeclContext *DC, Expr *expr,
+                                ConcreteDeclRef &referencedDecl) {
   ASTContext &Context = TC.Context;
 
   FrontendStatsTracer StatsTracer(Context.Stats,
@@ -2237,7 +2237,7 @@ static Type getTypeOfCompletionOperatorImpl(TypeChecker &TC, DeclContext *DC,
   ConstraintSystem CS(TC, DC, options);
   expr = CS.generateConstraints(expr);
   if (!expr)
-    return Type();
+    return nullptr;
 
   if (TC.getLangOpts().DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
@@ -2250,7 +2250,7 @@ static Type getTypeOfCompletionOperatorImpl(TypeChecker &TC, DeclContext *DC,
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
   if (CS.solve(expr, viable, FreeTypeVariableBinding::Disallow))
-    return Type();
+    return nullptr;
 
   auto &solution = viable[0];
   if (TC.getLangOpts().DebugConstraintSolver) {
@@ -2281,27 +2281,27 @@ static Type getTypeOfCompletionOperatorImpl(TypeChecker &TC, DeclContext *DC,
 
 /// \brief Return the type of operator function for specified LHS, or a null
 /// \c Type on error.
-Type TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
-                                              Identifier opName,
-                                              DeclRefKind refKind,
-                                              ConcreteDeclRef &referencedDecl) {
+FunctionType *
+TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
+                                         Identifier opName, DeclRefKind refKind,
+                                         ConcreteDeclRef &referencedDecl) {
 
   // For the infix operator, find the actual LHS from pre-folded LHS.
   if (refKind == DeclRefKind::BinaryOperator)
     LHS = findLHS(DC, LHS, opName);
 
   if (!LHS)
-    return Type();
+    return nullptr;
 
   auto LHSTy = LHS->getType();
 
   // FIXME: 'UnresolvedType' still might be typechecked by an operator.
   if (!LHSTy || LHSTy->is<UnresolvedType>())
-    return Type();
+    return nullptr;
 
   // Meta types and function types cannot be a operand of operator expressions.
   if (LHSTy->is<MetatypeType>() || LHSTy->is<AnyFunctionType>())
-    return Type();
+    return nullptr;
 
   auto Loc = LHS->getEndLoc();
 
@@ -2337,33 +2337,10 @@ Type TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
         /*hasTrailingClosure=*/false, /*isImplicit=*/true);
     BinaryExpr binaryExpr(opExpr, Args, /*isImplicit=*/true);
 
-    Type ty =
-        getTypeOfCompletionOperatorImpl(*this, DC, &binaryExpr, referencedDecl);
-    if (!ty)
-      return ty;
-
-    auto funcTy = ty->castTo<AnyFunctionType>();
-    Type rhsTy = funcTy->getParams()[1].getPlainType();
-    Type resultTy = funcTy->getResult();
-
-    // Don't complete optional operators on non-optional types.
-    if (!LHSTy->getRValueType()->getOptionalObjectType()) {
-      // 'T ?? T'
-      if (opName.str() == "??")
-        return Type();
-      // 'T == nil'
-      if (auto NT = rhsTy->getNominalOrBoundGenericNominal())
-        if (NT->getName() == Context.Id_OptionalNilComparisonType)
-          return Type();
-    }
-
-    // If the right-hand side and result type are both type parameters, we're
-    // not providing a useful completion.
-    if (resultTy->isTypeParameter() && rhsTy->isTypeParameter())
-      return Type();
-
-    return ty;
+    return getTypeOfCompletionOperatorImpl(*this, DC, &binaryExpr,
+                                           referencedDecl);
   }
+
   default:
     llvm_unreachable("Invalid DeclRefKind for operator completion");
   }

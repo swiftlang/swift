@@ -842,9 +842,10 @@ Optional<Type> swift::getTypeOfCompletionContextExpr(
 
 /// \brief Return the type of operator function for specified LHS, or a null
 /// \c Type on error.
-Type swift::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
-                                        Identifier opName, DeclRefKind refKind,
-                                        ConcreteDeclRef &referencedDecl) {
+FunctionType *
+swift::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
+                                   Identifier opName, DeclRefKind refKind,
+                                   ConcreteDeclRef &referencedDecl) {
   auto &ctx = DC->getASTContext();
   DiagnosticSuppression suppression(ctx.Diags);
   TypeChecker &TC = createTypeChecker(ctx);

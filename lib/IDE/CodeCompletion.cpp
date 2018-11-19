@@ -3292,13 +3292,11 @@ public:
 
   void tryPostfixOperator(Expr *expr, PostfixOperatorDecl *op) {
     ConcreteDeclRef referencedDecl;
-    Type ty = getTypeOfCompletionOperator(
+    FunctionType *funcTy = getTypeOfCompletionOperator(
         const_cast<DeclContext *>(CurrDeclContext), expr, op->getName(),
         DeclRefKind::PostfixOperator, referencedDecl);
-    if (!ty)
+    if (!funcTy)
       return;
-
-    auto *funcTy = ty->castTo<AnyFunctionType>();
 
     // TODO: Use referencedDecl (FuncDecl) instead of 'op' (OperatorDecl).
     addPostfixOperatorCompletion(op, funcTy->getResult());
@@ -3350,13 +3348,32 @@ public:
 
   void tryInfixOperatorCompletion(Expr *foldedExpr, InfixOperatorDecl *op) {
     ConcreteDeclRef referencedDecl;
-    Type ty = getTypeOfCompletionOperator(
+    FunctionType *funcTy = getTypeOfCompletionOperator(
         const_cast<DeclContext *>(CurrDeclContext), foldedExpr, op->getName(),
         DeclRefKind::BinaryOperator, referencedDecl);
-    if (!ty)
+    if (!funcTy)
       return;
 
-    auto *funcTy = ty->castTo<AnyFunctionType>();
+    Type lhsTy = funcTy->getParams()[0].getPlainType();
+    Type rhsTy = funcTy->getParams()[1].getPlainType();
+    Type resultTy = funcTy->getResult();
+
+    // Don't complete optional operators on non-optional types.
+    if (!lhsTy->getRValueType()->getOptionalObjectType()) {
+      // 'T ?? T'
+      if (op->getName().str() == "??")
+        return;
+      // 'T == nil'
+      if (auto NT = rhsTy->getNominalOrBoundGenericNominal())
+        if (NT->getName() ==
+            CurrDeclContext->getASTContext().Id_OptionalNilComparisonType)
+          return;
+    }
+
+    // If the right-hand side and result type are both type parameters, we're
+    // not providing a useful completion.
+    if (resultTy->isTypeParameter() && rhsTy->isTypeParameter())
+      return;
 
     // TODO: Use referencedDecl (FuncDecl) instead of 'op' (OperatorDecl).
     addInfixOperatorCompletion(op, funcTy->getResult(),

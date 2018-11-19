@@ -1406,9 +1406,10 @@ public:
 
   /// \brief Return the type of operator function for specified LHS, or a null
   /// \c Type on error.
-  Type getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
-                                   Identifier opName, DeclRefKind refKind,
-                                   ConcreteDeclRef &referencedDecl);
+  FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
+                                            Identifier opName,
+                                            DeclRefKind refKind,
+                                            ConcreteDeclRef &referencedDecl);
 
   /// Check the key-path expression.
   ///

@@ -104,9 +104,10 @@ namespace swift {
   /// or \c DeclRefKind::BinaryOperator for infix operator.
   /// On success, returns resolved function type of the operator. The LHS should
   /// already be type-checked. This function guarantees LHS not to be modified.
-  Type getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
-                                   Identifier opName, DeclRefKind refKind,
-                                   ConcreteDeclRef &referencedDecl);
+  FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
+                                            Identifier opName,
+                                            DeclRefKind refKind,
+                                            ConcreteDeclRef &referencedDecl);
 
   /// Typecheck the given expression.
   bool typeCheckExpression(DeclContext *DC, Expr *&parsedExpr);
