@@ -720,19 +720,6 @@ TypeChecker::lookupFuncDecl(
                                   funcName))
         results = tmp;
     }
-    // Note: static methods are omitted from `TypeChecker.lookupUnqualified` in
-    // Swift 3. The code below is a workaround for resolving them.
-    //
-    // This is necessary because the stdlib is compiled with `-swift-version 3`
-    // for Swift 3 compatibility, and floating point types use the
-    // `@differentiable` attribute with static adjoint methods (such as
-    // `_adjointAdd`).
-    else if (lookupContext->getASTContext().isSwiftVersion3() &&
-             results.empty() && lookupContext->isTypeContext()) {
-      results = lookupMember(lookupContext,
-                             lookupContext->getSelfTypeInContext(),
-                             funcName);
-    }
   }
 
   // Initialize error flags.

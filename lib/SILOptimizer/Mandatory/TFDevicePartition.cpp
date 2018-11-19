@@ -190,7 +190,7 @@ class DevicePartitionCloner
       auto *newOperand = cloneSingleInst(cast<SingleValueInstruction>(operand));
       ValueMap[operand] = newOperand;
     }
-    return this->remapValue(operand);
+    return this->getMappedValue(operand);
   }
 };
 }  // end anonymous namespace
@@ -220,7 +220,7 @@ void DevicePartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
     auto opValue = inst->getOperand(i);
     assert(isTensorFlowValue(opValue->getType()) &&
            "ops should only use tensors");
-    args.push_back(remapValue(opValue));
+    args.push_back(getMappedValue(opValue));
   }
 
   SmallVector<SILType, 2> resultTypes;
@@ -259,7 +259,7 @@ void DevicePartitionCloner::addD2DSend(GraphOperationInfo &graphOpInfo,
       {ctx.getIdentifier(TF_DEVICE_ATTR),
        SymbolicValue::getString(getDeviceString(thisDeviceType), allocator)});
 
-  auto valueToSend = remapValue(inst->getOperand(0));
+  auto valueToSend = getMappedValue(inst->getOperand(0));
   newInstBuilder.addArgument(valueToSend);
   if (inst->getNumAttributes() > tensorShapeAttrIdx)
     newInstBuilder.addAttribute(inst->getAttribute(tensorShapeAttrIdx));
@@ -342,7 +342,7 @@ void DevicePartitionCloner::visitTensorTransferInst(
   for (auto destDeviceForSend : deviceInfo.getUsedDeviceTypes()) {
     if (destDeviceForSend == srcDevice) {
       // When dest is src, update the mapping, and do not send.
-      ValueMap[getSingleValueResult(inst)] = remapValue(inst->getOperand(0));
+      ValueMap[getSingleValueResult(inst)] = getMappedValue(inst->getOperand(0));
       continue;
     }
     addD2DSend(graphOpInfo, tensorShapeAttrIdx, transferId, destDeviceForSend);

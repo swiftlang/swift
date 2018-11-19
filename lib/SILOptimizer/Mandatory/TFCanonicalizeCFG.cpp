@@ -405,7 +405,7 @@ public:
     return bb;
   }
 
-  SILValue remapValue(SILValue Value) {
+  SILValue getMappedValue(SILValue Value) {
     auto VI = ValueMap.find(Value);
     if (VI != ValueMap.end())
       return VI->second;
@@ -1550,7 +1550,7 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
           // A suitable value is found. Update the edge value in the unrolled
           // loop with the corresponding cloned value.
           changeEdgeValue(clonedPred->getTerminator(), clonedNewLatch, argIndex,
-                          cloner.remapValue(value));
+                          cloner.getMappedValue(value));
           patched = true;
           break;
         }

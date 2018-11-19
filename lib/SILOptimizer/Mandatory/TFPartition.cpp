@@ -2354,7 +2354,7 @@ void PartitionCloner::visitBranchInst(BranchInst *inst) {
   unsigned opNum = 0;
   for (auto &arg : inst->getAllOperands()) {
     if (shouldCloneArgument(destBB->getArgument(opNum++)))
-      operands.push_back(remapValue(arg.get()));
+      operands.push_back(getMappedValue(arg.get()));
   }
 
   getBuilder().setCurrentDebugScope(getOpScope(inst->getDebugScope()));
@@ -2409,7 +2409,7 @@ void PartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
     //
     // For this special op, we ignore any device placement. Logically, this
     // means this op is always placed on ALL devices.
-    auto result = remapValue(inst->getOperand(0));
+    auto result = getMappedValue(inst->getOperand(0));
     auto S2TResult = inst->getResult(0);
     if (!S2TResult->getType().getASTType()->isEqual(
             result->getType().getASTType())) {
@@ -2474,7 +2474,7 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
   // The TensorToScalar operation is promoted by just dropping the operation
   // and using the incoming tensor value.
   if (opKind == PromotedScalarKind::TensorToScalar) {
-    ValueMap[inst] = remapValue(inst->getOperand(1));
+    ValueMap[inst] = getMappedValue(inst->getOperand(1));
     return;
   }
 
@@ -2489,7 +2489,7 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
     operandRange = operandRange.drop_back();
 
   for (auto &op : operandRange)
-    opBuilder.addArgument(remapValue(op.get()));
+    opBuilder.addArgument(getMappedValue(op.get()));
 
   // The type of the new builtin is usually the same as the input type, but
   // "remapped", which turns Float into TensorHandle<Float>.
@@ -2568,7 +2568,7 @@ void PartitionCloner::visitTupleExtractInst(TupleExtractInst *inst) {
   if (classifyInst(inst->getOperand()->getDefiningInstruction()) ==
       PartitioningClass::OverflowCheckingInst) {
     assert(inst->getFieldNo() == 0 && "Unexpected extract to remap");
-    ValueMap[inst] = remapValue(inst->getOperand());
+    ValueMap[inst] = getMappedValue(inst->getOperand());
     return;
   }
 
@@ -2582,7 +2582,7 @@ void PartitionCloner::visitTupleExtractInst(TupleExtractInst *inst) {
 /// a struct_extract is when this is safe.
 void PartitionCloner::visitStructExtractInst(StructExtractInst *inst) {
   assert(inst->getFieldNo() == 0 && "Unexpected extract to remap");
-  ValueMap[inst] = remapValue(inst->getOperand());
+  ValueMap[inst] = getMappedValue(inst->getOperand());
 }
 
 /// Wrap a value in a simple struct wrapper, these are common in the standard
@@ -3189,7 +3189,7 @@ bool PartitionCloner::insertAccelToHostTransfer(SILValue value, SILLocation loc)
 
   // Create the send in the accelerator code.  Each send/receive pair gets
   // a unique ID to associate one with the other.
-  createAcceleratorSend(BA, loc, remapValue(value), nextSendID, FP.deviceInfo);
+  createAcceleratorSend(BA, loc, getMappedValue(value), nextSendID, FP.deviceInfo);
 
   // Create the receive in the host code.
   auto newVal = createHostReceive(BH, loc, value->getType(), tensorComputation,
@@ -3319,11 +3319,11 @@ void PartitionCloner::cloneFunction(ArrayRef<SILValue> resultValues) {
     // Create a return of N values, producing a tuple if necessary.
     SILValue result;
     if (resultValues.size() == 1)
-      result = remapValue(resultValues[0]);
+      result = getMappedValue(resultValues[0]);
     else {
       SmallVector<SILValue, 4> results;
       for (auto r : resultValues)
-        results.push_back(remapValue(r));
+        results.push_back(getMappedValue(r));
 
       result = Builder.createTuple(FP.hostFn.getLocation(), results);
     }
