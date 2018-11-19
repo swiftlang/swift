@@ -2403,13 +2403,9 @@ public:
       return;
     }
     // Find or register a differentiation task for this function.
-    auto *calleeOriginalFn = calleeOriginFnRef->getReferencedFunction();
-    auto *newTask =
-        context.lookUpMinimalDifferentiationTask(calleeOriginalFn, indices);
-    if (!newTask)
-      newTask =
-          context.registerDifferentiationTask(calleeOriginalFn, indices,
-                                              /*invoker*/ {ai, synthesis.task});
+    auto *newTask = context.lookUpOrRegisterDifferentiationTask(
+        calleeOriginFnRef->getReferencedFunction(), indices,
+        /*invoker*/ {ai, synthesis.task});
     // Associate the new differentiation task with this `apply` instruction, so
     // that adjoint synthesis can pick it up.
     getDifferentiationTask()->getAssociatedTasks().insert({ai, newTask});
@@ -4500,7 +4496,6 @@ void Differentiation::run() {
   // For every `[reverse_differentiable]` attribute, create a differentiation
   // task. If the attribute has a primal and adjoint, this task will not
   // synthesize anything, but it's still needed as a lookup target.
-  bool errorProcessingDiffAttrs = false;
   for (auto &fnAndAttr : diffAttrs) {
     context.registerDifferentiationTask(
         fnAndAttr.first, fnAndAttr.second->getIndices(),
@@ -4540,7 +4535,7 @@ void Differentiation::run() {
 
   // If there was any error that occurred during `gradient` instruction
   // processing, back out.
-  if (errorProcessingDiffAttrs || errorProcessingGradInsts)
+  if (errorProcessingGradInsts)
     return;
 
   // Fill the body of each empty canonical gradient function.
