@@ -1996,11 +1996,7 @@ ADContext::createPrimalValueStruct(const DifferentiationTask *task) {
     pvStruct->getAttrs().add(
         new (astCtx) UsableFromInlineAttr(/*implicit*/ true));
   }
-  // If the original function has generic parameters, clone them.
-  // FIXME: Generic functions are not supported yet!
-  auto *genEnv = function->getGenericEnvironment();
-  if (genEnv && genEnv->getGenericSignature())
-    llvm_unreachable("Generic functions are not supported yet");
+  pvStruct->setGenericEnvironment(task->getOriginal()->getGenericEnvironment());
   file.addVisibleDecl(pvStruct);
   LLVM_DEBUG({
     auto &s = getADDebugStream();
@@ -2410,20 +2406,10 @@ public:
     auto *calleeOriginalFn = calleeOriginFnRef->getReferencedFunction();
     auto *newTask =
         context.lookUpMinimalDifferentiationTask(calleeOriginalFn, indices);
-    if (!newTask) {
-      // If the callee function does not have a primitive declaration that
-      // covers the required indices and is generic, we cannot differentiate it
-      // yet so we bail out instead of registering a new differentiation task.
-      if (calleeOriginFnRef->getFunctionType()->getGenericSignature()) {
-        context.emitNondifferentiabilityError(ai, synthesis.task,
-            diag::autodiff_function_generic_functions_unsupported);
-        errorOccurred = true;
-        return;
-      }
+    if (!newTask)
       newTask =
           context.registerDifferentiationTask(calleeOriginalFn, indices,
                                               /*invoker*/ {ai, synthesis.task});
-    }
     // Associate the new differentiation task with this `apply` instruction, so
     // that adjoint synthesis can pick it up.
     getDifferentiationTask()->getAssociatedTasks().insert({ai, newTask});
@@ -2562,6 +2548,16 @@ bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
     errorOccurred = true;
     return true;
   }
+  // FIXME: Support generics.
+  auto *original = item.original;
+  if (original->getLoweredFunctionType()->getGenericSignature()) {
+    context.diagnose(original->getLocation().getSourceLoc(),
+                     diag::autodiff_function_generic_functions_unsupported);
+    context.diagnose(original->getLocation().getSourceLoc(),
+                     diag::autodiff_function_not_differentiable);
+    errorOccurred = true;
+    return true;
+  }
   // Compute necessary analyses on the original function.
   auto &passManager = context.getPassManager();
   auto *activityAnalysis =
@@ -2597,7 +2593,7 @@ PrimalGen::createEmptyPrimal(DifferentiationTask *task) {
   auto pvType = primalValueStructDecl->getDeclaredType()->getCanonicalType();
   auto objTy = SILType::getPrimitiveObjectType(pvType);
   auto resultConv = objTy.isLoadable(module) ? ResultConvention::Owned
-                                             : ResultConvention::Unowned;
+                                             : ResultConvention::Indirect;
   auto origResults = original->getLoweredFunctionType()->getResults();
   SmallVector<SILResultInfo, 8> results;
   results.push_back({pvType, resultConv});
@@ -4506,16 +4502,6 @@ void Differentiation::run() {
   // synthesize anything, but it's still needed as a lookup target.
   bool errorProcessingDiffAttrs = false;
   for (auto &fnAndAttr : diffAttrs) {
-    // TODO: Support generics.
-    if (!fnAndAttr.second->isAdjointPrimitive() &&
-        fnAndAttr.first->getGenericEnvironment()) {
-      context.diagnose(fnAndAttr.first->getLocation().getSourceLoc(),
-                       diag::autodiff_function_generic_functions_unsupported);
-      context.diagnose(fnAndAttr.first->getLocation().getSourceLoc(),
-                       diag::autodiff_function_not_differentiable);
-      errorProcessingDiffAttrs = true;
-      continue;
-    }
     context.registerDifferentiationTask(
         fnAndAttr.first, fnAndAttr.second->getIndices(),
         DifferentiationInvoker(fnAndAttr.second, fnAndAttr.first));
