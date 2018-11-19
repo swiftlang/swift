@@ -305,7 +305,7 @@ class BenchmarkDoctor(object):
         """Unregister handler on exit."""
         self.log.removeHandler(self.console_handler)
 
-    benchmark_naming_convention_re = re.compile(r'[A-Z][a-zA-Z0-9\-\.!?]+')
+    benchmark_naming_convention_re = re.compile(r'[A-Z][a-zA-Z0-9\-.!?]+')
     camel_humps_re = re.compile(r'[a-z][A-Z]')
 
     @staticmethod

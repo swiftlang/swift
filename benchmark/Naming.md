@@ -145,4 +145,4 @@ with minor implementation variations.
 </ul>
 
 Technically, the benchmark's name must match the following regular expression:
-`[A-Z][a-zA-Z0-9\-\.!?]+`
+`[A-Z][a-zA-Z0-9\-.!?]+`
