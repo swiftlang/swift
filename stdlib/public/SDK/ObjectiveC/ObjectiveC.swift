@@ -127,6 +127,15 @@ extension Selector : Equatable, Hashable {
   public var hashValue: Int {
     return ptr.hashValue
   }
+
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(ptr)
+  }
 }
 
 extension Selector : CustomStringConvertible {
