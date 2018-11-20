@@ -2050,9 +2050,10 @@ namespace {
         var->setSection(".data");
         break;
       case llvm::Triple::ELF:
+      case llvm::Triple::Wasm:
         var->setSection(".data");
         break;
-      default:
+      case llvm::Triple::UnknownObjectFormat:
         llvm_unreachable("Don't know how to emit private global constants for "
                          "the selected object format.");
       }

@@ -1033,6 +1033,7 @@ void IRGenModule::emitAutolinkInfo() {
 
   } else {
     assert((TargetInfo.OutputObjectFormat == llvm::Triple::ELF ||
+            TargetInfo.OutputObjectFormat == llvm::Triple::Wasm ||
             Triple.isOSCygMing()) &&
            "expected ELF output format or COFF format for Cygwin/MinGW");
 

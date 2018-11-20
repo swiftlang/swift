@@ -899,7 +899,7 @@ std::string IRGenModule::GetObjCSectionName(StringRef Section,
   case llvm::Triple::COFF:
     return ("." + Section.substr(2) + "$B").str();
   case llvm::Triple::Wasm:
-    error(SourceLoc(), "wasm is not a supported object file format");
+    return Section.substr(2).str();
   }
 
   llvm_unreachable("unexpected object file format");
@@ -930,7 +930,6 @@ void IRGenModule::SetCStringLiteralSection(llvm::GlobalVariable *GV,
   case llvm::Triple::COFF:
     return;
   case llvm::Triple::Wasm:
-    error(SourceLoc(), "wasm is not a supported object file format");
     return;
   }
 
@@ -1226,18 +1225,19 @@ void IRGenerator::noteUseOfTypeGlobals(NominalTypeDecl *type,
 static std::string getDynamicReplacementSection(IRGenModule &IGM) {
   std::string sectionName;
   switch (IGM.TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("Don't know how to emit field records table for "
+                     "the selected object format.");
   case llvm::Triple::MachO:
     sectionName = "__TEXT, __swift5_replace, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
+  case llvm::Triple::Wasm:
     sectionName = "swift5_replace";
     break;
   case llvm::Triple::COFF:
     sectionName = ".sw5repl";
     break;
-  default:
-    llvm_unreachable("Don't know how to emit field records table for "
-                     "the selected object format.");
   }
   return sectionName;
 }
@@ -2700,18 +2700,19 @@ llvm::Constant *IRGenModule::emitSwiftProtocols() {
 
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("Don't know how to emit protocols for "
+                     "the selected object format.");
   case llvm::Triple::MachO:
     sectionName = "__TEXT, __swift5_protos, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
+  case llvm::Triple::Wasm:
     sectionName = "swift5_protocols";
     break;
   case llvm::Triple::COFF:
     sectionName = ".sw5prt$B";
     break;
-  default:
-    llvm_unreachable("Don't know how to emit protocols for "
-                     "the selected object format.");
   }
 
   var->setSection(sectionName);
@@ -2772,18 +2773,19 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
 
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::UnknownObjectFormat:
+    llvm_unreachable("Don't know how to emit protocol conformances for "
+                     "the selected object format.");
   case llvm::Triple::MachO:
     sectionName = "__TEXT, __swift5_proto, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
+  case llvm::Triple::Wasm:
     sectionName = "swift5_protocol_conformances";
     break;
   case llvm::Triple::COFF:
     sectionName = ".sw5prtc$B";
     break;
-  default:
-    llvm_unreachable("Don't know how to emit protocol conformances for "
-                     "the selected object format.");
   }
 
   var->setSection(sectionName);
@@ -2803,12 +2805,13 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
     sectionName = "__TEXT, __swift5_types, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
+  case llvm::Triple::Wasm:
     sectionName = "swift5_type_metadata";
     break;
   case llvm::Triple::COFF:
     sectionName = ".sw5tymd$B";
     break;
-  default:
+  case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit type metadata table for "
                      "the selected object format.");
   }
@@ -2870,12 +2873,13 @@ llvm::Constant *IRGenModule::emitFieldDescriptors() {
     sectionName = "__TEXT, __swift5_fieldmd, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
+  case llvm::Triple::Wasm:
     sectionName = "swift5_fieldmd";
     break;
   case llvm::Triple::COFF:
     sectionName = ".swift5_fieldmd";
     break;
-  default:
+  case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("Don't know how to emit field records table for "
                      "the selected object format.");
   }

@@ -1160,7 +1160,7 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
     Section = std::string(MachOASTSegmentName) + "," + MachOASTSectionName;
     break;
   case llvm::Triple::Wasm:
-    llvm_unreachable("web assembly object format is not supported.");
+    Section = WasmASTSectionName;
     break;
   }
   ASTSym->setSection(Section);
