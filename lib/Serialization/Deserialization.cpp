@@ -2562,6 +2562,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
             : AutoDiffParameter::getIndexParameter(loc, paramValue >> 1);
           parameters.push_back(parameter);
         }
+        // TODO: Deserialize CheckedParameterIndices.
         // TODO: Deserialize trailing where clause.
         auto diffAttr =
           DifferentiableAttr::create(ctx, loc, SourceRange(), autodiffMode,
