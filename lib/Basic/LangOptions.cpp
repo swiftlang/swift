@@ -192,6 +192,8 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     addPlatformConditionValue(PlatformConditionKind::OS, "PS4");
   else if (Target.isOSHaiku())
     addPlatformConditionValue(PlatformConditionKind::OS, "Haiku");
+  else if (Target.isOSBinFormatWasm())
+    addPlatformConditionValue(PlatformConditionKind::OS, "WebAssembly");
   else
     UnsupportedOS = true;
 
@@ -220,6 +222,12 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     break;
   case llvm::Triple::ArchType::systemz:
     addPlatformConditionValue(PlatformConditionKind::Arch, "s390x");
+    break;
+  case llvm::Triple::ArchType::wasm32:
+    addPlatformConditionValue(PlatformConditionKind::Arch, "wasm32");
+    break;
+  case llvm::Triple::ArchType::wasm64:
+    addPlatformConditionValue(PlatformConditionKind::Arch, "wasm64");
     break;
   default:
     UnsupportedArch = true;
@@ -251,6 +259,10 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     break;
   case llvm::Triple::ArchType::systemz:
     addPlatformConditionValue(PlatformConditionKind::Endianness, "big");
+    break;
+  case llvm::Triple::ArchType::wasm32:
+  case llvm::Triple::ArchType::wasm64:
+    addPlatformConditionValue(PlatformConditionKind::Endianness, "little");
     break;
   default:
     llvm_unreachable("undefined architecture endianness");

@@ -316,6 +316,8 @@ namespace swift {
                  Target.isPS4() || Target.isOSHaiku() ||
                  Target.getTriple().empty()) {
         major = minor = revision = 0;
+      } else if (Target.isOSBinFormatWasm()) {
+        major = minor = revision = 0;
       } else {
         llvm_unreachable("Unsupported target OS");
       }

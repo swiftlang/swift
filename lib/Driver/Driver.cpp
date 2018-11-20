@@ -286,6 +286,11 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
   case llvm::Triple::Haiku:
     return llvm::make_unique<toolchains::GenericUnix>(*this, target);
   default:
+    // NOTE: WebAssembly doesn't yet have a defined OS convention in triples.
+    if (target.isOSBinFormatWasm()) {
+      return llvm::make_unique<toolchains::GenericUnix>(*this, target);
+    }
+  
     Diags.diagnose(SourceLoc(), diag::error_unknown_target,
                    ArgList.getLastArg(options::OPT_target)->getValue());
     break;
