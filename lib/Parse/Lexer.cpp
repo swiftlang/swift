@@ -937,9 +937,11 @@ void Lexer::lexDollarIdent() {
   }
 
   if (CurPtr == tokStart + 1) {
-    // It is an error to see a standalone '$'. Offer to replace '$' with '`$`'.
-    diagnose(tokStart, diag::standalone_dollar_identifier)
-      .fixItReplaceChars(getSourceLoc(tokStart), getSourceLoc(CurPtr), "`$`");
+    if (!InSILBody) {
+      // It is an error to see a standalone '$'. Offer to replace '$' with '`$`'.
+      diagnose(tokStart, diag::standalone_dollar_identifier)
+        .fixItReplaceChars(getSourceLoc(tokStart), getSourceLoc(CurPtr), "`$`");
+    }
     return formToken(tok::identifier, tokStart);
   }
 
