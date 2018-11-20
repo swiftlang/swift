@@ -4680,19 +4680,6 @@ bool TFPartition::partitionFunction(
   LLVM_DEBUG(llvm::dbgs() << "  " << hostFn->getName()
                           << " contains tensor op(s).\n");
 
-  // Check to see if we cannot transform the function but should.  In this
-  // case we emit a compiler error.  This is a limitation of the compiler that
-  // will need to be resolved in the future (possibly through a model change),
-  // it's not clear if we should allow partitioning to work on unspecialized
-  // generics.
-  if (hostFn->getLoweredFunctionType()->isPolymorphic()) {
-    auto &ctx = hostFn->getASTContext();
-    diagnose(ctx, hostFn->getLocation().getSourceLoc(), diag::tf_internal_error,
-             "TensorFlow graph program extraction does not work on generic "
-             "functions yet");
-    return true;
-  }
-
   // Because we're in active development, it is common to do something wrong
   // in the TensorFlow module.  Detect and reject things here.
   if (hostFn->getModule().getSwiftModule() == tfModule) {

@@ -150,7 +150,7 @@ namespace {
   private:
     void logCurrentState(const char *name, bool isDetailed);
     void inlineCalls();
-    bool simplifyTensorOperands();
+    void simplifyTensorOperands();
 
     void promoteToSSA(ArrayRef<AllocStackInst *> allocs);
     void prepareStackAllocForPromotion(AllocStackInst *alloc);
@@ -344,18 +344,22 @@ static SILValue lookThroughSingleElementStructInsts(SILValue value) {
   return value;
 }
 
-/// Scan the argument list of the graph_op.  If any argument is passed indirectly
-/// (i.e., an address of a stack location is passed instead of the value itself)
-/// then rewrite the graph_op to use a loaded version of that value.
+/// Scan the argument list of the graph_op.  If any argument is passed
+/// indirectly (i.e., an address of a stack location is passed instead of the
+/// value itself) then rewrite the graph_op to use a loaded version of that
+/// value.
 ///
-/// Similarly, if an argument is an indirect output, then rewrite the graph_op to
-/// return the value directly, and emit an instruction that stores the direct
+/// Similarly, if an argument is an indirect output, then rewrite the graph_op
+/// to return the value directly, and emit an instruction that stores the direct
 /// value to the indirect output address.
 ///
 /// Also, if a primitive integer or floating point value is passed as a struct
 /// value, extract out the underlying integer or float value.
 ///
-/// Returns nullptr on error.
+/// Returns nullptr when we fail to simplify `origInst` (e.g. when the result of
+/// that graph_op is not loadable, such that this op won't be included in the
+/// extracted graph). In that case, we can still run this graph_op via eager op
+/// dispatch.
 ///
 static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
                                             TFDeabstraction &TFDA) {
@@ -459,14 +463,8 @@ static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
       auto argumentType = argumentValue->getType();
       assert(argumentType.isAddress());
       if (!argumentType.isLoadable(origInst->getModule())) {
-        auto astType = argumentType.getASTType();
-        if (astType->hasArchetype()) {
-          diagnose(ctx, getUserSourceLocation(origInst).getSourceLoc(),
-                   diag::tf_op_result_generic, astType);
-        } else {
-          diagnose(ctx, getUserSourceLocation(origInst).getSourceLoc(),
-                   diag::tf_op_result_not_value_or_aggregate, astType);
-        }
+        // In graph mode, we will run this graph_op out-of-graph, via eager op
+        // dispatch.
         return nullptr;
       }
       assert(origInst->getNumResults() == 0 &&
@@ -633,12 +631,9 @@ static bool explodeAggregateInst(SILInstruction *inst,
 /// Since we're scanning the function, keep track of all of the tensor
 /// operations to avoid additional linear scans over the function.
 ///
-/// Returns true on error.
-///
-bool TFDeabstraction::simplifyTensorOperands() {
+void TFDeabstraction::simplifyTensorOperands() {
   llvm::PrettyStackTraceFormat X("TFDeabstraction::simplifyTensorOperands");
   bool containsGraphOp = false;
-  bool hasError = false;
 
   bool alreadyPrinted = false;
   auto logIfFirstChange = [&]() {
@@ -660,7 +655,7 @@ bool TFDeabstraction::simplifyTensorOperands() {
         auto newInst = simplifyOperands(graphOpInst, *this);
 
         if (!newInst) {
-          hasError = true;
+          graphOpInst->setNoClustering(true);
           continue;
         }
 
@@ -726,8 +721,6 @@ bool TFDeabstraction::simplifyTensorOperands() {
   // working on the host-side tensor operation.
   if (!containsGraphOp)
     tensorOps.clear();
-
-  return hasError;
 }
 
 namespace {
@@ -2152,7 +2145,8 @@ unwrapAggregateInstructions(SILValue value,
 
 /// Recursively unpacks aggregates of TensorFlow values to `inputList`, using
 /// the already-lowered values when possible to avoid code bloat.  Returns true
-/// to represent error if it detects a non-TensorFlow leaf field.
+/// if it encounters a leaf field whose type is not confirmed to be a TensorFlow
+/// value (e.g. if it's some generic type T).
 static bool unpackTensorAggregates(
     const ASTContext &ctx, SILLocation loc, SILBuilder &B, SILValue rootAggregate,
     llvm::DenseMap<std::pair<SILValue, unsigned>, SILValue> &loweredTupleElts,
@@ -2284,6 +2278,9 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
   };
 
   GraphOperationBuilder opBuilder(opInfo.getOperationName());
+  // When any deabstraction step fails below (e.g. cannot const-evaluate a tfop
+  // attribute), `noClustering` is set to true so that we run the graph_op
+  // out-of-graph via eager op dispatch.
   bool noClustering = false;
 
   // Find the device attribute specified for the instruction if present.
@@ -2322,7 +2319,6 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
     auto argumentValue = argument.getSingleArgument();
     auto argumentTy = argumentValue->getType();
     auto argumentNameAndLowering = argument.getArgumentNameAndLowering();
-    auto argumentLoc = getUserSourceLocation(argumentValue);
 
     // Collect and validate input arguments.
     if (std::get<1>(argumentNameAndLowering) ==
@@ -2345,24 +2341,29 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
             element = copyAddr->getSrc();
 
           if (!element) {
-            diagnoseInvalid(argumentLoc,
-                            "argument of type '" + elementType->getString() +
-                            "' is not a TensorFlow value or an aggregate of "
-                            "TensorFlow values");
-            return;
+            // It's not clear if we'll ever hit this condition. Perhaps
+            // asserting it won't happen would be more rigorous, but here we
+            // chose the "safer" route of having compiler still accept programs
+            // that trigger this condition.
+            noClustering = true;
+            break;
           }
 
           if (unpackTensorAggregates(context, origInst->getLoc(), B, element,
                                      loweredTupleElts, loweredStructFields,
                                      unwrapCache, inputList)) {
-            diagnoseInvalid(argumentLoc,
-                            "argument of type '" + elementType->getString() +
-                            "' is not a TensorFlow value or an aggregate of "
-                            "TensorFlow values");
-            return;
+            // If some element of the array fails to unpack, we expect all
+            // elements to fail to unpack (as they share the same array element
+            // type), so we bail out of the loop over array elements, and call
+            // `opBuilder.addArgument(argumentValue)` below.
+            noClustering = true;
+            break;
           }
         }
-        opBuilder.addListArgument(inputList);
+        if (noClustering)
+          opBuilder.addArgument(argumentValue);
+        else
+          opBuilder.addListArgument(inputList);
         continue;
       }
 
@@ -2370,19 +2371,14 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
       if (unpackTensorAggregates(context, origInst->getLoc(), B, argumentValue,
                                  loweredTupleElts, loweredStructFields,
                                  unwrapCache, inputList)) {
-        // FIXME: Since TFDeabstraction happens after mandatory inlining,
-        // numeric arguments will appear as having a builtin type such as
-        // `Builtin.FPIEEE32`. This is undesirable for user-facing diagnostics.
-        auto astTypeString = argumentTy.getASTType().getString();
-        diagnoseInvalid(argumentLoc,
-                        "argument of type '" + astTypeString +
-                        "' is not a TensorFlow value or an aggregate of "
-                        "TensorFlow values");
-        return;
+        noClustering = true;
+        opBuilder.addArgument(argumentValue);
+        continue;
       }
       if (inputList.size() == 1) {
         opBuilder.addArgument(inputList[0]);
       } else {
+        assert(inputList.size() > 1);
         opBuilder.addListArgument(inputList);
       }
       continue;
@@ -2539,8 +2535,7 @@ void TFDeabstraction::doIt() {
 
   // Scan for any Tensor operations, removing indirect operands and structs that
   // interfere with SSA construction.
-  if (simplifyTensorOperands())
-    return;
+  simplifyTensorOperands();
 
   // If we didn't find any ops, early exit processing of this function to save
   // compile time.
