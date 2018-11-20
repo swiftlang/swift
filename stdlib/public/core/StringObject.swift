@@ -137,7 +137,7 @@ internal struct _StringObject {
   internal var _variant: Variant
 
   @usableFromInline
-  internal var _discriminator: Builtin.Int7
+  internal var _discriminator: Discriminator
 
   @usableFromInline
   internal var _flags: Flags
@@ -149,11 +149,9 @@ internal struct _StringObject {
     discriminator: Discriminator,
     flags: Flags
   ) {
-    _internalInvariant(variant.isImmortal == discriminator.isImmortal)
     self._count = count
     self._variant = variant
-    self._discriminator =
-      Builtin.truncOrBitCast_Int8_Int7(discriminator._value._value)
+    self._discriminator = discriminator
     self._flags = flags
   }
 
@@ -197,20 +195,11 @@ internal struct _StringObject {
 }
 
 extension _StringObject {
-#if arch(i386) || arch(arm)
-  @inlinable @inline(__always)
-  internal func discriminator(isImmortal: Bool) -> Discriminator {
-    let lowBits = UInt8(Builtin.zextOrBitCast_Int7_Int8(_discriminator))
-    guard isImmortal else { return Discriminator(lowBits) }
-    return Discriminator(lowBits | 0x80)
-  }
-#endif
-
   @inlinable
   internal var discriminator: Discriminator {
     @inline(__always) get {
 #if arch(i386) || arch(arm)
-      return self.discriminator(isImmortal: _variant.isImmortal)
+      return _discriminator
 #else
       let d = objectRawBits &>> Nibbles.discriminatorShift
       return Discriminator(UInt8(truncatingIfNeeded: d))
@@ -233,7 +222,7 @@ extension _StringObject {
       let count = UInt64(truncatingIfNeeded: UInt(bitPattern: _count))
       let payload = UInt64(truncatingIfNeeded: undiscriminatedObjectRawBits)
       let flags = UInt64(truncatingIfNeeded: _flags._value)
-      let discr = UInt64(truncatingIfNeeded: discriminator._value)
+      let discr = UInt64(truncatingIfNeeded: _discriminator._value)
       if isSmall {
         // Rearrange small strings in a different way, compacting bytes into a
         // contiguous sequence. See comment on small string layout below.
@@ -636,9 +625,7 @@ extension _StringObject {
   internal var isSmall: Bool {
     @inline(__always) get {
 #if arch(i386) || arch(arm)
-      // Note: This assumes that the `isSmall` predicate doesn't look at the
-      // immortal bit. We may or may not actually be immortal.
-      return discriminator(isImmortal: true).isSmall
+      return _discriminator.isSmall
 #else
       return (objectRawBits & 0x2000_0000_0000_0000) != 0
 #endif
@@ -658,9 +645,7 @@ extension _StringObject {
   internal var providesFastUTF8: Bool {
     @inline(__always) get {
 #if arch(i386) || arch(arm)
-      // Note: This assumes that the `providesFastUTF8` predicate doesn't look
-      // at the immortal bit. We may or may not actually be immortal.
-      return discriminator(isImmortal: false).providesFastUTF8
+      return _discriminator.providesFastUTF8
 #else
       return (objectRawBits & 0x1000_0000_0000_0000) == 0
 #endif
@@ -677,7 +662,7 @@ extension _StringObject {
   internal var hasNativeStorage: Bool {
     @inline(__always) get {
 #if arch(i386) || arch(arm)
-      return discriminator.hasNativeStorage
+      return _discriminator.hasNativeStorage
 #else
       return (objectRawBits & 0xF800_0000_0000_0000) == 0
 #endif
@@ -688,7 +673,7 @@ extension _StringObject {
   internal var hasSharedStorage: Bool {
     @inline(__always) get {
 #if arch(i386) || arch(arm)
-      return discriminator.hasSharedStorage
+      return _discriminator.hasSharedStorage
 #else
       return (objectRawBits & 0xF800_0000_0000_0000)
         == Nibbles.largeSharedMortal()
@@ -705,9 +690,7 @@ extension _StringObject {
     @inline(__always) get {
       _internalInvariant(isLarge && providesFastUTF8)
 #if arch(i386) || arch(arm)
-      // Note: This assumes that the `largeFastIsNative` predicate doesn't look
-      // at the immortal bit. We may or may not actually be immortal.
-      return discriminator(isImmortal: false).largeFastIsNative
+      return _discriminator.largeFastIsNative
 #else
       return (objectRawBits & 0x0800_0000_0000_0000) == 0
 #endif
@@ -726,9 +709,7 @@ extension _StringObject {
     @inline(__always) get {
       _internalInvariant(isLarge)
 #if arch(i386) || arch(arm)
-      // Note: This assumes that the `largeIsCocoa` predicate doesn't look at
-      // the immortal bit. We may or may not actually be immortal.
-      return discriminator(isImmortal: false).largeIsCocoa
+      return _discriminator.largeIsCocoa
 #else
       return (objectRawBits & 0x4000_0000_0000_0000) != 0
 #endif
@@ -770,12 +751,7 @@ extension _StringObject {
     @inline(__always)
     get {
       _internalInvariant(isSmall)
-#if arch(i386) || arch(arm)
-      // Note: This assumes that `isSmall` implies that we're immortal.
-      return discriminator(isImmortal: true).smallCount
-#else
       return discriminator.smallCount
-#endif
     }
   }
 
@@ -785,8 +761,7 @@ extension _StringObject {
     get {
       _internalInvariant(isSmall)
 #if arch(i386) || arch(arm)
-      // Note: This assumes that `isSmall` implies that we're immortal.
-      return discriminator(isImmortal: true).smallIsASCII
+      return _discriminator.smallIsASCII
 #else
       return objectRawBits & 0x4000_0000_0000_0000 != 0
 #endif
@@ -1320,7 +1295,7 @@ extension _StringObject {
       <\(word0) \(word1)> \
       count: \(String(_count, radix: 16)), \
       variant: \(_variant), \
-      discriminator: \(discriminator), \
+      discriminator: \(_discriminator), \
       flags: \(_flags))
       """)
 #else
