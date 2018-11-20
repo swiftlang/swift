@@ -2103,48 +2103,38 @@ void AttributeChecker::visitNonOverrideAttr(NonOverrideAttr *attr) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
-  // Forward mode is unsupported.
-  if (attr->getMode() == AutoDiffMode::Forward) {
-    TC.diagnose(attr->getModeLoc(),
-                diag::differentiable_attr_forward_mode_unsupported);
-    return;
-  }
+static FuncDecl *resolveAutoDiffAssociatedFunction(
+    TypeChecker &TC, DifferentiableAttr::DeclNameWithLoc specifier,
+    FuncDecl *original, bool isPrimal, Type expectedTy,
+    std::function<bool(FuncDecl *)> isValid) {
+  auto nameLoc = specifier.Loc.getBaseNameLoc();
+  auto overloadDiagnostic = [&]() {
+    if (isPrimal) {
+      TC.diagnose(nameLoc, diag::differentiable_attr_primal_overload_not_found,
+                  specifier.Name, expectedTy);
+    } else {
+      TC.diagnose(nameLoc, diag::differentiable_attr_overload_not_found,
+                  specifier.Name, expectedTy);
+    }
+  };
+  auto ambiguousDiagnostic = [&]() {
+    TC.diagnose(nameLoc,
+                diag::differentiable_attr_ambiguous_function_identifier,
+                specifier.Name);
+  };
+  auto notFunctionDiagnostic = [&]() {
+    TC.diagnose(nameLoc, diag::differentiable_attr_specified_not_function,
+                specifier.Name);
+  };
+  std::function<void()> invalidTypeContextDiagnostic = [&]() {
+    TC.diagnose(nameLoc,
+                diag::differentiable_attr_function_not_same_type_context,
+                specifier.Name);
+  };
 
-  // '@differentiable' attribute is OnFunc only, rejected by the early checker.
-  auto *original = cast<FuncDecl>(D);
-  auto isInstanceMethod = original->isInstanceMember();
-  auto &ctx = original->getASTContext();
-  auto *originalFnTy = original->getInterfaceType()->castTo<AnyFunctionType>();
-
-  // If the original function has no parameters or returns the empty tuple
-  // type, there's nothing to differentiate from or with-respect-to.
-  auto &originalParams = *original->getParameters();
-  if (!isInstanceMethod && originalParams.size() == 0) {
-    TC.diagnose(attr->getLocation(), diag::differentiable_attr_no_parameters,
-                original->getName())
-      .highlight(original->getSourceRange());
-    attr->setInvalid();
-    return;
-  }
-  auto originalResultTy = original->getResultInterfaceType();
-  if (originalResultTy->isEqual(ctx.TheEmptyTupleType)) {
-    TC.diagnose(attr->getLocation(), diag::differentiable_attr_void_result,
-                original->getName())
-      .highlight(original->getSourceRange());
-    attr->setInvalid();
-    return;
-  }
-
-  auto originalParamTypes = map<SmallVector<TupleTypeElt, 8>>(
-      originalParams.getArray(),
-      [&](ParamDecl *decl) { return decl->getInterfaceType(); });
-  auto originalParamsTy = TupleType::get(originalParamTypes, ctx);
-
-  // If the original function and the primal/adjoint have different parents, or
-  // if they both have no type context and are in different modules, then it's
-  // an error.
-  // Returns true on error.
+  // If the original function and the associated functions different parents,
+  // or if they both have no type context and are in different modules, then
+  // it's an error. Returns true on error.
   std::function<bool(FuncDecl *)> hasValidTypeContext = [&](FuncDecl *func) {
     // Check if both are top-level.
     if (!original->getInnermostTypeContext() &&
@@ -2165,17 +2155,15 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   };
 
   // If the original function is exported (i.e. it is public or
-  // @usableFromInline), then the primal/adjoint must also be exported.
+  // @usableFromInline), then the associated functions must also be exported.
   // Returns true on error.
-  using FuncSpecifier = DifferentiableAttr::DeclNameWithLoc;
-  auto checkAccessControl = [&](FuncDecl *func, FuncSpecifier funcSpec,
-                                bool isPrimal) {
-    if (!isABIPublic(original)) return false;
-    if (isABIPublic(func)) return false;
-    TC.diagnose(funcSpec.Loc.getBaseNameLoc(),
-                diag::differentiable_attr_invalid_access,
-                funcSpec.Name, original->getFullName(), isPrimal);
-    attr->setInvalid();
+  auto checkAccessControl = [&](FuncDecl *func) {
+    if (!isABIPublic(original))
+      return false;
+    if (isABIPublic(func))
+      return false;
+    TC.diagnose(nameLoc, diag::differentiable_attr_invalid_access,
+                specifier.Name, original->getFullName());
     return true;
   };
 
@@ -2186,22 +2174,67 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Set lookup options.
   auto lookupOptions = defaultMemberLookupOptions
       | NameLookupFlags::IgnoreAccessControl;
-  
+
+  auto candidate = TC.lookupFuncDecl(
+      specifier.Name, nameLoc, /*baseType*/ Type(), originalTypeCtx, isValid,
+      overloadDiagnostic, ambiguousDiagnostic, notFunctionDiagnostic,
+      lookupOptions, hasValidTypeContext, invalidTypeContextDiagnostic);
+
+  if (checkAccessControl(candidate))
+    return nullptr;
+
+  return candidate;
+}
+
+void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
+  // Forward mode is unsupported.
+  if (attr->getMode() == AutoDiffMode::Forward) {
+    TC.diagnose(attr->getModeLoc(),
+                diag::differentiable_attr_forward_mode_unsupported);
+    return;
+  }
+
+  // '@differentiable' attribute is OnFunc only, rejected by the early checker.
+  auto *original = cast<FuncDecl>(D);
+  auto isInstanceMethod = original->isInstanceMember();
+  auto &ctx = original->getASTContext();
+  AnyFunctionType *originalFnTy =
+      original->getInterfaceType()->castTo<AnyFunctionType>();
+
+  // If the original function has no parameters or returns the empty tuple
+  // type, there's nothing to differentiate from or with-respect-to.
+  auto &originalParams = *original->getParameters();
+  if (!isInstanceMethod && originalParams.size() == 0) {
+    TC.diagnose(attr->getLocation(), diag::differentiable_attr_no_parameters,
+                original->getName())
+        .highlight(original->getSourceRange());
+    attr->setInvalid();
+    return;
+  }
+  auto originalResultTy = original->getResultInterfaceType();
+  if (originalResultTy->isEqual(ctx.TheEmptyTupleType)) {
+    TC.diagnose(attr->getLocation(), diag::differentiable_attr_void_result,
+                original->getName())
+        .highlight(original->getSourceRange());
+    attr->setInvalid();
+    return;
+  }
+
+  auto originalParamTypes = map<SmallVector<TupleTypeElt, 8>>(
+      originalParams.getArray(),
+      [&](ParamDecl *decl) { return decl->getInterfaceType(); });
+  auto originalParamsTy = TupleType::get(originalParamTypes, ctx);
+
   // Start type-checking the arguments of the @differentiable attribute. This
-  // covers 'wrt:', 'primal:' and 'adjoint:', all of which are optional.
+  // covers 'wrt:', 'primal:', 'adjoint:', and 'vjp:', all of which are
+  // optional.
 
   // If the declaration has no definition (e.g. it is a protocol requirement),
-  // then you are not allowed to specify a primal or adjoint.
+  // then you are not allowed to specify any associated functions.
   if (!original->hasBody()) {
-    if (attr->getPrimal()) {
-      TC.diagnose(attr->getPrimal()->Loc,
-                  diag::differentiable_attr_primal_no_definition);
-      attr->setInvalid();
-      return;
-    }
-    if (attr->getAdjoint()) {
-      TC.diagnose(attr->getAdjoint()->Loc,
-                  diag::differentiable_attr_adjoint_no_definition);
+    if (attr->getPrimal() || attr->getAdjoint()) {
+      TC.diagnose(attr->getLocation(),
+                  diag::differentiable_attr_associated_function_protocol);
       attr->setInvalid();
       return;
     }
@@ -2218,30 +2251,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Resolve the primal declaration, if it exists.
   FuncDecl *primal = nullptr;
   if (attr->getPrimal()) {
-    auto primalSpecifier = attr->getPrimal().getValue();
-    auto primalNameLoc = primalSpecifier.Loc.getBaseNameLoc();
-
-    auto primalOverloadDiagnostic = [&]() {
-      TC.diagnose(primalNameLoc,
-                  diag::differentiable_attr_primal_overload_not_found,
-                  primalSpecifier.Name, originalParamsTy);
-    };
-    auto primalAmbiguousDiagnostic = [&]() {
-      TC.diagnose(primalNameLoc,
-                  diag::differentiable_attr_ambiguous_function_identifier,
-                  primalSpecifier.Name);
-    };
-    auto primalNotFunctionDiagnostic = [&]() {
-      TC.diagnose(primalNameLoc,
-                  diag::differentiable_attr_specified_not_function,
-                  primalSpecifier.Name, /*isPrimal*/ true);
-    };
-    std::function<void()> primalInvalidTypeContextDiagnostic = [&]() {
-      TC.diagnose(primalNameLoc,
-                  diag::differentiable_attr_function_not_same_type_context,
-                  primalSpecifier.Name);
-    };
-
     auto isValidPrimal = [&](FuncDecl *primalCandidate) {
       // Returns true if the primal candidate
       // - has the same parameter types as the original function,
@@ -2274,18 +2283,14 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       return true;
     };
 
-    primal = TC.lookupFuncDecl(
-      primalSpecifier.Name, primalNameLoc, /*baseType*/ Type(),
-      originalTypeCtx, isValidPrimal, primalOverloadDiagnostic,
-      primalAmbiguousDiagnostic, primalNotFunctionDiagnostic, lookupOptions,
-      hasValidTypeContext, primalInvalidTypeContextDiagnostic);
+    primal = resolveAutoDiffAssociatedFunction(TC, attr->getPrimal().getValue(),
+                                               original, /*isPrimal*/ true,
+                                               originalParamsTy, isValidPrimal);
 
     if (!primal) {
       attr->setInvalid();
       return;
     }
-    // Check primal access control.
-    if (checkAccessControl(primal, primalSpecifier, /*isPrimal*/ true)) return;
     // Memorize the primal reference in the attribute.
     attr->setPrimalFunction(primal);
   }
@@ -2359,6 +2364,19 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return;
   }
 
+  // Predicate checking if a type conforms to Differentiable.
+  auto *differentiableProtocol =
+      ctx.getProtocol(KnownProtocolKind::Differentiable);
+  assert(differentiableProtocol && "could not find differentiable protocol");
+  auto conformsToDifferentiable = [&](Type type) -> bool {
+    auto *nomTy = type->getAnyNominal();
+    if (!nomTy)
+      return false;
+    SmallVector<ProtocolConformance *, 2> conformances;
+    return nomTy->lookupConformance(D->getDeclContext()->getParentModule(),
+                                    differentiableProtocol, conformances);
+  };
+
   // Check that the user has only selected wrt params with allowed types.
   SmallVector<Type, 4> wrtParamTypes;
   checkedWrtParamIndices->getSubsetParameterTypes(originalFnTy, wrtParamTypes);
@@ -2379,57 +2397,58 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       attr->setInvalid();
       return;
     }
+
+    // We also require that all the wrt params conform to Differentiable. But
+    // only for attrs that have JVP or VJP, because there are a lot of attrs
+    // using the legacy primal/adjoint whose wrt params do not conform.
+    bool hasJVPorVJP = attr->getJVP() || attr->getVJP();
+    if (hasJVPorVJP && !conformsToDifferentiable(wrtParamType)) {
+      TC.diagnose(loc, diag::differentiable_attr_wrt_not_differentiable,
+                  wrtParamType);
+      attr->setInvalid();
+      return;
+    }
+  }
+
+  // Check that all the result types are differentiable. But only for attrs that
+  // have JVP or VJP, because there are a lot of attrs using the legacy
+  // primal/adjoint whose results do not conform.
+  if (attr->getJVP() || attr->getVJP()) {
+    auto *unwrapped = originalFnTy;
+    if (checkedWrtParamIndices->isMethod())
+      unwrapped = unwrapped->getResult()->castTo<AnyFunctionType>();
+    Type originalResult = unwrapped->getResult();
+    if (auto *resultTuple = originalResult->getAs<TupleType>()) {
+      for (auto &resultTupleElt : resultTuple->getElements()) {
+        if (!conformsToDifferentiable(resultTupleElt.getType())) {
+          TC.diagnose(attr->getLocation(),
+                      diag::differentiable_attr_result_not_differentiable,
+                      resultTupleElt.getType());
+          attr->setInvalid();
+          return;
+        }
+      }
+    } else {
+      if (!conformsToDifferentiable(originalResult)) {
+        TC.diagnose(attr->getLocation(),
+                    diag::differentiable_attr_result_not_differentiable,
+                    originalResult);
+        attr->setInvalid();
+        return;
+      }
+    }
   }
 
   // Memorize the checked parameter indices in the attribute.
   attr->setCheckedParameterIndices(checkedWrtParamIndices);
 
-  // Resolve the adjoint declaration.
-  FuncDecl *adjoint = nullptr;
-  auto adjointSpecifier = attr->getAdjoint();
-  // If the adjoint is not specified, back out.
-  if (!adjointSpecifier)
-    return;
-
-  TupleType *primalResultTy =
-      primal ? primal->getResultInterfaceType()->getAs<TupleType>() : nullptr;
-  AnyFunctionType *expectedAdjointFnTy =
-      originalFnTy->getAutoDiffAdjointFunctionType(*checkedWrtParamIndices,
-                                                   primalResultTy);
-
-  auto adjointNameLoc = adjointSpecifier->Loc.getBaseNameLoc();
-  auto adjointOverloadDiagnostic = [&]() {
-    TC.diagnose(adjointNameLoc,
-                diag::differentiable_attr_adjoint_overload_not_found,
-                adjointSpecifier->Name, expectedAdjointFnTy);
-    attr->setInvalid();
-  };
-  auto adjointAmbiguousDiagnostic = [&]() {
-    TC.diagnose(adjointNameLoc,
-                diag::differentiable_attr_ambiguous_function_identifier,
-                adjointSpecifier->Name);
-    attr->setInvalid();
-  };
-  auto adjointNotFunctionDiagnostic = [&]() {
-    TC.diagnose(adjointNameLoc,
-                diag::differentiable_attr_specified_not_function,
-                adjointSpecifier->Name, /*isPrimal*/ false);
-    attr->setInvalid();
-  };
-  std::function<void()> adjointInvalidTypeContextDiagnostic = [&]() {
-    TC.diagnose(adjointNameLoc,
-                diag::differentiable_attr_function_not_same_type_context,
-                adjointSpecifier->Name);
-    attr->setInvalid();
-  };
-
   // Checks that the `candidate` function type equals the `required` function
   // type, disregarding parameter labels.
   //
   // Precondition: `required` has no parameter labels.
-  std::function<bool(CanAnyFunctionType, CanType)> checkAdjointSignature;
-  checkAdjointSignature = [&](CanAnyFunctionType required,
-                              CanType candidate) -> bool {
+  std::function<bool(CanAnyFunctionType, CanType)> checkFunctionSignature;
+  checkFunctionSignature = [&](CanAnyFunctionType required,
+                               CanType candidate) -> bool {
 
     // Check that candidate is actually a function.
     CanAnyFunctionType candidateFnTy = dyn_cast<AnyFunctionType>(candidate);
@@ -2456,31 +2475,87 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       return required.getResult() == candidateFnTy.getResult();
 
     // Required result type is a function. Recurse.
-    return checkAdjointSignature(requiredResultFnTy,
-                                 candidateFnTy.getResult());
+    return checkFunctionSignature(requiredResultFnTy,
+                                  candidateFnTy.getResult());
   };
 
-  auto isValidAdjoint = [&](FuncDecl *adjointCandidate) {
-    TC.validateDeclForNameLookup(adjointCandidate);
-    return checkAdjointSignature(
-        cast<AnyFunctionType>(expectedAdjointFnTy->getCanonicalType()),
-        adjointCandidate->getInterfaceType()->getCanonicalType());
-  };
+  // Resolve the adjoint declaration, if it exists.
+  if (attr->getAdjoint()) {
+    // Compute the expected adjoint function type.
+    TupleType *primalResultTy =
+        primal ? primal->getResultInterfaceType()->getAs<TupleType>() : nullptr;
+    AnyFunctionType *expectedAdjointFnTy =
+        originalFnTy->getAutoDiffAdjointFunctionType(*checkedWrtParamIndices,
+                                                     primalResultTy);
 
-  adjoint =
-    TC.lookupFuncDecl(adjointSpecifier->Name, adjointNameLoc,
-                      /*baseType*/ Type(), originalTypeCtx, isValidAdjoint,
-                      adjointOverloadDiagnostic, adjointAmbiguousDiagnostic,
-                      adjointNotFunctionDiagnostic, lookupOptions,
-                      hasValidTypeContext,
-                      adjointInvalidTypeContextDiagnostic);
+    auto isValidAdjoint = [&](FuncDecl *adjointCandidate) {
+      TC.validateDeclForNameLookup(adjointCandidate);
+      return checkFunctionSignature(
+          cast<AnyFunctionType>(expectedAdjointFnTy->getCanonicalType()),
+          adjointCandidate->getInterfaceType()->getCanonicalType());
+    };
 
-  // Check adjoint access control.
-  if (checkAccessControl(adjoint, *adjointSpecifier, /*isPrimal*/ false))
-    return;
-  // Done checking @differentiable attribute.
-  // Memorize the adjoint reference in the attribute.
-  attr->setAdjointFunction(adjoint);
+    FuncDecl *adjoint = resolveAutoDiffAssociatedFunction(
+        TC, attr->getAdjoint().getValue(), original, /*isPrimal*/ false,
+        expectedAdjointFnTy, isValidAdjoint);
+
+    if (!adjoint) {
+      attr->setInvalid();
+      return;
+    }
+    // Memorize the adjoint reference in the attribute.
+    attr->setAdjointFunction(adjoint);
+  }
+
+  // Resolve the JVP declaration, if it exists.
+  if (attr->getJVP()) {
+    AnyFunctionType *expectedJVPFnTy =
+        originalFnTy->getAutoDiffAssociatedFunctionType(
+            *checkedWrtParamIndices, 1, AutoDiffAssociatedFunctionKind::JVP);
+
+    auto isValidJVP = [&](FuncDecl *jvpCandidate) {
+      TC.validateDeclForNameLookup(jvpCandidate);
+      return checkFunctionSignature(
+          cast<AnyFunctionType>(expectedJVPFnTy->getCanonicalType()),
+          jvpCandidate->getInterfaceType()->getCanonicalType());
+    };
+
+    FuncDecl *jvp = resolveAutoDiffAssociatedFunction(
+        TC, attr->getJVP().getValue(), original, /*isPrimal*/ false,
+        expectedJVPFnTy, isValidJVP);
+
+    if (!jvp) {
+      attr->setInvalid();
+      return;
+    }
+    // Memorize the jvp reference in the attribute.
+    attr->setJVPFunction(jvp);
+  }
+
+  // Resolve the VJP declaration, if it exists.
+  if (attr->getVJP()) {
+    AnyFunctionType *expectedVJPFnTy =
+        originalFnTy->getAutoDiffAssociatedFunctionType(
+            *checkedWrtParamIndices, 1, AutoDiffAssociatedFunctionKind::VJP);
+
+    auto isValidVJP = [&](FuncDecl *vjpCandidate) {
+      TC.validateDeclForNameLookup(vjpCandidate);
+      return checkFunctionSignature(
+          cast<AnyFunctionType>(expectedVJPFnTy->getCanonicalType()),
+          vjpCandidate->getInterfaceType()->getCanonicalType());
+    };
+
+    FuncDecl *vjp = resolveAutoDiffAssociatedFunction(
+        TC, attr->getVJP().getValue(), original, /*isPrimal*/ false,
+        expectedVJPFnTy, isValidVJP);
+
+    if (!vjp) {
+      attr->setInvalid();
+      return;
+    }
+    // Memorize the vjp reference in the attribute.
+    attr->setVJPFunction(vjp);
+  }
 }
 
 static bool

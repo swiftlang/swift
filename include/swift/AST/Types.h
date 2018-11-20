@@ -3048,6 +3048,9 @@ public:
     return getExtInfo().getDifferentiability();
   }
 
+  AnyFunctionType *getAutoDiffAssociatedFunctionType(
+      const AutoDiffParameterIndices &indices, unsigned differentiationOrder,
+      AutoDiffAssociatedFunctionKind kind);
   AnyFunctionType *
   getAutoDiffAdjointFunctionType(const AutoDiffParameterIndices &indices,
                                  const TupleType *primalResultTy);

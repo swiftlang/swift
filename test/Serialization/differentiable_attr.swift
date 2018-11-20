@@ -66,3 +66,25 @@ func dbaz2_checkpointed<T : FloatingPoint>(_ x: T, _ y: T, primal: CheckpointsFP
 func baz2_checkpointed<T : FloatingPoint>(_ x: T, _ y: T) -> T {
   return x
 }
+
+@differentiable(reverse, jvp: jvpSimpleJVP)
+func jvpSimple(x: Float) -> Float {
+  return x
+}
+
+// CHECK-DAG: @differentiable(reverse, jvp: jvpSimpleJVP)
+// CHECK-DAG: func jvpSimpleJVP(x: Float) -> (Float, (Float) -> Float)
+func jvpSimpleJVP(x: Float) -> (Float, (Float) -> Float) {
+  return (x, { v in v })
+}
+
+@differentiable(reverse, vjp: vjpSimpleVJP)
+func vjpSimple(x: Float) -> Float {
+  return x
+}
+
+// CHECK-DAG: @differentiable(reverse, vjp: vjpSimpleVJP)
+// CHECK-DAG: func vjpSimpleVJP(x: Float) -> (Float, (Float) -> Float)
+func vjpSimpleVJP(x: Float) -> (Float, (Float) -> Float) {
+  return (x, { v in v })
+}
