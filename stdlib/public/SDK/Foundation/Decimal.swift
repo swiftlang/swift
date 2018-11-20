@@ -177,8 +177,17 @@ extension Decimal : Hashable, Comparable {
         return _isNegative != 0 ? -d : d
     }
 
-    public var hashValue: Int {
+    public var hashValue: Int { // FIXME(hashValue): Remove
         return Int(bitPattern: __CFHashDouble(doubleValue))
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        // FIXME: This is a lossy hash encoding; it may generate collisions.
+        //
+        // We should instead feed hasher with the actual components of a
+        // normalized version of self. Note that any such normalization must
+        // match the equivalence classes defined by NSDecimalNormalize.
+        hasher.combine(doubleValue)
     }
 
     public static func ==(lhs: Decimal, rhs: Decimal) -> Bool {
