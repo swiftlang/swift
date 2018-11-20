@@ -405,11 +405,20 @@ public struct Locale : Hashable, Equatable, ReferenceConvertible {
     // MARK: -
     //
     
-    public var hashValue : Int {
+    public var hashValue : Int { // FIXME(hashValue): Remove
         if _autoupdating {
             return 1
         } else {
             return _wrapped.hash
+        }
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        if _autoupdating {
+            hasher.combine(false)
+        } else {
+            hasher.combine(true)
+            hasher.combine(_wrapped)
         }
     }
 

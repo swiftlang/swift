@@ -137,10 +137,14 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
         _handle = _MutablePairHandle(NSIndexSet(), copying: false)
     }
     
-    public var hashValue: Int {
+    public var hashValue: Int { // FIXME(hashValue): Remove
         return _handle.map { $0.hash }
     }
-    
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(_handle.reference)
+    }
+
     /// Returns the number of integers in `self`.
     public var count: Int {
         return _handle.map { $0.count }

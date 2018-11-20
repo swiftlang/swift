@@ -632,10 +632,14 @@ public struct URL : ReferenceConvertible, Equatable {
         _url = URL._converted(from: NSURL(fileURLWithFileSystemRepresentation: path, isDirectory: isDirectory, relativeTo: baseURL))
     }
     
-    public var hashValue: Int {
+    public var hashValue: Int { // FIXME(hashValue): Remove
         return _url.hash
     }
-    
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(_url)
+    }
+
     // MARK: -
     
     /// Returns the data representation of the URL's relativeString. 

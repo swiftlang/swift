@@ -263,10 +263,14 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
     
     // MARK: -
     
-    public var hashValue : Int {
+    public var hashValue : Int { // FIXME(hashValue): Remove
         return _handle.map { $0.hash }
     }
-    
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(_handle._uncopiedReference())
+    }
+
     // MARK: - Bridging Helpers
     
     fileprivate init(reference: __shared NSDateComponents) {

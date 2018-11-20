@@ -71,10 +71,14 @@ public struct PersonNameComponents : ReferenceConvertible, Hashable, Equatable, 
         set { _applyMutation { $0.phoneticRepresentation = newValue } }
     }
     
-    public var hashValue : Int {
+    public var hashValue : Int { // FIXME(hashValue): Remove
         return _handle.map { $0.hash }
     }
-    
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(_handle._uncopiedReference())
+    }
+
     @available(macOS 10.11, iOS 9.0, *)
     public static func ==(lhs : PersonNameComponents, rhs: PersonNameComponents) -> Bool {
         // Don't copy references here; no one should be storing anything

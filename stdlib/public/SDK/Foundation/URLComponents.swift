@@ -299,11 +299,15 @@ public struct URLComponents : ReferenceConvertible, Hashable, Equatable, _Mutabl
         get { return _handle.map { $0.percentEncodedQueryItems } }
         set { _applyMutation { $0.percentEncodedQueryItems = newValue } }
     }
-	
-    public var hashValue: Int {
+
+    public var hashValue: Int { // FIXME(hashValue): Remove
         return _handle.map { $0.hash }
     }
-    
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(_handle._uncopiedReference())
+    }
+
     // MARK: - Bridging
     
     fileprivate init(reference: __shared NSURLComponents) {
@@ -412,7 +416,13 @@ public struct URLQueryItem : ReferenceConvertible, Hashable, Equatable {
         set { _queryItem = NSURLQueryItem(name: name, value: newValue) }
     }
     
-    public var hashValue: Int { return _queryItem.hash }
+    public var hashValue: Int { // FIXME(hashValue): Remove
+        return _queryItem.hash
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(_queryItem)
+    }
 
     @available(macOS 10.10, iOS 8.0, *)
     public static func ==(lhs: URLQueryItem, rhs: URLQueryItem) -> Bool {

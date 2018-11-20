@@ -229,10 +229,14 @@ public struct URLRequest : ReferenceConvertible, Equatable, Hashable {
         }
     }
     
-    public var hashValue: Int {
+    public var hashValue: Int { // FIXME(hashValue): Remove
         return _handle.map { $0.hashValue }
     }
-    
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(_handle._uncopiedReference())
+    }
+
     public static func ==(lhs: URLRequest, rhs: URLRequest) -> Bool {
         return lhs._handle._uncopiedReference().isEqual(rhs._handle._uncopiedReference())
     }

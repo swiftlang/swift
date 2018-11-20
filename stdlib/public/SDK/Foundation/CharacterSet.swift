@@ -49,7 +49,7 @@ fileprivate final class _CharacterSetStorage : Hashable {
     
     // MARK: -
     
-    fileprivate var hashValue : Int {
+    fileprivate var hashValue : Int { // FIXME(hashValue): Remove
         switch _backing {
         case .immutable(let cs):
             return Int(CFHash(cs))
@@ -57,7 +57,16 @@ fileprivate final class _CharacterSetStorage : Hashable {
             return Int(CFHash(cs))
         }
     }
-    
+
+    fileprivate func hash(into hasher: inout Hasher) {
+        switch _backing {
+        case .immutable(let cs):
+            hasher.combine(CFHash(cs))
+        case .mutable(let cs):
+            hasher.combine(CFHash(cs))
+        }
+    }
+
     fileprivate static func ==(lhs : _CharacterSetStorage, rhs : _CharacterSetStorage) -> Bool {
         switch (lhs._backing, rhs._backing) {
         case (.immutable(let cs1), .immutable(let cs2)):
@@ -751,8 +760,12 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
 
     // MARK: -
     
-    public var hashValue: Int {
+    public var hashValue: Int { // FIXME(hashValue): Remove
         return _storage.hashValue
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(_storage)
     }
 
     /// Returns true if the two `CharacterSet`s are equal.

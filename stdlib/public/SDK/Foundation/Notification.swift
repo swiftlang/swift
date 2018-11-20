@@ -39,10 +39,14 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
         self.userInfo = userInfo
     }
 
-    public var hashValue: Int {
+    public var hashValue: Int { // FIXME(hashValue): Remove
         return name.rawValue.hash
     }
-    
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(name.rawValue)
+    }
+
     public var description: String {
         return "name = \(name.rawValue), object = \(String(describing: object)), userInfo = \(String(describing: userInfo))"
     }
