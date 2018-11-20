@@ -1644,7 +1644,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     //
     
     /// The hash value for the data.
-    public var hashValue: Int {
+    public var hashValue: Int { // FIXME(hashValue): Remove
         var hashValue = 0
         let hashRange: Range<Int> = _sliceRange.lowerBound..<Swift.min(_sliceRange.lowerBound + 80, _sliceRange.upperBound)
         _withStackOrHeapBuffer(hashRange.count + 1) { buffer in
@@ -1657,7 +1657,13 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
         return hashValue
     }
-    
+
+    public func hash(into hasher: inout Hasher) {
+        _backing.withUnsafeBytes(in: _sliceRange) { buffer in
+            hasher.combine(bytes: buffer)
+        }
+    }
+
     public func advanced(by amount: Int) -> Data {
         _validateIndex(startIndex + amount)
         let length = count - amount
