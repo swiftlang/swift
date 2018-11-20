@@ -380,6 +380,16 @@ extension CGFloat : Hashable {
   public var hashValue: Int {
     return native.hashValue
   }
+
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable @_transparent
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(native)
+  }
 }
 
 % for dst_ty in all_integer_types(word_bits):
