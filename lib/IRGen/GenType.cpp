@@ -430,8 +430,7 @@ static Address alignAddress(IRGenFunction &IGF, Address originAddress,
   auto *alignedAddressValue =
       Builder.CreateBitCast(originAddress, IGM.Int8PtrTy).getAddress();
   Address alignedAddress = Builder.CreateBitCast(originAddress, IGM.Int8PtrTy);
-  if (IGM.Triple.getOS() == llvm::Triple::Linux &&
-      !IGM.Triple.isLittleEndian()) {
+  if (!IGM.Triple.isLittleEndian()) {
     alignedAddress = Builder.CreateConstByteArrayGEP(alignedAddress, Size(4));
     alignedAddressValue = alignedAddress.getAddress();
     alignedAddressValue =

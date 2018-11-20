@@ -564,9 +564,6 @@ EnumPayload::emitCompare(IRGenFunction &IGF, APInt mask, APInt value) const {
       v = IGF.Builder.CreateBitOrPointerCast(v, intTy);
     
     if (isMasked) {
-      if (!IGF.IGM.Triple.isLittleEndian() && IGF.IGM.Triple.isArch64Bit()) {
-        v  = IGF.Builder.CreateLShr(v, 56);
-      }
       auto maskConstant = llvm::ConstantInt::get(intTy, maskPiece);
       v = IGF.Builder.CreateAnd(v, maskConstant);
     }
