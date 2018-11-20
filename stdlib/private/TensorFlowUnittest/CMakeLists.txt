@@ -2,6 +2,7 @@ find_package(TensorFlow REQUIRED)
 
 add_swift_library(swiftTensorFlowUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   TensorFlowUnittest.swift
+  TensorFlowUnittestRemote.swift
 
   SWIFT_MODULE_DEPENDS Python StdlibUnittest TensorFlow
   SWIFT_MODULE_DEPENDS_OSX Darwin
