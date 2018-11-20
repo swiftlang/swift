@@ -441,7 +441,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   C_CC = llvm::CallingConv::C;
   // TODO: use "tinycc" on platforms that support it
   DefaultCC = SWIFT_DEFAULT_LLVM_CC;
-  SwiftCC = llvm::CallingConv::Swift;
+  if (clang::CodeGen::swiftcall::supportsSwiftCC(ClangCodeGen->CGM())) {
+    SwiftCC = llvm::CallingConv::Swift;
+  } else {
+    SwiftCC = SWIFT_DEFAULT_LLVM_CC;
+  }
 
   if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
     DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
