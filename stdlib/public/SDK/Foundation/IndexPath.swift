@@ -662,7 +662,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
         return .orderedSame
     }
     
-    public var hashValue: Int {
+    public var hashValue: Int { // FIXME(hashValue): Remove
         func hashIndexes(first: Int, last: Int, count: Int) -> Int {
             let totalBits = MemoryLayout<Int>.size * 8
             let lengthBits = 8
@@ -680,7 +680,36 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                 return hashIndexes(first: _indexes[0], last: _indexes[cnt - 1], count: cnt)
         }
     }
-    
+
+    public func hash(into hasher: inout Hasher) {
+        // Note: We compare all indices in ==, so for proper hashing, we must
+        // also feed them all to the hasher. (This is intentionally different
+        // from `hashValue` above, which only depends on the first and last
+        // index. `Set` and `Dictionary` relies on `hash(into:)` rather than
+        // `hashValue` -- the latter definition is only kept for compatibility
+        // with existing code that may depend on it.)
+        //
+        // To ensure we have unique hash encodings in nested hashing contexts,
+        // we combine the count of indices as well as the indices themselves.
+        // (This matches what Array does.)
+        switch _indexes {
+        case .empty:
+            hasher.combine(0)
+        case let .single(index):
+            hasher.combine(1)
+            hasher.combine(index)
+        case let .pair(first, second):
+            hasher.combine(2)
+            hasher.combine(first)
+            hasher.combine(second)
+        case let .array(indexes):
+            hasher.combine(indexes.count)
+            for index in indexes {
+                hasher.combine(index)
+            }
+        }
+    }
+
     // MARK: - Bridging Helpers
     
     fileprivate init(nsIndexPath: __shared ReferenceType) {
