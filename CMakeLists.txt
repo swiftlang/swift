@@ -731,6 +731,12 @@ if(swift_build_android AND NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
     message(FATAL_ERROR "A Darwin or Linux host is required to build the Swift runtime for Android")
   endif()
 
+  # NOTE(compnerd) we explicitly link against libc++_shared from the NDK in
+  # AddSwift.cmake.  Ensure that we do not try to link libstdc++ into our
+  # libraries.  Unfortunately, this is a global variable that is lazily used, so
+  # we cannot unset/set it around the add_library.
+  list(REMOVE_ITEM CMAKE_CXX_IMPLICIT_LINK_LIBRARIES stdc++)
+
   if("${SWIFT_SDK_ANDROID_ARCHITECTURES}" STREQUAL "")
     set(SWIFT_SDK_ANDROID_ARCHITECTURES armv7;aarch64)
   endif()

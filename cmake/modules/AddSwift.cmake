@@ -1299,8 +1299,13 @@ function(_add_swift_library_single target name)
         ${SWIFTLIB_SINGLE_INTERFACE_LINK_LIBRARIES})
   endif()
 
-  set_property(TARGET "${target}" PROPERTY
-      LINKER_LANGUAGE "CXX")
+  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
+    set_property(TARGET "${target}" PROPERTY
+        LINKER_LANGUAGE "C")
+  else()
+    set_property(TARGET "${target}" PROPERTY
+        LINKER_LANGUAGE "CXX")
+  endif()
 
   if(target_static)
     set_property(TARGET "${target_static}" APPEND_STRING PROPERTY
