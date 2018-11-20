@@ -78,6 +78,7 @@ enum class DeclContextKind : unsigned {
   Initializer,
   TopLevelCodeDecl,
   SubscriptDecl,
+  EnumElementDecl,
   AbstractFunctionDecl,
   SerializedLocal,
   Last_LocalDeclContextKind = SerializedLocal,
@@ -230,6 +231,7 @@ class alignas(1 << DeclContextAlignInBits) DeclContext {
     case DeclContextKind::TopLevelCodeDecl:
     case DeclContextKind::AbstractFunctionDecl:
     case DeclContextKind::SubscriptDecl:
+    case DeclContextKind::EnumElementDecl:
     case DeclContextKind::GenericTypeDecl:
     case DeclContextKind::ExtensionDecl:
       return ASTHierarchy::Decl;

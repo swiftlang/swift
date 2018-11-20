@@ -212,6 +212,10 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
     // FIXME
     Buffer << "<subscript>";
     return;
+  case DeclContextKind::EnumElementDecl:
+    // FIXME
+    Buffer << "<enum element>";
+    return;
   }
   llvm_unreachable("bad decl context");
 }

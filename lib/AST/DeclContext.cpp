@@ -405,6 +405,9 @@ DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
   case DeclContextKind::SubscriptDecl:
     break;
 
+  case DeclContextKind::EnumElementDecl:
+    break;
+
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
     return true;
@@ -461,6 +464,8 @@ bool DeclContext::walkContext(ASTWalker &Walker) {
     return cast<AbstractFunctionDecl>(this)->walk(Walker);
   case DeclContextKind::SubscriptDecl:
     return cast<SubscriptDecl>(this)->walk(Walker);
+  case DeclContextKind::EnumElementDecl:
+    return cast<EnumElementDecl>(this)->walk(Walker);
   case DeclContextKind::SerializedLocal:
     llvm_unreachable("walk is unimplemented for deserialized contexts");
   case DeclContextKind::Initializer:
@@ -547,6 +552,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
     Kind = "AbstractFunctionDecl";
     break;
   case DeclContextKind::SubscriptDecl:    Kind = "SubscriptDecl"; break;
+  case DeclContextKind::EnumElementDecl:  Kind = "EnumElementDecl"; break;
   }
   OS.indent(Depth*2 + indent) << (void*)this << " " << Kind;
 
@@ -597,6 +603,15 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
     OS << " name=" << SD->getBaseName();
     if (SD->hasInterfaceType())
       OS << " : " << SD->getInterfaceType();
+    else
+      OS << " : (no type set)";
+    break;
+  }
+  case DeclContextKind::EnumElementDecl: {
+    auto *EED = cast<EnumElementDecl>(this);
+    OS << " name=" << EED->getBaseName();
+    if (EED->hasInterfaceType())
+      OS << " : " << EED->getInterfaceType();
     else
       OS << " : (no type set)";
     break;
@@ -920,6 +935,8 @@ DeclContextKind DeclContext::getContextKind() const {
       return DeclContextKind::TopLevelCodeDecl;
     case DeclKind::Subscript:
       return DeclContextKind::SubscriptDecl;
+    case DeclKind::EnumElement:
+      return DeclContextKind::EnumElementDecl;
     case DeclKind::Extension:
       return DeclContextKind::ExtensionDecl;
     default:
