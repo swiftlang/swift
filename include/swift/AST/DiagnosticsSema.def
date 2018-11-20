@@ -4263,6 +4263,10 @@ WARNING(non_exhaustive_switch_warn,none, "switch must be exhaustive", ())
 WARNING(override_nsobject_hashvalue,none,
         "override of 'NSObject.hashValue' is deprecated; "
         "override 'NSObject.hash' to get consistent hashing behavior", ())
+WARNING(hashvalue_implementation,none,
+        "'Hashable.hashValue' is deprecated as a protocol requirement; "
+        "conform type %0 to 'Hashable' by implementing 'hash(into:)' instead",
+        (Type))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
