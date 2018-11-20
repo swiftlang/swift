@@ -83,6 +83,12 @@ enum class FixKind : uint8_t {
   /// Fix up one of the sides of conversion to make it seem
   /// like the types are aligned.
   ContextualMismatch,
+
+  /// Fix up @autoclosure argument to the @autoclosure parameter,
+  /// to for a call to be able to foward it properly, since
+  /// @autoclosure conversions are unsupported starting from
+  /// Swift version 5.
+  AutoClosureForwarding,
 };
 
 class ConstraintFix {
@@ -377,6 +383,29 @@ public:
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
+};
+
+/// Detect situations when argument of the @autoclosure parameter is itself
+/// marked as @autoclosure and is not applied. Form a fix which suggests a
+/// proper way to forward such arguments, e.g.:
+///
+/// ```swift
+/// func foo(_ fn: @autoclosure () -> Int) {}
+/// func bar(_ fn: @autoclosure () -> Int) {
+///   foo(fn) // error - fn should be called
+/// }
+/// ```
+class AutoClosureForwarding final : public ConstraintFix {
+public:
+  AutoClosureForwarding(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AutoClosureForwarding, locator) {}
+
+  std::string getName() const override { return "fix @autoclosure forwarding"; }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AutoClosureForwarding *create(ConstraintSystem &cs,
+                                       ConstraintLocator *locator);
 };
 
 } // end namespace constraints

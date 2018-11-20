@@ -202,3 +202,12 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
                                                ConstraintLocator *locator) {
   return new (cs.getAllocator()) ContextualMismatch(cs, lhs, rhs, locator);
 }
+
+bool AutoClosureForwarding::diagnose(Expr *root, bool asNote) const {
+  return false;
+}
+
+AutoClosureForwarding *AutoClosureForwarding::create(ConstraintSystem &cs,
+                                                     ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AutoClosureForwarding(cs, locator);
+}

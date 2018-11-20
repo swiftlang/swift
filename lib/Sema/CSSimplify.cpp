@@ -895,11 +895,15 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
       // is itself `@autoclosure` function type in Swift < 5,
       // let's fix that up by making it look like argument is
       // called implicitly.
-      if (!cs.getASTContext().isSwiftVersionAtLeast(5)) {
-        if (param.isAutoClosure() &&
-            isAutoClosureArg(locator.getAnchor(), argIdx)) {
-          argTy = argTy->castTo<FunctionType>()->getResult();
-          cs.increaseScore(SK_FunctionConversion);
+      if (param.isAutoClosure() &&
+          isAutoClosureArg(locator.getAnchor(), argIdx)) {
+        argTy = argTy->castTo<FunctionType>()->getResult();
+        cs.increaseScore(SK_FunctionConversion);
+
+        if (cs.getASTContext().isSwiftVersionAtLeast(5)) {
+          auto *fixLoc = cs.getConstraintLocator(loc);
+          if (cs.recordFix(AutoClosureForwarding::create(cs, fixLoc)))
+            return cs.getTypeMatchFailure(loc);
         }
       }
 
@@ -5431,6 +5435,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::CoerceToCheckedCast:
   case FixKind::RelabelArguments:
   case FixKind::AddConformance:
+  case FixKind::AutoClosureForwarding:
     llvm_unreachable("handled elsewhere");
   }
 
