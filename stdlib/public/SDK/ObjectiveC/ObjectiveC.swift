@@ -112,21 +112,10 @@ public struct Selector : ExpressibleByStringLiteral {
   }
 }
 
-extension Selector : Equatable, Hashable {
-  public static func ==(lhs: Selector, rhs: Selector) -> Bool {
-    return sel_isEqual(lhs, rhs)
-  }
-
-  /// The hash value.
-  ///
-  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
-  ///
-  /// - Note: the hash value is not guaranteed to be stable across
-  ///   different invocations of the same program.  Do not persist the
-  ///   hash value across program runs.
-  public var hashValue: Int {
-    return ptr.hashValue
-  }
+extension Selector: Equatable, Hashable {
+  // Note: The implementations for `==` and `hash(into:)` are synthesized by the
+  // compiler. The generated implementations use the value of `ptr` as the basis
+  // for equality.
 }
 
 extension Selector : CustomStringConvertible {
