@@ -252,9 +252,9 @@ struct SILAutoDiffConfig {
 /// `autodiff_function_extract` instructions in SIL.
 struct AutoDiffAssociatedFunctionKind {
   enum innerty : uint8_t {
-     // The vector-Jacobian products operator.
+     // The Jacobian-vector products function.
      JVP = 0,
-     // The Jacobian-vector products operator.
+     // The vector-Jacobian products function.
      VJP = 1
   } rawValue;
 

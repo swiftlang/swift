@@ -48,4 +48,4 @@ bb0:
 // CHECK:   [[FOO_VJP:%.*]] = function_ref @foo_vjp : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 // CHECK:   [[DIFFED_FOO:%.*]] = autodiff_function [wrt 0] [order 1] [[FOO]] : $@convention(thin) (Float) -> Float with {undef : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float), [[FOO_VJP]] : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)}
 // CHECK:   [[EXTRACTED_VJP:%.*]] = autodiff_function_extract [vjp] [order 1] [[DIFFED_FOO]] : $@autodiff @convention(thin) (Float) -> Float
-// CHECK:   return [[UNDIFFED_FOO]] : $@autodiff @convention(thin) (Float) -> Float // id: %5
+// CHECK:   return [[UNDIFFED_FOO]] : $@autodiff @convention(thin) (Float) -> Float
