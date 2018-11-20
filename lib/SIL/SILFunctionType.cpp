@@ -267,8 +267,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
       });
     auto differentialType = SILFunctionType::get(
         getGenericSignature(), ExtInfo(), SILCoroutineKind::None,
-        ParameterConvention::Direct_Guaranteed, tangentParams, {}, tangentResults,
-        None, getASTContext());
+        ParameterConvention::Direct_Guaranteed, tangentParams, {},
+        tangentResults, None, getASTContext());
     SmallVector<SILResultInfo, 8> jvpResults(getResults().begin(),
                                              getResults().end());
     jvpResults.push_back({differentialType, ResultConvention::Owned});
@@ -288,12 +288,10 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
       cotangentResults.push_back(
           getFormalResultInfo(
               getAssociatedType(param.getType(), "CotangentVector")));
-    auto pullbackType = SILFunctionType::get(getGenericSignature(),
-                                             ExtInfo(), SILCoroutineKind::None,
-                                         ParameterConvention::Direct_Guaranteed,
-                                             cotangentParams, {},
-                                             cotangentResults, {},
-                                             getASTContext());
+    auto pullbackType = SILFunctionType::get(
+        getGenericSignature(), ExtInfo(), SILCoroutineKind::None,
+        ParameterConvention::Direct_Guaranteed, cotangentParams, {},
+        cotangentResults, {}, getASTContext());
     SmallVector<SILResultInfo, 8> vjpResults(getResults().begin(),
                                              getResults().end());
     vjpResults.push_back({pullbackType, ResultConvention::Owned});

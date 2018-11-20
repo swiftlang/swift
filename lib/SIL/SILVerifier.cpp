@@ -1262,14 +1262,14 @@ public:
             "The original function must not be @autodiff");
     if (F.getModule().getStage() == SILStage::Canonical ||
         adfi->hasAssociatedFunctions()) {
-      for (auto i : range(1, adfi->getDifferentiationOrder() + 1)) {
-        auto pair = adfi->getAssociatedFunctionPair(i);
+      for (auto order : range(1, adfi->getDifferentiationOrder() + 1)) {
+        auto pair = adfi->getAssociatedFunctionPair(order);
         auto jvpType = pair.first->getType().getAs<SILFunctionType>();
         require(jvpType, "The JVP function must have a function type");
         require(!jvpType->isDifferentiable(),
                 "The JVP function must not be @autodiff");
         auto expectedJVPType = origTy->getAutoDiffAssociatedFunctionType(
-            adfi->getParameterIndices(), adfi->getDifferentiationOrder(),
+            adfi->getParameterIndices(), order,
             AutoDiffAssociatedFunctionKind::JVP, F.getModule());
         require(expectedJVPType == jvpType, "Unexpected JVP function type");
         auto vjpType = pair.second->getType().getAs<SILFunctionType>();
@@ -1277,9 +1277,8 @@ public:
         require(!vjpType->isDifferentiable(),
                 "The VJP function must not be @autodiff");
         auto expectedVJPType = origTy->getAutoDiffAssociatedFunctionType(
-            adfi->getParameterIndices(), adfi->getDifferentiationOrder(),
+            adfi->getParameterIndices(), order,
             AutoDiffAssociatedFunctionKind::VJP, F.getModule());
-        llvm::outs() << "Expected JVP type: " << expectedJVPType << '\n';
         require(expectedVJPType == vjpType, "Unexpected VJP function type");
       }
     }
