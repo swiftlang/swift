@@ -2145,7 +2145,8 @@ unwrapAggregateInstructions(SILValue value,
 
 /// Recursively unpacks aggregates of TensorFlow values to `inputList`, using
 /// the already-lowered values when possible to avoid code bloat.  Returns true
-/// to represent error if it detects a non-TensorFlow leaf field.
+/// if it encounters a leaf field whose type is not confirmed to be a TensorFlow
+/// value (e.g. if it's some generic type T).
 static bool unpackTensorAggregates(
     const ASTContext &ctx, SILLocation loc, SILBuilder &B, SILValue rootAggregate,
     llvm::DenseMap<std::pair<SILValue, unsigned>, SILValue> &loweredTupleElts,
@@ -2340,6 +2341,10 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
             element = copyAddr->getSrc();
 
           if (!element) {
+            // It's not clear if we'll ever hit this condition. Perhaps
+            // asserting it won't happen would be more rigorous, but here we
+            // chose the "safer" route of having compiler still accept programs
+            // that trigger this condition.
             noClustering = true;
             break;
           }
@@ -2347,13 +2352,14 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
           if (unpackTensorAggregates(context, origInst->getLoc(), B, element,
                                      loweredTupleElts, loweredStructFields,
                                      unwrapCache, inputList)) {
+            // If some element of the array fails to unpack, we expect all
+            // elements to fail to unpack (as they share the same array element
+            // type), so we bail out of the loop over array elements, and call
+            // `opBuilder.addArgument(argumentValue)` below.
             noClustering = true;
             break;
           }
         }
-        // TODO: even if we cannot deabstraction one input list elt, try and
-        // deabstract the others still. Create a unit test on #tfop("SomeOp", a,
-        // b), where a cannot be deabstracted, but b can.
         if (noClustering)
           opBuilder.addArgument(argumentValue);
         else
