@@ -36,42 +36,42 @@ let Py_GE: Int32 = 5
 
 let Py_Initialize = PythonLibrary.loadSymbol(
   name: "Py_Initialize",
-  signature: (@convention(c) () -> ()).self
+  type: (@convention(c) () -> ()).self
 )
 
 let Py_IncRef = PythonLibrary.loadSymbol(
   name: "Py_IncRef",
-  signature: (@convention(c) (PyObjectPointer?) -> ()).self
+  type: (@convention(c) (PyObjectPointer?) -> ()).self
 )
 
 let Py_DecRef = PythonLibrary.loadSymbol(
   name: "Py_DecRef",
-  signature: (@convention(c) (PyObjectPointer?) -> ()).self
+  type: (@convention(c) (PyObjectPointer?) -> ()).self
 )
 
 let PyImport_ImportModule = PythonLibrary.loadSymbol(
   name: "PyImport_ImportModule",
-  signature: (@convention(c) (PyCCharPointer) -> PyObjectPointer?).self
+  type: (@convention(c) (PyCCharPointer) -> PyObjectPointer?).self
 )
 
 let PyEval_GetBuiltins = PythonLibrary.loadSymbol(
   name: "PyEval_GetBuiltins",
-  signature: (@convention(c) () -> PyObjectPointer).self
+  type: (@convention(c) () -> PyObjectPointer).self
 )
 
 let PyErr_Occurred = PythonLibrary.loadSymbol(
   name: "PyErr_Occurred",
-  signature: (@convention(c) () -> PyObjectPointer?).self
+  type: (@convention(c) () -> PyObjectPointer?).self
 )
 
 let PyErr_Clear = PythonLibrary.loadSymbol(
   name: "PyErr_Clear",
-  signature: (@convention(c) () -> ()).self
+  type: (@convention(c) () -> ()).self
 )
 
 let PyErr_Fetch = PythonLibrary.loadSymbol(
   name: "PyErr_Fetch",
-  signature: (@convention(c) (
+  type: (@convention(c) (
     UnsafeMutablePointer<PyObjectPointer?>,
     UnsafeMutablePointer<PyObjectPointer?>,
     UnsafeMutablePointer<PyObjectPointer?>) -> ()).self
@@ -79,12 +79,12 @@ let PyErr_Fetch = PythonLibrary.loadSymbol(
 
 let PyDict_New = PythonLibrary.loadSymbol(
   name: "PyDict_New",
-  signature: (@convention(c) () -> PyObjectPointer?).self
+  type: (@convention(c) () -> PyObjectPointer?).self
 )
 
 let PyDict_SetItem = PythonLibrary.loadSymbol(
   name: "PyDict_SetItem",
-  signature: (@convention(c) (
+  type: (@convention(c) (
     PyObjectPointer?,
     PyObjectPointer,
     PyObjectPointer) -> ()).self
@@ -92,14 +92,14 @@ let PyDict_SetItem = PythonLibrary.loadSymbol(
 
 let PyObject_GetItem = PythonLibrary.loadSymbol(
   name: "PyObject_GetItem",
-  signature: (@convention(c) (
+  type: (@convention(c) (
     PyObjectPointer,
     PyObjectPointer) -> PyObjectPointer?).self
 )
 
 let PyObject_SetItem = PythonLibrary.loadSymbol(
   name: "PyObject_SetItem",
-  signature: (@convention(c) (
+  type: (@convention(c) (
     PyObjectPointer,
     PyObjectPointer,
     PyObjectPointer) -> ()).self
@@ -107,14 +107,14 @@ let PyObject_SetItem = PythonLibrary.loadSymbol(
 
 let PyObject_DelItem = PythonLibrary.loadSymbol(
   name: "PyObject_DelItem",
-  signature: (@convention(c) (
+  type: (@convention(c) (
     PyObjectPointer,
     PyObjectPointer) -> ()).self
 )
 
 let PyObject_Call = PythonLibrary.loadSymbol(
   name: "PyObject_Call",
-  signature: (@convention(c) (
+  type: (@convention(c) (
     PyObjectPointer,
     PyObjectPointer,
     PyObjectPointer?) -> (PyObjectPointer?)).self
@@ -122,21 +122,21 @@ let PyObject_Call = PythonLibrary.loadSymbol(
 
 let PyObject_CallObject = PythonLibrary.loadSymbol(
   name: "PyObject_CallObject",
-  signature: (@convention(c) (
+  type: (@convention(c) (
     PyObjectPointer,
     PyObjectPointer) -> (PyObjectPointer?)).self
 )
 
 let PyObject_GetAttrString = PythonLibrary.loadSymbol(
   name: "PyObject_GetAttrString",
-  signature: (@convention(c) (
+  type: (@convention(c) (
     PyObjectPointer,
     PyCCharPointer) -> (PyObjectPointer?)).self
 )
 
 let PyObject_SetAttrString = PythonLibrary.loadSymbol(
   name: "PyObject_SetAttrString",
-  signature: (@convention(c) (
+  type: (@convention(c) (
     PyObjectPointer,
     PyCCharPointer,
     PyObjectPointer) -> (Int)).self
@@ -144,7 +144,7 @@ let PyObject_SetAttrString = PythonLibrary.loadSymbol(
 
 let PySlice_New = PythonLibrary.loadSymbol(
   name: "PySlice_New",
-  signature: (@convention(c) (
+  type: (@convention(c) (
     PyObjectPointer?,
     PyObjectPointer?,
     PyObjectPointer?) -> (PyObjectPointer?)).self
@@ -152,24 +152,24 @@ let PySlice_New = PythonLibrary.loadSymbol(
 
 let PyTuple_New = PythonLibrary.loadSymbol(
   name: "PyTuple_New",
-  signature: (@convention(c) (Int) -> (PyObjectPointer?)).self
+  type: (@convention(c) (Int) -> (PyObjectPointer?)).self
 )
 
 let PyTuple_SetItem = PythonLibrary.loadSymbol(
   name: "PyTuple_SetItem",
-  signature: (@convention(c) (
+  type: (@convention(c) (
     PyObjectPointer, Int, PyObjectPointer) -> ()).self
 )
 
 let PyObject_RichCompareBool = PythonLibrary.loadSymbol(
   name: "PyObject_RichCompareBool",
-  signature: (@convention(c) (
+  type: (@convention(c) (
     PyObjectPointer, PyObjectPointer, Int32) -> (Int32)).self
 )
 
 let PyDict_Next = PythonLibrary.loadSymbol(
   name: "PyDict_Next",
-  signature: (@convention(c) (
+  type: (@convention(c) (
     PyObjectPointer, UnsafeMutablePointer<Int>,
     UnsafeMutablePointer<PyObjectPointer?>,
     UnsafeMutablePointer<PyObjectPointer?>) -> (Int32)).self
@@ -177,129 +177,129 @@ let PyDict_Next = PythonLibrary.loadSymbol(
 
 let PyList_New = PythonLibrary.loadSymbol(
   name: "PyList_New",
-  signature: (@convention(c) (Int) -> (PyObjectPointer?)).self
+  type: (@convention(c) (Int) -> (PyObjectPointer?)).self
 )
 
 let PyList_SetItem = PythonLibrary.loadSymbol(
   name: "PyList_SetItem",
-  signature: (@convention(c) (
+  type: (@convention(c) (
     PyObjectPointer, Int, PyObjectPointer) -> (Int32)).self
 )
 
 let PyBool_FromLong = PythonLibrary.loadSymbol(
   name: "PyBool_FromLong",
-  signature: (@convention(c) (Int) -> (PyObjectPointer)).self
+  type: (@convention(c) (Int) -> (PyObjectPointer)).self
 )
 
 let PyFloat_AsDouble = PythonLibrary.loadSymbol(
   name: "PyFloat_AsDouble",
-  signature: (@convention(c) (PyObjectPointer) -> (Double)).self
+  type: (@convention(c) (PyObjectPointer) -> (Double)).self
 )
 
 let PyFloat_FromDouble = PythonLibrary.loadSymbol(
   name: "PyFloat_FromDouble",
-  signature: (@convention(c) (Double) -> (PyObjectPointer)).self
+  type: (@convention(c) (Double) -> (PyObjectPointer)).self
 )
 
 let PyInt_AsLong = PythonLibrary.loadSymbol(
   name: "PyLong_AsLong",
   legacyName: "PyInt_AsLong",
-  signature: (@convention(c) (PyObjectPointer) -> (Int)).self
+  type: (@convention(c) (PyObjectPointer) -> (Int)).self
 )
 
 let PyInt_FromLong = PythonLibrary.loadSymbol(
   name: "PyLong_FromLong",
   legacyName: "PyInt_FromLong",
-  signature: (@convention(c) (Int) -> (PyObjectPointer)).self
+  type: (@convention(c) (Int) -> (PyObjectPointer)).self
 )
 
 let PyInt_AsUnsignedLongMask = PythonLibrary.loadSymbol(
   name: "PyLong_AsUnsignedLongMask",
   legacyName: "PyInt_AsUnsignedLongMask",
-  signature: (@convention(c) (PyObjectPointer) -> (UInt)).self
+  type: (@convention(c) (PyObjectPointer) -> (UInt)).self
 )
 
 let PyInt_FromSize_t = PythonLibrary.loadSymbol(
   name: "PyInt_FromLong",
   legacyName: "PyInt_FromSize_t",
-  signature: (@convention(c) (Int) -> (PyObjectPointer)).self
+  type: (@convention(c) (Int) -> (PyObjectPointer)).self
 )
 
 let PyString_AsString = PythonLibrary.loadSymbol(
   name: "PyUnicode_AsUTF8",
   legacyName: "PyString_AsString",
-  signature: (@convention(c) (
+  type: (@convention(c) (
     PyObjectPointer) -> (PyCCharPointer?)).self
 )
 
 let PyString_FromStringAndSize = PythonLibrary.loadSymbol(
   name: "PyUnicode_DecodeUTF8",
   legacyName: "PyString_FromStringAndSize",
-  signature: (@convention(c) (
+  type: (@convention(c) (
     PyCCharPointer?, Int) -> (PyObjectPointer?)).self
 )
 
 var _Py_ZeroStruct = PythonLibrary.loadSymbol(
   name: "_Py_ZeroStruct",
-  signature: PyObjectPointer.self
+  type: PyObjectPointer.self
 )
 
 var _Py_TrueStruct = PythonLibrary.loadSymbol(
   name: "_Py_TrueStruct",
-  signature: PyObjectPointer.self
+  type: PyObjectPointer.self
 )
 
 var _Py_TrueStructb = PythonLibrary.loadSymbol(
   name: "_Py_TrueStructb",
-  signature: PyObjectPointer.self
+  type: PyObjectPointer.self
 )
 
 var PyBool_Type = PythonLibrary.loadSymbol(
   name: "PyBool_Type",
-  signature: PyObjectPointer.self
+  type: PyObjectPointer.self
 )
 
 var PySlice_Type = PythonLibrary.loadSymbol(
   name: "PySlice_Type",
-  signature: PyObjectPointer.self
+  type: PyObjectPointer.self
 )
 
 let PyNumber_Add = PythonLibrary.loadSymbol(
   name: "PyNumber_Add",
-  signature: PyBinaryOperation.self
+  type: PyBinaryOperation.self
 )
 
 let PyNumber_Subtract = PythonLibrary.loadSymbol(
   name: "PyNumber_Subtract",
-  signature: PyBinaryOperation.self
+  type: PyBinaryOperation.self
 )
 
 let PyNumber_Multiply = PythonLibrary.loadSymbol(
   name: "PyNumber_Multiply",
-  signature: PyBinaryOperation.self
+  type: PyBinaryOperation.self
 )
 
 let PyNumber_TrueDivide = PythonLibrary.loadSymbol(
   name: "PyNumber_TrueDivide",
-  signature: PyBinaryOperation.self
+  type: PyBinaryOperation.self
 )
 
 let PyNumber_InPlaceAdd = PythonLibrary.loadSymbol(
   name: "PyNumber_InPlaceAdd",
-  signature: PyBinaryOperation.self
+  type: PyBinaryOperation.self
 )
 
 let PyNumber_InPlaceSubtract = PythonLibrary.loadSymbol(
   name: "PyNumber_InPlaceSubtract",
-  signature: PyBinaryOperation.self
+  type: PyBinaryOperation.self
 )
 
 let PyNumber_InPlaceMultiply = PythonLibrary.loadSymbol(
   name: "PyNumber_InPlaceMultiply",
-  signature: PyBinaryOperation.self
+  type: PyBinaryOperation.self
 )
 
 let PyNumber_InPlaceTrueDivide = PythonLibrary.loadSymbol(
   name: "PyNumber_InPlaceTrueDivide",
-  signature: PyBinaryOperation.self
+  type: PyBinaryOperation.self
 )
