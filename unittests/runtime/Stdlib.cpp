@@ -287,3 +287,8 @@ MANGLE_SYM(s20_playgroundPrintHookySScSgvg)() {
 SWIFT_RUNTIME_STDLIB_INTERNAL
 const long long $ss21_ObjectiveCBridgeableMp[1] = {0};
 
+// Key Path
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $ss7KeyPathCMo[1] = {0};
+
