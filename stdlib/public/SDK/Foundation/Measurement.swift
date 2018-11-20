@@ -36,8 +36,16 @@ public struct Measurement<UnitType : Unit> : ReferenceConvertible, Comparable, E
         self.unit = unit
     }
 
-    public var hashValue: Int {
-        return Int(bitPattern: __CFHashDouble(value))
+    public func hash(into hasher: inout Hasher) {
+        if let dimension = self.unit as? Dimension {
+            let baseUnit = type(of: dimension).baseUnit()
+            let baseValue = dimension.converter.baseUnitValue(fromValue: value)
+            hasher.combine(baseValue)
+            hasher.combine(baseUnit)
+        } else {
+            hasher.combine(value)
+            hasher.combine(unit)
+        }
     }
 }
 
