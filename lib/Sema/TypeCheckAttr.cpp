@@ -2299,7 +2299,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // We will put the checked wrt param indices here.
   auto *checkedWrtParamIndices = AutoDiffParameterIndices::create(
       ctx, originalFnTy,
-      /*isMethod*/original->getImplicitSelfDecl() ? true : false);
+      /*isMethod*/ original->getImplicitSelfDecl() ? true : false);
 
   if (uncheckedWrtParams.empty()) {
     // If 'wrt:' is not specified, the wrt parameters are all the parameters in
@@ -2391,9 +2391,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   if (!adjointSpecifier)
     return;
 
-  TupleType *primalResultTy = primal ?
-      primal->getResultInterfaceType()->getAs<TupleType>() :
-      nullptr;
+  TupleType *primalResultTy =
+      primal ? primal->getResultInterfaceType()->getAs<TupleType>() : nullptr;
   AnyFunctionType *expectedAdjointFnTy =
       originalFnTy->getAutoDiffAdjointFunctionType(*checkedWrtParamIndices,
                                                    primalResultTy);

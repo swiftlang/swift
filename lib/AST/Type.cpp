@@ -4113,9 +4113,8 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAdjointFunctionType(
   // If collected `retElts` has only 1 element, use that element as adjoint's
   // return type. Otherwise, make a tuple out of `retElts` as adjoint's return
   // type.
-  Type retTy = retElts.size() > 1
-      ? TupleType::get(retElts, getASTContext())
-      : retElts[0].getType();
+  Type retTy = retElts.size() > 1 ? TupleType::get(retElts, getASTContext())
+                                  : retElts[0].getType();
 
   // If this is a method, unwrap the function type so that we can see the
   // non-self parameters.
@@ -4141,8 +4140,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAdjointFunctionType(
   adjointParams.append(2, AnyFunctionType::Param(unwrapped->getResult()));
 
   // Build the adjoint type.
-  AnyFunctionType *adjoint = makeFunctionType(unwrapped, adjointParams,
-                                              retTy);
+  AnyFunctionType *adjoint = makeFunctionType(unwrapped, adjointParams, retTy);
 
   // If this is a method, wrap the adjoint type in an additional "(Self) ->"
   // curry level.

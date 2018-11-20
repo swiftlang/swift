@@ -118,9 +118,8 @@ public:
   /// Allocates and initializes an empty `AutoDiffParameterIndices` for the
   /// given `functionType`. `isMethod` specifies whether to treat the function
   /// as a method.
-  static AutoDiffParameterIndices *create(ASTContext &C,
-                                          AnyFunctionType *functionType,
-                                          bool isMethod);
+  static AutoDiffParameterIndices *
+  create(ASTContext &C, AnyFunctionType *functionType, bool isMethod);
 
   bool isMethod() const { return isMethodFlag; }
 

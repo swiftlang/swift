@@ -1314,8 +1314,8 @@ namespace {
       auto *checkedWrtParamIndices = AutoDiffParameterIndices::create(
           CS.getASTContext(), originalTy, /*isMethod=*/false);
 
-      // If no parameters are given, then differentiation is done with respect to
-      // all parameters in the first parameter group.
+      // If no parameters are given, then differentiation is done with respect
+      // to all parameters in the first parameter group.
       if (GE->getParameters().empty())
         checkedWrtParamIndices->setAllNonSelfParameters();
       // If parameters indices are specified, collect those parameters.
@@ -1345,7 +1345,8 @@ namespace {
       // Collect differentiation parameter types.
       SmallVector<Type, 8> diffParamTypes;
       SmallVector<TupleTypeElt, 8> resultTypes;
-      checkedWrtParamIndices->getSubsetParameterTypes(originalTy, diffParamTypes);
+      checkedWrtParamIndices->getSubsetParameterTypes(originalTy,
+                                                      diffParamTypes);
       resultTypes.append(diffParamTypes.begin(), diffParamTypes.end());
 
       // Check that the differentiation parameter types are allowed.
@@ -1367,8 +1368,8 @@ namespace {
       // signature as the original function. The gradient's result types are
       // what we collected in `diffParamTypes`.
       Type gradResult = resultTypes.size() == 1
-        ? resultTypes.front().getType()
-        : TupleType::get(resultTypes, TC.Context);
+                            ? resultTypes.front().getType()
+                            : TupleType::get(resultTypes, TC.Context);
       // If preserving original result, then the gradient's result type is a tuple
       // of the original result type with label "value" and `diffParamTypes` with
       // label "gradient".

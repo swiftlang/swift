@@ -103,10 +103,9 @@ static AnyFunctionType *unwrapSelfParameter(AnyFunctionType *functionType,
 /// Allocates and initializes an empty `AutoDiffParameterIndices` for the
 /// given `functionType`. `isMethod` specifies whether to treat the function
 /// as a method.
-AutoDiffParameterIndices
-*AutoDiffParameterIndices::create(ASTContext &C,
-                                  AnyFunctionType *functionType,
-                                  bool isMethod) {
+AutoDiffParameterIndices *
+AutoDiffParameterIndices::create(ASTContext &C, AnyFunctionType *functionType,
+                                 bool isMethod) {
   // TODO(SR-9290): Note that the AutoDiffParameterIndices' destructor never
   // gets called, which causes a small memory leak in the case that the
   // SmallBitVector decides to allocate some heap space.
@@ -178,8 +177,7 @@ void AutoDiffParameterIndices::setSelfParameter() {
 ///   ==> pushes {Self, C} to `paramTypes`.
 ///
 void AutoDiffParameterIndices::getSubsetParameterTypes(
-    AnyFunctionType *functionType,
-    SmallVectorImpl<Type> &paramTypes) const {
+    AnyFunctionType *functionType, SmallVectorImpl<Type> &paramTypes) const {
   AnyFunctionType *unwrapped = unwrapSelfParameter(functionType, isMethodFlag);
   if (isMethodFlag && indices[indices.size() - 1])
     paramTypes.push_back(functionType->getParams()[0].getPlainType());
@@ -190,10 +188,10 @@ void AutoDiffParameterIndices::getSubsetParameterTypes(
 
 static unsigned countNumFlattenedElementTypes(Type type) {
   if (auto *tupleTy = type->getCanonicalType()->getAs<TupleType>())
-    return accumulate(tupleTy->getElementTypes(), 0, [&](unsigned num,
-                                                         Type type) {
-      return num + countNumFlattenedElementTypes(type);
-    });
+    return accumulate(tupleTy->getElementTypes(), 0,
+                      [&](unsigned num, Type type) {
+                        return num + countNumFlattenedElementTypes(type);
+                      });
   return 1;
 }
 
@@ -216,8 +214,8 @@ static unsigned countNumFlattenedElementTypes(Type type) {
 ///   ==> returns 1110
 ///   (because the lowered SIL type is (A, B, C, D) -> R)
 ///
-llvm::SmallBitVector AutoDiffParameterIndices::getLowered(
-    AnyFunctionType *functionType) const {
+llvm::SmallBitVector
+AutoDiffParameterIndices::getLowered(AnyFunctionType *functionType) const {
   // Calculate the lowered sizes of all the parameters.
   AnyFunctionType *unwrapped = unwrapSelfParameter(functionType, isMethodFlag);
   SmallVector<unsigned, 8> paramLoweredSizes;
