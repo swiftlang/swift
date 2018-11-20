@@ -194,17 +194,19 @@ internal struct _StringObject {
   enum Nibbles {}
 }
 
-#if !(arch(i386) || arch(arm))
 extension _StringObject {
   @inlinable
-  internal var _discriminator: Discriminator {
+  internal var discriminator: Discriminator {
     @inline(__always) get {
+#if arch(i386) || arch(arm)
+      return _discriminator
+#else
       let d = objectRawBits &>> Nibbles.discriminatorShift
       return Discriminator(UInt8(truncatingIfNeeded: d))
+#endif
     }
   }
 }
-#endif
 
 // Raw
 extension _StringObject {
@@ -749,7 +751,7 @@ extension _StringObject {
     @inline(__always)
     get {
       _internalInvariant(isSmall)
-      return _discriminator.smallCount
+      return discriminator.smallCount
     }
   }
 
