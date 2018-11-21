@@ -114,7 +114,7 @@ private extension PythonLibrary {
       return String(cString: value)
     }
     
-    func set(_ value: String?) {
+    func set(_ value: String) {
       setenv(key, value, 1)
     }
   }
