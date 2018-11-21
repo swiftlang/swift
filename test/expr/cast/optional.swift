@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
-class Base : Hashable { 
-  var hashValue: Int { return 0 }
+class Base : Hashable {
+  func hash(into hasher: inout Hasher) {}
 }
 
 class Derived : Base { }
