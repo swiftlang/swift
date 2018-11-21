@@ -113,6 +113,13 @@ SILWitnessTable::~SILWitnessTable() {
         entry.getMethodWitness().Witness->decrementRefCount();
       }
       break;
+    // SWIFT_ENABLE_TENSORFLOW
+    case AutoDiffAssociatedFunction:
+      if (entry.getAutoDiffAssociatedFunctionWitness().Witness) {
+        entry.getAutoDiffAssociatedFunctionWitness().Witness
+            ->decrementRefCount();
+      }
+      break;
     case AssociatedType:
     case AssociatedTypeProtocol:
     case BaseProtocol:
@@ -140,6 +147,13 @@ void SILWitnessTable::convertToDefinition(
     case Method:
       if (entry.getMethodWitness().Witness) {
         entry.getMethodWitness().Witness->incrementRefCount();
+      }
+      break;
+    // SWIFT_ENABLE_TENSORFLOW
+    case AutoDiffAssociatedFunction:
+      if (entry.getAutoDiffAssociatedFunctionWitness().Witness) {
+        entry.getAutoDiffAssociatedFunctionWitness().Witness
+            ->incrementRefCount();
       }
       break;
     case AssociatedType:

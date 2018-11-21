@@ -257,6 +257,12 @@ void SILLinkerVisitor::visitProtocolConformance(
       maybeAddFunctionToWorklist(E.getMethodWitness().Witness);
       break;
     }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    case SILWitnessTable::WitnessKind::AutoDiffAssociatedFunction:
+      maybeAddFunctionToWorklist(
+          E.getAutoDiffAssociatedFunctionWitness().Witness);
+      break;
     
     // If the entry is a related witness table, see whether we need to
     // eagerly deserialize it.

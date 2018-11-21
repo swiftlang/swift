@@ -1,0 +1,138 @@
+// SWIFT_ENABLE_TENSORFLOW
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -module-name=witness_tables_autodiff | %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name=witness_tables_autodiff | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+protocol DifferentiableRequirement {
+  @differentiable(reverse)
+  func f(_ x: Float) -> Float
+}
+
+struct DifferentiableConformance : DifferentiableRequirement {
+  @differentiable(reverse, jvp: df, vjp: pf)
+  func f(_ x: Float) -> Float
+  func df(_ x: Float) -> (Float, (Float) -> Float)
+  func pf(_ x: Float) -> (Float, (Float) -> Float)
+  init()
+}
+
+// DifferentiableConformance.f(_:)
+sil hidden [differentiable source 0 wrt 0 primal @AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__primal_src_0_wrt_0 adjoint @AD__$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF__adjoint_src_0_wrt_0 jvp @$s23witness_tables_autodiff25DifferentiableConformanceV2dfySf_S2fctSfF vjp @$s23witness_tables_autodiff25DifferentiableConformanceV2pfySf_S2fctSfF] @$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF : $@convention(method) (Float, DifferentiableConformance) -> Float {
+// %0                                             // users: %4, %2
+// %1                                             // user: %3
+bb0(%0 : $Float, %1 : $DifferentiableConformance):
+  debug_value %0 : $Float, let, name "x", argno 1 // id: %2
+  debug_value %1 : $DifferentiableConformance, let, name "self", argno 2 // id: %3
+  return %0 : $Float                              // id: %4
+} // end sil function '$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF'
+
+// DifferentiableConformance.df(_:)
+sil hidden @$s23witness_tables_autodiff25DifferentiableConformanceV2dfySf_S2fctSfF : $@convention(method) (Float, DifferentiableConformance) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// %0                                             // users: %6, %2
+// %1                                             // user: %3
+bb0(%0 : $Float, %1 : $DifferentiableConformance):
+  debug_value %0 : $Float, let, name "x", argno 1 // id: %2
+  debug_value %1 : $DifferentiableConformance, let, name "self", argno 2 // id: %3
+  // function_ref closure #1 in DifferentiableConformance.df(_:)
+  %4 = function_ref @$s23witness_tables_autodiff25DifferentiableConformanceV2dfySf_S2fctSfFS2fcfU_ : $@convention(thin) (Float) -> Float // user: %5
+  %5 = thin_to_thick_function %4 : $@convention(thin) (Float) -> Float to $@callee_guaranteed (Float) -> Float // user: %6
+  %6 = tuple (%0 : $Float, %5 : $@callee_guaranteed (Float) -> Float) // user: %7
+  return %6 : $(Float, @callee_guaranteed (Float) -> Float) // id: %7
+} // end sil function '$s23witness_tables_autodiff25DifferentiableConformanceV2dfySf_S2fctSfF'
+
+// DifferentiableConformance.pf(_:)
+sil hidden @$s23witness_tables_autodiff25DifferentiableConformanceV2pfySf_S2fctSfF : $@convention(method) (Float, DifferentiableConformance) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// %0                                             // users: %6, %2
+// %1                                             // user: %3
+bb0(%0 : $Float, %1 : $DifferentiableConformance):
+  debug_value %0 : $Float, let, name "x", argno 1 // id: %2
+  debug_value %1 : $DifferentiableConformance, let, name "self", argno 2 // id: %3
+  // function_ref closure #1 in DifferentiableConformance.pf(_:)
+  %4 = function_ref @$s23witness_tables_autodiff25DifferentiableConformanceV2pfySf_S2fctSfFS2fcfU_ : $@convention(thin) (Float) -> Float // user: %5
+  %5 = thin_to_thick_function %4 : $@convention(thin) (Float) -> Float to $@callee_guaranteed (Float) -> Float // user: %6
+  %6 = tuple (%0 : $Float, %5 : $@callee_guaranteed (Float) -> Float) // user: %7
+  return %6 : $(Float, @callee_guaranteed (Float) -> Float) // id: %7
+} // end sil function '$s23witness_tables_autodiff25DifferentiableConformanceV2pfySf_S2fctSfF'
+
+// closure #1 in DifferentiableConformance.df(_:)
+sil private @$s23witness_tables_autodiff25DifferentiableConformanceV2dfySf_S2fctSfFS2fcfU_ : $@convention(thin) (Float) -> Float {
+// %0                                             // users: %2, %1
+bb0(%0 : $Float):
+  debug_value %0 : $Float, let, name "v", argno 1 // id: %1
+  return %0 : $Float                              // id: %2
+} // end sil function '$s23witness_tables_autodiff25DifferentiableConformanceV2dfySf_S2fctSfFS2fcfU_'
+
+// closure #1 in DifferentiableConformance.pf(_:)
+sil private @$s23witness_tables_autodiff25DifferentiableConformanceV2pfySf_S2fctSfFS2fcfU_ : $@convention(thin) (Float) -> Float {
+// %0                                             // users: %2, %1
+bb0(%0 : $Float):
+  debug_value %0 : $Float, let, name "v", argno 1 // id: %1
+  return %0 : $Float                              // id: %2
+} // end sil function '$s23witness_tables_autodiff25DifferentiableConformanceV2pfySf_S2fctSfFS2fcfU_'
+
+// DifferentiableConformance.init()
+sil hidden @$s23witness_tables_autodiff25DifferentiableConformanceVACycfC : $@convention(method) (@thin DifferentiableConformance.Type) -> DifferentiableConformance {
+bb0(%0 : $@thin DifferentiableConformance.Type):
+  %1 = alloc_stack $DifferentiableConformance, var, name "self" // user: %3
+  %2 = struct $DifferentiableConformance ()       // user: %4
+  dealloc_stack %1 : $*DifferentiableConformance  // id: %3
+  return %2 : $DifferentiableConformance          // id: %4
+} // end sil function '$s23witness_tables_autodiff25DifferentiableConformanceVACycfC'
+
+// protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
+sil private [transparent] [thunk] @$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW : $@convention(witness_method: DifferentiableRequirement) (Float, @in_guaranteed DifferentiableConformance) -> Float {
+// %0                                             // user: %4
+// %1                                             // user: %2
+bb0(%0 : $Float, %1 : $*DifferentiableConformance):
+  %2 = load %1 : $*DifferentiableConformance      // user: %4
+  // function_ref DifferentiableConformance.f(_:)
+  %3 = function_ref @$s23witness_tables_autodiff25DifferentiableConformanceV1fyS2fF : $@convention(method) (Float, DifferentiableConformance) -> Float // user: %4
+  %4 = apply %3(%0, %2) : $@convention(method) (Float, DifferentiableConformance) -> Float // user: %5
+  return %4 : $Float                              // id: %5
+} // end sil function '$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW'
+
+// jvpMSU protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
+sil private [transparent] [thunk] @$s3jvp008MSU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW : $@convention(witness_method: DifferentiableRequirement) (Float, @in_guaranteed DifferentiableConformance) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// %0                                             // user: %4
+// %1                                             // user: %2
+bb0(%0 : $Float, %1 : $*DifferentiableConformance):
+  %2 = load %1 : $*DifferentiableConformance      // user: %4
+  // function_ref DifferentiableConformance.df(_:)
+  %3 = function_ref @$s23witness_tables_autodiff25DifferentiableConformanceV2dfySf_S2fctSfF : $@convention(method) (Float, DifferentiableConformance) -> (Float, @owned @callee_guaranteed (Float) -> Float) // user: %4
+  %4 = apply %3(%0, %2) : $@convention(method) (Float, DifferentiableConformance) -> (Float, @owned @callee_guaranteed (Float) -> Float) // users: %6, %5
+  %5 = tuple_extract %4 : $(Float, @callee_guaranteed (Float) -> Float), 0 // user: %7
+  %6 = tuple_extract %4 : $(Float, @callee_guaranteed (Float) -> Float), 1 // user: %7
+  %7 = tuple (%5 : $Float, %6 : $@callee_guaranteed (Float) -> Float) // user: %8
+  return %7 : $(Float, @callee_guaranteed (Float) -> Float) // id: %8
+} // end sil function '$s3jvp008MSU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW'
+
+// vjpMSU protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
+sil private [transparent] [thunk] @$s3vjp008MSU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW : $@convention(witness_method: DifferentiableRequirement) (Float, @in_guaranteed DifferentiableConformance) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// %0                                             // user: %4
+// %1                                             // user: %2
+bb0(%0 : $Float, %1 : $*DifferentiableConformance):
+  %2 = load %1 : $*DifferentiableConformance      // user: %4
+  // function_ref DifferentiableConformance.pf(_:)
+  %3 = function_ref @$s23witness_tables_autodiff25DifferentiableConformanceV2pfySf_S2fctSfF : $@convention(method) (Float, DifferentiableConformance) -> (Float, @owned @callee_guaranteed (Float) -> Float) // user: %4
+  %4 = apply %3(%0, %2) : $@convention(method) (Float, DifferentiableConformance) -> (Float, @owned @callee_guaranteed (Float) -> Float) // users: %6, %5
+  %5 = tuple_extract %4 : $(Float, @callee_guaranteed (Float) -> Float), 0 // user: %7
+  %6 = tuple_extract %4 : $(Float, @callee_guaranteed (Float) -> Float), 1 // user: %7
+  %7 = tuple (%5 : $Float, %6 : $@callee_guaranteed (Float) -> Float) // user: %8
+  return %7 : $(Float, @callee_guaranteed (Float) -> Float) // id: %8
+} // end sil function '$s3vjp008MSU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW'
+
+// CHECK-LABEL: sil_witness_table hidden DifferentiableConformance: DifferentiableRequirement module witness_tables_autodiff {
+// CHECK:   method #DifferentiableRequirement.f!1: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW	// protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
+// CHECK:   autodiff_associated_function jvp 1 MSU #DifferentiableRequirement.f!1: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @$s3jvp008MSU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW	// jvpMSU protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
+// CHECK:   autodiff_associated_function vjp 1 MSU #DifferentiableRequirement.f!1: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @$s3vjp008MSU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW	// vjpMSU protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
+// CHECK: }
+
+sil_witness_table hidden DifferentiableConformance: DifferentiableRequirement module witness_tables_autodiff {
+  method #DifferentiableRequirement.f!1: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW	// protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
+  autodiff_associated_function jvp 1 MSU #DifferentiableRequirement.f!1: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @$s3jvp008MSU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW	// jvpMSU protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
+  autodiff_associated_function vjp 1 MSU #DifferentiableRequirement.f!1: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @$s3vjp008MSU_xiEp23witness_tables_autodiff25DifferentiableConformanceVAC0E11RequirementA2cFP1fyS2fFTW	// vjpMSU protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
+}

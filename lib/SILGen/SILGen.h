@@ -298,11 +298,17 @@ public:
   SILWitnessTable *getWitnessTable(ProtocolConformance *conformance);
   
   /// Emit a protocol witness entry point.
+  /// SWIFT_ENABLE_TENSORFLOW
+  /// If 'autoDiffFuncId' is 'nullptr', emits the protocol witness entry point
+  /// 'witnessRef'. Otherwise, emits the protocol witness entry point for the
+  /// corresponding autodiff associated function.
   SILFunction *
   emitProtocolWitness(ProtocolConformanceRef conformance, SILLinkage linkage,
                       IsSerialized_t isSerialized, SILDeclRef requirement,
                       SILDeclRef witnessRef, IsFreeFunctionWitness_t isFree,
-                      Witness witness);
+                      // SWIFT_ENABLE_TENSORFLOW
+                      Witness witness,
+                      AutoDiffAssociatedFunctionIdentifier *autoDiffFuncId);
 
   /// Emit the default witness table for a resilient protocol.
   void emitDefaultWitnessTable(ProtocolDecl *protocol);

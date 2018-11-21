@@ -780,6 +780,15 @@ namespace {
       Entries.push_back(WitnessTableEntry::forFunction(decl));
     }
 
+    // SWIFT_ENABLE_TENSORFLOW
+    void addAutoDiffAssociatedFunction(
+        SILDeclRef origFunc,
+        AutoDiffAssociatedFunctionIdentifier *autoDiffFuncId) {
+      auto decl = cast<AbstractFunctionDecl>(origFunc.getDecl());
+      Entries.push_back(WitnessTableEntry::forAutoDiffAssociatedFunction(
+          decl, autoDiffFuncId));
+    }
+
     void addPlaceholder(MissingMemberDecl *placeholder) {
       for (auto i : range(placeholder->getNumberOfVTableEntries())) {
         (void)i;
@@ -1326,6 +1335,46 @@ public:
 #endif
 
       SILFunction *Func = entry.getMethodWitness().Witness;
+      llvm::Constant *witness = nullptr;
+      if (Func) {
+        witness = IGM.getAddrOfSILFunction(Func, NotForDefinition);
+      } else {
+        // The method is removed by dead method elimination.
+        // It should be never called. We add a pointer to an error function.
+        witness = IGM.getDeletedMethodErrorFn();
+      }
+      Table.addBitCast(witness, IGM.Int8PtrTy);
+      return;
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    void addAutoDiffAssociatedFunction(
+        SILDeclRef requirementOriginalMethod,
+        AutoDiffAssociatedFunctionIdentifier *requirementIdentifier) {
+      auto &entry = SILEntries.front();
+      SILEntries = SILEntries.slice(1);
+
+      // Resilient conformances get a resilient witness table.
+      if (ResilientConformance)
+        return;
+
+#ifndef NDEBUG
+      assert(entry.getKind() == SILWitnessTable::AutoDiffAssociatedFunction
+             && "sil witness table does not match protocol");
+      auto silWitness = entry.getAutoDiffAssociatedFunctionWitness();
+      assert(silWitness.RequirementOriginalMethod == requirementOriginalMethod
+             && "sil witness table does not match protocol");
+      assert(*silWitness.RequirementIdentifier == *requirementIdentifier
+             && "sil witness table does not match protocol");
+      auto piIndex = PI.getAutoDiffAssociatedFunctionIndex(
+          cast<AbstractFunctionDecl>(requirementOriginalMethod.getDecl()),
+          requirementIdentifier);
+      assert((size_t)piIndex.getValue() ==
+              Table.size() - WitnessTableFirstRequirementOffset &&
+             "offset doesn't match ProtocolInfo layout");
+#endif
+
+      SILFunction *Func = entry.getAutoDiffAssociatedFunctionWitness().Witness;
       llvm::Constant *witness = nullptr;
       if (Func) {
         witness = IGM.getAddrOfSILFunction(Func, NotForDefinition);
@@ -2247,6 +2296,8 @@ static bool isConstantWitnessTable(SILWitnessTable *wt) {
     case SILWitnessTable::AssociatedTypeProtocol:
     case SILWitnessTable::BaseProtocol:
     case SILWitnessTable::Method:
+    // SWIFT_ENABLE_TENSORFLOW
+    case SILWitnessTable::AutoDiffAssociatedFunction:
       continue;
 
     case SILWitnessTable::AssociatedType:
