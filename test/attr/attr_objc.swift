@@ -2186,8 +2186,8 @@ class ConformsToProtocolThrowsObjCName2 : ProtocolThrowsObjCName {
   @nonobjc final func objc_ext_objc_explicit_nonobjc(_: PlainStruct) { }
 }
 
-@objc class ObjC_Class1 : Hashable { 
-  var hashValue: Int { return 0 }
+@objc class ObjC_Class1 : Hashable {
+  func hash(into hasher: inout Hasher) {}
 }
 
 func ==(lhs: ObjC_Class1, rhs: ObjC_Class1) -> Bool {

@@ -13,7 +13,7 @@ public struct S: Hashable {
   public var z: C
   public var reabstracted: () -> ()
 
-  public var hashValue: Int { get }
+  public func hash(into hasher: inout Hasher)
   public static func ==(_: S, _: S) -> Bool
 }
 public class C: Hashable {
@@ -24,7 +24,7 @@ public class C: Hashable {
 
   public init()
 
-  public var hashValue: Int { get }
+  public func hash(into hasher: inout Hasher)
   public static func ==(_: C, _: C) -> Bool
 }
 

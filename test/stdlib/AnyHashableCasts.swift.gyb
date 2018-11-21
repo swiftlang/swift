@@ -26,7 +26,9 @@ struct HashableStruct : Hashable {
   static func ==(lhs: HashableStruct, rhs: HashableStruct) -> Bool {
     return lhs.value == rhs.value
   }
-  var hashValue : Int { return value }
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+  }
 }
 
 class HashableClass : Hashable {
@@ -35,7 +37,9 @@ class HashableClass : Hashable {
   static func ==(lhs: HashableClass, rhs: HashableClass) -> Bool {
     return lhs.value == rhs.value
   }
-  var hashValue : Int { return value }
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+  }
 }
 
 enum HashableEnum : Hashable {
@@ -45,9 +49,10 @@ enum HashableEnum : Hashable {
     case (.value(let l), .value(let r)): return l == r
     }
   }
-  var hashValue : Int {
+  func hash(into hasher: inout Hasher) {
     switch self {
-    case .value(let v): return v
+    case .value(let v):
+      hasher.combine(v)
     }
   }
 }

@@ -77,6 +77,9 @@ extension NSObject : Equatable, Hashable {
   public var hashValue: Int {
     return hash
   }
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(hash)
+  }
 }
 
 public func == (lhs: NSObject, rhs: NSObject) -> Bool {
