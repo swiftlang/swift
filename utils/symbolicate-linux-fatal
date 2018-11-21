@@ -38,15 +38,17 @@ except ImportError:
     if swift_exec is not None:
         site_packages = os.path.join(os.path.dirname(swift_exec),
                                      '../lib/python2.7/site-packages/')
-        import sys
         sys.path.append(site_packages)
         import lldb
 
 lldb_target = None
 known_memmap = {}
+
+
 def print_with_flush(buff):
     print(buff)
     sys.stdout.flush()
+
 
 def process_ldd(lddoutput):
     dyn_libs = {}
@@ -73,6 +75,7 @@ def setup_lldb_target(binary, memmap):
         slide = text_section.GetFileAddress() - text_section.GetFileOffset()
         lldb_target.SetModuleLoadAddress(module, memmap[dynlib_path] - slide)
 
+
 def check_base_address(dynlib_path, dynlib_baseaddr, memmap):
     global known_memmap
     if dynlib_path in memmap or dynlib_path in known_memmap:
@@ -86,6 +89,7 @@ def check_base_address(dynlib_path, dynlib_baseaddr, memmap):
             error_msg = error_msg.format(
                 dynlib_path, existing_baseaddr, dynlib_baseaddr)
             raise Exception(error_msg)
+
 
 def symbolicate_one(frame_addr, frame_idx, dynlib_fname):
     global lldb_target
@@ -109,6 +113,7 @@ def symbolicate_one(frame_addr, frame_idx, dynlib_fname):
 
     return "{0:s}    {1:s} {2:s}".format(
            frame_fragment, symbol_fragment, line_fragment)
+
 
 def get_processed_stack(binary, dyn_libs, stack):
     global lldb_target
@@ -158,38 +163,56 @@ def get_processed_stack(binary, dyn_libs, stack):
 
     return processed_stack
 
+
 def is_fatal_error(line):
     return line.startswith("Fatal error:")
+
 
 def is_stack_trace_header(line):
     return line.startswith("Current stack trace:")
 
+
 def should_print_previous_line(current_line, previous_line):
-    return is_fatal_error(previous_line) and not is_stack_trace_header(current_line)
+    return is_fatal_error(previous_line) and \
+        not is_stack_trace_header(current_line)
+
 
 def should_print_current_line(current_line, previous_line):
-    return (not is_fatal_error(current_line) and not is_stack_trace_header(current_line)) or (is_stack_trace_header(current_line) and not is_fatal_error(previous_line))
+    return (not is_fatal_error(current_line) and
+            not is_stack_trace_header(current_line)) or \
+           (is_stack_trace_header(current_line) and
+            not is_fatal_error(previous_line))
+
 
 def fatal_error_with_stack_trace_found(current_line, previous_line):
-    return is_stack_trace_header(current_line) and is_fatal_error(previous_line)
+    return is_stack_trace_header(current_line) and \
+        is_fatal_error(previous_line)
 
-def print_stack(fatal_error_header, fatal_error_stack_trace_header, fatal_log_format, processed_stack):
+
+def print_stack(fatal_error_header,
+                fatal_error_stack_trace_header,
+                fatal_log_format,
+                processed_stack):
     if not fatal_error_header:
         for line in processed_stack:
             print_with_flush(line)
     else:
-        #fatal error with a stack trace
-        stack_str = fatal_error_header + fatal_error_stack_trace_header + '\n'.join(processed_stack)
+        # fatal error with a stack trace
+        stack_str = fatal_error_header + fatal_error_stack_trace_header + \
+            '\n'.join(processed_stack)
         formatted_output = fatal_log_format
 
         if "%t" in formatted_output:
             current_time = datetime.datetime.now()
-            time_in_iso_format = current_time.strftime('%Y-%m-%dT%H:%M:%S,%f%z')
-            formatted_output = formatted_output.replace("%t", time_in_iso_format)
+            time_in_iso_format = \
+                current_time.strftime('%Y-%m-%dT%H:%M:%S,%f%z')
+            formatted_output = \
+                formatted_output.replace("%t", time_in_iso_format)
         if "%m" in formatted_output:
             formatted_output = formatted_output.replace("%m", stack_str)
 
         print_with_flush(formatted_output)
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -202,7 +225,10 @@ def main():
         help="Log file for symbolication. Defaults to stdin.")
     parser.add_argument(
         "--fatal-log-format", default="%m",
-        help="Format for logging fatal errors. Variable %%t will be replaced with current time in ISO 8601 format, variable %%m will be replaced with the error message with a full stack trace.")
+        help="Format for logging fatal errors. Variable %%t will be "
+             "replaced with current time in ISO 8601 format, variable "
+             "%%m will be replaced with the error message with a full "
+             "stack trace.")
     args = parser.parse_args()
 
     binary = args.binary
@@ -228,7 +254,10 @@ def main():
             stackidx = stackidx + 1
         else:
             processed_stack = get_processed_stack(binary, dyn_libs, stack)
-            print_stack(fatal_error_header, fatal_error_stack_trace_header, fatal_log_format, processed_stack)
+            print_stack(fatal_error_header,
+                        fatal_error_stack_trace_header,
+                        fatal_log_format,
+                        processed_stack)
 
             instack = False
             stackidx = 0
@@ -253,7 +282,11 @@ def main():
     if is_fatal_error(previous_line):
         print_with_flush(previous_line.rstrip())
     processed_stack = get_processed_stack(binary, dyn_libs, stack)
-    print_stack(fatal_error_header, fatal_error_stack_trace_header, fatal_log_format, processed_stack)
+    print_stack(fatal_error_header,
+                fatal_error_stack_trace_header,
+                fatal_log_format,
+                processed_stack)
+
 
 if __name__ == '__main__':
     main()
