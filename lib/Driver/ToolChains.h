@@ -34,6 +34,9 @@ protected:
                            const DynamicLinkJobAction &job,
                            const JobContext &context) const;
 
+  void addDeploymentTargetArgs(llvm::opt::ArgStringList &Arguments,
+                               const JobContext &context) const;
+
   InvocationInfo constructInvocation(const InterpretJobAction &job,
                                      const JobContext &context) const override;
   InvocationInfo constructInvocation(const DynamicLinkJobAction &job,
