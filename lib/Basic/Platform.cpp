@@ -54,6 +54,25 @@ bool swift::tripleIsAnySimulator(const llvm::Triple &triple) {
     tripleIsAppleTVSimulator(triple);
 }
 
+
+bool swift::tripleHasSwiftInTheOS(const llvm::Triple &triple) {
+  unsigned major, minor, revision;
+  if (triple.isMacOSX()) {
+    triple.getMacOSXVersion(major, minor, revision);
+    return llvm::VersionTuple(major, minor, revision) >=
+      llvm::VersionTuple(10, 14, 4);
+  } else if (triple.isiOS()) {
+    triple.getiOSVersion(major, minor, revision);
+    return llvm::VersionTuple(major, minor, revision) >=
+      llvm::VersionTuple(12, 2);
+  } else if (triple.isWatchOS()) {
+    triple.getOSVersion(major, minor, revision);
+    return llvm::VersionTuple(major, minor, revision) >=
+      llvm::VersionTuple(5, 2);
+  }
+  return false;
+}
+
 DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
   if (triple.isiOS()) {
     if (triple.isTvOS()) {
