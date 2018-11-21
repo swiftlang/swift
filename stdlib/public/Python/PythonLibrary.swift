@@ -67,13 +67,9 @@ public struct PythonLibrary {
 }
 
 // Methods of `PythonLibrary` required to set a given the Python version.
-extension PythonLibrary {
-  public static func useVersion(_ major: Int, _ minor: Int? = nil) {
+public extension PythonLibrary {
+  static func useVersion(_ major: Int, _ minor: Int? = nil) {
     let version = PythonVersion(major: major, minor: minor)
-    self.useVersion(version)
-  }
-  
-  private static func useVersion(_ version: PythonVersion) {
     PythonLibrary.Environment.version.set(version.versionString)
   }
 }
@@ -127,7 +123,7 @@ private extension PythonLibrary {
 // Methods of `PythonLibrary` required to load the Python library.
 private extension PythonLibrary {
   static let supportedMajorVersions: [Int] = [3, 2]
-  static let triedMinorVersions: [Int?] = [nil] + Array(0...30).reversed()
+  static let supportedMinorVersions: [Int?] = [nil] + Array(0...30).reversed()
 
   static let libraryPathVersionCharacter: Character = ":"
   
@@ -161,7 +157,7 @@ private extension PythonLibrary {
     }
     
     for majorVersion in supportedMajorVersions {
-      for minorVersion in triedMinorVersions {
+      for minorVersion in supportedMinorVersions {
         for libraryPath in libraryPaths {
           let version = PythonVersion(major: majorVersion, minor: minorVersion)
           guard let pythonLibraryHandle = loadPythonLibrary(
