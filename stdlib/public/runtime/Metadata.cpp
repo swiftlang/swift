@@ -527,7 +527,7 @@ swift::swift_getGenericMetadata(MetadataRequest request,
   auto &generics = description->getFullGenericContextHeader();
   size_t numGenericArgs = generics.Base.NumKeyArguments;
 
-  auto key = MetadataCacheKey(arguments, numGenericArgs);
+  auto key = MetadataCacheKey(description, arguments, numGenericArgs);
   auto result =
     getCache(generics).getOrInsert(key, request, description, arguments);
 
@@ -4338,7 +4338,7 @@ static Result performOnMetadataCache(const Metadata *metadata,
     reinterpret_cast<const void * const *>(
                                     description->getGenericArguments(metadata));
   size_t numGenericArgs = generics.Base.NumKeyArguments;
-  auto key = MetadataCacheKey(genericArgs, numGenericArgs);
+  auto key = MetadataCacheKey(description, genericArgs, numGenericArgs);
 
   return std::move(callbacks).forGenericMetadata(metadata, description,
                                                  getCache(generics), key);

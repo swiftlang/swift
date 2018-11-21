@@ -353,26 +353,103 @@ public:
 
 /// A key value as provided to the concurrent map.
 class MetadataCacheKey {
+  const TypeContextDescriptor *Description;
   const void * const *Data;
   uint32_t Length;
   uint32_t Hash;
 
+  /// Compare two witness tables, which may involving checking the
+  /// contents of their conformance descriptors.
+  static int compareWitnessTables(const WitnessTable *awt,
+                                  const WitnessTable *bwt) {
+    if (awt == bwt)
+      return 0;
+
+    auto *aDescription = awt->Description;
+    auto *bDescription = bwt->Description;
+    if (aDescription == bDescription)
+      return 0;
+
+    if (!aDescription->isSynthesizedNonUnique() ||
+        !bDescription->isSynthesizedNonUnique())
+      return comparePointers(aDescription, bDescription);
+
+    auto aType = aDescription->getCanonicalTypeMetadata();
+    auto bType = bDescription->getCanonicalTypeMetadata();
+    if (!aType || !bType)
+      return comparePointers(aDescription, bDescription);
+
+    if (int result = comparePointers(aType, bType))
+      return result;
+
+    return comparePointers(aDescription->getProtocol(),
+                           bDescription->getProtocol());
+  }
+
+  /// Compare the content from two keys.
+  static int compareContent(
+             const TypeContextDescriptor *description,
+             const void * const *adata,
+             const void * const *bdata,
+             unsigned size) {
+    auto genericContext = description->getGenericContext();
+    if (!genericContext) {
+      assert(size == 0);
+      return 0;
+    }
+
+    // Compare generic parameters.
+    for (const auto &gp : genericContext->getGenericParams()) {
+      if (gp.hasKeyArgument()) {
+        assert(size > 0);
+        --size;
+        if (auto result = comparePointers(*adata++, *bdata++))
+          return result;
+      }
+    }
+
+    // Compare generic requirements.
+    for (const auto &req : genericContext->getGenericRequirements()) {
+      if (req.Flags.hasKeyArgument()) {
+        assert(size > 0);
+        --size;
+        if (req.getKind() == GenericRequirementKind::Protocol) {
+          if (auto result =
+                  compareWitnessTables((const WitnessTable *)*adata++,
+                                       (const WitnessTable *)*bdata++))
+            return result;
+        } else {
+          if (auto result = comparePointers(*adata++, *bdata++))
+            return result;
+        }
+      }
+    }
+
+    assert(size == 0);
+    return 0;
+  }
+
 public:
-  MetadataCacheKey(const void * const *data, size_t size)
-    : Data(data), Length(size), Hash(computeHash()) {}
-  MetadataCacheKey(const void * const *data, size_t size, uint32_t hash)
-    : Data(data), Length(size), Hash(hash) {}
+  MetadataCacheKey(const TypeContextDescriptor *description,
+                   const void * const *data, size_t size)
+    : Description(description), Data(data), Length(size),
+      Hash(computeHash()) {}
+  MetadataCacheKey(const TypeContextDescriptor *description,
+                   const void * const *data, size_t size, uint32_t hash)
+    : Description(description), Data(data), Length(size), Hash(hash) {}
 
   bool operator==(MetadataCacheKey rhs) const {
+    assert(Description == rhs.Description);
+
+    // Compare the hashes.
+    if (hash() != rhs.hash()) return false;
+
     // Compare the sizes.
     unsigned asize = size(), bsize = rhs.size();
     if (asize != bsize) return false;
 
     // Compare the content.
-    auto abegin = begin(), bbegin = rhs.begin();
-    for (unsigned i = 0; i < asize; ++i)
-      if (abegin[i] != bbegin[i]) return false;
-    return true;
+    return compareContent(Description, begin(), rhs.begin(), asize) == 0;
   }
 
   int compare(const MetadataCacheKey &rhs) const {
@@ -387,15 +464,10 @@ public:
     }
 
     // Compare the content.
-    auto lbegin = begin(), rbegin = rhs.begin();
-    for (unsigned i = 0, e = size(); i != e; ++i) {
-      if (auto ptrComparison = comparePointers(lbegin[i], rbegin[i]))
-        return ptrComparison;
-    }
-
-    // Equal.
-    return 0;
+    return compareContent(Description, begin(), rhs.begin(), size());
   }
+
+  const TypeContextDescriptor *description() const { return Description; }
 
   uint32_t hash() const {
     return Hash;
@@ -408,11 +480,23 @@ public:
 private:
   uint32_t computeHash() const {
     size_t H = 0x56ba80d1 * Length;
-    for (unsigned i = 0; i < Length; i++) {
+    auto addValue = [&](const void *ptr) {
       H = (H >> 10) | (H << ((sizeof(size_t) * 8) - 10));
-      H ^= (reinterpret_cast<size_t>(Data[i])
-            ^ (reinterpret_cast<size_t>(Data[i]) >> 19));
+      H ^= (reinterpret_cast<size_t>(ptr)
+            ^ (reinterpret_cast<size_t>(ptr) >> 19));
+    };
+
+    // Hash only the generic arguments; the witness tables need a deeper
+    // comparison.
+    if (auto genericContext = Description->getGenericContext()) {
+      unsigned index = 0;
+      for (const auto &gp : genericContext->getGenericParams()) {
+        if (gp.hasKeyArgument()) {
+          addValue(Data[index++]);
+        }
+      }
     }
+
     H *= 0x27d4eb2d;
 
     // Rotate right by 10 and then truncate to 32 bits.
@@ -1287,6 +1371,8 @@ private:
   const uint16_t KeyLength;
   const uint32_t Hash;
 
+  const TypeContextDescriptor *Description;
+
   /// Valid if TrackingInfo.getState() >= PrivateMetadataState::Abstract.
   ValueType Value;
 
@@ -1300,13 +1386,14 @@ private:
 
 public:
   VariadicMetadataCacheEntryBase(const MetadataCacheKey &key)
-      : KeyLength(key.size()), Hash(key.hash()) {
+    : KeyLength(key.size()), Hash(key.hash()), Description(key.description()) {
     memcpy(this->template getTrailingObjects<const void *>(),
            key.begin(), key.size() * sizeof(const void *));
   }
 
   MetadataCacheKey getKey() const {
-    return MetadataCacheKey(this->template getTrailingObjects<const void*>(),
+    return MetadataCacheKey(Description,
+                            this->template getTrailingObjects<const void*>(),
                             KeyLength, Hash);
   }
 
