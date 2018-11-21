@@ -36,3 +36,12 @@ do {
     foo(c)
   }
 }
+
+func passAutoClosureToSubscript(_ fn: @autoclosure () -> Int) {
+  struct S {
+    subscript(_ fn: @autoclosure () -> Int) -> Int { return fn() }
+  }
+
+  let s = S()
+  let _ = s[fn] // Ok
+}
