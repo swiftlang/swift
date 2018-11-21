@@ -3434,6 +3434,7 @@ namespace {
 
       if (CG.getConstraintSystem().shouldReusePrecheckedType()) {
         if (expr->getType()) {
+          assert(!expr->getType()->hasTypeVariable());
           CG.getConstraintSystem().cacheType(expr);
           return { false, expr };
         }
