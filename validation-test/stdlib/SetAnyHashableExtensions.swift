@@ -126,7 +126,10 @@ SetTests.test("insert<Hashable>(_:)") {
   expectEqual(expected, s)
 }
 
-SetTests.test("insert<Hashable>(_:)/FormerCastTrap") {
+SetTests.test("insert<Hashable>(_:)/CastTrap")
+  .crashOutputMatches("Could not cast value of type 'main.TestHashableDerivedA'")
+  .crashOutputMatches("to 'main.TestHashableDerivedB'")
+  .code {
   var s: Set<AnyHashable> = [
     AnyHashable(TestHashableDerivedA(1010, identity: 1)),
   ]
@@ -138,6 +141,7 @@ SetTests.test("insert<Hashable>(_:)/FormerCastTrap") {
     expectEqual(1, memberAfterInsert.identity)
   }
 
+  expectCrashLater()
   _ = s.insert(TestHashableDerivedB(1010, identity: 3))
 }
 
@@ -177,7 +181,10 @@ SetTests.test("update<Hashable>(with:)") {
   expectEqual(expected, s)
 }
 
-SetTests.test("update<Hashable>(with:)/FormerCastTrap") {
+SetTests.test("update<Hashable>(with:)/CastTrap")
+  .crashOutputMatches("Could not cast value of type 'main.TestHashableDerivedA'")
+  .crashOutputMatches("to 'main.TestHashableDerivedB'")
+  .code {
   var s: Set<AnyHashable> = [
     AnyHashable(TestHashableDerivedA(1010, identity: 1)),
   ]
@@ -187,6 +194,7 @@ SetTests.test("update<Hashable>(with:)/FormerCastTrap") {
     expectEqual(1, old.identity)
   }
 
+  expectCrashLater()
   s.update(with: TestHashableDerivedB(1010, identity: 3))
 }
 
@@ -220,7 +228,10 @@ SetTests.test("remove<Hashable>(_:)") {
   }
 }
 
-SetTests.test("remove<Hashable>(_:)/FormerCastTrap") {
+SetTests.test("remove<Hashable>(_:)/CastTrap")
+  .crashOutputMatches("Could not cast value of type 'main.TestHashableDerivedA'")
+  .crashOutputMatches("to 'main.TestHashableDerivedB'")
+  .code {
   var s: Set<AnyHashable> = [
     AnyHashable(TestHashableDerivedA(1010, identity: 1)),
     AnyHashable(TestHashableDerivedA(2020, identity: 1)),
@@ -232,6 +243,7 @@ SetTests.test("remove<Hashable>(_:)/FormerCastTrap") {
     expectEqual(1, old.identity)
   }
 
+  expectCrashLater()
   s.remove(TestHashableDerivedB(2020, identity: 2))
 }
 
