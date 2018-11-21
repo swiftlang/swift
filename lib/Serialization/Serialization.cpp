@@ -2401,6 +2401,18 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
       adjointName = addDeclBaseNameRef(adjoint->Name.getBaseName());
       adjointRef = addDeclRef(attr->getAdjointFunction());
     }
+    IdentifierID jvpName = 0;
+    DeclID jvpRef = 0;
+    if (auto jvp = attr->getJVP()) {
+      jvpName = addDeclBaseNameRef(jvp->Name.getBaseName());
+      jvpRef = addDeclRef(attr->getJVPFunction());
+    }
+    IdentifierID vjpName = 0;
+    DeclID vjpRef = 0;
+    if (auto vjp = attr->getVJP()) {
+      vjpName = addDeclBaseNameRef(vjp->Name.getBaseName());
+      vjpRef = addDeclRef(attr->getVJPFunction());
+    }
 
     SmallVector<uint32_t, 4> parameters;
     for (auto param : attr->getParameters()) {
@@ -2418,7 +2430,8 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
 
     DifferentiableDeclAttrLayout::emitRecord(
       Out, ScratchRecord, abbrCode, (unsigned) attr->getMode(), primalName,
-      primalRef, adjointName, adjointRef, parameters);
+      primalRef, adjointName, adjointRef, jvpName, jvpRef, vjpName, vjpRef,
+      parameters);
     // TODO: Serialize CheckedParameterIndices.
     // TODO: Serialize trailing where clause.
     // Type-checking where clause should be done first (mimicking the

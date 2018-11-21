@@ -852,11 +852,14 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   SmallVector<AutoDiffParameter, 8> params;
   Optional<DeclNameWithLoc> primalSpec;
   Optional<DeclNameWithLoc> adjointSpec;
+  Optional<DeclNameWithLoc> jvpSpec;
+  Optional<DeclNameWithLoc> vjpSpec;
   TrailingWhereClause *whereClause = nullptr;
 
   // Parse @differentiable attribute arguments.
   if (parseDifferentiableAttributeArguments(mode, modeLoc, params, primalSpec,
-                                            adjointSpec, whereClause))
+                                            adjointSpec, jvpSpec, vjpSpec,
+                                            whereClause))
     return makeParserError();
 
   // Parse ')'.
@@ -869,7 +872,7 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   return ParserResult<DifferentiableAttr>(
     DifferentiableAttr::create(Context, atLoc, SourceRange(loc, rParenLoc),
                                mode, modeLoc, params, primalSpec, adjointSpec,
-                               whereClause));
+                               jvpSpec, vjpSpec, whereClause));
 }
 
 bool Parser::parseDifferentiableAttributeArguments(
@@ -877,6 +880,8 @@ bool Parser::parseDifferentiableAttributeArguments(
     SmallVectorImpl<AutoDiffParameter> &params,
     Optional<DifferentiableAttr::DeclNameWithLoc> &primalSpec,
     Optional<DifferentiableAttr::DeclNameWithLoc> &adjointSpec,
+    Optional<DifferentiableAttr::DeclNameWithLoc> &jvpSpec,
+    Optional<DifferentiableAttr::DeclNameWithLoc> &vjpSpec,
     TrailingWhereClause *&whereClause) {
   StringRef AttrName = "differentiable";
 
@@ -1029,7 +1034,29 @@ bool Parser::parseDifferentiableAttributeArguments(
     if (parseFuncSpec("adjoint", *adjointSpec))
       return errorAndSkipToEnd();
   }
-  
+
+  // Parse 'jvp: <func_name>' (optional).
+  if (Tok.is(tok::comma) &&
+      peekToken().is(tok::identifier) && peekToken().getText() == "jvp") {
+    SyntaxParsingContext AdjointContext(
+        SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
+    consumeToken(tok::comma);
+    jvpSpec = FuncSpec();
+    if (parseFuncSpec("jvp", *jvpSpec))
+      return errorAndSkipToEnd();
+  }
+
+  // Parse 'vjp: <func_name>' (optional).
+  if (Tok.is(tok::comma) &&
+      peekToken().is(tok::identifier) && peekToken().getText() == "vjp") {
+    SyntaxParsingContext AdjointContext(
+        SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
+    consumeToken(tok::comma);
+    vjpSpec = FuncSpec();
+    if (parseFuncSpec("vjp", *vjpSpec))
+      return errorAndSkipToEnd();
+  }
+
   // If the token is still a comma, whatever follows it must be wrong. Emit a
   // diagnostic there.
   if (Tok.is(tok::comma)) {

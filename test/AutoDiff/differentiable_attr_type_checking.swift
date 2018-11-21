@@ -464,11 +464,205 @@ protocol ProtoWithDiffReqs {
   @differentiable(reverse, wrt: (.1))
   func req5(x: Float) -> Float
 
-  // expected-error @+1 {{cannot specify primal on protocol requirement}}
+  // expected-error @+1 {{cannot specify associated differentiation function on protocol requirement}}
   @differentiable(reverse, primal: dummyPrimal)
   func req6(x: Float) -> Float
 
-  // expected-error @+1 {{cannot specify adjoint on protocol requirement}}
+  // expected-error @+1 {{cannot specify associated differentiation function on protocol requirement}}
   @differentiable(reverse, adjoint: dummyAdjoint)
   func req7(x: Float) -> Float
+}
+
+// JVP and VJP typechecking
+// These tests are not as exhaustive as the primal and adjoint tests above,
+// because JVP and VJP are still under development. When we delete primal and
+// adjoint, we will replace the primal and adjoint tests with corresponding JVP
+// and VJP tests.
+
+// JVP
+
+@differentiable(reverse, jvp: jvpSimpleJVP)
+func jvpSimple(x: Float) -> Float {
+  return x
+}
+
+func jvpSimpleJVP(x: Float) -> (Float, ((Float) -> Float)) {
+  return (x, { v in v })
+}
+
+@differentiable(reverse, wrt: (.1), jvp: jvpWrtSubsetJVP)
+func jvpWrtSubset(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+func jvpWrtSubsetJVP(x: Float, y: Float) -> (Float, (Float) -> Float) {
+  return (x + y, { v in v })
+}
+
+@differentiable(reverse, jvp: jvp2ParamsJVP)
+func jvp2Params(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+func jvp2ParamsJVP(x: Float, y: Float) -> (Float, (Float, Float) -> Float) {
+  return (x + y, { (a, b) in a + b })
+}
+
+// expected-error @+1 {{'jvpWrongTypeJVP' does not have expected type '(Float) -> (Float, (Float) -> Float)'}}
+@differentiable(reverse, jvp: jvpWrongTypeJVP)
+func jvpWrongType(x: Float) -> Float {
+  return x
+}
+
+func jvpWrongTypeJVP(x: Float) -> (Float, (Float) -> Int) {
+  return (x, { v in Int(v) })
+}
+
+// expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
+@differentiable(reverse, jvp: jvpSimpleJVP)
+func jvpNonDiffParam(x: Int) -> Float {
+  return Float(x)
+}
+
+// expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
+@differentiable(reverse, jvp: jvpSimpleJVP)
+func jvpNonDiffResult(x: Float) -> Int {
+  return Int(x)
+}
+
+// expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
+@differentiable(reverse, jvp: jvpSimpleJVP)
+func jvpNonDiffResult2(x: Float) -> (Float, Int) {
+  return (x, Int(x))
+}
+
+struct JVPStruct {
+  let p: Float
+}
+
+extension JVPStruct : Differentiable {
+  typealias TangentVector = JVPStruct
+  typealias CotangentVector = JVPStruct
+  func moved(toward direction: JVPStruct) -> JVPStruct {
+    return JVPStruct(p: p + direction.p)
+  }
+  func tangentVector(from cotangent: JVPStruct) -> JVPStruct {
+    return cotangent
+  }
+}
+
+extension JVPStruct {
+  @differentiable(reverse, jvp: wrtAllNonSelfJVP)
+  func wrtAllNonSelf(x: Float) -> Float {
+    return x + p
+  }
+
+  func wrtAllNonSelfJVP(x: Float) -> (Float, (Float) -> Float) {
+    return (x + p, { v in v })
+  }
+}
+
+extension JVPStruct {
+  @differentiable(reverse, wrt: (self, .0), jvp: wrtAllJVP)
+  func wrtAll(x: Float) -> Float {
+    return x + p
+  }
+
+  func wrtAllJVP(x: Float) -> (Float, (JVPStruct, Float) -> Float) {
+    return (x + p, { (a, b) in a.p + b })
+  }
+}
+
+// VJP
+
+@differentiable(reverse, vjp: vjpSimpleVJP)
+func vjpSimple(x: Float) -> Float {
+  return x
+}
+
+func vjpSimpleVJP(x: Float) -> (Float, ((Float) -> Float)) {
+  return (x, { v in v })
+}
+
+@differentiable(reverse, wrt: (.1), vjp: vjpWrtSubsetVJP)
+func vjpWrtSubset(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+func vjpWrtSubsetVJP(x: Float, y: Float) -> (Float, (Float) -> Float) {
+  return (x + y, { v in v })
+}
+
+@differentiable(reverse, vjp: vjp2ParamsVJP)
+func vjp2Params(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+func vjp2ParamsVJP(x: Float, y: Float) -> (Float, (Float) -> (Float, Float)) {
+  return (x + y, { v in (v, v) })
+}
+
+// expected-error @+1 {{'vjpWrongTypeVJP' does not have expected type '(Float) -> (Float, (Float) -> Float)'}}
+@differentiable(reverse, vjp: vjpWrongTypeVJP)
+func vjpWrongType(x: Float) -> Float {
+  return x
+}
+
+func vjpWrongTypeVJP(x: Float) -> (Float, (Float) -> Int) {
+  return (x, { v in Int(v) })
+}
+
+// expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
+@differentiable(reverse, vjp: vjpSimpleVJP)
+func vjpNonDiffParam(x: Int) -> Float {
+  return Float(x)
+}
+
+// expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
+@differentiable(reverse, vjp: vjpSimpleVJP)
+func vjpNonDiffResult(x: Float) -> Int {
+  return Int(x)
+}
+
+// expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
+@differentiable(reverse, vjp: vjpSimpleVJP)
+func vjpNonDiffResult2(x: Float) -> (Float, Int) {
+  return (x, Int(x))
+}
+
+struct VJPStruct {
+  let p: Float
+}
+
+extension VJPStruct : Differentiable {
+  typealias TangentVector = VJPStruct
+  typealias CotangentVector = VJPStruct
+  func moved(toward direction: VJPStruct) -> VJPStruct {
+    return VJPStruct(p: p + direction.p)
+  }
+  func tangentVector(from cotangent: VJPStruct) -> VJPStruct {
+    return cotangent
+  }
+}
+
+extension VJPStruct {
+  @differentiable(reverse, vjp: wrtAllNonSelfVJP)
+  func wrtAllNonSelf(x: Float) -> Float {
+    return x + p
+  }
+
+  func wrtAllNonSelfVJP(x: Float) -> (Float, (Float) -> Float) {
+    return (x + p, { v in v })
+  }
+}
+
+extension VJPStruct {
+  @differentiable(reverse, wrt: (self, .0), vjp: wrtAllVJP)
+  func wrtAll(x: Float) -> Float {
+    return x + p
+  }
+
+  func wrtAllVJP(x: Float) -> (Float, (Float) -> (VJPStruct, Float)) {
+    return (x + p, { v in (VJPStruct(p: v), v) })
+  }
 }
