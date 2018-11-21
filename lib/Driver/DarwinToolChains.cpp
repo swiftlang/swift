@@ -246,6 +246,31 @@ static void findARCLiteLibPath(const toolchains::Darwin &TC,
 }
 
 void
+toolchains::Darwin::addArgsToLinkARCLite(ArgStringList &Arguments,
+                                         const JobContext &context) const {
+  if (!context.Args.hasFlag(options::OPT_link_objc_runtime,
+                            options::OPT_no_link_objc_runtime,
+                            /*Default=*/wantsObjCRuntime(getTriple())))
+    return;
+
+  llvm::SmallString<128> ARCLiteLib;
+  findARCLiteLibPath(*this, ARCLiteLib);
+
+  if (!ARCLiteLib.empty()) {
+    llvm::sys::path::append(ARCLiteLib, "libarclite_");
+    ARCLiteLib += getPlatformNameForTriple(getTriple());
+    ARCLiteLib += ".a";
+
+    Arguments.push_back("-force_load");
+    Arguments.push_back(context.Args.MakeArgString(ARCLiteLib));
+
+    // Arclite depends on CoreFoundation.
+    Arguments.push_back("-framework");
+    Arguments.push_back("CoreFoundation");
+  }
+}
+
+void
 toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
                                         const DynamicLinkJobAction &job,
                                         const JobContext &context) const {
@@ -440,25 +465,7 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
   if (llvm::sys::fs::exists(CompilerRTPath))
     Arguments.push_back(context.Args.MakeArgString(CompilerRTPath));
 
-  if (context.Args.hasFlag(options::OPT_link_objc_runtime,
-                           options::OPT_no_link_objc_runtime,
-                           /*Default=*/wantsObjCRuntime(Triple))) {
-    llvm::SmallString<128> ARCLiteLib;
-    findARCLiteLibPath(*this, ARCLiteLib);
-
-    if (!ARCLiteLib.empty()) {
-      llvm::sys::path::append(ARCLiteLib, "libarclite_");
-      ARCLiteLib += getPlatformNameForTriple(Triple);
-      ARCLiteLib += ".a";
-
-      Arguments.push_back("-force_load");
-      Arguments.push_back(context.Args.MakeArgString(ARCLiteLib));
-
-      // Arclite depends on CoreFoundation.
-      Arguments.push_back("-framework");
-      Arguments.push_back("CoreFoundation");
-    }
-  }
+  addArgsToLinkARCLite(Arguments, context);
 
   for (const Arg *arg :
        context.Args.filtered(options::OPT_F, options::OPT_Fsystem)) {
