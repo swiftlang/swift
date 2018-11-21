@@ -51,6 +51,9 @@ extension LifetimeTracked : Hashable {
   public var hashValue: Int {
     return value
   }
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+  }
 }
 
 extension LifetimeTracked : Strideable {
