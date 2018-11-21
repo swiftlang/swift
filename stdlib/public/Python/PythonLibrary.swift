@@ -24,7 +24,7 @@ import Glibc
 // The `PythonLibrary` struct that loads Python symbols at runtime.
 //===----------------------------------------------------------------------===//
 
-struct PythonLibrary {
+public struct PythonLibrary {
   private static let shared = PythonLibrary()
   private static let pythonLegacySymbolName = "PyString_AsString"
   
@@ -66,9 +66,67 @@ struct PythonLibrary {
   }
 }
 
+// Methods of `PythonLibrary` required to set a given the Python version.
+extension PythonLibrary {
+  private static func useVersion(_ version: PythonVersion) {
+    PythonLibrary.Environment.version.set(version.versionString)
+  }
+  
+  public static func useVersion(_ major: Int, _ minor: Int?) {
+    let version = PythonVersion(major: major, minor: minor)
+    self.useVersion(version)
+  }
+}
+
+// `PythonVersion` struct that defines a given Python version.
+private extension PythonLibrary {
+  struct PythonVersion {
+    let major: Int
+    let minor: Int?
+    
+    init(major: Int, minor: Int?) {
+      self.major = major
+      self.minor = minor
+    }
+    
+    var versionString: String {
+      var versionString = String(major)
+      if let minor = minor {
+        versionString += ".\(minor)"
+      }
+      return versionString
+    }
+  }
+}
+
+// `PythonLibrary.Environment` enum used to read and set environment variables.
+private extension PythonLibrary {
+  enum Environment: String {
+    private static let keyPrefix = "PYTHON"
+    private static let keySeparator = "_"
+    
+    case library = "LIBRARY"
+    case version = "VERSION"
+    case loaderLogging = "LOADER_LOGGING"
+    
+    var key: String {
+      return Environment.keyPrefix + Environment.keySeparator + rawValue
+    }
+    
+    var value: String? {
+      guard let value = getenv(key) else { return nil }
+      return String(cString: value)
+    }
+    
+    func set(_ value: String?) {
+      setenv(key, value, 1)
+    }
+  }
+}
+
 // Methods of `PythonLibrary` required to load the Python library.
 private extension PythonLibrary {
-  static let supportedMajorVersions: [Int] = Array(2...3).reversed()
+  static let supportedMajorVersions: [Int] = [3, 2]
   static let supportedMinorVersions: [Int?] = [nil] + Array(0...30).reversed()
   
   static let libraryPathVersionCharacter: Character = ":"
@@ -94,7 +152,6 @@ private extension PythonLibrary {
         }
       }
     }
-    
     return libraryPaths
   }()
   
@@ -106,9 +163,9 @@ private extension PythonLibrary {
     for majorVersion in supportedMajorVersions {
       for minorVersion in supportedMinorVersions {
         for libraryPath in libraryPaths {
+          let version = PythonVersion(major: majorVersion, minor: minorVersion)
           guard let pythonLibraryHandle = loadPythonLibrary(
-            at: libraryPath, majorVersion: majorVersion,
-            minorVersion: minorVersion) else {
+            at: libraryPath, version: version) else {
               continue
           }
           return pythonLibraryHandle
@@ -119,17 +176,14 @@ private extension PythonLibrary {
   }
   
   static func loadPythonLibrary(
-    at path: String, majorVersion: Int, minorVersion: Int? = nil
+    at path: String, version: PythonVersion
   ) -> UnsafeMutableRawPointer? {
-    var versionString = String(majorVersion)
-    if let minorVersion = minorVersion {
-      versionString += ".\(minorVersion)"
-    }
+    let versionString = version.versionString
     
     if let requiredPythonVersion = Environment.version.value {
       let requiredMajorVersion = Int(requiredPythonVersion)
       if requiredPythonVersion != versionString,
-        requiredMajorVersion != majorVersion {
+        requiredMajorVersion != version.major {
         return nil
       }
     }
@@ -155,26 +209,5 @@ private extension PythonLibrary {
   static func log(_ message: String) {
     guard Environment.loaderLogging.value != nil else { return }
     fputs(message + "\n", stderr)
-  }
-}
-
-// Methods of `PythonLibrary` required to read the environment variables.
-private extension PythonLibrary {
-  enum Environment: String {
-    private static let keyPrefix = "PYTHON"
-    private static let keySeparator = "_"
-    
-    case library = "LIBRARY"
-    case version = "VERSION"
-    case loaderLogging = "LOADER_LOGGING"
-    
-    var key: String {
-      return Environment.keyPrefix + Environment.keySeparator + rawValue
-    }
-    
-    var value: String? {
-      guard let value = getenv(key) else { return nil }
-      return String(cString: value)
-    }
   }
 }
