@@ -39,6 +39,9 @@ class FailureDiagnostic {
   ConstraintSystem &CS;
   ConstraintLocator *Locator;
 
+  /// The original anchor before any simplification.
+  Expr *RawAnchor;
+  /// Simplified anchor associated with the given locator.
   Expr *Anchor;
   /// Indicates whether locator could be simplified
   /// down to anchor expression.
@@ -47,7 +50,7 @@ class FailureDiagnostic {
 public:
   FailureDiagnostic(Expr *expr, ConstraintSystem &cs,
                     ConstraintLocator *locator)
-      : E(expr), CS(cs), Locator(locator) {
+      : E(expr), CS(cs), Locator(locator), RawAnchor(locator->getAnchor()) {
     std::tie(Anchor, HasComplexLocator) = computeAnchor();
   }
 
@@ -77,6 +80,8 @@ public:
   }
 
   Expr *getParentExpr() const { return E; }
+
+  Expr *getRawAnchor() const { return RawAnchor; }
 
   Expr *getAnchor() const { return Anchor; }
 
@@ -590,6 +595,16 @@ private:
     }
     return type;
   }
+};
+
+/// Diagnose situations when @autoclosure argument is passed to @autoclosure
+/// parameter directly without calling it first.
+class AutoClosureForwardingFailure final : public FailureDiagnostic {
+public:
+  AutoClosureForwardingFailure(ConstraintSystem &cs, ConstraintLocator *locator)
+      : FailureDiagnostic(nullptr, cs, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 } // end namespace constraints
