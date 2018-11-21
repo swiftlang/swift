@@ -224,6 +224,35 @@ static bool wantsObjCRuntime(const llvm::Triple &triple) {
   llvm_unreachable("unknown Darwin OS");
 }
 
+void
+toolchains::Darwin::addLinkerInputArgs(InvocationInfo &II,
+                                       const JobContext &context) const {
+  ArgStringList &Arguments = II.Arguments;
+  if (context.shouldUseInputFileList()) {
+    Arguments.push_back("-filelist");
+    Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
+    II.FilelistInfos.push_back({Arguments.back(), file_types::TY_Object,
+                                FilelistInfo::WhichFiles::Input});
+  } else {
+    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                           file_types::TY_Object);
+  }
+
+  addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+
+  if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile)
+    addInputsOfType(Arguments, context.Inputs, context.Args,
+                    file_types::TY_SwiftModuleFile, "-add_ast_path");
+  else
+    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                           file_types::TY_SwiftModuleFile, "-add_ast_path");
+
+  // Add all .swiftmodule file inputs as arguments, preceded by the
+  // "-add_ast_path" linker option.
+  addInputsOfType(Arguments, context.InputActions,
+                  file_types::TY_SwiftModuleFile, "-add_ast_path");
+}
+
 static void findARCLiteLibPath(const toolchains::Darwin &TC,
                                llvm::SmallVectorImpl<char> &ARCLiteLib) {
   auto& D = TC.getDriver();
@@ -509,29 +538,7 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
   InvocationInfo II = {LD};
   ArgStringList &Arguments = II.Arguments;
 
-  if (context.shouldUseInputFileList()) {
-    Arguments.push_back("-filelist");
-    Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
-    II.FilelistInfos.push_back({Arguments.back(), file_types::TY_Object,
-                                FilelistInfo::WhichFiles::Input});
-  } else {
-    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
-                           file_types::TY_Object);
-  }
-
-  addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
-
-  if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile)
-    addInputsOfType(Arguments, context.Inputs, context.Args,
-                    file_types::TY_SwiftModuleFile, "-add_ast_path");
-  else
-    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
-                           file_types::TY_SwiftModuleFile, "-add_ast_path");
-
-  // Add all .swiftmodule file inputs as arguments, preceded by the
-  // "-add_ast_path" linker option.
-  addInputsOfType(Arguments, context.InputActions,
-                  file_types::TY_SwiftModuleFile, "-add_ast_path");
+  addLinkerInputArgs(II, context);
 
   switch (job.getKind()) {
   case LinkKind::None:
