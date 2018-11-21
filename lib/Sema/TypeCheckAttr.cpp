@@ -2126,7 +2126,7 @@ static FuncDecl *resolveAutoDiffAssociatedFunction(
     TC.diagnose(nameLoc, diag::differentiable_attr_specified_not_function,
                 specifier.Name);
   };
-  std::function<void()> invalidTypeContextDiagnostic = [&]() {
+  auto invalidTypeContextDiagnostic = [&]() {
     TC.diagnose(nameLoc,
                 diag::differentiable_attr_function_not_same_type_context,
                 specifier.Name);
