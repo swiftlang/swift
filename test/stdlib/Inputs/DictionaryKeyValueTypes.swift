@@ -98,6 +98,9 @@ final class TestKeyTy
   var hashValue: Int {
     return _hashValue
   }
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(_hashValue)
+  }
 
   var value: Int
   var _hashValue: Int

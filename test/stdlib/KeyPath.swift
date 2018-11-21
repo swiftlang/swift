@@ -592,7 +592,9 @@ struct KeyA: Hashable {
   init(value: String) { self.value = value }
 
   static func ==(a: KeyA, b: KeyA) -> Bool { return a.value == b.value }
-  var hashValue: Int { return value.hashValue }
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+  }
 }
 struct KeyB: Hashable {
   var canary = LifetimeTracked(2222)
@@ -602,7 +604,9 @@ struct KeyB: Hashable {
   init(value: Int) { self.value = value }
 
   static func ==(a: KeyB, b: KeyB) -> Bool { return a.value == b.value }
-  var hashValue: Int { return value.hashValue }
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+  }
 }
 
 func fullGenericContext<T: Hashable, U: Hashable>(x: T, y: U) -> KeyPath<Subscripts<T>, SubscriptResult<T, U>> {

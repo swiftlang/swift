@@ -10,8 +10,8 @@ class TestHashableBase : Hashable {
     self.value = value
     self.identity = identity
   }
-  var hashValue: Int {
-    return value
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
   }
   static func == (
     lhs: TestHashableBase,

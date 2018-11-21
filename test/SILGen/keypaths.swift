@@ -280,7 +280,7 @@ func iuoKeyPaths() {
 
 class Bass: Hashable {
   static func ==(_: Bass, _: Bass) -> Bool { return false }
-  var hashValue: Int { return 0 }
+  func hash(into hasher: inout Hasher) {}
 }
 
 class Treble: Bass { }

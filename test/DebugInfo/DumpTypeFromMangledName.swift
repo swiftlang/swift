@@ -53,9 +53,7 @@ let _ = main()
 public struct tinky : Equatable, Hashable {
   internal let _value: Int
 
-  public var hashValue: Int {
-    return 0
-  }
+  public func hash(into hasher: inout Hasher) {}
 }
 
 public func == (lhs: tinky, rhs: tinky) -> Bool {
