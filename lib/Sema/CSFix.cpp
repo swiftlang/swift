@@ -204,7 +204,9 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
 }
 
 bool AutoClosureForwarding::diagnose(Expr *root, bool asNote) const {
-  return false;
+  auto failure =
+      AutoClosureForwardingFailure(getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
 }
 
 AutoClosureForwarding *AutoClosureForwarding::create(ConstraintSystem &cs,
