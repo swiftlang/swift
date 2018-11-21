@@ -848,18 +848,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   auto isAutoClosureArg = [&](Expr *anchor, unsigned argIdx) -> bool {
     assert(anchor);
 
-    auto *call = dyn_cast<ApplyExpr>(anchor);
-    if (!call)
-      return false;
-
-    Expr *argExpr = nullptr;
-    if (auto *PE = dyn_cast<ParenExpr>(call->getArg())) {
-      assert(argsWithLabels.size() == 1);
-      argExpr = PE->getSubExpr();
-    } else if (auto *TE = dyn_cast<TupleExpr>(call->getArg())) {
-      argExpr = TE->getElement(argIdx);
-    }
-
+    auto *argExpr = getArgumentExpr(anchor, argIdx);
     if (!argExpr)
       return false;
 
