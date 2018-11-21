@@ -219,7 +219,7 @@
                 "swift-integration-tests": "swift-DEVELOPMENT-SNAPSHOT-2018-10-22-a",
                 "swift-xcode-playground-support": "swift-DEVELOPMENT-SNAPSHOT-2018-10-22-a",
                 "ninja": "253e94c1fa511704baeb61cf69995bbf09ba435e",
-                "tensorflow": "01bcaa9336724e80541aa7d3dcb14d6f9fd6b2b4",
+                "tensorflow": "32e55164f691ff1f61a57a7bf36d414cb7ac7968",
                 "tensorflow-swift-bindings": "09d795dfc15b85d44718a1ad57c7cf9e651eca2d"
             }
         }
