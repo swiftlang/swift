@@ -5,30 +5,47 @@ sil_stage raw
 import Swift
 import Builtin
 
+// The pullback function emitted by the compiler. Parameter are a vector, as in
+// vector-Jacobian products, and primal values. The function is not itself a
+// pullback, but to be partially applied to form a pullback, which takes a
+// vector and returns vector-Jacobian products evaluated at the original
+// parameter.
 sil hidden @foo_adj : $@convention(thin) (Float, Float, Float) -> Float {
 bb0(%0 : @trivial $Float, %1 : @trivial $Float, %2 : @trivial $Float):
   return %2 : $Float
 }
 
+// The original function with an attribute that specifies the compiler-emitted pullback.
 sil hidden [reverse_differentiable source 0 wrt 0 primal @foo adjoint @foo_adj primitive] @foo : $@convention(thin) (Float) -> Float {
 bb0(%0 : @trivial $Float):
   return %0 : $Float
 }
 
-sil @make_diff_func : $@convention(thin) () -> @autodiff @convention(thin) (Float) -> Float {
-bb0:
-  %0 = function_ref @foo : $@convention(thin) (Float) -> Float
-  %1 = autodiff_function [wrt 0 1] [order 1] %0 : $@convention(thin) (Float) -> Float
-  %2 = function_ref @foo_adj : $@convention(thin) (Float, Float, Float) -> Float
-  %3 = autodiff_function [wrt 0 1] [order 1] %0 : $@convention(thin) (Float) -> Float with {%0 : $@convention(thin) (Float) -> Float, %2 : $@convention(thin) (Float, Float, Float) -> Float}
-  %4 = autodiff_function_extract [vjp] [order 1] %3 : $@autodiff @convention(thin) (Float) -> Float
-  return %1 : $@autodiff @convention(thin) (Float) -> Float
+// The vector-Jacobian product function, which returns the original result and a pullback.
+sil hidden @foo_vjp : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : @trivial $Float):
+  %1 = function_ref @foo : $@convention(thin) (Float) -> Float
+  %2 = apply %1(%0) : $@convention(thin) (Float) -> Float
+  %3 = function_ref @foo_adj : $@convention(thin) (Float, Float, Float) -> Float
+  %4 = partial_apply [callee_guaranteed] %3(%0, %2) : $@convention(thin) (Float, Float, Float) -> Float
+  %5 = tuple (%2 : $Float, %4 : $@callee_guaranteed (Float) -> Float)
+  return %5 : $(Float, @callee_guaranteed (Float) -> Float)
 }
 
-// CHECK-LABEL: @make_diff_func
-// CHECK: %0 = function_ref @foo : $@convention(thin) (Float) -> Float
-// CHECK: %1 = autodiff_function [wrt 0 1] [order 1] %0 : $@convention(thin) (Float) -> Float
-// CHECK: %2 = function_ref @foo_adj : $@convention(thin) (Float, Float, Float) -> Float
-// CHECK: %3 = autodiff_function [wrt 0 1] [order 1] %0 : $@convention(thin) (Float) -> Float with {%0 : $@convention(thin) (Float) -> Float, %2 : $@convention(thin) (Float, Float, Float) -> Float}
-// CHECK: %4 = autodiff_function_extract [vjp] [order 1] %3 : $@autodiff @convention(thin) (Float) -> Float
-// CHECK: return %1 : $@autodiff @convention(thin) (Float) -> Float
+sil @make_diff_func : $@convention(thin) () -> @autodiff @convention(thin) (Float) -> Float {
+bb0:
+  %orig = function_ref @foo : $@convention(thin) (Float) -> Float
+  %undiffedFunc = autodiff_function [wrt 0] [order 1] %orig : $@convention(thin) (Float) -> Float
+  %vjp = function_ref @foo_vjp : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+  %diffFunc = autodiff_function [wrt 0] [order 1] %orig : $@convention(thin) (Float) -> Float with {undef : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float), %vjp : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)}
+  %extractedVJP = autodiff_function_extract [vjp] [order 1] %diffFunc : $@autodiff @convention(thin) (Float) -> Float
+  return %undiffedFunc : $@autodiff @convention(thin) (Float) -> Float
+}
+
+// CHECK-LABEL: @make_diff_func : $@convention(thin) () -> @autodiff @convention(thin) (Float) -> Float
+// CHECK:   [[FOO:%.*]] = function_ref @foo : $@convention(thin) (Float) -> Float
+// CHECK:   [[UNDIFFED_FOO:%.*]] = autodiff_function [wrt 0] [order 1] [[FOO]] : $@convention(thin) (Float) -> Float
+// CHECK:   [[FOO_VJP:%.*]] = function_ref @foo_vjp : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK:   [[DIFFED_FOO:%.*]] = autodiff_function [wrt 0] [order 1] [[FOO]] : $@convention(thin) (Float) -> Float with {undef : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float), [[FOO_VJP]] : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)}
+// CHECK:   [[EXTRACTED_VJP:%.*]] = autodiff_function_extract [vjp] [order 1] [[DIFFED_FOO]] : $@autodiff @convention(thin) (Float) -> Float
+// CHECK:   return [[UNDIFFED_FOO]] : $@autodiff @convention(thin) (Float) -> Float

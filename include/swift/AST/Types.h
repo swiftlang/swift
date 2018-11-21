@@ -4081,8 +4081,8 @@ public:
   CanSILFunctionType getWithDifferentiability(
       unsigned differentiationOrder, const SmallBitVector &parameterIndices);
 
-  /// Returns the differentiation function type associated functions with this
-  /// function type.
+  /// Returns the type of a differentiation function that is associated with
+  /// a function of this type.
   CanSILFunctionType getAutoDiffAssociatedFunctionType(
       const SmallBitVector &parameterIndices, unsigned differentiationOrder,
       AutoDiffAssociatedFunctionKind kind, SILModule &module);

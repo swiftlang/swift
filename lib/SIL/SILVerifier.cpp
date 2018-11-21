@@ -1255,13 +1255,33 @@ public:
 
   void checkAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
     // FIXME(rxwei): Complete verification.
-    for (auto &op : adfi->getAllOperands())
-      require(op.get()->getType().is<SILFunctionType>(),
-              "All operands must have a function type");
-    auto fnTy = adfi->getOriginalFunction()
-        ->getType().castTo<SILFunctionType>();
-    require(!fnTy->isDifferentiable(),
-            "The original function operand must not be '@autodiff'");
+    auto origTy =
+        adfi->getOriginalFunction()->getType().getAs<SILFunctionType>();
+    require(origTy, "The original function must have a function type");
+    require(!origTy->isDifferentiable(),
+            "The original function must not be @autodiff");
+    if (F.getModule().getStage() == SILStage::Canonical ||
+        adfi->hasAssociatedFunctions()) {
+      for (auto order : range(1, adfi->getDifferentiationOrder() + 1)) {
+        auto pair = adfi->getAssociatedFunctionPair(order);
+        auto jvpType = pair.first->getType().getAs<SILFunctionType>();
+        require(jvpType, "The JVP function must have a function type");
+        require(!jvpType->isDifferentiable(),
+                "The JVP function must not be @autodiff");
+        auto expectedJVPType = origTy->getAutoDiffAssociatedFunctionType(
+            adfi->getParameterIndices(), order,
+            AutoDiffAssociatedFunctionKind::JVP, F.getModule());
+        require(expectedJVPType == jvpType, "Unexpected JVP function type");
+        auto vjpType = pair.second->getType().getAs<SILFunctionType>();
+        require(vjpType, "The VJP function must have a function type");
+        require(!vjpType->isDifferentiable(),
+                "The VJP function must not be @autodiff");
+        auto expectedVJPType = origTy->getAutoDiffAssociatedFunctionType(
+            adfi->getParameterIndices(), order,
+            AutoDiffAssociatedFunctionKind::VJP, F.getModule());
+        require(expectedVJPType == vjpType, "Unexpected VJP function type");
+      }
+    }
   }
   
   void checkAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *adfei) {

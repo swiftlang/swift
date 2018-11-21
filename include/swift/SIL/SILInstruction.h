@@ -7621,6 +7621,10 @@ public:
     return numOperands - 1;
   }
 
+  bool hasAssociatedFunctions() const {
+    return numOperands > 1;
+  }
+
   ArrayRef<Operand> getAssociatedFunctions() const {
     return getAllOperands().drop_front();
   }
