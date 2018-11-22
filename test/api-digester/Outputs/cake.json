@@ -539,64 +539,6 @@
           "implicit": true
         },
         {
-          "kind": "Var",
-          "name": "hashValue",
-          "printedName": "hashValue",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "Int",
-              "printedName": "Int",
-              "usr": "s:Si"
-            },
-            {
-              "kind": "Getter",
-              "name": "_",
-              "printedName": "_()",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Int",
-                  "printedName": "Int",
-                  "usr": "s:Si"
-                }
-              ],
-              "declKind": "Accessor",
-              "usr": "s:4cake6NumberO9hashValueSivg",
-              "moduleName": "cake",
-              "implicit": true
-            }
-          ],
-          "declKind": "Var",
-          "usr": "s:4cake6NumberO9hashValueSivp",
-          "moduleName": "cake",
-          "implicit": true
-        },
-        {
-          "kind": "Function",
-          "name": "hash",
-          "printedName": "hash(into:)",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "Void",
-              "printedName": "()"
-            },
-            {
-              "kind": "TypeNominal",
-              "name": "Hasher",
-              "printedName": "Hasher",
-              "paramValueOwnership": "InOut",
-              "usr": "s:s6HasherV"
-            }
-          ],
-          "declKind": "Func",
-          "usr": "s:4cake6NumberO4hash4intoys6HasherVz_tF",
-          "moduleName": "cake",
-          "implicit": true,
-          "funcSelfKind": "NonMutating"
-        },
-        {
           "kind": "Constructor",
           "name": "init",
           "printedName": "init(rawValue:)",
