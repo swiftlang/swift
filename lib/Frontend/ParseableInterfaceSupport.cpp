@@ -376,17 +376,42 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     llvm::SmallVectorImpl<char> &Scratch) {
 
+  // If running in OnlySerialized mode, ParseableInterfaceModuleLoader
+  // should not have been constructed at all.
+  assert(LoadMode != ModuleLoadingMode::OnlySerialized);
+
   auto &FS = *Ctx.SourceMgr.getFileSystem();
   auto &Diags = Ctx.Diags;
-  llvm::SmallString<128> InPath, OutPath;
+  llvm::SmallString<128> ModPath, InPath, OutPath;
 
   // First check to see if the .swiftinterface exists at all. Bail if not.
-  InPath = DirName;
-  llvm::sys::path::append(InPath, ModuleFilename);
+  ModPath = DirName;
+  llvm::sys::path::append(ModPath, ModuleFilename);
+
   auto Ext = file_types::getExtension(file_types::TY_SwiftParseableInterfaceFile);
+  InPath = ModPath;
   llvm::sys::path::replace_extension(InPath, Ext);
   if (!FS.exists(InPath))
     return std::make_error_code(std::errc::no_such_file_or_directory);
+
+  // Next, if we're in the load mode that prefers .swiftmodules, see if there's
+  // one here we can _likely_ load (validates OK). If so, bail early with
+  // errc::not_supported, so the next (serialized) loader in the chain will load
+  // it.
+  if (LoadMode == ModuleLoadingMode::PreferSerialized) {
+    if (FS.exists(ModPath)) {
+      auto ModBuf = FS.getBufferForFile(ModPath, /*FileSize=*/-1,
+                                        /*RequiresNullTerminator=*/false);
+      auto VI = serialization::validateSerializedAST(ModBuf.get()->getBuffer());
+      if (VI.status == serialization::Status::Valid) {
+        return std::make_error_code(std::errc::not_supported);
+      }
+    }
+  }
+
+  // At this point we're either in PreferParseable mode or there's no credible
+  // adjacent .swiftmodule so we'll go ahead and start trying to convert the
+  // .swiftinterface.
 
   // Set up a _potential_ sub-invocation to consume the .swiftinterface and emit
   // the .swiftmodule.
