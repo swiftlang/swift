@@ -127,14 +127,20 @@ namespace {
   class LinkedExprCollector : public ASTWalker {
     
     llvm::SmallVectorImpl<Expr*> &LinkedExprs;
+    ConstraintSystem &CS;
 
   public:
-    
-    LinkedExprCollector(llvm::SmallVectorImpl<Expr*> &linkedExprs) :
-        LinkedExprs(linkedExprs) {}
-    
+    LinkedExprCollector(llvm::SmallVectorImpl<Expr *> &linkedExprs,
+                        ConstraintSystem &cs)
+        : LinkedExprs(linkedExprs), CS(cs) {}
+
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      
+
+      if (CS.shouldReusePrecheckedType() &&
+          !CS.getType(expr)->hasTypeVariable()) {
+        return { false, expr };
+      }
+
       // Store top-level binary exprs for further analysis.
       if (isa<BinaryExpr>(expr) ||
           
@@ -195,6 +201,11 @@ namespace {
         LTI(lti), CS(cs) {}
     
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+
+      if (CS.shouldReusePrecheckedType() &&
+          !CS.getType(expr)->hasTypeVariable()) {
+        return { false, expr };
+      }
       
       if (isa<IntegerLiteralExpr>(expr)) {
         LTI.haveIntLiteral = true;
@@ -934,6 +945,11 @@ namespace {
       CS(cs) {}
     
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+
+      if (CS.shouldReusePrecheckedType() &&
+          !CS.getType(expr)->hasTypeVariable()) {
+        return { false, expr };
+      }
       
       if (auto applyExpr = dyn_cast<ApplyExpr>(expr)) {
         if (isa<PrefixUnaryExpr>(applyExpr) ||
@@ -3240,6 +3256,12 @@ namespace {
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       while (true) {
+
+        // If we should reuse pre-checked types, don't sanitize the expression
+        // if it's already type-checked.
+        if (CS.shouldReusePrecheckedType() && expr->getType())
+          return { false, expr };
+
         // OpenExistentialExpr contains OpaqueValueExpr in its sub expression.
         if (auto OOE = dyn_cast<OpenExistentialExpr>(expr)) {
           auto archetypeVal = OOE->getOpaqueValue();
@@ -3409,6 +3431,15 @@ namespace {
     ConstraintWalker(ConstraintGenerator &CG) : CG(CG) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+
+      if (CG.getConstraintSystem().shouldReusePrecheckedType()) {
+        if (expr->getType()) {
+          assert(!expr->getType()->hasTypeVariable());
+          CG.getConstraintSystem().cacheType(expr);
+          return { false, expr };
+        }
+      }
+
       // Note that the subexpression of a #selector expression is
       // unevaluated.
       if (auto sel = dyn_cast<ObjCSelectorExpr>(expr)) {
@@ -3629,7 +3660,7 @@ void ConstraintSystem::optimizeConstraints(Expr *e) {
   SmallVector<Expr *, 16> linkedExprs;
   
   // Collect any linked expressions.
-  LinkedExprCollector collector(linkedExprs);
+  LinkedExprCollector collector(linkedExprs, *this);
   e->walk(collector);
   
   // Favor types, as appropriate.

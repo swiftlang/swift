@@ -840,11 +840,17 @@ Optional<Type> swift::getTypeOfCompletionContextExpr(
                                           referencedDecl);
 }
 
-bool swift::typeCheckCompletionSequence(DeclContext *DC, Expr *&parsedExpr) {
+/// \brief Return the type of operator function for specified LHS, or a null
+/// \c Type on error.
+FunctionType *
+swift::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
+                                   Identifier opName, DeclRefKind refKind,
+                                   ConcreteDeclRef &referencedDecl) {
   auto &ctx = DC->getASTContext();
   DiagnosticSuppression suppression(ctx.Diags);
   TypeChecker &TC = createTypeChecker(ctx);
-  return TC.typeCheckCompletionSequence(parsedExpr, DC);
+  return TC.getTypeOfCompletionOperator(DC, LHS, opName, refKind,
+                                        referencedDecl);
 }
 
 bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
