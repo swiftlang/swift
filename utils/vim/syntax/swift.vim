@@ -144,7 +144,7 @@ syn match swiftKeyword
 syn region swiftCaseLabelRegion
       \ matchgroup=swiftKeyword start=/\<case\>/ matchgroup=Delimiter end=/:/ oneline contains=TOP
 syn region swiftDefaultLabelRegion
-      \ matchgroup=swiftKeyword start=/\<default\>/ matchgroup=Delimiter end=/:/
+      \ matchgroup=swiftKeyword start=/\<default\>/ matchgroup=Delimiter end=/:/ oneline
 
 syn region swiftParenthesisRegion matchgroup=NONE start=/(/ end=/)/ contains=TOP
 
