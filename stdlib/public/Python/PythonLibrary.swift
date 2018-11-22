@@ -51,7 +51,7 @@ public struct PythonLibrary {
   }
   
   static func loadSymbol<T>(
-    name: String, legacyName: String? = nil, type: T.Type
+    name: String, legacyName: String? = nil, type: T.Type = T.self
   ) -> T {
     var name = name
     if let legacyName = legacyName, PythonLibrary.shared.isLegacyPython {
