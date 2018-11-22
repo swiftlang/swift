@@ -1237,6 +1237,19 @@ public enum FloatingPointSign: Int {
   public static func ==(a: FloatingPointSign, b: FloatingPointSign) -> Bool {
     return a.rawValue == b.rawValue
   }
+
+  @inlinable
+  public var hashValue: Int { return rawValue.hashValue }
+
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(rawValue)
+  }
+
+  @inlinable
+  public func _rawHashValue(seed: Int) -> Int {
+    return rawValue._rawHashValue(seed: seed)
+  }
 }
 
 /// The IEEE 754 floating-point classes.
