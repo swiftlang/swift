@@ -116,7 +116,7 @@ syn match swiftImplicitVarName
 
 " TypeName[Optionality]?
 syn match swiftType contained skipwhite skipempty nextgroup=swiftTypeParameters
-      \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
+      \ /\<[A-Z_][A-Za-z_0-9\.]*\>[!?]\?/
 " [Type:Type] (dictionary) or [Type] (array)
 syn region swiftType contained contains=swiftTypePair,swiftType
       \ matchgroup=Delimiter start=/\[/ end=/\]/
