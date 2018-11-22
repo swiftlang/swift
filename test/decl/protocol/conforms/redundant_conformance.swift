@@ -19,7 +19,7 @@ extension ConformsToP
   : P2 { // expected-warning{{conformance of 'ConformsToP' to protocol 'P2' was already stated in the protocol's module 'redundant_conformance_B'}}
 }
 
-extension OtherConformsToP : P1 { // expected-error{{redundant conformance of 'OtherConformsToP' to protocol 'P1'}}
+extension OtherConformsToP : P1 { // expected-error{{redundant conformance of 'OtherConformsToP' to protocol 'P1'}}{{27-33=}}
   func f() -> Int { return 0 }
 }
 

@@ -5069,7 +5069,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
                         ? diag::redundant_conformance_conditional
                         : diag::redundant_conformance;
       diagnose(diag.Loc, diagID, dc->getDeclaredInterfaceType(),
-               diag.Protocol->getName());
+               diag.Protocol->getName())
+        .fixItRemove(diag.Loc);
     }
 
     // Special case: explain that 'RawRepresentable' conformance
