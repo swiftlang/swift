@@ -3539,6 +3539,8 @@ llvm::GlobalValue *IRGenModule::defineAssociatedConformanceDescriptor(
 llvm::Constant *IRGenModule::getAddrOfProtocolConformanceDescriptor(
                                 const RootProtocolConformance *conformance,
                                 ConstantInit definition) {
+  IRGen.addLazyWitnessTable(conformance);
+
   auto entity = LinkEntity::forProtocolConformanceDescriptor(conformance);
   return getAddrOfLLVMVariable(entity, definition,
                                DebugTypeInfo());
