@@ -35,8 +35,9 @@ namespace {
 
 // Defined out-of-line so that we can see ~ModuleFile.
 SerializedModuleLoaderBase::SerializedModuleLoaderBase(ASTContext &ctx,
-                                                       DependencyTracker *tracker)
-  : ModuleLoader(tracker), Ctx(ctx) {}
+                                                       DependencyTracker *tracker,
+                                                       ModuleLoadingMode loadMode)
+  : ModuleLoader(tracker), Ctx(ctx), LoadMode(loadMode) {}
 SerializedModuleLoaderBase::~SerializedModuleLoaderBase() = default;
 
 SerializedModuleLoader::~SerializedModuleLoader() = default;
@@ -49,6 +50,12 @@ std::error_code SerializedModuleLoaderBase::openModuleFiles(
   assert(((ModuleBuffer && ModuleDocBuffer) ||
           (!ModuleBuffer && !ModuleDocBuffer)) &&
          "Module and Module Doc buffer must both be initialized or NULL");
+
+  // The SerializedModuleLoaderBase implementation here only knows how to do a
+  // serialized (not parseable) module-load; this is valid behaviour in all
+  // ModuleLoadingModes except OnlyParseable mode, where it is disabled.
+  if (LoadMode == ModuleLoadingMode::OnlyParseable)
+    return std::make_error_code(std::errc::not_supported);
 
   clang::vfs::FileSystem &FS = *Ctx.SourceMgr.getFileSystem();
 
