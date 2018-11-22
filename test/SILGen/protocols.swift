@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name protocols -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name protocols -enable-sil-ownership %s -emit-sorted-sil | %FileCheck %s
 
 //===----------------------------------------------------------------------===//
 // Calling Existential Subscripts

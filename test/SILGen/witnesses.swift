@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name witnesses -Xllvm -sil-full-demangle %s -disable-objc-attr-requires-foundation-module -enable-objc-interop -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name witnesses -Xllvm -sil-full-demangle %s -disable-objc-attr-requires-foundation-module -enable-objc-interop -enable-sil-ownership -emit-sorted-sil | %FileCheck %s
 
 infix operator <~>
 

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-silgen %s -swift-version 4 | %FileCheck -check-prefix CHECK -check-prefix CHECK-FRAGILE %s
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-silgen %s -swift-version 4 -enable-resilience | %FileCheck -check-prefix CHECK -check-prefix CHECK-RESILIENT %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-silgen %s -swift-version 4 -emit-sorted-sil | %FileCheck -check-prefix CHECK -check-prefix CHECK-FRAGILE %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-silgen %s -swift-version 4 -enable-resilience -emit-sorted-sil | %FileCheck -check-prefix CHECK -check-prefix CHECK-RESILIENT %s
 
 struct Struct<T> {
     var x: T
@@ -29,36 +29,41 @@ struct Struct<T> {
 // CHECK:   func hash(into hasher: inout Hasher)
 // CHECK: }
 // CHECK-LABEL: extension Struct : Decodable & Encodable where T : Decodable, T : Encodable {
-// CHECK:   init(from decoder: Decoder) throws
 // CHECK:   func encode(to encoder: Encoder) throws
+// CHECK:   init(from decoder: Decoder) throws
 // CHECK: }
 
 extension Struct: Equatable where T: Equatable {}
-// CHECK-FRAGILE-LABEL: // static Struct<A>.__derived_struct_equals(_:_:)
-// CHECK-FRAGILE-NEXT: sil hidden @$s30synthesized_conformance_struct6StructVAASQRzlE010__derived_C7_equalsySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Struct<T>, @in_guaranteed Struct<T>, @thin Struct<T>.Type) -> Bool {
-// CHECK-RESILIENT-LABEL: // static Struct<A>.== infix(_:_:)
-// CHECK-RESILIENT-NEXT: sil hidden @$s30synthesized_conformance_struct6StructVAASQRzlE2eeoiySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Struct<T>, @in_guaranteed Struct<T>, @thin Struct<T>.Type) -> Bool {
 
 extension Struct: Hashable where T: Hashable {}
-// CHECK-LABEL: // Struct<A>.hashValue.getter
-// CHECK-NEXT: sil hidden @$s30synthesized_conformance_struct6StructVAASHRzlE9hashValueSivg : $@convention(method) <T where T : Hashable> (@in_guaranteed Struct<T>) -> Int {
+
+extension Struct: Codable where T: Codable {}
 
 // CHECK-LABEL: // Struct<A>.hash(into:)
 // CHECK-NEXT: sil hidden @$s30synthesized_conformance_struct6StructVAASHRzlE4hash4intoys6HasherVz_tF : $@convention(method) <T where T : Hashable> (@inout Hasher, @in_guaranteed Struct<T>) -> () {
-
-extension Struct: Codable where T: Codable {}
+//
+// CHECK-LABEL: // Struct<A>.hashValue.getter
+// CHECK-NEXT: sil hidden @$s30synthesized_conformance_struct6StructVAASHRzlE9hashValueSivg : $@convention(method) <T where T : Hashable> (@in_guaranteed Struct<T>) -> Int {
+//
+// CHECK-FRAGILE-LABEL: // static Struct<A>.__derived_struct_equals(_:_:)
+// CHECK-FRAGILE-NEXT: sil hidden @$s30synthesized_conformance_struct6StructVAASQRzlE010__derived_C7_equalsySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Struct<T>, @in_guaranteed Struct<T>, @thin Struct<T>.Type) -> Bool {
+//
+// CHECK-RESILIENT-LABEL: // static Struct<A>.== infix(_:_:)
+// CHECK-RESILIENT-NEXT: sil hidden @$s30synthesized_conformance_struct6StructVAASQRzlE2eeoiySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Struct<T>, @in_guaranteed Struct<T>, @thin Struct<T>.Type) -> Bool {
+//
 // CHECK-LABEL: // Struct<A>.init(from:)
 // CHECK-NEXT: sil hidden @$s30synthesized_conformance_struct6StructVAASeRzSERzlE4fromACyxGs7Decoder_p_tKcfC : $@convention(method) <T where T : Decodable, T : Encodable> (@in Decoder, @thin Struct<T>.Type) -> (@out Struct<T>, @error Error)
-
+//
 // CHECK-LABEL: // Struct<A>.encode(to:)
 // CHECK-NEXT: sil hidden @$s30synthesized_conformance_struct6StructVAASeRzSERzlE6encode2toys7Encoder_p_tKF : $@convention(method) <T where T : Decodable, T : Encodable> (@in_guaranteed Encoder, @in_guaranteed Struct<T>) -> @error Error {
 
 
 // Witness tables
 
-// CHECK-LABEL: sil_witness_table hidden <T where T : Equatable> Struct<T>: Equatable module synthesized_conformance_struct {
-// CHECK-NEXT:   method #Equatable."=="!1: <Self where Self : Equatable> (Self.Type) -> (Self, Self) -> Bool : @$s30synthesized_conformance_struct6StructVyxGSQAASQRzlSQ2eeoiySbx_xtFZTW	// protocol witness for static Equatable.== infix(_:_:) in conformance <A> Struct<A>
-// CHECK-NEXT:   conditional_conformance (T: Equatable): dependent
+// CHECK-LABEL: sil_witness_table hidden <T where T : Decodable, T : Encodable> Struct<T>: Encodable module synthesized_conformance_struct {
+// CHECK-NEXT:   method #Encodable.encode!1: <Self where Self : Encodable> (Self) -> (Encoder) throws -> () : @$s30synthesized_conformance_struct6StructVyxGSEAASeRzSERzlSE6encode2toys7Encoder_p_tKFTW	// protocol witness for Encodable.encode(to:) in conformance <A> Struct<A>
+// CHECK-NEXT:   conditional_conformance (T: Decodable): dependent
+// CHECK-NEXT:   conditional_conformance (T: Encodable): dependent
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_witness_table hidden <T where T : Hashable> Struct<T>: Hashable module synthesized_conformance_struct {
@@ -69,14 +74,14 @@ extension Struct: Codable where T: Codable {}
 // CHECK-NEXT:   conditional_conformance (T: Hashable): dependent
 // CHECK-NEXT: }
 
+// CHECK-LABEL: sil_witness_table hidden <T where T : Equatable> Struct<T>: Equatable module synthesized_conformance_struct {
+// CHECK-NEXT:   method #Equatable."=="!1: <Self where Self : Equatable> (Self.Type) -> (Self, Self) -> Bool : @$s30synthesized_conformance_struct6StructVyxGSQAASQRzlSQ2eeoiySbx_xtFZTW	// protocol witness for static Equatable.== infix(_:_:) in conformance <A> Struct<A>
+// CHECK-NEXT:   conditional_conformance (T: Equatable): dependent
+// CHECK-NEXT: }
+
 // CHECK-LABEL: sil_witness_table hidden <T where T : Decodable, T : Encodable> Struct<T>: Decodable module synthesized_conformance_struct {
 // CHECK-NEXT:   method #Decodable.init!allocator.1: <Self where Self : Decodable> (Self.Type) -> (Decoder) throws -> Self : @$s30synthesized_conformance_struct6StructVyxGSeAASeRzSERzlSe4fromxs7Decoder_p_tKcfCTW	// protocol witness for Decodable.init(from:) in conformance <A> Struct<A>
 // CHECK-NEXT:   conditional_conformance (T: Decodable): dependent
 // CHECK-NEXT:   conditional_conformance (T: Encodable): dependent
 // CHECK-NEXT: }
 
-// CHECK-LABEL: sil_witness_table hidden <T where T : Decodable, T : Encodable> Struct<T>: Encodable module synthesized_conformance_struct {
-// CHECK-NEXT:   method #Encodable.encode!1: <Self where Self : Encodable> (Self) -> (Encoder) throws -> () : @$s30synthesized_conformance_struct6StructVyxGSEAASeRzSERzlSE6encode2toys7Encoder_p_tKFTW	// protocol witness for Encodable.encode(to:) in conformance <A> Struct<A>
-// CHECK-NEXT:   conditional_conformance (T: Decodable): dependent
-// CHECK-NEXT:   conditional_conformance (T: Encodable): dependent
-// CHECK-NEXT: }

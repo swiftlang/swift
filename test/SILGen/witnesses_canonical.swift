@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s -emit-sorted-sil | %FileCheck %s
 
 // rdar://problem/20714534 -- we need to canonicalize an associated type's
 // protocols when emitting witness method table for a conformance.
@@ -51,8 +51,13 @@ struct XQ3 : Q3 {
   typealias Assoc = XP
 }
 
-// CHECK: sil_witness_table hidden XQ3: Q3 module witnesses_canonical {
+// CHECK: sil_witness_table hidden XQ3: Q1 module witnesses_canonical {
 // CHECK:  associated_type_protocol (Assoc: P1): XP: P1 module witnesses_canonical
+// CHECK:  associated_type Assoc: XP
+// CHECK: }
+
+// CHECK: sil_witness_table hidden XQ3: Q2 module witnesses_canonical {
 // CHECK:  associated_type_protocol (Assoc: P2): XP: P2 module witnesses_canonical
 // CHECK:  associated_type Assoc: XP
 // CHECK: }
+

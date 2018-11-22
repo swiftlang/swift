@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -enable-sil-ownership %s -emit-sorted-sil | %FileCheck %s
 
 public protocol P {
   func publicRequirement()
@@ -21,11 +21,8 @@ extension R {
 public struct S : R {}
 
 // CHECK-LABEL: sil private @$s21witness_accessibility1R{{.*}}E17publicRequirementyyF
-// CHECK-LABEL: sil private @$s21witness_accessibility1R{{.*}}E19internalRequirementyyF
 // CHECK-LABEL: sil private @$s21witness_accessibility1R{{.*}}AE18privateRequirementyyF
-
-// CHECK-LABEL: sil private [transparent] [thunk] @$s21witness_accessibility1SVAA1R{{.*}}dELLP18privateRequirementyyFTW
-// CHECK-LABEL: sil private [transparent] [thunk] @$s21witness_accessibility1SVAA1QA2aDP19internalRequirementyyFTW
+// CHECK-LABEL: sil private @$s21witness_accessibility1R{{.*}}E19internalRequirementyyF
 
 // FIXME: This is public because of an explicit workaround for
 // the default implementation of publicRequirement() having the
@@ -40,3 +37,6 @@ public struct S : R {}
 // should generate a warning, since it has no effect.
 
 // CHECK-LABEL: sil [transparent] [thunk] @$s21witness_accessibility1SVAA1PA2aDP17publicRequirementyyFTW
+
+// CHECK-LABEL: sil private [transparent] [thunk] @$s21witness_accessibility1SVAA1QA2aDP19internalRequirementyyFTW
+// CHECK-LABEL: sil private [transparent] [thunk] @$s21witness_accessibility1SVAA1R{{.*}}dELLP18privateRequirementyyFTW
