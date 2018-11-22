@@ -15,6 +15,7 @@
 % for mutable in (True, False):
 %  Self = 'UnsafeMutableRawBufferPointer' if mutable else 'UnsafeRawBufferPointer'
 %  Mutable = 'Mutable' if mutable else ''
+%  BufferMutable = '_MutableBufferPointer, Mutable' if mutable else ''
 
 /// A ${Mutable.lower()} nonowning collection interface to the bytes in a
 /// region of memory.
@@ -147,7 +148,7 @@ extension Unsafe${Mutable}RawBufferPointer: Sequence {
   }
 }
 
-extension Unsafe${Mutable}RawBufferPointer: ${Mutable}Collection {
+extension Unsafe${Mutable}RawBufferPointer: ${BufferMutable}Collection {
   // TODO: Specialize `index` and `formIndex` and
   // `_failEarlyRangeCheck` as in `UnsafeBufferPointer`.
   public typealias Element = UInt8

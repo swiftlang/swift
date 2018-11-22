@@ -1067,11 +1067,11 @@ extension ArraySlice: RangeReplaceableCollection {
 
   @inlinable
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
-      return try body(&bufferPointer)
+      return try body(bufferPointer)
     }
   }
 

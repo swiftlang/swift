@@ -14,6 +14,7 @@
 % for mutable in (True, False):
 %  Self = 'UnsafeMutableBufferPointer' if mutable else 'UnsafeBufferPointer'
 %  Mutable = 'Mutable' if mutable else ''
+%  BufferMutable = '_MutableBufferPointer, Mutable' if mutable else ''
 /// A nonowning collection interface to a buffer of ${Mutable.lower()}
 /// elements stored contiguously in memory.
 ///
@@ -117,7 +118,7 @@ extension Unsafe${Mutable}BufferPointer: Sequence {
   }
 }
 
-extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessCollection {
+extension Unsafe${Mutable}BufferPointer: ${BufferMutable}Collection, RandomAccessCollection {
   public typealias Index = Int
   public typealias Indices = Range<Int>
 

@@ -248,7 +248,7 @@ extension MutableCollection where Self: RandomAccessCollection {
   ) rethrows {
     let didSortUnsafeBuffer = try _withUnsafeMutableBufferPointerIfSupported {
       buffer -> Void? in
-        try buffer._stableSortImpl(by: areInIncreasingOrder)
+        try buffer.sort(by: areInIncreasingOrder)
     }
     if didSortUnsafeBuffer == nil {
       // Fallback since we can't use an unsafe buffer: sort into an outside

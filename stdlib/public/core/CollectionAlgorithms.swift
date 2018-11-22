@@ -320,7 +320,7 @@ extension MutableCollection where Self : BidirectionalCollection {
   ) rethrows -> Index {
     let maybeOffset = try _withUnsafeMutableBufferPointerIfSupported {
       (bufferPointer) -> Int in
-      let unsafeBufferPivot = try bufferPointer._partitionImpl(
+      let unsafeBufferPivot = try bufferPointer.partition(
         by: belongsInSecondPartition)
       return unsafeBufferPivot - bufferPointer.startIndex
     }
@@ -450,6 +450,13 @@ extension MutableCollection where Self : RandomAccessCollection {
   ///   Swift.
   @inlinable
   public mutating func shuffle<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) {
+    _shuffle(using: &generator)
+  }
+
+  @usableFromInline
+  internal mutating func _shuffle<T: RandomNumberGenerator>(
     using generator: inout T
   ) {
     guard count > 1 else { return }

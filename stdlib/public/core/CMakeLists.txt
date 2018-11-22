@@ -96,6 +96,7 @@ set(SWIFTLIB_ESSENTIAL
   UnicodeScalar.swift # ORDER DEPENDENCY: Must precede Mirrors.swift
   Mirrors.swift.gyb
   Misc.swift
+  MutableBufferPointer.swift
   MutableCollection.swift
   NativeDictionary.swift
   NativeSet.swift

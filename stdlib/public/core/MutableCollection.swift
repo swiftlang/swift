@@ -177,7 +177,7 @@ where SubSequence: MutableCollection
   /// same algorithm on `body`\ 's argument lets you trade safety for
   /// speed.
   mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R?
 }
 
@@ -185,7 +185,7 @@ where SubSequence: MutableCollection
 extension MutableCollection {
   @inlinable
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return nil
   }

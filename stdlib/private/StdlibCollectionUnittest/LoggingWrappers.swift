@@ -375,7 +375,7 @@ extension LoggingMutableCollection: MutableCollection {
    }
    
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     MutableCollectionLog._withUnsafeMutableBufferPointerIfSupported[selfType] += 1
     let result = try base._withUnsafeMutableBufferPointerIfSupported(body)
@@ -578,7 +578,7 @@ extension BufferAccessLoggingMutableCollection: MutableCollection {
   }
 
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     Log._withUnsafeMutableBufferPointerIfSupported[selfType] += 1
     let result = try base._withUnsafeMutableBufferPointerIfSupported(body)

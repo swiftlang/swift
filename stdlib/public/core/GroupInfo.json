@@ -175,6 +175,7 @@
     "Pointer.swift",
     "UnsafePointer.swift",
     "UnsafeRawPointer.swift",
+    "MutableBufferPointer.swift",
     "UnsafeBufferPointer.swift",
     "UnsafeRawBufferPointer.swift"
   ],
