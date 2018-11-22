@@ -1233,7 +1233,7 @@ static std::string getDynamicReplacementSection(IRGenModule &IGM) {
     sectionName = "swift5_replace";
     break;
   case llvm::Triple::COFF:
-    sectionName = ".sw5repl";
+    sectionName = ".sw5repl$B";
     break;
   default:
     llvm_unreachable("Don't know how to emit field records table for "
