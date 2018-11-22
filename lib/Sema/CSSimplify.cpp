@@ -848,18 +848,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   auto isAutoClosureArg = [&](Expr *anchor, unsigned argIdx) -> bool {
     assert(anchor);
 
-    auto *call = dyn_cast<ApplyExpr>(anchor);
-    if (!call)
-      return false;
-
-    Expr *argExpr = nullptr;
-    if (auto *PE = dyn_cast<ParenExpr>(call->getArg())) {
-      assert(argsWithLabels.size() == 1);
-      argExpr = PE->getSubExpr();
-    } else if (auto *TE = dyn_cast<TupleExpr>(call->getArg())) {
-      argExpr = TE->getElement(argIdx);
-    }
-
+    auto *argExpr = getArgumentExpr(anchor, argIdx);
     if (!argExpr)
       return false;
 
@@ -895,11 +884,15 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
       // is itself `@autoclosure` function type in Swift < 5,
       // let's fix that up by making it look like argument is
       // called implicitly.
-      if (!cs.getASTContext().isSwiftVersionAtLeast(5)) {
-        if (param.isAutoClosure() &&
-            isAutoClosureArg(locator.getAnchor(), argIdx)) {
-          argTy = argTy->castTo<FunctionType>()->getResult();
-          cs.increaseScore(SK_FunctionConversion);
+      if (param.isAutoClosure() &&
+          isAutoClosureArg(locator.getAnchor(), argIdx)) {
+        argTy = argTy->castTo<FunctionType>()->getResult();
+        cs.increaseScore(SK_FunctionConversion);
+
+        if (cs.getASTContext().isSwiftVersionAtLeast(5)) {
+          auto *fixLoc = cs.getConstraintLocator(loc);
+          if (cs.recordFix(AutoClosureForwarding::create(cs, fixLoc)))
+            return cs.getTypeMatchFailure(loc);
         }
       }
 
@@ -5431,6 +5424,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::CoerceToCheckedCast:
   case FixKind::RelabelArguments:
   case FixKind::AddConformance:
+  case FixKind::AutoClosureForwarding:
     llvm_unreachable("handled elsewhere");
   }
 

@@ -2356,3 +2356,23 @@ Expr *constraints::simplifyLocatorToAnchor(ConstraintSystem &cs,
 
   return locator->getAnchor();
 }
+
+Expr *constraints::getArgumentExpr(Expr *expr, unsigned index) {
+  Expr *argExpr = nullptr;
+  if (auto *AE = dyn_cast<ApplyExpr>(expr))
+    argExpr = AE->getArg();
+  else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(expr))
+    argExpr = UME->getArgument();
+  else if (auto *SE = dyn_cast<SubscriptExpr>(expr))
+    argExpr = SE->getIndex();
+  else
+    return nullptr;
+
+  if (auto *PE = dyn_cast<ParenExpr>(argExpr)) {
+    assert(index == 0);
+    return PE->getSubExpr();
+  }
+
+  assert(isa<TupleExpr>(argExpr));
+  return cast<TupleExpr>(argExpr)->getElement(index);
+}
