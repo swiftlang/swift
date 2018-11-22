@@ -19,6 +19,72 @@
 
 import TestsUtils
 
+/// The `Flatten` benchmark family tests the performance of `flatMap` function
+/// and functionally equivalent `map.joined`, along with their lazy variants
+/// relative to an imperative approach with simple for-in loop across a
+/// selection of representative types.
+///
+/// For transforming fully materialized collection with contiguous memory layout
+/// additional Unsafe versions were created as attempts at manual optimization
+/// that try to eliminate the abstraction overhead using assumptions about the
+/// internal memory layout of underlying data structures.
+///
+/// # Colors
+///
+/// First hypotetical scenario is transforming an array of RBGA pixel values
+/// represented as `struct ColorVal { let r, g, b, a: UInt8 }` to flat [UInt8]
+/// in ARGB format. In case of [ColorVal], this means that the real work being
+/// performed is copying of byte swizzled raw memory, obfuscated by type casting
+/// and higher-level abstractions (structs, arrays).
+///
+/// The alternative type `class ColorRef` demonstrates the impact of using
+/// reference type.
+///
+/// After experimenting with Unsafe variants, conforming the `ColorVal` to
+/// `Sequence` protocol by creating a custom iterator, which performes the color
+/// component swizzling, showed promising performance (better than imperative
+/// approach). That varaint is called `SwizSeq`. Turns out that conforming
+/// the type to `Collection` protocol (in `SwizCol` variant) is even better,
+/// allowing compiler to optimize the lazy variants for almost 4x gain, beating
+/// even the best performing Unsafe variant that copies the colors byte-by-byte.
+///
+/// See http://wiki.c2.com/?SufficientlySmartCompiler
+///
+/// The Unsafe variants were originally meant as aspirational goals for the
+/// functional approach, but are now kept here as artifacts of partial
+/// improvements over the imperative approach, which demonstrate unexpected
+/// performance behavior.
+///
+/// # Tuple4 and Array4
+///
+/// Second scenario tests the performance of flattening the compound type
+/// `(Int, Int, Int, Int)`, typealiased as Tuple4, into [Int]. This variant
+/// compensates for the larger data type by ommiting the structural
+/// transformation. In case of fully materialized collection, [Tuple4], the real
+/// work is simply a type cast. There's currently no Array API to perform this
+/// in O(1), pending [SE-0223](https://forums.swift.org/t/15194/41). Therefore
+/// the Unsafe variants perform a simple memory copy.
+///
+/// Next variant, `Array4` uses 4 element "static" array instead of the Tuple4,
+/// and is meant do demonstrate the relative cost of switching to this currency
+/// type. This is important, because Array is naturally used, thanks to its
+/// syntactic sugar, as the flattened collection in all the functional-style
+/// scenarios, i.e. the closures in `flatMap` and `map.joined` are producing
+/// "static" arrays on the fly.
+///
+/// The `Tuple4` and `Array4` type groups are varied across 3 container types:
+///
+/// * `Flatten.Array` is a fully materialized collection,
+/// * `Flatten.LazySeq` is lazily generated sequence, and
+/// * `Flatten.AnySeq.LazySeq` is a type erased version of the latter.
+///
+/// After [SE-0234](https://forums.swift.org/t/18002), no standard library API
+/// returns `AnySequence` anymore, but the tests
+/// `Flatten.LazySeq.Tuple4.flatMap` and `Flatten.AnySeq.LazySeq.Tuple4.flatMap`
+/// hint at the hidden potential for improvement in the utter performance
+/// debacle that is `Flatten.LazySeq`. The `AnySeq` group could be removed in
+/// the future, when _that_ deoptimization is properly addressed.
+
 let t: [BenchmarkCategory] = [.api, .validation]
 %{
 import re
@@ -27,6 +93,7 @@ method_variant_re = re.compile(r'\.([a-z])')
 control_flow_separator_re = re.compile(r'-')
 group_separator_re = re.compile(r'\.')
 
+# TODO: move to GYB helpers when #20334 lands
 def run_function_name(benchmark_name):
   return 'run_' + group_separator_re.sub(  # remove dots
     '', method_variant_re.sub(  # replace .methodName with _methodName
@@ -40,7 +107,7 @@ Tuple4 = [
   ('map.joined', """
     let f = input.map({ [$0.0, $0.1, $0.2, $0.3] }).joined()
 """),
-  ('for-in.Naive', """
+  ('for-in', """
     var f: [Int] = []
 
     for (x, y, z, w) in input {
@@ -61,24 +128,40 @@ Tuple4 = [
       f.append(w)
     }
 """),
-  ('Unsafe', """
+  ('Unsafe.InitSeq', """
+    // Create an UnsafeBufferPointer that conforms to a Sequence viewing the
+    // memory as a flattened sequence of 4 * count Ints. Construct a new Array
+    // from this sequence using Array.init<Sequence>.
     let f = input.withUnsafeBufferPointer {
-      $0.baseAddress!.withMemoryRebound(to: Int.self, capacity: input.count * 4) {
+      $0.baseAddress!.withMemoryRebound(
+        to: Int.self, capacity: input.count * 4) {
         Array(UnsafeBufferPointer(start: $0, count: input.count * 4))
+      }
+    }
+"""),
+  ('Unsafe.IntsReserve', """
+    // Copy Int-by-Int.
+    var f: [Int] = []
+    let size = input.count * 4
+    f.reserveCapacity(size)
+    input.withUnsafeBufferPointer {
+      $0.baseAddress!.withMemoryRebound(to: Int.self, capacity: size) {
+        ints in
+        for i in 0..<size {
+          f.append(ints[i])
+        }
       }
     }
 """),
 ]
 
-CollT4 = Tuple4[0:-1]  # skip Unsafe, input is not an Array
-SeqT4 = Tuple4[0:-2]  # skip Reserve, input is just some Sequence, size unknown
+SeqT4 = Tuple4[0:3]  # skip Reserve and Unsafe, input is just a Sequence
 
 FlattenTuple4 = (
   [('Flatten.Array.Tuple4.' + n, c) for (n, c) in Tuple4] +
-  [('Flatten.Array.Tuple4.lazy.' + n, c) for (n, c) in CollT4] +
-  [('Flatten.Seq.Tuple4.' + n, c) for (n, c) in SeqT4] +
-  [('Flatten.AnySeq.Array.Tuple4.' + n, c) for (n, c) in SeqT4] +
-  [('Flatten.AnySeq.Seq.Tuple4.' + n, c) for (n, c) in SeqT4]
+  [('Flatten.Array.Tuple4.lazy.' + n, c) for (n, c) in SeqT4] +
+  [('Flatten.LazySeq.Tuple4.' + n, c) for (n, c) in SeqT4] +
+  [('Flatten.AnySeq.LazySeq.Tuple4.' + n, c) for (n, c) in SeqT4]
 )
 
 Array4 = [
@@ -88,7 +171,7 @@ Array4 = [
   ('joined', """
     let f = input.joined()
 """),
-  ('for-in.Elem', """
+  ('for-in', """
     var f: [Int] = []
 
     for array in input {
@@ -97,34 +180,32 @@ Array4 = [
       }
     }
 """),
-  ('for-in.Batch', """
-    var f: [Int] = []
-
-    for array in input {
-      f += array
-    }
-"""),
 ]
 
 FlattenArray4 = (
   [('Flatten.Array.Array4.' + n, c) for (n, c) in Array4] +
-  [('Flatten.Array.Array4.lazy.' + n, c) for (n, c) in Array4] +
-  [('Flatten.Seq.Array4.' + n, c) for (n, c) in Array4] +
-  [('Flatten.AnySeq.Array.Array4.' + n, c) for (n, c) in Array4] +
-  [('Flatten.AnySeq.Seq.Array4.' + n, c) for (n, c) in Array4]
+  [('Flatten.Array.Array4.lazy.' + n, c) for (n, c) in Array4[0:2]] +
+  [('Flatten.LazySeq.Array4.' + n, c) for (n, c) in Array4] # +
+#  [('Flatten.AnySeq.LazySeq.Array4.' + n, c) for (n, c) in Array4]
 )
 
-Colors = [  # let's pretend we're converting pixel data from RGBA to ARGB
-  ('flatMap', """
-    let f = input.flatMap { [$0.a, $0.r, $0.g, $0.b] }
-"""),
-  ('map.joined', """
-    let f = input.map({ [$0.a, $0.r, $0.g, $0.b] }).joined()
-"""),
-  ('lazy.map.joined', """
-    let f = input.lazy.map({ [$0.a, $0.r, $0.g, $0.b] }).joined()
-"""),
-  ('for-in.Naive', """
+ColorFunctional = [(variant + func_name + type_name, """
+    let f = input.""" + variant + func_body.format(transform) + '\n')
+  for variant in ['', 'lazy.']
+  for func_name, func_body in [
+    ('flatMap.', 'flatMap {{ {0} }}'),
+    ('map.joined.', 'map({{ {0} }}).joined()'),
+  ]
+  for type_name, transform in [
+    ('Array', '[$0.a, $0.r, $0.g, $0.b]'),
+    ('ContArr', 'ContiguousArray([$0.a, $0.r, $0.g, $0.b])'),
+    ('SwizCol', '$0.collection'),
+    ('SwizSeq', '$0.sequence'),
+  ]
+]
+
+ColorImperative = [
+  ('for-in', """
     var f: [UInt8] = []
 
     for c in input {
@@ -134,71 +215,149 @@ Colors = [  # let's pretend we're converting pixel data from RGBA to ARGB
       f.append(c.b)
     }
 """),
-  ('Unsafe', """
+  ('for-in.Reserve', """
+    var f: [UInt8] = []
+    f.reserveCapacity(input.count * 4)
+
+    for c in input {
+      f.append(c.a)
+      f.append(c.r)
+      f.append(c.g)
+      f.append(c.b)
+    }
+"""),
+]
+
+ColorUnsafe = [
+  ('Unsafe.FlatMapArray', """
+    // Swizzle the bytes in UInt32 view, then flatMap to [UInt8] using Array.
     let f = input.withUnsafeBufferPointer {
-      $0.baseAddress!.withMemoryRebound(to: UInt32.self, capacity: input.count) {
+      $0.baseAddress!.withMemoryRebound(
+        to: UInt32.self, capacity: input.count) {
         UnsafeBufferPointer(start:$0, count: input.count).flatMap {
           (rawColor: UInt32) -> [UInt8] in
           let rgba = rawColor.bigEndian
-          let argb = (rgba << 24) | (rgba >> 8) // rotate
-          return stride(from:24, through:0, by: -8).map {
-            UInt8(truncatingIfNeeded: argb >> UInt32($0))
-          }
+          let argb = (rgba &<< 24) | (rgba &>> 8) // rotate
+          return [
+            UInt8(truncatingIfNeeded: argb &>> 24),
+            UInt8(truncatingIfNeeded: argb &>> 16),
+            UInt8(truncatingIfNeeded: argb &>> 8),
+            UInt8(truncatingIfNeeded: argb)]
         }
       }
     }
-    // print(f.suffix(4))
 """),
-  ('Unsafe2', """
+  ('Unsafe.UInt32InitSeq', """
+    // Swizzle the bytes in UInt32 view, creating Array<UInt32>, then create
+    // Array<UInt8> using Sequence initializer
     let f = input.withUnsafeBufferPointer {
-      $0.baseAddress!.withMemoryRebound(to: UInt32.self, capacity: input.count) {
+      $0.baseAddress!.withMemoryRebound(
+        to: UInt32.self, capacity: input.count) {
         UnsafeBufferPointer(start:$0, count: input.count).map { rgba in
           // rotate (inverted direction, because x86 is little endian)
-          (rgba >> 24) | (rgba << 8)
+          (rgba &>> 24) | (rgba &<< 8)
         }
         .withUnsafeBytes(Array.init)
       }
     }
-    // print(f.suffix(4))
 """),
-  ('Unsafe3', """
+  ('Unsafe.ColorValInitSeq', """
+    // Swizzle components within the ColorVal type, then create Array<UInt8>
+    // using Sequence initializer.
+    // Similar to the non-swizzling `Flatten.Array.Tuple4.Unsafe.InitSeq`.
     let f = input.map { c in ColorVal(r: c.a, g: c.r, b: c.g, a: c.b) }
         .withUnsafeBytes(Array.init)
-    // print(f.suffix(4))
+"""),
+  ('Unsafe.FlatMapColorVal', """
+    let f = input.withUnsafeBufferPointer {
+      $0.flatMap {
+        (c: ColorVal) -> [UInt8] in
+        [c.a, c.r, c.g, c.b]
+      }
+    }
+"""),
+  ('Unsafe.BytesReserve', """
+    // Copy the color components byte-by-byte with reserved capacity.
+    var f = Array<UInt8>()
+    let size = input.count * 4
+    f.reserveCapacity(size)
+    input.withUnsafeBytes { bytes in
+      for i in stride(from: 0, to: size, by: 4) {
+        f.append(bytes[i+3])
+        f.append(bytes[i])
+        f.append(bytes[i+1])
+        f.append(bytes[i+2])
+      }
+    }
+"""),
+  ('Unsafe.Bytes', """
+    // Copy the color components byte-by-byte without reserved capacity.
+    var f = Array<UInt8>()
+    let size = input.count * 4
+    input.withUnsafeBytes { bytes in
+      for i in stride(from: 0, to: size, by: 4) {
+        f.append(bytes[i+3])
+        f.append(bytes[i])
+        f.append(bytes[i+1])
+        f.append(bytes[i+2])
+      }
+    }
 """),
 ]
-FlattenColors = (
-  [('Flatten.Array.Color.Val.' + n, c) for (n, c) in Colors] +
-  [('Flatten.Array.Color.Ref.' + n, c) for (n, c) in Colors[0:-3]]
+
+Color = ColorFunctional + ColorImperative + ColorUnsafe
+
+FlattenColor = (
+  [('Flatten.ColorVal.' + n, c) for (n, c) in Color] +
+  [('Flatten.ColorRef.' + n, c) for (n, c) in Color if 'Unsafe' not in n]
 )
 
-Variants = FlattenTuple4 + FlattenArray4 + FlattenColors
+Variants = FlattenTuple4 + FlattenArray4 + FlattenColor
+
+def setup(payload):
+  return ',\n\t\tsetUpFunction: {0}'.format(payload)
 }%
 
 public let Flatten = [
 % for (Name, _) in Variants:
-  BenchmarkInfo(
-    name: "${Name}",
+  BenchmarkInfo(name: "${Name}",
     runFunction: ${run_function_name(Name)}, tags: t${
-    ',\n\t\tsetUpFunction: { blackHole(arrayTuple4) }' if 'Array.Tuple4' in Name else
-    ',\n\t\tsetUpFunction: { blackHole(arrayArray4) }' if 'Array.Array4' in Name else
-    ',\n\t\tsetUpFunction: { blackHole(arrayColorVals) }' if 'Color.Val' in Name else
-    ',\n\t\tsetUpFunction: { blackHole(arrayColorRefs) }' if 'Color.Ref' in Name else
+    setup('sat4') if 'Array.Tuple4' in Name else
+    setup('saa4') if 'Array.Array4' in Name else
+    setup('sacr') if 'ColorVal' in Name else
+    setup('sacv') if 'ColorRef' in Name else
     '' }),
 % end
 ]
 
+// Setup functions
+func sat4() { blackHole(arrayTuple4) }
+func saa4() { blackHole(arrayArray4) }
+func sacv() { blackHole(arrayColorVals) }
+func sacr() { blackHole(arrayColorRefs) }
+
+// Workloads and test constants
 let size = 1<<14
 let flatSize = size * 4
 let lastElement = size + 3
 
-let tuple4: (Int) -> (Int, Int, Int, Int) = { ($0, $0 + 1, $0 + 2, $0 + 3) }
+typealias Tuple4 = (Int, Int, Int, Int)
+func tuple4(_ i: Int) -> Tuple4 { return (i, i + 1, i + 2, i + 3) }
 let arrayTuple4 = (1...size).map(tuple4)
 let sequenceTuple4 = (1...size).lazy.map(tuple4)
 
-let array4: (Int) -> [Int] = { [$0, $0 + 1, $0 + 2, $0 + 3] }
+func array4(_ i: Int) -> [Int] { return [i, i + 1, i + 2, i + 3] }
 let arrayArray4 = (1...size).map(array4)
 let sequenceArray4 = (1...size).lazy.map(array4)
+
+func c(_ i: Int) -> UInt8 { return UInt8(i % 256) } // clamp
+let arrayColorVals = (1...size).map {
+  ColorVal(r: c($0), g: c($0 + 1), b: c($0 + 2), a: c($0 + 3))
+}
+let arrayColorRefs = (1...size).map {
+  ColorRef(r: c($0), g: c($0 + 1), b: c($0 + 2), a: c($0 + 3))
+}
+let lastBlue = c(size + 2)
 
 // 32-bit color
 struct ColorVal { let r, g, b, a: UInt8 }
@@ -209,15 +368,8 @@ final class ColorRef {
   }
 }
 
-let c: (Int) -> UInt8 = { UInt8($0 % 256) } // clamp
-let arrayColorVals = (1...size).map {
-  ColorVal(r: c($0), g: c($0 + 1), b: c($0 + 2), a: c($0 + 3))
-}
-let arrayColorRefs = (1...size).map {
-  ColorRef(r: c($0), g: c($0 + 1), b: c($0 + 2), a: c($0 + 3))
-}
-let lastBlue = c(size + 2)
-
+// Helper for materializing Sequence.
+// It counts the length and retains the last element.
 struct CountLast<T> {
   var count: Int = 0
   var last: T? = nil
@@ -227,6 +379,59 @@ struct CountLast<T> {
   }
 }
 
+// Byte swizzling Sequence and Collection conformances for Color types
+% for Type in ['Val', 'Ref']:
+extension Color${Type} {
+  public struct SwizzleSequence {
+    let c: Color${Type}
+    var i: UInt8 = 0
+    init(_ c: Color${Type}) { self.c = c }
+  }
+
+  public struct SwizzleCollection {
+    let c: Color${Type}
+    init(_ c: Color${Type}) { self.c = c }
+  }
+}
+
+extension Color${Type}.SwizzleSequence: Sequence, IteratorProtocol {
+  public var underestimatedCount: Int { return 4 }
+  public mutating func next() -> UInt8? {
+    i = i &+ 1
+    switch i {
+    case 1: return c.a
+    case 2: return c.r
+    case 3: return c.g
+    case 4: return c.b
+    default: return nil
+    }
+  }
+}
+
+extension Color${Type}.SwizzleCollection: RandomAccessCollection {
+  public var count: Int { return 4 }
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { return 4 }
+  public func index(after i: Int) -> Int { return i &+ 1 }
+  public subscript(position: Int) -> UInt8 {
+    switch position {
+    case 0: return c.a
+    case 1: return c.r
+    case 2: return c.g
+    case 3: return c.b
+    default: return 0 // never happens
+    }
+  }
+}
+
+extension Color${Type} {
+  public var sequence: SwizzleSequence { return SwizzleSequence(self) }
+  public var collection: SwizzleCollection { return SwizzleCollection(self) }
+}
+
+% end
+
+// Run functions
 % for (Name, Code) in Variants:
 @inline(never)
 public func ${run_function_name(Name)}(_ N: Int) {
@@ -234,8 +439,8 @@ public func ${run_function_name(Name)}(_ N: Int) {
 %   if 'Tuple4' in Name:
     let input = ${
     'AnySequence(arrayTuple4)' if 'AnySeq.Array' in Name else
-    'AnySequence(sequenceTuple4)' if 'AnySeq.Seq' in Name else
-    'sequenceTuple4' if 'Seq' in Name else
+    'AnySequence(sequenceTuple4)' if 'AnySeq.LazySeq' in Name else
+    'sequenceTuple4' if 'Seq' in Name and 'Unsafe' not in Name else
     'arrayTuple4.lazy' if '.lazy' in Name else
     'arrayTuple4'
 }
@@ -243,7 +448,7 @@ public func ${run_function_name(Name)}(_ N: Int) {
 %   if 'Array4' in Name:
     let input = ${
     'AnySequence(arrayArray4)' if 'AnySeq.Array' in Name else
-    'AnySequence(sequenceArray4)' if 'AnySeq.Seq' in Name else
+    'AnySequence(sequenceArray4)' if 'AnySeq.LazySeq' in Name else
     'sequenceArray4' if 'Seq' in Name else
     'arrayArray4.lazy' if '.lazy' in Name else
     'arrayArray4'
@@ -253,8 +458,10 @@ public func ${run_function_name(Name)}(_ N: Int) {
     let input = arrayColor${ 'Vals' if 'Val' in Name else 'Refs' }
 %   end
 ${Code}
-%   if 'Seq' in Name or 'lazy' in Name:
-%  #// Materialize the Sequence.
+%  #// When in doubt about correctness of implementation, debug with:
+%  #// print(Array(f.suffix(4))) // expect: [3, 0, 1, 2]
+%  if 'Seq' in Name or 'lazy' in Name or 'joined.' in Name:
+%  #// Materialize the Sequence by reducing into CountLast.
 %  #// Avoiding memory allocation overhead, it's functionally equivalent to:
 %  #// let fa = Array(f)
 %  #// CheckResults((fa.count, fa.last!) == (flatSize, lastElement))
