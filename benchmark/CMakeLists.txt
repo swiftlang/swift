@@ -153,6 +153,7 @@ set(SWIFT_BENCH_MODULES
     single-source/StaticArray
     single-source/StrComplexWalk
     single-source/StrToInt
+    single-source/StringBreadcrumbs
     single-source/StringBuilder
     single-source/StringComparison
     single-source/StringEdits

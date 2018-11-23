@@ -146,6 +146,7 @@ import StackPromo
 import StaticArray
 import StrComplexWalk
 import StrToInt
+import StringBreadcrumbs
 import StringBuilder
 import StringComparison
 import StringEdits
@@ -319,6 +320,7 @@ registerBenchmark(StackPromo)
 registerBenchmark(StaticArrayTest)
 registerBenchmark(StrComplexWalk)
 registerBenchmark(StrToInt)
+registerBenchmark(StringBreadcrumbs)
 registerBenchmark(StringBuilder)
 registerBenchmark(StringComparison)
 registerBenchmark(StringEdits)
