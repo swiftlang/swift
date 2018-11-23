@@ -1500,7 +1500,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Insert") {
     let identity2 = s._rawIdentifier()
     // Storage identity may or may not change depending on allocation behavior.
     // (s is eagerly bridged to a regular uniquely referenced native Set.)
-    expectTrue((count1 < capacity1) == (identity1 == s._rawIdentifier()))
+    expectTrue((count1 < capacity1) == (identity1 == identity2))
 
     expectTrue(isNativeSet(s))
     expectEqual(4, s.count)
@@ -1526,7 +1526,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.UpdateWith") {
     let identity2 = s._rawIdentifier()
     // Storage identity may or may not change depending on allocation behavior.
     // (s is eagerly bridged to a regular uniquely referenced native Set.)
-    expectTrue((count1 < capacity1) == (identity1 == s._rawIdentifier()))
+    expectTrue((count1 < capacity1) == (identity1 == identity2))
 
     expectTrue(isNativeSet(s))
     expectEqual(4, s.count)
@@ -4423,6 +4423,194 @@ SetTestSuite.test("localHashSeeds") {
   let sliceElements = slice.dropFirst(bunch)
   // If this test fails, there is a problem with local hash seeding.
   expectFalse(smallElements.elementsEqual(sliceElements))
+}
+
+SetTestSuite.test("RemoveAt.InvalidatesIndices") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  let j = s.firstIndex(of: 10)!
+
+  s.remove(at: j)
+
+  expectCrashLater()
+  _ = s[i]
+}
+
+SetTestSuite.test("RemoveValueForKey.InvalidatesIndices") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+
+  s.remove(10)
+
+  expectCrashLater()
+  _ = s[i]
+}
+
+SetTestSuite.test("ResizeOnInsertion.InvalidatesIndices") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  expectEqual(s[i], 20)
+
+  for i in 0 ..< (s.capacity - s.count) {
+    s.insert(100 + i)
+  }
+  expectEqual(s[i], 20)
+  s.insert(0)
+
+  expectCrashLater()
+  _ = s[i]
+}
+
+SetTestSuite.test("ResizeOnUpdate.InvalidatesIndices") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  expectEqual(s[i], 20)
+
+  for i in 0 ..< (s.capacity - s.count) {
+    s.update(with: 100 + i)
+  }
+  expectEqual(s[i], 20)
+  s.update(with: 0)
+
+  expectCrashLater()
+  _ = s[i]
+}
+
+SetTestSuite.test("RemoveAll.InvalidatesIndices") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  expectEqual(s[i], 20)
+
+  s.removeAll(keepingCapacity: true)
+
+  expectCrashLater()
+  _ = s[i]
+}
+
+SetTestSuite.test("ReserveCapacity.InvalidatesIndices") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  expectEqual(s[i], 20)
+
+  s.reserveCapacity(0)
+  expectEqual(s[i], 20)
+
+  s.reserveCapacity(s.capacity)
+  expectEqual(s[i], 20)
+
+  s.reserveCapacity(s.capacity * 10)
+
+  expectCrashLater()
+  _ = s[i]
+}
+
+SetTestSuite.test("IndexValidation.Subscript.Getter.AcrossInstances") {
+  // The mutation count may happen to be the same across any two sets.
+  // The probability of this is low, but it could happen -- so check a bunch of
+  // these cases at once; a trap will definitely occur at least once.
+  let sets = (0 ..< 10).map { _ in Set<Int>([10, 20, 30, 40]) }
+  let indices = sets.map { $0.firstIndex(of: 20)! }
+  let s: Set<Int> = [10, 20, 30, 40]
+
+  expectCrashLater()
+  for i in indices {
+    _ = s[i]
+  }
+  _fixLifetime(sets)
+}
+
+SetTestSuite.test("IndexValidation.Subscript.Getter.AfterRemoval") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  expectEqual(s[i], 20)
+
+  s.remove(10)
+
+  expectCrashLater()
+  _ = s[i]
+}
+
+SetTestSuite.test("IndexValidation.Subscript.Getter.AfterGrow") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  let identifier = s._rawIdentifier()
+  expectEqual(s[i], 20)
+
+  for i in 0 ..< (s.capacity - s.count) {
+    s.insert(100 + i)
+  }
+  expectEqual(s._rawIdentifier(), identifier)
+  expectEqual(s[i], 20)
+
+  s.insert(0)
+
+  expectNotEqual(s._rawIdentifier(), identifier)
+  expectCrashLater()
+  _ = s[i]
+}
+
+SetTestSuite.test("IndexValidation.RangeSubscript.AfterRemoval") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  let j = s.index(after: i)
+  expectTrue(i < j)
+
+  s.remove(40)
+
+  expectTrue(i < j)
+  expectCrashLater()
+  _ = s[i..<j]
+}
+
+SetTestSuite.test("IndexValidation.RangeSubscript.AfterGrow") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  let j = s.index(after: i)
+  expectTrue(i < j)
+  let identifier = s._rawIdentifier()
+
+  for i in 0 ..< (s.capacity - s.count) {
+    s.insert(100 + i)
+  }
+  expectEqual(s._rawIdentifier(), identifier)
+  expectTrue(i < j)
+
+  s.insert(0)
+
+  expectTrue(i < j)
+  expectNotEqual(s._rawIdentifier(), identifier)
+  expectCrashLater()
+  _ = s[i..<j]
+}
+
+SetTestSuite.test("IndexValidation.RemoveAt.AfterRemoval") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  expectEqual(s[i], 20)
+
+  s.remove(10)
+
+  expectCrashLater()
+  s.remove(at: i)
+}
+
+SetTestSuite.test("IndexValidation.RemoveAt.AfterGrow") {
+  var s: Set<Int> = [10, 20, 30, 40]
+  let i = s.firstIndex(of: 20)!
+  let identifier = s._rawIdentifier()
+  expectEqual(s[i], 20)
+
+  for i in 0 ..< (s.capacity - s.count) {
+    s.insert(100 + i)
+  }
+  expectEqual(s._rawIdentifier(), identifier)
+  expectEqual(s[i], 20)
+
+  s.insert(0)
+
+  expectNotEqual(s._rawIdentifier(), identifier)
+  expectCrashLater()
+  s.remove(at: i)
 }
 
 runAllTests()
