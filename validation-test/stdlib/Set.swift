@@ -81,28 +81,6 @@ func getCOWSlowSet(_ members: [Int] = [1010, 2020, 3030]) -> Set<TestKeyTy> {
   return s
 }
 
-func helperDeleteThree(_ k1: TestKeyTy, _ k2: TestKeyTy, _ k3: TestKeyTy) {
-  var s1 = Set<TestKeyTy>(minimumCapacity: 10)
-
-  s1.insert(k1)
-  s1.insert(k2)
-  s1.insert(k3)
-
-  expectTrue(s1.contains(k1))
-  expectTrue(s1.contains(k2))
-  expectTrue(s1.contains(k3))
-
-  s1.remove(k1)
-  expectTrue(s1.contains(k2))
-  expectTrue(s1.contains(k3))
-
-  s1.remove(k2)
-  expectTrue(s1.contains(k3))
-
-  s1.remove(k3)
-  expectEqual(0, s1.count)
-}
-
 func equalsUnordered(_ lhs: Set<Int>, _ rhs: Set<Int>) -> Bool {
   return lhs.sorted().elementsEqual(rhs.sorted()) {
     $0 == $1
@@ -1085,31 +1063,64 @@ SetTestSuite.test("COW.Slow.EqualityTestDoesNotReallocate") {
 // Native set tests.
 //===---
 
+func helperDeleteThree(
+  _ k1: RawTestKeyTy,
+  _ k2: RawTestKeyTy,
+  _ k3: RawTestKeyTy
+) {
+  var s1 = Set<RawTestKeyTy>(minimumCapacity: 10)
+
+  s1.insert(k1)
+  s1.insert(k2)
+  s1.insert(k3)
+
+  expectTrue(s1.contains(k1))
+  expectTrue(s1.contains(k2))
+  expectTrue(s1.contains(k3))
+
+  s1.remove(k1)
+  expectFalse(s1.contains(k1))
+  expectTrue(s1.contains(k2))
+  expectTrue(s1.contains(k3))
+
+  s1.remove(k2)
+  expectFalse(s1.contains(k1))
+  expectFalse(s1.contains(k2))
+  expectTrue(s1.contains(k3))
+
+  s1.remove(k3)
+  expectFalse(s1.contains(k1))
+  expectFalse(s1.contains(k2))
+  expectFalse(s1.contains(k3))
+
+  expectEqual(0, s1.count)
+}
+
 SetTestSuite.test("deleteChainCollision") {
-  let k1 = TestKeyTy(value: 1010, hashValue: 0)
-  let k2 = TestKeyTy(value: 2020, hashValue: 0)
-  let k3 = TestKeyTy(value: 3030, hashValue: 0)
+  let k1 = RawTestKeyTy(value: 1010, hashValue: 0)
+  let k2 = RawTestKeyTy(value: 2020, hashValue: 0)
+  let k3 = RawTestKeyTy(value: 3030, hashValue: 0)
 
   helperDeleteThree(k1, k2, k3)
 }
 
 SetTestSuite.test("deleteChainNoCollision") {
-  let k1 = TestKeyTy(value: 1010, hashValue: 0)
-  let k2 = TestKeyTy(value: 2020, hashValue: 1)
-  let k3 = TestKeyTy(value: 3030, hashValue: 2)
+  let k1 = RawTestKeyTy(value: 1010, hashValue: 0)
+  let k2 = RawTestKeyTy(value: 2020, hashValue: 1)
+  let k3 = RawTestKeyTy(value: 3030, hashValue: 2)
 
   helperDeleteThree(k1, k2, k3)
 }
 
 SetTestSuite.test("deleteChainCollision2") {
-  let k1_0 = TestKeyTy(value: 1010, hashValue: 0)
-  let k2_0 = TestKeyTy(value: 2020, hashValue: 0)
-  let k3_2 = TestKeyTy(value: 3030, hashValue: 2)
-  let k4_0 = TestKeyTy(value: 4040, hashValue: 0)
-  let k5_2 = TestKeyTy(value: 5050, hashValue: 2)
-  let k6_0 = TestKeyTy(value: 6060, hashValue: 0)
+  let k1_0 = RawTestKeyTy(value: 1010, hashValue: 0)
+  let k2_0 = RawTestKeyTy(value: 2020, hashValue: 0)
+  let k3_2 = RawTestKeyTy(value: 3030, hashValue: 2)
+  let k4_0 = RawTestKeyTy(value: 4040, hashValue: 0)
+  let k5_2 = RawTestKeyTy(value: 5050, hashValue: 2)
+  let k6_0 = RawTestKeyTy(value: 6060, hashValue: 0)
 
-  var s = Set<TestKeyTy>(minimumCapacity: 10)
+  var s = Set<RawTestKeyTy>(minimumCapacity: 10)
 
   s.insert(k1_0) // in bucket 0
   s.insert(k2_0) // in bucket 1
@@ -1133,7 +1144,7 @@ SetTestSuite.test("deleteChainCollisionRandomized") {
   var generator = LinearCongruentialGenerator(seed: seed)
   print("using LinearCongruentialGenerator(seed: \(seed))")
 
-  func check(_ s: Set<TestKeyTy>) {
+  func check(_ s: Set<RawTestKeyTy>) {
     let keys = Array(s)
     for i in 0..<keys.count {
       for j in 0..<i {
@@ -1150,22 +1161,27 @@ SetTestSuite.test("deleteChainCollisionRandomized") {
   let chainOverlap = Int.random(in: 0...5, using: &generator)
   let chainLength = 7
 
-  var knownKeys: [TestKeyTy] = []
-  func getKey(_ value: Int) -> TestKeyTy {
+  var knownKeys: [RawTestKeyTy] = []
+  func getKey(_ value: Int) -> RawTestKeyTy {
     for k in knownKeys {
       if k.value == value {
         return k
       }
     }
-    let hashValue = Int.random(in: 0 ..< (chainLength - chainOverlap), using: &generator) * collisionChains
-    let k = TestKeyTy(value: value, hashValue: hashValue)
+    let hashValue = Int.random(
+      in: 0 ..< (chainLength - chainOverlap),
+      using: &generator) * collisionChains
+    let k = RawTestKeyTy(value: value, hashValue: hashValue)
     knownKeys += [k]
     return k
   }
 
-  var s = Set<TestKeyTy>(minimumCapacity: 30)
+  var s = Set<RawTestKeyTy>(minimumCapacity: 30)
   for _ in 1..<300 {
-    let key = getKey(Int.random(in: 0 ..< (collisionChains * chainLength), using: &generator))
+    let value = Int.random(
+      in: 0 ..< (collisionChains * chainLength),
+      using: &generator)
+    let key = getKey(value)
     if Int.random(in: 0 ..< (chainLength * 2), using: &generator) == 0 {
       s.remove(key)
     } else {

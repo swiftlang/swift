@@ -1525,53 +1525,63 @@ DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Noop_modify") {
 // Native dictionary tests.
 //===---
 
-func helperDeleteThree(_ k1: TestKeyTy, _ k2: TestKeyTy, _ k3: TestKeyTy) {
-  var d1 = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 10)
+func helperDeleteThree(
+  _ k1: RawTestKeyTy,
+  _ k2: RawTestKeyTy,
+  _ k3: RawTestKeyTy
+) {
+  var d1 = Dictionary<RawTestKeyTy, TestValueTy>(minimumCapacity: 10)
 
   d1[k1] = TestValueTy(1010)
   d1[k2] = TestValueTy(1020)
   d1[k3] = TestValueTy(1030)
 
-  assert(d1[k1]!.value == 1010)
-  assert(d1[k2]!.value == 1020)
-  assert(d1[k3]!.value == 1030)
+  assert(d1[k1]?.value == 1010)
+  assert(d1[k2]?.value == 1020)
+  assert(d1[k3]?.value == 1030)
 
   d1[k1] = nil
-  assert(d1[k2]!.value == 1020)
-  assert(d1[k3]!.value == 1030)
+  assert(d1[k1]?.value == nil)
+  assert(d1[k2]?.value == 1020)
+  assert(d1[k3]?.value == 1030)
 
   d1[k2] = nil
-  assert(d1[k3]!.value == 1030)
+  assert(d1[k1]?.value == nil)
+  assert(d1[k2]?.value == nil)
+  assert(d1[k3]?.value == 1030)
 
   d1[k3] = nil
+  assert(d1[k1]?.value == nil)
+  assert(d1[k2]?.value == nil)
+  assert(d1[k3]?.value == nil)
   assert(d1.count == 0)
 }
 
 DictionaryTestSuite.test("deleteChainCollision") {
-  let k1 = TestKeyTy(value: 10, hashValue: 0)
-  let k2 = TestKeyTy(value: 20, hashValue: 0)
-  let k3 = TestKeyTy(value: 30, hashValue: 0)
+  let k1 = RawTestKeyTy(value: 10, hashValue: 0)
+  let k2 = RawTestKeyTy(value: 20, hashValue: 0)
+  let k3 = RawTestKeyTy(value: 30, hashValue: 0)
 
   helperDeleteThree(k1, k2, k3)
 }
 
 DictionaryTestSuite.test("deleteChainNoCollision") {
-  let k1 = TestKeyTy(value: 10, hashValue: 0)
-  let k2 = TestKeyTy(value: 20, hashValue: 1)
-  let k3 = TestKeyTy(value: 30, hashValue: 2)
+  let k1 = RawTestKeyTy(value: 10, hashValue: 0)
+  let k2 = RawTestKeyTy(value: 20, hashValue: 1)
+  let k3 = RawTestKeyTy(value: 30, hashValue: 2)
 
   helperDeleteThree(k1, k2, k3)
 }
 
 DictionaryTestSuite.test("deleteChainCollision2") {
-  let k1_0 = TestKeyTy(value: 10, hashValue: 0)
-  let k2_0 = TestKeyTy(value: 20, hashValue: 0)
-  let k3_2 = TestKeyTy(value: 30, hashValue: 2)
-  let k4_0 = TestKeyTy(value: 40, hashValue: 0)
-  let k5_2 = TestKeyTy(value: 50, hashValue: 2)
-  let k6_0 = TestKeyTy(value: 60, hashValue: 0)
+  let k1_0 = RawTestKeyTy(value: 10, hashValue: 0)
+  let k2_0 = RawTestKeyTy(value: 20, hashValue: 0)
+  let k3_2 = RawTestKeyTy(value: 30, hashValue: 2)
+  let k4_0 = RawTestKeyTy(value: 40, hashValue: 0)
+  let k5_2 = RawTestKeyTy(value: 50, hashValue: 2)
+  let k6_0 = RawTestKeyTy(value: 60, hashValue: 0)
 
-  var d = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 10)
+  var d = Dictionary<RawTestKeyTy, TestValueTy>(minimumCapacity: 10)
 
   d[k1_0] = TestValueTy(1010) // in bucket 0
   d[k2_0] = TestValueTy(1020) // in bucket 1
@@ -1595,7 +1605,7 @@ DictionaryTestSuite.test("deleteChainCollisionRandomized") {
   var generator = LinearCongruentialGenerator(seed: seed)
   print("using LinearCongruentialGenerator(seed: \(seed))")
 
-  func check(_ d: Dictionary<TestKeyTy, TestValueTy>) {
+  func check(_ d: Dictionary<RawTestKeyTy, TestValueTy>) {
     let keys = Array(d.keys)
     for i in 0..<keys.count {
       for j in 0..<i {
@@ -1612,20 +1622,20 @@ DictionaryTestSuite.test("deleteChainCollisionRandomized") {
   let chainOverlap = Int.random(in: 0...5, using: &generator)
   let chainLength = 7
 
-  var knownKeys: [TestKeyTy] = []
-  func getKey(_ value: Int) -> TestKeyTy {
+  var knownKeys: [RawTestKeyTy] = []
+  func getKey(_ value: Int) -> RawTestKeyTy {
     for k in knownKeys {
       if k.value == value {
         return k
       }
     }
     let hashValue = Int.random(in: 0 ..< (chainLength - chainOverlap), using: &generator) * collisionChains
-    let k = TestKeyTy(value: value, hashValue: hashValue)
+    let k = RawTestKeyTy(value: value, hashValue: hashValue)
     knownKeys += [k]
     return k
   }
 
-  var d = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 30)
+  var d = Dictionary<RawTestKeyTy, TestValueTy>(minimumCapacity: 30)
   for _ in 1..<300 {
     let key = getKey(Int.random(in: 0 ..< (collisionChains * chainLength), using: &generator))
     if Int.random(in: 0 ..< (chainLength * 2), using: &generator) == 0 {
