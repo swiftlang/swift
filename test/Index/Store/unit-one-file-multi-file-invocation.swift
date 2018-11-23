@@ -12,8 +12,8 @@
 
 // UNIT: unit-one-file-multi-file-invocation{{.*}}.output_for_index
 // UNIT: DEPEND START
-// UNIT: Unit | system |{{.*}}/Swift.swiftmodule | [[SWIFT]]
-// UNIT: Record | user |{{.*}}/unit-one-file-multi-file-invocation.swift |
+// UNIT: Unit | system | {{.*}}{{/|\\}}Swift.swiftmodule | [[SWIFT]]
+// UNIT: Record | user | {{.*}}{{/|\\}}unit-one-file-multi-file-invocation.swift |
 // UNIT: DEPEND END (2)
 
 func test1() {
