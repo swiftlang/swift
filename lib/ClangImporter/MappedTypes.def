@@ -161,6 +161,9 @@ MAP_TYPE("CGFloat", CGFloat, 0, "CoreGraphics", "CGFloat", false, DoNothing)
 
 // CoreFoundation types.
 // Note that we're preserving the typealias for CFIndex.
+MAP_STDLIB_TYPE("CFTypeID", UnsignedWord, 0, "UInt", false, DefineAndUse)
+MAP_STDLIB_TYPE("CFOptionFlags", UnsignedWord, 0, "UInt", false, DefineAndUse)
+MAP_STDLIB_TYPE("CFHashCode", UnsignedWord, 0, "UInt", false, DefineAndUse)
 MAP_STDLIB_TYPE("CFIndex", SignedWord, 0, "Int", false, DefineAndUse)
 
 // Foundation types.
