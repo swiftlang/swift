@@ -3,7 +3,7 @@
 // REQUIRES: stress_test
 
 import StdlibUnittest
-import SwiftPrivatePthreadExtras
+import SwiftPrivateThreadExtras
 #if os(OSX) || os(iOS)
 import Darwin
 #elseif os(Linux)

@@ -1,4 +1,4 @@
-//===--- SwiftPrivatePthreadExtras.swift ----------------------------------===//
+//===--- SwiftPrivateThreadExtras.swift ----------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -23,14 +23,14 @@ import Glibc
 
 /// An abstract base class to encapsulate the context necessary to invoke
 /// a block from pthread_create.
-internal class PthreadBlockContext {
+internal class ThreadBlockContext {
   /// Execute the block, and return an `UnsafeMutablePointer` to memory
   /// allocated with `UnsafeMutablePointer.alloc` containing the result of the
   /// block.
   func run() -> UnsafeMutableRawPointer { fatalError("abstract") }
 }
 
-internal class PthreadBlockContextImpl<Argument, Result>: PthreadBlockContext {
+internal class ThreadBlockContextImpl<Argument, Result>: ThreadBlockContext {
   let block: (Argument) -> Result
   let arg: Argument
 
@@ -52,7 +52,7 @@ internal func invokeBlockContext(
   _ contextAsVoidPointer: UnsafeMutableRawPointer?
 ) -> UnsafeMutableRawPointer! {
   // The context is passed in +1; we're responsible for releasing it.
-  let context = Unmanaged<PthreadBlockContext>
+  let context = Unmanaged<ThreadBlockContext>
     .fromOpaque(contextAsVoidPointer!)
     .takeRetainedValue()
 
@@ -71,7 +71,7 @@ public func _stdlib_pthread_create_block<Argument, Result>(
   _ start_routine: @escaping (Argument) -> Result,
   _ arg: Argument
 ) -> (CInt, pthread_t?) {
-  let context = PthreadBlockContextImpl(block: start_routine, arg: arg)
+  let context = ThreadBlockContextImpl(block: start_routine, arg: arg)
   // We hand ownership off to `invokeBlockContext` through its void context
   // argument.
   let contextAsVoidPointer = Unmanaged.passRetained(context).toOpaque()

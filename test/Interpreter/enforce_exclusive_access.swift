@@ -8,7 +8,7 @@
 // Tests for traps at run time when enforcing exclusive access.
 
 import StdlibUnittest
-import SwiftPrivatePthreadExtras
+import SwiftPrivateThreadExtras
 
 struct X {
   var i = 7

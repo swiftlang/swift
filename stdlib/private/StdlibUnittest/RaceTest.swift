@@ -38,7 +38,7 @@
 
 import SwiftPrivate
 import SwiftPrivateLibcExtras
-import SwiftPrivatePthreadExtras
+import SwiftPrivateThreadExtras
 #if os(macOS) || os(iOS)
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
