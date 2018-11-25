@@ -94,9 +94,9 @@ StringTestSuite.test("SliceConcurrentAppend") {
   expectEqual(0, ret)
 
   let (createRet1, tid1) = _stdlib_pthread_create_block(
-    nil, sliceConcurrentAppendThread, .Primary)
+    sliceConcurrentAppendThread, .Primary)
   let (createRet2, tid2) = _stdlib_pthread_create_block(
-    nil, sliceConcurrentAppendThread, .Secondary)
+    sliceConcurrentAppendThread, .Secondary)
 
   expectEqual(0, createRet1)
   expectEqual(0, createRet2)

@@ -59,15 +59,8 @@ internal func invokeBlockContext(
   return context.run()
 }
 
-#if os(Cygwin) || os(FreeBSD) || os(Haiku)
-public typealias _stdlib_pthread_attr_t = UnsafePointer<pthread_attr_t?>
-#else
-public typealias _stdlib_pthread_attr_t = UnsafePointer<pthread_attr_t>
-#endif
-
 /// Block-based wrapper for `pthread_create`.
 public func _stdlib_pthread_create_block<Argument, Result>(
-  _ attr: _stdlib_pthread_attr_t?,
   _ start_routine: @escaping (Argument) -> Result,
   _ arg: Argument
 ) -> (CInt, pthread_t?) {
@@ -77,7 +70,7 @@ public func _stdlib_pthread_create_block<Argument, Result>(
   let contextAsVoidPointer = Unmanaged.passRetained(context).toOpaque()
 
   var threadID = _make_pthread_t()
-  let result = pthread_create(&threadID, attr,
+  let result = pthread_create(&threadID, nil,
     { invokeBlockContext($0) }, contextAsVoidPointer)
   if result == 0 {
     return (result, threadID)

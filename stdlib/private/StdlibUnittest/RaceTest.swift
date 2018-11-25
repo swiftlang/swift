@@ -605,24 +605,21 @@ public func runRaceTest<RT : RaceTestWithPerTrialData>(
 
   // Create the master thread.
   do {
-    let (ret, tid) = _stdlib_pthread_create_block(
-      nil, masterThreadBody, ())
+    let (ret, tid) = _stdlib_pthread_create_block(masterThreadBody, ())
     expectEqual(0, ret)
     testTids.append(tid!)
   }
 
   // Create racing threads.
   for i in 0..<racingThreadCount {
-    let (ret, tid) = _stdlib_pthread_create_block(
-      nil, racingThreadBody, i)
+    let (ret, tid) = _stdlib_pthread_create_block(racingThreadBody, i)
     expectEqual(0, ret)
     testTids.append(tid!)
   }
 
   // Create the alarm thread that enforces the timeout.
   do {
-    let (ret, tid) = _stdlib_pthread_create_block(
-      nil, alarmThreadBody, ())
+    let (ret, tid) = _stdlib_pthread_create_block(alarmThreadBody, ())
     expectEqual(0, ret)
     alarmTid = tid!
   }
