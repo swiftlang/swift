@@ -19,6 +19,8 @@
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
 import Glibc
+#elseif os(Windows)
+import MSVCRT
 #endif
 
 /// An abstract base class to encapsulate the context necessary to invoke
@@ -59,25 +61,10 @@ internal func invokeBlockContext(
   return context.run()
 }
 
-/// Block-based wrapper for `pthread_create`.
-public func _stdlib_pthread_create_block<Argument, Result>(
-  _ start_routine: @escaping (Argument) -> Result,
-  _ arg: Argument
-) -> (CInt, pthread_t?) {
-  let context = ThreadBlockContextImpl(block: start_routine, arg: arg)
-  // We hand ownership off to `invokeBlockContext` through its void context
-  // argument.
-  let contextAsVoidPointer = Unmanaged.passRetained(context).toOpaque()
-
-  var threadID = _make_pthread_t()
-  let result = pthread_create(&threadID, nil,
-    { invokeBlockContext($0) }, contextAsVoidPointer)
-  if result == 0 {
-    return (result, threadID)
-  } else {
-    return (result, nil)
-  }
-}
+#if os(Windows)
+public typealias ThreadHandle = HANDLE
+#else
+public typealias ThreadHandle = pthread_t
 
 #if os(Linux) || os(Android)
 internal func _make_pthread_t() -> pthread_t {
@@ -88,6 +75,39 @@ internal func _make_pthread_t() -> pthread_t? {
   return nil
 }
 #endif
+#endif
+
+/// Block-based wrapper for `pthread_create`.
+public func _stdlib_thread_create_block<Argument, Result>(
+  _ start_routine: @escaping (Argument) -> Result,
+  _ arg: Argument
+) -> (CInt, ThreadHandle?) {
+  let context = ThreadBlockContextImpl(block: start_routine, arg: arg)
+  // We hand ownership off to `invokeBlockContext` through its void context
+  // argument.
+  let contextAsVoidPointer = Unmanaged.passRetained(context).toOpaque()
+
+#if os(Windows)
+  var threadID =
+      _beginthreadex(nil, 0, { invokeBlockContext($0)!
+                                  .assumingMemoryBound(to: UInt32.self).pointee },
+                     contextAsVoidPointer, 0, nil)
+  if threadID == 0 {
+    return (errno, nil)
+  } else {
+    return (0, UnsafeMutablePointer<ThreadHandle>(&threadID).pointee)
+  }
+#else
+  var threadID = _make_pthread_t()
+  let result = pthread_create(&threadID, nil,
+    { invokeBlockContext($0) }, contextAsVoidPointer)
+  if result == 0 {
+    return (result, threadID)
+  } else {
+    return (result, nil)
+  }
+#endif
+}
 
 /// Block-based wrapper for `pthread_join`.
 public func _stdlib_pthread_join<Result>(

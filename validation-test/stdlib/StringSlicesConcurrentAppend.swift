@@ -93,9 +93,9 @@ StringTestSuite.test("SliceConcurrentAppend") {
   var ret = _stdlib_thread_barrier_init(barrierVar!, 2)
   expectEqual(0, ret)
 
-  let (createRet1, tid1) = _stdlib_pthread_create_block(
+  let (createRet1, tid1) = _stdlib_thread_create_block(
     sliceConcurrentAppendThread, .Primary)
-  let (createRet2, tid2) = _stdlib_pthread_create_block(
+  let (createRet2, tid2) = _stdlib_thread_create_block(
     sliceConcurrentAppendThread, .Secondary)
 
   expectEqual(0, createRet1)

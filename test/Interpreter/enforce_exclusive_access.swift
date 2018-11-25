@@ -120,7 +120,7 @@ ExclusiveAccessTestSuite.test("ClosureCaptureReadRead") {
 // have overlapping accesses
 ExclusiveAccessTestSuite.test("PerThreadEnforcement") {
   modifyAndPerform(&globalX) {
-    let (_, otherThread) = _stdlib_pthread_create_block({ (_ : Void) -> () in
+    let (_, otherThread) = _stdlib_thread_create_block({ (_ : Void) -> () in
       globalX.i = 12 // no-trap
       return ()
     }, ())
