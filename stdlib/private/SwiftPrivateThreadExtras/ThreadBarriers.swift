@@ -14,6 +14,8 @@
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
 import Glibc
+#elseif os(Windows)
+import MSVCRT
 #endif
 
 //
@@ -21,22 +23,6 @@ import Glibc
 //
 // (OS X does not implement them.)
 //
-
-public struct _stdlib_pthread_barrierattr_t {
-  public init() {}
-}
-
-public func _stdlib_pthread_barrierattr_init(
-  _ attr: UnsafeMutablePointer<_stdlib_pthread_barrierattr_t>
-) -> CInt {
-  return 0
-}
-
-public func _stdlib_pthread_barrierattr_destroy(
-  _ attr: UnsafeMutablePointer<_stdlib_pthread_barrierattr_t>
-) -> CInt {
-  return 0
-}
 
 public var _stdlib_PTHREAD_BARRIER_SERIAL_THREAD: CInt {
   return 1
@@ -64,7 +50,6 @@ public struct _stdlib_pthread_barrier_t {
 
 public func _stdlib_pthread_barrier_init(
   _ barrier: UnsafeMutablePointer<_stdlib_pthread_barrier_t>,
-  _ attr: UnsafeMutablePointer<_stdlib_pthread_barrierattr_t>?,
   _ count: CUnsignedInt
 ) -> CInt {
   barrier.pointee = _stdlib_pthread_barrier_t()

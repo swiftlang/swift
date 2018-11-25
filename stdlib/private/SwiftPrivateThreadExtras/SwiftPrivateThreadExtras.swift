@@ -126,7 +126,7 @@ public class _stdlib_Barrier {
   public init(threadCount: Int) {
     self._pthreadBarrier = _stdlib_pthread_barrier_t()
     let ret = _stdlib_pthread_barrier_init(
-      _pthreadBarrierPtr, nil, CUnsignedInt(threadCount))
+      _pthreadBarrierPtr, CUnsignedInt(threadCount))
     if ret != 0 {
       fatalError("_stdlib_pthread_barrier_init() failed")
     }
