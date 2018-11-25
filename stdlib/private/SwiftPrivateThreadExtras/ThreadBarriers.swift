@@ -16,6 +16,7 @@ import Darwin
 import Glibc
 #elseif os(Windows)
 import MSVCRT
+import WinSDK
 #endif
 
 //
@@ -29,7 +30,10 @@ public var _stdlib_THREAD_BARRIER_SERIAL_THREAD: CInt {
 }
 
 public struct _stdlib_thread_barrier_t {
-#if os(Cygwin) || os(FreeBSD)
+#if os(Windows)
+  var mutex: UnsafeMutablePointer<SRWLOCK>?
+  var cond: UnsafeMutablePointer<CONDITION_VARIABLE>?
+#elseif os(Cygwin) || os(FreeBSD)
   var mutex: UnsafeMutablePointer<pthread_mutex_t?>?
   var cond: UnsafeMutablePointer<pthread_cond_t?>?
 #else
@@ -57,6 +61,13 @@ public func _stdlib_thread_barrier_init(
     errno = EINVAL
     return -1
   }
+#if os(Windows)
+  barrier.pointee.mutex = UnsafeMutablePointer.allocate(capacity: 1)
+  InitializeSRWLock(barrier.pointee.mutex!)
+
+  barrier.pointee.cond = UnsafeMutablePointer.allocate(capacity: 1)
+  InitializeConditionVariable(barrier.pointee.cond!)
+#else
   barrier.pointee.mutex = UnsafeMutablePointer.allocate(capacity: 1)
   if pthread_mutex_init(barrier.pointee.mutex!, nil) != 0 {
     // FIXME: leaking memory.
@@ -67,6 +78,7 @@ public func _stdlib_thread_barrier_init(
     // FIXME: leaking memory, leaking a mutex.
     return -1
   }
+#endif
   barrier.pointee.count = count
   return 0
 }
@@ -74,6 +86,10 @@ public func _stdlib_thread_barrier_init(
 public func _stdlib_thread_barrier_destroy(
   _ barrier: UnsafeMutablePointer<_stdlib_thread_barrier_t>
 ) -> CInt {
+#if os(Windows)
+  // Condition Variables do not need to be explicitly destroyed
+  // Mutexes do not need to be explicitly destroyed
+#else
   if pthread_cond_destroy(barrier.pointee.cond!) != 0 {
     // FIXME: leaking memory, leaking a mutex.
     return -1
@@ -82,40 +98,61 @@ public func _stdlib_thread_barrier_destroy(
     // FIXME: leaking memory.
     return -1
   }
+#endif
   barrier.pointee.cond!.deinitialize(count: 1)
   barrier.pointee.cond!.deallocate()
+
   barrier.pointee.mutex!.deinitialize(count: 1)
   barrier.pointee.mutex!.deallocate()
+
   return 0
 }
 
 public func _stdlib_thread_barrier_wait(
   _ barrier: UnsafeMutablePointer<_stdlib_thread_barrier_t>
 ) -> CInt {
+#if os(Windows)
+  AcquireSRWLockExclusive(barrier.pointee.mutex!)
+#else
   if pthread_mutex_lock(barrier.pointee.mutex!) != 0 {
     return -1
   }
+#endif
   barrier.pointee.numThreadsWaiting += 1
   if barrier.pointee.numThreadsWaiting < barrier.pointee.count {
     // Put the thread to sleep.
+#if os(Windows)
+    // TODO(compnerd) modularize rpc.h to get INFIITE (0xffffffff)
+    if SleepConditionVariableSRW(barrier.pointee.cond!, barrier.pointee.mutex!,
+                                 0xffffffff, 0) == 0 {
+      return -1
+    }
+    ReleaseSRWLockExclusive(barrier.pointee.mutex!)
+#else
     if pthread_cond_wait(barrier.pointee.cond!, barrier.pointee.mutex!) != 0 {
       return -1
     }
     if pthread_mutex_unlock(barrier.pointee.mutex!) != 0 {
       return -1
     }
+#endif
     return 0
   } else {
     // Reset thread count.
     barrier.pointee.numThreadsWaiting = 0
 
     // Wake up all threads.
+#if os(Windows)
+    WakeAllConditionVariable(barrier.pointee.cond!)
+    ReleaseSRWLockExclusive(barrier.pointee.mutex!)
+#else
     if pthread_cond_broadcast(barrier.pointee.cond!) != 0 {
       return -1
     }
     if pthread_mutex_unlock(barrier.pointee.mutex!) != 0 {
       return -1
     }
+#endif
     return _stdlib_THREAD_BARRIER_SERIAL_THREAD
   }
 }
