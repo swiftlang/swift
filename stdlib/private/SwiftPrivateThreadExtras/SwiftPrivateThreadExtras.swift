@@ -109,33 +109,33 @@ public func _stdlib_pthread_join<Result>(
 }
 
 public class _stdlib_Barrier {
-  var _pthreadBarrier: _stdlib_pthread_barrier_t
+  var _pthreadBarrier: _stdlib_thread_barrier_t
 
-  var _pthreadBarrierPtr: UnsafeMutablePointer<_stdlib_pthread_barrier_t> {
+  var _pthreadBarrierPtr: UnsafeMutablePointer<_stdlib_thread_barrier_t> {
     return _getUnsafePointerToStoredProperties(self)
-      .assumingMemoryBound(to: _stdlib_pthread_barrier_t.self)
+      .assumingMemoryBound(to: _stdlib_thread_barrier_t.self)
   }
 
   public init(threadCount: Int) {
-    self._pthreadBarrier = _stdlib_pthread_barrier_t()
-    let ret = _stdlib_pthread_barrier_init(
+    self._pthreadBarrier = _stdlib_thread_barrier_t()
+    let ret = _stdlib_thread_barrier_init(
       _pthreadBarrierPtr, CUnsignedInt(threadCount))
     if ret != 0 {
-      fatalError("_stdlib_pthread_barrier_init() failed")
+      fatalError("_stdlib_thread_barrier_init() failed")
     }
   }
 
   deinit {
-    let ret = _stdlib_pthread_barrier_destroy(_pthreadBarrierPtr)
+    let ret = _stdlib_thread_barrier_destroy(_pthreadBarrierPtr)
     if ret != 0 {
-      fatalError("_stdlib_pthread_barrier_destroy() failed")
+      fatalError("_stdlib_thread_barrier_destroy() failed")
     }
   }
 
   public func wait() {
-    let ret = _stdlib_pthread_barrier_wait(_pthreadBarrierPtr)
+    let ret = _stdlib_thread_barrier_wait(_pthreadBarrierPtr)
     if !(ret == 0 || ret == _stdlib_PTHREAD_BARRIER_SERIAL_THREAD) {
-      fatalError("_stdlib_pthread_barrier_wait() failed")
+      fatalError("_stdlib_thread_barrier_wait() failed")
     }
   }
 }

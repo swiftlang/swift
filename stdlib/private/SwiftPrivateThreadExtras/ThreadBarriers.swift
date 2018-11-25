@@ -28,7 +28,7 @@ public var _stdlib_PTHREAD_BARRIER_SERIAL_THREAD: CInt {
   return 1
 }
 
-public struct _stdlib_pthread_barrier_t {
+public struct _stdlib_thread_barrier_t {
 #if os(Cygwin) || os(FreeBSD)
   var mutex: UnsafeMutablePointer<pthread_mutex_t?>?
   var cond: UnsafeMutablePointer<pthread_cond_t?>?
@@ -48,11 +48,11 @@ public struct _stdlib_pthread_barrier_t {
   public init() {}
 }
 
-public func _stdlib_pthread_barrier_init(
-  _ barrier: UnsafeMutablePointer<_stdlib_pthread_barrier_t>,
+public func _stdlib_thread_barrier_init(
+  _ barrier: UnsafeMutablePointer<_stdlib_thread_barrier_t>,
   _ count: CUnsignedInt
 ) -> CInt {
-  barrier.pointee = _stdlib_pthread_barrier_t()
+  barrier.pointee = _stdlib_thread_barrier_t()
   if count == 0 {
     errno = EINVAL
     return -1
@@ -71,8 +71,8 @@ public func _stdlib_pthread_barrier_init(
   return 0
 }
 
-public func _stdlib_pthread_barrier_destroy(
-  _ barrier: UnsafeMutablePointer<_stdlib_pthread_barrier_t>
+public func _stdlib_thread_barrier_destroy(
+  _ barrier: UnsafeMutablePointer<_stdlib_thread_barrier_t>
 ) -> CInt {
   if pthread_cond_destroy(barrier.pointee.cond!) != 0 {
     // FIXME: leaking memory, leaking a mutex.
@@ -89,8 +89,8 @@ public func _stdlib_pthread_barrier_destroy(
   return 0
 }
 
-public func _stdlib_pthread_barrier_wait(
-  _ barrier: UnsafeMutablePointer<_stdlib_pthread_barrier_t>
+public func _stdlib_thread_barrier_wait(
+  _ barrier: UnsafeMutablePointer<_stdlib_thread_barrier_t>
 ) -> CInt {
   if pthread_mutex_lock(barrier.pointee.mutex!) != 0 {
     return -1
