@@ -21,6 +21,7 @@ import Darwin
 import Glibc
 #elseif os(Windows)
 import MSVCRT
+import WinSDK
 #endif
 
 /// An abstract base class to encapsulate the context necessary to invoke
@@ -110,10 +111,26 @@ public func _stdlib_thread_create_block<Argument, Result>(
 }
 
 /// Block-based wrapper for `pthread_join`.
-public func _stdlib_pthread_join<Result>(
-  _ thread: pthread_t,
+public func _stdlib_thread_join<Result>(
+  _ thread: ThreadHandle,
   _ resultType: Result.Type
 ) -> (CInt, Result?) {
+#if os(Windows)
+  // TODO(compnerd) modularize rpc.h for INFINITE (0xffffffff)
+  let result = WaitForSingleObject(thread, 0xffffffff);
+  // TODO(compnerd) modularize WinBase.h for WAIT_OBJECT_0 (0)
+  if result == 0 {
+    let threadResult: DWORD = 0
+    GetExitCodeThread(thread, &threadResult)
+    CloseHandle(thread)
+
+    return (result,
+            UnsafeMutablePointer<DWORD>(&threadResult)
+                .withMemoryRebound(to: Result.self, capacity: 1){ $0.pointee })
+  } else {
+    return (result, nil)
+  }
+#else
   var threadResultRawPtr: UnsafeMutableRawPointer?
   let result = pthread_join(thread, &threadResultRawPtr)
   if result == 0 {
@@ -126,6 +143,7 @@ public func _stdlib_pthread_join<Result>(
   } else {
     return (result, nil)
   }
+#endif
 }
 
 public class _stdlib_Barrier {

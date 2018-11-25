@@ -125,7 +125,7 @@ ExclusiveAccessTestSuite.test("PerThreadEnforcement") {
       return ()
     }, ())
 
-    _ = _stdlib_pthread_join(otherThread!, Void.self)
+    _ = _stdlib_thread_join(otherThread!, Void.self)
   }
 }
 

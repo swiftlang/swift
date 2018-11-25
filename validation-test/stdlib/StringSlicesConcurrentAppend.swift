@@ -101,8 +101,8 @@ StringTestSuite.test("SliceConcurrentAppend") {
   expectEqual(0, createRet1)
   expectEqual(0, createRet2)
 
-  let (joinRet1, _) = _stdlib_pthread_join(tid1!, Void.self)
-  let (joinRet2, _) = _stdlib_pthread_join(tid2!, Void.self)
+  let (joinRet1, _) = _stdlib_thread_join(tid1!, Void.self)
+  let (joinRet2, _) = _stdlib_thread_join(tid2!, Void.self)
 
   expectEqual(0, joinRet1)
   expectEqual(0, joinRet2)

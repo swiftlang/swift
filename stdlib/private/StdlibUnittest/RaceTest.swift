@@ -626,14 +626,14 @@ public func runRaceTest<RT : RaceTestWithPerTrialData>(
 
   // Join all testing threads.
   for tid in testTids {
-    let (ret, _) = _stdlib_pthread_join(tid, Void.self)
+    let (ret, _) = _stdlib_thread_join(tid, Void.self)
     expectEqual(0, ret)
   }
 
   // Tell the alarm thread to stop if it hasn't already, then join it.
   do {
     alarmTimer.wake()
-    let (ret, _) = _stdlib_pthread_join(alarmTid, Void.self)
+    let (ret, _) = _stdlib_thread_join(alarmTid, Void.self)
     expectEqual(0, ret)
   }
 
