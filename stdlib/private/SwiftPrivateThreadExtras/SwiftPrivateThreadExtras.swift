@@ -134,7 +134,7 @@ public class _stdlib_Barrier {
 
   public func wait() {
     let ret = _stdlib_thread_barrier_wait(_pthreadBarrierPtr)
-    if !(ret == 0 || ret == _stdlib_PTHREAD_BARRIER_SERIAL_THREAD) {
+    if !(ret == 0 || ret == _stdlib_THREAD_BARRIER_SERIAL_THREAD) {
       fatalError("_stdlib_thread_barrier_wait() failed")
     }
   }

@@ -41,7 +41,7 @@ var secondaryString: String = ""
 
 func barrier() {
   var ret = _stdlib_thread_barrier_wait(barrierVar!)
-  expectTrue(ret == 0 || ret == _stdlib_PTHREAD_BARRIER_SERIAL_THREAD)
+  expectTrue(ret == 0 || ret == _stdlib_THREAD_BARRIER_SERIAL_THREAD)
 }
 
 func sliceConcurrentAppendThread(_ tid: ThreadID) {

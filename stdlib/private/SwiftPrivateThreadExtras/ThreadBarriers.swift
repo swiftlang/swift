@@ -24,7 +24,7 @@ import MSVCRT
 // (OS X does not implement them.)
 //
 
-public var _stdlib_PTHREAD_BARRIER_SERIAL_THREAD: CInt {
+public var _stdlib_THREAD_BARRIER_SERIAL_THREAD: CInt {
   return 1
 }
 
@@ -116,6 +116,6 @@ public func _stdlib_thread_barrier_wait(
     if pthread_mutex_unlock(barrier.pointee.mutex!) != 0 {
       return -1
     }
-    return _stdlib_PTHREAD_BARRIER_SERIAL_THREAD
+    return _stdlib_THREAD_BARRIER_SERIAL_THREAD
   }
 }
