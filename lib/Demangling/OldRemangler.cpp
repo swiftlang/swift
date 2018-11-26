@@ -1894,6 +1894,11 @@ void Remangler::mangleGenericArgs(Node *node, EntityContext &ctx) {
     break;
   }
 
+  case Node::Kind::Extension: {
+    mangleGenericArgs(node->getChild(1), ctx);
+    break;
+  }
+
   default:
     break;
   }
