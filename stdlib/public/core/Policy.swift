@@ -384,7 +384,7 @@ precedencegroup BitwiseShiftPrecedence {
 // Standard postfix operators.
 postfix operator ++
 postfix operator --
-postfix operator ...
+postfix operator ... : Comparable
 
 // Optional<T> unwrapping operator is built into the compiler as a part of
 // postfix expression grammar.
@@ -394,12 +394,12 @@ postfix operator ...
 // Standard prefix operators.
 prefix operator ++
 prefix operator --
-prefix operator !
+prefix operator ! : Bool
 prefix operator ~ : BinaryInteger
 prefix operator + : AdditiveArithmetic
 prefix operator - : SignedNumeric
-prefix operator ...
-prefix operator ..<
+prefix operator ... : Comparable
+prefix operator ..< : Comparable
 
 // Standard infix operators.
 
@@ -420,7 +420,7 @@ infix operator   & : MultiplicationPrecedence, BinaryInteger
 
 // "Additive"
 
-infix operator   + : AdditionPrecedence, AdditiveArithmetic, String, Strideable
+infix operator   + : AdditionPrecedence, AdditiveArithmetic, String, Array, Strideable
 infix operator  &+ : AdditionPrecedence, FixedWidthInteger
 infix operator   - : AdditionPrecedence, AdditiveArithmetic, Strideable
 infix operator  &- : AdditionPrecedence, FixedWidthInteger
@@ -428,8 +428,8 @@ infix operator   | : AdditionPrecedence, BinaryInteger
 infix operator   ^ : AdditionPrecedence, BinaryInteger
 
 // FIXME: is this the right precedence level for "..." ?
-infix operator  ... : RangeFormationPrecedence
-infix operator  ..< : RangeFormationPrecedence
+infix operator  ... : RangeFormationPrecedence, Comparable
+infix operator  ..< : RangeFormationPrecedence, Comparable
 
 // The cast operators 'as' and 'is' are hardcoded as if they had the
 // following attributes:
@@ -454,11 +454,11 @@ infix operator  ~= : ComparisonPrecedence
 
 // "Conjunctive"
 
-infix operator && : LogicalConjunctionPrecedence
+infix operator && : LogicalConjunctionPrecedence, Bool
 
 // "Disjunctive"
 
-infix operator || : LogicalDisjunctionPrecedence
+infix operator || : LogicalDisjunctionPrecedence, Bool
 
 // User-defined ternary operators are not supported. The ? : operator is
 // hardcoded as if it had the following attributes:
@@ -474,7 +474,7 @@ infix operator   *= : AssignmentPrecedence, Numeric
 infix operator  &*= : AssignmentPrecedence, FixedWidthInteger
 infix operator   /= : AssignmentPrecedence, BinaryInteger
 infix operator   %= : AssignmentPrecedence, BinaryInteger
-infix operator   += : AssignmentPrecedence, AdditiveArithmetic, String, Strideable
+infix operator   += : AssignmentPrecedence, AdditiveArithmetic, String, Array, Strideable
 infix operator  &+= : AssignmentPrecedence, FixedWidthInteger
 infix operator   -= : AssignmentPrecedence, AdditiveArithmetic, Strideable
 infix operator  &-= : AssignmentPrecedence, FixedWidthInteger

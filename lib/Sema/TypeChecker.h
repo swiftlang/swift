@@ -870,6 +870,14 @@ public:
   /// Check for unsupported protocol types in the given statement.
   void checkUnsupportedProtocolType(Stmt *stmt);
 
+  /// Check for unsupported protocol types in the given generic requirement
+  /// list.
+  void checkUnsupportedProtocolType(TrailingWhereClause *whereClause);
+
+  /// Check for unsupported protocol types in the given generic requirement
+  /// list.
+  void checkUnsupportedProtocolType(GenericParamList *genericParams);
+
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
   GenericEnvironment *handleSILGenericParams(GenericParamList *genericParams,
                                              DeclContext *DC);
@@ -1396,7 +1404,12 @@ public:
           FreeTypeVariableBinding::Disallow,
       ExprTypeCheckListener *listener = nullptr);
 
-  bool typeCheckCompletionSequence(Expr *&expr, DeclContext *DC);
+  /// \brief Return the type of operator function for specified LHS, or a null
+  /// \c Type on error.
+  FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
+                                            Identifier opName,
+                                            DeclRefKind refKind,
+                                            ConcreteDeclRef &referencedDecl);
 
   /// Check the key-path expression.
   ///
@@ -1876,6 +1889,10 @@ public:
 
   PrecedenceGroupDecl *lookupPrecedenceGroup(DeclContext *dc, Identifier name,
                                              SourceLoc nameLoc);
+
+  /// Given an pre-folded expression, find LHS from the expression if a binary
+  /// operator \c name appended to the expression.
+  Expr *findLHS(DeclContext *DC, Expr *E, Identifier name);
 
   /// \brief Look up the Bool type in the standard library.
   Type lookupBoolType(const DeclContext *dc);

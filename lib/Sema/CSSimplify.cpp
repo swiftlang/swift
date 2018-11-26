@@ -848,18 +848,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   auto isAutoClosureArg = [&](Expr *anchor, unsigned argIdx) -> bool {
     assert(anchor);
 
-    auto *call = dyn_cast<ApplyExpr>(anchor);
-    if (!call)
-      return false;
-
-    Expr *argExpr = nullptr;
-    if (auto *PE = dyn_cast<ParenExpr>(call->getArg())) {
-      assert(argsWithLabels.size() == 1);
-      argExpr = PE->getSubExpr();
-    } else if (auto *TE = dyn_cast<TupleExpr>(call->getArg())) {
-      argExpr = TE->getElement(argIdx);
-    }
-
+    auto *argExpr = getArgumentExpr(anchor, argIdx);
     if (!argExpr)
       return false;
 
@@ -895,11 +884,15 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
       // is itself `@autoclosure` function type in Swift < 5,
       // let's fix that up by making it look like argument is
       // called implicitly.
-      if (!cs.getASTContext().isSwiftVersionAtLeast(5)) {
-        if (param.isAutoClosure() &&
-            isAutoClosureArg(locator.getAnchor(), argIdx)) {
-          argTy = argTy->castTo<FunctionType>()->getResult();
-          cs.increaseScore(SK_FunctionConversion);
+      if (param.isAutoClosure() &&
+          isAutoClosureArg(locator.getAnchor(), argIdx)) {
+        argTy = argTy->castTo<FunctionType>()->getResult();
+        cs.increaseScore(SK_FunctionConversion);
+
+        if (cs.getASTContext().isSwiftVersionAtLeast(5)) {
+          auto *fixLoc = cs.getConstraintLocator(loc);
+          if (cs.recordFix(AutoClosureForwarding::create(cs, fixLoc)))
+            return cs.getTypeMatchFailure(loc);
         }
       }
 
@@ -2401,6 +2394,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           forceUnwrapPossible = false;
         }
       }
+      
+      if (auto optTryExpr =
+          dyn_cast_or_null<OptionalTryExpr>(locator.trySimplifyToExpr())) {
+        auto subExprType = getType(optTryExpr->getSubExpr());
+        bool isSwift5OrGreater = TC.getLangOpts().isSwiftVersionAtLeast(5);
+        if (isSwift5OrGreater && (bool)subExprType->getOptionalObjectType()) {
+          // For 'try?' expressions, a ForceOptional fix converts 'try?'
+          // to 'try!'. If the sub-expression is optional, then a force-unwrap
+          // won't change anything in Swift 5+ because 'try?' already avoids
+          // adding an additional layer of Optional there.
+          forceUnwrapPossible = false;
+        }
+      }
+      
 
       if (forceUnwrapPossible) {
         conversionsOrFixes.push_back(
@@ -2473,6 +2480,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (conversionsOrFixes.size() > 1) {
     auto fixedLocator = getConstraintLocator(locator);
     SmallVector<Constraint *, 2> constraints;
+
     for (auto potential : conversionsOrFixes) {
       auto constraintKind = kind;
 
@@ -2485,6 +2493,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         constraints.push_back(
           Constraint::createRestricted(*this, constraintKind, *restriction,
                                        type1, type2, fixedLocator));
+
+        if (constraints.back()->getKind() == ConstraintKind::Equal)
+          constraints.back()->setFavored();
+
         continue;
       }
 
@@ -2493,6 +2505,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         Constraint::createFixed(*this, constraintKind, fix, type1, type2,
                                 fixedLocator));
     }
+
+    // Sort favored constraints first.
+    std::sort(constraints.begin(), constraints.end(),
+              [&](Constraint *lhs, Constraint *rhs) -> bool {
+                if (lhs->isFavored() == rhs->isFavored())
+                  return false;
+
+                return lhs->isFavored();
+              });
+
     addDisjunctionConstraint(constraints, fixedLocator);
     return getTypeMatchSuccess();
   }
@@ -5402,6 +5424,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::CoerceToCheckedCast:
   case FixKind::RelabelArguments:
   case FixKind::AddConformance:
+  case FixKind::AutoClosureForwarding:
     llvm_unreachable("handled elsewhere");
   }
 

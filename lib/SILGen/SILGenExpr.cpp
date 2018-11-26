@@ -1082,6 +1082,9 @@ RValue RValueEmitter::visitForceTryExpr(ForceTryExpr *E, SGFContext C) {
 RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   // FIXME: Much of this was copied from visitOptionalEvaluationExpr.
 
+  // Prior to Swift 5, an optional try's subexpression is always wrapped in an additional optional
+  bool shouldWrapInOptional = !(SGF.getASTContext().LangOpts.isSwiftVersionAtLeast(5));
+  
   auto &optTL = SGF.getTypeLowering(E->getType());
 
   Initialization *optInit = C.getEmitInto();
@@ -1112,16 +1115,27 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
     JumpDest(catchBB, SGF.Cleanups.getCleanupsDepth(), E)};
 
   SILValue branchArg;
-  if (isByAddress) {
-    assert(optInit);
-    SILValue optAddr = optInit->getAddressForInPlaceInitialization(SGF, E);
-    SGF.emitInjectOptionalValueInto(E, E->getSubExpr(), optAddr, optTL);
-  } else {
-    ManagedValue subExprValue = SGF.emitRValueAsSingleValue(E->getSubExpr());
-    ManagedValue wrapped = SGF.getOptionalSomeValue(E, subExprValue, optTL);
-    branchArg = wrapped.forward(SGF);
+  if (shouldWrapInOptional) {
+    if (isByAddress) {
+      assert(optInit);
+      SILValue optAddr = optInit->getAddressForInPlaceInitialization(SGF, E);
+      SGF.emitInjectOptionalValueInto(E, E->getSubExpr(), optAddr, optTL);
+    } else {
+      ManagedValue subExprValue = SGF.emitRValueAsSingleValue(E->getSubExpr());
+      ManagedValue wrapped = SGF.getOptionalSomeValue(E, subExprValue, optTL);
+      branchArg = wrapped.forward(SGF);
+    }
   }
-
+  else {
+    if (isByAddress) {
+      assert(optInit);
+      SGF.emitExprInto(E->getSubExpr(), optInit);
+    } else {
+      ManagedValue subExprValue = SGF.emitRValueAsSingleValue(E->getSubExpr());
+      branchArg = subExprValue.forward(SGF);
+    }
+  }
+  
   localCleanups.pop();
 
   // If it turns out there are no uses of the catch block, just drop it.
@@ -1133,8 +1147,10 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
     if (!isByAddress)
       return RValue(SGF, E,
                     SGF.emitManagedRValueWithCleanup(branchArg, optTL));
-
-    optInit->finishInitialization(SGF);
+    
+    if (shouldWrapInOptional) {
+      optInit->finishInitialization(SGF);
+    }
 
     // If we emitted into the provided context, we're done.
     if (usingProvidedContext)
@@ -1181,8 +1197,10 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
     return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(arg, optTL));
   }
 
-  optInit->finishInitialization(SGF);
-
+  if (shouldWrapInOptional) {
+    optInit->finishInitialization(SGF);
+  }
+  
   // If we emitted into the provided context, we're done.
   if (usingProvidedContext)
     return RValue::forInContext();
@@ -2044,7 +2062,8 @@ public:
     // Check that we have a stored access strategy. If we don't bail.
     AccessStrategy strategy =
       Field->getAccessStrategy(Expr->getAccessSemantics(), AccessKind::Read,
-                               SGF.FunctionDC);
+                               SGF.SGM.M.getSwiftModule(),
+                               SGF.F.getResilienceExpansion());
     if (strategy.getKind() != AccessStrategy::Storage)
       return None;
 
@@ -2630,6 +2649,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
                          AbstractStorageDecl *property,
                          SubstitutionMap subs,
                          GenericEnvironment *genericEnv,
+                         ResilienceExpansion expansion,
                          ArrayRef<IndexTypePair> indexes,
                          CanType baseType,
                          CanType propertyType) {
@@ -2687,17 +2707,15 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
     params, {}, result, None, SGM.getASTContext());
   
   // Find the function and see if we already created it.
-  SmallVector<CanType, 2> interfaceSubs;
-  for (auto replacement : subs.getReplacementTypes()) {
-    interfaceSubs.push_back(
-        replacement->mapTypeOutOfContext()->getCanonicalType());
-  }
   auto name = Mangle::ASTMangler()
     .mangleKeyPathGetterThunkHelper(property, genericSig, baseType,
-                                    interfaceSubs);
+                                    subs, expansion);
   SILGenFunctionBuilder builder(SGM);
   auto thunk = builder.getOrCreateSharedFunction(
-      loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
+      loc, name, signature, IsBare, IsNotTransparent,
+      (expansion == ResilienceExpansion::Minimal
+       ? IsSerializable
+       : IsNotSerialized),
       ProfileCounter(), IsThunk, IsNotDynamic);
   if (!thunk->empty())
     return thunk;
@@ -2761,6 +2779,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                           AbstractStorageDecl *property,
                           SubstitutionMap subs,
                           GenericEnvironment *genericEnv,
+                          ResilienceExpansion expansion,
                           ArrayRef<IndexTypePair> indexes,
                           CanType baseType,
                           CanType propertyType) {
@@ -2823,21 +2842,16 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
     params, {}, {}, None, SGM.getASTContext());
   
   // Mangle the name of the thunk to see if we already created it.
-  SmallString<64> nameBuf;
-  
-  SmallVector<CanType, 2> interfaceSubs;
-  for (Type replacement : subs.getReplacementTypes()) {
-    interfaceSubs.push_back(
-        replacement->mapTypeOutOfContext()->getCanonicalType());
-  }
-  auto name = Mangle::ASTMangler().mangleKeyPathSetterThunkHelper(property,
-                                                                genericSig,
-                                                                baseType,
-                                                                interfaceSubs);
+  auto name = Mangle::ASTMangler()
+    .mangleKeyPathSetterThunkHelper(property, genericSig, baseType,
+                                    subs, expansion);
 
   SILGenFunctionBuilder builder(SGM);
   auto thunk = builder.getOrCreateSharedFunction(
-      loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
+      loc, name, signature, IsBare, IsNotTransparent,
+      (expansion == ResilienceExpansion::Minimal
+       ? IsSerializable
+       : IsNotSerialized),
       ProfileCounter(), IsThunk, IsNotDynamic);
   if (!thunk->empty())
     return thunk;
@@ -2908,7 +2922,9 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   }
 
   auto semantics = AccessSemantics::Ordinary;
-  auto strategy = property->getAccessStrategy(semantics, AccessKind::Write);
+  auto strategy = property->getAccessStrategy(semantics, AccessKind::Write,
+                                              SGM.M.getSwiftModule(),
+                                              expansion);
 
   LValueOptions lvOptions;
   lv.addMemberComponent(subSGF, loc, property, subs, lvOptions,
@@ -2931,6 +2947,7 @@ static void
 getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
                               SILLocation loc,
                               GenericEnvironment *genericEnv,
+                              ResilienceExpansion expansion,
                               ArrayRef<KeyPathPatternComponent::Index> indexes,
                               SILFunction *&equals,
                               SILFunction *&hash) {
@@ -2969,8 +2986,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
 
   auto indexLoweredTy = SGM.Types.getLoweredType(indexTupleTy);
   // Get or create the equals witness
-  [&unsafeRawPointerTy, &boolTy, &genericSig, &C, &indexTypes, &equals, &loc,
-   &SGM, &genericEnv, &indexLoweredTy, &indexes]{
+  [unsafeRawPointerTy, boolTy, genericSig, &C, &indexTypes, &equals, loc,
+   &SGM, genericEnv, expansion, indexLoweredTy, indexes]{
     // (RawPointer, RawPointer) -> Bool
     SmallVector<SILParameterInfo, 2> params;
     params.push_back({unsafeRawPointerTy,
@@ -2990,13 +3007,14 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       params, /*yields*/ {}, results, None, C);
     
     // Mangle the name of the thunk to see if we already created it.
-    SmallString<64> nameBuf;
-    
-    auto name = Mangle::ASTMangler().mangleKeyPathEqualsHelper(indexTypes,
-                                                               genericSig);
+    auto name = Mangle::ASTMangler()
+      .mangleKeyPathEqualsHelper(indexTypes, genericSig, expansion);
     SILGenFunctionBuilder builder(SGM);
     equals = builder.getOrCreateSharedFunction(
-        loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
+        loc, name, signature, IsBare, IsNotTransparent,
+        (expansion == ResilienceExpansion::Minimal
+         ? IsSerializable
+         : IsNotSerialized),
         ProfileCounter(), IsThunk, IsNotDynamic);
     if (!equals->empty()) {
       return;
@@ -3138,8 +3156,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
   }();
 
   // Get or create the hash witness
-  [&unsafeRawPointerTy, &intTy, &genericSig, &C, &indexTypes, &hash, &loc,
-   &SGM, &genericEnv, &indexLoweredTy, &hashableProto, &indexes]{
+  [unsafeRawPointerTy, intTy, genericSig, &C, indexTypes, &hash, &loc,
+   &SGM, genericEnv, expansion, indexLoweredTy, hashableProto, indexes]{
     // (RawPointer) -> Int
     SmallVector<SILParameterInfo, 1> params;
     params.push_back({unsafeRawPointerTy,
@@ -3159,11 +3177,14 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     // Mangle the name of the thunk to see if we already created it.
     SmallString<64> nameBuf;
     
-    auto name = Mangle::ASTMangler().mangleKeyPathHashHelper(indexTypes,
-                                                             genericSig);
+    auto name = Mangle::ASTMangler()
+      .mangleKeyPathHashHelper(indexTypes, genericSig, expansion);
     SILGenFunctionBuilder builder(SGM);
     hash = builder.getOrCreateSharedFunction(
-        loc, name, signature, IsBare, IsNotTransparent, IsNotSerialized,
+        loc, name, signature, IsBare, IsNotTransparent,
+        (expansion == ResilienceExpansion::Minimal
+         ? IsSerializable
+         : IsNotSerialized),
         ProfileCounter(), IsThunk, IsNotDynamic);
     if (!hash->empty()) {
       return;
@@ -3326,6 +3347,7 @@ lowerKeyPathSubscriptIndexPatterns(
 KeyPathPatternComponent
 SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                                 GenericEnvironment *genericEnv,
+                                ResilienceExpansion expansion,
                                 unsigned &baseOperand,
                                 bool &needsGenericContext,
                                 SubstitutionMap subs,
@@ -3337,23 +3359,25 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
   /// subscript should be externally referenced.
   auto shouldUseExternalKeyPathComponent =
     [&]() -> bool {
-      return getASTContext().LangOpts.EnableKeyPathResilience
-        && !forPropertyDescriptor
-        && storage->getModuleContext() != SwiftModule
-        // Protocol requirements don't have nor need property descriptors.
-        && !isa<ProtocolDecl>(storage->getDeclContext())
-        // Properties that only dispatch via ObjC lookup do not have nor need
-        // property descriptors, since the selector identifies the storage.
-        && (!storage->hasAnyAccessors()
-            || !getAccessorDeclRef(getRepresentativeAccessorForKeyPath(storage))
-                  .isForeign);
+    return (!forPropertyDescriptor &&
+            (storage->getModuleContext() != SwiftModule ||
+             storage->isResilient(SwiftModule, expansion)) &&
+            // Protocol requirements don't have nor need property descriptors.
+            !isa<ProtocolDecl>(storage->getDeclContext()) &&
+            // Properties that only dispatch via ObjC lookup do not have nor
+            // need property descriptors, since the selector identifies the
+            // storage.
+            (!storage->hasAnyAccessors() ||
+             !getAccessorDeclRef(getRepresentativeAccessorForKeyPath(storage))
+             .isForeign));
     };
   
   auto strategy = storage->getAccessStrategy(AccessSemantics::Ordinary,
                                              storage->supportsMutation()
                                                ? AccessKind::ReadWrite
                                                : AccessKind::Read,
-                                             M.getSwiftModule());
+                                             M.getSwiftModule(),
+                                             expansion);
 
   AbstractStorageDecl *externalDecl = nullptr;
   SubstitutionMap externalSubs;
@@ -3370,6 +3394,18 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
         needsGenericContext = true;
         externalSubs = externalSubs.mapReplacementTypesOutOfContext();
       }
+    }
+
+    // ABI-compatible overrides do not have property descriptors, so we need
+    // to reference the overridden declaration instead.
+    auto *baseDecl = externalDecl;
+    if (isa<ClassDecl>(baseDecl->getDeclContext())) {
+      while (!baseDecl->isValidKeyPathComponent())
+        baseDecl = baseDecl->getOverriddenDecl();
+      externalSubs = SubstitutionMap::getOverrideSubstitutions(baseDecl,
+                                                               externalDecl,
+                                                               externalSubs);
+      externalDecl = baseDecl;
     }
   }
   
@@ -3397,56 +3433,31 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                       genericEnv ? genericEnv->getGenericSignature() : nullptr);
     }
   
-    if (Types.canStorageUseStoredKeyPathComponent(var)) {
+    if (canStorageUseStoredKeyPathComponent(var, expansion)) {
       return KeyPathPatternComponent::forStoredProperty(var, componentTy);
     }
 
-    switch (strategy.getKind()) {
-    case AccessStrategy::BehaviorStorage:
-      llvm_unreachable("key path for behavior storage?");
-    case AccessStrategy::Storage: {
-      // If the stored value would need to be reabstracted in fully opaque
-      // context, then we have to treat the component as computed.
-      auto componentObjTy = componentTy->getWithoutSpecifierType();
-      if (genericEnv)
-        componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
-      auto storageTy = Types.getSubstitutedStorageType(var, componentObjTy);
-      auto opaqueTy = Types
-        .getLoweredType(AbstractionPattern::getOpaque(), componentObjTy);
-      
-      if (storageTy.getAddressType() == opaqueTy.getAddressType()) {
-        return KeyPathPatternComponent::forStoredProperty(var, componentTy);
-      }
-      LLVM_FALLTHROUGH;
-    }
-    case AccessStrategy::MaterializeToTemporary:
-    case AccessStrategy::DirectToAccessor:
-    case AccessStrategy::DispatchToAccessor: {
-      // We need thunks to bring the getter and setter to the right signature
-      // expected by the key path runtime.
-      auto id = getIdForKeyPathComponentComputedProperty(*this, var,
-                                                         strategy);
-      auto getter = getOrCreateKeyPathGetter(*this, loc,
-               var, subs,
-               needsGenericContext ? genericEnv : nullptr,
-               {},
-               baseTy, componentTy);
-      
-      if (isSettableInComponent()) {
-        auto setter = getOrCreateKeyPathSetter(*this, loc,
-               var, subs,
-               needsGenericContext ? genericEnv : nullptr,
-               {},
-               baseTy, componentTy);
-        return KeyPathPatternComponent::forComputedSettableProperty(id,
-            getter, setter, {}, nullptr, nullptr,
-            externalDecl, externalSubs, componentTy);
-      } else {
-        return KeyPathPatternComponent::forComputedGettableProperty(id,
-            getter, {}, nullptr, nullptr,
-            externalDecl, externalSubs, componentTy);
-      }
-    }
+    // We need thunks to bring the getter and setter to the right signature
+    // expected by the key path runtime.
+    auto id = getIdForKeyPathComponentComputedProperty(*this, var,
+                                                       strategy);
+    auto getter = getOrCreateKeyPathGetter(*this, loc,
+             var, subs,
+             needsGenericContext ? genericEnv : nullptr,
+             expansion, {}, baseTy, componentTy);
+    
+    if (isSettableInComponent()) {
+      auto setter = getOrCreateKeyPathSetter(*this, loc,
+             var, subs,
+             needsGenericContext ? genericEnv : nullptr,
+             expansion, {}, baseTy, componentTy);
+      return KeyPathPatternComponent::forComputedSettableProperty(id,
+          getter, setter, {}, nullptr, nullptr,
+          externalDecl, externalSubs, componentTy);
+    } else {
+      return KeyPathPatternComponent::forComputedGettableProperty(id,
+          getter, {}, nullptr, nullptr,
+          externalDecl, externalSubs, componentTy);
     }
   }
   
@@ -3474,6 +3485,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
       
       getOrCreateKeyPathEqualsAndHash(*this, loc,
                needsGenericContext ? genericEnv : nullptr,
+               expansion,
                indexPatterns,
                indexEquals, indexHash);
     }
@@ -3482,6 +3494,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     auto getter = getOrCreateKeyPathGetter(*this, loc,
              decl, subs,
              needsGenericContext ? genericEnv : nullptr,
+             expansion,
              indexTypes,
              baseTy, componentTy);
   
@@ -3490,6 +3503,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
       auto setter = getOrCreateKeyPathSetter(*this, loc,
              decl, subs,
              needsGenericContext ? genericEnv : nullptr,
+             expansion,
              indexTypes,
              baseTy, componentTy);
       return KeyPathPatternComponent::forComputedSettableProperty(id,
@@ -3568,6 +3582,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
       loweredComponents.push_back(
         SGF.SGM.emitKeyPathComponentForDecl(SILLocation(E),
                             SGF.F.getGenericEnvironment(),
+                            SGF.F.getResilienceExpansion(),
                             numOperands,
                             needsGenericContext,
                             component.getDeclRef().getSubstitutions(),

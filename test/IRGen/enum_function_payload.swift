@@ -14,3 +14,11 @@ enum Multi {
   case F((Multi) -> ())
   case G((Multi) -> ())
 }
+
+enum Autoclosure<T> {
+  case first(@autoclosure () -> Bool, T)
+  case second(Int, @autoclosure () -> T)
+}
+
+_ = Autoclosure.first(false, 3)
+_ = Autoclosure.second(3, "hi")

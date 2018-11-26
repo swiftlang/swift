@@ -1842,8 +1842,7 @@ void ConstraintSystem::partitionDisjunction(
     PartitionBeginning.push_back(0);
   };
 
-  if (!getASTContext().isSwiftVersionAtLeast(5) ||
-      !TC.getLangOpts().SolverEnableOperatorDesignatedTypes ||
+  if (!TC.getLangOpts().SolverEnableOperatorDesignatedTypes ||
       !isOperatorBindOverload(Choices[0])) {
     originalOrdering();
     return;
@@ -1948,12 +1947,19 @@ Constraint *ConstraintSystem::selectDisjunction() {
   if (disjunctions.empty())
     return nullptr;
 
-  if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
-    return disjunction;
-
-  if (getASTContext().isSwiftVersionAtLeast(5))
+  // Attempt apply disjunctions first. When we have operators with
+  // designated types, this is important, because it allows us to
+  // select all the preferred operator overloads prior to other
+  // disjunctions that we may not be able to short-circuit, allowing
+  // us to eliminate behavior that is exponential in the number of
+  // operators in the expression.
+  if (getASTContext().isSwiftVersionAtLeast(5) ||
+      TC.getLangOpts().SolverEnableOperatorDesignatedTypes)
     if (auto *disjunction = selectApplyDisjunction())
       return disjunction;
+
+  if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
+    return disjunction;
 
   // Pick the disjunction with the smallest number of active choices.
   auto minDisjunction =

@@ -657,7 +657,7 @@ emitGeneratorForKeyPath(IRGenModule &IGM,
                         ArrayRef<GenericRequirement> requirements,
                         llvm::function_ref<void(IRGenFunction&,CanType)> emit) {
 
-  return IGM.getAddrOfStringForMetadataRef(name,
+  return IGM.getAddrOfStringForMetadataRef(name, /*alignment=*/2,
       /*shouldSetLowBit=*/true,
       [&](ConstantInitBuilder &B) {
         // Build a stub that loads the necessary bindings from the key path's
@@ -707,34 +707,11 @@ emitMetadataGeneratorForKeyPath(IRGenModule &IGM,
                                 CanType type,
                                 GenericEnvironment *genericEnv,
                                 ArrayRef<GenericRequirement> requirements) {
-  // If we have a non-dependent type, use a normal mangled type name.
-  if (!type->hasTypeParameter()) {
-    auto constant = IGM.getTypeRef(type, MangledTypeRefRole::Metadata);
-    auto bitConstant = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
-    return llvm::ConstantExpr::getGetElementPtr(nullptr, constant, bitConstant);
-  }
-
-  // Otherwise, create an accessor.
-  CanGenericSignature genericSig;
-  if (genericEnv)
-    genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
-
-  IRGenMangler mangler;
-  std::string symbolName =
-    mangler.mangleSymbolNameForKeyPathMetadata(
-      "keypath_get_type", genericSig, type,
-      ProtocolConformanceRef::forInvalid());
-
-  // TODO: Use the standard metadata accessor when there are no arguments
-  // and the metadata accessor is defined.
-  return emitGeneratorForKeyPath(IGM, symbolName, type,
-    IGM.TypeMetadataPtrTy,
-    genericEnv, requirements,
-    [&](IRGenFunction &IGF, CanType substType) {
-      auto ret = IGF.emitTypeMetadataRef(substType);
-      IGF.Builder.CreateRet(ret);
-    });
-};
+  // Produce a mangled name for the type.
+  auto constant = IGM.getTypeRef(type, MangledTypeRefRole::Metadata);
+  auto bitConstant = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
+  return llvm::ConstantExpr::getGetElementPtr(nullptr, constant, bitConstant);
+}
 
 static llvm::Constant *
 emitWitnessTableGeneratorForKeyPath(IRGenModule &IGM,
@@ -904,7 +881,12 @@ emitKeyPathComponent(IRGenModule &IGM,
     // If the component references an external property, encode that in a
     // header before the local attempt header, so that we can consult the
     // external descriptor at instantiation time.
-    if (auto externalDecl = component.getExternalDecl()) {
+    //
+    // Note that when compiling inlinable functions, we can have external
+    // declarations that point within the same module. Just ignore those.
+    auto externalDecl = component.getExternalDecl();
+    if (externalDecl &&
+        externalDecl->getModuleContext() != IGM.getSwiftModule()) {
       SmallVector<llvm::Constant *, 4> externalSubArgs;
       auto componentSig = externalDecl->getInnermostDeclContext()
         ->getGenericSignatureOfContext();
@@ -1171,6 +1153,9 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
     fields.addInt32(0);
   }
 
+  // Add the generic environment.
+  fields.addRelativeAddressOrNull(
+    getAddrOfGenericEnvironment(pattern->getGenericSignature()));
   // Store type references for the root and leaf.
   fields.addRelativeAddress(
     emitMetadataGeneratorForKeyPath(*this, rootTy, genericEnv, requirements));

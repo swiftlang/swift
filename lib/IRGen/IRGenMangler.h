@@ -416,6 +416,8 @@ public:
                                            CanType type,
                                            ProtocolConformanceRef conformance);
 
+  std::string mangleSymbolNameForGenericEnvironment(
+                                                CanGenericSignature genericSig);
 protected:
   SymbolicMangling
   withSymbolicReferences(IRGenModule &IGM,

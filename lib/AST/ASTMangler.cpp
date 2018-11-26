@@ -267,7 +267,8 @@ std::string ASTMangler::mangleKeyPathGetterThunkHelper(
                                             const AbstractStorageDecl *property,
                                             GenericSignature *signature,
                                             CanType baseType,
-                                            ArrayRef<CanType> subs) {
+                                            SubstitutionMap subs,
+                                            ResilienceExpansion expansion) {
   beginMangling();
   appendEntity(property);
   if (signature)
@@ -276,11 +277,13 @@ std::string ASTMangler::mangleKeyPathGetterThunkHelper(
   if (isa<SubscriptDecl>(property)) {
     // Subscripts can be generic, and different key paths could capture the same
     // subscript at different generic arguments.
-    for (auto &sub : subs) {
-      appendType(sub);
+    for (auto sub : subs.getReplacementTypes()) {
+      appendType(sub->mapTypeOutOfContext()->getCanonicalType());
     }
   }
   appendOperator("TK");
+  if (expansion == ResilienceExpansion::Minimal)
+    appendOperator("q");
   return finalize();
 }
 
@@ -288,7 +291,8 @@ std::string ASTMangler::mangleKeyPathSetterThunkHelper(
                                           const AbstractStorageDecl *property,
                                           GenericSignature *signature,
                                           CanType baseType,
-                                          ArrayRef<CanType> subs) {
+                                          SubstitutionMap subs,
+                                          ResilienceExpansion expansion) {
   beginMangling();
   appendEntity(property);
   if (signature)
@@ -297,33 +301,41 @@ std::string ASTMangler::mangleKeyPathSetterThunkHelper(
   if (isa<SubscriptDecl>(property)) {
     // Subscripts can be generic, and different key paths could capture the same
     // subscript at different generic arguments.
-    for (auto &sub : subs) {
-      appendType(sub);
+    for (auto sub : subs.getReplacementTypes()) {
+      appendType(sub->mapTypeOutOfContext()->getCanonicalType());
     }
   }
   appendOperator("Tk");
+  if (expansion == ResilienceExpansion::Minimal)
+    appendOperator("q");
   return finalize();
 }
 
 std::string ASTMangler::mangleKeyPathEqualsHelper(ArrayRef<CanType> indices,
-                                                  GenericSignature *signature) {
+                                                  GenericSignature *signature,
+                                                  ResilienceExpansion expansion) {
   beginMangling();
   for (auto &index : indices)
     appendType(index);
   if (signature)
     appendGenericSignature(signature);
   appendOperator("TH");
+  if (expansion == ResilienceExpansion::Minimal)
+    appendOperator("q");
   return finalize();
 }
 
 std::string ASTMangler::mangleKeyPathHashHelper(ArrayRef<CanType> indices,
-                                                GenericSignature *signature) {
+                                                GenericSignature *signature,
+                                                ResilienceExpansion expansion) {
   beginMangling();
   for (auto &index : indices)
     appendType(index);
   if (signature)
     appendGenericSignature(signature);
   appendOperator("Th");
+  if (expansion == ResilienceExpansion::Minimal)
+    appendOperator("q");
   return finalize();
 }
 

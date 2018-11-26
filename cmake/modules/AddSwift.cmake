@@ -1863,6 +1863,12 @@ function(add_swift_target_library name)
         set(swiftlib_swift_compile_private_frameworks_flag "-Fsystem" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/System/Library/PrivateFrameworks/")
       endif()
 
+      if("${sdk}" STREQUAL WINDOWS)
+        if(arch STREQUAL x86_64)
+          set(swiftlib_swift_compile_flags_arch -Xcc -D_AMD64_)
+        endif()
+      endif()
+
       # Add this library variant.
       _add_swift_library_single(
         ${VARIANT_NAME}
@@ -1881,7 +1887,7 @@ function(add_swift_target_library name)
         LLVM_COMPONENT_DEPENDS ${SWIFTLIB_LLVM_COMPONENT_DEPENDS}
         FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS} ${swiftlib_module_dependency_targets}
         C_COMPILE_FLAGS ${SWIFTLIB_C_COMPILE_FLAGS}
-        SWIFT_COMPILE_FLAGS ${swiftlib_swift_compile_flags_all} ${swiftlib_swift_compile_private_frameworks_flag}
+        SWIFT_COMPILE_FLAGS ${swiftlib_swift_compile_flags_all} ${swiftlib_swift_compile_flags_arch} ${swiftlib_swift_compile_private_frameworks_flag}
         LINK_FLAGS ${swiftlib_link_flags_all}
         PRIVATE_LINK_LIBRARIES ${swiftlib_private_link_libraries_targets}
         INCORPORATE_OBJECT_LIBRARIES ${SWIFTLIB_INCORPORATE_OBJECT_LIBRARIES}
@@ -2359,10 +2365,7 @@ endmacro()
 
 function(add_swift_host_tool executable)
   set(ADDSWIFTHOSTTOOL_multiple_parameter_options
-        SWIFT_COMPONENT
-        COMPILE_FLAGS
-        DEPENDS
-        SWIFT_MODULE_DEPENDS)
+        SWIFT_COMPONENT)
 
   cmake_parse_arguments(
       ADDSWIFTHOSTTOOL # prefix
@@ -2371,21 +2374,10 @@ function(add_swift_host_tool executable)
       "${ADDSWIFTHOSTTOOL_multiple_parameter_options}" # multi-value args
       ${ARGN})
 
-  # Configure variables for this subdirectory.
-  set(VARIANT_SUFFIX "-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
-  set(MODULE_VARIANT_SUFFIX "-swiftmodule${VARIANT_SUFFIX}")
-
-  foreach(mod ${ADDSWIFTHOSTTOOL_SWIFT_MODULE_DEPENDS})
-    list(APPEND ADDSWIFTHOSTTOOL_DEPENDS "swift${mod}${MODULE_VARIANT_SUFFIX}")
-    list(APPEND ADDSWIFTHOSTTOOL_DEPENDS "swift${mod}${VARIANT_SUFFIX}")
-  endforeach()
-
   # Create the executable rule.
   add_swift_executable(
     ${executable} 
     ${ADDSWIFTHOSTTOOL_UNPARSED_ARGUMENTS}
-    DEPENDS ${ADDSWIFTHOSTTOOL_DEPENDS}
-    COMPILE_FLAGS ${ADDSWIFTHOSTTOOL_COMPILE_FLAGS}
   )
 
   # And then create the install rule if we are asked to.

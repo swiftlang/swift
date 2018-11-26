@@ -324,7 +324,7 @@ protected:
     IsUserAccessible : 1
   );
 
-  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1+2,
+  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1+2+1+1,
     /// Whether the getter is mutating.
     IsGetterMutating : 1,
 
@@ -338,7 +338,12 @@ protected:
     SupportsMutation : 1,
 
     /// Whether an opaque read of this storage produces an owned value.
-    OpaqueReadOwnership : 2
+    OpaqueReadOwnership : 2,
+
+    /// Whether a keypath component can directly reference this storage,
+    /// or if it must use the overridden declaration instead.
+    HasComputedValidKeyPathComponent : 1,
+    ValidKeyPathComponent : 1
   );
 
   SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+4+1+1+1+1,
@@ -4263,6 +4268,8 @@ protected:
     Bits.AbstractStorageDecl.SupportsMutation = supportsMutation;
   }
 
+  void computeIsValidKeyPathComponent();
+
 public:
 
   /// \brief Should this declaration be treated as if annotated with transparent
@@ -4503,7 +4510,8 @@ public:
   /// Determine how this storage declaration should actually be accessed.
   AccessStrategy getAccessStrategy(AccessSemantics semantics,
                                    AccessKind accessKind,
-                                   DeclContext *accessFromDC = nullptr) const;
+                                   ModuleDecl *module,
+                                   ResilienceExpansion expansion) const;
 
   /// \brief Should this declaration behave as if it must be accessed
   /// resiliently, even when we're building a non-resilient module?
@@ -4541,7 +4549,20 @@ public:
   BehaviorRecord *getMutableBehavior() {
     return BehaviorInfo.getPointer();
   }
-  
+
+  void setIsValidKeyPathComponent(bool value) {
+    Bits.AbstractStorageDecl.HasComputedValidKeyPathComponent = true;
+    Bits.AbstractStorageDecl.ValidKeyPathComponent = value;
+  }
+
+  /// True if the storage can be referenced by a keypath directly.
+  /// Otherwise, its override must be referenced.
+  bool isValidKeyPathComponent() const {
+    if (!Bits.AbstractStorageDecl.HasComputedValidKeyPathComponent)
+      const_cast<AbstractStorageDecl *>(this)->computeIsValidKeyPathComponent();
+    return Bits.AbstractStorageDecl.ValidKeyPathComponent;
+  }
+
   /// True if the storage exports a property descriptor for key paths in
   /// other modules.
   bool exportsPropertyDescriptor() const;
@@ -4854,11 +4875,17 @@ class ParamDecl : public VarDecl {
     StringRef StringRepresentation;
   };
 
-  /// The default value, if any, along with whether this is varargs.
-  llvm::PointerIntPair<StoredDefaultArgument *, 1> DefaultValueAndIsVariadic;
+  enum class Flags : uint8_t {
+    /// Whether or not this parameter is vargs.
+    IsVariadic = 1 << 0,
 
-  /// `@autoclosure` flag associated with this parameter.
-  bool IsAutoClosure = false;
+    /// Whether or not this parameter is `@autoclosure`.
+    IsAutoClosure = 1 << 1,
+  };
+
+  /// The default value, if any, along with flags.
+  llvm::PointerIntPair<StoredDefaultArgument *, 2, OptionSet<Flags>>
+      DefaultValueAndFlags;
 
 public:
   ParamDecl(VarDecl::Specifier specifier,
@@ -4899,7 +4926,7 @@ public:
   }
   
   Expr *getDefaultValue() const {
-    if (auto stored = DefaultValueAndIsVariadic.getPointer())
+    if (auto stored = DefaultValueAndFlags.getPointer())
       return stored->DefaultArg;
     return nullptr;
   }
@@ -4907,7 +4934,7 @@ public:
   void setDefaultValue(Expr *E);
 
   Initializer *getDefaultArgumentInitContext() const {
-    if (auto stored = DefaultValueAndIsVariadic.getPointer())
+    if (auto stored = DefaultValueAndFlags.getPointer())
       return stored->InitContext;
     return nullptr;
   }
@@ -4941,12 +4968,24 @@ public:
   void setDefaultValueStringRepresentation(StringRef stringRepresentation);
 
   /// Whether or not this parameter is varargs.
-  bool isVariadic() const { return DefaultValueAndIsVariadic.getInt(); }
-  void setVariadic(bool value = true) {DefaultValueAndIsVariadic.setInt(value);}
+  bool isVariadic() const {
+    return DefaultValueAndFlags.getInt().contains(Flags::IsVariadic);
+  }
+  void setVariadic(bool value = true) {
+    auto flags = DefaultValueAndFlags.getInt();
+    DefaultValueAndFlags.setInt(value ? flags | Flags::IsVariadic
+                                      : flags - Flags::IsVariadic);
+  }
 
   /// Whether or not this parameter is marked with `@autoclosure`.
-  bool isAutoClosure() const { return IsAutoClosure; }
-  void setAutoClosure(bool value = true) { IsAutoClosure = value; }
+  bool isAutoClosure() const {
+    return DefaultValueAndFlags.getInt().contains(Flags::IsAutoClosure);
+  }
+  void setAutoClosure(bool value = true) {
+    auto flags = DefaultValueAndFlags.getInt();
+    DefaultValueAndFlags.setInt(value ? flags | Flags::IsAutoClosure
+                                      : flags - Flags::IsAutoClosure);
+  }
 
   /// Remove the type of this varargs element designator, without the array
   /// type wrapping it.  A parameter like "Int..." will have formal parameter

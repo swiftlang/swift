@@ -85,12 +85,16 @@ func _typeByName(_ name: String) -> Any.Type? {
   let nameUTF8 = Array(name.utf8)
   return nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
     return  _getTypeByMangledName(nameUTF8.baseAddress!,
-                                  UInt(nameUTF8.endIndex))
+                                  UInt(nameUTF8.endIndex),
+                                  genericEnvironment: nil,
+                                  genericArguments: nil)
   }
 }
 
 @_silgen_name("swift_stdlib_getTypeByMangledName")
 internal func _getTypeByMangledName(
   _ name: UnsafePointer<UInt8>,
-  _ nameLength: UInt)
+  _ nameLength: UInt,
+  genericEnvironment: UnsafeRawPointer?,
+  genericArguments: UnsafeRawPointer?)
   -> Any.Type?

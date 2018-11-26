@@ -586,7 +586,7 @@ void Remangler::mangleSpecializationPassID(Node *node) {
   Out << node->getIndex();
 }
 
-void Remangler::mangleSpecializationIsFragile(Node *node) {
+void Remangler::mangleIsSerialized(Node *node) {
   Out << "q";
 }
 
@@ -1221,6 +1221,20 @@ void Remangler::mangleEntityContext(Node *node, EntityContext &ctx) {
   // Remember that we're mangling a context.
   EntityContext::ManglingContextRAII raii(ctx);
 
+  // Deal with bound generic types.
+  switch (node->getKind()) {
+    case Node::Kind::BoundGenericStructure:
+    case Node::Kind::BoundGenericEnum:
+    case Node::Kind::BoundGenericClass:
+    case Node::Kind::BoundGenericOtherNominalType:
+    case Node::Kind::BoundGenericTypeAlias:
+      mangleAnyNominalType(node, ctx);
+      return;
+
+    default:
+      break;
+  }
+
   switch (node->getKind()) {
 #define NODE(ID)                                \
   case Node::Kind::ID:
@@ -1731,6 +1745,7 @@ void Remangler::mangleExtension(Node *node, EntityContext &ctx) {
   if (node->getNumChildren() == 3) {
     mangleDependentGenericSignature(node->begin()[2]); // generic sig
   }
+
   mangleEntityContext(node->begin()[1], ctx); // context
 }
 

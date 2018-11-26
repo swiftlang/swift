@@ -67,6 +67,7 @@
 #include "GenericRequirement.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
+#include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "MetadataPath.h"
 #include "MetadataRequest.h"
@@ -1936,7 +1937,8 @@ namespace {
       auto moduleContext =
         normal->getDeclContext()->getModuleScopeContext();
       ConstantReference moduleContextRef =
-        IGM.getAddrOfParentContextDescriptor(moduleContext);
+        IGM.getAddrOfParentContextDescriptor(moduleContext,
+                                             /*fromAnonymousContext=*/false);
       B.addRelativeAddress(moduleContextRef);
     }
 
@@ -3418,4 +3420,59 @@ llvm::Value *irgen::emitProtocolDescriptorRef(IRGenFunction &IGF,
   val = IGF.Builder.CreateOr(val, isObjCBit);
 
   return val;
+}
+
+llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
+                                                CanGenericSignature signature) {
+  if (!signature)
+    return nullptr;
+
+  IRGenMangler mangler;
+  auto symbolName = mangler.mangleSymbolNameForGenericEnvironment(signature);
+  return getAddrOfStringForMetadataRef(symbolName, /*alignment=*/0, false,
+      [&] (ConstantInitBuilder &builder) -> ConstantInitFuture {
+        /// Collect the cumulative count of parameters at each level.
+        llvm::SmallVector<uint16_t, 4> genericParamCounts;
+        unsigned curDepth = 0;
+        unsigned genericParamCount = 0;
+        for (const auto gp : signature->getGenericParams()) {
+          if (curDepth != gp->getDepth()) {
+            genericParamCounts.push_back(genericParamCount);
+            curDepth = gp->getDepth();
+          }
+
+          ++genericParamCount;
+        }
+        genericParamCounts.push_back(genericParamCount);
+
+        auto flags = GenericEnvironmentFlags()
+          .withNumGenericParameterLevels(genericParamCounts.size())
+          .withNumGenericRequirements(signature->getRequirements().size());
+
+        ConstantStructBuilder fields = builder.beginStruct();
+        fields.setPacked(true);
+
+        // Flags
+        fields.addInt32(flags.getIntValue());
+
+        // Parameter counts.
+        for (auto count : genericParamCounts) {
+          fields.addInt16(count);
+        }
+
+        // Generic parameters.
+        signature->forEachParam([&](GenericTypeParamType *param,
+                                    bool canonical) {
+          fields.addInt(Int8Ty,
+                        GenericParamDescriptor(GenericParamKind::Type,
+                                               canonical,
+                                               false)
+                          .getIntValue());
+        });
+
+        // Generic requirements
+        irgen::addGenericRequirements(*this, fields, signature,
+                                      signature->getRequirements());
+        return fields.finishAndCreateFuture();
+      });
 }

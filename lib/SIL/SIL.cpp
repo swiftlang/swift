@@ -233,6 +233,11 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
   if (isGetterMutating())
     return false;
 
+  // If the storage is an ABI-compatible override of another declaration, we're
+  // not going to be emitting a property descriptor either.
+  if (!isValidKeyPathComponent())
+    return false;
+
   // TODO: If previous versions of an ABI-stable binary needed the descriptor,
   // then we still do.
 

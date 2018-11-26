@@ -740,7 +740,8 @@ void IRGenModule::emitRuntimeRegistration() {
 /// For any other kind of context, this returns an anonymous context descriptor
 /// for the context.
 ConstantReference
-IRGenModule::getAddrOfParentContextDescriptor(DeclContext *from) {
+IRGenModule::getAddrOfParentContextDescriptor(DeclContext *from,
+                                              bool fromAnonymousContext) {
   // Some types get special treatment.
   if (auto Type = dyn_cast<NominalTypeDecl>(from)) {
     // Use a special module context if we have one.
@@ -757,7 +758,7 @@ IRGenModule::getAddrOfParentContextDescriptor(DeclContext *from) {
 
     // Wrap up private types in an anonymous context for the containing file
     // unit so that the runtime knows they have unstable identity.
-    if (Type->isOutermostPrivateOrFilePrivateScope())
+    if (!fromAnonymousContext && Type->isOutermostPrivateOrFilePrivateScope())
       return {getAddrOfAnonymousContextDescriptor(Type),
               ConstantReference::Direct};
   }
@@ -771,7 +772,8 @@ IRGenModule::getAddrOfParentContextDescriptor(DeclContext *from) {
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::Initializer:
   case DeclContextKind::SerializedLocal:
-    return {getAddrOfAnonymousContextDescriptor(from),
+    return {getAddrOfAnonymousContextDescriptor(
+              fromAnonymousContext ? parent : from),
             ConstantReference::Direct};
 
   case DeclContextKind::GenericTypeDecl:
@@ -779,7 +781,8 @@ IRGenModule::getAddrOfParentContextDescriptor(DeclContext *from) {
       return {getAddrOfTypeContextDescriptor(nomTy, DontRequireMetadata),
               ConstantReference::Direct};
     }
-    return {getAddrOfAnonymousContextDescriptor(from),
+    return {getAddrOfAnonymousContextDescriptor(
+              fromAnonymousContext ? parent : from),
             ConstantReference::Direct};
 
   case DeclContextKind::ExtensionDecl: {
@@ -1230,7 +1233,7 @@ static std::string getDynamicReplacementSection(IRGenModule &IGM) {
     sectionName = "swift5_replace";
     break;
   case llvm::Triple::COFF:
-    sectionName = ".sw5repl";
+    sectionName = ".sw5repl$B";
     break;
   default:
     llvm_unreachable("Don't know how to emit field records table for "
@@ -3536,6 +3539,8 @@ llvm::GlobalValue *IRGenModule::defineAssociatedConformanceDescriptor(
 llvm::Constant *IRGenModule::getAddrOfProtocolConformanceDescriptor(
                                 const RootProtocolConformance *conformance,
                                 ConstantInit definition) {
+  IRGen.addLazyWitnessTable(conformance);
+
   auto entity = LinkEntity::forProtocolConformanceDescriptor(conformance);
   return getAddrOfLLVMVariable(entity, definition,
                                DebugTypeInfo());

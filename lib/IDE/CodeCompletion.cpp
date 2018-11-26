@@ -3291,35 +3291,15 @@ public:
   }
 
   void tryPostfixOperator(Expr *expr, PostfixOperatorDecl *op) {
-    auto Ty = expr->getType();
-    if (!Ty)
+    ConcreteDeclRef referencedDecl;
+    FunctionType *funcTy = getTypeOfCompletionOperator(
+        const_cast<DeclContext *>(CurrDeclContext), expr, op->getName(),
+        DeclRefKind::PostfixOperator, referencedDecl);
+    if (!funcTy)
       return;
 
-    SWIFT_DEFER {
-      // Restore type.
-      // FIXME: This is workaround for getTypeOfExpressionWithoutApplying()
-      // modifies type of 'expr'.
-      expr->setType(Ty);
-      prepareForRetypechecking(expr);
-    };
-
-    // We allocate these expressions on the stack because we know they can't
-    // escape and there isn't a better way to allocate scratch Expr nodes.
-    UnresolvedDeclRefExpr UDRE(op->getName(), DeclRefKind::PostfixOperator,
-                               DeclNameLoc(expr->getSourceRange().End));
-    ParenExpr parenExpr(expr->getSourceRange().Start, expr,
-                        expr->getSourceRange().End,
-                        /*hasTrailingClosure=*/false);
-    PostfixUnaryExpr opExpr(&UDRE, &parenExpr);
-    Expr *tempExpr = &opExpr;
-    ConcreteDeclRef referencedDecl;
-    if (auto T = getTypeOfCompletionContextExpr(
-            CurrDeclContext->getASTContext(),
-            const_cast<DeclContext *>(CurrDeclContext),
-            CompletionTypeCheckKind::Normal,
-            tempExpr,
-            referencedDecl))
-      addPostfixOperatorCompletion(op, *T);
+    // TODO: Use referencedDecl (FuncDecl) instead of 'op' (OperatorDecl).
+    addPostfixOperatorCompletion(op, funcTy->getResult());
   }
 
   void addAssignmentOperator(Type RHSType, Type resultType) {
@@ -3366,168 +3346,66 @@ public:
       addTypeAnnotation(builder, resultType);
   }
 
-  void tryInfixOperatorCompletion(InfixOperatorDecl *op, SequenceExpr *SE) {
-    if (op->getName().str() == "~>")
+  void tryInfixOperatorCompletion(Expr *foldedExpr, InfixOperatorDecl *op) {
+    ConcreteDeclRef referencedDecl;
+    FunctionType *funcTy = getTypeOfCompletionOperator(
+        const_cast<DeclContext *>(CurrDeclContext), foldedExpr, op->getName(),
+        DeclRefKind::BinaryOperator, referencedDecl);
+    if (!funcTy)
       return;
 
-    MutableArrayRef<Expr *> sequence = SE->getElements();
-    assert(sequence.size() >= 3 && !sequence.back() &&
-           !sequence.drop_back(1).back() && "sequence not cleaned up");
-    assert((sequence.size() & 1) && "sequence expr ending with operator");
+    Type lhsTy = funcTy->getParams()[0].getPlainType();
+    Type rhsTy = funcTy->getParams()[1].getPlainType();
+    Type resultTy = funcTy->getResult();
 
-    // FIXME: these checks should apply to the LHS of the operator, not the
-    // immediately left expression.  Move under the type-checking.
-    Expr *LHS = sequence.drop_back(2).back();
-    if (LHS->getType() && (LHS->getType()->is<MetatypeType>() ||
-                           LHS->getType()->is<AnyFunctionType>()))
-      return;
-
-    // Preserve LHS type for restoring it.
-    Type LHSTy = LHS->getType();
-
-    // We allocate these expressions on the stack because we know they can't
-    // escape and there isn't a better way to allocate scratch Expr nodes.
-    UnresolvedDeclRefExpr UDRE(op->getName(), DeclRefKind::BinaryOperator,
-                               DeclNameLoc(LHS->getEndLoc()));
-    sequence.drop_back(1).back() = &UDRE;
-    CodeCompletionExpr CCE(LHS->getSourceRange());
-    sequence.back() = &CCE;
-
-    SWIFT_DEFER {
-      // Reset sequence.
-      SE->setElement(SE->getNumElements() - 1, nullptr);
-      SE->setElement(SE->getNumElements() - 2, nullptr);
-      LHS->setType(LHSTy);
-      prepareForRetypechecking(SE);
-
-      for (auto &element : sequence.drop_back(2)) {
-        // Unfold expressions for re-typechecking sequence.
-        if (auto *assignExpr = dyn_cast_or_null<AssignExpr>(element)) {
-          assignExpr->setSrc(nullptr);
-          assignExpr->setDest(nullptr);
-        } else if (auto *ifExpr = dyn_cast_or_null<IfExpr>(element)) {
-          ifExpr->setCondExpr(nullptr);
-          ifExpr->setElseExpr(nullptr);
-        }
-
-        // Reset any references to operators in types, so they are properly
-        // handled as operators by sequence folding.
-        //
-        // FIXME: Would be better to have some kind of 'OperatorRefExpr'?
-        if (auto operatorRef = element->getMemberOperatorRef()) {
-          operatorRef->setType(nullptr);
-          element = operatorRef;
-        }
-      }
-    };
-
-    Expr *expr = SE;
-    if (!typeCheckCompletionSequence(const_cast<DeclContext *>(CurrDeclContext),
-                                     expr)) {
-      if (!LHS->getType() ||
-          !LHS->getType()->getRValueType()->getOptionalObjectType()) {
-        // Don't complete optional operators on non-optional types.
-        // FIXME: can we get the type-checker to disallow these for us?
-        if (op->getName().str() == "??")
-          return;
-        if (auto NT = CCE.getType()->getNominalOrBoundGenericNominal()) {
-          if (NT->getName() ==
-              CurrDeclContext->getASTContext().Id_OptionalNilComparisonType)
-            return;
-        }
-      }
-
-      // If the right-hand side and result type are both type parameters, we're
-      // not providing a useful completion.
-      if (expr->getType()->isTypeParameter() &&
-          CCE.getType()->isTypeParameter())
+    // Don't complete optional operators on non-optional types.
+    if (!lhsTy->getRValueType()->getOptionalObjectType()) {
+      // 'T ?? T'
+      if (op->getName().str() == "??")
         return;
-
-      addInfixOperatorCompletion(op, expr->getType(), CCE.getType());
+      // 'T == nil'
+      if (auto NT = rhsTy->getNominalOrBoundGenericNominal())
+        if (NT->getName() ==
+            CurrDeclContext->getASTContext().Id_OptionalNilComparisonType)
+          return;
     }
+
+    // If the right-hand side and result type are both type parameters, we're
+    // not providing a useful completion.
+    if (resultTy->isTypeParameter() && rhsTy->isTypeParameter())
+      return;
+
+    // TODO: Use referencedDecl (FuncDecl) instead of 'op' (OperatorDecl).
+    addInfixOperatorCompletion(op, funcTy->getResult(),
+                               funcTy->getParams()[1].getPlainType());
   }
 
-  void flattenBinaryExpr(Expr *expr, SmallVectorImpl<Expr *> &sequence) {
-    if (auto binExpr = dyn_cast<BinaryExpr>(expr)) {
-      flattenBinaryExpr(binExpr->getArg()->getElement(0), sequence);
-      sequence.push_back(binExpr->getFn());
-      flattenBinaryExpr(binExpr->getArg()->getElement(1), sequence);
-    } else if (auto assignExpr = dyn_cast<AssignExpr>(expr)) {
-      flattenBinaryExpr(assignExpr->getDest(), sequence);
-      sequence.push_back(assignExpr);
-      flattenBinaryExpr(assignExpr->getSrc(), sequence);
-      assignExpr->setDest(nullptr);
-      assignExpr->setSrc(nullptr);
-    } else if (auto ifExpr = dyn_cast<IfExpr>(expr)) {
-      flattenBinaryExpr(ifExpr->getCondExpr(), sequence);
-      sequence.push_back(ifExpr);
-      flattenBinaryExpr(ifExpr->getElseExpr(), sequence);
-      ifExpr->setCondExpr(nullptr);
-      ifExpr->setElseExpr(nullptr);
-    } else if (auto tryExpr = dyn_cast<AnyTryExpr>(expr)) {
-      // Strip out try expression. It doesn't affect completion.
-      flattenBinaryExpr(tryExpr->getSubExpr(), sequence);
-    } else if (auto optEval = dyn_cast<OptionalEvaluationExpr>(expr)){
-      // Strip out optional evaluation expression. It doesn't affect completion.
-      flattenBinaryExpr(optEval->getSubExpr(), sequence);
-    } else {
-      sequence.push_back(expr);
-    }
-  }
+  Expr *typeCheckLeadingSequence(Expr *LHS, ArrayRef<Expr *> leadingSequence) {
+    if (leadingSequence.empty())
+      return LHS;
 
-  void typeCheckLeadingSequence(SmallVectorImpl<Expr *> &sequence) {
-
-    // Strip out try and optional evaluation expr because foldSequence() mutates
-    // hierarchy of these expressions. They don't affect completion anyway.
-    for (auto &element : sequence) {
-      if (auto *tryExpr = dyn_cast<AnyTryExpr>(element))
-        element = tryExpr->getSubExpr();
-      if (auto *optEval = dyn_cast<OptionalEvaluationExpr>(element))
-        element = optEval->getSubExpr();
-    }
+    assert(leadingSequence.size() % 2 == 0);
+    SmallVector<Expr *, 3> sequence(leadingSequence.begin(),
+                                    leadingSequence.end());
+    sequence.push_back(LHS);
 
     Expr *expr =
         SequenceExpr::create(CurrDeclContext->getASTContext(), sequence);
     prepareForRetypechecking(expr);
-    // Take advantage of the fact the type-checker leaves the types on the AST.
     if (!typeCheckExpression(const_cast<DeclContext *>(CurrDeclContext),
                              expr)) {
-      // Rebuild the sequence from the type-checked version.
-      sequence.clear();
-      flattenBinaryExpr(expr, sequence);
-      return;
+      return expr;
     }
-
-    // Fall back to just using the immediate LHS.
-    auto LHS = sequence.back();
-    sequence.clear();
-    sequence.push_back(LHS);
+    return LHS;
   }
 
   void getOperatorCompletions(Expr *LHS, ArrayRef<Expr *> leadingSequence) {
-    std::vector<OperatorDecl *> operators = collectOperators();
+    Expr *foldedExpr = typeCheckLeadingSequence(LHS, leadingSequence);
 
+    std::vector<OperatorDecl *> operators = collectOperators();
     // FIXME: this always chooses the first operator with the given name.
     llvm::DenseSet<Identifier> seenPostfixOperators;
     llvm::DenseSet<Identifier> seenInfixOperators;
-
-    SmallVector<Expr *, 3> sequence(leadingSequence.begin(),
-                                    leadingSequence.end());
-    sequence.push_back(LHS);
-    assert((sequence.size() & 1) && "sequence expr ending with operator");
-
-    if (sequence.size() > 1)
-      typeCheckLeadingSequence(sequence);
-
-    // Retrieve typechecked LHS.
-    LHS = sequence.back();
-
-    // Create a single sequence expression, which we will modify for each
-    // operator, filling in the operator and dummy right-hand side.
-    sequence.push_back(nullptr); // operator
-    sequence.push_back(nullptr); // RHS
-    auto *SE = SequenceExpr::create(CurrDeclContext->getASTContext(), sequence);
-    prepareForRetypechecking(SE);
 
     for (auto op : operators) {
       switch (op->getKind()) {
@@ -3541,7 +3419,7 @@ public:
         break;
       case DeclKind::InfixOperator:
         if (seenInfixOperators.insert(op->getName()).second)
-          tryInfixOperatorCompletion(cast<InfixOperatorDecl>(op), SE);
+          tryInfixOperatorCompletion(foldedExpr, cast<InfixOperatorDecl>(op));
         break;
       default:
         llvm_unreachable("unexpected operator kind");
@@ -3885,226 +3763,6 @@ public:
       Builder.addCallParameterColon();
       Builder.addTypeAnnotation("Argument name");
     }
-  }
-
-  using FunctionParams = ArrayRef<AnyFunctionType::Param>;
-
-  static void collectPossibleParamListByQualifiedLookup(
-      DeclContext &DC, Type baseTy, DeclBaseName name,
-      SmallVectorImpl<FunctionParams> &candidates) {
-
-    SmallVector<ValueDecl *, 2> decls;
-    auto resolver = DC.getASTContext().getLazyResolver();
-    if (!DC.lookupQualified(baseTy, name, NL_QualifiedDefault, resolver, decls))
-      return;
-
-    for (auto *VD : decls) {
-      if ((!isa<AbstractFunctionDecl>(VD) && !isa<SubscriptDecl>(VD)) ||
-          shouldHideDeclFromCompletionResults(VD))
-        continue;
-      resolver->resolveDeclSignature(VD);
-      if (!VD->hasInterfaceType())
-        continue;
-      Type declaredMemberType = VD->getInterfaceType();
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
-        if (AFD->getDeclContext()->isTypeContext())
-          declaredMemberType = AFD->getMethodInterfaceType();
-
-      auto fnType =
-          baseTy->getTypeOfMember(DC.getParentModule(), VD, declaredMemberType);
-
-      if (!fnType || fnType->hasError())
-        continue;
-      if (auto *AFT = fnType->getAs<AnyFunctionType>()) {
-        candidates.push_back(AFT->getParams());
-      }
-    }
-  }
-
-  static void collectPossibleParamListByQualifiedLookup(
-      DeclContext &DC, Expr *baseExpr, DeclBaseName name,
-      SmallVectorImpl<FunctionParams> &candidates) {
-    ConcreteDeclRef ref = nullptr;
-    auto baseTyOpt = getTypeOfCompletionContextExpr(
-        DC.getASTContext(), &DC, CompletionTypeCheckKind::Normal, baseExpr,
-        ref);
-    if (!baseTyOpt)
-      return;
-    auto baseTy = (*baseTyOpt)->getRValueType()->getMetatypeInstanceType();
-    if (!baseTy->mayHaveMembers())
-      return;
-
-    collectPossibleParamListByQualifiedLookup(DC, baseTy, name, candidates);
-  }
-
-  static bool
-  collectPossibleParamListsApply(DeclContext &DC, ApplyExpr *callExpr,
-                                 SmallVectorImpl<FunctionParams> &candidates) {
-    auto *fnExpr = callExpr->getFn();
-
-    if (auto type = fnExpr->getType()) {
-      if (auto *funcType = type->getAs<AnyFunctionType>())
-        candidates.push_back(funcType->getParams());
-    } else if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
-      if (auto *decl = DRE->getDecl()) {
-        auto declType = decl->getInterfaceType();
-        if (auto *funcType = declType->getAs<AnyFunctionType>())
-          candidates.push_back(funcType->getParams());
-      }
-    } else if (auto *OSRE = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
-      for (auto *decl : OSRE->getDecls()) {
-        auto declType = decl->getInterfaceType();
-        if (auto *funcType = declType->getAs<AnyFunctionType>())
-          candidates.push_back(funcType->getParams());
-      }
-    } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
-      collectPossibleParamListByQualifiedLookup(
-          DC, UDE->getBase(), UDE->getName().getBaseName(), candidates);
-    }
-
-    if (candidates.empty()) {
-      ConcreteDeclRef ref = nullptr;
-      auto fnType = getTypeOfCompletionContextExpr(
-          DC.getASTContext(), &DC, CompletionTypeCheckKind::Normal, fnExpr,
-          ref);
-      if (!fnType)
-        return false;
-
-      if (auto *AFT = (*fnType)->getAs<AnyFunctionType>()) {
-        candidates.push_back(AFT->getParams());
-      } else if (auto *AMT = (*fnType)->getAs<AnyMetatypeType>()) {
-        auto baseTy = AMT->getInstanceType();
-        if (baseTy->mayHaveMembers())
-          collectPossibleParamListByQualifiedLookup(
-              DC, baseTy, DeclBaseName::createConstructor(), candidates);
-      }
-    }
-
-    return !candidates.empty();
-  }
-
-  static bool collectPossibleParamListsSubscript(
-      DeclContext &DC, SubscriptExpr *subscriptExpr,
-      SmallVectorImpl<FunctionParams> &candidates) {
-    if (subscriptExpr->hasDecl()) {
-      if (auto SD =
-              dyn_cast<SubscriptDecl>(subscriptExpr->getDecl().getDecl())) {
-        auto declType = SD->getInterfaceType();
-        if (auto *funcType = declType->getAs<AnyFunctionType>())
-          candidates.push_back(funcType->getParams());
-      }
-    } else {
-      collectPossibleParamListByQualifiedLookup(DC, subscriptExpr->getBase(),
-                                                DeclBaseName::createSubscript(),
-                                                candidates);
-    }
-    return !candidates.empty();
-  }
-
-  static bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
-                                unsigned &Position, bool &HasName) {
-    if (auto TSE = dyn_cast<TupleShuffleExpr>(Args))
-      Args = TSE->getSubExpr();
-
-    if (isa<ParenExpr>(Args)) {
-      HasName = false;
-      Position = 0;
-      return true;
-    }
-
-    auto *tuple = dyn_cast<TupleExpr>(Args);
-    if (!tuple)
-      return false;
-
-    auto &SM = DC.getASTContext().SourceMgr;
-    for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
-      if (SM.isBeforeInBuffer(tuple->getElement(i)->getEndLoc(),
-                              CCExpr->getStartLoc()))
-        continue;
-      HasName = tuple->getElementNameLoc(i).isValid();
-      Position = i;
-      return true;
-    }
-    return false;
-  }
-
-  /// Translate argument index in \p Args to parameter index.
-  /// Does nothing unless \p Args is \c TupleShuffleExpr.
-  static bool translateArgIndexToParamIndex(Expr *Args,
-                                            unsigned &Position, bool &HasName) {
-    auto TSE = dyn_cast<TupleShuffleExpr>(Args);
-    if (!TSE)
-      return true;
-
-    auto mapping = TSE->getElementMapping();
-    for (unsigned destIdx = 0, e = mapping.size(); destIdx != e; ++destIdx) {
-      auto srcIdx = mapping[destIdx];
-      if (srcIdx == (signed)Position) {
-        Position = destIdx;
-        return true;
-      }
-      if (srcIdx == TupleShuffleExpr::Variadic &&
-          llvm::is_contained(TSE->getVariadicArgs(), Position)) {
-        // The arg is a part of variadic args.
-        Position = destIdx;
-        HasName = false;
-        if (auto Args = dyn_cast<TupleExpr>(TSE->getSubExpr())) {
-          // Check if the first variadiac argument has the label.
-          auto firstVarArgIdx = TSE->getVariadicArgs().front();
-          HasName = Args->getElementNameLoc(firstVarArgIdx).isValid();
-        }
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  static bool
-  collectArgumentExpectation(DeclContext &DC, Expr *E, Expr *CCExpr,
-                             std::vector<Type> &ExpectedTypes,
-                             std::vector<StringRef> &ExpectedNames) {
-    // Collect parameter lists for possible func decls.
-    SmallVector<FunctionParams, 4> Candidates;
-    Expr *Arg = nullptr;
-    if (auto *applyExpr = dyn_cast<ApplyExpr>(E)) {
-      if (!collectPossibleParamListsApply(DC, applyExpr, Candidates))
-        return false;
-      Arg = applyExpr->getArg();
-    } else if (auto *subscriptExpr = dyn_cast<SubscriptExpr>(E)) {
-      if (!collectPossibleParamListsSubscript(DC, subscriptExpr, Candidates))
-        return false;
-      Arg = subscriptExpr->getIndex();
-    }
-
-    // Determine the position of code completion token in call argument.
-    unsigned Position;
-    bool HasName;
-    if (!getPositionInArgs(DC, Arg, CCExpr, Position, HasName))
-      return false;
-    if (!translateArgIndexToParamIndex(Arg, Position, HasName))
-      return false;
-
-    // Collect possible types (or labels) at the position.
-    {
-      bool MayNeedName = !HasName && !E->isImplicit() &&
-                         (isa<CallExpr>(E) | isa<SubscriptExpr>(E));
-      SmallPtrSet<TypeBase *, 4> seenTypes;
-      SmallPtrSet<Identifier, 4> seenNames;
-      for (auto Params : Candidates) {
-        if (Position >= Params.size())
-          continue;
-        const auto &Param = Params[Position];
-        if (Param.hasLabel() && MayNeedName) {
-          if (seenNames.insert(Param.getLabel()).second)
-            ExpectedNames.push_back(Param.getLabel().str());
-        } else {
-          if (seenTypes.insert(Param.getOldType().getPointer()).second)
-            ExpectedTypes.push_back(Param.getOldType());
-        }
-      }
-    }
-    return !ExpectedTypes.empty() || !ExpectedNames.empty();
   }
 
   void getTypeContextEnumElementCompletions(SourceLoc Loc) {
@@ -5312,6 +4970,177 @@ namespace  {
   };
 } // end anonymous namespace
 
+namespace {
+using FunctionParams = ArrayRef<AnyFunctionType::Param>;
+
+void collectPossibleParamListByQualifiedLookup(
+    DeclContext &DC, Type baseTy, DeclBaseName name,
+    SmallVectorImpl<FunctionParams> &candidates) {
+
+  SmallVector<ValueDecl *, 2> decls;
+  auto resolver = DC.getASTContext().getLazyResolver();
+  if (!DC.lookupQualified(baseTy, name, NL_QualifiedDefault, resolver, decls))
+    return;
+
+  for (auto *VD : decls) {
+    if ((!isa<AbstractFunctionDecl>(VD) && !isa<SubscriptDecl>(VD)) ||
+        shouldHideDeclFromCompletionResults(VD))
+      continue;
+    resolver->resolveDeclSignature(VD);
+    if (!VD->hasInterfaceType())
+      continue;
+    Type declaredMemberType = VD->getInterfaceType();
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
+      if (AFD->getDeclContext()->isTypeContext())
+        declaredMemberType = AFD->getMethodInterfaceType();
+
+    auto fnType =
+        baseTy->getTypeOfMember(DC.getParentModule(), VD, declaredMemberType);
+
+    if (!fnType || fnType->hasError())
+      continue;
+    if (auto *AFT = fnType->getAs<AnyFunctionType>()) {
+      candidates.push_back(AFT->getParams());
+    }
+  }
+}
+
+void collectPossibleParamListByQualifiedLookup(
+    DeclContext &DC, Expr *baseExpr, DeclBaseName name,
+    SmallVectorImpl<FunctionParams> &candidates) {
+  ConcreteDeclRef ref = nullptr;
+  auto baseTyOpt = getTypeOfCompletionContextExpr(
+      DC.getASTContext(), &DC, CompletionTypeCheckKind::Normal, baseExpr, ref);
+  if (!baseTyOpt)
+    return;
+  auto baseTy = (*baseTyOpt)->getRValueType()->getMetatypeInstanceType();
+  if (!baseTy->mayHaveMembers())
+    return;
+
+  collectPossibleParamListByQualifiedLookup(DC, baseTy, name, candidates);
+}
+
+bool collectPossibleParamListsApply(
+    DeclContext &DC, ApplyExpr *callExpr,
+    SmallVectorImpl<FunctionParams> &candidates) {
+  auto *fnExpr = callExpr->getFn();
+
+  if (auto type = fnExpr->getType()) {
+    if (auto *funcType = type->getAs<AnyFunctionType>())
+      candidates.push_back(funcType->getParams());
+  } else if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
+    if (auto *decl = DRE->getDecl()) {
+      auto declType = decl->getInterfaceType();
+      if (auto *funcType = declType->getAs<AnyFunctionType>())
+        candidates.push_back(funcType->getParams());
+    }
+  } else if (auto *OSRE = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
+    for (auto *decl : OSRE->getDecls()) {
+      auto declType = decl->getInterfaceType();
+      if (auto *funcType = declType->getAs<AnyFunctionType>())
+        candidates.push_back(funcType->getParams());
+    }
+  } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
+    collectPossibleParamListByQualifiedLookup(
+        DC, UDE->getBase(), UDE->getName().getBaseName(), candidates);
+  }
+
+  if (candidates.empty()) {
+    ConcreteDeclRef ref = nullptr;
+    auto fnType = getTypeOfCompletionContextExpr(
+        DC.getASTContext(), &DC, CompletionTypeCheckKind::Normal, fnExpr, ref);
+    if (!fnType)
+      return false;
+
+    if (auto *AFT = (*fnType)->getAs<AnyFunctionType>()) {
+      candidates.push_back(AFT->getParams());
+    } else if (auto *AMT = (*fnType)->getAs<AnyMetatypeType>()) {
+      auto baseTy = AMT->getInstanceType();
+      if (baseTy->mayHaveMembers())
+        collectPossibleParamListByQualifiedLookup(
+            DC, baseTy, DeclBaseName::createConstructor(), candidates);
+    }
+  }
+
+  return !candidates.empty();
+}
+
+bool collectPossibleParamListsSubscript(
+    DeclContext &DC, SubscriptExpr *subscriptExpr,
+    SmallVectorImpl<FunctionParams> &candidates) {
+  if (subscriptExpr->hasDecl()) {
+    if (auto SD = dyn_cast<SubscriptDecl>(subscriptExpr->getDecl().getDecl())) {
+      auto declType = SD->getInterfaceType();
+      if (auto *funcType = declType->getAs<AnyFunctionType>())
+        candidates.push_back(funcType->getParams());
+    }
+  } else {
+    collectPossibleParamListByQualifiedLookup(DC, subscriptExpr->getBase(),
+                                              DeclBaseName::createSubscript(),
+                                              candidates);
+  }
+  return !candidates.empty();
+}
+
+bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
+                       unsigned &Position, bool &HasName) {
+  if (auto TSE = dyn_cast<TupleShuffleExpr>(Args))
+    Args = TSE->getSubExpr();
+
+  if (isa<ParenExpr>(Args)) {
+    HasName = false;
+    Position = 0;
+    return true;
+  }
+
+  auto *tuple = dyn_cast<TupleExpr>(Args);
+  if (!tuple)
+    return false;
+
+  auto &SM = DC.getASTContext().SourceMgr;
+  for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
+    if (SM.isBeforeInBuffer(tuple->getElement(i)->getEndLoc(),
+                            CCExpr->getStartLoc()))
+      continue;
+    HasName = tuple->getElementNameLoc(i).isValid();
+    Position = i;
+    return true;
+  }
+  return false;
+}
+
+/// Translate argument index in \p Args to parameter index.
+/// Does nothing unless \p Args is \c TupleShuffleExpr.
+bool translateArgIndexToParamIndex(Expr *Args, unsigned &Position,
+                                   bool &HasName) {
+  auto TSE = dyn_cast<TupleShuffleExpr>(Args);
+  if (!TSE)
+    return true;
+
+  auto mapping = TSE->getElementMapping();
+  for (unsigned destIdx = 0, e = mapping.size(); destIdx != e; ++destIdx) {
+    auto srcIdx = mapping[destIdx];
+    if (srcIdx == (signed)Position) {
+      Position = destIdx;
+      return true;
+    }
+    if (srcIdx == TupleShuffleExpr::Variadic &&
+        llvm::is_contained(TSE->getVariadicArgs(), Position)) {
+      // The arg is a part of variadic args.
+      Position = destIdx;
+      HasName = false;
+      if (auto Args = dyn_cast<TupleExpr>(TSE->getSubExpr())) {
+        // Check if the first variadiac argument has the label.
+        auto firstVarArgIdx = TSE->getVariadicArgs().front();
+        HasName = Args->getElementNameLoc(firstVarArgIdx).isValid();
+      }
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /// Given an expression and its context, the analyzer tries to figure out the
 /// expected type of the expression by analyzing its context.
 class CodeCompletionTypeContextAnalyzer {
@@ -5320,6 +5149,52 @@ class CodeCompletionTypeContextAnalyzer {
   SourceManager &SM;
   ASTContext &Context;
   ExprParentFinder Finder;
+
+  bool collectArgumentExpectation(DeclContext &DC, Expr *E, Expr *CCExpr,
+                                  std::vector<Type> &ExpectedTypes,
+                                  std::vector<StringRef> &ExpectedNames) {
+    // Collect parameter lists for possible func decls.
+    SmallVector<FunctionParams, 4> Candidates;
+    Expr *Arg = nullptr;
+    if (auto *applyExpr = dyn_cast<ApplyExpr>(E)) {
+      if (!collectPossibleParamListsApply(DC, applyExpr, Candidates))
+        return false;
+      Arg = applyExpr->getArg();
+    } else if (auto *subscriptExpr = dyn_cast<SubscriptExpr>(E)) {
+      if (!collectPossibleParamListsSubscript(DC, subscriptExpr, Candidates))
+        return false;
+      Arg = subscriptExpr->getIndex();
+    }
+
+    // Determine the position of code completion token in call argument.
+    unsigned Position;
+    bool HasName;
+    if (!getPositionInArgs(DC, Arg, CCExpr, Position, HasName))
+      return false;
+    if (!translateArgIndexToParamIndex(Arg, Position, HasName))
+      return false;
+
+    // Collect possible types (or labels) at the position.
+    {
+      bool MayNeedName = !HasName && !E->isImplicit() &&
+                         (isa<CallExpr>(E) | isa<SubscriptExpr>(E));
+      SmallPtrSet<TypeBase *, 4> seenTypes;
+      SmallPtrSet<Identifier, 4> seenNames;
+      for (auto Params : Candidates) {
+        if (Position >= Params.size())
+          continue;
+        const auto &Param = Params[Position];
+        if (Param.hasLabel() && MayNeedName) {
+          if (seenNames.insert(Param.getLabel()).second)
+            ExpectedNames.push_back(Param.getLabel().str());
+        } else {
+          if (seenTypes.insert(Param.getOldType().getPointer()).second)
+            ExpectedTypes.push_back(Param.getOldType());
+        }
+      }
+    }
+    return !ExpectedTypes.empty() || !ExpectedNames.empty();
+  }
 
 public:
   CodeCompletionTypeContextAnalyzer(DeclContext *DC, Expr *ParsedExpr) : DC(DC),
@@ -5383,7 +5258,7 @@ public:
       case ExprKind::PrefixUnary: {
         std::vector<Type> PotentialTypes;
         std::vector<StringRef> ExpectedNames;
-        CompletionLookup::collectArgumentExpectation(
+        collectArgumentExpectation(
             *DC, Parent, ParsedExpr, PotentialTypes, ExpectedNames);
         for (Type Ty : PotentialTypes)
           Callback(Ty);
@@ -5414,8 +5289,9 @@ public:
           return;
         unsigned Position = 0;
         bool HasName;
-        if (CompletionLookup::getPositionInArgs(*DC, Parent, ParsedExpr, Position, HasName)) {
-          Callback(Parent->getType()->castTo<TupleType>()->getElementType(Position));
+        if (getPositionInArgs(*DC, Parent, ParsedExpr, Position, HasName)) {
+          Callback(
+              Parent->getType()->castTo<TupleType>()->getElementType(Position));
         }
         break;
       }
@@ -5539,6 +5415,8 @@ public:
     return false;
   }
 };
+
+} // end anonymous namespace
 
 void CodeCompletionCallbacksImpl::doneParsing() {
   CompletionContext.CodeCompletionKind = Kind;

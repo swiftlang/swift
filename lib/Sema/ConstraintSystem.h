@@ -823,6 +823,10 @@ enum class ConstraintSystemFlags {
   /// system is not applied to the expression AST, but the ConstraintSystem is
   /// left in-tact.
   AllowUnresolvedTypeVariables = 0x10,
+
+  /// If set, constraint system always reuses type of pre-typechecked
+  /// expression, and doesn't dig into its subexpressions.
+  ReusePrecheckedType = 0x20,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -1779,15 +1783,19 @@ public:
 public:
 
   /// \brief Whether we should attempt to fix problems.
-  bool shouldAttemptFixes() {
+  bool shouldAttemptFixes() const {
     if (!(Options & ConstraintSystemFlags::AllowFixes))
       return false;
 
     return !solverState || solverState->recordFixes;
   }
 
-  bool shouldSuppressDiagnostics() {
+  bool shouldSuppressDiagnostics() const {
     return Options.contains(ConstraintSystemFlags::SuppressDiagnostics);
+  }
+
+  bool shouldReusePrecheckedType() const {
+    return Options.contains(ConstraintSystemFlags::ReusePrecheckedType);
   }
 
   /// \brief Log and record the application of the fix. Return true iff any
@@ -3457,6 +3465,13 @@ void simplifyLocator(Expr *&anchor,
 /// \returns the anchor expression if it fully describes the locator, or
 /// null otherwise.
 Expr *simplifyLocatorToAnchor(ConstraintSystem &cs, ConstraintLocator *locator);
+
+/// Retrieve argument at specified index from given expression.
+/// The expression could be "application", "subscript" or "member" call.
+///
+/// \returns argument expression or `nullptr` if given "base" expression
+/// wasn't of one of the kinds listed above.
+Expr *getArgumentExpr(Expr *expr, unsigned index);
 
 class DisjunctionChoice {
   unsigned Index;

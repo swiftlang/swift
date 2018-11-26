@@ -1525,53 +1525,63 @@ DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Noop_modify") {
 // Native dictionary tests.
 //===---
 
-func helperDeleteThree(_ k1: TestKeyTy, _ k2: TestKeyTy, _ k3: TestKeyTy) {
-  var d1 = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 10)
+func helperDeleteThree(
+  _ k1: RawTestKeyTy,
+  _ k2: RawTestKeyTy,
+  _ k3: RawTestKeyTy
+) {
+  var d1 = Dictionary<RawTestKeyTy, TestValueTy>(minimumCapacity: 10)
 
   d1[k1] = TestValueTy(1010)
   d1[k2] = TestValueTy(1020)
   d1[k3] = TestValueTy(1030)
 
-  assert(d1[k1]!.value == 1010)
-  assert(d1[k2]!.value == 1020)
-  assert(d1[k3]!.value == 1030)
+  assert(d1[k1]?.value == 1010)
+  assert(d1[k2]?.value == 1020)
+  assert(d1[k3]?.value == 1030)
 
   d1[k1] = nil
-  assert(d1[k2]!.value == 1020)
-  assert(d1[k3]!.value == 1030)
+  assert(d1[k1]?.value == nil)
+  assert(d1[k2]?.value == 1020)
+  assert(d1[k3]?.value == 1030)
 
   d1[k2] = nil
-  assert(d1[k3]!.value == 1030)
+  assert(d1[k1]?.value == nil)
+  assert(d1[k2]?.value == nil)
+  assert(d1[k3]?.value == 1030)
 
   d1[k3] = nil
+  assert(d1[k1]?.value == nil)
+  assert(d1[k2]?.value == nil)
+  assert(d1[k3]?.value == nil)
   assert(d1.count == 0)
 }
 
 DictionaryTestSuite.test("deleteChainCollision") {
-  let k1 = TestKeyTy(value: 10, hashValue: 0)
-  let k2 = TestKeyTy(value: 20, hashValue: 0)
-  let k3 = TestKeyTy(value: 30, hashValue: 0)
+  let k1 = RawTestKeyTy(value: 10, hashValue: 0)
+  let k2 = RawTestKeyTy(value: 20, hashValue: 0)
+  let k3 = RawTestKeyTy(value: 30, hashValue: 0)
 
   helperDeleteThree(k1, k2, k3)
 }
 
 DictionaryTestSuite.test("deleteChainNoCollision") {
-  let k1 = TestKeyTy(value: 10, hashValue: 0)
-  let k2 = TestKeyTy(value: 20, hashValue: 1)
-  let k3 = TestKeyTy(value: 30, hashValue: 2)
+  let k1 = RawTestKeyTy(value: 10, hashValue: 0)
+  let k2 = RawTestKeyTy(value: 20, hashValue: 1)
+  let k3 = RawTestKeyTy(value: 30, hashValue: 2)
 
   helperDeleteThree(k1, k2, k3)
 }
 
 DictionaryTestSuite.test("deleteChainCollision2") {
-  let k1_0 = TestKeyTy(value: 10, hashValue: 0)
-  let k2_0 = TestKeyTy(value: 20, hashValue: 0)
-  let k3_2 = TestKeyTy(value: 30, hashValue: 2)
-  let k4_0 = TestKeyTy(value: 40, hashValue: 0)
-  let k5_2 = TestKeyTy(value: 50, hashValue: 2)
-  let k6_0 = TestKeyTy(value: 60, hashValue: 0)
+  let k1_0 = RawTestKeyTy(value: 10, hashValue: 0)
+  let k2_0 = RawTestKeyTy(value: 20, hashValue: 0)
+  let k3_2 = RawTestKeyTy(value: 30, hashValue: 2)
+  let k4_0 = RawTestKeyTy(value: 40, hashValue: 0)
+  let k5_2 = RawTestKeyTy(value: 50, hashValue: 2)
+  let k6_0 = RawTestKeyTy(value: 60, hashValue: 0)
 
-  var d = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 10)
+  var d = Dictionary<RawTestKeyTy, TestValueTy>(minimumCapacity: 10)
 
   d[k1_0] = TestValueTy(1010) // in bucket 0
   d[k2_0] = TestValueTy(1020) // in bucket 1
@@ -1595,7 +1605,7 @@ DictionaryTestSuite.test("deleteChainCollisionRandomized") {
   var generator = LinearCongruentialGenerator(seed: seed)
   print("using LinearCongruentialGenerator(seed: \(seed))")
 
-  func check(_ d: Dictionary<TestKeyTy, TestValueTy>) {
+  func check(_ d: Dictionary<RawTestKeyTy, TestValueTy>) {
     let keys = Array(d.keys)
     for i in 0..<keys.count {
       for j in 0..<i {
@@ -1612,20 +1622,20 @@ DictionaryTestSuite.test("deleteChainCollisionRandomized") {
   let chainOverlap = Int.random(in: 0...5, using: &generator)
   let chainLength = 7
 
-  var knownKeys: [TestKeyTy] = []
-  func getKey(_ value: Int) -> TestKeyTy {
+  var knownKeys: [RawTestKeyTy] = []
+  func getKey(_ value: Int) -> RawTestKeyTy {
     for k in knownKeys {
       if k.value == value {
         return k
       }
     }
     let hashValue = Int.random(in: 0 ..< (chainLength - chainOverlap), using: &generator) * collisionChains
-    let k = TestKeyTy(value: value, hashValue: hashValue)
+    let k = RawTestKeyTy(value: value, hashValue: hashValue)
     knownKeys += [k]
     return k
   }
 
-  var d = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 30)
+  var d = Dictionary<RawTestKeyTy, TestValueTy>(minimumCapacity: 30)
   for _ in 1..<300 {
     let key = getKey(Int.random(in: 0 ..< (collisionChains * chainLength), using: &generator))
     if Int.random(in: 0 ..< (chainLength * 2), using: &generator) == 0 {
@@ -4863,8 +4873,20 @@ DictionaryTestSuite.test("Hashable") {
   checkHashable(variants, equalityOracle: { _, _ in true })
 }
 
+DictionaryTestSuite.test("Values.MutationDoesNotInvalidateIndices.Native") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  expectEqual(d[i], (key: 20, value: 1020))
+  var expected = 1020
+  for _ in 0 ..< 100 {
+    expected += 1
+    d.values[i] += 1
+    expectEqual(d[i], (key: 20, value: expected))
+  }
+}
+
 #if _runtime(_ObjC)
-DictionaryTestSuite.test("Values.MutationDoesNotInvalidateIndices") {
+DictionaryTestSuite.test("Values.MutationDoesNotInvalidateIndices.Bridged") {
   let objects: [NSNumber] = [1, 2, 3, 4]
   let keys: [NSString] = ["Blanche", "Rose", "Dorothy", "Sophia"]
   let ns = NSDictionary(objects: objects, forKeys: keys)
@@ -4896,7 +4918,404 @@ DictionaryTestSuite.test("Values.MutationDoesNotInvalidateIndices") {
 }
 #endif
 
+DictionaryTestSuite.test("RemoveAt.InvalidatesIndices") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  let j = d.index(forKey: 10)!
 
+  d.remove(at: j)
+
+  expectCrashLater()
+  _ = d[i]
+}
+
+DictionaryTestSuite.test("RemoveValueForKey.InvalidatesIndices") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+
+  d.removeValue(forKey: 10)
+
+  expectCrashLater()
+  _ = d[i]
+}
+
+DictionaryTestSuite.test("ResizeOnInsertion.InvalidatesIndices") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  for i in 0 ..< (d.capacity - d.count) {
+    d[100 + i] = 100 + i
+  }
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d[0] = 0
+
+  expectCrashLater()
+  _ = d[i]
+}
+
+DictionaryTestSuite.test("ResizeOnUpdate.InvalidatesIndices") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  for i in 0 ..< (d.capacity - d.count) {
+    d.updateValue(100 + i, forKey: 100 + i)
+  }
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.updateValue(0, forKey: 0)
+
+  expectCrashLater()
+  _ = d[i]
+}
+
+DictionaryTestSuite.test("RemoveAll.InvalidatesIndices") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.removeAll(keepingCapacity: true)
+
+  expectCrashLater()
+  _ = d[i]
+}
+
+DictionaryTestSuite.test("ReserveCapacity.InvalidatesIndices") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.reserveCapacity(0)
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.reserveCapacity(d.capacity)
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.reserveCapacity(d.capacity * 10)
+
+  expectCrashLater()
+  _ = d[i]
+}
+
+DictionaryTestSuite.test("IndexValidation.Subscript.Getter.AcrossInstances") {
+  // The mutation count may happen to be the same across any two dictionaries.
+  // The probability of this is low, but it could happen -- so check a bunch of
+  // these cases at once; a trap will definitely occur at least once.
+  let dicts = (0 ..< 10).map { _ in getCOWFastDictionary() }
+  let indices = dicts.map { $0.index(forKey: 20)! }
+  let d = getCOWFastDictionary()
+
+  expectCrashLater()
+  for i in indices {
+    _ = d[i]
+  }
+  _fixLifetime(dicts)
+}
+
+DictionaryTestSuite.test("IndexValidation.Subscript.Getter.AfterRemoval") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.removeValue(forKey: 10)
+  expectCrashLater()
+  _ = d[i]
+}
+
+DictionaryTestSuite.test("IndexValidation.Subscript.Getter.AfterGrow") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  let identifier = d._rawIdentifier()
+  expectEqual(d[i], (key: 20, value: 1020))
+  for i in 0 ..< (d.capacity - d.count) {
+    d[100 + i] = 100 + i
+  }
+  expectEqual(d._rawIdentifier(), identifier)
+  expectEqual(d.count, d.capacity)
+
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d[0] = 0
+  expectNotEqual(d._rawIdentifier(), identifier)
+
+  expectCrashLater()
+  _ = d[i]
+}
+
+DictionaryTestSuite.test("IndexValidation.KeysSubscript.Getter.AfterRemoval") {
+  var d = getCOWFastDictionary()
+  let i = d.keys.firstIndex(of: 20)!
+  expectEqual(d.keys[i], 20)
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.removeValue(forKey: 10)
+  expectCrashLater()
+  _ = d.keys[i]
+}
+
+DictionaryTestSuite.test("IndexValidation.KeysSubscript.Getter.AfterGrow") {
+  var d = getCOWFastDictionary()
+  let i = d.keys.firstIndex(of: 20)!
+  let identifier = d._rawIdentifier()
+  expectEqual(d.keys[i], 20)
+  expectEqual(d[i], (key: 20, value: 1020))
+  for i in 0 ..< (d.capacity - d.count) {
+    d[100 + i] = 100 + i
+  }
+  expectEqual(d._rawIdentifier(), identifier)
+  expectEqual(d.count, d.capacity)
+
+  expectEqual(d.keys[i], 20)
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d[0] = 0
+  expectNotEqual(d._rawIdentifier(), identifier)
+
+  expectCrashLater()
+  _ = d.keys[i]
+}
+
+DictionaryTestSuite.test("IndexValidation.ValuesSubscript.Getter.AfterRemoval") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  expectEqual(d.values[i], 1020)
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.removeValue(forKey: 10)
+  expectCrashLater()
+  _ = d.values[i]
+}
+
+DictionaryTestSuite.test("IndexValidation.ValuesSubscript.Getter.AfterGrow") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  let identifier = d._rawIdentifier()
+  expectEqual(d.values[i], 1020)
+  expectEqual(d[i], (key: 20, value: 1020))
+  for i in 0 ..< (d.capacity - d.count) {
+    d[100 + i] = 100 + i
+  }
+  expectEqual(d._rawIdentifier(), identifier)
+  expectEqual(d.count, d.capacity)
+
+  expectEqual(d.values[i], 1020)
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d[0] = 0
+  expectNotEqual(d._rawIdentifier(), identifier)
+
+  expectCrashLater()
+  _ = d.values[i]
+}
+
+DictionaryTestSuite.test("IndexValidation.ValuesSubscript.Setter.AfterRemoval") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  expectEqual(d.values[i], 1020)
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.values[i] = 1021
+  expectEqual(d.values[i], 1021)
+  expectEqual(d[i], (key: 20, value: 1021))
+
+  d.removeValue(forKey: 10)
+  expectCrashLater()
+  d.values[i] = 1022
+}
+
+DictionaryTestSuite.test("IndexValidation.ValuesSubscript.Setter.AfterGrow") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  let identifier = d._rawIdentifier()
+  expectEqual(d.values[i], 1020)
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  for i in 0 ..< (d.capacity - d.count) {
+    d[100 + i] = 100 + i
+  }
+  expectEqual(d._rawIdentifier(), identifier)
+  expectEqual(d.count, d.capacity)
+
+  d.values[i] = 1021
+  expectEqual(d.values[i], 1021)
+  expectEqual(d[i], (key: 20, value: 1021))
+
+  d[0] = 0
+  expectNotEqual(d._rawIdentifier(), identifier)
+
+  expectCrashLater()
+  d.values[i] = 1022
+}
+
+DictionaryTestSuite.test("IndexValidation.ValuesSubscript.Modify.AfterRemoval") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  expectEqual(d.values[i], 1020)
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.values[i] += 1
+  expectEqual(d.values[i], 1021)
+  expectEqual(d[i], (key: 20, value: 1021))
+
+  d.removeValue(forKey: 10)
+  expectCrashLater()
+  d.values[i] += 1
+}
+
+DictionaryTestSuite.test("IndexValidation.ValuesSubscript.Modify.AfterGrow") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  let identifier = d._rawIdentifier()
+  expectEqual(d.values[i], 1020)
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  for i in 0 ..< (d.capacity - d.count) {
+    d[100 + i] = 100 + i
+  }
+  expectEqual(d._rawIdentifier(), identifier)
+  expectEqual(d.count, d.capacity)
+
+  d.values[i] += 1
+  expectEqual(d.values[i], 1021)
+  expectEqual(d[i], (key: 20, value: 1021))
+
+  d[0] = 0
+  expectNotEqual(d._rawIdentifier(), identifier)
+
+  expectCrashLater()
+  d.values[i] += 1
+}
+
+DictionaryTestSuite.test("IndexValidation.RangeSubscript.AfterRemoval") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  let j = d.index(after: i)
+  expectTrue(i < j)
+  d.removeValue(forKey: 10)
+  expectTrue(i < j)
+  expectCrashLater()
+  _ = d[i..<j]
+}
+
+DictionaryTestSuite.test("IndexValidation.RangeSubscript.AfterGrow") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  let j = d.index(after: i)
+  expectTrue(i < j)
+  let identifier = d._rawIdentifier()
+  expectEqual(d[i], (key: 20, value: 1020))
+  for i in 0 ..< (d.capacity - d.count) {
+    d[100 + i] = 100 + i
+  }
+  expectEqual(d._rawIdentifier(), identifier)
+  expectEqual(d.count, d.capacity)
+
+  expectTrue(i < j)
+
+  d[0] = 0
+  expectNotEqual(d._rawIdentifier(), identifier)
+
+  expectTrue(i < j)
+  expectCrashLater()
+  _ = d[i..<j]
+}
+
+DictionaryTestSuite.test("IndexValidation.KeysRangeSubscript.AfterRemoval") {
+  var d = getCOWFastDictionary()
+  let i = d.keys.firstIndex(of: 20)!
+  let j = d.index(after: i)
+  expectTrue(i < j)
+
+  d.removeValue(forKey: 10)
+  expectTrue(i < j)
+  expectCrashLater()
+  _ = d.keys[i..<j]
+}
+
+DictionaryTestSuite.test("IndexValidation.KeysRangeSubscript.AfterGrow") {
+  var d = getCOWFastDictionary()
+  let i = d.keys.firstIndex(of: 20)!
+  let j = d.index(after: i)
+  let identifier = d._rawIdentifier()
+  expectTrue(i < j)
+  for i in 0 ..< (d.capacity - d.count) {
+    d[100 + i] = 100 + i
+  }
+  expectEqual(d._rawIdentifier(), identifier)
+  expectEqual(d.count, d.capacity)
+
+  expectTrue(i < j)
+
+  d[0] = 0
+  expectNotEqual(d._rawIdentifier(), identifier)
+  expectTrue(i < j)
+  expectCrashLater()
+  _ = d.keys[i..<j]
+}
+
+DictionaryTestSuite.test("IndexValidation.ValuesRangeSubscript.AfterRemoval") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  let j = d.index(after: i)
+  expectTrue(i < j)
+
+  d.removeValue(forKey: 10)
+  expectTrue(i < j)
+  expectCrashLater()
+  _ = d.values[i..<j]
+}
+
+DictionaryTestSuite.test("IndexValidation.ValuesRangeSubscript.AfterGrow") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  let j = d.index(after: i)
+  let identifier = d._rawIdentifier()
+  expectTrue(i < j)
+  for i in 0 ..< (d.capacity - d.count) {
+    d[100 + i] = 100 + i
+  }
+  expectEqual(d._rawIdentifier(), identifier)
+  expectEqual(d.count, d.capacity)
+
+  expectTrue(i < j)
+
+  d[0] = 0
+  expectNotEqual(d._rawIdentifier(), identifier)
+  expectTrue(i < j)
+  expectCrashLater()
+  _ = d.values[i..<j]
+}
+
+DictionaryTestSuite.test("IndexValidation.RemoveAt.AfterRemoval") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  d.removeValue(forKey: 10)
+  expectCrashLater()
+  d.remove(at: i)
+}
+
+DictionaryTestSuite.test("IndexValidation.RemoveAt.AfterGrow") {
+  var d = getCOWFastDictionary()
+  let i = d.index(forKey: 20)!
+  let identifier = d._rawIdentifier()
+  expectEqual(d[i], (key: 20, value: 1020))
+
+  for i in 0 ..< (d.capacity - d.count) {
+    d[100 + i] = 100 + i
+  }
+  expectEqual(d._rawIdentifier(), identifier)
+  expectEqual(d.count, d.capacity)
+
+  d[0] = 0
+  expectNotEqual(d._rawIdentifier(), identifier)
+
+  expectCrashLater()
+  d.remove(at: i)
+}
 
 DictionaryTestSuite.setUp {
 #if _runtime(_ObjC)
