@@ -106,15 +106,12 @@ popd
 cmake --build "%swift_source_dir%/build/Ninja-DebugAssert/cmark-windows-amd64/"
 ```
 
-### 6. Build LLVM/Clang/Compiler-RT
+### 6. Build LLVM/Clang
 - This must be done from within a developer command prompt. LLVM and Clang are
   large projects, so building might take a few hours. Make sure that the build
   type (e.g. `Debug`, `Release`, `RelWithDebInfoAssert`) for LLVM/Clang matches the
   build type for Swift.
-- Optionally, you can omit building compiler-rt by removing all lines referring
-  to `compiler-rt` below, which should give faster build times.
 ```cmd
-mklink /J "%swift_source_dir%/llvm/tools/compiler-rt" "%swift_source_dir%/compiler-rt"
 mkdir "%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"
 pushd "%swift_source_dir%/build/Ninja-DebugAssert/llvm-windows-amd64"
 cmake -G "Ninja"^
@@ -122,8 +119,6 @@ cmake -G "Ninja"^
  -DCMAKE_BUILD_TYPE=Debug^
  -DLLVM_TOOL_SWIFT_BUILD=NO^
  -DLLVM_INCLUDE_DOCS=TRUE^
- -DLLVM_TOOL_COMPILER_RT_BUILD=TRUE^
- -DLLVM_BUILD_EXTERNAL_COMPILER_RT=TRUE^
  -DLLVM_ENABLE_PROJECTS=clang^
  -DLLVM_LIT_ARGS=-sv^
  -DLLVM_TARGETS_TO_BUILD=X86^
