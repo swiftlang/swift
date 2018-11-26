@@ -48,6 +48,37 @@ struct ProcessResult {
   }
 }
 
+internal func runCore(_ executable: URL, _ arguments: [String] = [])
+    -> ProcessResult {
+  let stdoutPipe = Pipe()
+  var stdoutData = Data()
+  stdoutPipe.fileHandleForReading.readabilityHandler = { file in
+    stdoutData.append(file.availableData)
+  }
+
+  let stderrPipe = Pipe()
+  var stderrData = Data()
+  stderrPipe.fileHandleForReading.readabilityHandler = { file in
+    stderrData.append(file.availableData)
+  }
+
+  let process = Process()
+  process.terminationHandler = { process in
+    stdoutPipe.fileHandleForReading.readabilityHandler = nil
+    stderrPipe.fileHandleForReading.readabilityHandler = nil
+  }
+  process.launchPath = executable.path
+  process.arguments = arguments
+  process.standardOutput = stdoutPipe
+  process.standardError = stderrPipe
+  process.launch()
+  process.waitUntilExit()
+
+  return ProcessResult(exitCode: Int(process.terminationStatus),
+                       stdoutData: stdoutData,
+                       stderrData: stderrData)
+}
+
 /// Runs the provided executable with the provided arguments and returns the
 /// contents of stdout and stderr as Data.
 /// - Parameters:
@@ -55,39 +86,14 @@ struct ProcessResult {
 ///   - arguments: A list of strings to pass to the process as arguments.
 /// - Returns: A ProcessResult containing stdout, stderr, and the exit code.
 func run(_ executable: URL, arguments: [String] = []) -> ProcessResult {
+#if _runtime(_ObjC)
   // Use an autoreleasepool to prevent memory- and file-descriptor leaks.
-  return autoreleasepool {
-    () -> ProcessResult in
-    
-    let stdoutPipe = Pipe()
-    var stdoutData = Data()
-    stdoutPipe.fileHandleForReading.readabilityHandler = { file in
-      stdoutData.append(file.availableData)
-    }
-    
-    let stderrPipe = Pipe()
-    var stderrData = Data()
-    stderrPipe.fileHandleForReading.readabilityHandler = { file in
-      stderrData.append(file.availableData)
-    }
-    
-    let process = Process()
-    
-    process.terminationHandler = { process in
-      stdoutPipe.fileHandleForReading.readabilityHandler = nil
-      stderrPipe.fileHandleForReading.readabilityHandler = nil
-    }
-    
-    process.launchPath = executable.path
-    process.arguments = arguments
-    process.standardOutput = stdoutPipe
-    process.standardError = stderrPipe
-    process.launch()
-    process.waitUntilExit()
-    return ProcessResult(exitCode: Int(process.terminationStatus),
-                         stdoutData: stdoutData,
-                         stderrData: stderrData)
+  return autoreleasepool { () -> ProcessResult in
+    runCore(executable, arguments)
   }
+#else
+  return runCore(executable, arguments)
+#endif
 }
 
 /// Finds the dylib or executable which the provided address falls in.
@@ -100,7 +106,11 @@ func run(_ executable: URL, arguments: [String] = []) -> ProcessResult {
 ///            or executable. If unable to find the appropriate object, returns
 ///            `nil`.
 func findFirstObjectFile(for dsohandle: UnsafeRawPointer = #dsohandle) -> URL? {
+#if os(Linux)
+  var info = Dl_info()
+#else
   var info = dl_info()
+#endif
   if dladdr(dsohandle, &info) == 0 {
     return nil
   }
@@ -136,16 +146,25 @@ struct SwiftcRunner {
   ///           - lib/
   ///             - swift/
   ///               - ${target}/
-  ///                 - libswiftSwiftSyntax.[dylib|so]
+  ///                 - ${arch}/ (only on !Darwin and if launched from Xcode)
+  ///                   - libswiftSwiftSyntax.[dylib|so]
   ///         ```
   static func locateSwiftc() -> URL? {
     guard let libraryPath = findFirstObjectFile() else { return nil }
-    let swiftcURL = libraryPath.deletingLastPathComponent()
+
+    var swiftcURL = libraryPath.deletingLastPathComponent()
                                .deletingLastPathComponent()
                                .deletingLastPathComponent()
                                .deletingLastPathComponent()
-                               .appendingPathComponent("bin")
-                               .appendingPathComponent("swiftc")
+
+    if swiftcURL.lastPathComponent == "lib" {
+      // We are still one level to deep because we started in ${arch},
+      // not ${target}, see comment above). Traverse one more level upwards
+      swiftcURL = swiftcURL.deletingLastPathComponent()
+    }
+
+    swiftcURL = swiftcURL.appendingPathComponent("bin")
+                         .appendingPathComponent("swiftc")
     guard FileManager.default.fileExists(atPath: swiftcURL.path) else {
       return nil
     }

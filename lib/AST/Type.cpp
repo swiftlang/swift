@@ -434,12 +434,10 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
   }
 
   auto selfTy = dc->getDeclaredInterfaceType();
-  auto selfParam = AnyFunctionType::Param(selfTy,
-                                          Identifier(), ParameterTypeFlags());
+  auto selfParam = AnyFunctionType::Param(selfTy);
   if (sig)
-    return GenericFunctionType::get(sig, {selfParam}, type,
-                                    AnyFunctionType::ExtInfo());
-  return FunctionType::get({selfParam}, type, AnyFunctionType::ExtInfo());
+    return GenericFunctionType::get(sig, {selfParam}, type);
+  return FunctionType::get({selfParam}, type);
 }
 
 void
@@ -725,6 +723,32 @@ Type TypeBase::getUnlabeledType(ASTContext &Context) {
   return getStrippedType(Context, Type(this), /*stripLabels=*/true);
 }
 
+/// Remove argument labels from the function type.
+Type TypeBase::removeArgumentLabels(unsigned numArgumentLabels) {
+  // If there is nothing to remove, don't.
+  if (numArgumentLabels == 0) return Type(this);
+
+  auto fnType = castTo<AnyFunctionType>();
+
+  // Drop argument labels from the input type.
+  llvm::SmallVector<AnyFunctionType::Param, 8> unlabeledParams;
+  unlabeledParams.reserve(fnType->getNumParams());
+  for (const auto &param : fnType->getParams())
+    unlabeledParams.push_back(param.getWithoutLabel());
+
+  auto result = fnType->getResult()
+                      ->removeArgumentLabels(numArgumentLabels - 1);
+
+  if (auto *genericFnType = dyn_cast<GenericFunctionType>(fnType)) {
+    return GenericFunctionType::get(genericFnType->getGenericSignature(),
+                                    unlabeledParams, result,
+                                    fnType->getExtInfo());
+  }
+
+  return FunctionType::get(unlabeledParams, result, fnType->getExtInfo());
+}
+
+
 Type TypeBase::getWithoutParens() {
   Type Ty = this;
   while (auto ParenTy = dyn_cast<ParenType>(Ty.getPointer()))
@@ -893,41 +917,46 @@ std::string swift::getParamListAsString(ArrayRef<AnyFunctionType::Param> params)
 
 /// Rebuilds the given 'self' type using the given object type as the
 /// replacement for the object type of self.
-static Type rebuildSelfTypeWithObjectType(Type selfTy, Type objectTy) {
-  auto existingObjectTy = selfTy->getRValueInstanceType();
-  return selfTy.transform([=](Type type) -> Type {
-    if (type->isEqual(existingObjectTy))
-      return objectTy;
-    return type;
-  });
+static AnyFunctionType::Param
+rebuildSelfTypeWithObjectType(AnyFunctionType::Param selfParam,
+                              Type objectTy) {
+  if (selfParam.getPlainType()->getAs<MetatypeType>())
+    objectTy = MetatypeType::get(objectTy);
+
+  return AnyFunctionType::Param(objectTy,
+                                selfParam.getLabel(),
+                                selfParam.getParameterFlags());
 }
 
 /// Returns a new function type exactly like this one but with the self
-/// parameter replaced. Only makes sense for members of types.
+/// parameter replaced. Only makes sense for members of classes.
 Type TypeBase::replaceSelfParameterType(Type newSelf) {
   auto fnTy = castTo<AnyFunctionType>();
-  Type input = rebuildSelfTypeWithObjectType(fnTy->getInput(), newSelf);
+
+  auto params = fnTy->getParams();
+  assert(params.size() == 1);
+  auto selfParam = rebuildSelfTypeWithObjectType(params[0], newSelf);
 
   if (auto genericFnTy = getAs<GenericFunctionType>()) {
     return GenericFunctionType::get(genericFnTy->getGenericSignature(),
-                                    input,
+                                    {selfParam},
                                     fnTy->getResult(),
                                     fnTy->getExtInfo());
   }
 
-  return FunctionType::get(input,
+  return FunctionType::get({selfParam},
                            fnTy->getResult(),
                            fnTy->getExtInfo());
 }
 
-/// Retrieve the object type for a 'self' parameter, digging into
-/// inout types, and metatypes.
-Type TypeBase::getRValueInstanceType() {
+/// Look through a metatype, or just return the original type if it is
+/// not a metatype.
+Type TypeBase::getMetatypeInstanceType() {
   if (auto metaTy = getAs<AnyMetatypeType>())
     return metaTy->getInstanceType();
 
   // For mutable value type methods, we need to dig through inout types.
-  return getInOutObjectType();
+  return this;
 }
 
 /// \brief Collect the protocols in the existential type T into the given
@@ -1066,27 +1095,16 @@ void ProtocolType::canonicalizeProtocols(
   llvm::array_pod_sort(protocols.begin(), protocols.end(), TypeDecl::compare);
 }
 
-static Type
-getCanonicalInputType(AnyFunctionType *funcType,
-                      llvm::function_ref<CanType(Type)> getCanonicalType) {
-  auto origInputType = funcType->getInput();
-  bool isParen = origInputType->hasParenSugar();
-  Type inputType = getCanonicalType(origInputType);
-
-  if (!isParen && AnyFunctionType::isCanonicalFunctionInputType(inputType))
-    return inputType;
-
-  auto flags = ParameterTypeFlags().withInOut(inputType->is<InOutType>());
-  if (auto *parenTy = dyn_cast<ParenType>(origInputType.getPointer())) {
-    flags = parenTy->getParameterFlags().withInOut(flags.isInOut());
-    assert(!flags.isVariadic() && "variadic ParenType");
+static void
+getCanonicalParams(AnyFunctionType *funcType,
+                   CanGenericSignature genericSig,
+                   SmallVectorImpl<AnyFunctionType::Param> &canParams) {
+  auto origParams = funcType->getParams();
+  for (auto param : origParams) {
+    canParams.emplace_back(param.getPlainType()->getCanonicalType(genericSig),
+                           param.getLabel(),
+                           param.getParameterFlags());
   }
-
-  inputType = ParenType::get(inputType->getASTContext(),
-                             inputType->getInOutObjectType(), flags);
-  assert(AnyFunctionType::isCanonicalFunctionInputType(inputType));
-
-  return inputType;
 }
 
 CanType TypeBase::computeCanonicalType() {
@@ -1181,43 +1199,44 @@ CanType TypeBase::computeCanonicalType() {
     break;
   }
   case TypeKind::LValue:
-    Result = LValueType::get(getRValueType()->getCanonicalType());
+    Result = LValueType::get(cast<LValueType>(this)->getObjectType()
+                               ->getCanonicalType());
     break;
   case TypeKind::InOut:
     Result = InOutType::get(getInOutObjectType()->getCanonicalType());
     break;
+  case TypeKind::Function:
   case TypeKind::GenericFunction: {
-    GenericFunctionType *function = cast<GenericFunctionType>(this);
+    AnyFunctionType *funcTy = cast<AnyFunctionType>(this);
 
-    // Canonicalize the signature.
-    GenericSignature *sig = function->getGenericSignature()
-      ->getCanonicalSignature();
-    
-    // Transform the input and result types.
-    auto inputTy = getCanonicalInputType(function, [&](Type type) -> CanType {
-      return type->getCanonicalType(sig);
-    });
-    auto resultTy = function->getResult()->getCanonicalType(sig);
-    Result = GenericFunctionType::get(sig, inputTy, resultTy,
-                                      function->getExtInfo());
+    CanGenericSignature genericSig;
+    if (auto *genericFnTy = dyn_cast<GenericFunctionType>(this))
+      genericSig = genericFnTy->getGenericSignature()->getCanonicalSignature();
+
+    // Transform the parameter and result types.
+    SmallVector<AnyFunctionType::Param, 8> canParams;
+    getCanonicalParams(funcTy, genericSig, canParams);
+    auto resultTy = funcTy->getResult()->getCanonicalType(genericSig);
+
+    if (genericSig) {
+      Result = GenericFunctionType::get(genericSig, canParams, resultTy,
+                                        funcTy->getExtInfo(),
+                                        /*canonicalVararg=*/true);
+    } else {
+      Result = FunctionType::get(canParams, resultTy,
+                                 funcTy->getExtInfo(),
+                                 /*canonicalVararg=*/true);
+    }
     assert(Result->isCanonical());
     break;
   }
-      
+
   case TypeKind::SILBlockStorage:
   case TypeKind::SILBox:
   case TypeKind::SILFunction:
   case TypeKind::SILToken:
     llvm_unreachable("SIL-only types are always canonical!");
 
-  case TypeKind::Function: {
-    FunctionType *FT = cast<FunctionType>(this);
-    auto In = getCanonicalInputType(
-        FT, [](Type type) -> CanType { return type->getCanonicalType(); });
-    Type Out = FT->getResult()->getCanonicalType();
-    Result = FunctionType::get(In, Out, FT->getExtInfo());
-    break;
-  }
   case TypeKind::ProtocolComposition: {
     auto *PCT = cast<ProtocolCompositionType>(this);
     SmallVector<Type, 4> CanProtos;
@@ -1888,7 +1907,7 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
 
   // Class-constrained generic parameters, from ObjC generic classes.
   if (auto tyContext = dc->getInnermostTypeContext())
-    if (auto clas = tyContext->getAsClassOrClassExtensionContext())
+    if (auto clas = tyContext->getSelfClassDecl())
       if (clas->hasClangNode())
         if (auto archetype = type->getAs<ArchetypeType>())
           if (archetype->requiresClass())
@@ -3186,7 +3205,17 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
 
     t = t->getSuperclass(useArchetypes);
   }
-  llvm_unreachable("no inheritance relationship between given classes");
+
+#ifndef NDEBUG
+  auto *currentClass = getConcreteTypeForSuperclassTraversing(this)
+      ->getClassOrBoundGenericClass();
+  while (currentClass && currentClass != baseClass)
+    currentClass = currentClass->getSuperclassDecl();
+  assert(currentClass == baseClass &&
+         "no inheritance relationship between given classes");
+#endif
+
+  return ErrorType::get(this);
 }
 
 TypeSubstitutionMap
@@ -3205,7 +3234,7 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
 
   // If the member is part of a protocol or extension thereof, we need
   // to substitute in the type of Self.
-  if (dc->getAsProtocolOrProtocolExtensionContext()) {
+  if (dc->getSelfProtocolDecl()) {
     // FIXME: This feels painfully inefficient. We're creating a dense map
     // for a single substitution.
     substitutions[dc->getSelfInterfaceType()
@@ -3215,7 +3244,7 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   }
 
   // Find the superclass type with the context matching that of the member.
-  auto *ownerNominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *ownerNominal = dc->getSelfNominalTypeDecl();
   if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal))
     baseTy = baseTy->getSuperclassForDecl(ownerClass);
 
@@ -3770,19 +3799,45 @@ case TypeKind::Id:
   case TypeKind::GenericFunction:
   case TypeKind::Function: {
     auto function = cast<AnyFunctionType>(base);
-    auto inputTy = function->getInput().transformRec(fn);
-    if (!inputTy)
-      return Type();
+
+    bool isUnchanged = true;
+
+    // Transform function parameter types.
+    SmallVector<AnyFunctionType::Param, 8> substParams;
+    for (auto param : function->getParams()) {
+      auto type = param.getPlainType();
+      auto label = param.getLabel();
+      auto flags = param.getParameterFlags();
+
+      auto substType = type.transformRec(fn);
+      if (!substType)
+        return Type();
+
+      if (type.getPointer() != substType.getPointer())
+        isUnchanged = false;
+
+      // FIXME: Remove this once we get rid of TVO_CanBindToInOut;
+      // the only time we end up here is when the constraint solver
+      // simplifies a type containing a type variable fixed to an
+      // InOutType.
+      if (substType->is<InOutType>()) {
+        assert(flags.getValueOwnership() == ValueOwnership::Default);
+        substType = substType->getInOutObjectType();
+        flags = flags.withInOut(true);
+      }
+
+      substParams.emplace_back(substType, label, flags);
+    }
+
+    // Transform result type.
     auto resultTy = function->getResult().transformRec(fn);
     if (!resultTy)
       return Type();
 
-    bool isUnchanged =
-        inputTy.getPointer() == function->getInput().getPointer() &&
-        resultTy.getPointer() == function->getResult().getPointer();
+    if (resultTy.getPointer() != function->getResult().getPointer())
+      isUnchanged = false;
 
     if (auto genericFnType = dyn_cast<GenericFunctionType>(base)) {
-
 #ifndef NDEBUG
       // Check that generic parameters won't be trasnformed.
       // Transform generic parameters.
@@ -3791,17 +3846,20 @@ case TypeKind::Id:
                "GenericFunctionType transform() changes type parameter");
       }
 #endif
+
       if (isUnchanged) return *this;
-      
+
       auto genericSig = genericFnType->getGenericSignature();
-      return GenericFunctionType::get(genericSig, inputTy, resultTy,
-                                      function->getExtInfo());
+      return GenericFunctionType::get(genericSig, substParams, resultTy,
+                                      function->getExtInfo(),
+                                   /*canonicalVararg=*/function->isCanonical());
     }
 
     if (isUnchanged) return *this;
 
-    return FunctionType::get(inputTy, resultTy,
-                             function->getExtInfo());
+    return FunctionType::get(substParams, resultTy,
+                             function->getExtInfo(),
+                             /*canonicalVararg=*/function->isCanonical());
   }
 
   case TypeKind::ArraySlice: {
@@ -3988,13 +4046,10 @@ bool UnownedStorageType::isLoadable(ResilienceExpansion resilience) const {
   auto ty = getReferentType();
   if (auto underlyingTy = ty->getOptionalObjectType())
     ty = underlyingTy;
-  return ty->usesNativeReferenceCounting(resilience);
+  return ty->getReferenceCounting() == ReferenceCounting::Native;
 }
 
-static ReferenceCounting getClassReferenceCounting(
-                                             ClassDecl *theClass,
-                                             ResilienceExpansion resilience) {
-  // TODO: Resilience? there might be some legal avenue of changing this.
+static ReferenceCounting getClassReferenceCounting(ClassDecl *theClass) {
   while (auto superclass = theClass->getSuperclassDecl()) {
     theClass = superclass;
   }
@@ -4004,8 +4059,7 @@ static ReferenceCounting getClassReferenceCounting(
            : ReferenceCounting::Native;
 }
 
-ReferenceCounting TypeBase::getReferenceCounting(
-                                              ResilienceExpansion resilience) {
+ReferenceCounting TypeBase::getReferenceCounting() {
   CanType type = getCanonicalType();
   ASTContext &ctx = type->getASTContext();
 
@@ -4031,20 +4085,17 @@ ReferenceCounting TypeBase::getReferenceCounting(
     return ReferenceCounting::Unknown;
 
   case TypeKind::Class:
-    return getClassReferenceCounting(cast<ClassType>(type)->getDecl(),
-                                     resilience);
+    return getClassReferenceCounting(cast<ClassType>(type)->getDecl());
   case TypeKind::BoundGenericClass:
     return getClassReferenceCounting(
-                                  cast<BoundGenericClassType>(type)->getDecl(),
-                                  resilience);
+                                  cast<BoundGenericClassType>(type)->getDecl());
   case TypeKind::UnboundGeneric:
     return getClassReferenceCounting(
-                    cast<ClassDecl>(cast<UnboundGenericType>(type)->getDecl()),
-                    resilience);
+                    cast<ClassDecl>(cast<UnboundGenericType>(type)->getDecl()));
 
   case TypeKind::DynamicSelf:
     return cast<DynamicSelfType>(type).getSelfType()
-        ->getReferenceCounting(resilience);
+        ->getReferenceCounting();
 
   case TypeKind::Archetype: {
     auto archetype = cast<ArchetypeType>(type);
@@ -4053,7 +4104,7 @@ ReferenceCounting TypeBase::getReferenceCounting(
     assert(archetype->requiresClass() ||
            (layout && layout->isRefCounted()));
     if (auto supertype = archetype->getSuperclass())
-      return supertype->getReferenceCounting(resilience);
+      return supertype->getReferenceCounting();
     return ReferenceCounting::Unknown;
   }
 
@@ -4062,7 +4113,7 @@ ReferenceCounting TypeBase::getReferenceCounting(
     auto layout = type->getExistentialLayout();
     assert(layout.requiresClass() && "Opaque existentials don't use refcounting");
     if (auto superclass = layout.getSuperclass())
-      return superclass->getReferenceCounting(resilience);
+      return superclass->getReferenceCounting();
     return ReferenceCounting::Unknown;
   }
 
@@ -4098,10 +4149,6 @@ ReferenceCounting TypeBase::getReferenceCounting(
   }
 
   llvm_unreachable("Unhandled type kind!");
-}
-
-bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
-  return getReferenceCounting(resilience) == ReferenceCounting::Native;
 }
 
 //

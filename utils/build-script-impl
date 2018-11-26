@@ -60,6 +60,7 @@ KNOWN_SETTINGS=(
     lldb-no-debugserver         ""               "delete debugserver after building it, and don't try to codesign it"
     lldb-use-system-debugserver ""               "don't try to codesign debugserver, and use the system's debugserver instead"
     lldb-assertions             "1"              "build lldb with assertions enabled"
+    lldb-test-swift-compatibility     ""         "specify additional Swift compilers to test lldb with"
     llvm-build-type             "Debug"          "the CMake build variant for LLVM and Clang (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
     swift-build-type            "Debug"          "the CMake build variant for Swift"
     swift-enable-assertions     "1"              "enable assertions in Swift"
@@ -2131,6 +2132,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_EMBED_BITCODE_SECTION:BOOL=$(true_false "${EMBED_BITCODE_SECTION}")
                     -DSWIFT_TOOLS_ENABLE_LTO:STRING="${SWIFT_TOOLS_ENABLE_LTO}"
                     -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL=$(true_false "${BUILD_RUNTIME_WITH_HOST_COMPILER}")
+                    -DLIBDISPATCH_CMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
                     "${swift_cmake_options[@]}"
                 )
 
@@ -2587,7 +2589,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 # Set the PKG_CONFIG_PATH so that core-foundation can find the libraries and
                 # header files
-                export PKG_CONFIG_PATH="${ICU_TMPLIBDIR}/pkgconfig"
+                export PKG_CONFIG_PATH="${ICU_TMPLIBDIR}/pkgconfig:${PKG_CONFIG_PATH}"
                 swift_cmake_options=(
                     "${swift_cmake_options[@]}"
                     -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_UC_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
@@ -2823,7 +2825,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 # Watchpoint testing is currently disabled: see rdar://38566150.
                 if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
                     LLDB_TEST_SUBDIR_CLAUSE="--test-subdir lang/swift"
-                    LLDB_TEST_CATEGORIES="--skip-category=watchpoint --skip-category=dwo --skip-category=dsym --skip-category=gmodules -G swiftpr"
+                    LLDB_TEST_CATEGORIES="--skip-category=watchpoint --skip-category=dwo --skip-category=dsym --skip-category=gmodules"
                 else
                     LLDB_TEST_SUBDIR_CLAUSE=""
                     LLDB_TEST_CATEGORIES="--skip-category=watchpoint"
@@ -2872,8 +2874,19 @@ for host in "${ALL_HOSTS[@]}"; do
                     with_pushd ${lldb_build_dir} \
                      call ${NINJA_BIN} unittests/LLDBUnitTests
                     with_pushd ${results_dir} \
-                     call "${llvm_build_dir}/bin/llvm-lit" "${lldb_build_dir}/lit" -sv --xunit-xml-output=${results_dir}/results.xml --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -E \"${DOTEST_EXTRA}\""
-
+                          call "${llvm_build_dir}/bin/llvm-lit" \
+                               "${lldb_build_dir}/lit" -sv \
+                               --xunit-xml-output=${results_dir}/results.xml \
+                               --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -E \"${DOTEST_EXTRA}\""
+                    if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
+                        echo "Running LLDB swift compatibility tests against" \
+                             "${LLDB_TEST_SWIFT_COMPATIBILITY}"
+                        with_pushd ${results_dir} \
+                           call "${llvm_build_dir}/bin/llvm-lit" \
+                                "${lldb_build_dir}/lit" -sv \
+                                --xunit-xml-output=${results_dir}/results.xml \
+                                --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -G swift-history --swift-compiler \"${LLDB_TEST_SWIFT_COMPATIBILITY}\" -E \"${DOTEST_EXTRA}\""
+                    fi
                 else
                     with_pushd "${results_dir}" \
                         call env SWIFTC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
@@ -2887,6 +2900,23 @@ for host in "${ALL_HOSTS[@]}"; do
                         ${LLDB_FORMATTER_OPTS} \
                         --build-dir "${lldb_build_dir}/lldb-test-build.noindex" \
                         -E "${DOTEST_EXTRA}"
+                    if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
+                        echo "Running LLDB swift compatibility tests against" \
+                             "${LLDB_TEST_SWIFT_COMPATIBILITY}"
+                        call env SWIFTC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
+                             SWIFTLIBS="${swift_build_dir}/lib/swift" \
+                             "${LLDB_SOURCE_DIR}"/test/dotest.py \
+                             --executable "${lldb_executable}" \
+                             ${LLDB_TEST_DEBUG_SERVER} \
+                             ${LLDB_TEST_SUBDIR_CLAUSE} \
+                             ${LLDB_TEST_CATEGORIES} \
+                             ${LLDB_DOTEST_CC_OPTS} \
+                             ${LLDB_FORMATTER_OPTS} \
+                             --build-dir "${lldb_build_dir}/lldb-test-build.noindex" \
+                             -G swift-history \
+                             --swift-compiler "${LLDB_TEST_SWIFT_COMPATIBILITY}" \
+                             -E "${DOTEST_EXTRA}"
+                    fi
                 fi
 
                 continue

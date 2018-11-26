@@ -4,19 +4,8 @@
 // REQUIRES: CMAKE_GENERATOR=Ninja
 
 // Integration tests between Benchmark_Driver and Benchmark_O
-// TODO: Keep the "run just once" check and move the rest into unit tests for
-//       Benchmark_Driver, as they are redundant and unnecessarily slow.
-
-// RUN: %Benchmark_Driver run Ackermann | %FileCheck %s --check-prefix RUNNAMED
-// RUNNAMED: Ackermann
-
-// RUN: %Benchmark_Driver run 1 | %FileCheck %s --check-prefix RUNBYNUMBER
-// RUNBYNUMBER: Ackermann
 
 // RUN: %Benchmark_Driver run 1 Ackermann 1 \
 // RUN:                 | %FileCheck %s --check-prefix RUNJUSTONCE
 // RUNJUSTONCE-LABEL: Ackermann
 // RUNJUSTONCE-NOT: Ackermann
-
-// RUN: %Benchmark_Driver run -f Acker | %FileCheck %s --check-prefix RUNFILTER
-// RUNFILTER: Ackermann

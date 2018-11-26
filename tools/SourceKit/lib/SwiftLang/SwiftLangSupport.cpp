@@ -213,8 +213,6 @@ UIdent SwiftLangSupport::getUIDForAccessor(const ValueDecl *D,
                                            AccessorKind AccKind,
                                            bool IsRef) {
   switch (AccKind) {
-  case AccessorKind::MaterializeForSet:
-    llvm_unreachable("unexpected MaterializeForSet");
   case AccessorKind::Get:
     return IsRef ? KindRefAccessorGetter : KindDeclAccessorGetter;
   case AccessorKind::Set:
@@ -682,7 +680,6 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
     // Ignore these.
     case DAK_ShowInInterface:
     case DAK_RawDocComment:
-    case DAK_DowngradeExhaustivityCheck:
     case DAK_HasInitialValue:
       return None;
     default:

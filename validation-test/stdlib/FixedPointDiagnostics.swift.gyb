@@ -1,15 +1,15 @@
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/main.swift
-// RUN: %line-directive %t/main.swift -- %target-swift-frontend -typecheck -verify -swift-version 3 %t/main.swift
+// RUN: %line-directive %t/main.swift -- %target-swift-frontend -typecheck -verify -swift-version 4.2 %t/main.swift
 
 func testUnaryMinusInUnsigned() {
-  var a: UInt8 = -(1) // expected-error {{argument type 'UInt8' does not conform to expected type 'SignedNumeric'}} expected-note * {{}} expected-warning * {{}}
+  var a: UInt8 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt8'}} expected-note * {{}} expected-warning * {{}}
 
-  var b: UInt16 = -(1) // expected-error {{argument type 'UInt16' does not conform to expected type 'SignedNumeric'}} expected-note * {{}} expected-warning * {{}}
+  var b: UInt16 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt16'}} expected-note * {{}} expected-warning * {{}}
 
-  var c: UInt32 = -(1) // expected-error {{argument type 'UInt32' does not conform to expected type 'SignedNumeric'}} expected-note * {{}} expected-warning * {{}}
+  var c: UInt32 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt32'}} expected-note * {{}} expected-warning * {{}}
 
-  var d: UInt64 = -(1) // expected-error {{argument type 'UInt64' does not conform to expected type 'SignedNumeric'}} expected-note * {{}} expected-warning * {{}}
+  var d: UInt64 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt64'}} expected-note * {{}} expected-warning * {{}}
 }
 
 // Int and UInt are not identical to any fixed-size integer type
@@ -29,53 +29,53 @@ func expectSameType<T>(_: T.Type, _: T.Type) {}
 
 func test_truncatingBitPatternAPIIsStableAcrossPlatforms() {
   // Audit and update this test when adding new integer types.
-  expectSameType(Int64.self, IntMax.self)
-  expectSameType(UInt64.self, UIntMax.self)
+  expectSameType(Int64.self, IntMax.self) // expected-error {{'IntMax' has been renamed to 'Int64'}}  
+  expectSameType(UInt64.self, UIntMax.self) // expected-error {{'UIntMax' has been renamed to 'UInt64'}}
 
-  _ = UInt8(truncatingBitPattern: UInt(0))
-  _ = UInt16(truncatingBitPattern: UInt(0))
-  _ = UInt32(truncatingBitPattern: UInt(0))
+  _ = UInt8(truncatingBitPattern: UInt(0)) // expected-error {{'init(truncatingBitPattern:)' has been renamed to 'init(truncatingIfNeeded:)'}}
+  _ = UInt16(truncatingBitPattern: UInt(0)) // expected-error {{'init(truncatingBitPattern:)' has been renamed to 'init(truncatingIfNeeded:)'}}
+  _ = UInt32(truncatingBitPattern: UInt(0)) // expected-error {{'init(truncatingBitPattern:)' has been renamed to 'init(truncatingIfNeeded:)'}}
   UInt64(truncatingBitPattern: UInt(0)) // expected-error {{incorrect argument label in call (have 'truncatingBitPattern:', expected '_truncatingBits:')}}
-  UInt(truncatingBitPattern: UInt(0))   // expected-error {{}} expected-note * {{}}
+  UInt(truncatingBitPattern: UInt(0)) // expected-error {{cannot invoke initializer for type 'UInt' with an argument list of type '(truncatingBitPattern: UInt)'}} expected-note {{overloads for 'UInt' exist with these partially matching parameter lists: (truncatingBitPattern: UInt64), (truncatingBitPattern: Int64)}}
 
-  _ = Int8(truncatingBitPattern: UInt(0))
-  _ = Int16(truncatingBitPattern: UInt(0))
-  _ = Int32(truncatingBitPattern: UInt(0))
+  _ = Int8(truncatingBitPattern: UInt(0)) // expected-error {{'init(truncatingBitPattern:)' has been renamed to 'init(truncatingIfNeeded:)'}}
+  _ = Int16(truncatingBitPattern: UInt(0)) // expected-error {{'init(truncatingBitPattern:)' has been renamed to 'init(truncatingIfNeeded:)'}}
+  _ = Int32(truncatingBitPattern: UInt(0)) // expected-error {{'init(truncatingBitPattern:)' has been renamed to 'init(truncatingIfNeeded:)'}}
   Int64(truncatingBitPattern: UInt(0)) // expected-error {{incorrect argument label in call (have 'truncatingBitPattern:', expected '_truncatingBits:')}}
-  Int(truncatingBitPattern: UInt(0))   // expected-error {{}} expected-note * {{}}
+  Int(truncatingBitPattern: UInt(0)) // expected-error {{}} expected-note * {{}}
 
-  _ = UInt8(truncatingBitPattern: Int(0))
-  _ = UInt16(truncatingBitPattern: Int(0))
-  _ = UInt32(truncatingBitPattern: Int(0))
+  _ = UInt8(truncatingBitPattern: Int(0)) // expected-error {{'init(truncatingBitPattern:)' has been renamed to 'init(truncatingIfNeeded:)'}}
+  _ = UInt16(truncatingBitPattern: Int(0)) // expected-error {{'init(truncatingBitPattern:)' has been renamed to 'init(truncatingIfNeeded:)'}}
+  _ = UInt32(truncatingBitPattern: Int(0)) // expected-error {{'init(truncatingBitPattern:)' has been renamed to 'init(truncatingIfNeeded:)'}}
   UInt64(truncatingBitPattern: Int(0)) // expected-error {{argument labels '(truncatingBitPattern:)' do not match any available overloads}}
   // expected-note@-1 {{overloads for 'UInt64' exist with these partially matching parameter lists}}
   UInt(truncatingBitPattern: Int(0))   // expected-error {{}} expected-note * {{}}
 
-  _ = Int8(truncatingBitPattern: Int(0))
-  _ = Int16(truncatingBitPattern: Int(0))
-  _ = Int32(truncatingBitPattern: Int(0))
+  _ = Int8(truncatingBitPattern: Int(0)) // expected-error {{'init(truncatingBitPattern:)' has been renamed to 'init(truncatingIfNeeded:)'}}
+  _ = Int16(truncatingBitPattern: Int(0)) // expected-error {{'init(truncatingBitPattern:)' has been renamed to 'init(truncatingIfNeeded:)'}}
+  _ = Int32(truncatingBitPattern: Int(0)) // expected-error {{'init(truncatingBitPattern:)' has been renamed to 'init(truncatingIfNeeded:)'}}
   Int64(truncatingBitPattern: Int(0)) // expected-error {{}} expected-note * {{}}
   Int(truncatingBitPattern: Int(0))   // expected-error {{}} expected-note * {{}}
 
   UInt(truncatingBitPattern: UInt8(0))  // expected-error {{}} expected-note * {{}}
   UInt(truncatingBitPattern: UInt16(0))  // expected-error {{}} expected-note * {{}}
   UInt(truncatingBitPattern: UInt32(0))  // expected-error {{}} expected-note * {{}}
-  _ = UInt(truncatingBitPattern: UInt64(0))
+  _ = UInt(truncatingBitPattern: UInt64(0)) // expected-error {{'init(truncatingBitPattern:)' has been renamed to 'init(truncatingIfNeeded:)'}}
 
   Int(truncatingBitPattern: UInt8(0))  // expected-error {{}} expected-note * {{}}
   Int(truncatingBitPattern: UInt16(0)) // expected-error {{}} expected-note * {{}}
   Int(truncatingBitPattern: UInt32(0)) // expected-error {{}} expected-note * {{}}
-  _ = Int(truncatingBitPattern: UInt64(0))
+  _ = Int(truncatingBitPattern: UInt64(0)) // expected-error {{'init(truncatingBitPattern:)' has been renamed to 'init(truncatingIfNeeded:)'}}
 
   UInt(truncatingBitPattern: Int8(0))  // expected-error {{}} expected-note * {{}}
   UInt(truncatingBitPattern: Int16(0)) // expected-error {{}} expected-note * {{}}
   UInt(truncatingBitPattern: Int32(0)) // expected-error {{}} expected-note * {{}}
-  _ = UInt(truncatingBitPattern: Int64(0))
+  _ = UInt(truncatingBitPattern: Int64(0)) // expected-error {{'init(truncatingBitPattern:)' has been renamed to 'init(truncatingIfNeeded:)'}}
 
   Int(truncatingBitPattern: Int8(0))  // expected-error {{}} expected-note * {{}}
   Int(truncatingBitPattern: Int16(0)) // expected-error {{}} expected-note * {{}}
   Int(truncatingBitPattern: Int32(0)) // expected-error {{}} expected-note * {{}}
-  _ = Int(truncatingBitPattern: Int64(0))
+  _ = Int(truncatingBitPattern: Int64(0)) // expected-error {{'init(truncatingBitPattern:)' has been renamed to 'init(truncatingIfNeeded:)'}}
 }
 
 func testMixedSignArithmetic() {
@@ -87,15 +87,16 @@ func testMixedSignArithmetic() {
     typealias Stride = ${T}.Stride
     _ = ${T}(1) + 0     // OK
     _ = 0 + ${T}(1)     // OK
-    _ = ${T}(1) + Stride(0) // expected-warning {{}} // mixed-type arithmetics
-    _ = Stride(1) + ${T}(0) // expected-warning {{}} // mixed-type arithmetics
-    _ = ${T}(1) - Stride(0) // expected-warning {{}} // mixed-type arithmetics
+    _ = ${T}(1) + Stride(0) // expected-error {{'+' is unavailable: Please use explicit type conversions or Strideable methods for mixed-type arithmetics.}}
+    _ = Stride(1) + ${T}(0) // expected-error {{'+' is unavailable: Please use explicit type conversions or Strideable methods for mixed-type arithmetics.}}
+    _ = ${T}(1) - Stride(0) // expected-error {{'-' is unavailable: Please use explicit type conversions or Strideable methods for mixed-type arithmetics.}}
     var x: ${T} = 0
     x += 1              // OK
-    x += Stride(1)      // expected-warning {{}} // mixed-type arithmetics
-    x -= Stride(1)      // expected-warning {{}} // mixed-type arithmetics
+    x += Stride(1) // expected-error {{'+=' is unavailable: Please use explicit type conversions or Strideable methods for mixed-type arithmetics.}}
+    x -= Stride(1) // expected-error {{'-=' is unavailable: Please use explicit type conversions or Strideable methods for mixed-type arithmetics.}}
 
-    _ = (x - x) as Stride   // expected-warning {{}} // ambiguous use of operator '-'
+    // Terrible over-specific error, but at least disabled
+    _ = (x - x) as Stride // expected-error {{'(@lvalue ${T}, @lvalue ${T}) -> ${T}' is not convertible to '(${T}, ${T}) -> ${T}'}}
 
     //===------------------------------------------------------------------===//
     // The following errors are different because they're not being

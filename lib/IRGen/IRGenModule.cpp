@@ -51,6 +51,7 @@
 #include "GenType.h"
 #include "IRGenModule.h"
 #include "IRGenDebugInfo.h"
+#include "ProtocolInfo.h"
 #include "StructLayout.h"
 
 #include <initializer_list>

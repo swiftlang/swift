@@ -19,7 +19,7 @@
 #include "DerivedConformances.h"
 #include "TypeChecker.h"
 #include "TypeCheckAccess.h"
-#include "GenericTypeResolver.h"
+#include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTPrinter.h"
@@ -207,115 +207,65 @@ public:
 /// Check that the declaration attributes are ok.
 static void validateAttributes(TypeChecker &TC, Decl *D);
 
-void TypeChecker::resolveTrailingWhereClause(ProtocolDecl *proto) {
-  ProtocolRequirementTypeResolver resolver;
-  validateWhereClauses(proto, &resolver);
-}
-
-void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
-                                       GenericTypeResolver *resolver) {
-  TypeResolutionOptions options(TypeResolverContext::ProtocolWhereClause);
-
-  if (auto whereClause = protocol->getTrailingWhereClause()) {
-    revertGenericRequirements(whereClause->getRequirements());
-    validateRequirements(whereClause->getWhereLoc(),
-                         whereClause->getRequirements(), protocol,
-                         options, resolver);
-  }
-
-  for (auto assocType : protocol->getAssociatedTypeMembers()) {
-    if (auto whereClause = assocType->getTrailingWhereClause()) {
-      revertGenericRequirements(whereClause->getRequirements());
-      validateRequirements(whereClause->getWhereLoc(),
-                           whereClause->getRequirements(),
-                           protocol, options, resolver);
-    }
-  }
-}
-
-/// check the inheritance clause of a type declaration or extension thereof.
+/// Check the inheritance clause of a type declaration or extension thereof.
 ///
-/// This routine validates all of the types in the parsed inheritance clause,
-/// recording the superclass (if any and if allowed) as well as the protocols
-/// to which this type declaration conforms.
-void TypeChecker::checkInheritanceClause(Decl *decl,
-                                         GenericTypeResolver *resolver) {
+/// This routine performs detailed checking of the inheritance clause of the
+/// given type or extension. It need only be called within the primary source
+/// file.
+static void checkInheritanceClause(
+                    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> declUnion) {
   TypeResolutionOptions options = None;
   DeclContext *DC;
-  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    DC = nominal;
-    options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
-    options |= TypeResolutionFlags::AllowUnavailableProtocol;
-  } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    DC = ext;
-    options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
-    options |= TypeResolutionFlags::AllowUnavailableProtocol;
-  } else if (isa<GenericTypeParamDecl>(decl)) {
-    // For generic parameters, we want name lookup to look at just the
-    // signature of the enclosing entity.
-    DC = decl->getDeclContext();
-    if (auto nominal = dyn_cast<NominalTypeDecl>(DC)) {
-      DC = nominal;
-      options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
-    } else if (auto ext = dyn_cast<ExtensionDecl>(DC)) {
-      DC = ext;
-      options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
-    } else if (auto func = dyn_cast<AbstractFunctionDecl>(DC)) {
-      DC = func;
-      options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
-    } else if (!DC->isModuleScopeContext()) {
-      // Skip the generic parameter's context entirely.
-      DC = DC->getParent();
-    }
-  } else {
-    DC = decl->getDeclContext();
-  }
-
-  // Establish a default generic type resolver.
-  GenericTypeToArchetypeResolver defaultResolver(decl->getInnermostDeclContext());
-  if (!resolver)
-    resolver = &defaultResolver;
-
   MutableArrayRef<TypeLoc> inheritedClause;
-
-  if (auto type = dyn_cast<TypeDecl>(decl)) {
-    inheritedClause = type->getInherited();
-  } else {
-    auto ext = cast<ExtensionDecl>(decl);
-    if (!ext->getExtendedType())
-      return;
+  ExtensionDecl *ext = nullptr;
+  TypeDecl *typeDecl = nullptr;
+  Decl *decl;
+  if ((ext = declUnion.dyn_cast<ExtensionDecl *>())) {
+    decl = ext;
+    DC = ext;
+    options |= TypeResolutionFlags::AllowUnavailableProtocol;
 
     inheritedClause = ext->getInherited();
 
     // Protocol extensions cannot have inheritance clauses.
-    if (ext->getExtendedType()->is<ProtocolType>()) {
+    if (auto proto = ext->getExtendedProtocolDecl()) {
       if (!inheritedClause.empty()) {
-        diagnose(ext->getLoc(), diag::extension_protocol_inheritance,
-                 ext->getExtendedType())
+        ext->diagnose(diag::extension_protocol_inheritance,
+                 proto->getName())
           .highlight(SourceRange(inheritedClause.front().getSourceRange().Start,
                                  inheritedClause.back().getSourceRange().End));
-        ext->setInherited({ });
         return;
       }
     }
+  } else {
+    typeDecl = declUnion.get<TypeDecl *>();
+    decl = typeDecl;
+    if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
+      DC = nominal;
+      options |= TypeResolutionFlags::AllowUnavailableProtocol;
+    } else {
+      DC = typeDecl->getDeclContext();
+    }
+
+    inheritedClause = typeDecl->getInherited();
   }
+
+  ASTContext &ctx = decl->getASTContext();
+  auto &diags = ctx.Diags;
 
   // Retrieve the location of the start of the inheritance clause.
   auto getStartLocOfInheritanceClause = [&] {
-    if (auto genericTypeDecl = dyn_cast<GenericTypeDecl>(decl)) {
+    if (ext)
+      return ext->getSourceRange().End;
+
+    if (auto genericTypeDecl = dyn_cast<GenericTypeDecl>(typeDecl)) {
       if (auto genericParams = genericTypeDecl->getGenericParams())
         return genericParams->getSourceRange().End;
 
       return genericTypeDecl->getNameLoc();
     }
 
-    if (auto typeDecl = dyn_cast<TypeDecl>(decl))
-      return typeDecl->getNameLoc();
-
-    if (auto ext = dyn_cast<ExtensionDecl>(decl))
-      return ext->getSourceRange().End;
-
-    return SourceLoc();
+    return typeDecl->getNameLoc();
   };
 
   // Compute the source range to be used when removing something from an
@@ -325,8 +275,8 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     if (inheritedClause.size() == 1) {
       SourceLoc start = getStartLocOfInheritanceClause();
       SourceLoc end = inheritedClause[i].getSourceRange().End;
-      return SourceRange(Lexer::getLocForEndOfToken(Context.SourceMgr, start),
-                         Lexer::getLocForEndOfToken(Context.SourceMgr, end));
+      return SourceRange(Lexer::getLocForEndOfToken(ctx.SourceMgr, start),
+                         Lexer::getLocForEndOfToken(ctx.SourceMgr, end));
     }
 
     // If we're at the first entry, remove from the start of this entry to the
@@ -339,11 +289,11 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     // Otherwise, remove from the end of the previous entry to the end of this
     // entry.
     SourceLoc afterPriorLoc =
-      Lexer::getLocForEndOfToken(Context.SourceMgr,
+      Lexer::getLocForEndOfToken(ctx.SourceMgr,
                                  inheritedClause[i-1].getSourceRange().End);
 
     SourceLoc afterMyEndLoc =
-      Lexer::getLocForEndOfToken(Context.SourceMgr,
+      Lexer::getLocForEndOfToken(ctx.SourceMgr,
                                  inheritedClause[i].getSourceRange().End);
 
     return SourceRange(afterPriorLoc, afterMyEndLoc);
@@ -352,52 +302,49 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   // Check all of the types listed in the inheritance clause.
   Type superclassTy;
   SourceRange superclassRange;
-  llvm::SmallDenseMap<CanType, std::pair<unsigned, SourceRange>> inheritedTypes;
+  Optional<std::pair<unsigned, SourceRange>> inheritedAnyObject;
   for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
     auto &inherited = inheritedClause[i];
 
     // Validate the type.
-    if (validateType(inherited, DC, options, resolver)) {
-      inherited.setInvalidType(Context);
-      continue;
-    }
+    InheritedTypeRequest request{declUnion, i, TypeResolutionStage::Interface};
+    Type inheritedTy = evaluateOrDefault(ctx.evaluator, request, Type());
 
-    auto inheritedTy = inherited.getType();
-
-    // If this is an error type, ignore it.
-    if (inheritedTy->hasError())
+    // If we couldn't resolve an the inherited type, or it contains an error,
+    // ignore it.
+    if (!inheritedTy || inheritedTy->hasError())
       continue;
 
-    // Check whether we inherited from the same type twice.
-    auto knownPair = inheritedTypes.insert({ inheritedTy->getCanonicalType(),
-                                             {i, inherited.getSourceRange() }});
-    if (knownPair.second == /*insertion failed*/false) {
-      auto knownIndex = knownPair.first->second.first;
-      auto knownRange = knownPair.first->second.second;
-      // If the duplicated type is 'AnyObject', check whether the first was
-      // written as 'class'. Downgrade the error to a warning in such cases
-      // for backward compatibility with Swift <= 4.
-      if (!Context.LangOpts.isSwiftVersionAtLeast(5) &&
-          inheritedTy->isAnyObject() &&
-          (isa<ProtocolDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) &&
-          Lexer::getTokenAtLocation(Context.SourceMgr, knownRange.Start)
-            .is(tok::kw_class)) {
-        SourceLoc classLoc = knownRange.Start;
+    // Check whether we inherited from 'AnyObject' twice.
+    // Other redundant-inheritance scenarios are checked below, the
+    // GenericSignatureBuilder (for protocol inheritance) or the
+    // ConformanceLookupTable (for protocol conformance).
+    if (inheritedTy->isAnyObject()) {
+      if (inheritedAnyObject) {
+        // If the first occurrence was written as 'class', downgrade the error
+        // to a warning in such case for backward compatibility with
+        // Swift <= 4.
+        auto knownIndex = inheritedAnyObject->first;
+        auto knownRange = inheritedAnyObject->second;
         SourceRange removeRange = getRemovalRange(knownIndex);
+        if (!ctx.LangOpts.isSwiftVersionAtLeast(5) &&
+            (isa<ProtocolDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) &&
+            Lexer::getTokenAtLocation(ctx.SourceMgr, knownRange.Start)
+              .is(tok::kw_class)) {
+          SourceLoc classLoc = knownRange.Start;
 
-        diagnose(classLoc, diag::duplicate_anyobject_class_inheritance)
-          .fixItRemoveChars(removeRange.Start, removeRange.End);
-        inherited.setInvalidType(Context);
+          diags.diagnose(classLoc, diag::duplicate_anyobject_class_inheritance)
+            .fixItRemoveChars(removeRange.Start, removeRange.End);
+        } else {
+          diags.diagnose(inherited.getSourceRange().Start,
+                 diag::duplicate_inheritance, inheritedTy)
+            .fixItRemoveChars(removeRange.Start, removeRange.End);
+        }
         continue;
       }
 
-      auto removeRange = getRemovalRange(i);
-      diagnose(inherited.getSourceRange().Start,
-               diag::duplicate_inheritance, inheritedTy)
-        .fixItRemoveChars(removeRange.Start, removeRange.End)
-        .highlight(knownRange);
-      inherited.setInvalidType(Context);
-      continue;
+      // Note that we saw inheritance from 'AnyObject'.
+      inheritedAnyObject = { i, inherited.getSourceRange() };
     }
 
     if (inheritedTy->isExistentialType()) {
@@ -407,9 +354,8 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       if (layout.explicitSuperclass) {
         if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
           if (protoDecl->isObjC()) {
-            diagnose(protoDecl,
-                    diag::objc_protocol_with_superclass,
-                    protoDecl->getName());
+            protoDecl->diagnose(diag::objc_protocol_with_superclass,
+                                protoDecl->getName());
             continue;
           }
         }
@@ -439,13 +385,13 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       }
 
       // Swift 3 compatibility -- a class inheriting from AnyObject is a no-op.
-      if (Context.LangOpts.isSwiftVersion3() && isa<ClassDecl>(decl) &&
+      if (ctx.LangOpts.isSwiftVersion3() && isa<ClassDecl>(decl) &&
           inheritedTy->isAnyObject()) {
         auto classDecl = cast<ClassDecl>(decl);
         auto removeRange = getRemovalRange(i);
-        diagnose(inherited.getSourceRange().Start,
-                 diag::class_inherits_anyobject,
-                 classDecl->getDeclaredInterfaceType())
+        diags.diagnose(inherited.getSourceRange().Start,
+                       diag::class_inherits_anyobject,
+                       classDecl->getDeclaredInterfaceType())
           .fixItRemoveChars(removeRange.Start, removeRange.End);
         continue;
       }
@@ -455,10 +401,17 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     if (isa<EnumDecl>(decl)) {
       // Check if we already had a raw type.
       if (superclassTy) {
-        diagnose(inherited.getSourceRange().Start,
-                 diag::multiple_enum_raw_types, superclassTy, inheritedTy)
-          .highlight(superclassRange);
-        inherited.setInvalidType(Context);
+        if (superclassTy->isEqual(inheritedTy)) {
+          auto removeRange = getRemovalRange(i);
+          diags.diagnose(inherited.getSourceRange().Start,
+                         diag::duplicate_inheritance, inheritedTy)
+            .fixItRemoveChars(removeRange.Start, removeRange.End);
+        } else {
+          diags.diagnose(inherited.getSourceRange().Start,
+                         diag::multiple_enum_raw_types, superclassTy,
+                         inheritedTy)
+            .highlight(superclassRange);
+        }
         continue;
       }
       
@@ -466,8 +419,8 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       if (i > 0) {
         auto removeRange = getRemovalRange(i);
 
-        diagnose(inherited.getSourceRange().Start,
-                 diag::raw_type_not_first, inheritedTy)
+        diags.diagnose(inherited.getSourceRange().Start,
+                       diag::raw_type_not_first, inheritedTy)
           .fixItRemoveChars(removeRange.Start, removeRange.End)
           .fixItInsert(inheritedClause[0].getSourceRange().Start,
                        inheritedTy.getString() + ", ");
@@ -487,21 +440,27 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       if (superclassTy) {
         // FIXME: Check for shadowed protocol names, i.e., NSObject?
 
-        // Complain about multiple inheritance.
-        // Don't emit a Fix-It here. The user has to think harder about this.
-        diagnose(inherited.getSourceRange().Start,
-                 diag::multiple_inheritance, superclassTy, inheritedTy)
-          .highlight(superclassRange);
-        inherited.setInvalidType(Context);
+        if (superclassTy->isEqual(inheritedTy)) {
+          // Duplicate superclass.
+          auto removeRange = getRemovalRange(i);
+          diags.diagnose(inherited.getSourceRange().Start,
+                         diag::duplicate_inheritance, inheritedTy)
+            .fixItRemoveChars(removeRange.Start, removeRange.End);
+        } else {
+          // Complain about multiple inheritance.
+          // Don't emit a Fix-It here. The user has to think harder about this.
+          diags.diagnose(inherited.getSourceRange().Start,
+                         diag::multiple_inheritance, superclassTy, inheritedTy)
+            .highlight(superclassRange);
+        }
         continue;
       }
 
       // @objc protocols cannot have superclass constraints.
       if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
         if (protoDecl->isObjC()) {
-          diagnose(protoDecl,
-                   diag::objc_protocol_with_superclass,
-                   protoDecl->getName());
+          protoDecl->diagnose(diag::objc_protocol_with_superclass,
+                              protoDecl->getName());
           continue;
         }
       }
@@ -509,24 +468,22 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       // If the declaration we're looking at doesn't allow a superclass,
       // complain.
       if (isa<StructDecl>(decl) || isa<ExtensionDecl>(decl)) {
-        diagnose(decl->getLoc(),
-                 isa<ExtensionDecl>(decl)
-                   ? diag::extension_class_inheritance
-                   : diag::non_class_inheritance,
-                 isa<ExtensionDecl>(decl)
-                   ? cast<ExtensionDecl>(decl)->getDeclaredInterfaceType()
-                   : cast<TypeDecl>(decl)->getDeclaredInterfaceType(),
-                 inheritedTy)
+        decl->diagnose(isa<ExtensionDecl>(decl)
+                         ? diag::extension_class_inheritance
+                         : diag::non_class_inheritance,
+                       isa<ExtensionDecl>(decl)
+                         ? cast<ExtensionDecl>(decl)->getDeclaredInterfaceType()
+                         : cast<TypeDecl>(decl)->getDeclaredInterfaceType(),
+                       inheritedTy)
           .highlight(inherited.getSourceRange());
-        inherited.setInvalidType(Context);
         continue;
       }
 
       // If this is not the first entry in the inheritance clause, complain.
       if (isa<ClassDecl>(decl) && i > 0) {
         auto removeRange = getRemovalRange(i);
-        diagnose(inherited.getSourceRange().Start,
-                 diag::superclass_not_first, inheritedTy)
+        diags.diagnose(inherited.getSourceRange().Start,
+                       diag::superclass_not_first, inheritedTy)
           .fixItRemoveChars(removeRange.Start, removeRange.End)
           .fixItInsert(inheritedClause[0].getSourceRange().Start,
                        inheritedTy.getString() + ", ");
@@ -540,15 +497,38 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       continue;
     }
 
+    // The GenericSignatureBuilder diagnoses problems with generic type
+    // parameters.
+    if (isa<GenericTypeParamDecl>(decl))
+      continue;
+
     // We can't inherit from a non-class, non-protocol type.
-    diagnose(decl->getLoc(),
-             (isa<StructDecl>(decl) || isa<ExtensionDecl>(decl))
-               ? diag::inheritance_from_non_protocol
-               : diag::inheritance_from_non_protocol_or_class,
-             inheritedTy);
+    decl->diagnose((isa<StructDecl>(decl) || isa<ExtensionDecl>(decl))
+                     ? diag::inheritance_from_non_protocol
+                     : diag::inheritance_from_non_protocol_or_class,
+                   inheritedTy);
     // FIXME: Note pointing to the declaration 'inheritedTy' references?
-    inherited.setInvalidType(Context);
   }
+}
+
+/// Check the inheritance clauses generic parameters along with any
+/// requirements stored within the generic parameter list.
+static void checkGenericParams(GenericParamList *genericParams,
+                               DeclContext *owningDC) {
+  if (!genericParams)
+    return;
+
+  for (auto gp : *genericParams) {
+    checkInheritanceClause(gp);
+  }
+
+  // Force visitation of each of the requirements here.
+  RequirementRequest::visitRequirements(WhereClauseOwner(owningDC,
+                                                         genericParams),
+                                        TypeResolutionStage::Interface,
+                                        [](Requirement, RequirementRepr *) {
+                                          return false;
+                                        });
 }
 
 /// Retrieve the set of protocols the given protocol inherits.
@@ -683,12 +663,6 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
                                         /*allowConcreteGenericParams=*/true,
                                         /*ext=*/nullptr);
     parentSig = parentEnv->getGenericSignature();
-
-    // Compute the final set of archetypes.
-    revertGenericParamList(genericParams);
-    GenericTypeToArchetypeResolver archetypeResolver(parentEnv);
-    checkGenericParamList(nullptr, genericParams, parentSig,
-                          &archetypeResolver);
   }
 
   return parentEnv;
@@ -754,7 +728,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   SmallVector<ValueDecl *, 4> otherDefinitions;
   if (currentDC->isTypeContext()) {
     // Look within a type context.
-    if (auto nominal = currentDC->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    if (auto nominal = currentDC->getSelfNominalTypeDecl()) {
       auto found = nominal->lookupDirect(current->getBaseName());
       otherDefinitions.append(found.begin(), found.end());
       if (tracker)
@@ -1013,8 +987,7 @@ static void validatePatternBindingEntry(TypeChecker &tc,
   auto StaticSpelling = binding->getStaticSpelling();
   if (StaticSpelling != StaticSpellingKind::None &&
       binding->getDeclContext()->isExtensionContext()) {
-    if (auto *NTD = binding->getDeclContext()
-        ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    if (auto *NTD = binding->getDeclContext()->getSelfNominalTypeDecl()) {
       if (!isa<ClassDecl>(NTD)) {
         if (StaticSpelling == StaticSpellingKind::KeywordClass) {
           tc.diagnose(binding, diag::class_var_not_in_class, false)
@@ -1118,7 +1091,7 @@ enum class ImplicitlyFinalReason : unsigned {
 
 static void inferFinalAndDiagnoseIfNeeded(TypeChecker &TC, ValueDecl *D,
                                           StaticSpellingKind staticSpelling) {
-  auto cls = D->getDeclContext()->getAsClassOrClassExtensionContext();
+  auto cls = D->getDeclContext()->getSelfClassDecl();
   if (!cls)
     return;
 
@@ -1154,36 +1127,13 @@ static void inferFinalAndDiagnoseIfNeeded(TypeChecker &TC, ValueDecl *D,
   makeFinal(TC.Context, D);
 }
 
-/// Configure the implicit 'self' parameter of a function, setting its type,
-/// pattern, etc.
-///
-/// \param func The function whose 'self' is being configured.
-static void configureImplicitSelf(TypeChecker &tc,
-                                  AbstractFunctionDecl *func) {
-  auto selfDecl = func->getImplicitSelfDecl();
-
-  // Compute the type of self.
-  auto selfParam = computeSelfParam(func, /*isInitializingCtor*/true,
-                                    /*wantDynamicSelf*/true);
-  assert(selfDecl && selfParam.getPlainType() && "Not a method");
-
-  // 'self' is 'let' for reference types (i.e., classes) or when 'self' is
-  // neither inout.
-  auto specifier = selfParam.getParameterFlags().isInOut()
-                       ? VarDecl::Specifier::InOut
-                       : VarDecl::Specifier::Default;
-  selfDecl->setSpecifier(specifier);
-
-  selfDecl->setInterfaceType(selfParam.getPlainType());
-}
-
 /// Try to make the given declaration 'dynamic', checking any semantic
 /// constraints before doing so.
 ///
 /// \returns true if it can be made dynamic, false otherwise.
 static bool makeDynamic(ValueDecl *decl) {
   // Only  members of classes can be dynamic.
-  auto classDecl = decl->getDeclContext()->getAsClassOrClassExtensionContext();
+  auto classDecl = decl->getDeclContext()->getSelfClassDecl();
   if (!classDecl) {
     auto attr = decl->getAttrs().getAttribute<DynamicAttr>();
     decl->diagnose(diag::dynamic_not_in_class)
@@ -1209,13 +1159,14 @@ static bool makeDynamic(ValueDecl *decl) {
   return true;
 }
 
-bool IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
+llvm::Expected<bool>
+IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // If we can't infer dynamic here, don't.
   if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, decl))
     return false;
 
   // If 'dynamic' was explicitly specified, check it.
-  if (auto dynamicAttr = decl->getAttrs().getAttribute<DynamicAttr>()) {
+  if (decl->getAttrs().hasAttribute<DynamicAttr>()) {
     return makeDynamic(decl);
   }
 
@@ -1224,11 +1175,18 @@ bool IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
     switch (accessor->getAccessorKind()) {
     case AccessorKind::Get:
-    case AccessorKind::Set:
-      if (evaluator(IsDynamicRequest{accessor->getStorage()}))
+    case AccessorKind::Set: {
+      auto isDynamicResult = evaluator(
+        IsDynamicRequest{accessor->getStorage()});
+
+      if (!isDynamicResult)
+        return isDynamicResult;
+
+      if (*isDynamicResult)
         return makeDynamic(decl);
 
       return false;
+    }
 
 #define OBJC_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
@@ -1260,7 +1218,7 @@ bool IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // @objc declarations in class extensions are implicitly dynamic.
   // This is intended to enable overriding the declarations.
   auto dc = decl->getDeclContext();
-  if (isa<ExtensionDecl>(dc) && dc->getAsClassOrClassExtensionContext()) {
+  if (isa<ExtensionDecl>(dc) && dc->getSelfClassDecl()) {
     return makeDynamic(decl);
   }
 
@@ -1269,7 +1227,9 @@ bool IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // Don't do this if the declaration is not exposed to Objective-C; that's
   // currently the (only) manner in which one can make an override of a
   // dynamic declaration non-dynamic.
-  for (auto overridden : evaluator(OverriddenDeclsRequest{decl})) {
+  auto overriddenDecls = evaluateOrDefault(evaluator,
+    OverriddenDeclsRequest{decl}, {});
+  for (auto overridden : overriddenDecls) {
     if (overridden->isDynamic())
       return makeDynamic(decl);
 
@@ -1698,13 +1658,13 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
         //   static func initStorage(_: Value) -> Storage
         // for parameterized initialization.
         auto expectedDefaultInitStorageTy =
-          FunctionType::get(TC.Context.TheEmptyTupleType, storageTy);
+          FunctionType::get({}, storageTy);
         Type valueTy = DependentMemberType::get(
                                           behaviorProto->getSelfInterfaceType(),
                                           valueReqt);
         
         auto expectedParameterizedInitStorageTy =
-          FunctionType::get(valueTy, storageTy);
+          FunctionType::get({FunctionType::Param(valueTy)}, storageTy);
 
         auto lookup = TC.lookupMember(dc, behaviorProtoTy,
                                       TC.Context.Id_initStorage);
@@ -2222,7 +2182,7 @@ static bool computeIsSetterMutating(TypeChecker &TC,
     if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify) {
       auto modifyAccessor = storage->getModifyCoroutine();
       auto modifyResult = validateAccessorIsMutating(TC, modifyAccessor);
-      if (result != modifyResult) {
+      if ((result || storage->isGetterMutating()) != modifyResult) {
         TC.diagnose(modifyAccessor,
                     diag::modify_mutatingness_differs_from_setter,
                     modifyResult);
@@ -2266,6 +2226,31 @@ static void finalizeAbstractStorageDecl(TypeChecker &TC,
     // Are there accessors we can safely ignore here, like maybe observers?
     TC.validateDecl(accessor);
   }
+}
+
+/// Check the requirements in the where clause of the given \c source
+/// to ensure that they don't introduce additional 'Self' requirements.
+static void checkProtocolSelfRequirements(ProtocolDecl *proto,
+                                          TypeDecl *source) {
+  RequirementRequest::visitRequirements(source, TypeResolutionStage::Interface,
+      [&](const Requirement &req, RequirementRepr *reqRepr) {
+        switch (req.getKind()) {
+        case RequirementKind::Conformance:
+        case RequirementKind::Layout:
+        case RequirementKind::Superclass:
+          if (reqRepr &&
+              req.getFirstType()->isEqual(proto->getProtocolSelfType())) {
+            auto &diags = proto->getASTContext().Diags;
+            diags.diagnose(reqRepr->getSubjectLoc().getLoc(),
+                           diag::protocol_where_clause_self_requirement);
+          }
+
+          return false;
+
+        case RequirementKind::SameType:
+          return false;
+        }
+      });
 }
 
 namespace {
@@ -2390,12 +2375,12 @@ public:
 
         // Stored type variables in a generic context need to logically
         // occur once per instantiation, which we don't yet handle.
-        } else if (DC->getAsProtocolExtensionContext()) {
+        } else if (DC->getExtendedProtocolDecl()) {
           unimplementedStatic(ProtocolExtensions);
         } else if (DC->isGenericContext()
                && !DC->getGenericSignatureOfContext()->areAllParamsConcrete()) {
           unimplementedStatic(GenericTypes);
-        } else if (DC->getAsClassOrClassExtensionContext()) {
+        } else if (DC->getSelfClassDecl()) {
           auto StaticSpelling = PBD->getStaticSpelling();
           if (StaticSpelling != StaticSpellingKind::KeywordStatic)
             unimplementedStatic(Classes);
@@ -2516,45 +2501,61 @@ public:
         if (!var->hasStorage())
           return;
 
+        if (var->isInvalid() || PBD->isInvalid())
+          return;
+
         auto *varDC = var->getDeclContext();
+
+        auto markVarAndPBDInvalid = [PBD, var] {
+          PBD->setInvalid();
+          var->setInvalid();
+          if (!var->hasType())
+            var->markInvalid();
+        };
 
         // Non-member observing properties need an initializer.
         if (var->getWriteImpl() == WriteImplKind::StoredWithObservers &&
-            !isTypeContext && !var->isInvalid() && !PBD->isInvalid()) {
+            !isTypeContext) {
           TC.diagnose(var->getLoc(), diag::observingprop_requires_initializer);
-          PBD->setInvalid();
-          var->setInvalid();
-          if (!var->hasType()) {
-            var->markInvalid();
-          }
+          markVarAndPBDInvalid();
           return;
         }
 
         // Static/class declarations require an initializer unless in a
         // protocol.
-        if (var->isStatic() && !isa<ProtocolDecl>(varDC) &&
-            !var->isInvalid() && !PBD->isInvalid()) {
+        if (var->isStatic() && !isa<ProtocolDecl>(varDC)) {
+          // ...but don't enforce this for SIL or textual interface files.
+          switch (varDC->getParentSourceFile()->Kind) {
+          case SourceFileKind::Interface:
+          case SourceFileKind::SIL:
+            return;
+          case SourceFileKind::Main:
+          case SourceFileKind::REPL:
+          case SourceFileKind::Library:
+            break;
+          }
+
           TC.diagnose(var->getLoc(), diag::static_requires_initializer,
                       var->getCorrectStaticSpelling());
-          PBD->setInvalid();
-          var->setInvalid();
-          if (!var->hasType()) {
-            var->markInvalid();
-          }
+          markVarAndPBDInvalid();
           return;
         }
 
-        // Global variables require an initializer (except in top level code).
-        if (varDC->isModuleScopeContext() &&
-            !varDC->getParentSourceFile()->isScriptMode() &&
-            !var->isInvalid() && !PBD->isInvalid()) {
-          TC.diagnose(var->getLoc(),
-                      diag::global_requires_initializer, var->isLet());
-          PBD->setInvalid();
-          var->setInvalid();
-          if (!var->hasType()) {
-            var->markInvalid();
+        // Global variables require an initializer in normal source files.
+        if (varDC->isModuleScopeContext()) {
+          switch (varDC->getParentSourceFile()->Kind) {
+          case SourceFileKind::Main:
+          case SourceFileKind::REPL:
+          case SourceFileKind::Interface:
+          case SourceFileKind::SIL:
+            return;
+          case SourceFileKind::Library:
+            break;
           }
+
+          TC.diagnose(var->getLoc(), diag::global_requires_initializer,
+                      var->isLet());
+          markVarAndPBDInvalid();
           return;
         }
       });
@@ -2577,6 +2578,7 @@ public:
 
     if (!SD->isInvalid()) {
       TC.checkReferencedGenericParams(SD);
+      checkGenericParams(SD->getGenericParams(), SD);
       TC.checkProtocolSelfRequirements(SD);
     }
 
@@ -2616,9 +2618,11 @@ public:
     TC.validateDecl(AT);
     TC.checkDeclAttributes(AT);
 
-    TC.checkInheritanceClause(AT);
-
+    checkInheritanceClause(AT);
     auto *proto = AT->getProtocol();
+
+    checkProtocolSelfRequirements(proto, AT);
+
     if (proto->isObjC()) {
       TC.diagnose(AT->getLoc(),
                   diag::associated_type_objc,
@@ -2648,8 +2652,8 @@ public:
     // We don't support nested types in generics yet.
     if (NTD->isGenericContext()) {
       auto DC = NTD->getDeclContext();
-      if (auto proto = DC->getAsProtocolOrProtocolExtensionContext()) {
-        if (DC->getAsProtocolExtensionContext()) {
+      if (auto proto = DC->getSelfProtocolDecl()) {
+        if (DC->getExtendedProtocolDecl()) {
           TC.diagnose(NTD->getLoc(),
                       diag::unsupported_type_nested_in_protocol_extension,
                       NTD->getName(),
@@ -2683,6 +2687,7 @@ public:
 
     checkUnsupportedNestedType(ED);
     TC.validateDecl(ED);
+    checkGenericParams(ED->getGenericParams(), ED);
 
     {
       // Check for circular inheritance of the raw type.
@@ -2697,7 +2702,7 @@ public:
 
     TC.checkDeclAttributes(ED);
 
-    TC.checkInheritanceClause(ED);
+    checkInheritanceClause(ED);
 
     AccessControlChecker::checkAccessControl(TC, ED);
     UsableFromInlineChecker::checkUsableFromInline(TC, ED);
@@ -2720,6 +2725,7 @@ public:
     checkUnsupportedNestedType(SD);
 
     TC.validateDecl(SD);
+    checkGenericParams(SD->getGenericParams(), SD);
 
     TC.addImplicitConstructors(SD);
 
@@ -2728,7 +2734,7 @@ public:
 
     TC.checkDeclAttributes(SD);
 
-    TC.checkInheritanceClause(SD);
+    checkInheritanceClause(SD);
 
     AccessControlChecker::checkAccessControl(TC, SD);
     UsableFromInlineChecker::checkUsableFromInline(TC, SD);
@@ -2848,6 +2854,7 @@ public:
 
     TC.validateDecl(CD);
     TC.requestSuperclassLayout(CD);
+    checkGenericParams(CD->getGenericParams(), CD);
 
     {
       // Check for circular inheritance.
@@ -2960,7 +2967,7 @@ public:
 
     TC.checkDeclAttributes(CD);
 
-    TC.checkInheritanceClause(CD);
+    checkInheritanceClause(CD);
 
     AccessControlChecker::checkAccessControl(TC, CD);
     UsableFromInlineChecker::checkUsableFromInline(TC, CD);
@@ -3004,10 +3011,8 @@ public:
     AccessControlChecker::checkAccessControl(TC, PD);
     UsableFromInlineChecker::checkUsableFromInline(TC, PD);
 
-    TC.checkInheritanceClause(PD);
-
-    GenericTypeToArchetypeResolver resolver(PD);
-    TC.validateWhereClauses(PD, &resolver);
+    checkInheritanceClause(PD);
+    checkProtocolSelfRequirements(PD, PD);
 
     TC.checkDeclCircularity(PD);
     if (PD->isResilient())
@@ -3088,13 +3093,10 @@ public:
   void visitFuncDecl(FuncDecl *FD) {
     TC.validateDecl(FD);
 
-    // We get bogus errors here with generic subscript materializeForSet.
     if (!FD->isInvalid()) {
-      if (!isa<AccessorDecl>(FD) ||
-          !cast<AccessorDecl>(FD)->isMaterializeForSet()) {
-        TC.checkReferencedGenericParams(FD);
-        TC.checkProtocolSelfRequirements(FD);
-      }
+      checkGenericParams(FD->getGenericParams(), FD);
+      TC.checkReferencedGenericParams(FD);
+      TC.checkProtocolSelfRequirements(FD);
     }
 
     AccessControlChecker::checkAccessControl(TC, FD);
@@ -3112,12 +3114,12 @@ public:
       }
     }
 
-    if (FD->hasBody()) {
-      // Record the body.
-      TC.definedFunctions.push_back(FD);
-    } else if (requiresDefinition(FD)) {
+    if (requiresDefinition(FD) && !FD->hasBody()) {
       // Complain if we should have a body.
       TC.diagnose(FD->getLoc(), diag::func_decl_without_brace);
+    } else {
+      // Record the body.
+      TC.definedFunctions.push_back(FD);
     }
   }
 
@@ -3155,7 +3157,8 @@ public:
       }
     }
 
-    TC.checkInheritanceClause(ED);
+    checkInheritanceClause(ED);
+
     if (auto nominal = ED->getExtendedNominal()) {
       TC.validateDecl(nominal);
       if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
@@ -3168,6 +3171,9 @@ public:
           checkEnumRawValues(TC, enumDecl);
       }
     }
+
+    if (auto genericParams = ED->getGenericParams())
+      checkGenericParams(genericParams, ED);
 
     validateAttributes(TC, ED);
 
@@ -3211,7 +3217,7 @@ public:
     // nominal type.
     // FIXME: This is a hack to make sure that the type checker precomputes
     // enough information for later passes that might query conformances.
-    if (auto nominal = ED->getAsNominalTypeOrNominalTypeExtensionContext())
+    if (auto nominal = ED->getSelfNominalTypeDecl())
       (void)nominal->getAllConformances();
   }
 
@@ -3240,6 +3246,7 @@ public:
     TC.validateDecl(CD);
 
     if (!CD->isInvalid()) {
+      checkGenericParams(CD->getGenericParams(), CD);
       TC.checkReferencedGenericParams(CD);
       TC.checkProtocolSelfRequirements(CD);
     }
@@ -3315,8 +3322,7 @@ public:
     }
 
     if (CD->isRequired()) {
-      if (auto nominal = CD->getDeclContext()
-              ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+      if (auto nominal = CD->getDeclContext()->getSelfNominalTypeDecl()) {
         AccessLevel requiredAccess;
         switch (nominal->getFormalAccess()) {
         case AccessLevel::Open:
@@ -3344,20 +3350,18 @@ public:
     AccessControlChecker::checkAccessControl(TC, CD);
     UsableFromInlineChecker::checkUsableFromInline(TC, CD);
 
-    if (CD->hasBody() && !CD->isMemberwiseInitializer()) {
-      TC.definedFunctions.push_back(CD);
-    } else if (requiresDefinition(CD)) {
+    if (requiresDefinition(CD) && !CD->hasBody()) {
       // Complain if we should have a body.
       TC.diagnose(CD->getLoc(), diag::missing_initializer_def);
+    } else {
+      TC.definedFunctions.push_back(CD);
     }
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
     TC.validateDecl(DD);
     TC.checkDeclAttributes(DD);
-
-    if (DD->hasBody())
-      TC.definedFunctions.push_back(DD);
+    TC.definedFunctions.push_back(DD);
   }
 };
 } // end anonymous namespace
@@ -3371,7 +3375,7 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   if (!dc->getParentSourceFile())
     return true;
 
-  NominalTypeDecl *conformingDecl = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+  NominalTypeDecl *conformingDecl = dc->getSelfNominalTypeDecl();
   assert(conformingDecl && "Must have conforming declaration");
 
   // Make sure that any access of the witness through the protocol
@@ -3428,7 +3432,7 @@ static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
   }
 
   if (tc.validateType(typeAlias->getUnderlyingTypeLoc(),
-                      typeAlias, options)) {
+                      TypeResolution::forContextual(typeAlias), options)) {
     typeAlias->setInvalid();
     typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
   }
@@ -3454,7 +3458,7 @@ void bindFuncDeclToOperator(TypeChecker &TC, FuncDecl *FD) {
                      "static ");
 
       FD->setStatic();
-    } else if (auto classDecl = dc->getAsClassOrClassExtensionContext()) {
+    } else if (auto classDecl = dc->getSelfClassDecl()) {
       // For a class, we also need the function or class to be 'final'.
       if (!classDecl->isFinal() && !FD->isFinal() &&
           FD->getStaticSpelling() != StaticSpellingKind::KeywordStatic) {
@@ -3550,41 +3554,44 @@ void bindFuncDeclToOperator(TypeChecker &TC, FuncDecl *FD) {
   FD->setOperatorDecl(op);
 }
 
-void checkMemberOperator(TypeChecker &TC, FuncDecl *FD) {
+bool swift::isMemberOperator(FuncDecl *decl, Type type) {
   // Check that member operators reference the type of 'Self'.
-  if (FD->isInvalid()) return;
+  if (decl->isInvalid())
+    return true;
 
-  auto *DC = FD->getDeclContext();
-  auto selfNominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
-  if (!selfNominal) return;
+  auto *DC = decl->getDeclContext();
+  auto selfNominal = DC->getSelfNominalTypeDecl();
 
   // Check the parameters for a reference to 'Self'.
-  bool isProtocol = isa<ProtocolDecl>(selfNominal);
-  for (auto param : *FD->getParameters()) {
+  bool isProtocol = selfNominal && isa<ProtocolDecl>(selfNominal);
+  for (auto param : *decl->getParameters()) {
     auto paramType = param->getInterfaceType();
     if (!paramType) break;
 
-    // Look through 'inout'.
-    paramType = paramType->getInOutObjectType();
     // Look through a metatype reference, if there is one.
-    if (auto metatypeType = paramType->getAs<AnyMetatypeType>())
-      paramType = metatypeType->getInstanceType();
+    paramType = paramType->getMetatypeInstanceType();
 
-    // Is it the same nominal type?
-    if (paramType->getAnyNominal() == selfNominal) return;
+    auto nominal = paramType->getAnyNominal();
+    if (type.isNull()) {
+      // Is it the same nominal type?
+      if (selfNominal && nominal == selfNominal)
+        return true;
+    } else {
+      // Is it the same nominal type? Or a generic (which may or may not match)?
+      if (paramType->is<GenericTypeParamType>() ||
+          nominal == type->getAnyNominal())
+        return true;
+    }
 
     if (isProtocol) {
       // For a protocol, is it the 'Self' type parameter?
       if (auto genericParam = paramType->getAs<GenericTypeParamType>())
         if (genericParam->isEqual(DC->getSelfInterfaceType()))
-          return;
+          return true;
     }
   }
 
-  // We did not find 'Self'. Complain.
-  TC.diagnose(FD, diag::operator_in_unrelated_type,
-              FD->getDeclContext()->getDeclaredInterfaceType(),
-              isProtocol, FD->getFullName());
+  return false;
 }
 
 bool checkDynamicSelfReturn(FuncDecl *func,
@@ -3643,7 +3650,7 @@ bool checkDynamicSelfReturn(FuncDecl *func) {
     return false;
 
   // 'Self' on a free function is not dynamic 'Self'.
-  if (!func->getDeclContext()->getAsClassOrClassExtensionContext() &&
+  if (!func->getDeclContext()->getSelfClassDecl() &&
       !isa<ProtocolDecl>(func->getDeclContext()))
     return false;
 
@@ -3691,20 +3698,6 @@ Type buildAddressorResultType(TypeChecker &TC,
     TupleTypeElt elts[] = {
       pointerType,
       TC.Context.TheNativeObjectType
-    };
-    return TupleType::get(elts, TC.Context);
-  }
-
-  // For native pinning addressors, the return type is actually
-  //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject?)
-  case AddressorKind::NativePinning: {
-    Type pinTokenType =
-      TC.getOptionalType(addressor->getLoc(), TC.Context.TheNativeObjectType);
-    if (!pinTokenType) return Type();
-
-    TupleTypeElt elts[] = {
-      pointerType,
-      pinTokenType
     };
     return TupleType::get(elts, TC.Context);
   }
@@ -3810,7 +3803,11 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // Check the default definition, if there is one.
     TypeLoc &defaultDefinition = assocType->getDefaultDefinitionLoc();
     if (!defaultDefinition.isNull()) {
-      if (validateType(defaultDefinition, assocType->getDeclContext())) {
+      if (validateType(
+            defaultDefinition,
+            TypeResolution::forContextual(
+              assocType->getDeclContext()),
+            None)) {
         defaultDefinition.setInvalidType(Context);
       } else {
         // associatedtype X = X is invalid
@@ -3927,8 +3924,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       }
     }
 
-    resolveTrailingWhereClause(proto);
-
     validateAttributes(*this, D);
 
     // FIXME: IRGen likes to emit @objc protocol descriptors even if the
@@ -4003,8 +3998,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     validateAttributes(*this, VD);
 
     // Properties need some special validation logic.
-    if (auto *nominalDecl = VD->getDeclContext()
-            ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    if (auto *nominalDecl = VD->getDeclContext()->getSelfNominalTypeDecl()) {
       // If this variable is a class member, mark it final if the
       // class is final, or if it was declared with 'let'.
       auto staticSpelling =
@@ -4057,8 +4051,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     auto StaticSpelling = FD->getStaticSpelling();
     if (StaticSpelling != StaticSpellingKind::None &&
         FD->getDeclContext()->isExtensionContext()) {
-      if (auto *NTD = FD->getDeclContext()
-              ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+      if (auto *NTD = FD->getDeclContext()->getSelfNominalTypeDecl()) {
         if (!isa<ClassDecl>(NTD)) {
           if (StaticSpelling == StaticSpellingKind::KeywordClass) {
             diagnose(FD, diag::class_func_not_in_class, false)
@@ -4127,7 +4120,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       case AccessorKind::WillSet:
         // Make sure that observing accessors are marked final if in a class.
         if (!accessor->isFinal() &&
-            accessor->getDeclContext()->getAsClassOrClassExtensionContext()) {
+            accessor->getDeclContext()->getSelfClassDecl()) {
           makeFinal(Context, accessor);
         }
         LLVM_FALLTHROUGH;
@@ -4150,16 +4143,11 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
       // These don't mention the value type directly.
       // If we add yield types to the function type, we'll need to update this.
-      case AccessorKind::MaterializeForSet:
       case AccessorKind::Read:
       case AccessorKind::Modify:
         break;
       }
     }
-
-    // Before anything else, set up the 'self' argument correctly if present.
-    if (FD->getDeclContext()->isTypeContext())
-      configureImplicitSelf(*this, FD);
 
     // If we have generic parameters, check the generic signature now.
     if (FD->getGenericParams() || !isa<AccessorDecl>(FD)) {
@@ -4192,8 +4180,14 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Member functions need some special validation logic.
     if (FD->getDeclContext()->isTypeContext()) {
-      if (FD->isOperator())
-        checkMemberOperator(*this, FD);
+      if (FD->isOperator() && !isMemberOperator(FD, nullptr)) {
+        auto selfNominal = FD->getDeclContext()->getSelfNominalTypeDecl();
+        auto isProtocol = selfNominal && isa<ProtocolDecl>(selfNominal);
+        // We did not find 'Self'. Complain.
+        diagnose(FD, diag::operator_in_unrelated_type,
+                 FD->getDeclContext()->getDeclaredInterfaceType(), isProtocol,
+                 FD->getFullName());
+      }
 
       auto accessor = dyn_cast<AccessorDecl>(FD);
 
@@ -4282,12 +4276,10 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         diagnose(CD->getLoc(), diag::designated_init_in_extension, extType)
           .fixItInsert(CD->getLoc(), "convenience ");
         CD->setInitKind(CtorInitializerKind::Convenience);
-      } else if (CD->getDeclContext()->getAsProtocolExtensionContext()) {
+      } else if (CD->getDeclContext()->getExtendedProtocolDecl()) {
         CD->setInitKind(CtorInitializerKind::Convenience);
       }
     }
-
-    configureImplicitSelf(*this, CD);
 
     validateGenericFuncSignature(CD);
 
@@ -4315,8 +4307,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     if (auto enclosingClass = dyn_cast<ClassDecl>(DD->getDeclContext()))
       DD->copyFormalAccessFrom(enclosingClass, /*sourceIsParentContext*/true);
-
-    configureImplicitSelf(*this, DD);
 
     validateGenericFuncSignature(DD);
 
@@ -4367,10 +4357,11 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     DeclValidationRAII IBV(EED);
 
     if (auto *PL = EED->getParameterList()) {
-      CompleteGenericTypeResolver resolver(*this, ED->getGenericSignature());
-
-      typeCheckParameterList(PL, EED->getParentEnum(),
-                             TypeResolverContext::EnumElementDecl, resolver);
+      typeCheckParameterList(PL,
+                             TypeResolution::forInterface(
+                                                    EED->getParentEnum(),
+                                                    ED->getGenericSignature()),
+                             TypeResolverContext::EnumElementDecl);
       checkDefaultArguments(PL, EED);
     }
 
@@ -4435,8 +4426,6 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
 
     (void) proto->getFormalAccess();
 
-    resolveTrailingWhereClause(proto);
-
     for (auto ATD : proto->getAssociatedTypeMembers()) {
       validateDeclForNameLookup(ATD);
     }
@@ -4475,10 +4464,9 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
         auto helper = [&] {
           (void) typealias->getFormalAccess();
 
-          ProtocolRequirementTypeResolver resolver;
           TypeResolutionOptions options(TypeResolverContext::TypeAliasDecl);
           if (validateType(typealias->getUnderlyingTypeLoc(),
-                           typealias, options, &resolver)) {
+                           TypeResolution::forStructural(typealias), options)) {
             typealias->setInvalid();
             typealias->getUnderlyingTypeLoc().setInvalidType(Context);
           }
@@ -4553,7 +4541,7 @@ void TypeChecker::requestMemberLayout(ValueDecl *member) {
     requestNominalLayout(protocolDecl);
 
   if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    if (ext->getAsClassOrClassExtensionContext()) {
+    if (ext->getSelfClassDecl()) {
       // Finalize members of class extensions, to ensure we compute their
       // @objc and dynamic state.
       DeclsToFinalize.insert(member);
@@ -4842,7 +4830,8 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
       GenericSignatureBuilder::FloatingRequirementSource::forInferred(nullptr);
 
     builder.inferRequirements(*ext->getModuleContext(),
-                              TypeLoc::withoutLoc(extInterfaceType),
+                              extInterfaceType,
+                              nullptr,
                               source);
   };
 
@@ -4852,16 +4841,6 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
                                          /*allowConcreteGenericParams=*/true,
                                          ext, inferExtendedTypeReqs,
                                          mustInferRequirements);
-
-  // Validate the generic parameters for the last time, to splat down
-  // actual archetypes.
-  visitOuterToInner(genericParams, [&](GenericParamList *gpList) {
-    tc.revertGenericParamList(gpList);
-  });
-  GenericTypeToArchetypeResolver archetypeResolver(env);
-  visitOuterToInner(genericParams, [&](GenericParamList *gpList) {
-    tc.checkGenericParamList(nullptr, gpList, nullptr, &archetypeResolver);
-  });
 
   Type extContextType =
     env->mapTypeIntoContext(extInterfaceType);
@@ -5121,6 +5100,19 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
 }
 
 void TypeChecker::maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
+  if (auto *SF = classDecl->getParentSourceFile()) {
+    // Allow classes without initializers in SIL and textual interface files.
+    switch (SF->Kind) {
+    case SourceFileKind::SIL:
+    case SourceFileKind::Interface:
+      return;
+    case SourceFileKind::Library:
+    case SourceFileKind::Main:
+    case SourceFileKind::REPL:
+      break;
+    }
+  }
+
   // Some heuristics to skip emitting a diagnostic if the class is already
   // irreperably busted.
   if (classDecl->isInvalid() ||
@@ -5244,6 +5236,14 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // Don't add implicit constructors for an invalid declaration
   if (decl->isInvalid())
     return;
+
+  // Don't add implicit constructors in textual interfaces.
+  if (auto *SF = decl->getParentSourceFile()) {
+    if (SF->Kind == SourceFileKind::Interface) {
+      decl->setAddedImplicitInitializers();
+      return;
+    }
+  }
 
   // Bail out if we're validating one of our constructors already; we'll
   // revisit the issue later.
@@ -5676,7 +5676,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
 
   auto checkObjCDeclContext = [](Decl *D) {
     DeclContext *DC = D->getDeclContext();
-    if (DC->getAsClassOrClassExtensionContext())
+    if (DC->getSelfClassDecl())
       return true;
     if (auto *PD = dyn_cast<ProtocolDecl>(DC))
       if (PD->isObjC())
@@ -5691,7 +5691,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
         isa<ProtocolDecl>(D)) {
       /* ok */
     } else if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
-      if (!Ext->getAsClassOrClassExtensionContext())
+      if (!Ext->getSelfClassDecl())
         error = diag::objc_extension_not_class;
     } else if (auto ED = dyn_cast<EnumDecl>(D)) {
       if (ED->isGenericContext())
@@ -5809,7 +5809,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     }
 
     if (auto ext = dyn_cast<ExtensionDecl>(D)) {
-      if (!ext->getAsClassOrClassExtensionContext())
+      if (!ext->getSelfClassDecl())
         error = diag::invalid_nonobjc_extension;
     }
 

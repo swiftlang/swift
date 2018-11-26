@@ -19,6 +19,7 @@
 #include "ConstraintSystem.h"
 #include "TypeChecker.h"
 #include "TypeCheckObjC.h"
+#include "TypeCheckType.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
@@ -35,17 +36,47 @@ using namespace swift;
 
 const bool IsImplicit = true;
 
+static  SynthesizedFunction::Kind
+getSynthKindForAccessorKind(AccessorKind kind) {
+  switch (kind) {
+  case AccessorKind::Read:
+    return SynthesizedFunction::ReadCoroutine;
+
+  case AccessorKind::Modify:
+    return SynthesizedFunction::ModifyCoroutine;
+
+  case AccessorKind::Get:
+    return SynthesizedFunction::Getter;
+
+  case AccessorKind::Set:
+    return SynthesizedFunction::Setter;
+
+#define OPAQUE_ACCESSOR(ID, KEYWORD)
+#define ACCESSOR(ID) \
+  case AccessorKind::ID:
+#include "swift/AST/AccessorKinds.def"
+    llvm_unreachable("unexpected synthesized accessor");
+  }
+  llvm_unreachable("bad kind");
+}
+
 /// Should a particular accessor for the given storage be synthesized
 /// on-demand, or is it always defined eagerly in the file that declared
 /// the storage?
 static bool isOnDemandAccessor(AbstractStorageDecl *storage,
                                AccessorKind kind) {
-  assert(kind == AccessorKind::Get || kind == AccessorKind::Set);
+  assert(kind == AccessorKind::Get ||
+         kind == AccessorKind::Set ||
+         kind == AccessorKind::Read ||
+         kind == AccessorKind::Modify);
+
+  // If the accessor isn't in the inherent opaque-accessor set of the
+  // declaration, it's on-demand.
+  if (!storage->requiresOpaqueAccessor(kind))
+    return true;
 
   // Currently this only applies to imported declarations because we
-  // eagerly create accessors for all other member storage (except
-  // sometimes materializeForSet, but materializeForSet never needs a
-  // definition in the AST).
+  // eagerly create accessors for all other member storage.
   //
   // Note that we can't just use hasClangNode() because the importer
   // sometimes synthesizes things that lack clang nodes.
@@ -109,6 +140,17 @@ buildIndexForwardingParamList(AbstractStorageDecl *storage,
   auto indices = subscript->getIndices()->clone(context,
                                                 ParameterList::Implicit|
                                                 ParameterList::WithoutTypes);
+
+  // Give all of the parameters meaningless names so that we can forward
+  // them properly.  If it's declared anonymously, SILGen will think
+  // it's unused.
+  // TODO: use some special DeclBaseName for this?
+  for (auto param : indices->getArray()) {
+    if (!param->hasName())
+      param->setName(context.getIdentifier("anonymous"));
+    assert(param->hasName());
+  }
+
   if (prefix.empty())
     return indices;
   
@@ -130,17 +172,16 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
 
   GenericEnvironment *genericEnvironmentOfLazyAccessor = nullptr;
 
-  // The implicit 'self' argument if in a type context.
   ParamDecl *selfDecl = nullptr;
   if (storage->getDeclContext()->isTypeContext()) {
-    // For lazy properties, steal the 'self' from the initializer context.
     if (storage->getAttrs().hasAttribute<LazyAttr>()) {
       // The getter is considered mutating if it's on a value type.
-      if (!storage->getDeclContext()->getAsClassOrClassExtensionContext() &&
+      if (!storage->getDeclContext()->getSelfClassDecl() &&
           !storage->isStatic()) {
         storage->setIsGetterMutating(true);
       }
 
+      // For lazy properties, steal the 'self' from the initializer context.
       auto *varDecl = cast<VarDecl>(storage);
       auto *bindingDecl = varDecl->getParentPatternBinding();
       auto *bindingInit = cast<PatternBindingInitializer>(
@@ -149,13 +190,9 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
       selfDecl = bindingInit->getImplicitSelfDecl();
       genericEnvironmentOfLazyAccessor =
         bindingInit->getGenericEnvironmentOfContext();
-    } else {
-      selfDecl = ParamDecl::createSelf(loc,
-                                       storage->getDeclContext(),
-                                       /*isStatic*/false);
     }
   }
-    
+
   // Add an index-forwarding clause.
   auto *getterParams = buildIndexForwardingParamList(storage, {});
 
@@ -173,10 +210,16 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
       staticLoc, StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr,
-      selfDecl, getterParams,
+      getterParams,
       TypeLoc::withoutLoc(storageInterfaceType),
       storage->getDeclContext());
   getter->setImplicit();
+
+  // If we're stealing the 'self' from a lazy initializer, set it now.
+  if (selfDecl) {
+    *getter->getImplicitSelfDeclStorage() = selfDecl;
+    selfDecl->setDeclContext(getter);
+  }
 
   // We need to install the generic environment here because:
   // 1) validating the getter will change the implicit self decl's DC to it,
@@ -212,15 +255,6 @@ static AccessorDecl *createSetterPrototype(TypeChecker &TC,
 
   bool isStatic = storage->isStatic();
   bool isMutating = storage->isSetterMutating();
-
-  // The implicit 'self' argument if in a type context.
-  ParamDecl *selfDecl = nullptr;
-  if (storage->getDeclContext()->isTypeContext()) {
-    selfDecl = ParamDecl::createSelf(loc,
-                                     storage->getDeclContext(),
-                                     /*isStatic*/isStatic,
-                                     /*isInOut*/isMutating);
-  }
   
   // Add a "(value : T, indices...)" argument list.
   auto storageInterfaceType = storage->getValueInterfaceType();
@@ -235,7 +269,7 @@ static AccessorDecl *createSetterPrototype(TypeChecker &TC,
       AccessorKind::Set, AddressorKind::NotAddressor, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, selfDecl, params,
+      /*GenericParams=*/nullptr, params,
       TypeLoc::withoutLoc(setterRetTy),
       storage->getDeclContext());
   setter->setImplicit();
@@ -255,10 +289,10 @@ static AccessorDecl *createSetterPrototype(TypeChecker &TC,
 }
 
 // True if the storage is dynamic or imported from Objective-C. In these cases,
-// we need to emit a static materializeForSet thunk that dynamically dispatches
+// we need to emit static coroutine accessors that dynamically dispatch
 // to 'get' and 'set', rather than the normal dynamically dispatched
-// materializeForSet that peer dispatches to 'get' and 'set'.
-static bool needsDynamicMaterializeForSet(AbstractStorageDecl *storage) {
+// opaque accessors that peer dispatch to 'get' and 'set'.
+static bool needsDynamicCoroutineAccessors(AbstractStorageDecl *storage) {
   return storage->isDynamic() || storage->hasClangNode();
 }
 
@@ -274,7 +308,7 @@ static bool needsDynamicMaterializeForSet(AbstractStorageDecl *storage) {
 /// interface to the storage and they should not be transparent.
 static void maybeMarkTransparent(TypeChecker &TC, AccessorDecl *accessor) {
   auto *DC = accessor->getDeclContext();
-  auto *nominalDecl = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *nominalDecl = DC->getSelfNominalTypeDecl();
 
   // Global variable accessors are not @_transparent.
   if (!nominalDecl)
@@ -320,103 +354,104 @@ static void finishSynthesis(TypeChecker &TC, FuncDecl *fn) {
 }
 
 static AccessorDecl *
-createMaterializeForSetPrototype(AbstractStorageDecl *storage,
-                                 FuncDecl *getter,
-                                 FuncDecl *setter,
-                                 TypeChecker &TC) {
-  auto &ctx = storage->getASTContext();
+createCoroutineAccessorPrototype(TypeChecker &TC,
+                                 AbstractStorageDecl *storage,
+                                 AccessorKind kind) {
+  assert(kind == AccessorKind::Read || kind == AccessorKind::Modify);
+
+  auto &ctx = TC.Context;
   SourceLoc loc = storage->getLoc();
 
-  //  - The implicit 'self' argument if in a type context.
-  auto DC = storage->getDeclContext();
-  ParamDecl *selfDecl = nullptr;
-  if (DC->isTypeContext())
-    selfDecl = ParamDecl::createSelf(loc, DC, /*isStatic*/false);
+  bool isStatic = storage->isStatic();
+  bool isMutating = storage->isGetterMutating();
+  if (kind == AccessorKind::Modify)
+    isMutating |= storage->isSetterMutating();
 
-  //  - The buffer parameter, (buffer: Builtin.RawPointer,
-  //                           inout storage: Builtin.UnsafeValueBuffer,
-  //                           indices...).
-  ParamDecl *bufferElements[] = {
-      buildArgument(loc, DC, "buffer", ctx.TheRawPointerType,
-                    VarDecl::Specifier::Default),
-      buildArgument(loc, DC, "callbackStorage", ctx.TheUnsafeValueBufferType,
-                    VarDecl::Specifier::InOut)};
-  auto *params = buildIndexForwardingParamList(storage, bufferElements);
+  auto dc = storage->getDeclContext();
 
-  // The accessor returns (temporary: Builtin.RawPointer,
-  //                       callback: Optional<Builtin.RawPointer>),
-  // where the first pointer is the materialized address and the
-  // second is the address of an optional callback.
-  TupleTypeElt retElts[] = {
-    { ctx.TheRawPointerType },
-    { OptionalType::get(ctx.TheRawPointerType) },
-  };
-  Type retTy = TupleType::get(retElts, ctx);
+  // The forwarding index parameters.
+  auto *params = buildIndexForwardingParamList(storage, {});
+
+  // Coroutine accessors always return ().
+  Type retTy = TupleType::getEmpty(ctx);
 
   // Accessors of generic subscripts get a copy of the subscript's
   // generic parameter list, because they're not nested inside the
   // subscript.
   GenericParamList *genericParams = nullptr;
-  if (auto *subscript = dyn_cast<SubscriptDecl>(storage))
+  if (auto *subscript = dyn_cast<SubscriptDecl>(storage)) {
     genericParams = subscript->getGenericParams();
-
-  auto *materializeForSet = AccessorDecl::create(
-      ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(),
-      AccessorKind::MaterializeForSet, AddressorKind::NotAddressor, storage,
-      /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
-      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      (genericParams
-       ? genericParams->clone(DC)
-       : nullptr),
-      selfDecl, params, TypeLoc::withoutLoc(retTy), DC);
-  materializeForSet->setImplicit();
-  
-  // Open-code the setMutating() calculation since we might run before
-  // the setter has been type checked.
-  Type contextTy = DC->getDeclaredInterfaceType();
-  if (contextTy && !contextTy->hasReferenceSemantics()) {
-    bool hasMutatingSetter =
-      !setter->getAttrs().hasAttribute<NonMutatingAttr>() &&
-      storage->isSetterMutating();
-    bool hasMutatingGetter =
-      getter->getAttrs().hasAttribute<MutatingAttr>();
-    if (hasMutatingSetter || hasMutatingGetter)
-      materializeForSet->setSelfAccessKind(SelfAccessKind::Mutating);
+    if (genericParams)
+      genericParams = genericParams->clone(dc);
   }
 
-  materializeForSet->setStatic(storage->isStatic());
+  auto *accessor = AccessorDecl::create(
+      ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(),
+      kind, AddressorKind::NotAddressor, storage,
+      /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      genericParams, params, TypeLoc::withoutLoc(retTy), dc);
+  accessor->setImplicit();
+  
+  if (isMutating)
+    accessor->setSelfAccessKind(SelfAccessKind::Mutating);
 
-  // materializeForSet is final if the storage is.
+  if (isStatic)
+    accessor->setStatic();
+
+  // The accessor is final if the storage is.
   if (storage->isFinal())
-    makeFinal(ctx, materializeForSet);
+    makeFinal(ctx, accessor);
 
   // If the storage is dynamic or ObjC-native, we can't add a dynamically-
-  // dispatched method entry for materializeForSet, so force it to be
+  // dispatched method entry for the accessor, so force it to be
   // statically dispatched. ("final" would be inappropriate because the
   // property can still be overridden.)
-  if (needsDynamicMaterializeForSet(storage))
-    materializeForSet->setForcedStaticDispatch(true);
+  if (needsDynamicCoroutineAccessors(storage))
+    accessor->setForcedStaticDispatch(true);
 
-  // Make sure materializeForSet is available enough to access
+  // Make sure the coroutine is available enough to access
   // the storage (and its getters/setters if it has them).
   SmallVector<const Decl *, 2> asAvailableAs;
   asAvailableAs.push_back(storage);
   if (FuncDecl *getter = storage->getGetter()) {
     asAvailableAs.push_back(getter);
   }
-  if (FuncDecl *setter = storage->getSetter()) {
-    asAvailableAs.push_back(setter);
+  if (kind == AccessorKind::Modify) {
+    if (FuncDecl *setter = storage->getSetter()) {
+      asAvailableAs.push_back(setter);
+    }
   }
 
-  maybeMarkTransparent(TC, materializeForSet);
+  maybeMarkTransparent(TC, accessor);
 
-  AvailabilityInference::applyInferredAvailableAttrs(materializeForSet,
+  AvailabilityInference::applyInferredAvailableAttrs(accessor,
                                                      asAvailableAs, ctx);
 
-  addMemberToContextIfNeeded(materializeForSet, DC, setter);
+  Decl *afterDecl;
+  if (kind == AccessorKind::Read) {
+    // Add the synthesized read coroutine after the getter, if one exists,
+    // or else immediately after the storage.
+    afterDecl = storage->getGetter();
+    if (!afterDecl) afterDecl = storage;
+  } else {
+    // Add the synthesized modify coroutine after the setter.
+    afterDecl = storage->getSetter();
+  }
 
-  finishSynthesis(TC, materializeForSet);
-  return materializeForSet;
+  addMemberToContextIfNeeded(accessor, dc, afterDecl);
+
+  return accessor;
+}
+
+static AccessorDecl *
+createReadCoroutinePrototype(TypeChecker &tc, AbstractStorageDecl *storage) {
+  return createCoroutineAccessorPrototype(tc, storage, AccessorKind::Read);
+}
+
+static AccessorDecl *
+createModifyCoroutinePrototype(TypeChecker &tc, AbstractStorageDecl *storage) {
+  return createCoroutineAccessorPrototype(tc, storage, AccessorKind::Modify);
 }
 
 /// Build an expression that evaluates the specified parameter list as a tuple
@@ -432,13 +467,11 @@ static Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
   SmallVector<Expr *, 4> args;
   
   for (auto param : params) {
-    // We cannot express how to forward variadic parameters yet.
-    if (param->isVariadic())
-      return nullptr;
-    
     Expr *ref = new (ctx) DeclRefExpr(param, DeclNameLoc(), /*implicit*/ true);
     if (param->isInOut())
       ref = new (ctx) InOutExpr(SourceLoc(), ref, Type(), /*isImplicit=*/true);
+    else if (param->isVariadic())
+      ref = new (ctx) VarargExpansionExpr(ref, /*implicit*/ true);
     args.push_back(ref);
     
     labels.push_back(param->getArgumentName());
@@ -466,17 +499,14 @@ static Expr *buildSubscriptIndexReference(ASTContext &ctx,
   auto params = accessor->getParameters()->getArray();
   auto accessorKind = accessor->getAccessorKind();
 
-  // Ignore the value/buffer parameter.
-  if (accessorKind != AccessorKind::Get)
+  // Ignore the value parameter of a setter.
+  if (accessorKind == AccessorKind::Set) {
     params = params.slice(1);
+  }
 
-  // Ignore the materializeForSet callback storage parameter.
-  if (accessorKind == AccessorKind::MaterializeForSet)
-    params = params.slice(1);
-  
   // Okay, everything else should be forwarded, build the expression.
   auto result = buildArgumentForwardingExpr(params, ctx);
-  assert(result && "FIXME: Cannot forward varargs");
+  assert(result && "FIXME: Cannot forward expression");
   return result;
 }
 
@@ -540,6 +570,8 @@ namespace {
   };
 
   enum class TargetImpl {
+    /// We're doing an ordinary storage reference.
+    Ordinary,
     /// We're referencing the physical storage created for the storage.
     Storage,
     /// We're referencing this specific implementation of the storage, not
@@ -561,6 +593,11 @@ static Expr *buildStorageReference(
   AccessSemantics semantics;
   SelfAccessorKind selfAccessKind;
   switch (target) {
+  case TargetImpl::Ordinary:
+    semantics = AccessSemantics::Ordinary;
+    selfAccessKind = SelfAccessorKind::Peer;
+    break;
+
   case TargetImpl::Storage:
     semantics = AccessSemantics::DirectToStorage;
     selfAccessKind = SelfAccessorKind::Peer;
@@ -603,9 +640,6 @@ static Expr *buildStorageReference(
                                  IsImplicit, semantics);
   }
 
-  // This is a potentially polymorphic access, which is unnecessary;
-  // however, it shouldn't be problematic because any overrides
-  // should also redefine materializeForSet.
   return new (ctx) MemberRefExpr(selfDRE, SourceLoc(), storage,
                                  DeclNameLoc(), IsImplicit, semantics);
 }
@@ -856,6 +890,53 @@ static void synthesizeTrivialSetterBody(TypeChecker &TC, AccessorDecl *setter) {
                                          storage);
 }
 
+static void synthesizeCoroutineAccessorBody(TypeChecker &TC,
+                                            AccessorDecl *accessor) {
+  assert(accessor->isCoroutine());
+
+  auto storage = accessor->getStorage();
+  auto target = (accessor->hasForcedStaticDispatch()
+                   ? TargetImpl::Ordinary
+                   : TargetImpl::Implementation);
+
+  SourceLoc loc = storage->getLoc();
+  SmallVector<ASTNode, 1> body;
+
+  // Build a reference to the storage.
+  Expr *ref = buildStorageReference(accessor, storage, target, TC);
+
+  // Wrap it with an `&` marker if this is a modify.
+  if (accessor->getAccessorKind() == AccessorKind::Modify) {
+    ref = new (TC.Context) InOutExpr(SourceLoc(), ref, Type(), true);
+  }
+
+  // Yield it.
+  YieldStmt *yield = YieldStmt::create(TC.Context, loc, loc, ref, loc, true);
+  body.push_back(yield);
+
+  accessor->setBody(BraceStmt::create(TC.Context, loc, body, loc, true));
+
+  finishSynthesis(TC, accessor);
+  maybeMarkTransparent(TC, accessor);
+}
+
+/// Synthesize the body of a read coroutine.
+static void synthesizeReadCoroutineBody(TypeChecker &TC, AccessorDecl *read) {
+  assert(read->getStorage()->getReadImpl() != ReadImplKind::Read);
+  synthesizeCoroutineAccessorBody(TC, read);
+}
+
+/// Synthesize the body of a modify coroutine.
+static void synthesizeModifyCoroutineBody(TypeChecker &TC,
+                                          AccessorDecl *modify) {
+#ifndef NDEBUG
+  auto impl = modify->getStorage()->getReadWriteImpl();
+  assert(impl != ReadWriteImplKind::Modify &&
+         impl != ReadWriteImplKind::Immutable);
+#endif
+  synthesizeCoroutineAccessorBody(TC, modify);
+}
+
 static void addGetterToStorage(TypeChecker &TC, AbstractStorageDecl *storage) {
   auto getter = createGetterPrototype(TC, storage);
 
@@ -870,19 +951,20 @@ static void addSetterToStorage(TypeChecker &TC, AbstractStorageDecl *storage) {
   storage->setSynthesizedSetter(setter);
 }
 
-/// Add a materializeForSet accessor to the given declaration.
-static void addMaterializeForSetToStorage(TypeChecker &TC,
-                                          AbstractStorageDecl *storage) {
-  if (TC.Context.getOptionalDecl() == nullptr) {
-    TC.diagnose(storage->getStartLoc(), diag::optional_intrinsics_not_found);
-    return;
-  }
-
-  auto materializeForSet = createMaterializeForSetPrototype(
-      storage, storage->getGetter(), storage->getSetter(), TC);
+static void addReadCoroutineToStorage(TypeChecker &TC,
+                                      AbstractStorageDecl *storage) {
+  auto read = createReadCoroutinePrototype(TC, storage);
 
   // Install the prototype.
-  storage->setSynthesizedMaterializeForSet(materializeForSet);
+  storage->setSynthesizedReadCoroutine(read);
+}
+
+static void addModifyCoroutineToStorage(TypeChecker &TC,
+                                        AbstractStorageDecl *storage) {
+  auto modify = createModifyCoroutinePrototype(TC, storage);
+
+  // Install the prototype.
+  storage->setSynthesizedModifyCoroutine(modify);
 }
 
 
@@ -896,8 +978,11 @@ static void addOpaqueAccessorToStorage(TypeChecker &TC,
   case AccessorKind::Set:
     return addSetterToStorage(TC, storage);
 
-  case AccessorKind::MaterializeForSet:
-    return addMaterializeForSetToStorage(TC, storage);
+  case AccessorKind::Read:
+    return addReadCoroutineToStorage(TC, storage);
+
+  case AccessorKind::Modify:
+    return addModifyCoroutineToStorage(TC, storage);
 
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
@@ -930,7 +1015,8 @@ static StorageImplInfo getProtocolStorageImpl(AbstractStorageDecl *storage) {
   if (protocol->isObjC()) {
     return StorageImplInfo::getComputed(storage->supportsMutation());
   } else {
-    return StorageImplInfo::getOpaque(storage->supportsMutation());
+    return StorageImplInfo::getOpaque(storage->supportsMutation(),
+                                      storage->getOpaqueReadOwnership());
   }
 }
 
@@ -1009,29 +1095,8 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
     addedAccessor = true;
 
     // Trigger synthesize of the accessor body if it's created on-demand.
-    SynthesizedFunction::Kind synthKind;
-    switch (kind) {
-    case AccessorKind::MaterializeForSet:
-      // No need to do this for materializeForSet, which we always synthesize
-      // in SILGen.
-      return;
-
-    case AccessorKind::Get:
-      synthKind = SynthesizedFunction::Getter;
-      break;
-
-    case AccessorKind::Set:
-      synthKind = SynthesizedFunction::Setter;
-      break;
-
-#define OPAQUE_ACCESSOR(ID, KEYWORD)
-#define ACCESSOR(ID) \
-    case AccessorKind::ID:
-#include "swift/AST/AccessorKinds.def"
-      llvm_unreachable("unexpected synthesized accessor");
-    }
-
     if (isOnDemandAccessor(storage, kind)) {
+      auto synthKind = getSynthKindForAccessorKind(kind);
       triggerSynthesis(*this, storage->getAccessor(kind), synthKind);
     }
   });
@@ -1334,7 +1399,7 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   Storage->setUserAccessible(false);
   // Mark the vardecl to be final, implicit, and private.  In a class, this
   // prevents it from being dynamically dispatched.
-  if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
+  if (VD->getDeclContext()->getSelfClassDecl())
     makeFinal(Context, Storage);
   Storage->setImplicit();
   Storage->setAccess(AccessLevel::Private);
@@ -1357,10 +1422,10 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
     auto InitStorageRef = new (Context) DeclRefExpr(SpecializeInitStorage,
                                                     DeclNameLoc(),
                                                     /*implicit*/ true);
-    auto InitStorageMethodTy = FunctionType::get(Context.TheEmptyTupleType,
-                                                 SubstStorageContextTy);
-    auto InitStorageRefTy = FunctionType::get(SelfTypeRef->getType(),
-                                              InitStorageMethodTy);
+    auto InitStorageMethodTy = FunctionType::get({}, SubstStorageContextTy);
+
+    FunctionType::Param SelfParam(SelfTypeRef->getType());
+    auto InitStorageRefTy = FunctionType::get({SelfParam}, InitStorageMethodTy);
     InitStorageRef->setType(InitStorageRefTy);
 
     auto SelfApply = new (Context) DotSyntaxCallExpr(InitStorageRef,
@@ -1467,26 +1532,20 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   
   // Add the Self type back to the interface and context types.
   if (DC->isTypeContext()) {
+    FunctionType::Param SelfParam(DC->getSelfInterfaceType());
+
     if (DC->isGenericContext()) {
       genericSig = DC->getGenericSignatureOfContext();
       genericEnv = DC->getGenericEnvironmentOfContext();
-      SubstInterfaceTy = GenericFunctionType::get(genericSig,
-                                                  DC->getSelfInterfaceType(),
-                                                  SubstInterfaceTy,
-                                                  AnyFunctionType::ExtInfo());
+      SubstInterfaceTy =
+        GenericFunctionType::get(genericSig, {SelfParam}, SubstInterfaceTy);
     } else {
-      SubstInterfaceTy = FunctionType::get(DC->getSelfInterfaceType(),
-                                           SubstInterfaceTy);
+      SubstInterfaceTy =
+        FunctionType::get({SelfParam}, SubstInterfaceTy);
     }
   }
   
   // Borrow the parameters from the requirement declaration.
-  ParamDecl *SelfDecl = nullptr;
-  if (DC->isTypeContext()) {
-    SelfDecl = ParamDecl::createSelf(SourceLoc(), DC);
-    SelfDecl->setImplicit();
-  }
-
   SmallVector<ParamDecl *, 4> Params;
   SmallVector<Identifier, 4> NameComponents;
   
@@ -1519,7 +1578,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                      DeclName(Context, ParameterBaseName, NameComponents),
                      /*NameLoc=*/SourceLoc(),
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr, SelfDecl, ParamList,
+                     /*GenericParams=*/nullptr, ParamList,
                      TypeLoc::withoutLoc(SubstBodyResultTy), DC);
 
   Parameter->setInterfaceType(SubstInterfaceTy);
@@ -1528,7 +1587,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
 
   // Mark the method to be final, implicit, and private.  In a class, this
   // prevents it from being dynamically dispatched.
-  if (DC->getAsClassOrClassExtensionContext())
+  if (DC->getSelfClassDecl())
     makeFinal(Context, Parameter);
   Parameter->setImplicit();
   Parameter->setAccess(AccessLevel::Private);
@@ -1734,11 +1793,31 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   // prevents it from being dynamically dispatched.  Note that we do this after
   // the accessors are set up, because we don't want the setter for the lazy
   // property to inherit these properties from the storage.
-  if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
+  if (VD->getDeclContext()->getSelfClassDecl())
     makeFinal(Context, Storage);
   Storage->setImplicit();
   Storage->overwriteAccess(AccessLevel::Private);
   Storage->overwriteSetterAccess(AccessLevel::Private);
+}
+
+static bool wouldBeCircularSynthesis(AbstractStorageDecl *storage,
+                                     AccessorKind kind) {
+  switch (kind) {
+  case AccessorKind::Get:
+    return storage->getReadImpl() == ReadImplKind::Get;
+  case AccessorKind::Read:
+    return storage->getReadImpl() == ReadImplKind::Read;
+  case AccessorKind::Set:
+    return storage->getWriteImpl() == WriteImplKind::Set;
+  case AccessorKind::Modify:
+    return storage->getReadWriteImpl() == ReadWriteImplKind::Modify;
+#define OPAQUE_ACCESSOR(ID, KEYWORD)
+#define ACCESSOR(ID) \
+  case AccessorKind::ID:
+#include "swift/AST/AccessorKinds.def"
+    llvm_unreachable("unexpected opaque accessor");
+  }
+  llvm_unreachable("bad kind");
 }
 
 void swift::triggerAccessorSynthesis(TypeChecker &TC,
@@ -1746,39 +1825,34 @@ void swift::triggerAccessorSynthesis(TypeChecker &TC,
   auto VD = dyn_cast<VarDecl>(storage);
 
   // Synthesize accessors for lazy, all checking already been performed.
+  bool lazy = false;
   if (VD && VD->getAttrs().hasAttribute<LazyAttr>() && !VD->isStatic() &&
-      !VD->getGetter()->hasBody())
+      !VD->getGetter()->hasBody()) {
     TC.completeLazyVarImplementation(VD);
-
-  switch (storage->getReadImpl()) {
-  case ReadImplKind::Get:
-    break;
-
-  // Synthesize the getter override for an inherited observed property.
-  case ReadImplKind::Stored:
-  case ReadImplKind::Inherited:
-  case ReadImplKind::Address:
-  case ReadImplKind::Read:
-    if (auto getter = storage->getGetter())
-      triggerSynthesis(TC, getter, SynthesizedFunction::Getter);
-    break;
+    lazy = true;
   }
 
-  switch (storage->getWriteImpl()) {
-  case WriteImplKind::Immutable:
-  case WriteImplKind::Set:
-    break;
+  // Trigger accessor synthesis.
+  storage->visitExpectedOpaqueAccessors([&](AccessorKind kind) {
+    // Ignore 'get' and 'set' for variables that we triggered above.
+    // TODO: just record the lazy-storage link in the AST, don't trigger
+    // in completeLazyVarImplementation, and remove this special case.
+    if (lazy && (kind == AccessorKind::Get || kind == AccessorKind::Set))
+      return;
 
-  // Synthesize the setter for an observed property.
-  case WriteImplKind::Stored:
-  case WriteImplKind::StoredWithObservers:
-  case WriteImplKind::InheritedWithObservers:
-  case WriteImplKind::MutableAddress:
-  case WriteImplKind::Modify:
-    if (auto setter = storage->getSetter())
-      triggerSynthesis(TC, setter, SynthesizedFunction::Setter);
-    break;
-  }
+    // Don't synthesize an accessor if the accessor is supposed to be
+    // the basis of the storage implementation.
+    if (wouldBeCircularSynthesis(storage, kind))
+      return;
+
+    // Don't try to synthesize an accessor that doesn't exist.
+    // TODO: should this be an assertion?
+    auto accessor = storage->getAccessor(kind);
+    if (!accessor)
+      return;
+
+    triggerSynthesis(TC, accessor, getSynthKindForAccessorKind(kind));
+  });
 }
 
 static void maybeAddAccessorsToBehaviorStorage(TypeChecker &TC, VarDecl *var) {
@@ -1836,8 +1910,9 @@ static void maybeAddAccessorsToBehaviorStorage(TypeChecker &TC, VarDecl *var) {
 
     SmallVector<AccessorDecl*, 2> accessors;
     accessors.push_back(getter);
-    if (setter) accessors.push_back(setter);
-    var->setAccessors(StorageImplInfo::getComputed(setter != nullptr),
+    auto isMutable = StorageIsMutable_t(setter != nullptr);
+    if (isMutable) accessors.push_back(setter);
+    var->setAccessors(StorageImplInfo::getComputed(isMutable),
                       SourceLoc(), accessors, SourceLoc());
     
     // Save the conformance and 'value' decl for later type checking.
@@ -1846,7 +1921,8 @@ static void maybeAddAccessorsToBehaviorStorage(TypeChecker &TC, VarDecl *var) {
   };
 
   // Try to resolve the behavior to a protocol.
-  auto behaviorType = TC.resolveType(behavior->ProtocolName, dc, None);
+  auto resolution = TypeResolution::forContextual(dc);
+  auto behaviorType = resolution.resolveType(behavior->ProtocolName, None);
   if (!behaviorType) {
     return makeBehaviorAccessors();
   }
@@ -1994,7 +2070,7 @@ void swift::maybeAddAccessorsToStorage(TypeChecker &TC,
     return;
 
   // NSManaged properties on classes require special handling.
-  } else if (dc->getAsClassOrClassExtensionContext()) {
+  } else if (dc->getSelfClassDecl()) {
     auto var = dyn_cast<VarDecl>(storage);
     if (var && var->getAttrs().hasAttribute<NSManagedAttr>()) {
       convertNSManagedStoredVarToComputed(var, TC);
@@ -2008,10 +2084,10 @@ void swift::maybeAddAccessorsToStorage(TypeChecker &TC,
   }
 
   // Stored properties in SIL mode don't get accessors.
-  // But they might get a materializeForSet.
+  // But we might need to create opaque accessors for them.
   if (auto sourceFile = dc->getParentSourceFile())
     if (sourceFile->Kind == SourceFileKind::SIL) {
-      if (storage->getGetter() && storage->getSetter()) {
+      if (storage->getGetter()) {
         addExpectedOpaqueAccessorsToStorage(TC, storage);
       }
       return;
@@ -2082,9 +2158,12 @@ void TypeChecker::synthesizeFunctionBody(SynthesizedFunction fn) {
     synthesizeSetterBody(*this, cast<AccessorDecl>(fn.getDecl()));
     return;
 
-  case SynthesizedFunction::MaterializeForSet:
-    llvm_unreachable("not used right now?");
-    //synthesizeMaterializeForSetBody(*this, cast<AccessorDecl>(fn.getDecl()));
+  case SynthesizedFunction::ReadCoroutine:
+    synthesizeReadCoroutineBody(*this, cast<AccessorDecl>(fn.getDecl()));
+    return;
+
+  case SynthesizedFunction::ModifyCoroutine:
+    synthesizeModifyCoroutineBody(*this, cast<AccessorDecl>(fn.getDecl()));
     return;
 
   case SynthesizedFunction::LazyGetter:
@@ -2169,14 +2248,11 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   
   // Create the constructor.
   DeclName name(context, DeclBaseName::createConstructor(), paramList);
-  auto *selfParam = ParamDecl::createSelf(Loc, decl,
-                                          /*static*/false, /*inout*/true);
   auto *ctor =
     new (context) ConstructorDecl(name, Loc,
                                   OTK_None, /*FailabilityLoc=*/SourceLoc(),
                                   /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                                  selfParam, paramList,
-                                  nullptr, decl);
+                                  paramList, /*GenericParams=*/nullptr, decl);
 
   // Mark implicit.
   ctor->setImplicit();
@@ -2202,7 +2278,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
 /// Create a stub body that emits a fatal error message.
 static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
   auto unimplementedInitDecl = tc.Context.getUnimplementedInitializerDecl(&tc);
-  auto classDecl = ctor->getDeclContext()->getAsClassOrClassExtensionContext();
+  auto classDecl = ctor->getDeclContext()->getSelfClassDecl();
   if (!unimplementedInitDecl) {
     tc.diagnose(classDecl->getLoc(), diag::missing_unimplemented_init_runtime);
     return;
@@ -2382,7 +2458,7 @@ configureInheritedDesignatedInitAttributes(TypeChecker &tc,
     Decl *parentDecl = classDecl;
     while (parentDecl != nullptr) {
       asAvailableAs.push_back(parentDecl);
-      parentDecl = parentDecl->getDeclContext()->getAsDeclOrDeclExtensionContext();
+      parentDecl = parentDecl->getDeclContext()->getAsDecl();
     }
     AvailabilityInference::applyInferredAvailableAttrs(
         ctor, asAvailableAs, ctx);
@@ -2420,8 +2496,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   // FIXME: Remove this when lookup of initializers becomes restricted to our
   // immediate superclass.
   auto *superclassCtorDecl =
-      superclassCtor->getDeclContext()
-          ->getAsNominalTypeOrNominalTypeExtensionContext();
+      superclassCtor->getDeclContext()->getSelfNominalTypeDecl();
   Type superclassTy = classDecl->getSuperclass();
   NominalTypeDecl *superclassDecl = superclassTy->getAnyNominal();
   if (superclassCtorDecl != superclassDecl) {
@@ -2439,9 +2514,6 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                                              superclassCtor);
 
   // Determine the initializer parameters.
-
-  // Create the 'self' declaration and patterns.
-  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), classDecl);
 
   // Create the initializer parameter patterns.
   OptionSet<ParameterList::CloneFlags> options = ParameterList::Implicit;
@@ -2469,8 +2541,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                               /*FailabilityLoc=*/SourceLoc(),
                               /*Throws=*/superclassCtor->hasThrows(),
                               /*ThrowsLoc=*/SourceLoc(),
-                              selfDecl, bodyParams,
-                              genericParams, classDecl);
+                              bodyParams, genericParams, classDecl);
 
   ctor->setImplicit();
 
@@ -2499,6 +2570,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   assert(kind == DesignatedInitKind::Chaining);
 
   // Reference to super.init.
+  auto *selfDecl = ctor->getImplicitSelfDecl();
   Expr *superRef = new (ctx) SuperRefExpr(selfDecl, SourceLoc(),
                                           /*Implicit=*/true);
   Expr *ctorRef  = new (ctx) UnresolvedDotExpr(superRef, SourceLoc(),
@@ -2507,18 +2579,6 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                                                /*Implicit=*/true);
 
   auto ctorArgs = buildArgumentForwardingExpr(bodyParams->getArray(), ctx);
-
-  // If buildArgumentForwardingExpr failed, then it was because we tried to
-  // forward varargs, which cannot be done yet.
-  // TODO: We should be able to forward varargs!
-  if (!ctorArgs) {
-    tc.diagnose(classDecl->getLoc(),
-                diag::unsupported_synthesize_init_variadic,
-                classDecl->getDeclaredType());
-    tc.diagnose(superclassCtor, diag::variadic_superclass_init_here);
-    createStubBody(tc, ctor);
-    return ctor;
-  }
 
   Expr *superCall =
     CallExpr::create(ctx, ctorRef, ctorArgs,

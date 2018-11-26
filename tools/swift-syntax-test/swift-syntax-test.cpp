@@ -33,7 +33,9 @@
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxData.h"
 #include "swift/Syntax/SyntaxNodes.h"
+#include "llvm/Support/BinaryByteStream.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FileOutputBuffer.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/raw_ostream.h"
@@ -50,7 +52,6 @@ enum class ActionType {
   DeserializeRawTree,
   ParseOnly,
   ParserGen,
-  DumpAllSyntaxTokens,
   EOFPos,
   None
 };
@@ -88,10 +89,6 @@ Action(llvm::cl::desc("Action (required):"),
                    "deserialize-raw-tree",
                    "Parse the JSON file from the serialized raw tree "
                    "to the original"),
-        clEnumValN(ActionType::DumpAllSyntaxTokens,
-                   "dump-all-syntax-tokens",
-                   "Dump the names of all token kinds that shall be included "
-                   "in swiftSyntax"),
         clEnumValN(ActionType::EOFPos,
                    "eof",
                    "Parse the source file, calculate the absolute position"
@@ -152,6 +149,21 @@ static llvm::cl::opt<bool>
 OmitNodeIds("omit-node-ids",
             llvm::cl::desc("If specified, the serialized syntax tree will not "
                            "include the IDs of the serialized nodes."));
+
+static llvm::cl::opt<bool>
+SerializeAsByteTree("serialize-byte-tree",
+                    llvm::cl::desc("If specified the syntax tree will be "
+                                   "serialized in the ByteTree format instead "
+                                   "of JSON."));
+
+static llvm::cl::opt<bool>
+AddByteTreeFields("add-bytetree-fields",
+                  llvm::cl::desc("If specified, further fields will be added "
+                                 "to the syntax tree if it is serialized as a "
+                                 "ByteTree. This is to test forward "
+                                 "compatibility with future versions of "
+                                 "SwiftSyntax that might add more fields to "
+                                 "syntax nodes."));
 
 static llvm::cl::opt<bool>
 IncrementalSerialization("incremental-serialization",
@@ -705,35 +717,62 @@ int doSerializeRawTree(const char *MainExecutablePath,
                        const StringRef InputFile) {
   return parseFile(MainExecutablePath, InputFile,
     [](SourceFile *SF, SyntaxParsingCache *SyntaxCache) -> int {
-    auto SerializeTree = [](llvm::raw_ostream &os, RC<RawSyntax> Root,
-                            SyntaxParsingCache *SyntaxCache) {
-      std::unordered_set<unsigned> ReusedNodeIds;
-      if (options::IncrementalSerialization && SyntaxCache) {
-        ReusedNodeIds = SyntaxCache->getReusedNodeIds();
-      }
-
-      swift::json::Output::UserInfoMap JsonUserInfo;
-      JsonUserInfo[swift::json::OmitNodesUserInfoKey] = &ReusedNodeIds;
-      if (options::OmitNodeIds) {
-        JsonUserInfo[swift::json::DontSerializeNodeIdsUserInfoKey] =
-            (void *)true;
-      }
-      swift::json::Output out(os, JsonUserInfo);
-      out << *Root;
-      os << "\n";
-    };
-
     auto Root = SF->getSyntaxRoot().getRaw();
+    std::unordered_set<unsigned> ReusedNodeIds;
+    if (options::IncrementalSerialization && SyntaxCache) {
+      ReusedNodeIds = SyntaxCache->getReusedNodeIds();
+    }
 
-    if (!options::OutputFilename.empty()) {
-      std::error_code errorCode;
-      llvm::raw_fd_ostream os(options::OutputFilename, errorCode,
-                              llvm::sys::fs::F_None);
-      assert(!errorCode && "Couldn't open output file");
+    if (options::SerializeAsByteTree) {
+      if (options::OutputFilename.empty()) {
+        llvm::errs() << "Cannot serialize syntax tree as ByteTree to stdout\n";
+        return EXIT_FAILURE;
+      }
 
-      SerializeTree(os, Root, SyntaxCache);
+      swift::ExponentialGrowthAppendingBinaryByteStream Stream(
+          llvm::support::endianness::little);
+      Stream.reserve(32 * 1024);
+      std::map<void *, void *> UserInfo;
+      UserInfo[swift::byteTree::UserInfoKeyReusedNodeIds] = &ReusedNodeIds;
+      if (options::AddByteTreeFields) {
+        UserInfo[swift::byteTree::UserInfoKeyAddInvalidFields] = (void *)true;
+      }
+      swift::byteTree::ByteTreeWriter::write(Stream, /*ProtocolVersion=*/1,
+                                             *Root, UserInfo);
+      auto OutputBufferOrError = llvm::FileOutputBuffer::create(
+          options::OutputFilename, Stream.data().size());
+      assert(OutputBufferOrError && "Couldn't open output file");
+      auto &OutputBuffer = OutputBufferOrError.get();
+      memcpy(OutputBuffer->getBufferStart(), Stream.data().data(),
+             Stream.data().size());
+      auto Error = OutputBuffer->commit();
+      (void)Error;
+      assert(!Error && "Unable to write output file");
     } else {
-      SerializeTree(llvm::outs(), Root, SyntaxCache);
+      // Serialize as JSON
+      auto SerializeTree = [&ReusedNodeIds](llvm::raw_ostream &os,
+                                            RC<RawSyntax> Root,
+                                            SyntaxParsingCache *SyntaxCache) {
+        swift::json::Output::UserInfoMap JsonUserInfo;
+        JsonUserInfo[swift::json::OmitNodesUserInfoKey] = &ReusedNodeIds;
+        if (options::OmitNodeIds) {
+          JsonUserInfo[swift::json::DontSerializeNodeIdsUserInfoKey] =
+              (void *)true;
+        }
+        swift::json::Output out(os, JsonUserInfo);
+        out << *Root;
+        os << "\n";
+      };
+
+      if (!options::OutputFilename.empty()) {
+        std::error_code errorCode;
+        llvm::raw_fd_ostream os(options::OutputFilename, errorCode,
+                                llvm::sys::fs::F_None);
+        assert(!errorCode && "Couldn't open output file");
+        SerializeTree(os, Root, SyntaxCache);
+      } else {
+        SerializeTree(llvm::outs(), Root, SyntaxCache);
+      }
     }
     return EXIT_SUCCESS;
   });
@@ -770,31 +809,6 @@ int dumpParserGen(const char *MainExecutablePath, const StringRef InputFile) {
     SF->getSyntaxRoot().print(llvm::outs(), Opts);
     return EXIT_SUCCESS;
   });
-}
-
-void printToken(const StringRef name) {
-  // We don't expect any SIL related tokens on the SwiftSyntax side
-  if (name == "sil_dollar" ||
-      name == "sil_exclamation" ||
-      name == "sil_local_name") {
-    return;
-  }
-
-  // These token kinds are internal only and should not be exposed on the
-  // SwiftSyntax side
-  if (name == "code_complete" ||
-      name == "comment" ||
-      name == "eof") {
-    return;
-  }
-  llvm::outs() << name << '\n';
-}
-
-int dumpAllSyntaxTokens() {
-  #define TOKEN(KW) printToken(#KW);
-  #define SIL_KEYWORD(KW)
-  #include "swift/Syntax/TokenKinds.def"
-  return EXIT_SUCCESS;
 }
 
 int dumpEOFSourceLoc(const char *MainExecutablePath,
@@ -848,9 +862,6 @@ int invokeCommand(const char *MainExecutablePath,
     case ActionType::ParserGen:
       ExitCode = dumpParserGen(MainExecutablePath, InputSourceFilename);
       break;
-    case ActionType::DumpAllSyntaxTokens:
-      ExitCode = dumpAllSyntaxTokens();
-      break;
     case ActionType::EOFPos:
       ExitCode = dumpEOFSourceLoc(MainExecutablePath, InputSourceFilename);
       break;
@@ -869,13 +880,7 @@ int main(int argc, char *argv[]) {
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Syntax Test\n");
 
   int ExitCode = EXIT_SUCCESS;
-
-  if (options::Action == ActionType::DumpAllSyntaxTokens) {
-    // DumpAllSyntaxTokens doesn't require an input file. Hande it before we 
-    // reach input file handling
-    return dumpAllSyntaxTokens();
-  }
-
+  
   if (options::InputSourceFilename.empty() &&
       options::InputSourceDirectory.empty()) {
     llvm::errs() << "input source file is required\n";

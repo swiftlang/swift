@@ -143,6 +143,17 @@ LOGMEMORY: ,{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}}
 LOGVERBOSE-LABEL: Running AngryPhonebook for 2 samples.
 ````
 
+Verify the specified delimiter is used when logging to console. The non-verbose
+variant of this invocation is used from [`Benchmark_Driver`][BD] to get the list
+of all tests. That's why it is *crucial* to tests this integration point.
+
+````
+RUN: %Benchmark_O --list --skip-tags= --delim=$'\t' --verbose \
+RUN:              | %FileCheck %s --check-prefix LOGVERBOSEDELIM
+LOGVERBOSEDELIM: Delimiter: "\t"
+LOGVERBOSEDELIM: #	Test	[Tags]
+````
+
 ## Error Handling
 
 ````

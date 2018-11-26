@@ -79,13 +79,6 @@ struct _BridgeStorage<
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
-  public // @testable
-  mutating func isUniquelyReferencedOrPinnedNative() -> Bool {
-    return _isUniqueOrPinned(&rawValue)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
   public // @testable
   var isNative: Bool {
     @inline(__always) get {
@@ -137,14 +130,6 @@ struct _BridgeStorage<
   mutating func isUniquelyReferenced_native_noSpareBits() -> Bool {
     _sanityCheck(isNative)
     return _isUnique_native(&rawValue)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
-  public // @testable
-  mutating func isUniquelyReferencedOrPinned_native_noSpareBits() -> Bool {
-    _sanityCheck(isNative)
-    return _isUniqueOrPinned_native(&rawValue)
   }
 
   @inlinable // FIXME(sil-serialize-all)

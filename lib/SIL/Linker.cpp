@@ -157,23 +157,26 @@ void SILLinkerVisitor::linkInVTable(ClassDecl *D) {
 //                                  Visitors
 //===----------------------------------------------------------------------===//
 
+static template<typename Inst>
+bool applyInstCalleeIsGeneric(Inst AI) {
+  return AI->getCallee()->getType().template castTo<SILFunctionType>()
+           ->getGenericSignature();
+}
+
 void SILLinkerVisitor::visitApplyInst(ApplyInst *AI) {
-  if (auto sig = AI->getCallee()->getType().castTo<SILFunctionType>()
-                   ->getGenericSignature()) {
+  if (applyInstCalleeIsGeneric(AI)) {
     visitApplySubstitutions(AI->getSubstitutionMap());
   }
 }
 
 void SILLinkerVisitor::visitTryApplyInst(TryApplyInst *TAI) {
-  if (auto sig = TAI->getCallee()->getType().castTo<SILFunctionType>()
-                   ->getGenericSignature()) {
+  if (applyInstCalleeIsGeneric(TAI)) {
     visitApplySubstitutions(TAI->getSubstitutionMap());
   }
 }
 
 void SILLinkerVisitor::visitPartialApplyInst(PartialApplyInst *PAI) {
-  if (auto sig = PAI->getCallee()->getType().castTo<SILFunctionType>()
-                    ->getGenericSignature()) {
+  if (applyInstCalleeIsGeneric(PAI)) {
     visitApplySubstitutions(PAI->getSubstitutionMap());
   }
 }
@@ -288,30 +291,16 @@ void SILLinkerVisitor::visitProtocolConformance(
 }
 
 void SILLinkerVisitor::visitApplySubstitutions(SubstitutionMap subs) {
-  for (auto &reqt : subs.getGenericSignature()->getRequirements()) {
-    switch (reqt.getKind()) {
-    case RequirementKind::Conformance: {
-      auto conformance = subs.lookupConformance(
-          reqt.getFirstType()->getCanonicalType(),
-          cast<ProtocolDecl>(reqt.getSecondType()->getAnyNominal()))
-        .getValue();
-      
-      // Formally all conformances referenced in a function application are
-      // used. However, eagerly visiting them all at this point leads to a
-      // large blowup in the amount of SIL we read in, and we aren't very
-      // systematic about laziness. For optimization purposes we can defer
-      // reading in most conformances until we need them for devirtualization.
-      // However, we *must* pull in shared clang-importer-derived conformances
-      // we potentially use, since we may not otherwise have a local definition.
-      if (mustDeserializeProtocolConformance(Mod, conformance)) {
-        visitProtocolConformance(conformance, None);
-      }
-      break;
-    }
-    case RequirementKind::Layout:
-    case RequirementKind::SameType:
-    case RequirementKind::Superclass:
-      break;
+  for (auto conformance : subs.getConformances()) {
+    // Formally all conformances referenced in a function application are
+    // used. However, eagerly visiting them all at this point leads to a
+    // large blowup in the amount of SIL we read in, and we aren't very
+    // systematic about laziness. For optimization purposes we can defer
+    // reading in most conformances until we need them for devirtualization.
+    // However, we *must* pull in shared clang-importer-derived conformances
+    // we potentially use, since we may not otherwise have a local definition.
+    if (mustDeserializeProtocolConformance(Mod, conformance)) {
+      visitProtocolConformance(conformance, None);
     }
   }
 }

@@ -82,7 +82,7 @@ public:
     return mangleNominalTypeSymbol(Decl, "Mi");
   }
 
-  std::string mangleTypeMetadataInPlaceInitializationCache(
+  std::string mangleTypeMetadataSingletonInitializationCache(
                                                   const NominalTypeDecl *Decl) {
     return mangleNominalTypeSymbol(Decl, "Ml");
   }

@@ -23,7 +23,7 @@ using namespace swift;
 using namespace ide;
 using namespace api;
 
-inline raw_ostream &swift::ide::api::
+raw_ostream &swift::ide::api::
 operator<<(raw_ostream &Out, const SDKNodeKind Value) {
   switch (Value) {
 #define NODE_KIND(Name, Value) case SDKNodeKind::Name: return Out << #Value;
@@ -32,17 +32,31 @@ operator<<(raw_ostream &Out, const SDKNodeKind Value) {
   llvm_unreachable("Undefined SDK node kind.");
 }
 
-inline raw_ostream &swift::ide::api::
+raw_ostream &swift::ide::api::
 operator<<(raw_ostream &Out, const NodeAnnotation Value) {
 #define NODE_ANNOTATION(X) if (Value == NodeAnnotation::X) { return Out << #X; }
 #include "swift/IDE/DigesterEnums.def"
   llvm_unreachable("Undefined SDK node kind.");
 }
 
-SDKNodeKind swift::ide::api::parseSDKNodeKind(StringRef Content) {
-  return llvm::StringSwitch<SDKNodeKind>(Content)
+StringRef swift::ide::api::getDeclKindStr(const DeclKind Value)  {
+  switch (Value) {
+#define DECL(X, PARENT) case DeclKind::X: return #X;
+#include "swift/AST/DeclNodes.def"
+  } 
+  llvm_unreachable("Unhandled DeclKind in switch.");
+}
+
+raw_ostream &swift::ide::api::operator<<(raw_ostream &Out,
+    const DeclKind Value) {
+  return Out << getDeclKindStr(Value);
+}
+
+Optional<SDKNodeKind> swift::ide::api::parseSDKNodeKind(StringRef Content) {
+  return llvm::StringSwitch<Optional<SDKNodeKind>>(Content)
 #define NODE_KIND(NAME, VALUE) .Case(#VALUE, SDKNodeKind::NAME)
 #include "swift/IDE/DigesterEnums.def"
+    .Default(None)
   ;
 }
 
@@ -326,7 +340,7 @@ serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
   switch (parseDiffItemKind(DiffItemKind)) {
   case APIDiffItemKind::ADK_CommonDiffItem: {
     return new (Alloc.Allocate<CommonDiffItem>())
-      CommonDiffItem(parseSDKNodeKind(NodeKind),
+      CommonDiffItem(*parseSDKNodeKind(NodeKind),
                      parseSDKNodeAnnotation(NodeAnnotation), ChildIndex,
                      LeftUsr, RightUsr, LeftComment, RightComment, ModuleName);
   }

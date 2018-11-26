@@ -213,7 +213,7 @@ class alignas(1 << DeclContextAlignInBits) DeclContext {
 
   /// If this DeclContext is a GenericType declaration or an
   /// extension thereof, return the GenericTypeDecl.
-  GenericTypeDecl *getAsTypeOrTypeExtensionContext() const;
+  GenericTypeDecl *getSelfTypeDecl() const;
 
   static ASTHierarchy getASTHierarchyFromKind(DeclContextKind Kind) {
     switch (Kind) {
@@ -238,12 +238,12 @@ class alignas(1 << DeclContextAlignInBits) DeclContext {
 
 public:
   LLVM_READONLY
-  Decl *getAsDeclOrDeclExtensionContext() {
+  Decl *getAsDecl() {
     return ParentAndKind.getInt() == ASTHierarchy::Decl ?
       reinterpret_cast<Decl*>(this + 1) : nullptr;
   }
-  const Decl *getAsDeclOrDeclExtensionContext() const {
-    return const_cast<DeclContext*>(this)->getAsDeclOrDeclExtensionContext();
+  const Decl *getAsDecl() const {
+    return const_cast<DeclContext*>(this)->getAsDecl();
   }
 
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
@@ -283,36 +283,36 @@ public:
   /// If this DeclContext is a NominalType declaration or an
   /// extension thereof, return the NominalTypeDecl.
   LLVM_READONLY
-  NominalTypeDecl *getAsNominalTypeOrNominalTypeExtensionContext() const;
+  NominalTypeDecl *getSelfNominalTypeDecl() const;
 
   /// If this DeclContext is a class, or an extension on a class, return the
   /// ClassDecl, otherwise return null.
   LLVM_READONLY
-  ClassDecl *getAsClassOrClassExtensionContext() const;
+  ClassDecl *getSelfClassDecl() const;
 
   /// If this DeclContext is an enum, or an extension on an enum, return the
   /// EnumDecl, otherwise return null.
   LLVM_READONLY
-  EnumDecl *getAsEnumOrEnumExtensionContext() const;
+  EnumDecl *getSelfEnumDecl() const;
 
   /// If this DeclContext is a struct, or an extension on a struct, return the
   /// StructDecl, otherwise return null.
   LLVM_READONLY
-  StructDecl *getAsStructOrStructExtensionContext() const;
+  StructDecl *getSelfStructDecl() const;
 
   /// If this DeclContext is a protocol, or an extension on a
   /// protocol, return the ProtocolDecl, otherwise return null.
   LLVM_READONLY
-  ProtocolDecl *getAsProtocolOrProtocolExtensionContext() const;
+  ProtocolDecl *getSelfProtocolDecl() const;
 
   /// If this DeclContext is a protocol extension, return the extended protocol.
   LLVM_READONLY
-  ProtocolDecl *getAsProtocolExtensionContext() const;
+  ProtocolDecl *getExtendedProtocolDecl() const;
 
   /// \brief Retrieve the generic parameter 'Self' from a protocol or
   /// protocol extension.
   ///
-  /// Only valid if \c getAsProtocolOrProtocolExtensionContext().
+  /// Only valid if \c getSelfProtocolDecl().
   GenericTypeParamType *getProtocolSelfType() const;
 
   /// Gets the type being declared by this context.
@@ -500,7 +500,7 @@ public:
   /// lookup.
   ///
   /// \returns true if anything was found.
-  bool lookupQualified(ArrayRef<NominalTypeDecl *> types, DeclName member,
+  bool lookupQualified(ArrayRef<TypeDecl *> types, DeclName member,
                        NLOptions options,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 

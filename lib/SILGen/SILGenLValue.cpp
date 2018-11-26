@@ -47,6 +47,8 @@ struct LValueWritebackCleanup : Cleanup {
 
   void emit(SILGenFunction &SGF, CleanupLocation loc,
             ForUnwind_t forUnwind) override {
+    FullExpr scope(SGF.Cleanups, loc);
+
     // TODO: honor forUnwind!
     auto &evaluation = *SGF.FormalEvalContext.find(Depth);
     assert(evaluation.getKind() == FormalAccess::Exclusive);
@@ -541,21 +543,8 @@ static SILValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
     }
   }();
 
-  // Hack for materializeForSet emission, where we can't safely
-  // push a begin/end access.
-  if (!SGF.InFormalEvaluationScope) {
-    auto unpairedAccesses = SGF.UnpairedAccessesForMaterializeForSet;
-    assert(unpairedAccesses &&
-           "tried to enter access scope without a writeback scope!");
-    if (enforcement == SILAccessEnforcement::Dynamic) {
-      SGF.B.createBeginUnpairedAccess(loc, addr, unpairedAccesses->Buffer,
-                                      silAccessKind, enforcement,
-                                      /*hasNoNestedConflict=*/false,
-                                      /*fromBuiltin=*/false);
-      unpairedAccesses->NumAccesses++;
-    }
-    return addr;
-  }
+  assert(SGF.InFormalEvaluationScope &&
+         "tried to enter access scope without a writeback scope!");
 
   // Enter the access.
   addr = SGF.B.createBeginAccess(loc, addr, silAccessKind, enforcement,
@@ -1121,7 +1110,7 @@ namespace {
 
     /// The subscript index expression.  Useless
     Expr *IndexExprForDiagnostics;
-    RValue Indices;
+    PreparedArguments Indices;
 
     /// AST type of the base expression, in case the accessor call
     /// requires re-abstraction.
@@ -1129,7 +1118,7 @@ namespace {
 
     struct AccessorArgs {
       ArgumentSource base;
-      RValue Indices;
+      PreparedArguments Indices;
     };
 
     /// Returns a tuple of RValues holding the accessor value, base (retained if
@@ -1154,13 +1143,12 @@ namespace {
                     CanType baseFormalType,
                     LValueTypeData typeData,
                     Expr *indexExprForDiagnostics,
-                    RValue *optSubscripts)
+                    PreparedArguments &&indices)
       : Base(typeData, kind), Storage(storage),
         IndexExprForDiagnostics(indexExprForDiagnostics),
+        Indices(std::move(indices)),
         BaseFormalType(baseFormalType)
     {
-      if (optSubscripts)
-        Indices = std::move(*optSubscripts);
     }
 
     AccessComponent(const AccessComponent &copied,
@@ -1209,9 +1197,9 @@ namespace {
                            CanType baseFormalType,
                            LValueTypeData typeData,
                            Expr *indexExprForDiagnostics,
-                           RValue *optIndices)
+                           PreparedArguments &&indices)
       : super(kind, decl, baseFormalType, typeData,
-              indexExprForDiagnostics, optIndices),
+              indexExprForDiagnostics, std::move(indices)),
         Accessor(accessor), IsSuper(isSuper),
         IsDirectAccessorUse(isDirectAccessorUse),
         Substitutions(substitutions) {}
@@ -1248,15 +1236,14 @@ namespace {
                            SubstitutionMap substitutions,
                            CanType baseFormalType,
                            LValueTypeData typeData,
-                           Expr *subscriptIndexExpr = nullptr,
-                           RValue *subscriptIndex = nullptr)
+                           Expr *subscriptIndexExpr,
+                           PreparedArguments &&indices)
       : AccessorBasedComponent(GetterSetterKind, decl, accessor, isSuper,
                                isDirectAccessorUse, substitutions,
                                baseFormalType, typeData, subscriptIndexExpr,
-                               subscriptIndex)
+                               std::move(indices))
     {
-      assert(getAccessorDecl()->isGetterOrSetter() ||
-             getAccessorDecl()->isMaterializeForSet());
+      assert(getAccessorDecl()->isGetterOrSetter());
     }
     
     GetterSetterComponent(const GetterSetterComponent &copied,
@@ -1276,7 +1263,7 @@ namespace {
       auto subs = this->Substitutions;
       bool isSuper = this->IsSuper;
       bool isDirectAccessorUse = this->IsDirectAccessorUse;
-      RValue indices = std::move(this->Indices);
+      auto indices = std::move(this->Indices);
       auto baseFormalType = this->BaseFormalType;
 
       // Drop this component from the l-value.
@@ -1292,7 +1279,8 @@ namespace {
                                      bool isSuper, SILDeclRef setter,
                                      bool isDirectAccessorUse,
                                      SubstitutionMap subs,
-                                     RValue &&indices, ArgumentSource &&value) {
+                                     PreparedArguments &&indices,
+                                     ArgumentSource &&value) {
       ArgumentSource self = [&] {
         if (!baseLV.isValid()) {
           return ArgumentSource();
@@ -1331,217 +1319,12 @@ namespace {
                                  SILLocation loc,
                                  ManagedValue base,
                                  AccessKind accessKind) && override {
-      assert(accessKind == AccessKind::Read ||
-             accessKind == AccessKind::ReadWrite);
-      if (accessKind == AccessKind::Read) {
-        return std::move(*this).LogicalPathComponent::getMaterialized(SGF,
-                                                        loc, base, accessKind);
-      }
-
-      assert(getAccessorDecl()->isMaterializeForSet());
-
-      assert(Storage->getMaterializeForSetFunc() &&
-             "polymorphic storage without materializeForSet");
-      assert(SGF.InFormalEvaluationScope &&
-             "materializing l-value for modification without writeback scope");
-
-      // Allocate opaque storage for the callback to use.
-      SILValue callbackStorage = SGF.emitTemporaryAllocation(loc,
-        SILType::getPrimitiveObjectType(
-                                SGF.getASTContext().TheUnsafeValueBufferType));
-
-      // Allocate a temporary.
-      SILValue buffer =
-        SGF.emitTemporaryAllocation(loc, getTypeOfRValue());
-
-      // Clone the component without cloning the indices.  We don't actually
-      // consume them in writeback().
-      std::unique_ptr<LogicalPathComponent> clonedComponent(
-          [&]() -> LogicalPathComponent* {
-        // Steal the subscript values without copying them so that we
-        // can peek at them in diagnoseWritebackConflict.
-        //
-        // This is *amazingly* unprincipled.
-        RValue borrowedIndices;
-        RValue *optIndices = nullptr;
-        if (!Indices.isNull()) {
-          CanType type = Indices.getType();
-          SmallVector<ManagedValue, 4> values;
-          std::move(Indices).getAll(values);
-          Indices = RValue(SGF, values, type);
-          borrowedIndices = RValue(SGF, values, type);
-          optIndices = &borrowedIndices;
-        }
-        return new GetterSetterComponent(Storage, Accessor, IsSuper,
-                                         IsDirectAccessorUse,
-                                         Substitutions, BaseFormalType,
-                                         getTypeData(), IndexExprForDiagnostics,
-                                         optIndices);
-      }());
-
-      SILDeclRef materializeForSet = Accessor;
-
-      MaterializedLValue materialized;
-      {
-        FormalEvaluationScope Scope(SGF);
-
-        // If the base is a +1 r-value, just borrow it for materializeForSet.
-        // prepareAccessorArgs will copy it if necessary.
-        ManagedValue borrowedBase =
-            base ? base.formalAccessBorrow(SGF, loc) : ManagedValue();
-
-        auto args = std::move(*this).prepareAccessorArgs(SGF, loc, borrowedBase,
-                                                         materializeForSet);
-        materialized = SGF.emitMaterializeForSetAccessor(
-            loc, materializeForSet, Substitutions,
-            std::move(args.base),
-            IsSuper, IsDirectAccessorUse, std::move(args.Indices), buffer,
-            callbackStorage);
-
-        // Mark a value-dependence on the base.  We do this regardless
-        // of whether the base is trivial because even a trivial base
-        // may be value-dependent on something non-trivial.
-        if (base) {
-          SILValue temporary = materialized.temporary.getLValueAddress();
-          materialized.temporary = ManagedValue::forLValue(
-              SGF.B.createMarkDependence(loc, temporary, base.getValue()));
-        }
-      }
-      // Enter an access scope for the temporary.
-      materialized.temporary =
-        enterAccessScope(SGF, loc, materialized.temporary, getTypeData(),
-                         accessKind, SILAccessEnforcement::Unsafe);
-
-      // TODO: maybe needsWriteback should be a thin function pointer
-      // to which we pass the base?  That would let us use direct
-      // access for stored properties with didSet.
-      pushWriteback(SGF, loc, std::move(clonedComponent), base, materialized);
-
-      return ManagedValue::forLValue(materialized.temporary.getValue());
+      assert(accessKind == AccessKind::Read &&
+             "shouldn't be using this path to call modify");
+      return std::move(*this).LogicalPathComponent::getMaterialized(SGF,
+                                                      loc, base, accessKind);
     }
 
-    void writeback(SILGenFunction &SGF, SILLocation loc,
-                   ManagedValue base, MaterializedLValue materialized,
-                   bool isFinal) override {
-      // If we don't have a callback, we don't have to conditionalize
-      // the writeback.
-      if (!materialized.callback) {
-        LogicalPathComponent::writeback(SGF, loc,
-                                        base, materialized,
-                                        isFinal);
-        return;
-      }
-
-      // Otherwise, 'materialized' holds an optional callback and the
-      // callback storage.
-
-      // Mark the writeback as auto-generated so that we don't get
-      // warnings if we manage to devirtualize materializeForSet.
-      loc.markAutoGenerated();
-
-      SILModule &M = SGF.SGM.M;
-      ASTContext &ctx = SGF.getASTContext();
-
-      SILBasicBlock *contBB = SGF.createBasicBlock();
-      SILBasicBlock *writebackBB = SGF.createBasicBlock(SGF.B.getInsertionBB());
-
-      SGF.B.createSwitchEnum(loc, materialized.callback, /*defaultDest*/ nullptr,
-                             { { ctx.getOptionalSomeDecl(), writebackBB },
-                               { ctx.getOptionalNoneDecl(), contBB } });
-
-      // The writeback block.
-      SGF.B.setInsertionPoint(writebackBB); {
-        FullExpr scope(SGF.Cleanups, CleanupLocation::get(loc));
-
-        auto emptyTupleTy =
-          SILType::getPrimitiveObjectType(TupleType::getEmpty(ctx));
-        auto rawPointerTy = SILType::getRawPointerType(ctx);
-
-        // The callback is a BB argument from the switch_enum.
-        SILValue callback = writebackBB->createPHIArgument(
-            rawPointerTy, ValueOwnershipKind::Trivial);
-
-        // Cast the callback to the correct polymorphic function type.
-        SILFunctionTypeRepresentation rep;
-        Optional<ProtocolConformanceRef> witnessMethodConformance;
-        if (auto proto = dyn_cast<ProtocolDecl>(Storage->getDeclContext())) {
-          rep = SILFunctionTypeRepresentation::WitnessMethod;
-          witnessMethodConformance = ProtocolConformanceRef(proto);
-        } else {
-          rep = SILFunctionTypeRepresentation::Method;
-        }
-
-        auto origCallbackFnType =
-            SGF.SGM.Types.getMaterializeForSetCallbackType(
-                Storage, materialized.genericSig, materialized.origSelfType,
-                rep, witnessMethodConformance);
-        auto origCallbackType = SILType::getPrimitiveObjectType(origCallbackFnType);
-        callback = SGF.B.createPointerToThinFunction(loc, callback, origCallbackType);
-
-        auto substCallbackFnType = origCallbackFnType->substGenericArgs(
-            M, Substitutions);
-        auto metatypeType =
-            SGF.getSILType(substCallbackFnType->getParameters().back());
-
-        // We need to borrow the base here.  We can't just consume it
-        // because we're in conditionally-executed code (and because
-        // this might be a non-final use).  We also need to pass it
-        // indirectly.
-        SILValue baseAddress;
-        SILValue baseMetatype;
-        UnenforcedAccess baseAccess;
-        if (base) {
-          if (base.getType().isAddress()) {
-            baseAddress = base.getValue();
-          } else {
-            AbstractionPattern origSelfType(materialized.genericSig,
-                                            materialized.origSelfType);
-            base = SGF.emitSubstToOrigValue(loc, base, origSelfType,
-                                            BaseFormalType);
-
-            baseAddress = SGF.emitTemporaryAllocation(loc, base.getType());
-            // Create an unenforced formal access for the temporary base, which
-            // is passed @inout to the callback.
-            baseAddress = baseAccess.beginAccess(SGF, loc, baseAddress,
-                                                 SILAccessKind::Modify);
-            if (base.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
-              SGF.B.createStoreBorrow(loc, base.getValue(), baseAddress);
-            } else {
-              SGF.B.emitStoreValueOperation(loc, base.getValue(), baseAddress,
-                                            StoreOwnershipQualifier::Init);
-            }
-          }
-          baseMetatype = SGF.B.createMetatype(loc, metatypeType);
-
-        // Otherwise, we have to pass something; use an empty tuple
-        // and an undef metatype.
-        } else {
-          baseAddress = SILUndef::get(emptyTupleTy.getAddressType(), M);
-          baseMetatype = SILUndef::get(metatypeType, M);
-        }
-
-        SILValue temporaryPointer =
-          SGF.B.createAddressToPointer(loc,
-                                       materialized.temporary.getValue(),
-                                       rawPointerTy);
-
-        // Apply the callback.
-        SGF.B.createApply(loc, callback,
-                          Substitutions, {
-                            temporaryPointer,
-                            materialized.callbackStorage,
-                            baseAddress,
-                            baseMetatype
-                          }, false);
-
-        if (baseAccess.beginAccessPtr)
-          baseAccess.endAccess(SGF);
-      }
-
-      // Continue.
-      SGF.B.emitBlock(contBB, loc);
-    }
-    
     RValue get(SILGenFunction &SGF, SILLocation loc,
                ManagedValue base, SGFContext c) && override {
       assert(getAccessorDecl()->isGetter());
@@ -1579,33 +1362,6 @@ namespace {
     }
   };
 
-  class UnpinPseudoComponent : public WritebackPseudoComponent {
-  public:
-    UnpinPseudoComponent(const LValueTypeData &typeData)
-      : WritebackPseudoComponent(typeData) {}
-
-  private:
-    void writeback(SILGenFunction &SGF, SILLocation loc,
-                   ManagedValue base,
-                   MaterializedLValue materialized,
-                   bool isFinal) override {
-      loc.markAutoGenerated();
-
-      // If this is final, we can consume the owner (stored as
-      // 'base').  If it isn't, we actually need to retain it, because
-      // we've still got a release active.
-      SILValue baseValue = (isFinal ? base.forward(SGF) : base.getValue());
-      if (!isFinal)
-        baseValue = SGF.B.createCopyValue(loc, baseValue);
-
-      SGF.B.createStrongUnpin(loc, baseValue, SGF.B.getDefaultAtomicity());
-    }
-
-    void dump(raw_ostream &OS, unsigned indent) const override {
-      OS.indent(indent) << "UnpinPseudoComponent";
-    }
-  };
-
   class MaterializeToTemporaryComponent final
       : public AccessComponent<LogicalPathComponent> {
     SubstitutionMap Substitutions;
@@ -1623,9 +1379,9 @@ namespace {
                                     CanType baseFormalType,
                                     LValueTypeData typeData,
                                     Expr *indexExprForDiagnostics,
-                                    RValue *optIndices)
+                                    PreparedArguments &&indices)
       : AccessComponent(MaterializeToTemporaryKind, storage, baseFormalType,
-                        typeData, indexExprForDiagnostics, optIndices),
+                        typeData, indexExprForDiagnostics, std::move(indices)),
         Substitutions(subs),
         ReadStrategy(readStrategy), WriteStrategy(writeStrategy),
         Options(options), IsSuper(isSuper) {}
@@ -1640,12 +1396,7 @@ namespace {
 
     std::unique_ptr<LogicalPathComponent>
     clone(SILGenFunction &SGF, SILLocation loc) const override {
-      RValue clonedIndicesBuffer;
-      RValue *clonedIndices = nullptr;
-      if (!Indices.isNull()) {
-        clonedIndicesBuffer = Indices.copy(SGF, loc);
-        clonedIndices = &clonedIndicesBuffer;
-      }
+      PreparedArguments clonedIndices = Indices.copy(SGF, loc);
 
       LogicalPathComponent *clone =
         new MaterializeToTemporaryComponent(Storage, IsSuper, Substitutions,
@@ -1653,7 +1404,7 @@ namespace {
                                             ReadStrategy, WriteStrategy,
                                             BaseFormalType, getTypeData(),
                                             IndexExprForDiagnostics,
-                                            clonedIndices);
+                                            std::move(clonedIndices));
       return std::unique_ptr<LogicalPathComponent>(clone);
     }
 
@@ -1715,12 +1466,12 @@ namespace {
                         SubstitutionMap substitutions,
                         CanType baseFormalType, LValueTypeData typeData,
                         SILType substFieldType,
-                        Expr *subscriptIndexExpr = nullptr,
-                        RValue *subscriptIndex = nullptr)
+                        Expr *indexExprForDiagnostics,
+                        PreparedArguments &&indices)
       : AccessorBasedComponent(AddressorKind, decl, accessor, isSuper,
                                isDirectAccessorUse, substitutions,
-                               baseFormalType, typeData, subscriptIndexExpr,
-                               subscriptIndex),
+                               baseFormalType, typeData,
+                               indexExprForDiagnostics, std::move(indices)),
         SubstFieldType(substFieldType)
     {
       assert(getAccessorDecl()->isAnyAddressor());
@@ -1757,15 +1508,6 @@ namespace {
       case AddressorKind::Owning:
       case AddressorKind::NativeOwning:
         break;
-
-      // For pinning addressors, we have to push a writeback.
-      case AddressorKind::NativePinning: {
-        std::unique_ptr<LogicalPathComponent>
-          component(new UnpinPseudoComponent(getTypeData()));
-        pushWriteback(SGF, loc, std::move(component), result.second,
-                      MaterializedLValue());
-        break;
-      }
       }
 
       // Enter an unsafe access scope for the access.
@@ -1783,22 +1525,34 @@ namespace {
 
   class EndApplyPseudoComponent : public WritebackPseudoComponent {
     CleanupHandle EndApplyHandle;
+    Optional<AccessedStorage> Access;
   public:
     EndApplyPseudoComponent(const LValueTypeData &typeData,
-                            CleanupHandle endApplyHandle)
-      : WritebackPseudoComponent(typeData), EndApplyHandle(endApplyHandle) {}
+                            CleanupHandle endApplyHandle,
+                            Optional<AccessedStorage> access)
+      : WritebackPseudoComponent(typeData),
+        EndApplyHandle(endApplyHandle),
+        Access(access) {}
 
   private:
     void writeback(SILGenFunction &SGF, SILLocation loc,
                    ManagedValue base,
                    MaterializedLValue materialized,
                    bool isFinal) override {
+      // Just let the cleanup get emitted normally if the writeback is for
+      // an unwind.
+      if (!isFinal) return;
+
       SGF.Cleanups.popAndEmitCleanup(EndApplyHandle, CleanupLocation::get(loc),
                                      NotForUnwind);
     }
 
     void dump(raw_ostream &OS, unsigned indent) const override {
       OS.indent(indent) << "EndApplyPseudoComponent";
+    }
+
+    Optional<AccessedStorage> getAccessedStorage() const override {
+      return Access;
     }
   };
 
@@ -1812,12 +1566,12 @@ namespace {
                                SubstitutionMap substitutions,
                                CanType baseFormalType,
                                LValueTypeData typeData,
-                               Expr *indexExprForDiagnostics = nullptr,
-                               RValue *optIndices = nullptr)
+                               Expr *indexExprForDiagnostics,
+                               PreparedArguments &&indices)
       : AccessorBasedComponent(CoroutineAccessorKind,
                                decl, accessor, isSuper, isDirectAccessorUse,
                                substitutions, baseFormalType, typeData,
-                               indexExprForDiagnostics, optIndices) {
+                               indexExprForDiagnostics, std::move(indices)) {
     }
 
     using AccessorBasedComponent::AccessorBasedComponent;
@@ -1829,6 +1583,10 @@ namespace {
 
       ManagedValue result;
 
+      LogicalPathComponent::AccessedStorage abstractStorage = {
+        Storage, IsSuper, /*indices*/ nullptr, IndexExprForDiagnostics
+      };
+
       auto args =
         std::move(*this).prepareAccessorArgs(SGF, loc, base, Accessor);
       SmallVector<ManagedValue, 4> yields;
@@ -1839,7 +1597,8 @@ namespace {
 
       // Push a writeback that ends the access.
       std::unique_ptr<LogicalPathComponent>
-        component(new EndApplyPseudoComponent(getTypeData(), endApplyHandle));
+        component(new EndApplyPseudoComponent(getTypeData(), endApplyHandle,
+                                              abstractStorage));
       pushWriteback(SGF, loc, std::move(component), ManagedValue(),
                     MaterializedLValue());
 
@@ -1999,6 +1758,10 @@ namespace {
                        ManagedValue base,
                        MaterializedLValue materialized,
                        bool isFinal) override {
+          // Just let the cleanup get emitted normally if the writeback is for
+          // an unwind.
+          if (!isFinal) return;
+
           SGF.Cleanups.popAndEmitCleanup(owner.getCleanup(),
                                          CleanupLocation::get(loc),
                                          NotForUnwind);
@@ -2284,7 +2047,7 @@ void LValue::addMemberComponent(SILGenFunction &SGF, SILLocation loc,
                                 bool isSuper,
                                 AccessStrategy accessStrategy,
                                 CanType formalRValueType,
-                                RValue &&indices,
+                                PreparedArguments &&indices,
                                 Expr *indexExprForDiagnostics) {
   if (auto var = dyn_cast<VarDecl>(storage)) {
     assert(indices.isNull());
@@ -2533,14 +2296,11 @@ namespace {
     void emitUsingAccessor(AccessorKind accessorKind, bool isDirect) {
       switch (accessorKind) {
       case AccessorKind::Get:
-      case AccessorKind::Set:
-      case AccessorKind::MaterializeForSet: {
+      case AccessorKind::Set: {
         auto accessor =
           accessorKind == AccessorKind::Get ?
             SGF.SGM.getGetterDeclRef(Storage) :
-          accessorKind == AccessorKind::Set ?
-            SGF.SGM.getSetterDeclRef(Storage) :
-            SGF.SGM.getMaterializeForSetDeclRef(Storage);
+            SGF.SGM.getSetterDeclRef(Storage);
         auto typeData = getLogicalStorageTypeData(SGF.SGM, FormalRValueType);
         return asImpl().emitUsingGetterSetter(accessor, isDirect, typeData);
       }
@@ -2634,21 +2394,24 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
         SGF.SGM.Types.getLoweredType(Storage->getType()).getAddressType();
       LV.add<AddressorComponent>(Storage, addressor,
                                  /*isSuper=*/false, isDirect, getSubs(),
-                                 CanType(), typeData, storageType);
+                                 CanType(), typeData, storageType,
+                                 nullptr, PreparedArguments());
     }
 
     void emitUsingCoroutineAccessor(SILDeclRef accessor, bool isDirect,
                                     LValueTypeData typeData) {
       LV.add<CoroutineAccessorComponent>(Storage, accessor,
                                          /*isSuper*/ false, isDirect, getSubs(),
-                                         CanType(), typeData);
+                                         CanType(), typeData,
+                                         nullptr, PreparedArguments());
     }
 
     void emitUsingGetterSetter(SILDeclRef accessor, bool isDirect,
                                LValueTypeData typeData) {
       LV.add<GetterSetterComponent>(Storage, accessor,
                                     /*isSuper=*/false, isDirect, getSubs(),
-                                    CanType(), typeData);
+                                    CanType(), typeData,
+                                    nullptr, PreparedArguments());
     }
 
     void emitUsingMaterialization(AccessStrategy readStrategy,
@@ -2658,7 +2421,7 @@ void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
                                               getSubs(), Options,
                                               readStrategy, writeStrategy,
                                               /*base type*/CanType(), typeData,
-                                              nullptr, nullptr);
+                                              nullptr, PreparedArguments());
     }
 
     void emitUsingStorage(LValueTypeData typeData) {
@@ -2998,7 +2761,7 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
   CanType BaseFormalType;
   SubstitutionMap Subs;
   Expr *IndexExprForDiagnostics;
-  RValue *Indices;
+  PreparedArguments Indices;
 
   MemberStorageAccessEmitter(SILGenFunction &SGF, SILLocation loc,
                              StorageType *storage,
@@ -3008,11 +2771,12 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
                              LValueOptions options,
                              LValue &lv,
                              Expr *indexExprForDiagnostics,
-                             RValue *indices)
+                             PreparedArguments &&indices)
     : super(SGF, storage, formalRValueType),
       LV(lv), Options(options), Loc(loc), IsSuper(isSuper),
       BaseFormalType(lv.getSubstFormalType()), Subs(subs),
-      IndexExprForDiagnostics(indexExprForDiagnostics), Indices(indices) {}
+      IndexExprForDiagnostics(indexExprForDiagnostics),
+      Indices(std::move(indices)) {}
 
   void emitUsingAddressor(SILDeclRef addressor, bool isDirect,
                           LValueTypeData typeData) {
@@ -3021,21 +2785,22 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
 
     LV.add<AddressorComponent>(Storage, addressor, IsSuper, isDirect, Subs,
                                BaseFormalType, typeData, varStorageType,
-                               IndexExprForDiagnostics, Indices);
+                               IndexExprForDiagnostics, std::move(Indices));
   }
 
   void emitUsingCoroutineAccessor(SILDeclRef accessor, bool isDirect,
                                   LValueTypeData typeData) {
     LV.add<CoroutineAccessorComponent>(Storage, accessor, IsSuper, isDirect,
                                        Subs, BaseFormalType, typeData,
-                                       IndexExprForDiagnostics, Indices);
+                                       IndexExprForDiagnostics,
+                                       std::move(Indices));
   }
 
   void emitUsingGetterSetter(SILDeclRef accessor, bool isDirect,
                              LValueTypeData typeData) {
     LV.add<GetterSetterComponent>(Storage, accessor, IsSuper, isDirect,
                                   Subs, BaseFormalType, typeData,
-                                  IndexExprForDiagnostics, Indices);
+                                  IndexExprForDiagnostics, std::move(Indices));
   }
 
   void emitUsingMaterialization(AccessStrategy readStrategy,
@@ -3044,7 +2809,8 @@ struct MemberStorageAccessEmitter : AccessEmitter<Impl, StorageType> {
     LV.add<MaterializeToTemporaryComponent>(Storage, IsSuper, Subs, Options,
                                             readStrategy, writeStrategy,
                                             BaseFormalType, typeData,
-                                            IndexExprForDiagnostics, Indices);
+                                            IndexExprForDiagnostics,
+                                            std::move(Indices));
   }
 };
 } // end anonymous namespace
@@ -3104,7 +2870,7 @@ void LValue::addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
       LV.add<ValueComponent>(addr, None, typeData);
     }
   } emitter(SGF, loc, var, subs, isSuper, formalRValueType, options, *this,
-            /*indices for diags*/ nullptr, /*indices*/ nullptr);
+            /*indices for diags*/ nullptr, /*indices*/ PreparedArguments());
 
   emitter.emitUsingStrategy(strategy);
 }
@@ -3113,6 +2879,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
                                         AccessKind accessKind,
                                         LValueOptions options) {
   auto decl = cast<SubscriptDecl>(e->getDecl().getDecl());
+  auto subs = e->getDecl().getSubstitutions();
 
   auto accessSemantics = e->getAccessSemantics();
   auto strategy =
@@ -3124,15 +2891,12 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
   assert(lv.isValid());
 
   Expr *indexExpr = e->getIndex();
-  // FIXME: This admits varargs tuples, which should only be handled as part of
-  // argument emission.
-  RValue index = SGF.emitRValue(indexExpr);
+  auto indices = SGF.prepareSubscriptIndices(decl, subs, strategy, indexExpr);
 
   CanType formalRValueType = getSubstFormalRValueType(e);
-  lv.addMemberSubscriptComponent(SGF, e, decl,
-                                 e->getDecl().getSubstitutions(),
+  lv.addMemberSubscriptComponent(SGF, e, decl, subs,
                                  options, e->isSuper(), strategy,
-                                 formalRValueType, std::move(index),
+                                 formalRValueType, std::move(indices),
                                  indexExpr);
   return lv;
 }
@@ -3187,7 +2951,7 @@ void LValue::addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
                                          bool isSuper,
                                          AccessStrategy strategy,
                                          CanType formalRValueType,
-                                         RValue &&indices,
+                                         PreparedArguments &&indices,
                                          Expr *indexExprForDiagnostics) {
   struct MemberSubscriptAccessEmitter
       : MemberStorageAccessEmitter<MemberSubscriptAccessEmitter,
@@ -3202,7 +2966,7 @@ void LValue::addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
       llvm_unreachable("subscripts never have behaviors");
     }
   } emitter(SGF, loc, decl, subs, isSuper, formalRValueType, options, *this,
-            indexExprForDiagnostics, &indices);
+            indexExprForDiagnostics, std::move(indices));
 
   emitter.emitUsingStrategy(strategy);
 }
@@ -3999,12 +3763,18 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc, RValue &&src,
 void SILGenFunction::emitAssignToLValue(SILLocation loc,
                                         ArgumentSource &&src,
                                         LValue &&dest) {
-  FormalEvaluationScope scope(*this);
+  // Enter a FormalEvaluationScope so that formal access to independent LValue
+  // components do not overlap. Furthermore, use an ArgumentScope to force
+  // cleanup of materialized LValues immediately, before evaluating the next
+  // LValue. For example: (x[i], x[j]) = a, b
+  ArgumentScope argScope(*this, loc);
 
   // If the last component is a getter/setter component, use a special
   // generation pattern that allows us to peephole the emission of the RHS.
-  if (trySetterPeephole(*this, loc, std::move(src), std::move(dest)))
+  if (trySetterPeephole(*this, loc, std::move(src), std::move(dest))) {
+    argScope.pop();
     return;
+  }
 
   // Otherwise, force the RHS now to preserve evaluation order.
   auto srcLoc = src.getLocation();
@@ -4041,6 +3811,7 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
 
   // The writeback scope closing will propagate the value back up through the
   // writeback chain.
+  argScope.pop();
 }
 
 void SILGenFunction::emitCopyLValueInto(SILLocation loc, LValue &&src,

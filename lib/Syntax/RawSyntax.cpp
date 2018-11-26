@@ -70,10 +70,13 @@ static void dumpTokenKind(llvm::raw_ostream &OS, tok Kind) {
 unsigned RawSyntax::NextFreeNodeId = 1;
 
 RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-                     SourcePresence Presence, bool ManualMemory,
+                     SourcePresence Presence, const RC<SyntaxArena> &Arena,
                      llvm::Optional<unsigned> NodeId) {
   assert(Kind != SyntaxKind::Token &&
          "'token' syntax node must be constructed with dedicated constructor");
+
+  RefCount = 0;
+
   if (NodeId.hasValue()) {
     this->NodeId = NodeId.getValue();
     NextFreeNodeId = std::max(this->NodeId + 1, NextFreeNodeId);
@@ -82,9 +85,10 @@ RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
   }
   Bits.Common.Kind = unsigned(Kind);
   Bits.Common.Presence = unsigned(Presence);
-  Bits.Common.ManualMemory = unsigned(ManualMemory);
   Bits.Layout.NumChildren = Layout.size();
   Bits.Layout.TextLength = UINT32_MAX;
+
+  this->Arena = Arena;
 
   // Initialize layout data.
   std::uninitialized_copy(Layout.begin(), Layout.end(),
@@ -94,8 +98,10 @@ RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
 RawSyntax::RawSyntax(tok TokKind, OwnedString Text,
                      ArrayRef<TriviaPiece> LeadingTrivia,
                      ArrayRef<TriviaPiece> TrailingTrivia,
-                     SourcePresence Presence, bool ManualMemory,
+                     SourcePresence Presence, const RC<SyntaxArena> &Arena,
                      llvm::Optional<unsigned> NodeId) {
+  RefCount = 0;
+
   if (NodeId.hasValue()) {
     this->NodeId = NodeId.getValue();
     NextFreeNodeId = std::max(this->NodeId + 1, NextFreeNodeId);
@@ -104,10 +110,11 @@ RawSyntax::RawSyntax(tok TokKind, OwnedString Text,
   }
   Bits.Common.Kind = unsigned(SyntaxKind::Token);
   Bits.Common.Presence = unsigned(Presence);
-  Bits.Common.ManualMemory = unsigned(ManualMemory);
   Bits.Token.TokenKind = unsigned(TokKind);
   Bits.Token.NumLeadingTrivia = LeadingTrivia.size();
   Bits.Token.NumTrailingTrivia = TrailingTrivia.size();
+
+  this->Arena = Arena;
 
   // Initialize token text.
   ::new (static_cast<void *>(getTrailingObjects<OwnedString>()))
@@ -135,28 +142,30 @@ RawSyntax::~RawSyntax() {
 }
 
 RC<RawSyntax> RawSyntax::make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-                              SourcePresence Presence, SyntaxArena *Arena,
+                              SourcePresence Presence,
+                              const RC<SyntaxArena> &Arena,
                               llvm::Optional<unsigned> NodeId) {
   auto size = totalSizeToAlloc<RC<RawSyntax>, OwnedString, TriviaPiece>(
       Layout.size(), 0, 0);
-  void *data = Arena ? Arena->AllocateRawSyntax(size, alignof(RawSyntax))
+  void *data = Arena ? Arena->Allocate(size, alignof(RawSyntax))
                      : ::operator new(size);
   return RC<RawSyntax>(
-      new (data) RawSyntax(Kind, Layout, Presence, bool(Arena), NodeId));
+      new (data) RawSyntax(Kind, Layout, Presence, Arena, NodeId));
 }
 
 RC<RawSyntax> RawSyntax::make(tok TokKind, OwnedString Text,
                               ArrayRef<TriviaPiece> LeadingTrivia,
                               ArrayRef<TriviaPiece> TrailingTrivia,
-                              SourcePresence Presence, SyntaxArena *Arena,
+                              SourcePresence Presence,
+                              const RC<SyntaxArena> &Arena,
                               llvm::Optional<unsigned> NodeId) {
   auto size = totalSizeToAlloc<RC<RawSyntax>, OwnedString, TriviaPiece>(
       0, 1, LeadingTrivia.size() + TrailingTrivia.size());
-  void *data = Arena ? Arena->AllocateRawSyntax(size, alignof(RawSyntax))
+  void *data = Arena ? Arena->Allocate(size, alignof(RawSyntax))
                      : ::operator new(size);
   return RC<RawSyntax>(new (data) RawSyntax(TokKind, Text, LeadingTrivia,
                                             TrailingTrivia, Presence,
-                                            bool(Arena), NodeId));
+                                            Arena, NodeId));
 }
 
 RC<RawSyntax> RawSyntax::append(RC<RawSyntax> NewLayoutElement) const {

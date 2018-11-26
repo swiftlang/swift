@@ -5,7 +5,7 @@
 import Foundation
 
 extension MutableCollection {
-  typealias SubSequence = MutableRangeReplaceableRandomAccessSlice<Data>
+  typealias SubSequence = Slice<Data>
 }
 
 print(type(of: Data.self.SubSequence.self))

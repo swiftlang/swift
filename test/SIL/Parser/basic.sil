@@ -1469,13 +1469,6 @@ bb0(%0 : $*Builtin.NativeObject):
   return %1 : $Builtin.Int1
 }
 
-// CHECK-LABEL: sil @is_unique_or_pinned : $@convention(thin) (@inout Builtin.NativeObject)
-sil @is_unique_or_pinned : $@convention(thin) (@inout Builtin.NativeObject) -> Builtin.Int1 {
-bb0(%0 : $*Builtin.NativeObject):
-  // CHECK: %1 = is_unique_or_pinned %0 : $*Builtin.NativeObject
-  %1 = is_unique_or_pinned %0 : $*Builtin.NativeObject
-  return %1 : $Builtin.Int1
-}
 // CHECK-LABEL: sil @is_escaping_closure
 sil @is_escaping_closure : $@convention(thin)(@guaranteed @callee_guaranteed () -> ()) -> Builtin.Int1 {
 bb0(%0 : $@callee_guaranteed () -> ()):

@@ -49,6 +49,7 @@ namespace swift {
   HAS_TRIVIAL_DISPLAY(float);
   HAS_TRIVIAL_DISPLAY(double);
   HAS_TRIVIAL_DISPLAY(bool);
+  HAS_TRIVIAL_DISPLAY(std::string);
 
 #undef HAS_TRIVIAL_DISPLAY
 

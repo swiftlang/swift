@@ -33,6 +33,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILOpenedArchetypesTracker.h"
 #include "swift/SIL/SILVTable.h"
+#include "swift/SIL/SILVTableVisitor.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/TypeLowering.h"
@@ -2554,7 +2555,56 @@ public:
                                      F.getASTContext());
     return SILType::getPrimitiveObjectType(fnTy);
   }
-  
+
+  /// Visitor class that checks whether a given decl ref has an entry in the
+  /// class's vtable.
+  class VerifyClassMethodVisitor
+      : public SILVTableVisitor<VerifyClassMethodVisitor>
+  {
+  public:
+    SILDeclRef MethodToSee;
+    bool Seen = false;
+    
+    VerifyClassMethodVisitor(ClassDecl *theClass,
+                             SILDeclRef method)
+      : MethodToSee(method)
+    {
+      addVTableEntries(theClass);
+    }
+    
+    bool methodMatches(SILDeclRef method) {
+      auto methodToCheck = MethodToSee;
+      do {
+        if (method == methodToCheck) {
+          return true;
+        }
+      } while ((methodToCheck = methodToCheck.getNextOverriddenVTableEntry()));
+
+      return false;
+    }
+    
+    void addMethod(SILDeclRef method) {
+      if (Seen)
+        return;
+      if (methodMatches(method))
+        Seen = true;
+    }
+    
+    void addMethodOverride(SILDeclRef base, SILDeclRef derived) {
+      if (Seen)
+        return;
+      // The derived method should already have been checked.
+      // Test against the overridden base.
+      if (methodMatches(base))
+        Seen = true;
+    }
+
+    
+    void addPlaceholder(MissingMemberDecl *) {
+      /* no-op */
+    }
+  };
+
   void checkClassMethodInst(ClassMethodInst *CMI) {
     auto member = CMI->getMember();
     auto overrideTy = TC.getConstantOverrideType(member);
@@ -2577,6 +2627,13 @@ public:
             "foreign method cannot be dispatched natively");
     require(!isa<ExtensionDecl>(member.getDecl()->getDeclContext()),
             "extension method cannot be dispatched natively");
+    
+    // The method ought to appear in the class vtable.
+    require(VerifyClassMethodVisitor(
+                             operandType.getASTType()->getMetatypeInstanceType()
+                                       ->getClassOrBoundGenericClass(),
+                             member).Seen,
+            "method does not appear in the class's vtable");
   }
 
   void checkSuperMethodInst(SuperMethodInst *CMI) {
@@ -2607,6 +2664,13 @@ public:
 
     require(methodClass->getClassOrBoundGenericClass(),
             "super_method must look up a class method");
+
+    // The method ought to appear in the class vtable.
+    require(VerifyClassMethodVisitor(
+                             operandType.getASTType()->getMetatypeInstanceType()
+                                       ->getClassOrBoundGenericClass(),
+                             member).Seen,
+            "method does not appear in the class's vtable");    
   }
 
   void checkObjCMethodInst(ObjCMethodInst *OMI) {
@@ -4309,16 +4373,22 @@ public:
   void verifyEpilogBlocks(SILFunction *F) {
     bool FoundReturnBlock = false;
     bool FoundThrowBlock = false;
+    bool FoundUnwindBlock = false;
     for (auto &BB : *F) {
       if (isa<ReturnInst>(BB.getTerminator())) {
         require(!FoundReturnBlock,
                 "more than one return block in function");
         FoundReturnBlock = true;
-      }
-      if (isa<ThrowInst>(BB.getTerminator())) {
+      } else if (isa<ThrowInst>(BB.getTerminator())) {
         require(!FoundThrowBlock,
                 "more than one throw block in function");
         FoundThrowBlock = true;
+      } else if (isa<UnwindInst>(BB.getTerminator())) {
+        require(!FoundUnwindBlock,
+                "more than one unwind block in function");
+        FoundUnwindBlock = true;
+      } else {
+        assert(!BB.getTerminator()->isFunctionExiting());
       }
     }
   }
@@ -4524,26 +4594,24 @@ public:
       return true;
     };
 
-    SILModule &M = F->getModule();
     for (auto &BB : *F) {
       TermInst *TI = BB.getTerminator();
+      CurInstruction = TI;
 
-      // Check for non-cond_br critical edges in canonical SIL.
-      if (!isa<CondBranchInst>(TI) && M.getStage() == SILStage::Canonical) {
+      // Check for non-cond_br critical edges.
+      auto *CBI = dyn_cast<CondBranchInst>(TI);
+      if (!CBI) {
         for (unsigned Idx = 0, e = BB.getSuccessors().size(); Idx != e; ++Idx) {
           require(!isCriticalEdgePred(TI, Idx),
                   "non cond_br critical edges not allowed");
         }
         continue;
       }
-
       // In ownership qualified SIL, ban critical edges from CondBranchInst that
       // have non-trivial arguments.
+      //
+      // FIXME: it would be far simpler to ban all critical edges in general.
       if (!F->hasQualifiedOwnership())
-        continue;
-
-      auto *CBI = dyn_cast<CondBranchInst>(TI);
-      if (!CBI)
         continue;
 
       if (isCriticalEdgePred(CBI, CondBranchInst::TrueIdx)) {

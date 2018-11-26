@@ -37,13 +37,13 @@ using namespace swift;
 /// \p theEnum The enum whose elements and associated values should be checked.
 /// \p protocol The protocol being requested.
 /// \return True if all associated values of all elements of the enum conform.
-static bool allAssociatedValuesConformToProtocol(TypeChecker &tc,
-                                                 DeclContext *DC,
+static bool allAssociatedValuesConformToProtocol(DeclContext *DC,
                                                  EnumDecl *theEnum,
                                                  ProtocolDecl *protocol) {
+  auto lazyResolver = DC->getASTContext().getLazyResolver();
   for (auto elt : theEnum->getAllElements()) {
     if (!elt->hasInterfaceType())
-      tc.validateDecl(elt);
+      lazyResolver->resolveDeclSignature(elt);
 
     auto PL = elt->getParameterList();
     if (!PL)
@@ -51,8 +51,9 @@ static bool allAssociatedValuesConformToProtocol(TypeChecker &tc,
 
     for (auto param : *PL) {
       auto type = param->getType()->mapTypeOutOfContext();
-      if (!tc.conformsToProtocol(DC->mapTypeIntoContext(type), protocol, DC,
-                                 ConformanceCheckFlags::Used)) {
+      if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
+                                           protocol, DC,
+                                           ConformanceCheckFlags::Used)) {
         return false;
       }
     }
@@ -65,21 +66,22 @@ static bool allAssociatedValuesConformToProtocol(TypeChecker &tc,
 /// \p theStruct The struct whose stored properties should be checked.
 /// \p protocol The protocol being requested.
 /// \return True if all stored properties of the struct conform.
-static bool allStoredPropertiesConformToProtocol(TypeChecker &tc,
-                                                 DeclContext *DC,
+static bool allStoredPropertiesConformToProtocol(DeclContext *DC,
                                                  StructDecl *theStruct,
                                                  ProtocolDecl *protocol) {
+  auto lazyResolver = DC->getASTContext().getLazyResolver();
   auto storedProperties =
     theStruct->getStoredProperties(/*skipInaccessible=*/true);
   for (auto propertyDecl : storedProperties) {
     if (!propertyDecl->hasType())
-      tc.validateDecl(propertyDecl);
+      lazyResolver->resolveDeclSignature(propertyDecl);
     if (!propertyDecl->hasType())
       return false;
 
     auto type = propertyDecl->getType()->mapTypeOutOfContext();
-    if (!tc.conformsToProtocol(DC->mapTypeIntoContext(type), protocol, DC,
-                               ConformanceCheckFlags::Used)) {
+    if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
+                                         protocol, DC,
+                                         ConformanceCheckFlags::Used)) {
       return false;
     }
   }
@@ -87,19 +89,19 @@ static bool allStoredPropertiesConformToProtocol(TypeChecker &tc,
 }
 
 /// Common preconditions for Equatable and Hashable.
-static bool canDeriveConformance(TypeChecker &tc, DeclContext *DC,
+static bool canDeriveConformance(DeclContext *DC,
                                  NominalTypeDecl *target,
                                  ProtocolDecl *protocol) {
   // The type must be an enum or a struct.
   if (auto enumDecl = dyn_cast<EnumDecl>(target)) {
     // The cases must not have associated values, or all associated values must
     // conform to the protocol.
-    return allAssociatedValuesConformToProtocol(tc, DC, enumDecl, protocol);
+    return allAssociatedValuesConformToProtocol(DC, enumDecl, protocol);
   }
 
   if (auto structDecl = dyn_cast<StructDecl>(target)) {
     // All stored properties of the struct must conform to the protocol.
-    return allStoredPropertiesConformToProtocol(tc, DC, structDecl, protocol);
+    return allStoredPropertiesConformToProtocol(DC, structDecl, protocol);
   }
 
   return false;
@@ -601,9 +603,6 @@ deriveEquatable_eq(DerivedConformance &derived,
     return param;
   };
 
-  auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC,
-                                        /*isStatic=*/true);
-
   ParameterList *params = ParameterList::create(C, {
     getParamDecl("a"),
     getParamDecl("b")
@@ -629,7 +628,7 @@ deriveEquatable_eq(DerivedConformance &derived,
                      /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
                      /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,
-                     selfDecl, params,
+                     params,
                      TypeLoc::withoutLoc(boolTy),
                      parentDC);
   eqDecl->setImplicit();
@@ -675,12 +674,12 @@ deriveEquatable_eq(DerivedConformance &derived,
   return eqDecl;
 }
 
-bool DerivedConformance::canDeriveEquatable(TypeChecker &tc, DeclContext *DC,
+bool DerivedConformance::canDeriveEquatable(DeclContext *DC,
                                             NominalTypeDecl *type) {
   ASTContext &ctx = DC->getASTContext();
   auto equatableProto = ctx.getProtocol(KnownProtocolKind::Equatable);
   if (!equatableProto) return false;
-  return canDeriveConformance(tc, DC, type, equatableProto);
+  return canDeriveConformance(DC, type, equatableProto);
 }
 
 ValueDecl *DerivedConformance::deriveEquatable(ValueDecl *requirement) {
@@ -755,7 +754,6 @@ deriveHashable_hashInto(DerivedConformance &derived,
   Type hasherType = hasherDecl->getDeclaredType();
 
   // Params: self (implicit), hasher
-  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC);
   auto *hasherParamDecl = new (C) ParamDecl(VarDecl::Specifier::InOut,
                                             SourceLoc(),
                                             SourceLoc(), C.Id_into, SourceLoc(),
@@ -773,7 +771,7 @@ deriveHashable_hashInto(DerivedConformance &derived,
                                     SourceLoc(), StaticSpellingKind::None,
                                     SourceLoc(), name, SourceLoc(),
                                     /*Throws=*/false, SourceLoc(),
-                                    nullptr, selfDecl, params,
+                                    nullptr, params,
                                     TypeLoc::withoutLoc(returnType),
                                     parentDC);
   hashDecl->setImplicit();
@@ -868,7 +866,7 @@ deriveBodyHashable_enum_noAssociatedValues_hashInto(
   auto parentDC = hashIntoDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto enumDecl = parentDC->getAsEnumOrEnumExtensionContext();
+  auto enumDecl = parentDC->getSelfEnumDecl();
   auto selfDecl = hashIntoDecl->getImplicitSelfDecl();
 
   // generate: switch self {...}
@@ -911,7 +909,7 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
   auto parentDC = hashIntoDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto enumDecl = parentDC->getAsEnumOrEnumExtensionContext();
+  auto enumDecl = parentDC->getSelfEnumDecl();
   auto selfDecl = hashIntoDecl->getImplicitSelfDecl();
 
   Type enumType = selfDecl->getType();
@@ -991,7 +989,7 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl) {
   auto parentDC = hashIntoDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto structDecl = parentDC->getAsStructOrStructExtensionContext();
+  auto structDecl = parentDC->getSelfStructDecl();
   SmallVector<ASTNode, 6> statements;
   auto selfDecl = hashIntoDecl->getImplicitSelfDecl();
 
@@ -1075,7 +1073,6 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
                     C.Id_hashValue, parentDC);
   hashValueDecl->setType(intType);
 
-  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC);
   ParameterList *params = ParameterList::createEmpty(C);
 
   AccessorDecl *getterDecl = AccessorDecl::create(C,
@@ -1083,7 +1080,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
       AccessorKind::Get, AddressorKind::NotAddressor, hashValueDecl,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, selfDecl, params,
+      /*GenericParams=*/nullptr, params,
       TypeLoc::withoutLoc(intType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);
@@ -1187,7 +1184,7 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
       // Refuse to synthesize Hashable if type isn't a struct or enum, or if it
       // has non-Hashable stored properties/associated values.
       auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
-      if (!canDeriveConformance(TC, getConformanceContext(), Nominal,
+      if (!canDeriveConformance(getConformanceContext(), Nominal,
                                 hashableProto)) {
         TC.diagnose(ConformanceDecl->getLoc(), diag::type_does_not_conform,
                     Nominal->getDeclaredType(),

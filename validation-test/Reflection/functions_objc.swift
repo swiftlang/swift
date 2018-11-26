@@ -1,7 +1,13 @@
 // RUN: %empty-directory(%t)
+
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/functions
 // RUN: %target-codesign %t/functions
-// RUN: %target-run %target-swift-reflection-test %t/functions | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+
+// Link %target-swift-reflection-test into %t to convince %target-run to copy
+// it.
+// RUN: ln -s %target-swift-reflection-test %t/swift-reflection-test
+// RUN: %target-run %t/swift-reflection-test %t/functions | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 

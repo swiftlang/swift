@@ -59,7 +59,7 @@ printSwiftEnumElemNameInObjC(const EnumElementDecl *EL, llvm::raw_ostream &OS,
     OS << ElemName;
     return true;
   }
-  OS << getNameForObjC(EL->getDeclContext()->getAsEnumOrEnumExtensionContext());
+  OS << getNameForObjC(EL->getDeclContext()->getSelfEnumDecl());
   if (PreferredName.empty())
     ElemName = EL->getName().str();
   else

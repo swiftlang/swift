@@ -336,7 +336,6 @@ public:
   SILDeclRef getSetterDeclRef(AbstractStorageDecl *decl);
   SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl);
   SILDeclRef getMutableAddressorDeclRef(AbstractStorageDecl *decl);
-  SILDeclRef getMaterializeForSetDeclRef(AbstractStorageDecl *decl);
   SILDeclRef getReadCoroutineDeclRef(AbstractStorageDecl *decl);
   SILDeclRef getModifyCoroutineDeclRef(AbstractStorageDecl *decl);
 

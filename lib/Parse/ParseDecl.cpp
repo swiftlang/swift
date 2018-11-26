@@ -3763,11 +3763,6 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                      EndLoc);
   }
 
-  // Create the implicit 'self' if needed.
-  ParamDecl *SelfDecl = nullptr;
-  if (Flags & Parser::PD_HasContainerType)
-    SelfDecl = ParamDecl::createUnboundSelf(DeclLoc, P->CurDeclContext);
-
   // The typechecker will always fill this in.
   TypeLoc ReturnType;
 
@@ -3781,12 +3776,11 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                  (GenericParams
                                   ? GenericParams->clone(P->CurDeclContext)
                                   : nullptr),
-                                 SelfDecl, ValueArg, ReturnType,
+                                 ValueArg, ReturnType,
                                  P->CurDeclContext);
 
-  // Non-static set/willSet/didSet/materializeForSet/mutableAddress
-  // default to mutating.  get/address default to
-  // non-mutating.
+  // Non-static set/willSet/didSet/mutableAddress default to mutating.
+  // get/address default to non-mutating.
   switch (Kind) {
   case AccessorKind::Address:
   case AccessorKind::Get:
@@ -3801,9 +3795,6 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
     if (D->isInstanceMember())
       D->setSelfAccessKind(SelfAccessKind::Mutating);
     break;
-
-  case AccessorKind::MaterializeForSet:
-    llvm_unreachable("not parseable accessors");
   }
 
   return D;
@@ -3864,7 +3855,9 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
     SyntaxParsingContext ParamCtx(P.SyntaxContext, SyntaxKind::AccessorParameter);
     StartLoc = P.consumeToken(tok::l_paren);
     if (P.Tok.isNot(tok::identifier)) {
-      P.diagnose(P.Tok, diag::expected_accessor_name, (unsigned)Kind);
+      P.diagnose(P.Tok, diag::expected_accessor_parameter_name,
+                 Kind == AccessorKind::Set ? 0 :
+                 Kind == AccessorKind::WillSet ? 1 : 2);
       P.skipUntil(tok::r_paren, tok::l_brace);
       if (P.Tok.is(tok::r_paren))
         EndLoc = P.consumeToken();
@@ -3970,8 +3963,6 @@ static StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind,
     return "'willSet'";
   case AccessorKind::DidSet:
     return "'didSet'";
-  case AccessorKind::MaterializeForSet:
-    llvm_unreachable("unparseable");
   }
   llvm_unreachable("bad accessor kind");  
 }
@@ -4023,7 +4014,6 @@ static bool isAllowedInLimitedSyntax(AccessorKind kind) {
 
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
-  case AccessorKind::MaterializeForSet:
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
   case AccessorKind::Read:
@@ -4086,11 +4076,23 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
                              SourceLoc &LastValidLoc, SourceLoc StaticLoc,
                              SourceLoc VarLBLoc) {
   // Properties in protocols use a very limited syntax.
-  // SIL mode uses the same syntax.
+  // SIL mode and textual interfaces use the same syntax.
   // Otherwise, we have a normal var or subscript declaration and we need
   // parse the full complement of specifiers, along with their bodies.
-  bool parsingLimitedSyntax =
-    Flags.contains(PD_InProtocol) || isInSILMode();
+  bool parsingLimitedSyntax = Flags.contains(PD_InProtocol);
+  if (!parsingLimitedSyntax) {
+    switch (SF.Kind) {
+    case SourceFileKind::Interface:
+      // FIXME: Textual interfaces /can/ have inlinable code but don't have to.
+    case SourceFileKind::SIL:
+      parsingLimitedSyntax = true;
+      break;
+    case SourceFileKind::Library:
+    case SourceFileKind::Main:
+    case SourceFileKind::REPL:
+      break;
+    }
+  }
 
   // If the body is completely empty, preserve it.  This is at best a getter with
   // an implicit fallthrough off the end.
@@ -4369,9 +4371,6 @@ static void fillInAccessorTypeErrors(Parser &P, FuncDecl *accessor,
 
   // Fill in the result type.
   switch (kind) {
-  case AccessorKind::MaterializeForSet:
-    llvm_unreachable("should never be seen here");
-
   // These have non-trivial returns, so fill in error.
   case AccessorKind::Get:
   case AccessorKind::Address:
@@ -4768,7 +4767,7 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
   // Allow the sil_stored attribute to override all the accessors we parsed
   // when making the final classification.
   if (attrs.hasAttribute<SILStoredAttr>()) {
-    return StorageImplInfo::getSimpleStored(Set != nullptr);
+    return StorageImplInfo::getSimpleStored(StorageIsMutable_t(Set != nullptr));
   }
 
   return StorageImplInfo(readImpl, writeImpl, readWriteImpl);
@@ -5177,10 +5176,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                       ParseDeclOptions Flags, DeclAttributes &Attributes) {
   assert(StaticLoc.isInvalid() || StaticSpelling != StaticSpellingKind::None);
 
-  bool HasContainerType = Flags.contains(PD_HasContainerType);
-
   if (StaticLoc.isValid()) {
-    if (!HasContainerType) {
+    if (!Flags.contains(PD_HasContainerType)) {
       // Reject static functions at global scope.
       diagnose(Tok, diag::static_func_decl_global_scope, StaticSpelling)
           .fixItRemove(StaticLoc);
@@ -5258,17 +5255,6 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   if (SignatureHasCodeCompletion && !CodeCompletion)
     return makeParserCodeCompletionStatus();
 
-  // If we're within a container, create a parameter to match the
-  // container type named 'self'.
-  //
-  // This turns an instance function "(int)->int" on FooTy into
-  // "(inout self: FooTy)->(int)->int", and a static function
-  // "(int)->int" on FooTy into "(self: FooTy.Type)->(int)->int".
-  // Note that we can't actually compute the type here until Sema.
-  ParamDecl *SelfDecl = nullptr;
-  if (HasContainerType)
-    SelfDecl = ParamDecl::createUnboundSelf(NameLoc, CurDeclContext);
-
   DefaultArgumentInfo DefaultArgs;
   TypeRepr *FuncRetTy = nullptr;
   DeclName FullName;
@@ -5292,7 +5278,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                               FuncLoc, FullName, NameLoc,
                               /*Throws=*/throwsLoc.isValid(), throwsLoc,
                               /*GenericParams=*/nullptr,
-                              SelfDecl, BodyParams, FuncRetTy,
+                              BodyParams, FuncRetTy,
                               CurDeclContext);
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.
@@ -5319,63 +5305,26 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   if (rethrows) {
     Attributes.add(new (Context) RethrowsAttr(throwsLoc));
   }
-  
-  // Enter the arguments for the function into a new function-body scope.  We
-  // need this even if there is no function body to detect argument name
-  // duplication.
-  {
-    Scope S(this, ScopeKind::FunctionBody);
 
-    diagnoseOperatorFixityAttributes(*this, Attributes, FD);
-    
-    // Add the attributes here so if we need them while parsing the body
-    // they are available.
-    FD->getAttrs() = Attributes;
+  diagnoseOperatorFixityAttributes(*this, Attributes, FD);
+  // Add the attributes here so if we need them while parsing the body
+  // they are available.
+  FD->getAttrs() = Attributes;
 
-    // Pass the function signature to code completion.
-    if (SignatureHasCodeCompletion)
-      CodeCompletion->setParsedDecl(FD);
+  // Pass the function signature to code completion.
+  if (SignatureHasCodeCompletion)
+    CodeCompletion->setParsedDecl(FD);
 
-    DefaultArgs.setFunctionContext(FD, FD->getParameters());
-    if (auto *P = FD->getImplicitSelfDecl())
-      addToScope(P);
-    addParametersToScope(FD->getParameters());
-    setLocalDiscriminator(FD);
-    
-    // Establish the new context.
-    ParseFunctionBody CC(*this, FD);
-    setLocalDiscriminatorToParamList(FD->getParameters());
+  DefaultArgs.setFunctionContext(FD, FD->getParameters());
+  setLocalDiscriminator(FD);
 
-    // Check to see if we have a "{" to start a brace statement.
+  if (Flags.contains(PD_InProtocol)) {
     if (Tok.is(tok::l_brace)) {
-      // Record the curly braces but nothing inside.
-      SF.recordInterfaceToken("{");
-      SF.recordInterfaceToken("}");
-      llvm::SaveAndRestore<bool> T(IsParsingInterfaceTokens, false);
-
-      if (Flags.contains(PD_InProtocol)) {
-        diagnose(Tok, diag::protocol_method_with_body);
-        skipUntilDeclRBrace();
-      } else if (!isDelayedParsingEnabled()) {
-        if (Context.Stats)
-          Context.Stats->getFrontendCounters().NumFunctionsParsed++;
-
-        ParserResult<BraceStmt> Body =
-            parseBraceItemList(diag::func_decl_without_brace);
-        if (Body.isNull()) {
-          // FIXME: Should do some sort of error recovery here?
-        } else if (SignatureStatus.hasCodeCompletion()) {
-          // Code completion was inside the signature, don't attach the body.
-          FD->setBodySkipped(Body.get()->getSourceRange());
-        } else {
-          FD->setBody(Body.get());
-        }
-      } else {
-        consumeAbstractFunctionBody(FD, Attributes);
-      }
-    } else {
-      checkForInputIncomplete();
+      diagnose(Tok, diag::protocol_method_with_body);
+      skipSingle();
     }
+  } else {
+    parseAbstractFunctionBody(FD);
   }
 
   // Exit the scope introduced for the generic parameters.
@@ -5383,6 +5332,46 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
 
   addToScope(FD);
   return DCC.fixupParserResult(FD);
+}
+
+/// Parse function body into \p AFD.
+void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
+  Scope S(this, ScopeKind::FunctionBody);
+
+  // Enter the arguments for the function into a new function-body scope.  We
+  // need this even if there is no function body to detect argument name
+  // duplication.
+  if (auto *P = AFD->getImplicitSelfDecl())
+    addToScope(P);
+  addParametersToScope(AFD->getParameters());
+
+   // Establish the new context.
+  ParseFunctionBody CC(*this, AFD);
+  setLocalDiscriminatorToParamList(AFD->getParameters());
+
+  if (!Tok.is(tok::l_brace)) {
+    checkForInputIncomplete();
+    return;
+  }
+
+  if (IsParsingInterfaceTokens) {
+    // Record the curly braces but nothing inside.
+    SF.recordInterfaceToken("{");
+    SF.recordInterfaceToken("}");
+  }
+  llvm::SaveAndRestore<bool> T(IsParsingInterfaceTokens, false);
+
+  if (isDelayedParsingEnabled()) {
+    consumeAbstractFunctionBody(AFD, AFD->getAttrs());
+    return;
+  }
+
+  if (Context.Stats)
+    Context.Stats->getFrontendCounters().NumFunctionsParsed++;
+
+  ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
+  if (!Body.isNull())
+    AFD->setBody(Body.get());
 }
 
 bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
@@ -5828,8 +5817,6 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
   ClassDecl *CD = new (Context) ClassDecl(ClassLoc, ClassName, ClassNameLoc,
                                           { }, nullptr, CurDeclContext);
   setLocalDiscriminator(CD);
-
-  // Attach attributes.
   CD->getAttrs() = Attributes;
 
   ContextChange CC(*this, CD);
@@ -6220,13 +6207,11 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
-  auto *SelfDecl = ParamDecl::createUnboundSelf(ConstructorLoc, CurDeclContext);
   DeclName FullName(Context, DeclBaseName::createConstructor(), namePieces);
-
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
                                            Failability, FailabilityLoc,
                                            throwsLoc.isValid(), throwsLoc,
-                                           SelfDecl, Params.get(), nullptr,
+                                           Params.get(), nullptr,
                                            CurDeclContext);
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.
@@ -6243,7 +6228,6 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   CD->setGenericParams(GenericParams);
 
-  Scope S2(this, ScopeKind::ConstructorBody);
   CtorInitializerKind initKind = CtorInitializerKind::Designated;
   if (Attributes.hasAttribute<ConvenienceAttr>())
     initKind = CtorInitializerKind::Convenience;
@@ -6261,38 +6245,14 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     // Tell the type checker not to touch this constructor.
     CD->setInvalid();
   }
-  
-  addToScope(SelfDecl);
-  addParametersToScope(Params.get());
 
-  // '{'
-  if (Tok.is(tok::l_brace)) {
-    // Record the curly braces but nothing inside.
-    SF.recordInterfaceToken("{");
-    SF.recordInterfaceToken("}");
-    llvm::SaveAndRestore<bool> T(IsParsingInterfaceTokens, false);
-
-    if (Flags.contains(PD_InProtocol)) {
+  if (Flags.contains(PD_InProtocol)) {
+    if (Tok.is(tok::l_brace)) {
       diagnose(Tok, diag::protocol_init_with_body);
-      skipUntilDeclRBrace();
-    } else {
-      // Parse the body.
-      ParseFunctionBody CC(*this, CD);
-      setLocalDiscriminatorToParamList(CD->getParameters());
-
-      if (!isDelayedParsingEnabled()) {
-        if (Context.Stats)
-          Context.Stats->getFrontendCounters().NumFunctionsParsed++;
-
-        ParserResult<BraceStmt> Body =
-          parseBraceItemList(diag::invalid_diagnostic);
-
-        if (!Body.isNull())
-          CD->setBody(Body.get());
-      } else {
-        consumeAbstractFunctionBody(CD, Attributes);
-      }
+      skipSingle();
     }
+  } else {
+    parseAbstractFunctionBody(CD);
   }
 
   CD->getAttrs() = Attributes;
@@ -6305,65 +6265,48 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc DestructorLoc = consumeToken(tok::kw_deinit);
 
   // Parse extraneous parentheses and remove them with a fixit.
-  if (Tok.is(tok::l_paren)) {
-    SourceRange ParenRange;
-    SourceLoc LParenLoc = consumeToken();
+  auto skipParameterListIfPresent = [this] {
+    SourceLoc LParenLoc;
+    if (!consumeIf(tok::l_paren, LParenLoc))
+      return;
     SourceLoc RParenLoc;
     skipUntil(tok::r_paren);
 
     if (Tok.is(tok::r_paren)) {
       SourceLoc RParenLoc = consumeToken();
-      ParenRange = SourceRange(LParenLoc, RParenLoc);
-      
-      diagnose(ParenRange.Start, diag::destructor_params)
-      .fixItRemoveChars(Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                                   DestructorLoc),
-                        Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                                   ParenRange.End));
+      diagnose(LParenLoc, diag::destructor_params)
+        .fixItRemove(SourceRange(LParenLoc, RParenLoc));
     } else {
       diagnose(Tok, diag::opened_destructor_expected_rparen);
       diagnose(LParenLoc, diag::opening_paren);
     }
-  }
+  };
 
   // '{'
   if (!Tok.is(tok::l_brace)) {
-    if (!Tok.is(tok::l_brace) && !isInSILMode()) {
+    switch (SF.Kind) {
+    case SourceFileKind::Interface:
+    case SourceFileKind::SIL:
+      // It's okay to have no body for SIL code or textual interfaces.
+      break;
+    case SourceFileKind::Library:
+    case SourceFileKind::Main:
+    case SourceFileKind::REPL:
       if (Tok.is(tok::identifier)) {
         diagnose(Tok, diag::destructor_has_name).fixItRemove(Tok.getLoc());
-      } else
-        diagnose(Tok, diag::expected_lbrace_destructor);
+        consumeToken();
+      }
+      skipParameterListIfPresent();
+      if (Tok.is(tok::l_brace))
+        break;
+
+      diagnose(Tok, diag::expected_lbrace_destructor);
       return nullptr;
     }
   }
 
-  auto *SelfDecl = ParamDecl::createUnboundSelf(DestructorLoc, CurDeclContext);
-
-  Scope S(this, ScopeKind::DestructorBody);
-  auto *DD = new (Context) DestructorDecl(DestructorLoc, SelfDecl,
-                                          CurDeclContext);
-
-  // Parse the body.
-  if (Tok.is(tok::l_brace)) {
-    // Record the curly braces but nothing inside.
-    SF.recordInterfaceToken("{");
-    SF.recordInterfaceToken("}");
-    llvm::SaveAndRestore<bool> T(IsParsingInterfaceTokens, false);
-
-    ParseFunctionBody CC(*this, DD);
-    if (!isDelayedParsingEnabled()) {
-      if (Context.Stats)
-          Context.Stats->getFrontendCounters().NumFunctionsParsed++;
-
-      ParserResult<BraceStmt> Body =
-        parseBraceItemList(diag::invalid_diagnostic);
-
-      if (!Body.isNull())
-        DD->setBody(Body.get());
-    } else {
-      consumeAbstractFunctionBody(DD, Attributes);
-    }
-  }
+  auto *DD = new (Context) DestructorDecl(DestructorLoc, CurDeclContext);
+  parseAbstractFunctionBody(DD);
 
   DD->getAttrs() = Attributes;
 

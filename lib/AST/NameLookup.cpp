@@ -51,7 +51,7 @@ ValueDecl *LookupResultEntry::getBaseDecl() const {
     return selfDecl;
   }
 
-  auto *nominalDecl = BaseDC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *nominalDecl = BaseDC->getSelfNominalTypeDecl();
   assert(nominalDecl);
   return nominalDecl;
 }
@@ -157,27 +157,175 @@ static ConstructorComparison compareConstructors(ConstructorDecl *ctor1,
   return ConstructorComparison::Same;
 }
 
-bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
-                                const ModuleDecl *curModule) {
-  auto typeResolver = curModule->getASTContext().getLazyResolver();
+/// Given a set of declarations whose names and signatures have matched,
+/// figure out which of these declarations have been shadowed by others.
+static void recordShadowedDeclsAfterSignatureMatch(
+                              ArrayRef<ValueDecl *> decls,
+                              const ModuleDecl *curModule,
+                              llvm::SmallPtrSetImpl<ValueDecl *> &shadowed) {
+  assert(decls.size() > 1 && "Nothing collided");
 
-  // Category declarations by their signatures.
-  llvm::SmallDenseMap<std::pair<CanType, DeclBaseName>,
-                      llvm::TinyPtrVector<ValueDecl *>>
-    CollidingDeclGroups;
+  // Compare each declaration to every other declaration. This is
+  // unavoidably O(n^2) in the number of declarations, but because they
+  // all have the same signature, we expect n to remain small.
+  ASTContext &ctx = curModule->getASTContext();
+  for (unsigned firstIdx : indices(decls)) {
+    auto firstDecl = decls[firstIdx];
+    auto firstModule = firstDecl->getModuleContext();
+    auto firstSig = firstDecl->getOverloadSignature();
+    for (unsigned secondIdx : range(firstIdx + 1, decls.size())) {
+      // Determine whether one module takes precedence over another.
+      auto secondDecl = decls[secondIdx];
+      auto secondModule = secondDecl->getModuleContext();
 
-  /// Objective-C initializers are tracked by their context type and
-  /// full name.
-  llvm::SmallDenseMap<std::pair<CanType, DeclName>, 
-                      llvm::TinyPtrVector<ConstructorDecl *>>
-    ObjCCollidingConstructors;
-  bool anyCollisions = false;
+      // Swift 4 compatibility hack: Don't shadow properties defined in
+      // extensions of generic types with properties defined elsewhere.
+      // This is due to the fact that in Swift 4, we only gave custom overload
+      // types to properties in extensions of generic types, otherwise we
+      // used the null type.
+      if (!ctx.isSwiftVersionAtLeast(5)) {
+        auto secondSig = secondDecl->getOverloadSignature();
+        if (firstSig.IsVariable && secondSig.IsVariable)
+          if (firstSig.InExtensionOfGenericType !=
+              secondSig.InExtensionOfGenericType)
+            continue;
+      }
+
+      // If one declaration is in a protocol or extension thereof and the
+      // other is not, prefer the one that is not.
+      if ((bool)firstDecl->getDeclContext()->getSelfProtocolDecl() !=
+            (bool)secondDecl->getDeclContext()->getSelfProtocolDecl()) {
+        if (firstDecl->getDeclContext()->getSelfProtocolDecl()) {
+          shadowed.insert(firstDecl);
+          break;
+        } else {
+          shadowed.insert(secondDecl);
+          continue;
+        }
+      }
+
+      // If one declaration is available and the other is not, prefer the
+      // available one.
+      if (firstDecl->getAttrs().isUnavailable(ctx) !=
+            secondDecl->getAttrs().isUnavailable(ctx)) {
+       if (firstDecl->getAttrs().isUnavailable(ctx)) {
+         shadowed.insert(firstDecl);
+         break;
+       } else {
+         shadowed.insert(secondDecl);
+         continue;
+       }
+      }
+
+      // Don't apply module-shadowing rules to members of protocol types.
+      if (isa<ProtocolDecl>(firstDecl->getDeclContext()) ||
+          isa<ProtocolDecl>(secondDecl->getDeclContext()))
+        continue;
+
+      // Prefer declarations in the current module over those in another
+      // module.
+      // FIXME: This is a hack. We should query a (lazily-built, cached)
+      // module graph to determine shadowing.
+      if ((firstModule == curModule) != (secondModule == curModule)) {
+        // If the first module is the current module, the second declaration
+        // is shadowed by the first.
+        if (firstModule == curModule) {
+          shadowed.insert(secondDecl);
+          continue;
+        }
+
+        // Otherwise, the first declaration is shadowed by the second. There is
+        // no point in continuing to compare the first declaration to others.
+        shadowed.insert(firstDecl);
+        break;
+      }
+
+      // Prefer declarations in an overlay to similar declarations in
+      // the Clang module it customizes.
+      if (firstDecl->hasClangNode() != secondDecl->hasClangNode()) {
+        auto clangLoader = ctx.getClangModuleLoader();
+        if (!clangLoader) continue;
+
+        if (clangLoader->isInOverlayModuleForImportedModule(
+                                              firstDecl->getDeclContext(),
+                                              secondDecl->getDeclContext())) {
+          shadowed.insert(secondDecl);
+          continue;
+        }
+
+        if (clangLoader->isInOverlayModuleForImportedModule(
+                                               secondDecl->getDeclContext(),
+                                               firstDecl->getDeclContext())) {
+          shadowed.insert(firstDecl);
+          break;
+        }
+      }
+    }
+  }
+}
+
+/// Look through the given set of declarations (that all have the same name),
+/// recording those that are shadowed by another declaration in the
+/// \c shadowed set.
+static void recordShadowDeclsAfterObjCInitMatch(
+                                ArrayRef<ConstructorDecl *> ctors,
+                                llvm::SmallPtrSetImpl<ValueDecl *> &shadowed) {
+  assert(ctors.size() > 1 && "No collisions");
+
+  ASTContext &ctx = ctors.front()->getASTContext();
+
+  // Find the "best" constructor with this signature.
+  ConstructorDecl *bestCtor = ctors[0];
+  for (auto ctor : ctors.slice(1)) {
+    auto comparison = compareConstructors(ctor, bestCtor, ctx);
+    if (comparison == ConstructorComparison::Better)
+      bestCtor = ctor;
+  }
+
+  // Shadow any initializers that are worse.
+  for (auto ctor : ctors) {
+    auto comparison = compareConstructors(ctor, bestCtor, ctx);
+    if (comparison == ConstructorComparison::Worse)
+      shadowed.insert(ctor);
+  }
+}
+
+/// Look through the given set of declarations (that all have the same name),
+/// recording those that are shadowed by another declaration in the
+/// \c shadowed set.
+static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
+                                const ModuleDecl *curModule,
+                                llvm::SmallPtrSetImpl<ValueDecl *> &shadowed) {
+  if (decls.size() < 2)
+    return;
+
+  auto typeResolver = decls[0]->getASTContext().getLazyResolver();
+
+  // Categorize all of the declarations based on their overload signatures.
+  llvm::SmallDenseMap<CanType, llvm::TinyPtrVector<ValueDecl *>> collisions;
+  llvm::SmallVector<CanType, 2> collisionTypes;
+  llvm::SmallDenseMap<NominalTypeDecl *, llvm::TinyPtrVector<ConstructorDecl *>>
+    objCInitializerCollisions;
+  llvm::TinyPtrVector<NominalTypeDecl *> objCInitializerCollisionNominals;
+
   for (auto decl : decls) {
-    // FIXME: Egregious hack to avoid failing when there are no declared types.
-    // FIXME: Pass this down instead of getting it from the ASTContext.
+    // Specifically keep track of Objective-C initializers, which can come from
+    // either init methods or factory methods.
+    if (decl->hasClangNode()) {
+      if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
+        auto nominal = ctor->getDeclContext()->getSelfNominalTypeDecl();
+        auto &knownInits = objCInitializerCollisions[nominal];
+        if (knownInits.size() == 1) {
+          objCInitializerCollisionNominals.push_back(nominal);
+        }
+        knownInits.push_back(ctor);
+      }
+    }
+
+    // We need an interface type here.
     if (typeResolver)
       typeResolver->resolveDeclSignature(decl);
-    
+
     // If the decl is currently being validated, this is likely a recursive
     // reference and we'll want to skip ahead so as to avoid having its type
     // attempt to desugar itself.
@@ -195,154 +343,60 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
       signature = asd->getOverloadSignatureType();
 
-    // If we've seen a declaration with this signature before, note it.
-    auto &knownDecls =
-        CollidingDeclGroups[std::make_pair(signature, decl->getBaseName())];
+    // Record this declaration based on its signature.
+    auto &known = collisions[signature];
+    if (known.size() == 1) {
+      collisionTypes.push_back(signature);
+    }
+    known.push_back(decl);
+  }
+
+  // Check whether we have shadowing for signature collisions.
+  for (auto signature : collisionTypes) {
+    recordShadowedDeclsAfterSignatureMatch(collisions[signature], curModule,
+                                           shadowed);
+  }
+
+  // Check whether we have shadowing for Objective-C initializer collisions.
+  for (auto nominal : objCInitializerCollisionNominals) {
+    recordShadowDeclsAfterObjCInitMatch(objCInitializerCollisions[nominal],
+                                        shadowed);
+  }
+}
+
+bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
+                                const ModuleDecl *curModule) {
+  // Collect declarations with the same (full) name.
+  llvm::SmallDenseMap<DeclName, llvm::TinyPtrVector<ValueDecl *>>
+    collidingDeclGroups;
+  bool anyCollisions = false;
+  for (auto decl : decls) {
+    // Record this declaration based on its full name.
+    auto &knownDecls = collidingDeclGroups[decl->getFullName()];
     if (!knownDecls.empty())
       anyCollisions = true;
 
     knownDecls.push_back(decl);
-
-    // Specifically keep track of Objective-C initializers, which can come from
-    // either init methods or factory methods.
-    if (decl->hasClangNode()) {
-      if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-        auto ctorSignature
-          = std::make_pair(ctor->getDeclContext()->getDeclaredInterfaceType()
-                               ->getCanonicalType(),
-                           decl->getFullName());
-        auto &knownCtors = ObjCCollidingConstructors[ctorSignature];
-        if (!knownCtors.empty())
-          anyCollisions = true;
-        knownCtors.push_back(ctor);
-      }
-    }
   }
 
-  // If there were no signature collisions, there is nothing to do.
+  // If nothing collided, we're done.
   if (!anyCollisions)
     return false;
 
-  // Determine the set of declarations that are shadowed by other declarations.
+  // Walk through the declarations again, marking any declarations that shadow.
   llvm::SmallPtrSet<ValueDecl *, 4> shadowed;
-  ASTContext &ctx = decls[0]->getASTContext();
-  for (auto &collidingDecls : CollidingDeclGroups) {
-    // If only one declaration has this signature, it isn't shadowed by
-    // anything.
-    if (collidingDecls.second.size() == 1)
+  for (auto decl : decls) {
+    auto known = collidingDeclGroups.find(decl->getFullName());
+    if (known == collidingDeclGroups.end()) {
+      // We already handled this group.
       continue;
-
-    // Compare each declaration to every other declaration. This is
-    // unavoidably O(n^2) in the number of declarations, but because they
-    // all have the same signature, we expect n to remain small.
-    for (unsigned firstIdx = 0, n = collidingDecls.second.size();
-         firstIdx != n; ++firstIdx) {
-      auto firstDecl = collidingDecls.second[firstIdx];
-      auto firstModule = firstDecl->getModuleContext();
-      for (unsigned secondIdx = firstIdx + 1; secondIdx != n; ++secondIdx) {
-        // Determine whether one module takes precedence over another.
-        auto secondDecl = collidingDecls.second[secondIdx];
-        auto secondModule = secondDecl->getModuleContext();
-
-        // If one declaration is in a protocol or extension thereof and the
-        // other is not, prefer the one that is not.
-        if ((bool)firstDecl->getDeclContext()
-              ->getAsProtocolOrProtocolExtensionContext()
-              != (bool)secondDecl->getDeclContext()
-                   ->getAsProtocolOrProtocolExtensionContext()) {
-          if (firstDecl->getDeclContext()
-                ->getAsProtocolOrProtocolExtensionContext()) {
-            shadowed.insert(firstDecl);
-            break;
-          } else {
-            shadowed.insert(secondDecl);
-            continue;
-          }
-        }
-
-        // If one declaration is available and the other is not, prefer the
-        // available one.
-        if (firstDecl->getAttrs().isUnavailable(ctx) !=
-              secondDecl->getAttrs().isUnavailable(ctx)) {
-         if (firstDecl->getAttrs().isUnavailable(ctx)) {
-           shadowed.insert(firstDecl);
-           break;
-         } else {
-           shadowed.insert(secondDecl);
-           continue;
-         }
-        }
-
-        // Don't apply module-shadowing rules to members of protocol types.
-        if (isa<ProtocolDecl>(firstDecl->getDeclContext()) ||
-            isa<ProtocolDecl>(secondDecl->getDeclContext()))
-          continue;
-
-        // Prefer declarations in the current module over those in another
-        // module.
-        // FIXME: This is a hack. We should query a (lazily-built, cached)
-        // module graph to determine shadowing.
-        if ((firstModule == curModule) != (secondModule == curModule)) {
-          // If the first module is the current module, the second declaration
-          // is shadowed by the first.
-          if (firstModule == curModule) {
-            shadowed.insert(secondDecl);
-            continue;
-          }
-
-          // Otherwise, the first declaration is shadowed by the second. There is
-          // no point in continuing to compare the first declaration to others.
-          shadowed.insert(firstDecl);
-          break;
-        }
-
-        // Prefer declarations in an overlay to similar declarations in
-        // the Clang module it customizes.
-        if (firstDecl->hasClangNode() != secondDecl->hasClangNode()) {
-          auto clangLoader = ctx.getClangModuleLoader();
-          if (!clangLoader) continue;
-
-          if (clangLoader->isInOverlayModuleForImportedModule(
-                                                firstDecl->getDeclContext(),
-                                                secondDecl->getDeclContext())) {
-            shadowed.insert(secondDecl);
-            continue;
-          }
-
-          if (clangLoader->isInOverlayModuleForImportedModule(
-                                                 secondDecl->getDeclContext(),
-                                                 firstDecl->getDeclContext())) {
-            shadowed.insert(firstDecl);
-            break;
-          }
-        }
-      }
-    }
-  }
-  
-  // Check for collisions among Objective-C initializers. When such collisions
-  // exist, we pick the
-  for (const auto &colliding : ObjCCollidingConstructors) {
-    if (colliding.second.size() == 1)
-      continue;
-
-    // Find the "best" constructor with this signature.
-    ConstructorDecl *bestCtor = colliding.second[0];
-    for (auto ctor : colliding.second) {
-      auto comparison = compareConstructors(ctor, bestCtor, ctx);
-      if (comparison == ConstructorComparison::Better)
-        bestCtor = ctor;
     }
 
-    // Shadow any initializers that are worse.
-    for (auto ctor : colliding.second) {
-      auto comparison = compareConstructors(ctor, bestCtor, ctx);
-      if (comparison == ConstructorComparison::Worse)
-        shadowed.insert(ctor);
-    }
+    recordShadowedDecls(known->second, curModule, shadowed);
+    collidingDeclGroups.erase(known);
   }
 
-  // If none of the declarations were shadowed, we're done.
+  // If no declarations were shadowed, we're done.
   if (shadowed.empty())
     return false;
 
@@ -472,6 +526,103 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
 
   llvm_unreachable("Unhandled ASTScopeKind in switch.");
 }
+
+/// Retrieve the set of type declarations that are directly referenced from
+/// the given parsed type representation.
+static DirectlyReferencedTypeDecls
+directReferencesForTypeRepr(Evaluator &evaluator,
+                            ASTContext &ctx, TypeRepr *typeRepr,
+                            DeclContext *dc);
+
+/// Retrieve the set of type declarations that are directly referenced from
+/// the given type.
+static DirectlyReferencedTypeDecls directReferencesForType(Type type);
+
+/// Given a set of type declarations, find all of the nominal type declarations
+/// that they reference, looking through typealiases as appropriate.
+static TinyPtrVector<NominalTypeDecl *>
+resolveTypeDeclsToNominal(Evaluator &evaluator,
+                          ASTContext &ctx,
+                          ArrayRef<TypeDecl *> typeDecls,
+                          SmallVectorImpl<ModuleDecl *> &modulesFound,
+                          bool &anyObject);
+
+TinyPtrVector<NominalTypeDecl *>
+SelfBoundsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
+                                           ExtensionDecl *ext) const {
+  auto proto = ext->getExtendedProtocolDecl();
+  assert(proto && "Not a protocol extension?");
+
+  ASTContext &ctx = proto->getASTContext();
+  TinyPtrVector<NominalTypeDecl *> result;
+  for (const auto &req : ext->getGenericParams()->getTrailingRequirements()) {
+    // We only care about type constraints.
+    if (req.getKind() != RequirementReprKind::TypeConstraint)
+      continue;
+
+    // The left-hand side of the type constraint must be 'Self'.
+    bool isSelfLHS = false;
+    if (auto typeRepr = req.getSubjectRepr()) {
+      if (auto identTypeRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr))
+        isSelfLHS = (identTypeRepr->getIdentifier() == ctx.Id_Self);
+    } else if (Type type = req.getSubject()) {
+      isSelfLHS = type->isEqual(proto->getSelfInterfaceType());
+    }
+    if (!isSelfLHS)
+      continue;
+
+    // Resolve the right-hand side.
+    DirectlyReferencedTypeDecls rhsDecls;
+    if (auto typeRepr = req.getConstraintRepr()) {
+      rhsDecls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
+    } else if (Type type = req.getConstraint()) {
+      rhsDecls = directReferencesForType(type);
+    }
+
+    SmallVector<ModuleDecl *, 2> modulesFound;
+    bool anyObject = false;
+    auto rhsNominals = resolveTypeDeclsToNominal(evaluator, ctx, rhsDecls,
+                                                 modulesFound, anyObject);
+    result.insert(result.end(), rhsNominals.begin(), rhsNominals.end());
+  }
+
+  return result;
+}
+
+namespace {
+
+/// Determine whether unqualified lookup should look at the members of the
+/// given nominal type or extension, vs. only looking at type parameters.
+template<typename D>
+bool shouldLookupMembers(D *decl, SourceLoc loc) {
+  // Only look at members of this type (or its inherited types) when
+  // inside the body or a protocol's top-level 'where' clause. (Why the
+  // 'where' clause? Because that's where you put constraints on
+  // inherited associated types.)
+
+  // When we have no source-location information, we have to perform member
+  // lookup.
+  if (loc.isInvalid() || decl->getBraces().isInvalid())
+    return true;
+
+  // Within the braces, always look for members.
+  auto &ctx = decl->getASTContext();
+  if (ctx.SourceMgr.rangeContainsTokenLoc(decl->getBraces(), loc))
+    return true;
+
+  // Within 'where' clause, we can also look for members.
+  if (auto *whereClause = decl->getTrailingWhereClause()) {
+    SourceRange whereClauseRange = whereClause->getSourceRange();
+    if (whereClauseRange.isValid() &&
+        ctx.SourceMgr.rangeContainsTokenLoc(whereClauseRange, loc)) {
+      return true;
+    }
+  }
+
+  // Don't look at the members.
+  return false;
+}
+} // end anonymous namespace
 
 UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                      LazyResolver *TypeResolver, SourceLoc Loc,
@@ -606,19 +757,21 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         // We have a nominal type or an extension thereof. Perform lookup into
         // the nominal type.
-        auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+        auto nominal = dc->getSelfNominalTypeDecl();
         if (!nominal) continue;
 
         // Dig out the type we're looking into.
-        // FIXME: We shouldn't need to compute a type to perform this lookup.
-        Type lookupType;
+        SmallVector<TypeDecl *, 2> lookupDecls;
+        lookupDecls.push_back(nominal);
+
+        // For a protocol extension, check whether there are additional
+        // "Self" constraints that can affect name lookup.
         if (isa<ProtocolDecl>(nominal)) {
           if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-            TypeResolver->bindExtension(ext);
-
-            lookupType = dc->getSelfTypeInContext();
-
-            if (lookupType->hasError()) continue;
+            auto bounds = evaluateOrDefault(Ctx.evaluator,
+              SelfBoundsFromWhereClauseRequest{ext}, {});
+            for (auto bound : bounds)
+              lookupDecls.push_back(bound);
           }
         }
 
@@ -630,10 +783,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           options |= NL_KnownNonCascadingDependency;
 
         SmallVector<ValueDecl *, 4> lookup;
-        if (lookupType)
-          dc->lookupQualified(lookupType, Name, options, TypeResolver, lookup);
-        else
-          dc->lookupQualified(nominal, Name, options, lookup);
+        dc->lookupQualified(lookupDecls, Name, options, lookup);
 
         auto startIndex = Results.size();
         for (auto result : lookup) {
@@ -687,7 +837,30 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         DeclContext *BaseDC = nullptr;
         DeclContext *MetaBaseDC = nullptr;
         GenericParamList *GenericParams = nullptr;
-        Type ExtendedType;
+
+        // Dig out the type we're looking into.
+        SmallVector<TypeDecl *, 2> lookupDecls;
+
+        // Local function to populate the set of lookup declarations from
+        // the given DeclContext.
+        auto populateLookupDeclsFromContext = [&](DeclContext *dc) {
+          auto nominal = dc->getSelfNominalTypeDecl();
+          if (!nominal)
+            return;
+
+          lookupDecls.push_back(nominal);
+
+          // For a protocol extension, check whether there are additional
+          // "Self" constraints that can affect name lookup.
+          if (isa<ProtocolDecl>(nominal)) {
+            if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+              auto bounds = evaluateOrDefault(Ctx.evaluator,
+                SelfBoundsFromWhereClauseRequest{ext}, {});
+              for (auto bound : bounds)
+                lookupDecls.push_back(bound);
+            }
+          }
+        };
 
         if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC)) {
           auto *PBD = PBI->getBinding();
@@ -703,7 +876,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
             DC = DC->getParent();
 
-            ExtendedType = DC->getSelfTypeInContext();
+            populateLookupDeclsFromContext(DC);
             MetaBaseDC = DC;
             BaseDC = PBI;
           }
@@ -712,7 +885,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           else if (PBD->getDeclContext()->isTypeContext()) {
             DC = DC->getParent();
 
-            ExtendedType = DC->getSelfTypeInContext();
+            populateLookupDeclsFromContext(DC);
             MetaBaseDC = DC;
             BaseDC = MetaBaseDC;
 
@@ -750,7 +923,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             isCascadingUse = AFD->isCascadingContextForLookup(false);
 
           if (AFD->getDeclContext()->isTypeContext()) {
-            ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();
+            populateLookupDeclsFromContext(AFD->getDeclContext());
             BaseDC = AFD;
             MetaBaseDC = AFD->getDeclContext();
             DC = DC->getParent();
@@ -796,18 +969,16 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             continue;
           }
 
-          if (TypeResolver) {
-            TypeResolver->bindExtension(ED);
-          }
-
-          ExtendedType = ED->getSelfTypeInContext();
+          if (shouldLookupMembers(ED, Loc))
+            populateLookupDeclsFromContext(ED);
 
           BaseDC = ED;
           MetaBaseDC = ED;
           if (!isCascadingUse.hasValue())
             isCascadingUse = ED->isCascadingContextForLookup(false);
         } else if (auto *ND = dyn_cast<NominalTypeDecl>(DC)) {
-          ExtendedType = ND->getDeclaredType();
+          if (shouldLookupMembers(ND, Loc))
+            populateLookupDeclsFromContext(ND);
           BaseDC = DC;
           MetaBaseDC = DC;
           if (!isCascadingUse.hasValue())
@@ -834,7 +1005,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             return;
         }
 
-        if (BaseDC && ExtendedType && !ExtendedType->hasError()) {
+        if (BaseDC && !lookupDecls.empty()) {
           NLOptions options = baseNLOptions;
           if (isCascadingUse.getValue())
             options |= NL_KnownCascadingDependency;
@@ -842,7 +1013,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             options |= NL_KnownNonCascadingDependency;
 
           SmallVector<ValueDecl *, 4> Lookup;
-          DC->lookupQualified(ExtendedType, Name, options, TypeResolver, Lookup);
+          DC->lookupQualified(lookupDecls, Name, options, Lookup);
           bool FoundAny = false;
           auto startIndex = Results.size();
           for (auto Result : Lookup) {
@@ -1702,10 +1873,15 @@ bool DeclContext::lookupQualified(Type type,
   SmallVector<NominalTypeDecl *, 4> nominalTypesToLookInto;
   extractDirectlyReferencedNominalTypes(type, nominalTypesToLookInto);
 
-  return lookupQualified(nominalTypesToLookInto, member, options, decls);
+  SmallVector<TypeDecl *, 4> typeDeclsToLookInto;
+  typeDeclsToLookInto.reserve(nominalTypesToLookInto.size());
+  for (auto nominal : nominalTypesToLookInto)
+    typeDeclsToLookInto.push_back(nominal);
+
+  return lookupQualified(typeDeclsToLookInto, member, options, decls);
 }
 
-bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
+bool DeclContext::lookupQualified(ArrayRef<TypeDecl *> typeDecls,
                                   DeclName member,
                                   NLOptions options,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
@@ -1734,10 +1910,31 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
     return true;
   };
 
-  // Look through the type declarations we were given, resolving
+  // Look through the type declarations we were given, resolving them down
+  // to nominal type declarations, module declarations, and
   ASTContext &ctx = getASTContext();
-  for (auto nominal : typeDecls) {
+  SmallVector<ModuleDecl *, 2> moduleDecls;
+  bool anyObject = false;
+  auto nominalTypeDecls =
+    resolveTypeDeclsToNominal(ctx.evaluator, ctx, typeDecls, moduleDecls,
+                              anyObject);
+
+  // If the only declaration we were given was AnyObject, this is AnyObject
+  // lookup.
+  if (anyObject && nominalTypeDecls.empty() && moduleDecls.empty())
+    return lookupAnyObject(member, options, decls);
+
+  // Add all of the nominal types to the stack.
+  for (auto nominal : nominalTypeDecls) {
     addNominalType(nominal);
+  }
+
+  // Search all of the modules.
+  for (auto module : moduleDecls) {
+    auto innerOptions = options;
+    innerOptions &= ~NL_RemoveOverridden;
+    innerOptions &= ~NL_RemoveNonVisible;
+    lookupQualified(module, member, innerOptions, decls);
   }
 
   // Whether we only want to return complete object initializers.
@@ -1838,7 +2035,6 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
                                   NLOptions options,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
-  assert(decls.empty() && "additive lookup not supported");
 
   // Configure lookup and dig out the tracker.
   ReferencedNameTracker *tracker = nullptr;
@@ -1926,8 +2122,9 @@ bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
       continue;
 
     auto dc = decl->getDeclContext();
-    auto nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto nominal = dc->getSelfNominalTypeDecl();
     assert(nominal && "Couldn't find nominal type?");
+    (void)nominal;
 
     // If we didn't see this declaration before, and it's an acceptable
     // result, add it to the list.
@@ -1984,8 +2181,9 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
       if (!typealiases.insert(typealias).second)
         continue;
 
-      auto underlyingTypeReferences
-        = evaluator(UnderlyingTypeDeclsReferencedRequest{typealias});
+      auto underlyingTypeReferences = evaluateOrDefault(evaluator,
+        UnderlyingTypeDeclsReferencedRequest{typealias}, {});
+
       auto underlyingNominalReferences
         = resolveTypeDeclsToNominal(evaluator, ctx, underlyingTypeReferences,
                                     modulesFound, anyObject, typealiases);
@@ -2063,14 +2261,6 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
                                        ArrayRef<TypeDecl *> baseTypes,
                                        DeclName name,
                                        DeclContext *dc) {
-  // Look through the base types to find something on which we can perform
-  // qualified name lookup.
-  SmallVector<ModuleDecl *, 2> moduleBaseTypes;
-  bool anyObject = false;
-  auto nominalBaseTypes =
-      resolveTypeDeclsToNominal(evaluator, ctx, baseTypes, moduleBaseTypes,
-                                anyObject);
-
   DirectlyReferencedTypeDecls result;
   auto addResults = [&result](ArrayRef<ValueDecl *> found){
     for (auto decl : found){
@@ -2081,21 +2271,11 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
   };
 
   {
-    // Look through nominal types.
-    SmallVector<ValueDecl *, 4> nominalMembers;
+    // Look into the base types.
+    SmallVector<ValueDecl *, 4> members;
     auto options = NL_RemoveNonVisible | NL_OnlyTypes;
-    dc->lookupQualified(nominalBaseTypes, name, options, nominalMembers);
-    addResults(nominalMembers);
-  }
-
-  {
-    // Look through modules.
-    auto options = NL_RemoveNonVisible | NL_OnlyTypes;
-    for (auto module : moduleBaseTypes) {
-      SmallVector<ValueDecl *, 4> moduleMembers;
-      dc->lookupQualified(module, name, options, moduleMembers);
-      addResults(moduleMembers);
-    }
+    dc->lookupQualified(baseTypes, name, options, members);
+    addResults(members);
   }
 
   return result;
@@ -2143,8 +2323,6 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
   return current;
 }
 
-/// Retrieve the set of type declarations that are directly referenced from
-/// the given parsed type representation.
 static DirectlyReferencedTypeDecls
 directReferencesForTypeRepr(Evaluator &evaluator,
                             ASTContext &ctx, TypeRepr *typeRepr,
@@ -2201,10 +2379,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   }
 }
 
-/// Retrieve the set of type declarations that are directly referenced from
-/// the given type.
-static DirectlyReferencedTypeDecls
-directReferencesForType(Type type) {
+static DirectlyReferencedTypeDecls directReferencesForType(Type type) {
   // If it's a typealias, return that.
   if (auto aliasType = dyn_cast<NameAliasType>(type.getPointer()))
     return { 1, aliasType->getDecl() };
@@ -2282,12 +2457,13 @@ DirectlyReferencedTypeDecls UnderlyingTypeDeclsReferencedRequest::evaluate(
 }
 
 /// Evaluate a superclass declaration request.
-ClassDecl *SuperclassDeclRequest::evaluate(Evaluator &evaluator,
-                                           NominalTypeDecl *subject) const {
+llvm::Expected<ClassDecl *>
+SuperclassDeclRequest::evaluate(Evaluator &evaluator,
+                                NominalTypeDecl *subject) const {
   for (unsigned i : indices(subject->getInherited())) {
     // Find the inherited declarations referenced at this position.
-    auto inheritedTypes =
-      evaluator(InheritedDeclsReferencedRequest{subject, i});
+    auto inheritedTypes = evaluateOrDefault(evaluator,
+      InheritedDeclsReferencedRequest{subject, i}, {});
 
     // Resolve those type declarations to nominal type declarations.
     SmallVector<ModuleDecl *, 2> modulesFound;
@@ -2306,8 +2482,9 @@ ClassDecl *SuperclassDeclRequest::evaluate(Evaluator &evaluator,
   return nullptr;
 }
 
-NominalTypeDecl *ExtendedNominalRequest::evaluate(Evaluator &evaluator,
-                                                  ExtensionDecl *ext) const {
+llvm::Expected<NominalTypeDecl *>
+ExtendedNominalRequest::evaluate(Evaluator &evaluator,
+                                 ExtensionDecl *ext) const {
   DirectlyReferencedTypeDecls referenced;
   ASTContext &ctx = ext->getASTContext();
 
@@ -2343,7 +2520,8 @@ void swift::getDirectlyInheritedNominalTypeDecls(
                              : extDecl->getASTContext();
 
   // Find inherited declarations.
-  auto referenced = ctx.evaluator(InheritedDeclsReferencedRequest{decl, i});
+  auto referenced = evaluateOrDefault(ctx.evaluator,
+    InheritedDeclsReferencedRequest{decl, i}, {});
 
   // Resolve those type declarations to nominal type declarations.
   SmallVector<ModuleDecl *, 2> modulesFound;

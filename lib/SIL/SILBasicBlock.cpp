@@ -29,12 +29,15 @@ using namespace swift;
 // SILBasicBlock Implementation
 //===----------------------------------------------------------------------===//
 
-SILBasicBlock::SILBasicBlock(SILFunction *parent, SILBasicBlock *afterBB)
+SILBasicBlock::SILBasicBlock(SILFunction *parent, SILBasicBlock *relativeToBB,
+                             bool after)
     : Parent(parent), PredList(nullptr) {
-  if (afterBB) {
-    parent->getBlocks().insertAfter(afterBB->getIterator(), this);
-  } else {
+  if (!relativeToBB) {
     parent->getBlocks().push_back(this);
+  } else if (after) {
+    parent->getBlocks().insertAfter(relativeToBB->getIterator(), this);
+  } else {
+    parent->getBlocks().insert(relativeToBB->getIterator(), this);
   }
 }
 SILBasicBlock::~SILBasicBlock() {
@@ -238,11 +241,8 @@ void SILBasicBlock::eraseArgument(int Index) {
 /// stay as part of the original basic block. The old basic block is left
 /// without a terminator.
 SILBasicBlock *SILBasicBlock::split(iterator I) {
-  SILBasicBlock *New = new (Parent->getModule()) SILBasicBlock(Parent);
-  SILFunction::iterator Where = std::next(SILFunction::iterator(this));
-  SILFunction::iterator First = SILFunction::iterator(New);
-  if (Where != First)
-    Parent->getBlocks().splice(Where, Parent->getBlocks(), First);
+  SILBasicBlock *New =
+    new (Parent->getModule()) SILBasicBlock(Parent, this, /*after*/true);
   // Move all of the specified instructions from the original basic block into
   // the new basic block.
   New->InstList.splice(New->end(), InstList, I, end());

@@ -12,6 +12,7 @@
 
 #include "swift/Basic/Program.h"
 
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/Program.h"
 
@@ -33,7 +34,9 @@ int swift::ExecuteInPlace(const char *Program, const char **args,
 
   return result;
 #else
-  int result = llvm::sys::ExecuteAndWait(Program, args, env);
+  llvm::ArrayRef<llvm::StringRef> Env = llvm::toStringRefArray(env);
+  int result =
+      llvm::sys::ExecuteAndWait(Program, llvm::toStringRefArray(args), Env);
   if (result >= 0)
     exit(result);
   return result;

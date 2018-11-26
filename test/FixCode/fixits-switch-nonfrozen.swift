@@ -146,7 +146,6 @@ public enum NonExhaustivePayload {
   case milliseconds(Int)
   case microseconds(Int)
   case nanoseconds(Int)
-  @_downgrade_exhaustivity_check
   case never
 }
 
@@ -240,7 +239,6 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   @unknown case _: break
   } // no-warning
 
-  // Test interaction with @_downgrade_exhaustivity_check.
   switch (value, interval) {
   case (_, .seconds): break
   case (.a, _): break

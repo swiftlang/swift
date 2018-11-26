@@ -38,6 +38,7 @@ class ConsumableManagedValue;
 class LogicalPathComponent;
 class LValue;
 class ManagedValue;
+class PreparedArguments;
 class RValue;
 class CalleeTypeInfo;
 class ResultPlan;
@@ -127,8 +128,7 @@ enum class TSanKind : bool {
 
 /// Represents an LValue opened for mutating access.
 ///
-/// This is used by LogicalPathComponent::getMaterialized() and
-/// SILGenFunction::emitMaterializeForSetAccessor().
+/// This is used by LogicalPathComponent::getMaterialized().
 struct MaterializedLValue {
   ManagedValue temporary;
 
@@ -253,16 +253,6 @@ public:
 
   /// \brief The current context where formal evaluation cleanups are managed.
   FormalEvaluationContext FormalEvalContext;
-
-  /// \brief Values to end dynamic access enforcement on.  A hack for
-  /// materializeForSet.
-  struct UnpairedAccesses {
-    SILValue Buffer;
-    unsigned NumAccesses = 0; // Values besides 0 and 1 are unsupported.
-
-    explicit UnpairedAccesses(SILValue buffer) : Buffer(buffer) {}
-  };
-  UnpairedAccesses *UnpairedAccessesForMaterializeForSet = nullptr;
 
   /// VarLoc - representation of an emitted local variable or constant.  There
   /// are three scenarios here:
@@ -557,6 +547,7 @@ public:
   void emitProtocolWitness(AbstractionPattern reqtOrigTy,
                            CanAnyFunctionType reqtSubstTy,
                            SILDeclRef requirement,
+                           SubstitutionMap reqtSubs,
                            SILDeclRef witness,
                            SubstitutionMap witnessSubs,
                            IsFreeFunctionWitness_t isFree);
@@ -636,7 +627,9 @@ public:
   /// first block.  (This is clearly desirable behavior when blocks
   /// are created by different emissions; it's just a little
   /// counter-intuitive within a single emission.)
-  SILBasicBlock *createBasicBlock(SILBasicBlock *afterBB = nullptr);  
+  SILBasicBlock *createBasicBlock();
+  SILBasicBlock *createBasicBlockAfter(SILBasicBlock *afterBB);
+  SILBasicBlock *createBasicBlockBefore(SILBasicBlock *beforeBB);
 
   /// Create a new basic block at the end of the given function
   /// section.
@@ -1101,7 +1094,7 @@ public:
                                   ManagedValue base,
                                   CanType baseFormalType,
                                   bool isSuper, AbstractStorageDecl *storage,
-                                  RValue indexes,
+                                  PreparedArguments &&indices,
                                   SubstitutionMap substitutions,
                                   AccessSemantics semantics, Type propTy,
                                   SGFContext C,
@@ -1119,7 +1112,12 @@ public:
                                 SILDeclRef function,
                                 CanType expectedType,
                                 SubstitutionMap subs);
-  
+
+  PreparedArguments prepareSubscriptIndices(SubscriptDecl *subscript,
+                                            SubstitutionMap subs,
+                                            AccessStrategy strategy,
+                                            Expr *indices);
+
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,
                                         SILDeclRef accessor);
@@ -1128,22 +1126,15 @@ public:
                          SubstitutionMap substitutions,
                          ArgumentSource &&optionalSelfValue,
                          bool isSuper, bool isDirectAccessorUse,
-                         RValue &&optionalSubscripts, SGFContext C);
+                         PreparedArguments &&optionalSubscripts, SGFContext C);
 
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
                        SubstitutionMap substitutions,
                        ArgumentSource &&optionalSelfValue,
                        bool isSuper, bool isDirectAccessorUse,
-                       RValue &&optionalSubscripts,
+                       PreparedArguments &&optionalSubscripts,
                        ArgumentSource &&value);
 
-  MaterializedLValue
-  emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
-                                SubstitutionMap substitutions,
-                                ArgumentSource &&optionalSelfValue,
-                                bool isSuper, bool isDirectAccessorUse,
-                                RValue &&optionalSubscripts,
-                                SILValue buffer, SILValue callbackStorage);
   bool maybeEmitMaterializeForSetThunk(ProtocolConformanceRef conformance,
                                        SILLinkage linkage,
                                        Type selfInterfaceType, Type selfType,
@@ -1151,14 +1142,13 @@ public:
                                        AccessorDecl *requirement,
                                        AccessorDecl *witness,
                                        SubstitutionMap witnessSubs);
-  void emitMaterializeForSet(AccessorDecl *decl);
 
   std::pair<ManagedValue,ManagedValue>
   emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                         SubstitutionMap substitutions,
                         ArgumentSource &&optionalSelfValue,
                         bool isSuper, bool isDirectAccessorUse,
-                        RValue &&optionalSubscripts,
+                        PreparedArguments &&optionalSubscripts,
                         SILType addressType);
 
   CleanupHandle
@@ -1166,7 +1156,7 @@ public:
                         SubstitutionMap substitutions,
                         ArgumentSource &&optionalSelfValue,
                         bool isSuper, bool isDirectAccessorUse,
-                        RValue &&optionalSubscripts,
+                        PreparedArguments &&optionalSubscripts,
                         SmallVectorImpl<ManagedValue> &yields);
 
   RValue emitApplyConversionFunction(SILLocation loc,
@@ -1311,6 +1301,8 @@ public:
   void emitYield(SILLocation loc, MutableArrayRef<ArgumentSource> yieldValues,
                  ArrayRef<AbstractionPattern> origTypes,
                  JumpDest unwindDest);
+  void emitRawYield(SILLocation loc, ArrayRef<ManagedValue> yieldArgs,
+                    JumpDest unwindDest, bool isUniqueYield);
 
   RValue emitAnyHashableErasure(SILLocation loc,
                                 ManagedValue value,
@@ -1375,6 +1367,13 @@ public:
                                 SILType substFnType,
                                 SubstitutionMap subs,
                                 ArrayRef<SILValue> args);
+
+  SILValue emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
+                                     SILType substFnType,
+                                     SubstitutionMap subs,
+                                     ArrayRef<SILValue> args,
+                                     SmallVectorImpl<SILValue> &yields);
+  void emitEndApplyWithRethrow(SILLocation loc, SILValue token);
 
   /// Emit a literal that applies the various initializers.
   RValue emitLiteral(LiteralExpr *literal, SGFContext C);
@@ -1483,20 +1482,6 @@ public:
       llvm::function_ref<void(Optional<ManagedValue>)> handleFalse,
       ProfileCounter TrueCount = ProfileCounter(),
       ProfileCounter FalseCount = ProfileCounter());
-
-  /// A form of checked cast branch that uses the old non-ownership preserving
-  /// semantics.
-  ///
-  /// The main difference is that this code does not pass the old argument as a
-  /// block argument in the failure case. This causes values to be double
-  /// consumed.
-  void
-  emitCheckedCastBranchOld(SILLocation loc, Expr *source, Type targetType,
-                           SGFContext ctx,
-                           llvm::function_ref<void(ManagedValue)> handleTrue,
-                           llvm::function_ref<void()> handleFalse,
-                           ProfileCounter TrueCount = ProfileCounter(),
-                           ProfileCounter FalseCount = ProfileCounter());
 
   /// \brief Emit a conditional checked cast branch, starting from an
   /// expression.  Terminates the current BB.
@@ -1658,8 +1643,7 @@ public:
                               CanType outputSubstType,
                               SGFContext ctx = SGFContext());
 
-  /// Used for emitting SILArguments of bare functions, such as thunks and
-  /// open-coded materializeForSet.
+  /// Used for emitting SILArguments of bare functions, such as thunks.
   void collectThunkParams(
       SILLocation loc, SmallVectorImpl<ManagedValue> &params,
       SmallVectorImpl<SILArgument *> *indirectResultParams = nullptr);
@@ -1782,7 +1766,8 @@ public:
   
   /// Enter a cleanup to emit a DeinitExistentialAddr or DeinitExistentialBox
   /// of the specified value.
-  CleanupHandle enterDeinitExistentialCleanup(SILValue valueOrAddr,
+  CleanupHandle enterDeinitExistentialCleanup(CleanupState state,
+                                              SILValue addr,
                                               CanType concreteFormalType,
                                               ExistentialRepresentation repr);
 

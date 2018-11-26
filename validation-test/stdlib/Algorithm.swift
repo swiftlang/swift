@@ -243,7 +243,7 @@ Algorithm.test("sort3/stable")
   ]) {
     // decorate with offset, but sort by value
     var input = Array($0.enumerated())
-    _sort3(&input, 0, 1, 2) { $0.element < $1.element }
+    input._sort3(0, 1, 2) { $0.element < $1.element }
     // offsets should still be ordered for equal values
     expectTrue(isSorted(input) {
       if $0.element == $1.element {

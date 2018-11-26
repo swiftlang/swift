@@ -3,6 +3,11 @@
 // RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all -swift-version 4 %s -O
 // RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all -swift-version 4 %s -enable-testing -O
 
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -typecheck -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/typecheck.tbd
+// RUN: %target-swift-frontend -emit-ir -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/emit-ir.tbd
+// RUN: diff -u %t/typecheck.tbd %t/emit-ir.tbd
+
 public func publicNoArgs() {}
 public func publicSomeArgs(_: Int, x: Int) {}
 public func publicWithDefault(_: Int = 0) {}

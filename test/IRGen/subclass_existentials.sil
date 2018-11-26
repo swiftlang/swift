@@ -21,7 +21,7 @@ protocol R {}
 // CHECK-objc-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkRefcounting(%T21subclass_existentials1CC*, i8**, %objc_object*, i8**)
 // CHECK-native-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkRefcounting(%T21subclass_existentials1CC*, i8**, %swift.refcounted*, i8**)
 // CHECK-NEXT: entry:
-// CHECK-objc-NEXT:   call void @swift_unknownRelease(%objc_object* %2)
+// CHECK-objc-NEXT:   call void @swift_unknownObjectRelease(%objc_object* %2)
 // CHECK-native-NEXT: call void @swift_release(%swift.refcounted* %2)
 // CHECK-NEXT:   call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T21subclass_existentials1CC*)*)(%T21subclass_existentials1CC* %0)
 // CHECK-NEXT:   ret void

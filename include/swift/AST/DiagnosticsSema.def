@@ -58,6 +58,8 @@ NOTE(extended_type_declared_here,none,
 
 ERROR(ambiguous_member_overload_set,none,
       "ambiguous reference to member %0", (DeclName))
+ERROR(ambiguous_reference_to_decl,none,
+      "ambiguous reference to %0 %1", (DescriptiveDeclKind, DeclName))
 
 ERROR(ambiguous_subscript,none,
       "ambiguous subscript with base type %0 and index type %1",
@@ -499,8 +501,6 @@ ERROR(expr_swift_keypath_invalid_component,none,
       "invalid component of Swift key path", ())
 ERROR(expr_swift_keypath_not_starting_with_type,none,
       "a Swift key path must begin with a type", ())
-ERROR(expr_swift_keypath_unimplemented_component,none,
-      "key path support for %0 components is not implemented", (StringRef))
 ERROR(expr_smart_keypath_value_covert_to_contextual_type,none,
       "key path value type %0 cannot be converted to contextual type %1",
       (Type, Type))
@@ -929,6 +929,12 @@ NOTE(unwrap_with_default_value,none,
 NOTE(unwrap_with_force_value,none,
      "force-unwrap using '!' to abort execution if the optional value contains "
      "'nil'", ())
+NOTE(unwrap_iuo_initializer,none,
+     "value inferred to be type %0 when initialized with an implicitly "
+     "unwrapped value", (Type))
+NOTE(unwrap_with_guard,none,
+     "short-circuit using 'guard' to exit this function early "
+     "if the optional value contains 'nil'", ())
 ERROR(optional_base_not_unwrapped,none,
       "value of optional type %0 must be unwrapped to refer to member %1 of "
       "wrapped base type %2", (Type, DeclName, Type))
@@ -1248,12 +1254,6 @@ ERROR(missing_unimplemented_init_runtime,none,
       "standard library error: missing _unimplementedInitializer", ())
 ERROR(missing_undefined_runtime,none,
       "standard library error: missing _undefined", ())
-WARNING(unsupported_synthesize_init_variadic,none,
-        "synthesizing a variadic inherited initializer for subclass %0 is "
-        "unsupported",
-        (Type))
-NOTE(variadic_superclass_init_here,none,
-     "variadic superclass initializer defined here", ())
 
 WARNING(expr_dynamic_lookup_swift3_objc_inference,none,
         "reference to %0 %1 of %2 depends on '@objc' inference "
@@ -1480,7 +1480,7 @@ ERROR(extension_nongeneric_trailing_where,none,
       "trailing 'where' clause for extension of non-generic type %0",
       (DeclName))
 ERROR(extension_protocol_inheritance,none,
-      "extension of protocol %0 cannot have an inheritance clause", (Type))
+      "extension of protocol %0 cannot have an inheritance clause", (DeclName))
 ERROR(objc_generic_extension_using_type_parameter,none,
       "extension of a generic Objective-C class cannot access the class's "
       "generic parameters at runtime", ())
@@ -1523,10 +1523,28 @@ ERROR(type_does_not_conform_in_decl_ref,none,
 ERROR(type_does_not_conform_decl_owner,none,
       "%0 %1 requires that %2 conform to %3",
       (DescriptiveDeclKind, DeclName, Type, Type))
-NOTE(where_type_does_not_conform_type,none,
+ERROR(types_not_equal_decl,none,
+      "%0 %1 requires the types %2 and %3 be equivalent",
+      (DescriptiveDeclKind, DeclName, Type, Type))
+ERROR(types_not_equal_in_decl_ref,none,
+      "referencing %0 %1 on %2 requires the types %3 and %4 be equivalent",
+      (DescriptiveDeclKind, DeclName, Type, Type, Type))
+ERROR(types_not_inherited_decl,none,
+      "%0 %1 requires that %2 inherit from %3",
+      (DescriptiveDeclKind, DeclName, Type, Type))
+ERROR(types_not_inherited_in_decl_ref,none,
+      "referencing %0 %1 on %2 requires that %3 inherit from %4",
+      (DescriptiveDeclKind, DeclName, Type, Type, Type))
+NOTE(where_requirement_failure_one_subst,none,
      "where %0 = %1", (Type, Type))
+NOTE(where_requirement_failure_both_subst,none,
+     "where %0 = %1, %2 = %3", (Type, Type, Type, Type))
 NOTE(requirement_implied_by_conditional_conformance,none,
      "requirement from conditional conformance of %0 to %1", (Type, Type))
+NOTE(candidate_types_conformance_requirement,none,
+     "candidate requires that %0 conform to %1 "
+     "(requirement specified as %2 == %3%4)",
+     (Type, Type, Type, Type, StringRef))
 NOTE(candidate_types_equal_requirement,none,
      "candidate requires that the types %0 and %1 be equivalent "
      "(requirement specified as %2 == %3%4)",
@@ -1562,9 +1580,9 @@ ERROR(objc_protocol_cannot_have_conditional_conformance,none,
       (Type, Type))
 ERROR(objc_protocol_in_generic_extension,none,
       "conformance of "
-      "%select{|subclass of a }2%select{class from generic context|generic class}3"
-      " %0 to @objc protocol %1 cannot be in an extension",
-      (Type, Type, bool, bool))
+      "%select{class from generic context|generic class}0 "
+      "%1 to @objc protocol %2 cannot be in an extension",
+      (bool, Type, Type))
 ERROR(conditional_conformances_cannot_imply_conformances,none,
       "conditional conformance of type %0 to protocol %1 does not imply conformance to "
       "inherited protocol %2",
@@ -3531,7 +3549,9 @@ ERROR(invalid_nonobjc_extension,none,
 ERROR(objc_in_extension_context,none,
       "members of constrained extensions cannot be declared @objc", ())
 ERROR(objc_in_generic_extension,none,
-      "@objc is not supported within extensions of generic classes or classes that inherit from generic classes", ())
+      "members of extensions of "
+      "%select{classes from generic context|generic classes}0 "
+      "cannot be declared @objc", (bool))
 ERROR(objc_operator, none,
       "operator methods cannot be declared @objc", ())
 ERROR(objc_operator_proto, none,

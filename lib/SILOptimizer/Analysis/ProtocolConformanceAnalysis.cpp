@@ -67,4 +67,60 @@ void ProtocolConformanceAnalysis::init() {
   }
 }
 
+/// Recursively traverse the conformance lists to determine sole conforming
+/// class, struct or enum type.
+NominalTypeDecl *
+ProtocolConformanceAnalysis::findSoleConformingType(ProtocolDecl *Protocol) {
+
+  /// First check in the SoleConformingTypeCache.
+  auto SoleConformingTypeIt = SoleConformingTypeCache.find(Protocol);
+  if (SoleConformingTypeIt != SoleConformingTypeCache.end())
+    return SoleConformingTypeIt->second;
+
+  SmallVector<ProtocolDecl *, 8> PDWorkList;
+  SmallPtrSet<ProtocolDecl *, 8> VisitedPDs;
+  NominalTypeDecl *SoleConformingNTD = nullptr;
+  PDWorkList.push_back(Protocol);
+  while (!PDWorkList.empty()) {
+    auto *PD = PDWorkList.pop_back_val();
+    // Protocols must have internal or lower access.
+    if (PD->getEffectiveAccess() > AccessLevel::Internal) {
+      return nullptr;
+    }
+    VisitedPDs.insert(PD);
+    auto NTDList = getConformances(PD);
+    for (auto *ConformingNTD : NTDList) {
+      // Recurse on protocol types.
+      if (auto *Proto = dyn_cast<ProtocolDecl>(ConformingNTD)) {
+        // Ignore visited protocol decls.
+        if (!VisitedPDs.count(Proto))
+          PDWorkList.push_back(Proto);
+      } else { // Classes, Structs and Enums are added here.
+        // Bail if more than one conforming types were found.
+        if (SoleConformingNTD && ConformingNTD != SoleConformingNTD) {
+          return nullptr;
+        } else {
+          SoleConformingNTD = ConformingNTD;
+        }
+      }
+    }
+  }
+
+  // Bail if we did not find a sole conforming type.
+  if (!SoleConformingNTD)
+    return nullptr;
+
+  // Generic declarations are ignored.
+  if (SoleConformingNTD->isGenericContext()) {
+    return nullptr;
+  }
+
+  // Populate SoleConformingTypeCache.
+  SoleConformingTypeCache.insert(std::pair<ProtocolDecl *, NominalTypeDecl *>(
+      Protocol, SoleConformingNTD));
+
+  // Return SoleConformingNTD.
+  return SoleConformingNTD;
+}
+
 ProtocolConformanceAnalysis::~ProtocolConformanceAnalysis() {}

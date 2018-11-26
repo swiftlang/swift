@@ -82,3 +82,28 @@ internal func makeSyntax(root: SyntaxData?, data: SyntaxData) -> Syntax {
 % end
   }
 }
+
+
+extension SyntaxKind: ByteTreeScalarDecodable {
+  static func read(from pointer: UnsafeRawPointer, size: Int,
+                   userInfo: UnsafePointer<[ByteTreeUserInfoKey: Any]>
+  ) -> SyntaxKind {
+    // Explicitly spell out all SyntaxKinds to keep the serialized value stable
+    // even if its members get reordered or members get removed
+    let rawValue = UInt16.read(from: pointer, size: size, userInfo: userInfo)
+    switch rawValue {
+    case 0: 
+      return .token
+    case 1: 
+      return .unknown
+% for name, nodes in grouped_nodes.items():
+%   for node in nodes:
+    case ${SYNTAX_NODE_SERIALIZATION_CODES[node.syntax_kind]}: 
+      return .${node.swift_syntax_kind};
+%   end
+% end
+    default:
+      fatalError("Unknown SyntaxKind \(rawValue)")
+    }
+  }
+}

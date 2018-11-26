@@ -1771,7 +1771,7 @@ CaseBlocks::CaseBlocks(
     if (!insertionResult.second) {
       index = insertionResult.first->second;
     } else {
-      curBB = SGF.createBasicBlock(curBB);
+      curBB = SGF.createBasicBlockAfter(curBB);
       CaseBBs.push_back({formalElt, curBB});
       CaseInfos.push_back(CaseInfo());
       CaseInfos.back().FirstMatcher = row.Pattern;
@@ -1806,8 +1806,7 @@ CaseBlocks::CaseBlocks(
       enumDecl->isEffectivelyExhaustive(SGF.getModule().getSwiftModule(),
                                         SGF.F.getResilienceExpansion());
   if (canAssumeExhaustive) {
-    // Check that Sema didn't let any cases slip through. (This can happen
-    // with @_downgrade_exhaustivity_check.)
+    // Check that Sema didn't let any cases slip through.
     canAssumeExhaustive = llvm::all_of(enumDecl->getAllElements(),
                                        [&](const EnumElementDecl *elt) {
       return caseToIndex.count(elt);
@@ -1815,7 +1814,7 @@ CaseBlocks::CaseBlocks(
   }
 
   if (!canAssumeExhaustive)
-    DefaultBB = SGF.createBasicBlock(curBB);
+    DefaultBB = SGF.createBasicBlockAfter(curBB);
 }
 
 /// Perform specialized dispatch for a sequence of EnumElementPattern or an
@@ -2201,7 +2200,7 @@ emitBoolDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     } else {
       caseToIndex[isTrue] = index;
     
-      curBB = SGF.createBasicBlock(curBB);
+      curBB = SGF.createBasicBlockAfter(curBB);
       auto *IL = SGF.B.createIntegerLiteral(PatternMatchStmt,
                                     SILType::getBuiltinIntegerType(1, Context),
                                             isTrue ? 1 : 0);
@@ -2223,7 +2222,7 @@ emitBoolDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
 
   // Check to see if we need a default block.
   if (caseBBs.size() < 2)
-    defaultBB = SGF.createBasicBlock(curBB);
+    defaultBB = SGF.createBasicBlockAfter(curBB);
 
   // Emit the switch_value
   SILLocation loc = PatternMatchStmt;

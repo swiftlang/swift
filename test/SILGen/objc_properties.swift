@@ -196,15 +196,11 @@ class NonObjCClassWithObjCProperty {
 
   // CHECK-LABEL: sil hidden @$S15objc_properties016NonObjCClassWithD9CPropertyC11usePropertyyyF : $@convention(method) (@guaranteed NonObjCClassWithObjCProperty) -> () {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $NonObjCClassWithObjCProperty):
-  // CHECK: [[MATERIALIZE_FOR_SET:%.*]] = class_method [[ARG]] : $NonObjCClassWithObjCProperty, #NonObjCClassWithObjCProperty.property!materializeForSet.1
-  // CHECK: [[TUPLE:%.*]] = apply [[MATERIALIZE_FOR_SET]]({{.*}}, {{.*}}, [[ARG]])
-  // CHECK: [[RAW_POINTER:%.*]] = tuple_extract [[TUPLE]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 0
-  // CHECK: [[OBJECT:%.*]] = pointer_to_address [[RAW_POINTER]] : $Builtin.RawPointer to [strict] $*NSObject
-  // CHECK: [[OBJECT_DEP:%.*]] = mark_dependence [[OBJECT]] : $*NSObject on [[ARG]]
-  // CHECK: [[OBJECT_ACCESS:%.*]] = begin_access [modify] [unsafe] [[OBJECT_DEP]] : $*NSObject
-  // CHECK: [[LOADED_OBJECT:%.*]] = load_borrow [[OBJECT_ACCESS]]
+  // CHECK: [[MODIFY:%.*]] = class_method [[ARG]] : $NonObjCClassWithObjCProperty, #NonObjCClassWithObjCProperty.property!modify.1
+  // CHECK: ([[OBJECT:%.*]], [[TOKEN:%.*]]) = begin_apply [[MODIFY]]([[ARG]])
+  // CHECK: [[LOADED_OBJECT:%.*]] = load_borrow [[OBJECT]]
   // CHECK: [[UNMANAGED_OBJECT:%.*]] = ref_to_unmanaged [[LOADED_OBJECT]] : $NSObject to $@sil_unmanaged NSObject
-  // CHECK: end_borrow [[LOADED_OBJECT]] from [[OBJECT_ACCESS]]
+  // CHECK: end_borrow [[LOADED_OBJECT]] from [[OBJECT]]
   func useProperty() {
     useAutoreleasingUnsafeMutablePointer(&property)
   }

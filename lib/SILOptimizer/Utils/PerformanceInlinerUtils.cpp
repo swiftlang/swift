@@ -662,8 +662,8 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     return nullptr;
   }
 
-  // We don't currently support inlining co-routines with several yields.
-  if (!SILInliner::canInlineBeginApply(AI))
+  // Not all apply sites can be inlined, even if they're direct.
+  if (!SILInliner::canInline(AI))
     return nullptr;
 
   auto ModuleName = Callee->getModule().getSwiftModule()->getName().str();

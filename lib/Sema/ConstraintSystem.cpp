@@ -17,7 +17,10 @@
 //===----------------------------------------------------------------------===//
 #include "ConstraintSystem.h"
 #include "ConstraintGraph.h"
+#include "CSDiagnostics.h"
+#include "TypeCheckType.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallString.h"
@@ -474,10 +477,9 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
   // pointing at a generic TypeAliasDecl here. If we find a way to
   // handle generic TypeAliases elsewhere, this can just become a
   // call to BoundGenericType::get().
-  return TC.applyUnboundGenericArguments(
+  return TypeChecker::applyUnboundGenericArguments(
       unbound, unboundDecl,
-      SourceLoc(), DC, arguments,
-      /*resolver*/nullptr);
+      SourceLoc(), TypeResolution::forContextual(DC), arguments);
 }
 
 static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
@@ -508,7 +510,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
     if (parentTy && extension && extension->isConstrainedExtension()) {
       auto contextSubMap = parentTy->getContextSubstitutionMap(
           extension->getParentModule(),
-          extension->getAsNominalTypeOrNominalTypeExtensionContext());
+          extension->getSelfNominalTypeDecl());
       if (!subMap) {
         // The substitution map wasn't set above, meaning we should grab the map
         // for the extension itself.
@@ -588,25 +590,6 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
     });
 }
 
-/// Remove argument labels from the function type.
-static Type removeArgumentLabels(Type type, unsigned numArgumentLabels) {
-  // If there is nothing to remove, don't.
-  if (numArgumentLabels == 0) return type;
-  
-  auto fnType = type->getAs<FunctionType>();
-
-  // Drop argument labels from the input type.
-  llvm::SmallVector<AnyFunctionType::Param, 4> unlabeledParams;
-  unlabeledParams.reserve(fnType->getNumParams());
-  for (const auto &param : fnType->getParams())
-    unlabeledParams.push_back(param.getWithoutLabel());
-
-  return FunctionType::get(
-      unlabeledParams,
-      removeArgumentLabels(fnType->getResult(), numArgumentLabels - 1),
-      fnType->getExtInfo());
-}
-
 Type ConstraintSystem::openFunctionType(
        AnyFunctionType *funcType,
        unsigned numArgumentLabelsToRemove,
@@ -643,7 +626,7 @@ Type ConstraintSystem::openFunctionType(
         FunctionType::ExtInfo().withThrows(genericFn->throws()));
   }
 
-  return removeArgumentLabels(funcType, numArgumentLabelsToRemove);
+  return funcType->removeArgumentLabels(numArgumentLabelsToRemove);
 }
 
 Optional<Type> ConstraintSystem::isArrayType(Type type) {
@@ -938,11 +921,11 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     // If this is a method whose result type is dynamic Self, replace
     // DynamicSelf with the actual object type.
-    if (!func->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+    if (!func->getDeclContext()->getSelfProtocolDecl()) {
       if (func->hasDynamicSelf()) {
         auto params = openedFnType->getParams();
         assert(params.size() == 1);
-        Type selfTy = params.front().getType()->getRValueInstanceType();
+        Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
         openedType = openedType->replaceCovariantResultType(selfTy, 2);
         openedFnType = openedType->castTo<FunctionType>();
       }
@@ -980,9 +963,11 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   // Unqualified reference to a type.
   if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
     // Resolve the reference to this type declaration in our current context.
-    auto type = TC.resolveTypeInContext(typeDecl, nullptr, useDC,
-                                        TypeResolverContext::InExpression,
-                                        /*isSpecialized=*/false);
+    auto type = TypeChecker::resolveTypeInContext(
+                                      typeDecl, nullptr,
+                                      TypeResolution::forContextual(useDC),
+                                      TypeResolverContext::InExpression,
+                                      /*isSpecialized=*/false);
 
     // Open the type.
     type = openUnboundGenericType(type, locator);
@@ -1089,7 +1074,7 @@ static void bindArchetypesFromContext(
        !parentDC->isModuleScopeContext();
        parentDC = parentDC->getParent()) {
     if (parentDC->isTypeContext()) {
-      if (parentDC != outerDC && parentDC->getAsProtocolOrProtocolExtensionContext()) {
+      if (parentDC != outerDC && parentDC->getSelfProtocolDecl()) {
         auto selfTy = parentDC->getSelfInterfaceType();
         auto contextTy = cs.TC.Context.TheUnresolvedType;
         bindContextArchetype(selfTy, contextTy);
@@ -1189,7 +1174,8 @@ void ConstraintSystem::openGenericRequirements(
     addConstraint(
         *openedReq,
         locator.withPathElement(ConstraintLocator::OpenedGeneric)
-            .withPathElement(LocatorPathElt::getTypeRequirementComponent(pos)));
+            .withPathElement(
+                LocatorPathElt::getTypeRequirementComponent(pos, kind)));
   }
 }
 
@@ -1250,6 +1236,8 @@ ConstraintSystem::getTypeOfMemberReference(
     return getTypeOfReference(value, functionRefKind, locator, useDC, base);
   }
 
+  FunctionType::Param baseObjParam(baseObjTy);
+
   // Don't open existentials when accessing typealias members of
   // protocols.
   if (auto *alias = dyn_cast<TypeAliasDecl>(value)) {
@@ -1258,7 +1246,7 @@ ConstraintSystem::getTypeOfMemberReference(
       // If we end up with a protocol typealias here, it's underlying
       // type must be fully concrete.
       assert(!memberTy->hasTypeParameter());
-      auto openedType = FunctionType::get(baseObjTy, memberTy);
+      auto openedType = FunctionType::get({baseObjParam}, memberTy);
       return { openedType, memberTy };
     }
   }
@@ -1274,7 +1262,7 @@ ConstraintSystem::getTypeOfMemberReference(
     // Wrap it in a metatype.
     memberTy = MetatypeType::get(memberTy);
 
-    auto openedType = FunctionType::get(baseObjTy, memberTy);
+    auto openedType = FunctionType::get({baseObjParam}, memberTy);
     return { openedType, memberTy };
   }
 
@@ -1318,9 +1306,9 @@ ConstraintSystem::getTypeOfMemberReference(
           elementTy = OptionalType::get(elementTy->getRValueType());
       }
 
-      auto indicesTy = subscript->getIndicesInterfaceType();
-      refType = FunctionType::get(indicesTy, elementTy,
-                                  AnyFunctionType::ExtInfo());
+      auto indices = subscript->getInterfaceType()
+                              ->castTo<AnyFunctionType>()->getParams();
+      refType = FunctionType::get(indices, elementTy);
     } else {
       refType = getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC,
                                            base, /*wantInterfaceType=*/true);
@@ -1337,13 +1325,11 @@ ConstraintSystem::getTypeOfMemberReference(
       selfFlags = selfFlags.withInOut(true);
 
     // If the storage is generic, add a generic signature.
-    auto selfParam = AnyFunctionType::Param(selfTy, Identifier(), selfFlags);
+    FunctionType::Param selfParam(selfTy, Identifier(), selfFlags);
     if (auto *sig = innerDC->getGenericSignatureOfContext()) {
-      funcType = GenericFunctionType::get(sig, {selfParam}, refType,
-                                          AnyFunctionType::ExtInfo());
+      funcType = GenericFunctionType::get(sig, {selfParam}, refType);
     } else {
-      funcType = FunctionType::get({selfParam}, refType,
-                                   AnyFunctionType::ExtInfo());
+      funcType = FunctionType::get({selfParam}, refType);
     }
   }
 
@@ -1351,7 +1337,7 @@ ConstraintSystem::getTypeOfMemberReference(
                                 locator, replacements, innerDC, outerDC,
                                 /*skipProtocolSelfConstraint=*/true);
 
-  if (!outerDC->getAsProtocolOrProtocolExtensionContext()) {
+  if (!outerDC->getSelfProtocolDecl()) {
     // Class methods returning Self as well as constructors get the
     // result replaced with the base object type.
     if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
@@ -1382,8 +1368,8 @@ ConstraintSystem::getTypeOfMemberReference(
   auto openedParams = openedFnType->getParams();
   assert(openedParams.size() == 1);
 
-  Type selfObjTy = openedParams.front().getType()->getRValueInstanceType();
-  if (outerDC->getAsProtocolOrProtocolExtensionContext()) {
+  Type selfObjTy = openedParams.front().getPlainType()->getMetatypeInstanceType();
+  if (outerDC->getSelfProtocolDecl()) {
     // For a protocol, substitute the base object directly. We don't need a
     // conformance constraint because we wouldn't have found the declaration
     // if it didn't conform.
@@ -1411,7 +1397,7 @@ ConstraintSystem::getTypeOfMemberReference(
   // the access will operate on existentials and not type parameters.
   if (!isDynamicResult &&
       baseObjTy->isExistentialType() &&
-      outerDC->getAsProtocolOrProtocolExtensionContext()) {
+      outerDC->getSelfProtocolDecl()) {
     auto selfTy = replacements[
       cast<GenericTypeParamType>(outerDC->getSelfInterfaceType()
                                  ->getCanonicalType())];
@@ -1457,7 +1443,7 @@ static void tryOptimizeGenericDisjunction(ConstraintSystem &cs,
 
     auto funcType = AFD->getInterfaceType();
     auto hasAnyOrOptional = funcType.findIf([](Type type) -> bool {
-      if (auto objType = type->getOptionalObjectType())
+      if (type->getOptionalObjectType())
         return true;
 
       return type->isAny();
@@ -1585,12 +1571,12 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     auto output = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult));
 
-    auto inputArg = TupleTypeElt(input, CS.getASTContext().getIdentifier("of"));
-    auto inputTuple = TupleType::get(inputArg, CS.getASTContext());
+    FunctionType::Param inputArg(input,
+                                 CS.getASTContext().getIdentifier("of"));
     
     CS.addConstraint(ConstraintKind::DynamicTypeOf, output, input,
         CS.getConstraintLocator(locator, ConstraintLocator::RValueAdjustment));
-    refType = FunctionType::get(inputTuple, output);
+    refType = FunctionType::get({inputArg}, output);
     openedFullType = refType;
     return true;
   }
@@ -1607,19 +1593,18 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
          CS.getConstraintLocator(locator, ConstraintLocator::RValueAdjustment));
     auto result = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult));
-    auto bodyClosure = FunctionType::get(
-      ParenType::get(CS.getASTContext(), escapeClosure), result,
+    FunctionType::Param arg(escapeClosure);
+    auto bodyClosure = FunctionType::get(arg, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
                               /*autoclosure*/ false,
                               /*noescape*/ true,
                               /*throws*/ true));
-    TupleTypeElt argTupleElts[] = {
-      TupleTypeElt(noescapeClosure),
-      TupleTypeElt(bodyClosure, CS.getASTContext().getIdentifier("do")),
+    FunctionType::Param args[] = {
+      FunctionType::Param(noescapeClosure),
+      FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
     
-    auto argTuple = TupleType::get(argTupleElts, CS.getASTContext());
-    refType = FunctionType::get(argTuple, result,
+    refType = FunctionType::get(args, result,
       FunctionType::ExtInfo(FunctionType::Representation::Swift,
                             /*autoclosure*/ false,
                             /*noescape*/ false,
@@ -1639,18 +1624,17 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
          CS.getConstraintLocator(locator, ConstraintLocator::RValueAdjustment));
     auto result = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult));
-    auto bodyClosure = FunctionType::get(
-      ParenType::get(CS.getASTContext(), openedTy), result,
+    FunctionType::Param bodyArgs[] = {FunctionType::Param(openedTy)};
+    auto bodyClosure = FunctionType::get(bodyArgs, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
                               /*autoclosure*/ false,
                               /*noescape*/ true,
                               /*throws*/ true));
-    TupleTypeElt argTupleElts[] = {
-      TupleTypeElt(existentialTy),
-      TupleTypeElt(bodyClosure, CS.getASTContext().getIdentifier("do")),
+    FunctionType::Param args[] = {
+      FunctionType::Param(existentialTy),
+      FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
-    auto argTuple = TupleType::get(argTupleElts, CS.getASTContext());
-    refType = FunctionType::get(argTuple, result,
+    refType = FunctionType::get(args, result,
       FunctionType::ExtInfo(FunctionType::Representation::Swift,
                             /*autoclosure*/ false,
                             /*noescape*/ false,
@@ -1886,12 +1870,13 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     addKeyPathApplicationConstraint(
                   keyPathIndexTy, choice.getBaseType(), elementTy, locator);
     
-    TupleTypeElt indexTupleElts[] = {
-      TupleTypeElt(keyPathIndexTy, getASTContext().Id_keyPath),
+    FunctionType::Param indices[] = {
+      FunctionType::Param(keyPathIndexTy, getASTContext().Id_keyPath),
     };
-    auto indexTuple = TupleType::get(indexTupleElts, getASTContext());
-    auto subscriptTy = FunctionType::get(indexTuple, elementTy);
-    auto fullTy = FunctionType::get(choice.getBaseType(), subscriptTy);
+    auto subscriptTy = FunctionType::get(indices, elementTy);
+
+    FunctionType::Param baseParam(choice.getBaseType());
+    auto fullTy = FunctionType::get({baseParam}, subscriptTy);
     openedFullType = fullTy;
     refType = subscriptTy;
 
@@ -2079,4 +2064,334 @@ bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
   case FunctionRefKind::DoubleApply:
     return true;
   }
+}
+
+bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = TC.Context.TypeCheckerDebug->getStream();
+    log << "---Attempting to salvage and emit diagnostics---\n";
+  }
+
+  // Attempt to solve again, capturing all states that come from our attempts to
+  // select overloads or bind type variables.
+  //
+  // FIXME: can this be removed?  We need to arrange for recordFixes to be
+  // eliminated.
+  viable.clear();
+
+  {
+    // Set up solver state.
+    SolverState state(expr, *this);
+    state.recordFixes = true;
+
+    // Solve the system.
+    solveRec(viable, FreeTypeVariableBinding::Disallow);
+
+    // Check whether we have a best solution; this can happen if we found
+    // a series of fixes that worked.
+    if (auto best = findBestSolution(viable, state.ExprWeights,
+                                     /*minimize=*/true)) {
+      if (*best != 0)
+        viable[0] = std::move(viable[*best]);
+      viable.erase(viable.begin() + 1, viable.end());
+      return false;
+    }
+
+    // FIXME: If we were able to actually fix things along the way,
+    // we may have to hunt for the best solution. For now, we don't care.
+
+    // Before removing any "fixed" solutions, let's check
+    // if ambiguity is caused by fixes and diagnose if possible.
+    if (diagnoseAmbiguityWithFixes(expr, viable))
+      return true;
+
+    // Remove solutions that require fixes; the fixes in those systems should
+    // be diagnosed rather than any ambiguity.
+    auto hasFixes = [](const Solution &sol) { return !sol.Fixes.empty(); };
+    auto newEnd = std::remove_if(viable.begin(), viable.end(), hasFixes);
+    viable.erase(newEnd, viable.end());
+
+    // If there are multiple solutions, try to diagnose an ambiguity.
+    if (viable.size() > 1) {
+      if (getASTContext().LangOpts.DebugConstraintSolver) {
+        auto &log = getASTContext().TypeCheckerDebug->getStream();
+        log << "---Ambiguity error: " << viable.size()
+            << " solutions found---\n";
+        int i = 0;
+        for (auto &solution : viable) {
+          log << "---Ambiguous solution #" << i++ << "---\n";
+          solution.dump(log);
+          log << "\n";
+        }
+      }
+
+      if (diagnoseAmbiguity(expr, viable)) {
+        return true;
+      }
+    }
+
+    // Fall through to produce diagnostics.
+  }
+
+  if (getExpressionTooComplex(viable)) {
+    TC.diagnose(expr->getLoc(), diag::expression_too_complex)
+        .highlight(expr->getSourceRange());
+    return true;
+  }
+
+  // If all else fails, diagnose the failure by looking through the system's
+  // constraints.
+  diagnoseFailureForExpr(expr);
+  return true;
+}
+
+bool ConstraintSystem::diagnoseAmbiguityWithFixes(
+    Expr *expr, ArrayRef<Solution> solutions) {
+  if (solutions.empty())
+    return false;
+
+  auto getOverloadDecl = [&](SelectedOverload &overload) -> ValueDecl * {
+    auto &choice = overload.choice;
+    return choice.isDecl() ? choice.getDecl() : nullptr;
+  };
+
+  // Problems related to fixes forming ambiguous solution set
+  // could only be diagnosed (at the moment), if all of the fixes
+  // are attached to the same anchor, which means they fix
+  // different overloads of the same declaration.
+  Expr *commonAnchor = nullptr;
+  SmallPtrSet<ValueDecl *, 4> distinctChoices;
+  SmallVector<std::pair<const Solution *, const ConstraintFix *>, 4>
+      viableSolutions;
+
+  bool diagnosable = llvm::all_of(solutions, [&](const Solution &solution) {
+    ArrayRef<ConstraintFix *> fixes = solution.Fixes;
+
+    // Currently only support a single fix in a solution,
+    // but ultimately should be able to deal with multiple.
+    if (fixes.size() != 1)
+      return false;
+
+    const auto *fix = fixes.front();
+    if (commonAnchor && commonAnchor != fix->getAnchor())
+      return false;
+
+    commonAnchor = fix->getAnchor();
+
+    SmallVector<SelectedOverload, 2> overloads;
+    solution.getOverloadChoices(commonAnchor, overloads);
+    // There is unfortunately no way, at the moment, to figure out
+    // what declaration the fix is attached to, so we have to make
+    // sure that there is only one declaration associated with common
+    // anchor to be sure that the right problem is being diagnosed.
+    if (overloads.size() != 1)
+      return false;
+
+    auto *decl = getOverloadDecl(overloads.front());
+    if (!decl)
+      return false;
+
+    // If this declaration is distinct, let's record this solution
+    // as viable, otherwise we'd produce the same diagnostic multiple
+    // times, which means that actual problem is elsewhere.
+    if (distinctChoices.insert(decl).second)
+      viableSolutions.push_back({&solution, fix});
+    return true;
+  });
+
+  if (!diagnosable || viableSolutions.size() < 2)
+    return false;
+
+  auto *decl = *distinctChoices.begin();
+  assert(solverState);
+
+  bool diagnosed = true;
+  {
+    DiagnosticTransaction transaction(TC.Diags);
+
+    TC.diagnose(commonAnchor->getLoc(), diag::ambiguous_reference_to_decl,
+                decl->getDescriptiveKind(), decl->getFullName());
+
+    for (const auto &viable : viableSolutions) {
+      // Create scope so each applied solution is rolled back.
+      ConstraintSystem::SolverScope scope(*this);
+      applySolution(*viable.first);
+      // All of the solutions supposed to produce a "candidate" note.
+      diagnosed &= viable.second->diagnose(expr, /*asNote*/ true);
+    }
+
+    // If not all of the fixes produced a note, we can't diagnose this.
+    if (!diagnosed)
+      transaction.abort();
+  }
+
+  return diagnosed;
+}
+
+/// \brief Determine the number of distinct overload choices in the
+/// provided set.
+static unsigned countDistinctOverloads(ArrayRef<OverloadChoice> choices) {
+  llvm::SmallPtrSet<void *, 4> uniqueChoices;
+  unsigned result = 0;
+  for (auto choice : choices) {
+    if (uniqueChoices.insert(choice.getOpaqueChoiceSimple()).second)
+      ++result;
+  }
+  return result;
+}
+
+/// \brief Determine the name of the overload in a set of overload choices.
+static DeclName getOverloadChoiceName(ArrayRef<OverloadChoice> choices) {
+  DeclName name;
+  for (auto choice : choices) {
+    if (!choice.isDecl())
+      continue;
+
+    DeclName nextName = choice.getDecl()->getFullName();
+    if (!name) {
+      name = nextName;
+      continue;
+    }
+
+    if (name != nextName) {
+      // Assume all choices have the same base name and only differ in
+      // argument labels. This may not be a great assumption, but we don't
+      // really have a way to recover for diagnostics otherwise.
+      return name.getBaseName();
+    }
+  }
+
+  return name;
+}
+
+bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
+                                         ArrayRef<Solution> solutions) {
+  // Produce a diff of the solutions.
+  SolutionDiff diff(solutions);
+
+  // Find the locators which have the largest numbers of distinct overloads.
+  Optional<unsigned> bestOverload;
+  // Overloads are scored by lexicographical comparison of (# of distinct
+  // overloads, depth, *reverse* of the index). N.B. - cannot be used for the
+  // reversing: the score version of index == 0 should be > than that of 1, but
+  // -0 == 0 < UINT_MAX == -1, whereas ~0 == UINT_MAX > UINT_MAX - 1 == ~1.
+  auto score = [](unsigned distinctOverloads, unsigned depth, unsigned index) {
+    return std::make_tuple(distinctOverloads, depth, ~index);
+  };
+  auto bestScore = score(0, 0, std::numeric_limits<unsigned>::max());
+
+  // Get a map of expressions to their depths and post-order traversal indices.
+  // Heuristically, all other things being equal, we should complain about the
+  // ambiguous expression that (1) has the most overloads, (2) is deepest, or
+  // (3) comes earliest in the expression.
+  auto depthMap = expr->getDepthMap();
+  auto indexMap = expr->getPreorderIndexMap();
+
+  for (unsigned i = 0, n = diff.overloads.size(); i != n; ++i) {
+    auto &overload = diff.overloads[i];
+
+    // If we can't resolve the locator to an anchor expression with no path,
+    // we can't diagnose this well.
+    auto *anchor = simplifyLocatorToAnchor(*this, overload.locator);
+    if (!anchor)
+      continue;
+    auto it = indexMap.find(anchor);
+    if (it == indexMap.end())
+      continue;
+    unsigned index = it->second;
+    it = depthMap.find(anchor);
+    if (it == depthMap.end())
+      continue;
+    unsigned depth = it->second;
+
+    // If we don't have a name to hang on to, it'll be hard to diagnose this
+    // overload.
+    if (!getOverloadChoiceName(overload.choices))
+      continue;
+
+    unsigned distinctOverloads = countDistinctOverloads(overload.choices);
+
+    // We need at least two overloads to make this interesting.
+    if (distinctOverloads < 2)
+      continue;
+
+    // If we have more distinct overload choices for this locator than for
+    // prior locators, just keep this locator.
+    auto thisScore = score(distinctOverloads, depth, index);
+    if (thisScore > bestScore) {
+      bestScore = thisScore;
+      bestOverload = i;
+      continue;
+    }
+
+    // We have better results. Ignore this one.
+  }
+
+  // FIXME: Should be able to pick the best locator, e.g., based on some
+  // depth-first numbering of expressions.
+  if (bestOverload) {
+    auto &overload = diff.overloads[*bestOverload];
+    auto name = getOverloadChoiceName(overload.choices);
+    auto anchor = simplifyLocatorToAnchor(*this, overload.locator);
+
+    // Emit the ambiguity diagnostic.
+    auto &tc = getTypeChecker();
+    tc.diagnose(anchor->getLoc(),
+                name.isOperator() ? diag::ambiguous_operator_ref
+                                  : diag::ambiguous_decl_ref,
+                name);
+
+    TrailingClosureAmbiguityFailure failure(expr, *this, anchor,
+                                            overload.choices);
+    if (failure.diagnoseAsNote())
+      return true;
+
+    // Emit candidates.  Use a SmallPtrSet to make sure only emit a particular
+    // candidate once.  FIXME: Why is one candidate getting into the overload
+    // set multiple times? (See also tryDiagnoseTrailingClosureAmbiguity.)
+    SmallPtrSet<Decl *, 8> EmittedDecls;
+    for (auto choice : overload.choices) {
+      switch (choice.getKind()) {
+      case OverloadChoiceKind::Decl:
+      case OverloadChoiceKind::DeclViaDynamic:
+      case OverloadChoiceKind::DeclViaBridge:
+      case OverloadChoiceKind::DeclViaUnwrappedOptional:
+        // FIXME: show deduced types, etc, etc.
+        if (EmittedDecls.insert(choice.getDecl()).second)
+          tc.diagnose(choice.getDecl(), diag::found_candidate);
+        break;
+
+      case OverloadChoiceKind::KeyPathApplication:
+      case OverloadChoiceKind::DynamicMemberLookup:
+        // Skip key path applications and dynamic member lookups, since we don't
+        // want them to noise up unrelated subscript diagnostics.
+        break;
+
+      case OverloadChoiceKind::BaseType:
+      case OverloadChoiceKind::TupleIndex:
+        // FIXME: Actually diagnose something here.
+        break;
+      }
+    }
+
+    return true;
+  }
+
+  // FIXME: If we inferred different types for literals (for example),
+  // could diagnose ambiguity that way as well.
+
+  return false;
+}
+
+Expr *constraints::simplifyLocatorToAnchor(ConstraintSystem &cs,
+                                           ConstraintLocator *locator) {
+  if (!locator || !locator->getAnchor())
+    return nullptr;
+
+  SourceRange range;
+  locator = simplifyLocator(cs, locator, range);
+  if (!locator->getAnchor() || !locator->getPath().empty())
+    return nullptr;
+
+  return locator->getAnchor();
 }

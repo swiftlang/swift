@@ -23,3 +23,17 @@ public enum SourcePresence: String, Codable {
   /// The syntax was expected or optional, but not found in the source.
   case missing = "Missing"
 }
+
+extension SourcePresence: ByteTreeScalarDecodable {
+  static func read(from pointer: UnsafeRawPointer, size: Int,
+                   userInfo: UnsafePointer<[ByteTreeUserInfoKey: Any]>
+  ) -> SourcePresence {
+    let rawValue = pointer.bindMemory(to: UInt8.self, capacity: 1).pointee
+    switch rawValue {
+    case 0: return .missing
+    case 1: return .present
+    default:
+      fatalError("Unknown source presence \(rawValue)")
+    }
+  }
+}

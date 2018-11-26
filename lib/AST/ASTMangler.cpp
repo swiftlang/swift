@@ -71,8 +71,6 @@ static StringRef getCodeForAccessorKind(AccessorKind kind,
       return "lO";
     case AddressorKind::NativeOwning:
       return "lo";
-    case AddressorKind::NativePinning:
-      return "lp";
     }
     llvm_unreachable("bad addressor kind");
   case AccessorKind::MutableAddress:
@@ -85,12 +83,8 @@ static StringRef getCodeForAccessorKind(AccessorKind kind,
       return "aO";
     case AddressorKind::NativeOwning:
       return "ao";
-    case AddressorKind::NativePinning:
-      return "aP";
     }
     llvm_unreachable("bad addressor kind");
-  case AccessorKind::MaterializeForSet:
-    return "m";
   }
   llvm_unreachable("bad accessor kind");
 }
@@ -1046,7 +1040,7 @@ unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
   // This is important when extending a nested type, because the generic
   // parameters will line up with the (semantic) nesting of the nominal type.
   if (auto ext = dyn_cast<ExtensionDecl>(decl))
-    decl = ext->getAsNominalTypeOrNominalTypeExtensionContext();
+    decl = ext->getSelfNominalTypeDecl();
 
   // Handle the generic arguments of the parent.
   unsigned currentGenericParamIdx =
@@ -1424,7 +1418,7 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
       appendModule(ExtD->getParentModule());
       if (sig && ExtD->isConstrainedExtension()) {
         Mod = ExtD->getModuleContext();
-        auto nominalSig = ExtD->getAsNominalTypeOrNominalTypeExtensionContext()
+        auto nominalSig = ExtD->getSelfNominalTypeDecl()
                             ->getGenericSignatureOfContext();
         appendGenericSignature(sig, nominalSig);
       }
@@ -1711,7 +1705,7 @@ void ASTMangler::appendFunctionInputType(
 
   case 1: {
     const auto &param = params.front();
-    auto type = param.getType();
+    auto type = param.getPlainType();
 
     // If this is just a single parenthesized type,
     // to save space in the mangled name, let's encode
@@ -1730,7 +1724,7 @@ void ASTMangler::appendFunctionInputType(
   default:
     bool isFirstParam = true;
     for (auto &param : params) {
-      appendTypeListElement(Identifier(), param.getType(),
+      appendTypeListElement(Identifier(), param.getPlainType(),
                             param.getParameterFlags());
       appendListSeparator(isFirstParam);
     }
@@ -1749,8 +1743,11 @@ void ASTMangler::appendTypeList(Type listTy) {
       return appendOperator("y");
     bool firstField = true;
     for (auto &field : tuple->getElements()) {
-      appendTypeListElement(field.getName(), field.getType(),
-                            field.getParameterFlags());
+      // FIXME: We shouldn't put @escaping in non-parameter list tuples
+      auto flags = field.getParameterFlags().withEscaping(false);
+
+      assert(flags.isNone());
+      appendTypeListElement(field.getName(), field.getRawType(), flags);
       appendListSeparator(firstField);
     }
   } else {
@@ -1761,7 +1758,7 @@ void ASTMangler::appendTypeList(Type listTy) {
 
 void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
                                        ParameterTypeFlags flags) {
-  appendType(elementType->getInOutObjectType());
+  appendType(elementType);
   switch (flags.getValueOwnership()) {
   case ValueOwnership::Default:
     /* nothing */
@@ -2042,7 +2039,7 @@ CanType ASTMangler::getDeclTypeForMangling(
   if (!decl->hasInterfaceType() || decl->getInterfaceType()->is<ErrorType>()) {
     if (isa<AbstractFunctionDecl>(decl))
       return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)},
-                                  C.TheErrorType, AnyFunctionType::ExtInfo());
+                                  C.TheErrorType);
     return C.TheErrorType;
   }
 
@@ -2052,7 +2049,7 @@ CanType ASTMangler::getDeclTypeForMangling(
     genericSig = gft.getGenericSignature();
     CurGenericSignature = gft.getGenericSignature();
 
-    type = CanFunctionType::get(gft->getParams(), gft.getResult(),
+    type = CanFunctionType::get(gft.getParams(), gft.getResult(),
                                 gft->getExtInfo());
   }
 

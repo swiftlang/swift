@@ -58,8 +58,8 @@ extension ProtoRefinesClass {
     let _: Concrete = self
 
     // CHECK:      [[BOX:%.*]] = alloc_stack $BaseProto
-    // CHECK-NEXT: [[ADDR:%.*]] = init_existential_addr [[BOX]] : $*BaseProto, $Self
     // CHECK-NEXT: [[SELF:%.*]] = copy_value %3 : $Self
+    // CHECK-NEXT: [[ADDR:%.*]] = init_existential_addr [[BOX]] : $*BaseProto, $Self
     // CHECK-NEXT: store [[SELF]] to [init] [[ADDR]] : $*Self
     // CHECK-NEXT: destroy_addr [[BOX]] : $*BaseProto
     // CHECK-NEXT: dealloc_stack [[BOX]] : $*BaseProto

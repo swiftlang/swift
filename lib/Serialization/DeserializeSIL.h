@@ -28,7 +28,7 @@ namespace swift {
     
     ModuleFile *MF;
     SILModule &SILMod;
-    SerializedSILLoader::Callback *Callback;
+    DeserializationNotificationHandlerSet *Callback;
 
     /// The cursor used to lazily load SILFunctions.
     llvm::BitstreamCursor SILCursor;
@@ -150,7 +150,8 @@ public:
     ///
     /// TODO: Globals.
     void getAll(bool UseCallback = true) {
-      llvm::SaveAndRestore<SerializedSILLoader::Callback *> SaveCB(Callback);
+      llvm::SaveAndRestore<DeserializationNotificationHandlerSet *> SaveCB(
+          Callback);
 
       if (!UseCallback)
         Callback = nullptr;
@@ -183,9 +184,9 @@ public:
     /// Deserialize all Property descriptors inside the module and add them
     /// to SILMod.
     void getAllProperties();
-    
+
     SILDeserializer(ModuleFile *MF, SILModule &M,
-                    SerializedSILLoader::Callback *callback);
+                    DeserializationNotificationHandlerSet *callback);
 
     // Out of line to avoid instantiation OnDiskChainedHashTable here.
     ~SILDeserializer();

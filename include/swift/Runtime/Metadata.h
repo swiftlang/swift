@@ -330,11 +330,11 @@ ClassMetadataBounds getResilientMetadataBounds(
 int32_t getResilientImmediateMembersOffset(const ClassDescriptor *descriptor);
 
 /// \brief Fetch a uniqued metadata object for a nominal type which requires
-/// in-place metadata initialization.
+/// singleton metadata initialization.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse
-swift_getInPlaceMetadata(MetadataRequest request,
-                         const TypeContextDescriptor *description);
+swift_getSingletonMetadata(MetadataRequest request,
+                           const TypeContextDescriptor *description);
 
 /// \brief Fetch a uniqued metadata object for a generic nominal type.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
@@ -574,20 +574,22 @@ void swift_initStructMetadata(StructMetadata *self,
                               const TypeLayout * const *fieldTypes,
                               uint32_t *fieldOffsets);
 
-/// Relocate the metadata for a class and copy fields from the given template.
-/// The final size of the metadata is calculated at runtime from the size of
-/// the superclass metadata together with the given number of immediate
-/// members.
+/// Allocate the metadata for a class and copy fields from the given pattern.
+/// The final size of the metadata is calculated at runtime from the metadata
+/// bounds in the class descriptor.
+///
+/// This function is only intended to be called from the relocation function
+/// of a resilient class pattern.
 SWIFT_RUNTIME_EXPORT
 ClassMetadata *
-swift_relocateClassMetadata(ClassMetadata *self,
-                            size_t templateSize,
-                            size_t numImmediateMembers);
+swift_relocateClassMetadata(ClassDescriptor *descriptor,
+                            ResilientClassMetadataPattern *pattern);
 
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 SWIFT_RUNTIME_EXPORT
 void swift_initClassMetadata(ClassMetadata *self,
+                             ClassMetadata *super,
                              ClassLayoutFlags flags,
                              size_t numFields,
                              const TypeLayout * const *fieldTypes,
@@ -740,22 +742,11 @@ SWIFT_RUNTIME_EXPORT
 void swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
                                        const TypeMetadataRecord *end);
 
-/// Register a block of type field records for dynamic lookup.
-SWIFT_RUNTIME_EXPORT
-void swift_registerFieldDescriptors(const reflection::FieldDescriptor **records,
-                                    size_t size);
-
 /// Return the superclass, if any.  The result is nullptr for root
 /// classes and class protocol types.
 SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_API
 const Metadata *_swift_class_getSuperclass(const Metadata *theClass);
-
-SWIFT_CC(swift)
-SWIFT_RUNTIME_STDLIB_API
-void swift_getFieldAt(
-  const Metadata *base, unsigned index, 
-  void (*callback)(const char *name, const Metadata *type, void *ctx), void *callbackCtx);
 
 #if !NDEBUG
 /// Verify that the given metadata pointer correctly roundtrips its
@@ -765,6 +756,10 @@ void verifyMangledNameRoundtrip(const Metadata *metadata);
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 const TypeContextDescriptor *swift_getTypeContextDescriptor(const Metadata *type);
+
+// Defined in KeyPath.swift in the standard library.
+SWIFT_RUNTIME_EXPORT
+const HeapObject *swift_getKeyPath(const void *pattern, const void *arguments);
 
 } // end namespace swift
 

@@ -18,6 +18,7 @@
 #include "ImporterImpl.h"
 #include "ClangDiagnosticConsumer.h"
 #include "swift/Strings.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -46,6 +47,16 @@ using namespace importer;
 static bool isImportedCFPointer(clang::QualType clangType, Type type) {
   return (clangType->isPointerType() &&
           (type->is<ClassType>() || type->isClassExistentialType()));
+}
+
+bool ClangImporter::Implementation::isOverAligned(const clang::TypeDecl *decl) {
+  auto type = getClangASTContext().getTypeDeclType(decl);
+  return isOverAligned(type);
+}
+
+bool ClangImporter::Implementation::isOverAligned(clang::QualType type) {
+  auto align = getClangASTContext().getTypeAlignInChars(type);
+  return align.getQuantity() > MaximumAlignment;
 }
 
 namespace {
@@ -377,9 +388,10 @@ namespace {
             pointeeQualType, ImportTypeKind::Pointee, AllowNSUIntegerAsInt,
             Bridgeability::None);
 
-      // If the pointed-to type is unrepresentable in Swift, import as
+      // If the pointed-to type is unrepresentable in Swift, or its C
+      // alignment is greater than the maximum Swift alignment, import as
       // OpaquePointer.
-      if (!pointeeType) {
+      if (!pointeeType || Impl.isOverAligned(pointeeQualType)) {
         auto opaquePointer = Impl.SwiftContext.getOpaquePointerDecl();
         if (!opaquePointer)
           return Type();
@@ -523,7 +535,7 @@ namespace {
       if (!resultTy)
         return Type();
 
-      SmallVector<TupleTypeElt, 4> params;
+      SmallVector<FunctionType::Param, 4> params;
       for (auto param = type->param_type_begin(),
              paramEnd = type->param_type_end();
            param != paramEnd; ++param) {
@@ -537,14 +549,11 @@ namespace {
         // names. The probably doesn't matter outside of a FuncDecl, which
         // we'll have to special-case, but it's an interesting bit of data loss.
         // We also lose `noescape`. <https://bugs.swift.org/browse/SR-2529>
-        params.push_back(swiftParamTy);
+        params.push_back(FunctionType::Param(swiftParamTy));
       }
 
-      // Form the parameter tuple.
-      auto paramsTy = TupleType::get(params, Impl.SwiftContext);
-
       // Form the function type.
-      return FunctionType::get(paramsTy, resultTy);
+      return FunctionType::get(params, resultTy);
     }
 
     ImportResult
@@ -556,7 +565,7 @@ namespace {
       if (!resultTy)
         return Type();
 
-      return FunctionType::get(TupleType::getEmpty(Impl.SwiftContext),resultTy);
+      return FunctionType::get({}, resultTy);
     }
 
     ImportResult VisitParenType(const clang::ParenType *type) {
@@ -2481,9 +2490,7 @@ Type ClangImporter::Implementation::getSugaredTypeReference(TypeDecl *type) {
   if (auto typealias = dyn_cast<TypeAliasDecl>(type)) {
     // If this typealias is nested, retrieve the parent type.
     Type parentType;
-    if (auto nominal =
-          typealias->getDeclContext()
-            ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    if (auto nominal = typealias->getDeclContext()->getSelfNominalTypeDecl()) {
       if (!nominal->getGenericSignature())
         parentType = nominal->getDeclaredInterfaceType();
     }

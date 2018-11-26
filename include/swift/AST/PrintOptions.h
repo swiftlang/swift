@@ -112,8 +112,8 @@ public:
 };
 
 struct ShouldPrintChecker {
-  virtual bool shouldPrint(const Decl *D, PrintOptions &Options);
-  bool shouldPrint(const Pattern *P, PrintOptions &Options);
+  virtual bool shouldPrint(const Decl *D, const PrintOptions &Options);
+  bool shouldPrint(const Pattern *P, const PrintOptions &Options);
   virtual ~ShouldPrintChecker() = default;
 };
 
@@ -362,6 +362,9 @@ struct PrintOptions {
   std::function<std::string(const ValueDecl *)> FunctionBody;
 
   BracketOptions BracketOptions;
+
+  // This is explicit to guarantee that it can be called from LLDB.
+  PrintOptions() {}
 
   bool excludeAttrKind(AnyAttrKind K) const {
     if (std::any_of(ExcludeAttrList.begin(), ExcludeAttrList.end(),

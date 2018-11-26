@@ -18,6 +18,7 @@
 #define SWIFT_ATTRKIND_H
 
 #include "swift/Basic/InlineBitfield.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/Config.h"
 #include "llvm/Support/DataTypes.h"
 
@@ -62,6 +63,9 @@ enum class AccessLevel : uint8_t {
   /// Open access is not limited, and all capabilities are unrestricted.
   Open,
 };
+
+/// Returns the in-source spelling of the given access level.
+StringRef getAccessLevelSpelling(AccessLevel value);
 
 enum class InlineKind : uint8_t {
   Never = 0,

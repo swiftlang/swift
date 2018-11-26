@@ -76,7 +76,7 @@ public:
     asImpl().addIVarDestroyer();
 
     // Class members.
-    addClassMembers(Target, Target->getDeclaredTypeInContext());
+    addClassMembers(Target);
   }
 
   /// Notes the beginning of the field offset vector for a particular ancestor
@@ -89,11 +89,13 @@ public:
 
 private:
   /// Add fields associated with the given class and its bases.
-  void addClassMembers(ClassDecl *theClass, Type type) {
+  void addClassMembers(ClassDecl *theClass) {
     // Visit the superclass first.
-    if (Type superclass = type->getSuperclass()) {
-      auto *superclassDecl = superclass->getClassOrBoundGenericClass();
-      if (IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
+    if (auto *superclassDecl = theClass->getSuperclassDecl()) {
+      if (superclassDecl->hasClangNode()) {
+        // Nothing to do; Objective-C classes do not add new members to
+        // Swift class metadata.
+      } else if (IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
         // Runtime metadata instantiation will initialize our field offset
         // vector and vtable entries.
         //
@@ -104,7 +106,7 @@ private:
         // NB: We don't apply superclass substitutions to members because we want
         // consistent metadata layout between generic superclasses and concrete
         // subclasses.
-        addClassMembers(superclassDecl, superclass);
+        addClassMembers(superclassDecl);
       }
     }
 
@@ -114,7 +116,7 @@ private:
 
     // Add space for the generic parameters, if applicable.
     // This must always be the first item in the immediate members.
-    asImpl().addGenericFields(theClass, type, theClass);
+    asImpl().addGenericFields(theClass, theClass);
 
     // Add vtable entries.
     asImpl().addVTableEntries(theClass);
@@ -192,13 +194,8 @@ public:
       addPointer();
     }
   }
-  void addGenericArgument(CanType argument, ClassDecl *forClass) {
-    addPointer();
-  }
-  void addGenericWitnessTable(CanType argument, ProtocolConformanceRef conf,
-                              ClassDecl *forClass) {
-    addPointer();
-  }
+  void addGenericArgument(ClassDecl *forClass) { addPointer(); }
+  void addGenericWitnessTable(ClassDecl *forClass) { addPointer(); }
   void addPlaceholder(MissingMemberDecl *MMD) {
     for (auto i : range(MMD->getNumberOfVTableEntries())) {
       (void)i;

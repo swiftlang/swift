@@ -497,7 +497,7 @@ emitDiagnosticMessage(SourceManager &SM,
 
   StringRef filename = "";
   if (Loc.isValid())
-    filename = SM.getIdentifierForBuffer(SM.findBufferContainingLoc(Loc));
+    filename = SM.getDisplayNameForLoc(Loc);
 
   // Emit the RECORD_DIAG record.
   Record.clear();

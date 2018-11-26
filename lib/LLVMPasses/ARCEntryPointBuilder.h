@@ -60,8 +60,8 @@ class ARCEntryPointBuilder {
   NullablePtr<Constant> CheckUnowned;
   NullablePtr<Constant> RetainN;
   NullablePtr<Constant> ReleaseN;
-  NullablePtr<Constant> UnknownRetainN;
-  NullablePtr<Constant> UnknownReleaseN;
+  NullablePtr<Constant> UnknownObjectRetainN;
+  NullablePtr<Constant> UnknownObjectReleaseN;
   NullablePtr<Constant> BridgeRetainN;
   NullablePtr<Constant> BridgeReleaseN;
 
@@ -159,19 +159,20 @@ public:
     return CI;
   }
 
-  CallInst *createUnknownRetainN(Value *V, uint32_t n, CallInst *OrigI) {
+  CallInst *createUnknownObjectRetainN(Value *V, uint32_t n, CallInst *OrigI) {
     // Cast just to make sure that we have the right object type.
     V = B.CreatePointerCast(V, getObjectPtrTy());
-    CallInst *CI = CreateCall(getUnknownRetainN(OrigI), {V, getIntConstant(n)});
+    CallInst *CI =
+        CreateCall(getUnknownObjectRetainN(OrigI), {V, getIntConstant(n)});
     CI->setTailCall(true);
     return CI;
   }
 
-  CallInst *createUnknownReleaseN(Value *V, uint32_t n, CallInst *OrigI) {
+  CallInst *createUnknownObjectReleaseN(Value *V, uint32_t n, CallInst *OrigI) {
     // Cast just to make sure we have the right object type.
     V = B.CreatePointerCast(V, getObjectPtrTy());
-    CallInst *CI = CreateCall(getUnknownReleaseN(OrigI),
-                              {V, getIntConstant(n)});
+    CallInst *CI =
+        CreateCall(getUnknownObjectReleaseN(OrigI), {V, getIntConstant(n)});
     CI->setTailCall(true);
     return CI;
   }
@@ -299,40 +300,43 @@ private:
     return ReleaseN.get();
   }
 
-  /// getUnknownRetainN - Return a callable function for swift_unknownRetain_n.
-  Constant *getUnknownRetainN(CallInst *OrigI) {
-    if (UnknownRetainN)
-      return UnknownRetainN.get();
+  /// getUnknownObjectRetainN - Return a callable function for
+  /// swift_unknownObjectRetain_n.
+  Constant *getUnknownObjectRetainN(CallInst *OrigI) {
+    if (UnknownObjectRetainN)
+      return UnknownObjectRetainN.get();
     auto *ObjectPtrTy = getObjectPtrTy();
     auto *Int32Ty = Type::getInt32Ty(getModule().getContext());
 
     llvm::Constant *cache = nullptr;
-    UnknownRetainN =
+    UnknownObjectRetainN =
         getRuntimeFn(getModule(), cache,
-                     isNonAtomic(OrigI) ? "swift_nonatomic_unknownRetain_n"
-                                        : "swift_unknownRetain_n",
+                     isNonAtomic(OrigI)
+                       ? "swift_nonatomic_unknownObjectRetain_n"
+                       : "swift_unknownObjectRetain_n",
                      DefaultCC, {ObjectPtrTy}, {ObjectPtrTy, Int32Ty},
                      {NoUnwind, FirstParamReturned});
 
-    return UnknownRetainN.get();
+    return UnknownObjectRetainN.get();
   }
 
-  /// Return a callable function for swift_unknownRelease_n.
-  Constant *getUnknownReleaseN(CallInst *OrigI) {
-    if (UnknownReleaseN)
-      return UnknownReleaseN.get();
+  /// Return a callable function for swift_unknownObjectRelease_n.
+  Constant *getUnknownObjectReleaseN(CallInst *OrigI) {
+    if (UnknownObjectReleaseN)
+      return UnknownObjectReleaseN.get();
     auto *ObjectPtrTy = getObjectPtrTy();
     auto *Int32Ty = Type::getInt32Ty(getModule().getContext());
     auto *VoidTy = Type::getVoidTy(getModule().getContext());
 
     llvm::Constant *cache = nullptr;
-    UnknownReleaseN =
+    UnknownObjectReleaseN =
         getRuntimeFn(getModule(), cache,
-                     isNonAtomic(OrigI) ? "swift_nonatomic_unknownRelease_n"
-                                        : "swift_unknownRelease_n",
+                     isNonAtomic(OrigI)
+                       ? "swift_nonatomic_unknownObjectRelease_n"
+                       : "swift_unknownObjectRelease_n",
                      DefaultCC, {VoidTy}, {ObjectPtrTy, Int32Ty}, {NoUnwind});
 
-    return UnknownReleaseN.get();
+    return UnknownObjectReleaseN.get();
   }
 
   /// Return a callable function for swift_bridgeRetain_n.

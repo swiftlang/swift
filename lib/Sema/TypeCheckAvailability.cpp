@@ -2083,7 +2083,7 @@ bool isSubscriptReturningString(const ValueDecl *D, ASTContext &Context) {
   auto *stringDecl = Context.getStringDecl();
   auto *substringDecl = Context.getSubstringDecl();
 
-  auto *typeDecl = declContext->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *typeDecl = declContext->getSelfNominalTypeDecl();
   if (!typeDecl)
     return false;
 

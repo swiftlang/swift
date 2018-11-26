@@ -1,0 +1,80 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enforce-exclusivity=checked -enable-sil-verify-all %s -licm | %FileCheck %s
+
+sil_stage canonical
+
+
+import Builtin
+import Swift
+
+struct X {
+  @sil_stored var i: Int64 { get set }
+  init(i: Int64)
+  init()
+}
+
+var globalX: X
+
+sil_global hidden @globalX : $X
+
+
+sil hidden_external [global_init] @globalAddressor : $@convention(thin) () -> Builtin.RawPointer
+
+// public func hoist_access_with_conflict() {
+// Tests Hoisting of begin/end access when there's a "sandwiched" unidentified access
+//
+// CHECK-LABEL: sil @hoist_access_with_conflict : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK: [[BEGIN:%.*]] = begin_access [read] [dynamic] %0 : $*X
+// CHECK-NEXT: br bb1
+// CHECK: apply
+// CHECK: load
+// CHECK: cond_br
+// CHECK: bb2
+// CHECK: end_access [[BEGIN]]
+// CHECK-LABEL: } // end sil function 'hoist_access_with_conflict'
+sil @hoist_access_with_conflict : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %u0 = function_ref @globalAddressor : $@convention(thin) () -> Builtin.RawPointer
+  br bb1
+  
+bb1:
+  %u3 = begin_access [read] [dynamic] %0 : $*X
+  %u1 = apply %u0() : $@convention(thin) () -> Builtin.RawPointer
+  %u4 = load %u3 : $*X
+  end_access %u3 : $*X
+  cond_br undef, bb1, bb2
+
+bb2:
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// public func dont_hoist_access_with_conflict() {
+// Tests *not* hoisting begin/end access when there's an unidentified access not protected by them
+//
+// CHECK-LABEL: sil @dont_hoist_access_with_conflict : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK: br bb1
+// CHECK: apply
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] %0 : $*X
+// CHECK-NEXT: load
+// CHECK-NEXT: end_access [[BEGIN]]
+// CHECK-LABEL: } // end sil function 'dont_hoist_access_with_conflict'
+sil @dont_hoist_access_with_conflict : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %u0 = function_ref @globalAddressor : $@convention(thin) () -> Builtin.RawPointer
+  br bb1
+  
+bb1:
+  %u1 = apply %u0() : $@convention(thin) () -> Builtin.RawPointer
+  %u3 = begin_access [read] [dynamic] %0 : $*X
+  %u4 = load %u3 : $*X
+  end_access %u3 : $*X
+  cond_br undef, bb1, bb2
+
+bb2:
+  %10 = tuple ()
+  return %10 : $()
+}

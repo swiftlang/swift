@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -707,6 +707,9 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   if (AFR.getCaptureInfo().hasBeenComputed())
     return;
 
+  if (!AFR.getBody())
+    return;
+
   SmallVector<CapturedValue, 4> Captures;
   SourceLoc GenericParamCaptureLoc;
   SourceLoc DynamicSelfCaptureLoc;
@@ -792,7 +795,7 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   // Extensions of generic ObjC functions can't use generic parameters from
   // their context.
   if (AFD && GenericParamCaptureLoc.isValid()) {
-    if (auto Clas = AFD->getParent()->getAsClassOrClassExtensionContext()) {
+    if (auto Clas = AFD->getParent()->getSelfClassDecl()) {
       if (Clas->usesObjCGenericsModel()) {
         diagnose(AFD->getLoc(),
                  diag::objc_generic_extension_using_type_parameter);

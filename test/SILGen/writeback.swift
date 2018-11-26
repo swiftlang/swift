@@ -130,7 +130,7 @@ protocol Frobable {
 }
 
 // CHECK-LABEL: sil hidden @$S9writeback12test_generic{{[_0-9a-zA-Z]*}}F 
-// CHECK:         witness_method $Runce, #Runcible.frob!materializeForSet.1
+// CHECK:         witness_method $Runce, #Runcible.frob!modify.1
 // CHECK:         witness_method $Runce.Frob, #Frobable.anse!setter.1
 func test_generic<Runce: Runcible>(runce runce: inout Runce, anse: Runce.Frob.Anse) {
   runce.frob.anse = anse

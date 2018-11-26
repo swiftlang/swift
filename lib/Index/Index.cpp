@@ -19,6 +19,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/SourceManager.h"
@@ -50,7 +51,6 @@ printArtificialName(const swift::AbstractStorageDecl *ASD, AccessorKind AK, llvm
     OS << "willSet:" << ASD->getFullName() ;
     return false;
 
-  case AccessorKind::MaterializeForSet:
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
   case AccessorKind::Read:
@@ -77,6 +77,13 @@ static bool isMemberwiseInit(swift::ValueDecl *D) {
   if (auto AFD = dyn_cast<AbstractFunctionDecl>(D))
     return AFD->getBodyKind() == AbstractFunctionDecl::BodyKind::MemberwiseInitializer;
   return false;
+}
+
+static SourceLoc getLocForExtension(ExtensionDecl *D) {
+  // Use the 'End' token of the range, in case it is a compound name, e.g.
+  //   extension A.B {}
+  // we want the location of 'B' token.
+  return D->getExtendedTypeLoc().getSourceRange().End;
 }
 
 namespace {
@@ -122,6 +129,11 @@ public:
   }
 };
 
+struct ValueWitness {
+  ValueDecl *Member;
+  ValueDecl *Requirement;
+};
+
 class IndexSwiftASTWalker : public SourceEntityWalker {
   IndexDataConsumer &IdxConsumer;
   SourceManager &SrcMgr;
@@ -134,6 +146,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
     Decl *D;
     SymbolInfo SymInfo;
     SymbolRoleSet Roles;
+    SmallVector<ValueWitness, 6> ExplicitValueWitnesses;
     SmallVector<SourceLoc, 6> RefsToSuppress;
   };
   SmallVector<Entity, 6> EntitiesStack;
@@ -306,8 +319,8 @@ private:
       return;
 
     // match labels to properties
-    auto *TypeContext = MemberwiseInit->getDeclContext()
-                          ->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto *TypeContext =
+        MemberwiseInit->getDeclContext()->getSelfNominalTypeDecl();
     if (!TypeContext || !shouldIndex(TypeContext, false))
       return;
 
@@ -320,7 +333,7 @@ private:
       IndexSymbol Info;
       if (initIndexSymbol(Prop, *LabelIt++, /*IsRef=*/true, Info))
         continue;
-      if (startEntity(Prop, Info))
+      if (startEntity(Prop, Info, /*IsRef=*/true))
         finishCurrentEntity();
     }
   }
@@ -399,8 +412,10 @@ private:
   bool reportExtension(ExtensionDecl *D);
   bool reportRef(ValueDecl *D, SourceLoc Loc, IndexSymbol &Info,
                  Optional<AccessKind> AccKind);
+  bool reportImplicitValueConformance(ValueDecl *witness, ValueDecl *requirement,
+                                      Decl *container);
 
-  bool startEntity(Decl *D, IndexSymbol &Info);
+  bool startEntity(Decl *D, IndexSymbol &Info, bool IsRef);
   bool startEntityDecl(ValueDecl *D);
 
   bool reportRelatedRef(ValueDecl *D, SourceLoc Loc, bool isImplicit, SymbolRoleSet Relations, Decl *Related);
@@ -459,6 +474,14 @@ private:
 
     return true;
   }
+
+  /// Reports all implicit member value decl conformances that \p D introduces
+  /// as implicit overrides at the source location of \p D, and returns the
+  /// explicit ones so we can check against them later on when visiting them as
+  /// members.
+  ///
+  /// \returns false if AST visitation should stop.
+  bool handleValueWitnesses(Decl *D, SmallVectorImpl<ValueWitness> &explicitValueWitnesses);
 
   void getModuleHash(SourceFileOrModule SFOrMod, llvm::raw_ostream &OS);
   llvm::hash_code hashModule(llvm::hash_code code, SourceFileOrModule SFOrMod);
@@ -613,16 +636,53 @@ bool IndexSwiftASTWalker::visitImports(
   return true;
 }
 
-bool IndexSwiftASTWalker::startEntity(Decl *D, IndexSymbol &Info) {
+bool IndexSwiftASTWalker::handleValueWitnesses(Decl *D, SmallVectorImpl<ValueWitness> &explicitValueWitnesses) {
+  auto DC = dyn_cast<DeclContext>(D);
+  if (!DC)
+    return true;
+
+  for (auto *conf : DC->getLocalConformances()) {
+    if (conf->isInvalid())
+      continue;
+
+    auto normal = conf->getRootNormalConformance();
+    normal->forEachValueWitness(nullptr,
+                                [&](ValueDecl *req, Witness witness) {
+      if (Cancelled)
+        return;
+
+      auto *decl = witness.getDecl();
+      if (decl->getDeclContext() == DC) {
+        explicitValueWitnesses.push_back(ValueWitness{decl, req});
+      } else {
+        // Report the implicit conformance.
+        reportImplicitValueConformance(decl, req, D);
+      }
+    });
+  }
+
+  if (Cancelled)
+    return false;
+
+  return true;
+}
+
+bool IndexSwiftASTWalker::startEntity(Decl *D, IndexSymbol &Info, bool IsRef) {
   switch (IdxConsumer.startSourceEntity(Info)) {
     case swift::index::IndexDataConsumer::Abort:
       Cancelled = true;
       LLVM_FALLTHROUGH;
     case swift::index::IndexDataConsumer::Skip:
       return false;
-    case swift::index::IndexDataConsumer::Continue:
-      EntitiesStack.push_back({D, Info.symInfo, Info.roles, {}});
+    case swift::index::IndexDataConsumer::Continue: {
+      SmallVector<ValueWitness, 6> explicitValueWitnesses;
+      if (!IsRef) {
+        if (!handleValueWitnesses(D, explicitValueWitnesses))
+          return false;
+      }
+      EntitiesStack.push_back({D, Info.symInfo, Info.roles, std::move(explicitValueWitnesses), {}});
       return true;
+    }
   }
 
   llvm_unreachable("Unhandled IndexDataConsumer in switch.");
@@ -650,12 +710,15 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
       return false;
   }
 
-  for (auto Overriden: getOverriddenDecls(D, /*IncludeProtocolReqs=*/!isSystemModule)) {
-    if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Overriden))
-      return false;
+  for (auto Overriden: getOverriddenDecls(D, /*IncludeProtocolReqs=*/false)) {
+    addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Overriden);
   }
 
   if (auto Parent = getParentDecl()) {
+    for (const ValueWitness &witness : EntitiesStack.back().ExplicitValueWitnesses) {
+      if (witness.Member == D)
+        addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, witness.Requirement);
+    }
     if (auto ParentVD = dyn_cast<ValueDecl>(Parent)) {
       SymbolRoleSet RelationsToParent = (SymbolRoleSet)SymbolRole::RelationChildOf;
       if (Info.symInfo.SubKind == SymbolSubKind::AccessorGetter ||
@@ -674,7 +737,7 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
     }
   }
 
-  return startEntity(D, Info);
+  return startEntity(D, Info, /*IsRef=*/false);
 }
 
 bool IndexSwiftASTWalker::reportRelatedRef(ValueDecl *D, SourceLoc Loc, bool isImplicit,
@@ -743,7 +806,7 @@ bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet 
 }
 
 static bool isDynamicVarAccessorOrFunc(ValueDecl *D, SymbolInfo symInfo) {
-  if (auto NTD = D->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext()) {
+  if (auto NTD = D->getDeclContext()->getSelfNominalTypeDecl()) {
     bool isClassOrProtocol = isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD);
     bool isInternalAccessor =
       symInfo.SubKind == SymbolSubKind::SwiftAccessorWillSet ||
@@ -837,10 +900,7 @@ IndexSwiftASTWalker::getTypeLocAsNominalTypeDecl(const TypeLoc &Ty) {
 }
 
 bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
-  // Use the 'End' token of the range, in case it is a compound name, e.g.
-  //   extension A.B {}
-  // we want the location of 'B' token.
-  SourceLoc Loc = D->getExtendedTypeLoc().getSourceRange().End;
+  SourceLoc Loc = getLocForExtension(D);
   NominalTypeDecl *NTD = D->getExtendedNominal();
   if (!NTD)
     return true;
@@ -851,7 +911,7 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
   if (initIndexSymbol(D, NTD, Loc, Info))
     return true;
 
-  if (!startEntity(D, Info))
+  if (!startEntity(D, Info, /*IsRef=*/false))
     return false;
 
   if (!reportRelatedRef(NTD, Loc, /*isImplicit=*/false,
@@ -941,7 +1001,7 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
   if (isSystemModule && !hasUsefulRoleInSystemModule(Info.roles))
     return true;
 
-  if (!startEntity(D, Info))
+  if (!startEntity(D, Info, /*IsRef=*/true))
     return true;
 
   // Report the accessors that were utilized.
@@ -959,6 +1019,34 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
         return false;
   }
 
+  return finishCurrentEntity();
+}
+
+bool IndexSwiftASTWalker::reportImplicitValueConformance(ValueDecl *witness, ValueDecl *requirement,
+                                                         Decl *container) {
+  if (!shouldIndex(witness, /*IsRef=*/true))
+    return true; // keep walking
+
+  SourceLoc loc;
+  if (auto *extD = dyn_cast<ExtensionDecl>(container))
+    loc = getLocForExtension(extD);
+  else
+    loc = container->getLoc();
+
+  IndexSymbol info;
+  if (initIndexSymbol(witness, loc, /*IsRef=*/true, info))
+    return true;
+  if (addRelation(info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, requirement))
+    return true;
+  if (addRelation(info, (SymbolRoleSet) SymbolRole::RelationContainedBy, container))
+    return true;
+  // Remove the 'ref' role that \c initIndexSymbol introduces. This isn't
+  // actually a 'reference', but an 'implicit' override.
+  info.roles &= ~(SymbolRoleSet)SymbolRole::Reference;
+  info.roles |= (SymbolRoleSet)SymbolRole::Implicit;
+
+  if (!startEntity(witness, info, /*IsRef=*/true))
+    return true;
   return finishCurrentEntity();
 }
 
@@ -1014,7 +1102,7 @@ bool IndexSwiftASTWalker::initIndexSymbol(ExtensionDecl *ExtD, ValueDecl *Extend
 }
 
 static NominalTypeDecl *getNominalParent(ValueDecl *D) {
-  return D->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  return D->getDeclContext()->getSelfNominalTypeDecl();
 }
 
 bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
@@ -1368,7 +1456,7 @@ canDeclProvideDefaultImplementationFor(ValueDecl* VD,
     return {};
 
   // Check if VD is from a protocol extension.
-  auto P = VD->getDeclContext()->getAsProtocolExtensionContext();
+  auto P = VD->getDeclContext()->getExtendedProtocolDecl();
   if (!P)
     return {};
 

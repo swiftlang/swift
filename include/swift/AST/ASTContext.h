@@ -392,7 +392,7 @@ public:
   }
 
   /// Retrive the syntax node memory manager for this context.
-  syntax::SyntaxArena &getSyntaxArena() const;
+  llvm::IntrusiveRefCntPtr<syntax::SyntaxArena> getSyntaxArena() const;
 
   /// Retrieve the lazy resolver for this context.
   LazyResolver *getLazyResolver() const;

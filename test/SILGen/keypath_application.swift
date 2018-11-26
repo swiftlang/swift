@@ -138,17 +138,13 @@ func writebackNesting(x: inout Int,
   // -- apply keypath y
   // CHECK: [[PROJECT_FN:%.*]] = function_ref @{{.*}}_projectKeyPathWritable
   // CHECK: [[PROJECT_RET:%.*]] = apply [[PROJECT_FN]]
-  // CHECK: [[PROJECT_RET_BORROW:%.*]] = begin_borrow [[PROJECT_RET]]
-  // CHECK: [[PROJECT_RET_BORROW_OWNER:%.*]] = tuple_extract [[PROJECT_RET_BORROW]] {{.*}}, 1
-  // CHECK: [[OWNER_Y:%.*]] = copy_value [[PROJECT_RET_BORROW_OWNER]]
+  // CHECK: ({{%.*}}, [[OWNER_Y:%.*]]) = destructure_tuple [[PROJECT_RET]]
   // -- get 'u'
   // CHECK: function_ref @$SSi19keypath_applicationE1uSivg
   // -- apply keypath z
   // CHECK: [[PROJECT_FN:%.*]] = function_ref @{{.*}}_projectKeyPathWritable
   // CHECK: [[PROJECT_RET:%.*]] = apply [[PROJECT_FN]]
-  // CHECK: [[PROJECT_RET_BORROW:%.*]] = begin_borrow [[PROJECT_RET]]
-  // CHECK: [[PROJECT_RET_BORROW_OWNER:%.*]] = tuple_extract [[PROJECT_RET_BORROW]] {{.*}}, 1
-  // CHECK: [[OWNER_Z:%.*]] = copy_value [[PROJECT_RET_BORROW_OWNER]]
+  // CHECK: ({{%.*}}, [[OWNER_Z:%.*]]) = destructure_tuple [[PROJECT_RET]]
 
   // -- set 'tt'
   // CHECK: function_ref @$SSi19keypath_applicationE2ttSivs

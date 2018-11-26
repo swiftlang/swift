@@ -930,6 +930,7 @@ public:
                                        StaticSpellingKind StaticSpelling,
                                        ParseDeclOptions Flags,
                                        DeclAttributes &Attributes);
+  void parseAbstractFunctionBody(AbstractFunctionDecl *AFD);
   bool parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);

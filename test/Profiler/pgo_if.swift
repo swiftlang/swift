@@ -1,6 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -profile-generate -Xfrontend -disable-incremental-llvm-codegen -module-name pgo_if -o %t/main
-// RUN: env LLVM_PROFILE_FILE=%t/default.profraw %target-run %t/main
+
+// This unusual use of 'sh' allows the path of the profraw file to be
+// substituted by %target-run.
+// RUN: %target-run sh -c 'env LLVM_PROFILE_FILE=$1 $2' -- %t/default.profraw %t/main
+
 // RUN: %llvm-profdata merge %t/default.profraw -o %t/default.profdata
 // RUN: %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -emit-sorted-sil -emit-sil -module-name pgo_if -o - | %FileCheck %s --check-prefix=SIL
 // RUN: %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -emit-ir -module-name pgo_if -o - | %FileCheck %s --check-prefix=IR
@@ -9,6 +13,7 @@
 
 // REQUIRES: profile_runtime
 // REQUIRES: OS=macosx
+// REQUIRES: executable_test
 
 // SIL-LABEL: // pgo_if.guess1
 // SIL-LABEL: sil @$S6pgo_if6guess11xs5Int32VAE_tF : $@convention(thin) (Int32) -> Int32 !function_entry_count(5001) {

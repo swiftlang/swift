@@ -1,0 +1,85 @@
+
+/* Generic Signature Changes */
+
+/* RawRepresentable Changes */
+
+/* Removed Decls */
+Constructor Int.init(truncatingBitPattern:) has been removed
+Constructor Int16.init(truncatingBitPattern:) has been removed
+Constructor Int32.init(truncatingBitPattern:) has been removed
+Constructor Int8.init(truncatingBitPattern:) has been removed
+Constructor String.init(_:obsoletedInSwift4:) has been removed
+Constructor UInt.init(truncatingBitPattern:) has been removed
+Constructor UInt16.init(truncatingBitPattern:) has been removed
+Constructor UInt32.init(truncatingBitPattern:) has been removed
+Constructor UInt8.init(truncatingBitPattern:) has been removed
+Func BinaryInteger.toIntMax() has been removed
+Func FixedWidthInteger.addWithOverflow(_:_:) has been removed
+Func FixedWidthInteger.divideWithOverflow(_:_:) has been removed
+Func FixedWidthInteger.multiplyWithOverflow(_:_:) has been removed
+Func FixedWidthInteger.remainderWithOverflow(_:_:) has been removed
+Func FixedWidthInteger.subtractWithOverflow(_:_:) has been removed
+Func FloatingPoint.abs(_:) has been removed (deprecated)
+Func FloatingPoint.add(_:) has been removed
+Func FloatingPoint.adding(_:) has been removed
+Func FloatingPoint.divide(by:) has been removed
+Func FloatingPoint.divided(by:) has been removed
+Func FloatingPoint.multiplied(by:) has been removed
+Func FloatingPoint.multiply(by:) has been removed
+Func FloatingPoint.negated() has been removed
+Func FloatingPoint.subtract(_:) has been removed
+Func FloatingPoint.subtracting(_:) has been removed
+Func Int.toUIntMax() has been removed
+Func Int16.toUIntMax() has been removed
+Func Int32.toUIntMax() has been removed
+Func Int64.toUIntMax() has been removed
+Func Int8.toUIntMax() has been removed
+Func Sequence.flatMap(_:) has been removed
+Func SignedNumeric.abs(_:) has been removed
+Func String.UTF16View.distance(from:to:) has been removed
+Func String.UTF16View.index(_:offsetBy:) has been removed
+Func String.UTF16View.index(after:) has been removed
+Func String.UTF8View.distance(from:to:) has been removed
+Func String.UTF8View.index(_:offsetBy:) has been removed
+Func String.UTF8View.index(after:) has been removed
+Func String.UnicodeScalarView.distance(from:to:) has been removed
+Func String.UnicodeScalarView.index(_:offsetBy:) has been removed
+Func String.UnicodeScalarView.index(after:) has been removed
+Func String.UnicodeScalarView.popFirst() has been removed (deprecated)
+Func String.popFirst() has been removed (deprecated)
+Func UInt.toIntMax() has been removed
+Func UInt16.toIntMax() has been removed
+Func UInt32.toIntMax() has been removed
+Func UInt64.toIntMax() has been removed
+Func UInt8.toIntMax() has been removed
+Func UnsignedInteger.toUIntMax() has been removed
+TypeAlias AbsoluteValuable has been removed
+TypeAlias BitwiseOperations has been removed (deprecated)
+TypeAlias IntMax has been removed
+TypeAlias Integer has been removed
+TypeAlias IntegerArithmetic has been removed
+TypeAlias SignedNumber has been removed
+TypeAlias StringProtocol.UTF16Index has been removed (deprecated)
+TypeAlias StringProtocol.UTF8Index has been removed (deprecated)
+TypeAlias StringProtocol.UnicodeScalarIndex has been removed (deprecated)
+TypeAlias UIntMax has been removed
+Var FixedWidthInteger.allZeros has been removed (deprecated)
+
+/* Moved Decls */
+
+/* Renamed Decls */
+Func Dictionary.filter(_:obsoletedInSwift4:) has been renamed to Func Dictionary.filter(_:)
+Func Set.filter(_:obsoletedInSwift4:) has been renamed to Func Set.filter(_:)
+
+/* Type Changes */
+Constructor Mirror.init(_:children:displayStyle:ancestorRepresentation:) has parameter 1 type change from DictionaryLiteral<String, Any> to KeyValuePairs<String, Any>
+Constructor String.init(_:) has return type change from String? to String
+Func Dictionary.filter(_:obsoletedInSwift4:) has return type change from [Dictionary<Key, Value>.Element] to [Dictionary<Key, Value>.Key : Dictionary<Key, Value>.Value]
+Func Dictionary.makeIterator() has return type change from DictionaryIterator<Dictionary<Key, Value>.Key, Dictionary<Key, Value>.Value> to Dictionary<Key, Value>.Iterator
+Func Set.filter(_:obsoletedInSwift4:) has return type change from [Set<Element>.Element] to Set<Element>
+Func Set.makeIterator() has return type change from SetIterator<Element> to Set<Element>.Iterator
+Var Dictionary.keys has declared type change from LazyMapCollection<[Key : Value], Key> to Dictionary<Key, Value>.Keys
+Var Dictionary.values has declared type change from LazyMapCollection<[Key : Value], Value> to Dictionary<Key, Value>.Values
+
+
+/* Decl Attribute changes */

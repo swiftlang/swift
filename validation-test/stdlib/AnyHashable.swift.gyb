@@ -599,7 +599,7 @@ AnyHashableTests.test("AnyHashable(CFBitVector)/Hashable, .base") {
     hashEqualityOracle: hashEqualityOracle)
 
   do {
-    expectEqual(.foreignClass, SwiftRuntime.metadataKind(of: bitVectors.first!))
+    expectEqual("ForeignClass", SwiftRuntime.metadataKind(of: bitVectors.first!))
 
     let anyHashables = bitVectors.map(AnyHashable.init)
     checkHashable(anyHashables,
@@ -614,7 +614,7 @@ AnyHashableTests.test("AnyHashable(CFBitVector)/Hashable, .base") {
       ($0 as AnyObject) as! NSObject
     }
     expectEqual(
-      .objCClassWrapper,
+      "ObjCClassWrapper",
       SwiftRuntime.metadataKind(of: bitVectorsAsAnyObjects.first!))
 
     let anyHashables = bitVectorsAsAnyObjects.map(AnyHashable.init)
@@ -648,7 +648,7 @@ AnyHashableTests.test("AnyHashable(CFMutableBitVector)/Hashable, .base") {
 
   do {
     expectEqual(
-      .foreignClass,
+      "ForeignClass",
       SwiftRuntime.metadataKind(of: bitVectors.first!))
 
     let anyHashables = bitVectors.map(AnyHashable.init)
@@ -670,7 +670,7 @@ AnyHashableTests.test("AnyHashable(CFMutableBitVector)/Hashable, .base") {
       hashEqualityOracle: hashEqualityOracle)
 
     expectEqual(
-      .objCClassWrapper,
+      "ObjCClassWrapper",
       SwiftRuntime.metadataKind(of: bitVectorsAsAnyObjects.first!))
 
     let anyHashables = bitVectorsAsAnyObjects.map(AnyHashable.init)
@@ -731,7 +731,7 @@ AnyHashableTests.test("AnyHashable(MinimalHashablePODSwiftError)/Hashable") {
     .caseB, .caseB,
     .caseC, .caseC,
   ]
-  expectEqual(.enum, SwiftRuntime.metadataKind(of: xs.first!))
+  expectEqual("Enum", SwiftRuntime.metadataKind(of: xs.first!))
   checkHashable(xs, equalityOracle: { $0 / 2 == $1 / 2 })
   checkHashable(
     xs.map(AnyHashable.init),
@@ -752,7 +752,7 @@ AnyHashableTests.test("AnyHashable(MinimalHashableRCSwiftError)/Hashable") {
     .caseC(LifetimeTracked(1)), .caseC(LifetimeTracked(1)),
     .caseC(LifetimeTracked(2)), .caseC(LifetimeTracked(2)),
   ]
-  expectEqual(.enum, SwiftRuntime.metadataKind(of: xs.first!))
+  expectEqual("Enum", SwiftRuntime.metadataKind(of: xs.first!))
   checkHashable(
     xs,
     equalityOracle: { $0 / 2 == $1 / 2 },
@@ -1017,7 +1017,7 @@ AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashablePODSwiftEr
     ]
   }
   expectEqual(
-    .objCClassWrapper,
+    "ObjCClassWrapper",
     SwiftRuntime.metadataKind(of: nsErrors[0]))
   expectEqual("_SwiftNativeNSError", String(describing: type(of: nsErrors[0])))
 
@@ -1069,12 +1069,12 @@ AnyHashableTests.test("AnyHashable(_SwiftNativeNSError(MinimalHashableRCSwiftErr
   }
 
   expectEqual(
-    .objCClassWrapper,
+    "ObjCClassWrapper",
     SwiftRuntime.metadataKind(of: nsErrors[0]))
   expectEqual("_SwiftNativeNSError", String(describing: type(of: nsErrors[0])))
 
   expectEqual(
-    .objCClassWrapper,
+    "ObjCClassWrapper",
     SwiftRuntime.metadataKind(of: nsErrors[1]))
   expectEqual("NSError", String(describing: type(of: nsErrors[1])))
 
@@ -1137,7 +1137,7 @@ AnyHashableTests.test("AnyHashable(NSError)/Hashable") {
     NSError(domain: "Foo", code: 2),
   ]
   expectEqual(
-    .objCClassWrapper,
+    "ObjCClassWrapper",
     SwiftRuntime.metadataKind(of: nsErrors.first!))
   checkHashable(nsErrors, equalityOracle: { $0 / 2 == $1 / 2 })
   checkHashable(

@@ -30,13 +30,17 @@ def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument(
         '-O', action='append_const', const='O', dest='opt_levels',
-        help='test -O benchmarks')
+        help='report code size of -O benchmarks')
     argparser.add_argument(
         '-Osize', action='append_const', const='Osize', dest='opt_levels',
-        help='test -Osize benchmarks')
+        help='report code size of -Osize benchmarks')
     argparser.add_argument(
         '-Onone', action='append_const', const='Onone', dest='opt_levels',
-        help='test -Onone benchmarks')
+        help='report code size of -Onone benchmarks')
+    argparser.add_argument(
+        '-swiftlibs', action='append_const', const='swiftlibs',
+        dest='opt_levels',
+        help='report code size of swift dylibs')
     argparser.add_argument(
         'oldbuilddir', nargs=1, type=str,
         help='old benchmark build directory')
@@ -62,10 +66,13 @@ def report_code_size(opt_level, old_dir, new_dir, platform):
     old_logf = open(log_filename(old_dir), 'w')
     new_logf = open(log_filename(new_dir), 'w')
 
-    files = glob.glob(os.path.join(old_dir, opt_level + '-*' + platform + '*',
-                                   '*.o'))
-    files += glob.glob(os.path.join(old_dir, 'lib', 'swift', platform,
-                                    '*.dylib'))
+    if opt_level == 'swiftlibs':
+        files = glob.glob(os.path.join(old_dir, 'lib', 'swift', platform,
+                                       '*.dylib'))
+    else:
+        files = glob.glob(os.path.join(old_dir,
+                                       opt_level + '-*' + platform + '*',
+                                       '*.o'))
 
     idx = 1
     for oldfile in files:

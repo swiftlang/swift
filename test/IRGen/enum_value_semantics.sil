@@ -119,7 +119,7 @@ enum GenericFixedLayout<T> {
 // CHECK-LABEL: @"$S20enum_value_semantics20SinglePayloadTrivialOMf" =
 // CHECK-SAME:   internal constant <{ {{.*}} }> <{
 // CHECK-SAME:   i8** getelementptr inbounds ([17 x i8*], [17 x i8*]* @"$S20enum_value_semantics20SinglePayloadTrivialOWV", i32 0, i32 0),
-// CHECK-SAME:   i64 2,
+// CHECK-SAME:   i64 513,
 // CHECK-SAME:   {{.*}}* @"$S20enum_value_semantics20SinglePayloadTrivialOMn"
 // CHECK-SAME: }>
 
@@ -156,7 +156,7 @@ enum GenericFixedLayout<T> {
 // CHECK-LABEL: @"$S20enum_value_semantics23SinglePayloadNontrivialOMf" =
 // CHECK-SAME: internal constant <{ {{.*}} }> <{
 // CHECK-SAME:   i8** getelementptr inbounds ([17 x i8*], [17 x i8*]* @"$S20enum_value_semantics23SinglePayloadNontrivialOWV", i32 0, i32 0),
-// CHECK-SAME:   i64 2,
+// CHECK-SAME:   i64 513,
 // CHECK-SAME:   {{.*}}* @"$S20enum_value_semantics23SinglePayloadNontrivialOMn"
 // CHECK-SAME: }>
 
@@ -167,11 +167,11 @@ enum GenericFixedLayout<T> {
 
 // CHECK-LABEL: @"$S20enum_value_semantics18GenericFixedLayoutOMP" = internal constant <{ {{.*}} }> <{
 //   Instantiation function.
-// CHECK-SAME:    i32 trunc (i64 sub (i64 ptrtoint (%swift.type* (%swift.type_descriptor*, i8**, i8**)* @"$S20enum_value_semantics18GenericFixedLayoutOMi" to i64), i64 ptrtoint (<{ i32, i32, i32, i32 }>* @"$S20enum_value_semantics18GenericFixedLayoutOMP" to i64)) to i32),
+// CHECK-SAME:    i32 trunc (i64 sub (i64 ptrtoint (%swift.type* (%swift.type_descriptor*, i8**, i8*)* @"$S20enum_value_semantics18GenericFixedLayoutOMi" to i64), i64 ptrtoint (<{ i32, i32, i32, i32 }>* @"$S20enum_value_semantics18GenericFixedLayoutOMP" to i64)) to i32),
 //   Completion function.
 // CHECK-SAME:    i32 0,
-//   Pattern flags.  0x400000 == (MetadataKind::Enum << 21).
-// CHECK-SAME:    i32 4194304,
+//   Pattern flags.  0x4020_0000 == (MetadataKind::Enum << 21).
+// CHECK-SAME:    i32 1075838976,
 //   Value witness table.
 // CHECK-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([17 x i8*]* @"$S20enum_value_semantics18GenericFixedLayoutOWV" to i64), i64 ptrtoint (i32* getelementptr inbounds (<{ i32, i32, i32, i32 }>, <{ i32, i32, i32, i32 }>* @"$S20enum_value_semantics18GenericFixedLayoutOMP", i32 0, i32 3) to i64)) to i32)
 // CHECK-SAME:  }>

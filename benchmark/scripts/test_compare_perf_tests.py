@@ -19,36 +19,174 @@ import sys
 import tempfile
 import unittest
 
-from StringIO import StringIO
-from contextlib import contextmanager
-
+from compare_perf_tests import LogParser
 from compare_perf_tests import PerformanceTestResult
+from compare_perf_tests import PerformanceTestSamples
 from compare_perf_tests import ReportFormatter
 from compare_perf_tests import ResultComparison
+from compare_perf_tests import Sample
 from compare_perf_tests import TestComparator
 from compare_perf_tests import main
 from compare_perf_tests import parse_args
 
+from test_utils import captured_output
 
-@contextmanager
-def captured_output():
-    new_out, new_err = StringIO(), StringIO()
-    old_out, old_err = sys.stdout, sys.stderr
-    try:
-        sys.stdout, sys.stderr = new_out, new_err
-        yield sys.stdout, sys.stderr
-    finally:
-        sys.stdout, sys.stderr = old_out, old_err
+
+class TestSample(unittest.TestCase):
+    def test_has_named_fields(self):
+        s = Sample(1, 2, 3)
+        self.assertEquals(s.i, 1)
+        self.assertEquals(s.num_iters, 2)
+        self.assertEquals(s.runtime, 3)
+
+    def test_is_iterable(self):
+        s = Sample(1, 2, 3)
+        self.assertEquals(s[0], 1)
+        self.assertEquals(s[1], 2)
+        self.assertEquals(s[2], 3)
+
+
+class TestPerformanceTestSamples(unittest.TestCase):
+    def setUp(self):
+        self.samples = PerformanceTestSamples('B1')
+        self.samples.add(Sample(7, 42, 1000))
+
+    def test_has_name(self):
+        self.assertEquals(self.samples.name, 'B1')
+
+    def test_stores_samples(self):
+        self.assertEquals(self.samples.count, 1)
+        s = self.samples.samples[0]
+        self.assertTrue(isinstance(s, Sample))
+        self.assertEquals(s.i, 7)
+        self.assertEquals(s.num_iters, 42)
+        self.assertEquals(s.runtime, 1000)
+
+    def assertEqualFiveNumberSummary(self, ss, expected_fns):
+        e_min, e_q1, e_median, e_q3, e_max = expected_fns
+        self.assertEquals(ss.min, e_min)
+        self.assertEquals(ss.q1, e_q1)
+        self.assertEquals(ss.median, e_median)
+        self.assertEquals(ss.q3, e_q3)
+        self.assertEquals(ss.max, e_max)
+
+    def test_computes_five_number_summary(self):
+        self.assertEqualFiveNumberSummary(
+            self.samples, (1000, 1000, 1000, 1000, 1000))
+        self.samples.add(Sample(2, 1, 1100))
+        self.assertEqualFiveNumberSummary(
+            self.samples, (1000, 1000, 1100, 1100, 1100))
+        self.samples.add(Sample(3, 1, 1050))
+        self.assertEqualFiveNumberSummary(
+            self.samples, (1000, 1000, 1050, 1050, 1100))
+        self.samples.add(Sample(4, 1, 1025))
+        self.assertEqualFiveNumberSummary(
+            self.samples, (1000, 1025, 1050, 1100, 1100))
+        self.samples.add(Sample(5, 1, 1075))
+        self.assertEqualFiveNumberSummary(
+            self.samples, (1000, 1025, 1050, 1075, 1100))
+
+    def test_computes_inter_quartile_range(self):
+        self.assertEquals(self.samples.iqr, 0)
+        self.samples.add(Sample(2, 1, 1025))
+        self.samples.add(Sample(3, 1, 1050))
+        self.samples.add(Sample(4, 1, 1075))
+        self.samples.add(Sample(5, 1, 1100))
+        self.assertEquals(self.samples.iqr, 50)
+
+    def assertEqualStats(self, stats, expected_stats):
+        for actual, expected in zip(stats, expected_stats):
+            self.assertAlmostEquals(actual, expected, places=2)
+
+    def test_computes_mean_sd_cv(self):
+        ss = self.samples
+        self.assertEqualStats(
+            (ss.mean, ss.sd, ss.cv), (1000.0, 0.0, 0.0))
+        self.samples.add(Sample(2, 1, 1100))
+        self.assertEqualStats(
+            (ss.mean, ss.sd, ss.cv), (1050.0, 70.71, 6.7 / 100))
+
+    def test_computes_range_spread(self):
+        ss = self.samples
+        self.assertEqualStats(
+            (ss.range, ss.spread), (0, 0))
+        self.samples.add(Sample(2, 1, 1100))
+        self.assertEqualStats(
+            (ss.range, ss.spread), (100, 10.0 / 100))
+
+    def test_init_with_samples(self):
+        self.samples = PerformanceTestSamples(
+            'B2', [Sample(0, 1, 1000), Sample(1, 1, 1100)])
+        self.assertEquals(self.samples.count, 2)
+        self.assertEqualStats(
+            (self.samples.mean, self.samples.sd,
+             self.samples.range, self.samples.spread),
+            (1050.0, 70.71, 100, 9.52 / 100))
+
+    def test_can_handle_zero_runtime(self):
+        # guard against dividing by 0
+        self.samples = PerformanceTestSamples('Zero')
+        self.samples.add(Sample(0, 1, 0))
+        self.assertEqualStats(
+            (self.samples.mean, self.samples.sd, self.samples.cv,
+             self.samples.range, self.samples.spread),
+            (0, 0, 0.0, 0, 0.0))
+
+    def test_excludes_outliers(self):
+        ss = [Sample(*map(int, s.split())) for s in
+              '0 1 1000, 1 1 1025, 2 1 1050, 3 1 1075, 4 1 1100, '
+              '5 1 1000, 6 1 1025, 7 1 1050, 8 1 1075, 9 1 1100, '
+              '10 1 1050, 11 1 949, 12 1 1151'.split(',')]
+        self.samples = PerformanceTestSamples('Outliers', ss)
+        self.assertEquals(self.samples.count, 13)
+        self.assertEqualStats(
+            (self.samples.mean, self.samples.sd), (1050, 52.36))
+
+        self.samples.exclude_outliers()
+
+        self.assertEquals(self.samples.count, 11)
+        self.assertEquals(self.samples.outliers, ss[11:])
+        self.assertEqualFiveNumberSummary(
+            self.samples, (1000, 1025, 1050, 1075, 1100))
+        self.assertEqualStats(
+            (self.samples.mean, self.samples.sd), (1050, 35.36))
+
+    def test_excludes_outliers_zero_IQR(self):
+        self.samples = PerformanceTestSamples('Tight')
+        self.samples.add(Sample(0, 2, 23))
+        self.samples.add(Sample(1, 2, 18))
+        self.samples.add(Sample(2, 2, 18))
+        self.assertEquals(self.samples.iqr, 0)
+
+        self.samples.exclude_outliers()
+
+        self.assertEquals(self.samples.count, 2)
+        self.assertEqualStats(
+            (self.samples.min, self.samples.max), (18, 18))
+
+    def test_excludes_outliers_top_only(self):
+        ss = [Sample(*map(int, s.split())) for s in
+              '0 1 1, 1 1 2, 2 1 2, 3 1 2, 4 1 3'.split(',')]
+        self.samples = PerformanceTestSamples('Top', ss)
+        self.assertEqualFiveNumberSummary(self.samples, (1, 2, 2, 2, 3))
+        self.assertEquals(self.samples.iqr, 0)
+
+        self.samples.exclude_outliers(top_only=True)
+
+        self.assertEquals(self.samples.count, 4)
+        self.assertEqualStats((self.samples.min, self.samples.max), (1, 2))
 
 
 class TestPerformanceTestResult(unittest.TestCase):
-
     def test_init(self):
         log_line = '1,AngryPhonebook,20,10664,12933,11035,576,10884'
         r = PerformanceTestResult(log_line.split(','))
+        self.assertEquals(r.test_num, '1')
         self.assertEquals(r.name, 'AngryPhonebook')
-        self.assertEquals((r.samples, r.min, r.max, r.mean, r.sd, r.median),
-                          (20, 10664, 12933, 11035, 576, 10884))
+        self.assertEquals(
+            (r.num_samples, r.min, r.max, r.mean, r.sd, r.median),
+            (20, 10664, 12933, 11035, 576, 10884))
+        self.assertEquals(r.samples, None)
 
         log_line = '1,AngryPhonebook,1,12045,12045,12045,0,12045,10510336'
         r = PerformanceTestResult(log_line.split(','))
@@ -60,25 +198,7 @@ class TestPerformanceTestResult(unittest.TestCase):
         self.assertEquals(
             str(r),
             '<PerformanceTestResult name:\'AngryPhonebook\' samples:20 '
-            'min:10664 max:12933 mean:11035 sd:576.0 median:10884>'
-        )
-
-    def test_header(self):
-        self.assertEquals(PerformanceTestResult.header,
-                          ('TEST', 'MIN', 'MAX', 'MEAN', 'MAX_RSS'))
-
-    def test_values(self):
-        log_line = '1,AngryPhonebook,20,10664,12933,11035,576,10884'
-        r = PerformanceTestResult(log_line.split(','))
-        self.assertEquals(
-            r.values(),
-            ('AngryPhonebook', '10664', '12933', '11035', '—')
-        )
-        log_line = '1,AngryPhonebook,1,12045,12045,12045,0,12045,10510336'
-        r = PerformanceTestResult(log_line.split(','))
-        self.assertEquals(
-            r.values(),
-            ('AngryPhonebook', '12045', '12045', '12045', '10510336')
+            'min:10664 max:12933 mean:11035 sd:576 median:10884>'
         )
 
     def test_merge(self):
@@ -90,21 +210,21 @@ class TestPerformanceTestResult(unittest.TestCase):
                       [line.split(',') for line in tests])
 
         def as_tuple(r):
-            return (r.min, r.max, round(r.mean, 2), round(r.sd, 2), r.median,
-                    r.max_rss)
+            return (r.num_samples, r.min, r.max, round(r.mean, 2),
+                    r.sd, r.median, r.max_rss)
 
         r = results[0]
         self.assertEquals(as_tuple(r),
-                          (12045, 12045, 12045, 0, 12045, 10510336))
+                          (1, 12045, 12045, 12045, 0, 12045, 10510336))
         r.merge(results[1])
-        self.assertEquals(as_tuple(r),
-                          (12045, 12325, 12185, 197.99, 12045, 10510336))
+        self.assertEquals(as_tuple(r),  # drops SD and median
+                          (2, 12045, 12325, 12185, 0, 0, 10510336))
         r.merge(results[2])
-        self.assertEquals(as_tuple(r),
-                          (11616, 12325, 11995.33, 357.10, 12045, 10510336))
+        self.assertEquals(as_tuple(r),  # picks smaller of the MAX_RSS
+                          (3, 11616, 12325, 11995.33, 0, 0, 10502144))
         r.merge(results[3])
         self.assertEquals(as_tuple(r),
-                          (11616, 12325, 12064, 322.29, 12045, 10510336))
+                          (4, 11616, 12325, 12064, 0, 0, 10498048))
 
 
 class TestResultComparison(unittest.TestCase):
@@ -142,64 +262,19 @@ class TestResultComparison(unittest.TestCase):
             ResultComparison, self.r0, self.r1
         )
 
-    def test_header(self):
-        self.assertEquals(ResultComparison.header,
-                          ('TEST', 'OLD', 'NEW', 'DELTA', 'SPEEDUP'))
-
-    def test_values(self):
-        rc = ResultComparison(self.r1, self.r2)
-        self.assertEquals(
-            rc.values(),
-            ('AngryPhonebook', '12325', '11616', '-5.8%', '1.06x')
-        )
-        # other way around
-        rc = ResultComparison(self.r2, self.r1)
-        self.assertEquals(
-            rc.values(),
-            ('AngryPhonebook', '11616', '12325', '+6.1%', '0.94x')
-        )
-
     def test_values_is_dubious(self):
+        self.assertFalse(ResultComparison(self.r1, self.r2).is_dubious)
         self.r2.max = self.r1.min + 1
         # new.min < old.min < new.max
-        rc = ResultComparison(self.r1, self.r2)
-        self.assertEquals(rc.values()[4], '1.06x (?)')
+        self.assertTrue(ResultComparison(self.r1, self.r2).is_dubious)
         # other way around: old.min < new.min < old.max
-        rc = ResultComparison(self.r2, self.r1)
-        self.assertEquals(rc.values()[4], '0.94x (?)')
+        self.assertTrue(ResultComparison(self.r2, self.r1).is_dubious)
 
 
-class OldAndNewLog(unittest.TestCase):
+class FileSystemIntegration(unittest.TestCase):
     def setUp(self):
         # Create a temporary directory
         self.test_dir = tempfile.mkdtemp()
-
-        self.old_log = self.write_temp_file('old.log', """
-1,AngryPhonebook,20,10458,12714,11000,0,11000,10204365
-2,AnyHashableWithAClass,20,247027,319065,259056,0,259056,10250445
-3,Array2D,20,335831,400221,346622,0,346622,28297216
-4,ArrayAppend,20,23641,29000,24990,0,24990,11149926
-34,BitCount,20,3,4,4,0,4,10192896
-35,ByteSwap,20,4,6,4,0,4,10185933
-
-Totals,269,67351871,70727022,68220188,0,0,0
-""")
-        # Log lines are deliberately in descending sort order in order to test
-        # the ordering of the comparison results.
-        # ArrayAppend is included twice to test results merging.
-        self.new_log = self.write_temp_file('new.log', """
-265,TwoSum,20,5006,5679,5111,0,5111
-35,ByteSwap,20,0,0,0,0,0
-34,BitCount,20,9,9,9,0,9
-4,ArrayAppend,20,23641,29000,24990,0,24990
-3,Array2D,20,335831,400221,346622,0,346622
-1,AngryPhonebook,20,10458,12714,11000,0,11000
-
-Totals,269,67351871,70727022,68220188,0,0,0
-4,ArrayAppend,1,20000,20000,20000,0,20000
-
-Totals,1,20000,20000,20000,0,0,0
-""")
 
     def tearDown(self):
         # Remove the directory after the test
@@ -211,27 +286,219 @@ Totals,1,20000,20000,20000,0,0,0
             f.write(data)
         return temp_file_name
 
+
+class OldAndNewLog(unittest.TestCase):
+    old_log_content = """1,AngryPhonebook,20,10458,12714,11000,0,11000,10204365
+2,AnyHashableWithAClass,20,247027,319065,259056,0,259056,10250445
+3,Array2D,20,335831,400221,346622,0,346622,28297216
+4,ArrayAppend,20,23641,29000,24990,0,24990,11149926
+34,BitCount,20,3,4,4,0,4,10192896
+35,ByteSwap,20,4,6,4,0,4,10185933"""
+
+    new_log_content = """265,TwoSum,20,5006,5679,5111,0,5111
+35,ByteSwap,20,0,0,0,0,0
+34,BitCount,20,9,9,9,0,9
+4,ArrayAppend,20,20000,29000,24990,0,24990
+3,Array2D,20,335831,400221,346622,0,346622
+1,AngryPhonebook,20,10458,12714,11000,0,11000"""
+
+    old_results = dict([(r.name, r)
+                        for r in
+                        map(PerformanceTestResult,
+                            [line.split(',')
+                             for line in
+                             old_log_content.splitlines()])])
+
+    new_results = dict([(r.name, r)
+                        for r in
+                        map(PerformanceTestResult,
+                            [line.split(',')
+                             for line in
+                             new_log_content.splitlines()])])
+
     def assert_report_contains(self, texts, report):
         assert not isinstance(texts, str)
         for text in texts:
             self.assertIn(text, report)
 
 
+class TestLogParser(unittest.TestCase):
+    def test_parse_results_csv(self):
+        """Ignores header row, empty lines and Totals row."""
+        log = """#,TEST,SAMPLES,MIN(us),MAX(us),MEAN(us),SD(us),MEDIAN(us)
+34,BitCount,20,3,4,4,0,4
+
+Total performance tests executed: 1
+"""
+        parser = LogParser()
+        results = parser.parse_results(log.splitlines())
+        self.assertTrue(isinstance(results[0], PerformanceTestResult))
+        self.assertEquals(results[0].name, 'BitCount')
+
+    def test_parse_results_tab_delimited(self):
+        log = '34\tBitCount\t20\t3\t4\t4\t0\t4'
+        parser = LogParser()
+        results = parser.parse_results(log.splitlines())
+        self.assertTrue(isinstance(results[0], PerformanceTestResult))
+        self.assertEquals(results[0].name, 'BitCount')
+
+    def test_parse_results_formatted_text(self):
+        """Parse format that Benchmark_Driver prints to console"""
+        log = ("""
+  # TEST      SAMPLES MIN(μs) MAX(μs) MEAN(μs) SD(μs) MEDIAN(μs) MAX_RSS(B)
+  3 Array2D        20    2060    2188     2099      0       2099   20915200
+
+Total performance tests executed: 1
+""")
+        parser = LogParser()
+        results = parser.parse_results(log.splitlines()[1:])  # without 1st \n
+        self.assertTrue(isinstance(results[0], PerformanceTestResult))
+        r = results[0]
+        self.assertEquals(r.name, 'Array2D')
+        self.assertEquals(r.max_rss, 20915200)
+
+    def test_parse_results_verbose(self):
+        """Parse multiple performance test results with 2 sample formats:
+        single line for N = 1; two lines for N > 1.
+        """
+        verbose_log = """--- DATA ---
+#,TEST,SAMPLES,MIN(us),MAX(us),MEAN(us),SD(us),MEDIAN(us)
+Running AngryPhonebook for 3 samples.
+    Measuring with scale 78.
+    Sample 0,11812
+    Measuring with scale 90.
+    Sample 1,13898
+    Measuring with scale 91.
+    Sample 2,11467
+1,AngryPhonebook,3,11467,13898,12392,1315,11812
+Running Array2D for 3 samples.
+    Sample 0,369900
+    Sample 1,381039
+    Sample 2,371043
+3,Array2D,3,369900,381039,373994,6127,371043
+
+Totals,2"""
+        parser = LogParser()
+        results = parser.parse_results(verbose_log.split('\n'))
+
+        r = results[0]
+        self.assertEquals(
+            (r.name, r.min, r.max, int(r.mean), int(r.sd), r.median),
+            ('AngryPhonebook', 11467, 13898, 12392, 1315, 11812)
+        )
+        self.assertEquals(r.num_samples, r.samples.num_samples)
+        self.assertEquals(results[0].samples.all_samples,
+                          [(0, 78, 11812), (1, 90, 13898), (2, 91, 11467)])
+
+        r = results[1]
+        self.assertEquals(
+            (r.name, r.min, r.max, int(r.mean), int(r.sd), r.median),
+            ('Array2D', 369900, 381039, 373994, 6127, 371043)
+        )
+        self.assertEquals(r.num_samples, r.samples.num_samples)
+        self.assertEquals(results[1].samples.all_samples,
+                          [(0, 1, 369900), (1, 1, 381039), (2, 1, 371043)])
+
+    def test_parse_environment_verbose(self):
+        """Parse stats about environment in verbose mode."""
+        verbose_log = """    MAX_RSS 8937472 - 8904704 = 32768 (8 pages)
+    ICS 1338 - 229 = 1109
+    VCS 2 - 1 = 1
+2,AngryPhonebook,3,11269,11884,11657,338,11820
+"""
+        parser = LogParser()
+        results = parser.parse_results(verbose_log.split('\n'))
+
+        r = results[0]
+        self.assertEquals(r.max_rss, 32768)
+        self.assertEquals(r.mem_pages, 8)
+        self.assertEquals(r.voluntary_cs, 1)
+        self.assertEquals(r.involuntary_cs, 1109)
+
+    def test_results_from_merge(self):
+        """Parsing concatenated log merges same PerformanceTestResults"""
+        concatenated_logs = """4,ArrayAppend,20,23641,29000,24990,0,24990
+4,ArrayAppend,1,20000,20000,20000,0,20000"""
+        results = LogParser.results_from_string(concatenated_logs)
+        self.assertEquals(results.keys(), ['ArrayAppend'])
+        result = results['ArrayAppend']
+        self.assertTrue(isinstance(result, PerformanceTestResult))
+        self.assertEquals(result.min, 20000)
+        self.assertEquals(result.max, 29000)
+
+    def test_results_from_merge_verbose(self):
+        """Parsing verbose log  merges all PerformanceTestSamples.
+        ...this should technically be on TestPerformanceTestResult, but it's
+        easier to write here. ¯\_(ツ)_/¯"""
+        concatenated_logs = """
+    Sample 0,355883
+    Sample 1,358817
+    Sample 2,353552
+    Sample 3,350815
+3,Array2D,4,350815,358817,354766,3403,355883
+    Sample 0,363094
+    Sample 1,369169
+    Sample 2,376131
+    Sample 3,364245
+3,Array2D,4,363094,376131,368159,5931,369169"""
+        results = LogParser.results_from_string(concatenated_logs)
+        self.assertEquals(results.keys(), ['Array2D'])
+        result = results['Array2D']
+        self.assertTrue(isinstance(result, PerformanceTestResult))
+        self.assertEquals(result.min, 350815)
+        self.assertEquals(result.max, 376131)
+        self.assertEquals(result.median, 363094)
+        self.assertAlmostEquals(result.sd, 8443.37, places=2)
+        self.assertAlmostEquals(result.mean, 361463.25, places=2)
+        self.assertEquals(result.num_samples, 8)
+        samples = result.samples
+        self.assertTrue(isinstance(samples, PerformanceTestSamples))
+        self.assertEquals(samples.count, 8)
+
+    def test_excludes_outliers_from_samples(self):
+        verbose_log = """Running DropFirstAnySeqCntRangeLazy for 10 samples.
+    Measuring with scale 2.
+    Sample 0,455
+    Measuring with scale 2.
+    Sample 1,203
+    Measuring with scale 2.
+    Sample 2,205
+    Measuring with scale 2.
+    Sample 3,207
+    Measuring with scale 2.
+    Sample 4,208
+    Measuring with scale 2.
+    Sample 5,206
+    Measuring with scale 2.
+    Sample 6,205
+    Measuring with scale 2.
+    Sample 7,206
+    Measuring with scale 2.
+    Sample 8,208
+    Measuring with scale 2.
+    Sample 9,184
+65,DropFirstAnySeqCntRangeLazy,10,184,455,228,79,206
+"""
+        parser = LogParser()
+        result = parser.parse_results(verbose_log.split('\n'))[0]
+        self.assertEquals(result.num_samples, 10)
+        self.assertEquals(result.samples.count, 8)
+        self.assertEquals(len(result.samples.outliers), 2)
+
+
 class TestTestComparator(OldAndNewLog):
     def test_init(self):
-        old_log, new_log = self.old_log, self.new_log
-
         def names(tests):
             return [t.name for t in tests]
 
-        tc = TestComparator(old_log, new_log, 0.05)
+        tc = TestComparator(self.old_results, self.new_results, 0.05)
         self.assertEquals(names(tc.unchanged), ['AngryPhonebook', 'Array2D'])
         self.assertEquals(names(tc.increased), ['ByteSwap', 'ArrayAppend'])
         self.assertEquals(names(tc.decreased), ['BitCount'])
         self.assertEquals(names(tc.added), ['TwoSum'])
         self.assertEquals(names(tc.removed), ['AnyHashableWithAClass'])
         # other way around
-        tc = TestComparator(new_log, old_log, 0.05)
+        tc = TestComparator(self.new_results, self.old_results, 0.05)
         self.assertEquals(names(tc.unchanged), ['AngryPhonebook', 'Array2D'])
         self.assertEquals(names(tc.increased), ['BitCount'])
         self.assertEquals(names(tc.decreased), ['ByteSwap', 'ArrayAppend'])
@@ -239,7 +506,7 @@ class TestTestComparator(OldAndNewLog):
         self.assertEquals(names(tc.removed), ['TwoSum'])
         # delta_threshold determines the sorting into change groups;
         # report only change above 100% (ByteSwap's runtime went to 0):
-        tc = TestComparator(old_log, new_log, 1)
+        tc = TestComparator(self.old_results, self.new_results, 1)
         self.assertEquals(
             names(tc.unchanged),
             ['AngryPhonebook', 'Array2D', 'ArrayAppend', 'BitCount']
@@ -251,7 +518,7 @@ class TestTestComparator(OldAndNewLog):
 class TestReportFormatter(OldAndNewLog):
     def setUp(self):
         super(TestReportFormatter, self).setUp()
-        self.tc = TestComparator(self.old_log, self.new_log, 0.05)
+        self.tc = TestComparator(self.old_results, self.new_results, 0.05)
         self.rf = ReportFormatter(self.tc, '', '', changes_only=False)
         self.markdown = self.rf.markdown()
         self.git = self.rf.git()
@@ -265,6 +532,37 @@ class TestReportFormatter(OldAndNewLog):
 
     def assert_html_contains(self, texts):
         self.assert_report_contains(texts, self.html)
+
+    def test_values(self):
+        self.assertEquals(
+            ReportFormatter.values(PerformanceTestResult(
+                '1,AngryPhonebook,20,10664,12933,11035,576,10884'.split(','))),
+            ('AngryPhonebook', '10664', '12933', '11035', '—')
+        )
+        self.assertEquals(
+            ReportFormatter.values(PerformanceTestResult(
+                '1,AngryPhonebook,1,12045,12045,12045,0,12045,10510336'
+                .split(','))),
+            ('AngryPhonebook', '12045', '12045', '12045', '10510336')
+        )
+
+        r1 = PerformanceTestResult(
+            '1,AngryPhonebook,1,12325,12325,12325,0,12325,10510336'.split(','))
+        r2 = PerformanceTestResult(
+            '1,AngryPhonebook,1,11616,11616,11616,0,11616,10502144'.split(','))
+        self.assertEquals(
+            ReportFormatter.values(ResultComparison(r1, r2)),
+            ('AngryPhonebook', '12325', '11616', '-5.8%', '1.06x')
+        )
+        self.assertEquals(
+            ReportFormatter.values(ResultComparison(r2, r1)),
+            ('AngryPhonebook', '11616', '12325', '+6.1%', '0.94x')
+        )
+        r2.max = r1.min + 1
+        self.assertEquals(
+            ReportFormatter.values(ResultComparison(r1, r2))[4],
+            '1.06x (?)'  # is_dubious
+        )
 
     def test_justified_columns(self):
         """Table columns are all formated with same width, defined by the
@@ -281,6 +579,16 @@ class TestReportFormatter(OldAndNewLog):
         """Report contains table headers for ResultComparisons and changed
         PerformanceTestResults.
         """
+        performance_test_result = self.tc.added[0]
+        self.assertEquals(
+            ReportFormatter.header_for(performance_test_result),
+            ('TEST', 'MIN', 'MAX', 'MEAN', 'MAX_RSS')
+        )
+        comparison_result = self.tc.increased[0]
+        self.assertEquals(
+            ReportFormatter.header_for(comparison_result),
+            ('TEST', 'OLD', 'NEW', 'DELTA', 'SPEEDUP')
+        )
         self.assert_markdown_contains([
             'TEST                  | OLD    | NEW    | DELTA   | SPEEDUP',
             '---                   | ---    | ---    | ---     | ---    ',
@@ -452,7 +760,7 @@ class Test_parse_args(unittest.TestCase):
         self.assertEquals(args.new_branch, 'amazing-optimization')
 
 
-class Test_compare_perf_tests_main(OldAndNewLog):
+class Test_compare_perf_tests_main(OldAndNewLog, FileSystemIntegration):
     """Integration test that invokes the whole comparison script."""
     markdown = [
         '<summary>Regression (1)</summary>',
@@ -465,6 +773,11 @@ class Test_compare_perf_tests_main(OldAndNewLog):
         'BitCount                3        9        +199.9%   **0.33x**',
     ]
     html = ['<html>', "<td align='left'>BitCount</td>"]
+
+    def setUp(self):
+        super(Test_compare_perf_tests_main, self).setUp()
+        self.old_log = self.write_temp_file('old.log', self.old_log_content)
+        self.new_log = self.write_temp_file('new.log', self.new_log_content)
 
     def execute_main_with_format(self, report_format, test_output=False):
         report_file = self.test_dir + 'report.log'

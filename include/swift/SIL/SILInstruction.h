@@ -3957,9 +3957,12 @@ class ConvertFunctionInst final
   friend SILBuilder;
 
   ConvertFunctionInst(SILDebugLocation DebugLoc, SILValue Operand,
-                      ArrayRef<SILValue> TypeDependentOperands, SILType Ty)
+                      ArrayRef<SILValue> TypeDependentOperands, SILType Ty,
+                      bool WithoutActuallyEscaping)
       : UnaryInstructionWithTypeDependentOperandsBase(
             DebugLoc, Operand, TypeDependentOperands, Ty) {
+    SILInstruction::Bits.ConvertFunctionInst.WithoutActuallyEscaping =
+        WithoutActuallyEscaping;
     assert((Operand->getType().castTo<SILFunctionType>()->isNoEscape() ==
                 Ty.castTo<SILFunctionType>()->isNoEscape() ||
             Ty.castTo<SILFunctionType>()->getRepresentation() !=
@@ -3967,9 +3970,24 @@ class ConvertFunctionInst final
            "Change of escapeness is not ABI compatible");
   }
 
-  static ConvertFunctionInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+  static ConvertFunctionInst *create(SILDebugLocation DebugLoc,
+                                     SILValue Operand, SILType Ty,
+                                     SILFunction &F,
+                                     SILOpenedArchetypesState &OpenedArchetypes,
+                                     bool WithoutActuallyEscaping);
+
+public:
+  /// Returns `true` if this converts a non-escaping closure into an escaping
+  /// function type. `True` must be returned whenever the closure operand has an
+  /// unboxed capture (via @inout_aliasable) *and* the resulting function type
+  /// is escaping. (This only happens as a result of
+  /// withoutActuallyEscaping()). If `true` is returned, then the resulting
+  /// function type must be escaping, but the operand's function type may or may
+  /// not be @noescape. Note that a non-escaping closure may have unboxed
+  /// captured even though its SIL function type is "escaping".
+  bool withoutActuallyEscaping() const {
+    return SILInstruction::Bits.ConvertFunctionInst.WithoutActuallyEscaping;
+  }
 };
 
 /// ConvertEscapeToNoEscapeInst - Change the type of a escaping function value
@@ -4754,60 +4772,6 @@ class SetDeallocatingInst
 
   SetDeallocatingInst(SILDebugLocation DebugLoc, SILValue operand,
                       Atomicity atomicity)
-      : UnaryInstructionBase(DebugLoc, operand) {
-    setAtomicity(atomicity);
-  }
-};
-
-/// StrongPinInst - Ensure that the operand is retained and pinned, if
-/// not by this operation then by some enclosing pin.
-///
-/// Transformations must not do anything which reorders pin and unpin
-/// operations.  (This should generally be straightforward, as pin and
-/// unpin may be conservatively assumed to have arbitrary
-/// side-effects.)
-///
-/// This can't be a RefCountingInst because it returns a value.
-class StrongPinInst
-  : public UnaryInstructionBase<SILInstructionKind::StrongPinInst,
-                                SingleValueInstruction>
-{
-public:
-  using Atomicity = RefCountingInst::Atomicity;
-
-private:
-  friend SILBuilder;
-
-  StrongPinInst(SILDebugLocation DebugLoc, SILValue operand,
-                Atomicity atomicity);
-
-public:
-  void setAtomicity(Atomicity flag) {
-    SILInstruction::Bits.StrongPinInst.atomicity = bool(flag);
-  }
-  void setNonAtomic() {
-    SILInstruction::Bits.StrongPinInst.atomicity = bool(Atomicity::NonAtomic);
-  }
-  void setAtomic() {
-    SILInstruction::Bits.StrongPinInst.atomicity = bool(Atomicity::Atomic);
-  }
-  Atomicity getAtomicity() const {
-    return Atomicity(SILInstruction::Bits.StrongPinInst.atomicity);
-  }
-  bool isNonAtomic() const { return getAtomicity() == Atomicity::NonAtomic; }
-  bool isAtomic() const { return getAtomicity() == Atomicity::Atomic; }
-};
-
-/// StrongUnpinInst - Given that the operand is the result of a
-/// strong_pin instruction, unpin it.
-class StrongUnpinInst
-  : public UnaryInstructionBase<SILInstructionKind::StrongUnpinInst,
-                                RefCountingInst>
-{
-  friend SILBuilder;
-
-  StrongUnpinInst(SILDebugLocation DebugLoc, SILValue operand,
-                  Atomicity atomicity)
       : UnaryInstructionBase(DebugLoc, operand) {
     setAtomicity(atomicity);
   }
@@ -5664,8 +5628,7 @@ class WitnessMethodInst final
 public:
   CanType getLookupType() const { return LookupType; }
   ProtocolDecl *getLookupProtocol() const {
-    return getMember().getDecl()->getDeclContext()
-             ->getAsProtocolOrProtocolExtensionContext();
+    return getMember().getDecl()->getDeclContext()->getSelfProtocolDecl();
   }
 
   ProtocolConformanceRef getConformance() const { return Conformance; }
@@ -6241,19 +6204,6 @@ class IsUniqueInst
   friend SILBuilder;
 
   IsUniqueInst(SILDebugLocation DebugLoc, SILValue Operand, SILType BoolTy)
-      : UnaryInstructionBase(DebugLoc, Operand, BoolTy) {}
-};
-
-/// Given an object reference, return true iff it is non-nil and either refers
-/// to a native swift object with strong reference count of 1 or refers to a
-/// pinned object (for simultaneous access to multiple subobjects).
-class IsUniqueOrPinnedInst
-    : public UnaryInstructionBase<SILInstructionKind::IsUniqueOrPinnedInst,
-                                  SingleValueInstruction> {
-  friend SILBuilder;
-
-  IsUniqueOrPinnedInst(SILDebugLocation DebugLoc, SILValue Operand,
-                       SILType BoolTy)
       : UnaryInstructionBase(DebugLoc, Operand, BoolTy) {}
 };
 
@@ -7806,6 +7756,21 @@ public:
       return cast<BeginApplyInst>(Inst)->getArgumentsWithoutSelf();
     case SILInstructionKind::TryApplyInst:
       return cast<TryApplyInst>(Inst)->getArgumentsWithoutSelf();
+    default:
+      llvm_unreachable("not implemented for this instruction!");
+    }
+  }
+
+  /// Return whether the given apply is of a formally-throwing function
+  /// which is statically known not to throw.
+  bool isNonThrowing() const {
+    switch (getInstruction()->getKind()) {
+    case SILInstructionKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->isNonThrowing();
+    case SILInstructionKind::BeginApplyInst:
+      return cast<BeginApplyInst>(Inst)->isNonThrowing();
+    case SILInstructionKind::TryApplyInst:
+      return false;
     default:
       llvm_unreachable("not implemented for this instruction!");
     }

@@ -45,22 +45,14 @@ func inoutGlobalStructStoredProperty() {
 // CHECK:  [[GLOBAL_ADDR:%.*]] = global_addr @$S20tsan_instrumentation6gClassAA02MyC0Cvp : $*MyClass
 // CHECK:  [[READ:%.*]] = begin_access [read] [dynamic] [[GLOBAL_ADDR]] : $*MyClass
 // CHECK:  [[LOADED_CLASS:%.*]] = load [copy] [[READ]] : $*MyClass
-// CHECK:  [[VALUE_BUFFER:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
-// CHECK:  [[TEMPORARY:%.*]] = alloc_stack $Int
-// CHECK:  [[BORROWED_CLASS:%.*]] = begin_borrow [[LOADED_CLASS]] : $MyClass
-// CHECK:  [[TEMPORARY_RAW:%.*]] = address_to_pointer [[TEMPORARY]] : $*Int to $Builtin.RawPointer
-// CHECK:  {{%.*}} = builtin "tsanInoutAccess"([[VALUE_BUFFER]] : $*Builtin.UnsafeValueBuffer) : $()
-// CHECK:  [[MATERIALIZE_FOR_SET:%.*]] = class_method [[BORROWED_CLASS]] : $MyClass, #MyClass.storedProperty!materializeForSet.1 : (MyClass) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?), $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed MyClass) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
-// CHECK:  [[MATERIALIZE_FOR_SET_TUPLE:%.*]] = apply [[MATERIALIZE_FOR_SET]]([[TEMPORARY_RAW]], [[VALUE_BUFFER]], [[BORROWED_CLASS]]) : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed MyClass) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
-// CHECK:  [[TEMPORARY_BUFFER:%.*]] = tuple_extract [[MATERIALIZE_FOR_SET_TUPLE]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 0
-// CHECK:  [[OPTIONAL_CALLBACK:%.*]] = tuple_extract [[MATERIALIZE_FOR_SET_TUPLE]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 1
-// CHECK:  [[BUFFER_ADDRESS:%.*]] = pointer_to_address [[TEMPORARY_BUFFER]] : $Builtin.RawPointer to [strict] $*Int
-// CHECK:  [[BUFFER_ADDRESS_DEPENDENCE:%.*]] = mark_dependence [[BUFFER_ADDRESS]] : $*Int on [[LOADED_CLASS]] : $MyClass
-// CHECK:  end_borrow [[BORROWED_CLASS]] from [[LOADED_CLASS]] : $MyClass, $MyClass
-// CHECK:  [[BUFFER_ADDRESS_ACCESS:%.*]] = begin_access [modify] [unsafe] [[BUFFER_ADDRESS_DEPENDENCE]]
-// CHECK:  {{%.*}} builtin "tsanInoutAccess"([[BUFFER_ADDRESS_ACCESS]] : $*Int) : $()
+// CHECK:  end_access [[READ]]
+// CHECK:  [[MODIFY:%.*]] = class_method [[LOADED_CLASS]] : $MyClass, #MyClass.storedProperty!modify.1 :
+// CHECK:  ([[BUFFER_ADDRESS:%.*]], [[TOKEN:%.*]]) = begin_apply [[MODIFY]]([[LOADED_CLASS]]) : $@yield_once @convention(method) (@guaranteed MyClass) -> @yields @inout Int
+// CHECK:  {{%.*}} = builtin "tsanInoutAccess"([[BUFFER_ADDRESS]] : $*Int) : $()
 // CHECK:  [[TAKES_INOUT_FUNC:%.*]] = function_ref @$S20tsan_instrumentation10takesInoutyySizF : $@convention(thin) (@inout Int) -> ()
-// CHECK:  {{%.*}} apply [[TAKES_INOUT_FUNC]]([[BUFFER_ADDRESS_ACCESS]]) : $@convention(thin) (@inout Int) -> ()
+// CHECK:  {{%.*}} apply [[TAKES_INOUT_FUNC]]([[BUFFER_ADDRESS]]) : $@convention(thin) (@inout Int) -> ()
+// CHECK:  end_apply [[TOKEN]]
+// CHECK:  destroy_value [[LOADED_CLASS]]
 func inoutGlobalClassStoredProperty() {
   // This generates two TSan inout instrumentations. One for the value
   // buffer that is passed inout to materializeForSet and one for the

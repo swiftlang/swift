@@ -120,7 +120,7 @@ Algorithm.test("${t}/sorted/${name}") {
   let i1 = 400
   let i2 = 700
   sortedAry2 = ary
-  _introSort(&sortedAry2, subRange: i1..<i2, by: <)
+  sortedAry2._introSort(within: i1..<i2, by: <)
   expectEqual(ary[0..<i1], sortedAry2[0..<i1])
   expectSortedCollection(sortedAry2[i1..<i2], ary[i1..<i2])
   expectEqual(ary[i2..<count], sortedAry2[i2..<count])

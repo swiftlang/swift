@@ -193,9 +193,9 @@ extension subject_genericClass where T : Hashable {
 }
 
 extension subject_genericClass {
-  @objc var extProp: Int { return 0 } // expected-error{{@objc is not supported within extensions of generic classes}}
+  @objc var extProp: Int { return 0 } // expected-error{{members of extensions of generic classes cannot be declared @objc}}
   
-  @objc func extFoo() {} // expected-error{{@objc is not supported within extensions of generic classes}}
+  @objc func extFoo() {} // expected-error{{members of extensions of generic classes cannot be declared @objc}}
 }
 
 @objc
@@ -414,21 +414,21 @@ class GenericContext3<T> {
 class ConcreteSubclassOfGeneric : GenericContext3<Int> {}
 
 extension ConcreteSubclassOfGeneric {
-  @objc func foo() {} // expected-error {{@objc is not supported within extensions of generic classes}}
+  @objc func foo() {} // okay
 }
 
 @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc'}} {{1-7=}}
 class ConcreteSubclassOfGeneric2 : subject_genericClass2<Int> {}
 
 extension ConcreteSubclassOfGeneric2 {
-  @objc func foo() {} // expected-error {{@objc is not supported within extensions of generic classes}}
+  @objc func foo() {} // okay
 }
 
 @objc(CustomNameForSubclassOfGeneric) // okay
 class ConcreteSubclassOfGeneric3 : GenericContext3<Int> {}
 
 extension ConcreteSubclassOfGeneric3 {
-  @objc func foo() {} // expected-error {{@objc is not supported within extensions of generic classes}}
+  @objc func foo() {} // okay
 }
 
 class subject_subscriptIndexed1 {

@@ -310,13 +310,13 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
 static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
                                                DeclContext *dc1,
                                                DeclContext *dc2) {
-  assert(dc1->getAsProtocolExtensionContext());
-  assert(dc2->getAsProtocolExtensionContext());
+  assert(dc1->getExtendedProtocolDecl());
+  assert(dc2->getExtendedProtocolDecl());
 
   // If one of the protocols being extended inherits the other, prefer the
   // more specialized protocol.
-  auto proto1 = dc1->getAsProtocolExtensionContext();
-  auto proto2 = dc2->getAsProtocolExtensionContext();
+  auto proto1 = dc1->getExtendedProtocolDecl();
+  auto proto2 = dc2->getExtendedProtocolDecl();
   if (proto1 != proto2) {
     if (proto1->inheritsFrom(proto2))
       return true;
@@ -429,10 +429,8 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       }
 
       // Members of protocol extensions have special overloading rules.
-      ProtocolDecl *inProtocolExtension1 = outerDC1
-                                             ->getAsProtocolExtensionContext();
-      ProtocolDecl *inProtocolExtension2 = outerDC2
-                                             ->getAsProtocolExtensionContext();
+      ProtocolDecl *inProtocolExtension1 = outerDC1->getExtendedProtocolDecl();
+      ProtocolDecl *inProtocolExtension2 = outerDC2->getExtendedProtocolDecl();
       if (inProtocolExtension1 && inProtocolExtension2) {
         // Both members are in protocol extensions.
         // Determine whether the 'Self' type from the first protocol extension
@@ -536,7 +534,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       auto getSelfType = [](AnyFunctionType *fnType) -> Type {
         auto params = fnType->getParams();
         assert(params.size() == 1);
-        return params.front().getType()->getRValueInstanceType();
+        return params.front().getPlainType()->getMetatypeInstanceType();
       };
 
       Type selfTy1;
@@ -559,6 +557,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           computeSelfTypeRelationship(tc, dc, decl1, decl2);
       auto relationshipKind = selfTypeRelationship.first;
       auto conformance = selfTypeRelationship.second;
+      (void)conformance;
       switch (relationshipKind) {
       case SelfTypeRelationship::Unrelated:
         // Skip the self types parameter entirely.
@@ -926,8 +925,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // found if requested directly.
     if (!decl1->isInstanceMember() && !decl2->isInstanceMember()) {
       if (isa<VarDecl>(decl1) && isa<VarDecl>(decl2)) {
-        auto *nominal1 = dc1->getAsNominalTypeOrNominalTypeExtensionContext();
-        auto *nominal2 = dc2->getAsNominalTypeOrNominalTypeExtensionContext();
+        auto *nominal1 = dc1->getSelfNominalTypeDecl();
+        auto *nominal2 = dc2->getSelfNominalTypeDecl();
 
         if (nominal1 && nominal2 && nominal1 != nominal2) {
           auto base1 = nominal1->getDeclaredType();

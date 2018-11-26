@@ -313,19 +313,18 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
       super::noteStartOfGenericRequirements(forClass);
     }
 
-    void addGenericWitnessTable(CanType argType, ProtocolConformanceRef conf,
-                                ClassDecl *forClass) {
+    void addGenericWitnessTable(ClassDecl *forClass) {
       if (forClass == Target) {
         Layout.NumImmediateMembers++;
       }
-      super::addGenericWitnessTable(argType, conf, forClass);
+      super::addGenericWitnessTable(forClass);
     }
 
-    void addGenericArgument(CanType argType, ClassDecl *forClass) {
+    void addGenericArgument(ClassDecl *forClass) {
       if (forClass == Target) {
         Layout.NumImmediateMembers++;
       }
-      super::addGenericArgument(argType, forClass);
+      super::addGenericArgument(forClass);
     }
 
     void addMethod(SILDeclRef fn) {

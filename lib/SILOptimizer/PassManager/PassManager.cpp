@@ -86,6 +86,21 @@ llvm::cl::list<std::string>
                      llvm::cl::desc("Disable passes "
                                     "which contain a string from this list"));
 
+llvm::cl::list<std::string> SILVerifyBeforePass(
+    "sil-verify-before-pass",
+    llvm::cl::desc("Verify the module/analyses before we run "
+                   "a pass from this list"));
+
+llvm::cl::list<std::string> SILVerifyAroundPass(
+    "sil-verify-around-pass",
+    llvm::cl::desc("Verify the module/analyses before/after we run "
+                   "a pass from this list"));
+
+llvm::cl::list<std::string>
+    SILVerifyAfterPass("sil-verify-after-pass",
+                       llvm::cl::desc("Verify the module/analyses after we run "
+                                      "a pass from this list"));
+
 llvm::cl::opt<bool> SILVerifyWithoutInvalidation(
     "sil-verify-without-invalidation", llvm::cl::init(false),
     llvm::cl::desc("Verify after passes even if the pass has not invalidated"));
@@ -230,11 +245,36 @@ public:
   }
 };
 
+//===----------------------------------------------------------------------===//
+//                 Serialization Notification Implementation
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class PassManagerDeserializationNotificationHandler final
+    : public DeserializationNotificationHandler {
+  NullablePtr<SILPassManager> pm;
+
+public:
+  PassManagerDeserializationNotificationHandler(SILPassManager *pm) : pm(pm) {}
+  ~PassManagerDeserializationNotificationHandler() override = default;
+
+  StringRef getName() const override {
+    return "PassManagerDeserializationNotificationHandler";
+  }
+
+  /// Observe that we deserialized a function declaration.
+  void didDeserialize(ModuleDecl *mod, SILFunction *fn) override {
+    pm.get()->notifyAnalysisOfFunction(fn);
+  }
+};
+
+} // end anonymous namespace
 
 SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage,
-                               bool isMandatoryPipeline) :
-  Mod(M), StageName(Stage), isMandatoryPipeline(isMandatoryPipeline) {
-  
+                               bool isMandatoryPipeline)
+    : Mod(M), StageName(Stage), isMandatoryPipeline(isMandatoryPipeline),
+      deserializationNotificationHandler(nullptr) {
 #define ANALYSIS(NAME) \
   Analyses.push_back(create##NAME##Analysis(Mod));
 #include "swift/SILOptimizer/Analysis/Analysis.def"
@@ -243,6 +283,11 @@ SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage,
     A->initialize(this);
     M->registerDeleteNotificationHandler(A);
   }
+
+  std::unique_ptr<DeserializationNotificationHandler> handler(
+      new PassManagerDeserializationNotificationHandler(this));
+  deserializationNotificationHandler = handler.get();
+  M->registerDeserializationNotificationHandler(std::move(handler));
 }
 
 SILPassManager::SILPassManager(SILModule *M, irgen::IRGenModule *IRMod,
@@ -335,6 +380,20 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
 
   CurrentPassHasInvalidated = false;
 
+  auto MatchFun = [&](const std::string &Str) -> bool {
+    return SFT->getTag().find(Str) != StringRef::npos ||
+           SFT->getID().find(Str) != StringRef::npos;
+  };
+  if ((SILVerifyBeforePass.end() != std::find_if(SILVerifyBeforePass.begin(),
+                                                 SILVerifyBeforePass.end(),
+                                                 MatchFun)) ||
+      (SILVerifyAroundPass.end() != std::find_if(SILVerifyAroundPass.begin(),
+                                                 SILVerifyAroundPass.end(),
+                                                 MatchFun))) {
+    F->verify();
+    verifyAnalyses();
+  }
+
   if (SILPrintPassName)
     dumpPassInfo("Run", TransIdx, F);
 
@@ -374,6 +433,16 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
       (CurrentPassHasInvalidated || SILVerifyWithoutInvalidation)) {
     F->verify();
     verifyAnalyses(F);
+  } else {
+    if ((SILVerifyAfterPass.end() != std::find_if(SILVerifyAfterPass.begin(),
+                                                  SILVerifyAfterPass.end(),
+                                                  MatchFun)) ||
+        (SILVerifyAroundPass.end() != std::find_if(SILVerifyAroundPass.begin(),
+                                                   SILVerifyAroundPass.end(),
+                                                   MatchFun))) {
+      F->verify();
+      verifyAnalyses();
+    }
   }
 
   ++NumPassesRun;
@@ -467,6 +536,20 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
     printModule(Mod, Options.EmitVerboseSIL);
   }
 
+  auto MatchFun = [&](const std::string &Str) -> bool {
+    return SMT->getTag().find(Str) != StringRef::npos ||
+           SMT->getID().find(Str) != StringRef::npos;
+  };
+  if ((SILVerifyBeforePass.end() != std::find_if(SILVerifyBeforePass.begin(),
+                                                 SILVerifyBeforePass.end(),
+                                                 MatchFun)) ||
+      (SILVerifyAroundPass.end() != std::find_if(SILVerifyAroundPass.begin(),
+                                                 SILVerifyAroundPass.end(),
+                                                 MatchFun))) {
+    Mod->verify();
+    verifyAnalyses();
+  }
+
   llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
   Mod->registerDeleteNotificationHandler(SMT);
@@ -492,6 +575,16 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
       (CurrentPassHasInvalidated || !SILVerifyWithoutInvalidation)) {
     Mod->verify();
     verifyAnalyses();
+  } else {
+    if ((SILVerifyAfterPass.end() != std::find_if(SILVerifyAfterPass.begin(),
+                                                  SILVerifyAfterPass.end(),
+                                                  MatchFun)) ||
+        (SILVerifyAroundPass.end() != std::find_if(SILVerifyAroundPass.begin(),
+                                                   SILVerifyAroundPass.end(),
+                                                   MatchFun))) {
+      Mod->verify();
+      verifyAnalyses();
+    }
   }
 }
 
@@ -538,6 +631,26 @@ void SILPassManager::execute() {
 SILPassManager::~SILPassManager() {
   assert(IRGenPasses.empty() && "Must add IRGen SIL passes that were "
                                 "registered to the list of transformations");
+  // Before we do anything further, verify the module and our analyses. These
+  // are natural points with which to verify.
+  //
+  // TODO: We currently do not verify the module here since the verifier asserts
+  // in the normal build. This should be enabled and those problems resolved
+  // either by changing the verifier or treating those asserts as signs of a
+  // bug.
+  for (auto *A : Analyses) {
+    // We use verify full instead of just verify to ensure that passes that want
+    // to run more expensive verification after a pass manager is destroyed
+    // properly trigger.
+    //
+    // NOTE: verifyFull() has a default implementation that just calls
+    // verify(). So functionally, there is no difference here.
+    A->verifyFull();
+  }
+
+  // Remove our deserialization notification handler.
+  Mod->removeDeserializationNotificationHandler(
+      deserializationNotificationHandler);
 
   // Free all transformations.
   for (auto *T : Transformations)

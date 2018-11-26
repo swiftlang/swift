@@ -17,6 +17,7 @@
 #include "LValue.h"
 #include "RValue.h"
 #include "SILGenFunction.h"
+#include "swift/AST/GenericEnvironment.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -29,7 +30,7 @@ namespace {
 
 /// A result plan for evaluating an indirect result into the address
 /// associated with an initialization.
-class InPlaceInitializationResultPlan : public ResultPlan {
+class InPlaceInitializationResultPlan final : public ResultPlan {
   Initialization *init;
 
 public:
@@ -47,10 +48,155 @@ public:
   }
 };
 
+/// A cleanup that handles the delayed emission of an indirect buffer for opened
+/// Self arguments.
+class IndirectOpenedSelfCleanup final : public Cleanup {
+  SILValue box;
+public:
+  IndirectOpenedSelfCleanup()
+    : box()
+  {}
+  
+  void setBox(SILValue b) {
+    assert(!box && "buffer already set?!");
+    box = b;
+  }
+  
+  void emit(SILGenFunction &SGF, CleanupLocation loc, ForUnwind_t forUnwind)
+  override {
+    assert(box && "buffer never emitted before activating cleanup?!");
+    SGF.B.createDeallocBox(loc, box);
+  }
+  
+  void dump(SILGenFunction &SGF) const override {
+    llvm::errs() << "IndirectOpenedSelfCleanup\n";
+    if (box)
+      box->dump();
+  }
+};
+
+/// Map a type expressed in terms of opened archetypes into a context-free
+/// dependent type, returning the type, a generic signature with parameters
+/// corresponding to each opened type,
+static std::tuple<CanType, CanGenericSignature, SubstitutionMap>
+mapTypeOutOfOpenedExistentialContext(CanType t) {
+  SmallVector<ArchetypeType *, 4> openedTypes;
+  t->getOpenedExistentials(openedTypes);
+
+  ArrayRef<Type> openedTypesAsTypes(
+    reinterpret_cast<const Type *>(openedTypes.data()),
+    openedTypes.size());
+
+  SmallVector<GenericTypeParamType *, 4> params;
+  for (unsigned i : indices(openedTypes)) {
+    params.push_back(GenericTypeParamType::get(0, i, t->getASTContext()));
+  }
+  
+  auto mappedSig = GenericSignature::get(params, {});
+  auto mappedSubs = SubstitutionMap::get(mappedSig, openedTypesAsTypes, {});
+
+  auto mappedTy = t.subst(
+    [&](SubstitutableType *t) -> Type {
+      auto index = std::find(openedTypes.begin(), openedTypes.end(), t)
+        - openedTypes.begin();
+      assert(index != openedTypes.end() - openedTypes.begin());
+      return params[index];
+    },
+    MakeAbstractConformanceForGenericType());
+
+  return std::make_tuple(mappedTy->getCanonicalType(mappedSig),
+                         mappedSig->getCanonicalSignature(),
+                         mappedSubs);
+}
+
+/// A result plan for an indirectly-returned opened existential value.
+///
+/// This defers allocating the temporary for the result to a later point so that
+/// it happens after the arguments are evaluated.
+class IndirectOpenedSelfResultPlan final : public ResultPlan {
+  AbstractionPattern origType;
+  CanType substType;
+  CleanupHandle handle = CleanupHandle::invalid();
+  mutable SILValue resultBox, resultBuf;
+
+public:
+  IndirectOpenedSelfResultPlan(SILGenFunction &SGF,
+                               AbstractionPattern origType,
+                               CanType substType)
+    : origType(origType), substType(substType)
+  {
+    // Create a cleanup to deallocate the stack buffer at the proper scope.
+    // We won't emit the buffer till later, after arguments have been opened,
+    // though.
+    SGF.Cleanups.pushCleanupInState<IndirectOpenedSelfCleanup>(
+                                                         CleanupState::Dormant);
+    handle = SGF.Cleanups.getCleanupsDepth();
+  }
+  
+  void
+  gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
+                            SmallVectorImpl<SILValue> &outList) const override {
+    assert(!resultBox && "already created temporary?!");
+    
+    // We allocate the buffer as a box because the scope nesting won't clean
+    // this up with good stack discipline relative to any stack allocations that
+    // occur during argument emission. Escape analysis during mandatory passes
+    // ought to clean this up.
+
+    auto resultTy = SGF.getLoweredType(origType, substType).getASTType();
+    CanType layoutTy;
+    CanGenericSignature layoutSig;
+    SubstitutionMap layoutSubs;
+    std::tie(layoutTy, layoutSig, layoutSubs)
+      = mapTypeOutOfOpenedExistentialContext(resultTy);
+    
+    auto boxLayout = SILLayout::get(SGF.getASTContext(),
+      layoutSig->getCanonicalSignature(),
+      SILField(layoutTy->getCanonicalType(layoutSig), true));
+    
+    resultBox = SGF.B.createAllocBox(loc,
+      SILBoxType::get(SGF.getASTContext(),
+                      boxLayout,
+                      layoutSubs));
+    
+    // Complete the cleanup to deallocate this buffer later, after we're
+    // finished with the argument.
+    static_cast<IndirectOpenedSelfCleanup&>(SGF.Cleanups.getCleanup(handle))
+      .setBox(resultBox);
+    SGF.Cleanups.setCleanupState(handle, CleanupState::Active);
+
+    resultBuf = SGF.B.createProjectBox(loc, resultBox, 0);
+    outList.emplace_back(resultBuf);
+  }
+
+  RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
+                ArrayRef<ManagedValue> &directResults) override {
+    assert(resultBox && "never emitted temporary?!");
+    
+    // Lower the unabstracted result type.
+    auto &substTL = SGF.getTypeLowering(substType);
+
+    ManagedValue value;
+    // If the value isn't address-only, go ahead and load.
+    if (!substTL.isAddressOnly()) {
+      auto load = substTL.emitLoad(SGF.B, loc, resultBuf,
+                                   LoadOwnershipQualifier::Take);
+      value = SGF.emitManagedRValueWithCleanup(load);
+    } else {
+      value = SGF.emitManagedRValueWithCleanup(resultBuf);
+    }
+
+    // A Self return should never be further abstracted. It's also never emitted
+    // into context; we disable that optimization because Self may not even
+    // be available to pre-allocate a stack buffer before we prepare a call.
+    return RValue(SGF, loc, substType, value);
+  }
+};
+
 /// A result plan for working with a single value and potentially
 /// reabstracting it.  The value can actually be a tuple if the
 /// abstraction is opaque.
-class ScalarResultPlan : public ResultPlan {
+class ScalarResultPlan final : public ResultPlan {
   std::unique_ptr<TemporaryInitialization> temporary;
   AbstractionPattern origType;
   Initialization *init;
@@ -150,7 +296,7 @@ public:
 
 /// A result plan which calls copyOrInitValueInto on an Initialization
 /// using a temporary buffer initialized by a sub-plan.
-class InitValueFromTemporaryResultPlan : public ResultPlan {
+class InitValueFromTemporaryResultPlan final : public ResultPlan {
   Initialization *init;
   ResultPlanPtr subPlan;
   std::unique_ptr<TemporaryInitialization> temporary;
@@ -184,7 +330,7 @@ public:
 
 /// A result plan which calls copyOrInitValueInto using the result of
 /// a sub-plan.
-class InitValueFromRValueResultPlan : public ResultPlan {
+class InitValueFromRValueResultPlan final : public ResultPlan {
   Initialization *init;
   ResultPlanPtr subPlan;
 
@@ -212,7 +358,7 @@ public:
 
 /// A result plan which produces a larger RValue from a bunch of
 /// components.
-class TupleRValueResultPlan : public ResultPlan {
+class TupleRValueResultPlan final : public ResultPlan {
   SmallVector<ResultPlanPtr, 4> eltPlans;
 
 public:
@@ -254,7 +400,7 @@ public:
 
 /// A result plan which evaluates into the sub-components
 /// of a splittable tuple initialization.
-class TupleInitializationResultPlan : public ResultPlan {
+class TupleInitializationResultPlan final : public ResultPlan {
   Initialization *tupleInit;
   SmallVector<InitializationPtr, 4> eltInitsBuffer;
   MutableArrayRef<InitializationPtr> eltInits;
@@ -305,7 +451,7 @@ public:
   }
 };
 
-class ForeignErrorInitializationPlan : public ResultPlan {
+class ForeignErrorInitializationPlan final : public ResultPlan {
   SILLocation loc;
   LValue lvalue;
   ResultPlanPtr subPlan;
@@ -466,6 +612,16 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
   //   - store it to the destination
   // We could break this down into different ResultPlan implementations,
   // but it's easier not to.
+  
+  // If the result type involves an indirectly-returned opened existential,
+  // then we need to evaluate the arguments first in order to have access to
+  // the opened Self type. A special result plan defers allocating the stack
+  // slot to the point the call is emitted.
+  if (result.getType()->hasOpenedExistential()
+      && SGF.silConv.isSILIndirect(result)) {
+    return ResultPlanPtr(
+      new IndirectOpenedSelfResultPlan(SGF, origType, substType));
+  }
 
   // Create a temporary if the result is indirect.
   std::unique_ptr<TemporaryInitialization> temporary;

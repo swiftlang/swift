@@ -412,7 +412,8 @@ static void prepareForRetypechecking(Expr *E) {
   assert(E);
   struct Eraser : public ASTWalker {
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      if (expr && expr->getType() && expr->getType()->hasError())
+      if (expr && expr->getType() && (expr->getType()->hasError() ||
+                                      expr->getType()->hasUnresolvedType()))
         expr->setType(Type());
       if (auto *ACE = dyn_cast_or_null<AutoClosureExpr>(expr)) {
         return { true, ACE->getSingleExpressionBody() };
@@ -420,13 +421,15 @@ static void prepareForRetypechecking(Expr *E) {
       return { true, expr };
     }
     bool walkToTypeLocPre(TypeLoc &TL) override {
-      if (TL.getType() && TL.getType()->hasError())
+      if (TL.getType() && (TL.getType()->hasError() ||
+                           TL.getType()->hasUnresolvedType()))
         TL.setType(Type());
       return true;
     }
 
     std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-      if (P && P->hasType() && P->getType()->hasError()) {
+      if (P && P->hasType() && (P->getType()->hasError() ||
+                                P->getType()->hasUnresolvedType())) {
         P->setType(Type());
       }
       return { true, P };
@@ -1315,7 +1318,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     auto *DC = CurDeclContext->getInnermostTypeContext();
     if (!DC)
       return;
-    auto *CD = DC->getAsClassOrClassExtensionContext();
+    auto *CD = DC->getSelfClassDecl();
     if (!CD)
       return;
     Type ST = CD->getSuperclass();
@@ -2079,7 +2082,7 @@ public:
       BaseTy = CurrDeclContext->getInnermostTypeContext()
                    ->getDeclaredTypeInContext();
     if (BaseTy) {
-      BaseTy = BaseTy->getRValueInstanceType();
+      BaseTy = BaseTy->getInOutObjectType()->getMetatypeInstanceType();
       if (auto NTD = BaseTy->getAnyNominal()) {
         auto *Module = NTD->getParentModule();
         auto Conformance = Module->lookupConformance(
@@ -2679,9 +2682,7 @@ public:
       auto underlyingType = TAD->getUnderlyingTypeLoc().getType();
       if (underlyingType->hasError()) {
         Type parentType;
-        if (auto nominal =
-              TAD->getDeclContext()
-                ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+        if (auto nominal = TAD->getDeclContext()->getSelfNominalTypeDecl()) {
           parentType = nominal->getDeclaredInterfaceType();
         }
         addTypeAnnotation(
@@ -2909,72 +2910,7 @@ public:
       if (HaveLParen)
         return;
 
-      if (auto *VD = dyn_cast<VarDecl>(D)) {
-        addVarDeclRef(VD, Reason);
-        return;
-      }
-
-      if (auto *FD = dyn_cast<FuncDecl>(D)) {
-        // We cannot call operators with a postfix parenthesis syntax.
-        if (FD->isBinaryOperator() || FD->isUnaryOperator())
-          return;
-
-        // We cannot call accessors.  We use VarDecls and SubscriptDecls to
-        // produce completions that refer to getters and setters.
-        if (isa<AccessorDecl>(FD))
-          return;
-
-        // Do we want compound function names here?
-        if (shouldUseFunctionReference(FD)) {
-          addCompoundFunctionName(FD, Reason);
-          return;
-        }
-
-        addMethodCall(FD, Reason);
-        return;
-      }
-
-      if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-        addNominalTypeRef(NTD, Reason);
-        addConstructorCallsForType(NTD->getDeclaredInterfaceType(),
-                                   NTD->getName(), Reason);
-        return;
-      }
-
-      if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
-        addTypeAliasRef(TAD, Reason);
-        auto type = TAD->mapTypeIntoContext(TAD->getUnderlyingTypeLoc().getType());
-        if (type->mayHaveMembers())
-          addConstructorCallsForType(type, TAD->getName(), Reason);
-        return;
-      }
-
-      if (auto *GP = dyn_cast<GenericTypeParamDecl>(D)) {
-        addGenericTypeParamRef(GP, Reason);
-        for (auto *protocol : GP->getConformingProtocols())
-          addConstructorCallsForType(protocol->getDeclaredInterfaceType(),
-                                     GP->getName(), Reason);
-        return;
-      }
-
-      if (auto *AT = dyn_cast<AssociatedTypeDecl>(D)) {
-        addAssociatedTypeRef(AT, Reason);
-        return;
-      }
-
-      if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
-        addEnumElementRef(EED, Reason, /*HasTypeContext=*/false);
-      }
-
-      // Swift key path allows .[0]
-      if (shouldAddSubscriptCall()) {
-        if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
-          if (ExprType->is<AnyMetatypeType>())
-            return;
-          addSubscriptCall(SD, Reason);
-        }
-      }
-      return;
+      LLVM_FALLTHROUGH;
 
     case LookupKind::ValueInDeclContext:
     case LookupKind::ImportFromModule:
@@ -3031,6 +2967,19 @@ public:
         return;
       }
 
+      if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
+        addEnumElementRef(EED, Reason, /*HasTypeContext=*/false);
+        return;
+      }
+
+      // Swift key path allows .[0]
+      if (shouldAddSubscriptCall()) {
+        if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
+          if (ExprType && !ExprType->is<AnyMetatypeType>())
+            addSubscriptCall(SD, Reason);
+          return;
+        }
+      }
       return;
 
     case LookupKind::EnumElement:
@@ -3190,7 +3139,8 @@ public:
       DeclContext *DC = nullptr;
       if (VD)
         DC = VD->getInnermostDeclContext();
-      else if (auto NTD = ExprType->getRValueInstanceType()->getAnyNominal())
+      else if (auto NTD = ExprType->getInOutObjectType()
+                   ->getMetatypeInstanceType()->getAnyNominal())
         DC = NTD;
       if (DC)
         ExprType = DC->mapTypeIntoContext(ExprType);
@@ -3303,6 +3253,7 @@ public:
       // FIXME: This is workaround for getTypeOfExpressionWithoutApplying()
       // modifies type of 'expr'.
       expr->setType(Ty);
+      prepareForRetypechecking(expr);
     };
 
     // We allocate these expressions on the stack because we know they can't
@@ -3424,8 +3375,8 @@ public:
     Expr *expr = SE;
     if (!typeCheckCompletionSequence(const_cast<DeclContext *>(CurrDeclContext),
                                      expr)) {
-
-      if (!LHS->getType()->getRValueType()->getOptionalObjectType()) {
+      if (!LHS->getType() ||
+          !LHS->getType()->getRValueType()->getOptionalObjectType()) {
         // Don't complete optional operators on non-optional types.
         // FIXME: can we get the type-checker to disallow these for us?
         if (op->getName().str() == "??")
@@ -4118,15 +4069,14 @@ public:
 
   bool missingOverride(DeclVisibilityKind Reason) {
     return !hasOverride && Reason == DeclVisibilityKind::MemberOfSuper &&
-           !CurrDeclContext->getAsProtocolOrProtocolExtensionContext();
+           !CurrDeclContext->getSelfProtocolDecl();
   }
 
   void addAccessControl(const ValueDecl *VD,
                         CodeCompletionResultBuilder &Builder) {
-    assert(CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext());
+    assert(CurrDeclContext->getSelfNominalTypeDecl());
     auto AccessOfContext =
-      CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext()
-        ->getFormalAccess();
+        CurrDeclContext->getSelfNominalTypeDecl()->getFormalAccess();
     auto Access = std::min(VD->getFormalAccess(), AccessOfContext);
     // Only emit 'public', not needed otherwise.
     if (Access >= AccessLevel::Public)
@@ -4236,7 +4186,7 @@ public:
     // and 1) this is a protocol conformance and the class is not final, or 2)
     // this is subclass and the initializer is marked as required.
     bool needRequired = false;
-    auto C = CurrDeclContext->getAsClassOrClassExtensionContext();
+    auto C = CurrDeclContext->getSelfClassDecl();
     if (C && !isKeywordSpecified("required")) {
       if (Reason ==
             DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal &&
@@ -4361,7 +4311,7 @@ public:
   }
 
   void getOverrideCompletions(SourceLoc Loc) {
-    if (!CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext())
+    if (!CurrDeclContext->isTypeContext())
       return;
     if (isa<ProtocolDecl>(CurrDeclContext))
       return;
@@ -4821,10 +4771,33 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     addAnyTypeKeyword(Sink);
     break;
       
-  case CompletionKind::NominalMemberBeginning:
-    addDeclKeywords(Sink);
-    addLetVarKeywords(Sink);
+  case CompletionKind::NominalMemberBeginning: {
+    bool HasDeclIntroducer = llvm::find_if(ParsedKeywords, [](const StringRef kw) {
+      return llvm::StringSwitch<bool>(kw)
+        .Case("associatedtype", true)
+        .Case("class", true)
+        .Case("deinit", true)
+        .Case("enum", true)
+        .Case("extension", true)
+        .Case("func", true)
+        .Case("import", true)
+        .Case("init", true)
+        .Case("let", true)
+        .Case("operator", true)
+        .Case("precedencegroup", true)
+        .Case("protocol", true)
+        .Case("struct", true)
+        .Case("subscript", true)
+        .Case("typealias", true)
+        .Case("var", true)
+        .Default(false);
+    }) != ParsedKeywords.end();
+    if (!HasDeclIntroducer) {
+      addDeclKeywords(Sink);
+      addLetVarKeywords(Sink);
+    }
     break;
+  }
 
   case CompletionKind::AfterIfStmtElse:
     addKeyword(Sink, "if", CodeCompletionKeywordKind::kw_if);

@@ -1,0 +1,22 @@
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+
+class SomeClass {
+  // Has defaults, but no body.
+  public func hasDefaults(a: Int = 4, b: Int = 1 + 2)
+
+  // CHECK-LABEL: sil hidden @$S11DefaultArgs9SomeClassC11hasDefaults1a1bySi_SitFfA_
+  // CHECK: integer_literal $Builtin.Int2048, 4
+  // CHECK: end sil function '$S11DefaultArgs9SomeClassC11hasDefaults1a1bySi_SitFfA_'
+
+  // CHECK-LABEL: sil hidden @$S11DefaultArgs9SomeClassC11hasDefaults1a1bySi_SitFfA0_
+  // CHECK: integer_literal $Builtin.Int2048, 1
+  // CHECK: integer_literal $Builtin.Int2048, 2
+  // CHECK: function_ref @$SSi1poiyS2i_SitFZ
+  // CHECK: end sil function '$S11DefaultArgs9SomeClassC11hasDefaults1a1bySi_SitFfA0_'
+
+  public init(a: Int = 5)
+
+  // CHECK-LABEL: sil hidden @$S11DefaultArgs9SomeClassC1aACSi_tcfcfA_
+  // CHECK: integer_literal $Builtin.Int2048, 5
+  // CHECK: end sil function '$S11DefaultArgs9SomeClassC1aACSi_tcfcfA_'
+}

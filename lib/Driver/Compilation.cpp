@@ -14,6 +14,7 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
+#include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Program.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Statistic.h"
@@ -26,7 +27,6 @@
 #include "swift/Driver/Job.h"
 #include "swift/Driver/ParseableOutput.h"
 #include "swift/Driver/ToolChain.h"
-#include "swift/Frontend/OutputFileMap.h"
 #include "swift/Option/Options.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"

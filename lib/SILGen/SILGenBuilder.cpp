@@ -207,12 +207,13 @@ ManagedValue SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
   return getSILGenFunction().emitManagedRValueWithCleanup(result);
 }
 
-ManagedValue SILGenBuilder::createConvertFunction(SILLocation loc,
-                                                  ManagedValue fn,
-                                                  SILType resultTy) {
+ManagedValue
+SILGenBuilder::createConvertFunction(SILLocation loc, ManagedValue fn,
+                                     SILType resultTy,
+                                     bool withoutActuallyEscaping) {
   CleanupCloner cloner(*this, fn);
-  SILValue result =
-      createConvertFunction(loc, fn.forward(getSILGenFunction()), resultTy);
+  SILValue result = SILBuilder::createConvertFunction(
+      loc, fn.forward(getSILGenFunction()), resultTy, withoutActuallyEscaping);
   return cloner.clone(result);
 }
 
@@ -959,4 +960,14 @@ ManagedValue SILGenBuilder::createUncheckedTrivialBitCast(SILLocation loc,
   SILValue result =
       SGF.B.createUncheckedTrivialBitCast(loc, original.getValue(), type);
   return ManagedValue::forUnmanaged(result);
+}
+
+void SILGenBuilder::emitDestructureValueOperation(
+    SILLocation loc, ManagedValue value,
+    llvm::function_ref<void(unsigned, ManagedValue)> func) {
+  CleanupCloner cloner(*this, value);
+  SILBuilder::emitDestructureValueOperation(
+      loc, value.forward(SGF), [&](unsigned index, SILValue subValue) {
+        return func(index, cloner.clone(subValue));
+      });
 }

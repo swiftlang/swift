@@ -2182,7 +2182,8 @@ void Lexer::lexImpl() {
       size_t BOMLen = ContentStart - BufferStart;
       assert(BOMLen == 3 && "UTF-8 BOM is 3 bytes");
       // Add UTF-8 BOM to LeadingTrivia.
-      LeadingTrivia.push_back(TriviaPiece::garbageText({CurPtr, BOMLen}));
+      auto Text = OwnedString::makeRefCounted(StringRef(CurPtr, BOMLen));
+      LeadingTrivia.push_back(TriviaPiece::garbageText(Text));
       CurPtr += BOMLen;
     }
     NextToken.setAtStartOfLine(true);
@@ -2407,18 +2408,18 @@ Restart:
       bool isDocComment = CurPtr[1] == '/';
       skipSlashSlashComment(/*EatNewline=*/false);
       size_t Length = CurPtr - TriviaStart;
-      Pieces.push_back(isDocComment
-                           ? TriviaPiece::docLineComment({TriviaStart, Length})
-                           : TriviaPiece::lineComment({TriviaStart, Length}));
+      auto Text = OwnedString::makeRefCounted(StringRef(TriviaStart, Length));
+      Pieces.push_back(isDocComment ? TriviaPiece::docLineComment(Text)
+                                    : TriviaPiece::lineComment(Text));
       goto Restart;
     } else if (*CurPtr == '*') {
       // '/* ... */' comment.
       bool isDocComment = CurPtr[1] == '*';
       skipSlashStarComment();
       size_t Length = CurPtr - TriviaStart;
-      Pieces.push_back(isDocComment
-                           ? TriviaPiece::docBlockComment({TriviaStart, Length})
-                           : TriviaPiece::blockComment({TriviaStart, Length}));
+      auto Text = OwnedString::makeRefCounted(StringRef(TriviaStart, Length));
+      Pieces.push_back(isDocComment ? TriviaPiece::docBlockComment(Text)
+                                    : TriviaPiece::blockComment(Text));
       goto Restart;
     }
     break;
@@ -2430,7 +2431,8 @@ Restart:
         diagnose(TriviaStart, diag::lex_hashbang_not_allowed);
       skipHashbang(/*EatNewline=*/false);
       size_t Length = CurPtr - TriviaStart;
-      Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
+      auto Text = OwnedString::makeRefCounted(StringRef(TriviaStart, Length));
+      Pieces.push_back(TriviaPiece::garbageText(Text));
       goto Restart;
     }
     break;
@@ -2439,7 +2441,8 @@ Restart:
     if (tryLexConflictMarker(/*EatNewline=*/false)) {
       // Conflict marker.
       size_t Length = CurPtr - TriviaStart;
-      Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
+      auto Text = OwnedString::makeRefCounted(StringRef(TriviaStart, Length));
+      Pieces.push_back(TriviaPiece::garbageText(Text));
       goto Restart;
     }
     break;
@@ -2448,7 +2451,8 @@ Restart:
     case NulCharacterKind::Embedded: {
       diagnoseEmbeddedNul(Diags, CurPtr - 1);
       size_t Length = CurPtr - TriviaStart;
-      Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
+      auto Text = OwnedString::makeRefCounted(StringRef(TriviaStart, Length));
+      Pieces.push_back(TriviaPiece::garbageText(Text));
       goto Restart;
     }
     case NulCharacterKind::CodeCompletion:
@@ -2494,7 +2498,8 @@ Restart:
     }
 
     size_t Length = CurPtr - TriviaStart;
-    Pieces.push_back(TriviaPiece::garbageText({TriviaStart, Length}));
+    auto Text = OwnedString::makeRefCounted(StringRef(TriviaStart, Length));
+    Pieces.push_back(TriviaPiece::garbageText(Text));
     goto Restart;
   }
   // Reset the cursor.

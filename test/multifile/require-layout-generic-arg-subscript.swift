@@ -21,7 +21,7 @@ public class AccessorTest {
   }
 }
 
-// FILE2-LABEL: define internal %swift.type* @"$S4test3SubCMi"(%swift.type_descriptor*, i8**, i8**)
+// FILE2-LABEL: define internal %swift.type* @"$S4test3SubCMi"(%swift.type_descriptor*, i8**, i8*)
 // FILE2:   [[T_ADDR:%.*]] = bitcast i8** %1 to %swift.type**
 // FILE2:   [[T:%.*]] = load %swift.type*, %swift.type** [[T_ADDR]]
 // FILE2:   [[CLASSMETADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata

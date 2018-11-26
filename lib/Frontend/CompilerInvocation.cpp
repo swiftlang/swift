@@ -259,6 +259,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EvaluatorCycleDiagnostics = CycleDiagnosticKind::DebugDiagnose;
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_output_request_graphviz)) {
+    Opts.RequestEvaluatorGraphVizPath = A->getValue();
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_solver_memory_threshold)) {
     unsigned threshold;
     if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
@@ -281,7 +285,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.SolverShrinkUnsolvedThreshold = threshold;
   }
 
-  if (const Arg *A = Args.getLastArg(OPT_solver_disable_shrink))
+  if (Args.getLastArg(OPT_solver_disable_shrink))
     Opts.SolverDisableShrink = true;
 
   if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
@@ -769,6 +773,36 @@ void CompilerInvocation::buildDebugFlags(std::string &Output,
   }
 }
 
+static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
+                            DiagnosticEngine &Diags,
+                            CompilerInvocation &Invocation) {
+  using namespace options;
+
+  Opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
+
+  if (const Arg *A = Args.getLastArg(OPT_module_link_name)) {
+    Opts.ModuleLinkName = A->getValue();
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_tbd_install_name)) {
+    Opts.InstallName = A->getValue();
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_tbd_compatibility_version)) {
+    if (auto vers = version::Version::parseVersionString(
+          A->getValue(), SourceLoc(), &Diags)) {
+      Opts.CompatibilityVersion = *vers;
+    }
+  }
+  if (const Arg *A = Args.getLastArg(OPT_tbd_current_version)) {
+    if (auto vers = version::Version::parseVersionString(
+          A->getValue(), SourceLoc(), &Diags)) {
+      Opts.CurrentVersion = *vers;
+    }
+  }
+  return false;
+}
+
 static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                            DiagnosticEngine &Diags,
                            const FrontendOptions &FrontendOpts,
@@ -1143,6 +1177,10 @@ bool CompilerInvocation::parseArgs(
   if (ParseIRGenArgs(IRGenOpts, ParsedArgs, Diags, FrontendOpts, SILOpts,
                      getSDKPath(), SearchPathOpts.RuntimeResourcePath,
                      LangOpts.Target)) {
+    return true;
+  }
+
+  if (ParseTBDGenArgs(TBDGenOpts, ParsedArgs, Diags, *this)) {
     return true;
   }
 

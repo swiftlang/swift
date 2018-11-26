@@ -18,12 +18,13 @@
 #ifndef SWIFT_SEMA_CONSTRAINT_SYSTEM_H
 #define SWIFT_SEMA_CONSTRAINT_SYSTEM_H
 
-#include "TypeChecker.h"
+#include "CSFix.h"
 #include "Constraint.h"
 #include "ConstraintGraph.h"
 #include "ConstraintGraphScope.h"
 #include "ConstraintLocator.h"
 #include "OverloadChoice.h"
+#include "TypeChecker.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/AST/ASTVisitor.h"
@@ -92,7 +93,7 @@ class ConstraintLocator;
 struct RestrictionOrFix {
   union {
     ConversionRestrictionKind Restriction;
-    Fix TheFix;
+    ConstraintFix *TheFix;
   };
   bool IsRestriction;
 
@@ -100,9 +101,7 @@ public:
   RestrictionOrFix(ConversionRestrictionKind restriction)
   : Restriction(restriction), IsRestriction(true) { }
 
-  RestrictionOrFix(Fix fix) : TheFix(fix), IsRestriction(false) { }
-
-  RestrictionOrFix(FixKind fix) : TheFix(fix), IsRestriction(false) { }
+  RestrictionOrFix(ConstraintFix *fix) : TheFix(fix), IsRestriction(false) {}
 
   Optional<ConversionRestrictionKind> getRestriction() const {
     if (IsRestriction)
@@ -111,7 +110,7 @@ public:
     return None;
   }
 
-  Optional<Fix> getFix() const {
+  Optional<ConstraintFix *> getFix() const {
     if (!IsRestriction)
       return TheFix;
 
@@ -592,7 +591,7 @@ public:
 
   /// The list of fixes that need to be applied to the initial expression
   /// to make the solution work.
-  llvm::SmallVector<std::pair<Fix, ConstraintLocator *>, 4> Fixes;
+  llvm::SmallVector<ConstraintFix *, 4> Fixes;
 
   /// The set of disjunction choices used to arrive at this solution,
   /// which informs constraint application.
@@ -706,6 +705,16 @@ public:
     if (known != overloadChoices.end())
       return known->second;
     return None;
+  }
+
+  /// Retrieve overload choices associated with given expression.
+  void getOverloadChoices(Expr *anchor,
+                          SmallVectorImpl<SelectedOverload> &overloads) const {
+    for (auto &e : overloadChoices) {
+      auto *locator = e.first;
+      if (locator->getAnchor() == anchor)
+        overloads.push_back(e.second);
+    }
   }
 
   LLVM_ATTRIBUTE_DEPRECATED(
@@ -908,11 +917,12 @@ public:
   ConstraintSystemOptions Options;
   Optional<ExpressionTimer> Timer;
   
-  friend class Fix;
+  friend class ConstraintFix;
   friend class OverloadChoice;
   friend class ConstraintGraph;
   friend class DisjunctionChoice;
   friend class Component;
+  friend class FailureDiagnostic;
 
   class SolverScope;
 
@@ -1008,24 +1018,7 @@ private:
       ConstraintRestrictions;
 
   /// The set of fixes applied to make the solution work.
-  ///
-  /// Each fix is paired with a locator that describes where the fix occurs.
-  SmallVector<std::pair<Fix, ConstraintLocator *>, 4> Fixes;
-
-  /// Types used in fixes.
-  std::vector<Type> FixedTypes;
-
-  /// Declaration names used in fixes.
-  std::vector<DeclName> FixedDeclNames;
-
-  /// Argument labels fixed by the constraint solver.
-  SmallVector<std::vector<Identifier>, 4> FixedArgLabels;
-
-  /// Conformances which solver "fixed" to help with
-  /// diagnosing problems related to generic requirements.
-  llvm::SmallDenseMap<std::pair<Expr *, unsigned>,
-                      std::pair<TypeBase *, ProtocolDecl *>>
-      MissingConformances;
+  llvm::SmallVector<ConstraintFix *, 4> Fixes;
 
   /// \brief The set of remembered disjunction choices used to reach
   /// the current constraint system.
@@ -1524,12 +1517,6 @@ private:
   /// able to emit an error message, or false if none of the fixits worked out.
   bool applySolutionFixes(Expr *E, const Solution &solution);
 
-  /// \brief Apply the specified Fix to this solution, producing a fix-it hint
-  /// diagnostic for it and returning true.  If the fix-it hint turned out to be
-  /// bogus, this returns false and doesn't emit anything.
-  bool applySolutionFix(Expr *expr, const Solution &solution,
-                        std::pair<Fix, ConstraintLocator *> &fix);
-
   /// \brief If there is more than one viable solution,
   /// attempt to pick the best solution and remove all of the rest.
   ///
@@ -1766,8 +1753,8 @@ public:
 
   /// \brief Log and record the application of the fix. Return true iff any
   /// subsequent solution would be worse than the best known solution.
-  bool recordFix(Fix fix, ConstraintLocatorBuilder locator);
-  
+  bool recordFix(ConstraintFix *fix);
+
   /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
   /// constraint system, return the decl that it references.
   ValueDecl *findResolvedMemberRef(ConstraintLocator *locator);
@@ -1787,7 +1774,7 @@ public:
 
   /// When an assignment to an expression is detected and the destination is
   /// invalid, emit a detailed error about the condition.
-  void diagnoseAssignmentFailure(Expr *dest, Type destTy, SourceLoc equalLoc);
+  bool diagnoseAssignmentFailure(Expr *dest, Type destTy, SourceLoc equalLoc);
 
   
   /// \brief Mine the active and inactive constraints in the constraint
@@ -1800,6 +1787,9 @@ public:
   /// Assuming that this constraint system is actually erroneous, this *always*
   /// emits an error message.
   void diagnoseFailureForExpr(Expr *expr);
+
+  bool diagnoseAmbiguity(Expr *expr, ArrayRef<Solution> solutions);
+  bool diagnoseAmbiguityWithFixes(Expr *expr, ArrayRef<Solution> solutions);
 
   /// \brief Give the deprecation warning for referring to a global function
   /// when there's a method from a conditional conformance in a smaller/closer
@@ -2118,20 +2108,6 @@ public:
   Type getResultType(const AbstractClosureExpr *E);
 
 private:
-  /// Determine if the given constraint represents explicit conversion,
-  /// e.g. coercion constraint "as X" which forms a disjunction.
-  bool isExplicitConversionConstraint(Constraint *constraint) const {
-    if (constraint->getKind() != ConstraintKind::Disjunction)
-      return false;
-
-    if (auto locator = constraint->getLocator()) {
-      if (auto anchor = locator->getAnchor())
-        return isa<CoerceExpr>(anchor);
-    }
-
-    return false;
-  }
-
   /// Introduce the constraints associated with the given type variable
   /// into the worklist.
   void addTypeVariableConstraintsToWorkList(TypeVariableType *typeVar);
@@ -2376,10 +2352,6 @@ public:
     TypeMatchResult(SolutionKind result) : Kind(result) {}
   };
 
-  /// \brief Compute the rvalue type of the given expression, which is the
-  /// destination of an assignment statement.
-  Type computeAssignDestType(Expr *dest, SourceLoc equalLoc);
-
   /// \brief Subroutine of \c matchTypes(), which matches up two tuple types.
   ///
   /// \returns the result of performing the tuple-to-tuple conversion.
@@ -2401,15 +2373,6 @@ public:
   TypeMatchResult matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator);
-  
-  /// \brief Subroutine of \c matchFunctionTypes(), which matches up the
-  /// parameter types of two function types.
-  TypeMatchResult matchFunctionParamTypes(ArrayRef<AnyFunctionType::Param> type1,
-                                          ArrayRef<AnyFunctionType::Param> type2,
-                                          Type argType, Type paramType,
-                                          ConstraintKind kind,
-                                          TypeMatchOptions flags,
-                                          ConstraintLocatorBuilder locator);
   
   /// \brief Subroutine of \c matchTypes(), which matches up a value to a
   /// superclass.
@@ -2670,6 +2633,13 @@ private:
                                           TypeMatchOptions flags,
                                           ConstraintLocatorBuilder locator);
 
+  /// \brief Attempt to simplify a function input or result constraint.
+  SolutionKind simplifyFunctionComponentConstraint(
+                                          ConstraintKind kind,
+                                          Type first, Type second,
+                                          TypeMatchOptions flags,
+                                          ConstraintLocatorBuilder locator);
+
   /// \brief Attempt to simplify the BridgingConversion constraint.
   SolutionKind simplifyBridgingConstraint(Type type1,
                                          Type type2,
@@ -2741,8 +2711,7 @@ private:
 
 public: // FIXME: Public for use by static functions.
   /// \brief Simplify a conversion constraint with a fix applied to it.
-  SolutionKind simplifyFixConstraint(Fix fix,
-                                     Type type1, Type type2,
+  SolutionKind simplifyFixConstraint(ConstraintFix *fix, Type type1, Type type2,
                                      ConstraintKind matchKind,
                                      TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator);
@@ -3344,6 +3313,11 @@ bool matchCallArguments(ArrayRef<AnyFunctionType::Param> argTuple,
                         MatchCallArgumentListener &listener,
                         SmallVectorImpl<ParamBinding> &parameterBindings);
 
+ConstraintSystem::TypeMatchResult
+matchCallArguments(ConstraintSystem &cs,
+                   bool isOperator, Type argType, Type paramType,
+                   ConstraintLocatorBuilder locator);
+
 /// Attempt to prove that arguments with the given labels at the
 /// given parameter depth cannot be used with the given value.
 /// If this cannot be proven, conservatively returns true.
@@ -3380,6 +3354,13 @@ void simplifyLocator(Expr *&anchor,
                      Expr *&targetAnchor,
                      SmallVectorImpl<LocatorPathElt> &targetPath,
                      SourceRange &range);
+
+/// Simplify the given locator down to a specific anchor expression,
+/// if possible.
+///
+/// \returns the anchor expression if it fully describes the locator, or
+/// null otherwise.
+Expr *simplifyLocatorToAnchor(ConstraintSystem &cs, ConstraintLocator *locator);
 
 class DisjunctionChoice {
   ConstraintSystem *CS;
@@ -3582,12 +3563,6 @@ public:
 
   size_t getNumSkippedParameters() const { return NumSkippedParameters; }
 };
-
-/// Diagnose an attempt to recover when we have a value of optional type
-/// that needs to be unwrapped.
-///
-/// \returns true if a diagnostic was produced.
-bool diagnoseUnwrap(TypeChecker &TC, DeclContext *DC, Expr *expr, Type type);
 
 /// Diagnose an attempt to recover from a member access into a value of
 /// optional type which needed to be unwrapped for the member to be found.

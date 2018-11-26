@@ -71,12 +71,14 @@ add_swift_library(swiftBasic STATIC
   DiverseStack.cpp
   Edit.cpp
   EditorPlaceholder.cpp
+  ExponentialGrowthAppendingBinaryByteStream.cpp
   FileSystem.cpp
   FileTypes.cpp
   JSONSerialization.cpp
   LangOptions.cpp
   LLVMContext.cpp
   Mangler.cpp
+  OutputFileMap.cpp
   Platform.cpp
   PrefixMap.cpp
   PrettyStackTrace.cpp

@@ -2,6 +2,9 @@
 // RUN: %FileCheck %s < %t.ll
 // RUN: %FileCheck -check-prefix NEGATIVE %s < %t.ll
 
+// CHECK: @"$S27protocol_accessor_multifile5ProtoMp" = external global
+// NEGATIVE-NOT: @"$S27protocol_accessor_multifile10ClassProtoMp" =
+
 // CHECK-LABEL: define{{.*}} void @"$S27protocol_accessor_multifile14useExistentialyyF"()
 func useExistential() {
   // CHECK: [[BOX:%.+]] = alloca %T27protocol_accessor_multifile5ProtoP,
@@ -12,4 +15,21 @@ func useExistential() {
   // CHECK: ret void
 }
 
-// NEGATIVE-NOT: @"$S27protocol_accessor_multifile5ProtoMp" = 
+class GenericContext<T: Proto> {
+  // CHECK-LABEL: define{{.*}} void @"$S27protocol_accessor_multifile14GenericContextC04testdE0yyFZ
+  static func testGenericContext() {
+    // CHECK: [[SELF:%.+]] = bitcast %swift.type* %0 to %swift.type**
+    // CHECK: [[WITNESS_TABLE:%.+]] = getelementptr inbounds %swift.type*, %swift.type** [[SELF]],
+    // CHECK: = load %swift.type*, %swift.type** [[WITNESS_TABLE]]
+    // CHECK: ret void
+  }
+}
+
+// CHECK-LABEL: define{{.*}} void @"$S27protocol_accessor_multifile19useClassExistentialyyF"()
+func useClassExistential() {
+  let g = getClassExistential()
+  // CHECK: [[G_TYPE:%.+]] = call %swift.type* @swift_getObjectType({{%.+}} {{%.+}})
+  // CHECK: call swiftcc void {{%.+}}(i{{32|64}} 1, {{%.+}} {{%.+}}, %swift.type* [[G_TYPE]], i8** {{%.+}})
+  g?.baseProp = 1
+  // CHECK: ret void
+}

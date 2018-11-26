@@ -574,6 +574,7 @@ private:
 
   /// Sets the accessors for \p storage based on \p rawStorageKind.
   void configureStorage(AbstractStorageDecl *storage,
+                        uint8_t rawOpaqueReadOwnership,
                         uint8_t rawReadImpl,
                         uint8_t rawWriteImpl,
                         uint8_t rawReadWriteImpl,

@@ -55,8 +55,8 @@ assert(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefTy.self))
 
 DictionaryTraps.test("sanity") {
   // Sanity checks.  This code should not trap.
-  var d = Dictionary<BridgedVerbatimRefTy, BridgedVerbatimRefTy>()
-  var nsd = d as NSDictionary
+  let d = Dictionary<BridgedVerbatimRefTy, BridgedVerbatimRefTy>()
+  _ = d as NSDictionary
 }
 
 class TestObjCKeyTy : NSObject {
@@ -124,8 +124,8 @@ DictionaryTraps.test("BridgedKeyIsNotNSCopyable1")
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches("unrecognized selector sent to instance").code {
   // This Dictionary is bridged in O(1).
-  var d = [ TestObjCKeyTy(10): NSObject() ]
-  var nsd = d as NSDictionary
+  let d = [ TestObjCKeyTy(10): NSObject() ]
+  let nsd = d as NSDictionary
   expectCrashLater()
   nsd.mutableCopy()
 }
@@ -136,8 +136,8 @@ DictionaryTraps.test("BridgedKeyIsNotNSCopyable2")
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   // This Dictionary is bridged in O(1).
-  var d = [ TestObjCKeyTy(10): 10 ]
-  var nsd = d as NSDictionary
+  let d = [ TestObjCKeyTy(10): 10 ]
+  let nsd = d as NSDictionary
   expectCrashLater()
   nsd.mutableCopy()
 }
@@ -147,11 +147,11 @@ DictionaryTraps.test("Downcast1") {
                                             NSObject() : NSObject() ]
   let d2: Dictionary<TestObjCKeyTy, NSObject> = _dictionaryDownCast(d)
   expectCrashLater()
-  let v1 = d2[TestObjCKeyTy(10)]
-  let v2 = d2[TestObjCKeyTy(20)]
+  _ = d2[TestObjCKeyTy(10)]
+  _ = d2[TestObjCKeyTy(20)]
 
   // This triggers failure.
-  for (k, v) in d2 { }
+  for (_, _) in d2 { }
 }
 
 DictionaryTraps.test("Downcast2")
@@ -163,9 +163,8 @@ DictionaryTraps.test("Downcast2")
                                             NSObject() : NSObject() ]
 
   expectCrashLater()
-  let d2: Dictionary<TestBridgedKeyTy, NSObject>
-    = _dictionaryBridgeFromObjectiveC(d)
-  let v1 = d2[TestBridgedKeyTy(10)]
+  let d2 = d as! Dictionary<TestBridgedKeyTy, NSObject>
+  _ = d2[TestBridgedKeyTy(10)]
 }
 
 runAllTests()

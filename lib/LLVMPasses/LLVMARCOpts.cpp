@@ -57,7 +57,7 @@ STATISTIC(NumAllocateReleasePairs,
           "Number of swift allocate/release pairs eliminated");
 STATISTIC(NumStoreOnlyObjectsEliminated,
           "Number of swift stored-only objects eliminated");
-STATISTIC(NumUnknownRetainReleaseSRed,
+STATISTIC(NumUnknownObjectRetainReleaseSRed,
           "Number of unknownretain/release strength reduced to retain/release");
 
 llvm::cl::opt<bool>
@@ -78,11 +78,11 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
                                       SwiftRCIdentity *RC) {
   bool Changed = false;
   DenseSet<Value *> NativeRefs;
-  DenseMap<Value *, TinyPtrVector<Instruction *>> UnknownRetains;
-  DenseMap<Value *, TinyPtrVector<Instruction *>> UnknownReleases;
+  DenseMap<Value *, TinyPtrVector<Instruction *>> UnknownObjectRetains;
+  DenseMap<Value *, TinyPtrVector<Instruction *>> UnknownObjectReleases;
   for (auto &BB : F) {
-    UnknownRetains.clear();
-    UnknownReleases.clear();
+    UnknownObjectRetains.clear();
+    UnknownObjectReleases.clear();
     NativeRefs.clear();
     for (auto I = BB.begin(); I != BB.end(); ) {
       Instruction &Inst = *I++;
@@ -91,10 +91,10 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
       // These instructions should not reach here based on the pass ordering.
       // i.e. LLVMARCOpt -> LLVMContractOpt.
       case RT_RetainN:
-      case RT_UnknownRetainN:
+      case RT_UnknownObjectRetainN:
       case RT_BridgeRetainN:
       case RT_ReleaseN:
-      case RT_UnknownReleaseN:
+      case RT_UnknownObjectReleaseN:
       case RT_BridgeReleaseN:
         llvm_unreachable("These are only created by LLVMARCContract !");
       case RT_Unknown:
@@ -118,20 +118,20 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
         }
         // Rewrite unknown retains into swift_retains.
         NativeRefs.insert(ArgVal);
-        for (auto &X : UnknownRetains[ArgVal]) {
+        for (auto &X : UnknownObjectRetains[ArgVal]) {
           B.setInsertPoint(X);
           B.createRetain(ArgVal, cast<CallInst>(X));
           X->eraseFromParent();
-          ++NumUnknownRetainReleaseSRed;
+          ++NumUnknownObjectRetainReleaseSRed;
           Changed = true;
         }
-        UnknownRetains[ArgVal].clear();
+        UnknownObjectRetains[ArgVal].clear();
         break;
       }
-      case RT_UnknownRetain: {
+      case RT_UnknownObjectRetain: {
         CallInst &CI = cast<CallInst>(Inst);
         Value *ArgVal = RC->getSwiftRCIdentityRoot(CI.getArgOperand(0));
-        // unknownRetain(null) is a no-op.
+        // unknownObjectRetain(null) is a no-op.
         if (isa<ConstantPointerNull>(ArgVal)) {
           CI.eraseFromParent();
           Changed = true;
@@ -143,12 +143,12 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
         // unknown retain/release list for now. It might get replaced
         // later.
         if (NativeRefs.find(ArgVal) == NativeRefs.end()) {
-           UnknownRetains[ArgVal].push_back(&CI);
+           UnknownObjectRetains[ArgVal].push_back(&CI);
         } else {
           B.setInsertPoint(&CI);
           B.createRetain(ArgVal, &CI);
           CI.eraseFromParent();
-          ++NumUnknownRetainReleaseSRed;
+          ++NumUnknownObjectRetainReleaseSRed;
           Changed = true;
         }
         break;
@@ -165,20 +165,20 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
         }
         // Rewrite unknown releases into swift_releases.
         NativeRefs.insert(ArgVal);
-        for (auto &X : UnknownReleases[ArgVal]) {
+        for (auto &X : UnknownObjectReleases[ArgVal]) {
           B.setInsertPoint(X);
           B.createRelease(ArgVal, cast<CallInst>(X));
           X->eraseFromParent();
-          ++NumUnknownRetainReleaseSRed;
+          ++NumUnknownObjectRetainReleaseSRed;
           Changed = true;
         }
-        UnknownReleases[ArgVal].clear();
+        UnknownObjectReleases[ArgVal].clear();
         break;
       }
-      case RT_UnknownRelease: {
+      case RT_UnknownObjectRelease: {
         CallInst &CI = cast<CallInst>(Inst);
         Value *ArgVal = RC->getSwiftRCIdentityRoot(CI.getArgOperand(0));
-        // unknownRelease(null) is a no-op.
+        // unknownObjectRelease(null) is a no-op.
         if (isa<ConstantPointerNull>(ArgVal)) {
           CI.eraseFromParent();
           Changed = true;
@@ -190,12 +190,12 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
         // unknown retain/release list for now. It might get replaced
         // later.
         if (NativeRefs.find(ArgVal) == NativeRefs.end()) {
-          UnknownReleases[ArgVal].push_back(&CI);
+          UnknownObjectReleases[ArgVal].push_back(&CI);
         } else {
           B.setInsertPoint(&CI);
           B.createRelease(ArgVal, &CI);
           CI.eraseFromParent();
-          ++NumUnknownRetainReleaseSRed;
+          ++NumUnknownObjectRetainReleaseSRed;
           Changed = true;
         }
         break;
@@ -227,7 +227,7 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
           Changed = true;
         }
 
-        // {objc_retain,swift_unknownRetain}(null) is a noop, delete it.
+        // {objc_retain,swift_unknownObjectRetain}(null) is a noop, delete it.
         if (isa<ConstantPointerNull>(ArgVal)) {
           CI.eraseFromParent();
           Changed = true;
@@ -276,10 +276,10 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB,
     switch (classifyInstruction(*BBI)) {
     // These instructions should not reach here based on the pass ordering.
     // i.e. LLVMARCOpt -> LLVMContractOpt.
-    case RT_UnknownRetainN:
+    case RT_UnknownObjectRetainN:
     case RT_BridgeRetainN:
     case RT_RetainN:
-    case RT_UnknownReleaseN:
+    case RT_UnknownObjectReleaseN:
     case RT_BridgeReleaseN:
     case RT_ReleaseN:
         llvm_unreachable("These are only created by LLVMARCContract !");
@@ -288,7 +288,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB,
       // protection by retain/release.
       continue;
 
-    case RT_UnknownRelease:
+    case RT_UnknownObjectRelease:
     case RT_BridgeRelease:
     case RT_ObjCRelease:
     case RT_Release: {
@@ -310,7 +310,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB,
       continue;
     }
 
-    case RT_UnknownRetain:
+    case RT_UnknownObjectRetain:
     case RT_BridgeRetain:
     case RT_ObjCRetain:
     case RT_Retain: {  // swift_retain(obj)
@@ -428,10 +428,10 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB,
     // These instructions should not reach here based on the pass ordering.
     // i.e. LLVMARCOpt -> LLVMContractOpt.
     case RT_RetainN:
-    case RT_UnknownRetainN:
+    case RT_UnknownObjectRetainN:
     case RT_BridgeRetainN:
     case RT_ReleaseN:
-    case RT_UnknownReleaseN:
+    case RT_UnknownObjectReleaseN:
     case RT_BridgeReleaseN:
         llvm_unreachable("These are only created by LLVMARCContract !");
     case RT_NoMemoryAccessed:
@@ -446,7 +446,7 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB,
       break;
 
     case RT_Retain:
-    case RT_UnknownRetain:
+    case RT_UnknownObjectRetain:
     case RT_BridgeRetain:
     case RT_RetainUnowned:
     case RT_ObjCRetain: {  // swift_retain(obj)
@@ -460,7 +460,7 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB,
     }
 
 
-    case RT_UnknownRelease:
+    case RT_UnknownObjectRelease:
     case RT_BridgeRelease:
     case RT_ObjCRelease:
     case RT_Release: {
@@ -583,10 +583,10 @@ static DtorKind analyzeDestructor(Value *P) {
       // These instructions should not reach here based on the pass ordering.
       // i.e. LLVMARCOpt -> LLVMContractOpt.
       case RT_RetainN:
-      case RT_UnknownRetainN:
+      case RT_UnknownObjectRetainN:
       case RT_BridgeRetainN:
       case RT_ReleaseN:
-      case RT_UnknownReleaseN:
+      case RT_UnknownObjectReleaseN:
       case RT_BridgeReleaseN:
         llvm_unreachable("These are only created by LLVMARCContract !");
       case RT_NoMemoryAccessed:
@@ -624,8 +624,8 @@ static DtorKind analyzeDestructor(Value *P) {
 
       case RT_ObjCRelease:
       case RT_ObjCRetain:
-      case RT_UnknownRetain:
-      case RT_UnknownRelease:
+      case RT_UnknownObjectRetain:
+      case RT_UnknownObjectRelease:
       case RT_BridgeRelease:
         // Objective-C retain and release can have arbitrary side effects.
         break;
@@ -699,10 +699,10 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
     // These instructions should not reach here based on the pass ordering.
     // i.e. LLVMARCOpt -> LLVMContractOpt.
     case RT_RetainN:
-    case RT_UnknownRetainN:
+    case RT_UnknownObjectRetainN:
     case RT_BridgeRetainN:
     case RT_ReleaseN:
-    case RT_UnknownReleaseN:
+    case RT_UnknownObjectReleaseN:
     case RT_BridgeReleaseN:
       llvm_unreachable("These are only created by LLVMARCContract !");
     case RT_AllocObject:
@@ -736,8 +736,8 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
     case RT_Unknown:
     case RT_ObjCRelease:
     case RT_ObjCRetain:
-    case RT_UnknownRetain:
-    case RT_UnknownRelease:
+    case RT_UnknownObjectRetain:
+    case RT_UnknownObjectRelease:
     case RT_BridgeRetain:
     case RT_BridgeRelease:
     case RT_RetainUnowned:
@@ -878,7 +878,7 @@ static void performRedundantCheckUnownedRemoval(BasicBlock &BB) {
       case RT_AllocObject:
       case RT_FixLifetime:
       case RT_Retain:
-      case RT_UnknownRetain:
+      case RT_UnknownObjectRetain:
       case RT_BridgeRetain:
       case RT_RetainUnowned:
       case RT_ObjCRetain:
@@ -933,13 +933,13 @@ static bool performGeneralOptimizations(Function &F, ARCEntryPointBuilder &B,
         break;
       case RT_BridgeRelease:
       case RT_ObjCRelease:
-      case RT_UnknownRelease:
+      case RT_UnknownObjectRelease:
       case RT_Release:
         Changed |= performLocalReleaseMotion(cast<CallInst>(I), BB, RC);
         break;
       case RT_BridgeRetain:
       case RT_Retain:
-      case RT_UnknownRetain:
+      case RT_UnknownObjectRetain:
       case RT_ObjCRetain: {
         // Retain motion is a forward pass over the block.  Make sure we don't
         // invalidate our iterators by parking it on the instruction before I.

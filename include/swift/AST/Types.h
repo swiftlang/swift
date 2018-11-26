@@ -54,6 +54,7 @@ namespace swift {
   class GenericParamList;
   class GenericSignature;
   class Identifier;
+  class InOutType;
   enum class ReferenceCounting : uint8_t;
   enum class ResilienceExpansion : unsigned;
   class SILModule;
@@ -841,13 +842,9 @@ public:
   /// unknown-released.
   bool hasRetainablePointerRepresentation();
 
-  /// \brief Given that this type is a reference type, is it known to use
-  /// Swift-native reference counting?
-  bool usesNativeReferenceCounting(ResilienceExpansion resilience);
-
   /// Given that this type is a reference type, which kind of reference
   /// counting does it use?
-  ReferenceCounting getReferenceCounting(ResilienceExpansion resilience);
+  ReferenceCounting getReferenceCounting();
 
   /// Determines whether this type has a bridgeable object
   /// representation, i.e., whether it is always represented as a single
@@ -906,6 +903,10 @@ public:
   /// declaration.
   GenericTypeDecl *getAnyGeneric();
 
+  /// removeArgumentLabels -  Retrieve a version of this type with all
+  /// argument labels removed.
+  Type removeArgumentLabels(unsigned numArgumentLabels);
+
   /// getUnlabeledType - Retrieve a version of this type with all labels
   /// removed at every level. For example, given a tuple type 
   /// \code
@@ -947,8 +948,8 @@ public:
   /// Otherwise, returns the type itself.
   Type getWithoutSpecifierType();
 
-  /// getRValueInstanceType - Looks through inout types and metatypes.
-  Type getRValueInstanceType();
+  /// getMetatypeInstanceType - Looks through metatypes.
+  Type getMetatypeInstanceType();
 
   /// For a ReferenceStorageType like @unowned, this returns the referent.
   /// Otherwise, it returns the type itself.
@@ -1743,6 +1744,78 @@ public:
   }
 
   bool operator!=(const ParameterTypeFlags &other) const {
+    return value.toRaw() != other.value.toRaw();
+  }
+
+  uint8_t toRaw() const { return value.toRaw(); }
+};
+
+class YieldTypeFlags {
+  enum YieldFlags : uint8_t {
+    None        = 0,
+    InOut       = 1 << 1,
+    Shared      = 1 << 2,
+    Owned       = 1 << 3,
+
+    NumBits = 3
+  };
+  OptionSet<YieldFlags> value;
+
+  static_assert(NumBits < 8 * sizeof(OptionSet<YieldFlags>), "overflowed");
+
+  YieldTypeFlags(OptionSet<YieldFlags, uint8_t> val) : value(val) {}
+
+public:
+  YieldTypeFlags() = default;
+  static YieldTypeFlags fromRaw(uint8_t raw) {
+    return YieldTypeFlags(OptionSet<YieldFlags>(raw));
+  }
+
+  YieldTypeFlags(ValueOwnership ownership)
+      : value((ownership == ValueOwnership::InOut ? InOut : 0) |
+              (ownership == ValueOwnership::Shared ? Shared : 0) |
+              (ownership == ValueOwnership::Owned ? Owned : 0)) {}
+
+  bool isInOut() const { return value.contains(InOut); }
+  bool isShared() const { return value.contains(Shared); }
+  bool isOwned() const { return value.contains(Owned); }
+
+  ValueOwnership getValueOwnership() const {
+    if (isInOut())
+      return ValueOwnership::InOut;
+    else if (isShared())
+      return ValueOwnership::Shared;
+    else if (isOwned())
+      return ValueOwnership::Owned;
+
+    return ValueOwnership::Default;
+  }
+
+  YieldTypeFlags withInOut(bool isInout) const {
+    return YieldTypeFlags(isInout ? value | InOut : value - InOut);
+  }
+  
+  YieldTypeFlags withShared(bool isShared) const {
+    return YieldTypeFlags(isShared ? value | Shared : value - Shared);
+  }
+
+  YieldTypeFlags withOwned(bool isOwned) const {
+    return YieldTypeFlags(isOwned ? value | Owned : value - Owned);
+  }
+
+  /// Return these flags interpreted as parameter flags.
+  ParameterTypeFlags asParamFlags() const {
+    return ParameterTypeFlags(/*variadic*/ false,
+                              /*autoclosure*/ false,
+                              /*escaping*/ false,
+                              getValueOwnership());
+  }
+
+  bool operator ==(const YieldTypeFlags &other) const {
+    return value.toRaw() == other.value.toRaw();
+  }
+
+  bool operator!=(const YieldTypeFlags &other) const {
     return value.toRaw() != other.value.toRaw();
   }
 
@@ -2564,12 +2637,16 @@ class AnyFunctionType : public TypeBase {
   
 public:
   using Representation = FunctionTypeRepresentation;
-  
+
   class Param {
   public:
-    explicit Param(const TupleTypeElt &tte);
-    explicit Param(Type t, Identifier l, ParameterTypeFlags f);
-    
+    explicit Param(Type t,
+                   Identifier l = Identifier(),
+                   ParameterTypeFlags f = ParameterTypeFlags())
+        : Ty(t), Label(l), Flags(f) {
+      assert(!t || !t->is<InOutType>() && "set flags instead");
+    }
+
   private:
     /// The type of the parameter. For a variadic parameter, this is the
     /// element type.
@@ -2582,15 +2659,15 @@ public:
     ParameterTypeFlags Flags = {};
     
   public:
-    Type getType() const;
-    CanType getCanType() const {
-      assert(getType()->isCanonical());
-      return CanType(getType());
-    }
-    
     /// FIXME(Remove InOutType): This is mostly for copying between param
     /// types and should go away.
+    Type getType() const;
+
     Type getPlainType() const { return Ty; }
+
+    /// The type of the parameter.  Adjusts for varargs, but not inout.
+    Type getParameterType(bool forCanonical = false,
+                          ASTContext *ctx = nullptr) const;
 
     bool hasLabel() const { return !Label.empty(); }
     Identifier getLabel() const { return Label; }
@@ -2634,11 +2711,67 @@ public:
     static CanParam getFromParam(const Param &param) { return CanParam(param); }
 
     CanType getType() const { return CanType(Param::getType()); }
+    CanType getPlainType() const { return CanType(Param::getPlainType()); }
+    CanType getParameterType() const {
+      return CanType(Param::getParameterType(/*forCanonical*/ true));
+    }
   };
 
   using CanParamArrayRef =
     ArrayRefView<Param,CanParam,CanParam::getFromParam,/*AccessOriginal*/true>;
   
+  class CanYield;
+  class Yield {
+    Type Ty;
+    YieldTypeFlags Flags;
+  public:
+    explicit Yield(Type type, YieldTypeFlags flags)
+      : Ty(type), Flags(flags) {}
+
+    Type getType() const { return Ty; }
+
+    YieldTypeFlags getFlags() const { return Flags; }
+    ValueOwnership getValueOwnership() const {
+      return getFlags().getValueOwnership();
+    }
+    bool isInOut() const { return getFlags().isInOut(); }
+
+    CanYield getCanonical() const;
+
+    /// There are a number of places where it's convenient to re-use
+    /// the call machinery, processing yields as if they were
+    /// parameters of a call.  Return this reinterpreted as a parameter.
+    Param asParam() const {
+      return Param(getType(), Identifier(), getFlags().asParamFlags());
+    }
+
+    Yield subst(SubstitutionMap subs, SubstOptions options = None) const {
+      return Yield(getType().subst(subs, options), getFlags());
+    }
+
+    bool operator==(const Yield &other) const {
+      return getType()->isEqual(other.getType()) &&
+             getFlags() == other.getFlags();
+    }
+    bool operator!=(const Yield &other) const {
+      return !operator==(other);
+    }
+  };
+
+  class CanYield : public Yield {
+  public:
+    explicit CanYield(CanType type, YieldTypeFlags flags)
+      : Yield(type, flags) {}
+
+    CanType getType() const { return CanType(Yield::getType()); }
+    CanParam asParam() const { return CanParam::getFromParam(Yield::asParam());}
+
+    CanYield subst(SubstitutionMap subs, SubstOptions options = None) const {
+      return CanYield(getType().subst(subs, options)->getCanonicalType(),
+                      getFlags());
+    }
+  };
+
   /// \brief A class which abstracts out some details necessary for
   /// making a call.
   class ExtInfo {
@@ -2786,7 +2919,7 @@ public:
 protected:
   AnyFunctionType(TypeKind Kind, const ASTContext *CanTypeContext,
                   Type Input, Type Output, RecursiveTypeProperties properties,
-                  unsigned NumParams, const ExtInfo &Info)
+                  unsigned NumParams, ExtInfo Info)
   : TypeBase(Kind, CanTypeContext, properties), Input(Input), Output(Output) {
     Bits.AnyFunctionType.ExtInfo = Info.Bits;
     Bits.AnyFunctionType.NumParams = NumParams;
@@ -2800,7 +2933,7 @@ protected:
 public:
   /// \brief Break an input type into an array of \c AnyFunctionType::Params.
   static void decomposeInput(Type type,
-                             SmallVectorImpl<AnyFunctionType::Param> &result);
+                             SmallVectorImpl<Param> &result);
 
   /// \brief Take an array of parameters and turn it into an input type.
   ///
@@ -2814,15 +2947,14 @@ public:
   }
 
   /// \brief Given two arrays of parameters determine if they are equal.
-  static bool equalParams(ArrayRef<AnyFunctionType::Param> a,
-                          ArrayRef<AnyFunctionType::Param> b);
+  static bool equalParams(ArrayRef<Param> a, ArrayRef<Param> b);
 
   /// \brief Given two arrays of parameters determine if they are equal.
   static bool equalParams(CanParamArrayRef a, CanParamArrayRef b);
 
   Type getInput() const { return Input; }
   Type getResult() const { return Output; }
-  ArrayRef<AnyFunctionType::Param> getParams() const;
+  ArrayRef<Param> getParams() const;
   unsigned getNumParams() const { return Bits.AnyFunctionType.NumParams; }
 
   GenericSignature *getOptGenericSignature() const;
@@ -2875,13 +3007,9 @@ BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
   using CanParamArrayRef = AnyFunctionType::CanParamArrayRef;
 
   static CanAnyFunctionType get(CanGenericSignature signature,
-                                CanType input, CanType result);
-  static CanAnyFunctionType get(CanGenericSignature signature,
-                                CanType input, CanType result,
-                                const ExtInfo &extInfo);
-  static CanAnyFunctionType get(CanGenericSignature signature,
                                 CanParamArrayRef params,
-                                CanType result, const ExtInfo &info);
+                                CanType result,
+                                ExtInfo info = ExtInfo());
 
   CanGenericSignature getOptGenericSignature() const;
 
@@ -2900,6 +3028,10 @@ BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
   }
 END_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
 
+inline AnyFunctionType::CanYield AnyFunctionType::Yield::getCanonical() const {
+  return CanYield(getType()->getCanonicalType(), getFlags());
+}
+
 /// FunctionType - A monomorphic function type, specified with an arrow.
 ///
 /// For example:
@@ -2910,19 +3042,14 @@ class FunctionType final : public AnyFunctionType,
       
 public:
   /// 'Constructor' Factory Function
-  static FunctionType *get(Type Input, Type Result) {
-    return get(Input, Result, ExtInfo());
-  }
-
-  static FunctionType *get(Type Input, Type Result, const ExtInfo &Info);
-      
-  static FunctionType *get(ArrayRef<AnyFunctionType::Param> params,
-                           Type result, const ExtInfo &info,
+  static FunctionType *get(ArrayRef<Param> params,
+                           Type result,
+                           ExtInfo info = ExtInfo(),
                            bool canonicalVararg = false);
 
   // Retrieve the input parameters of this function type.
-  ArrayRef<AnyFunctionType::Param> getParams() const {
-    return {getTrailingObjects<AnyFunctionType::Param>(), getNumParams()};
+  ArrayRef<Param> getParams() const {
+    return {getTrailingObjects<Param>(), getNumParams()};
   }
       
   // Implement isa/cast/dyncast/etc.
@@ -2931,23 +3058,14 @@ public:
   }
       
 private:
-  FunctionType(ArrayRef<AnyFunctionType::Param> params,
+  FunctionType(ArrayRef<Param> params,
                Type Input, Type Result,
                RecursiveTypeProperties properties,
-               const ExtInfo &Info);
+               ExtInfo Info);
 };
 BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
-  static CanFunctionType get(CanType input, CanType result) {
-    auto fnType = FunctionType::get(input, result);
-    return cast<FunctionType>(fnType->getCanonicalType());
-  }
-  static CanFunctionType get(CanType input, CanType result,
-                             const ExtInfo &info) {
-    auto fnType = FunctionType::get(input, result, info);
-    return cast<FunctionType>(fnType->getCanonicalType());
-  }
   static CanFunctionType get(CanParamArrayRef params, CanType result,
-                             const ExtInfo &info) {
+                             ExtInfo info = ExtInfo()) {
     auto fnType = FunctionType::get(params.getOriginalArray(),
                                     result, info, /*canonicalVararg=*/true);
     return cast<FunctionType>(fnType->getCanonicalType());
@@ -2992,30 +3110,24 @@ class GenericFunctionType final : public AnyFunctionType,
 
   /// Construct a new generic function type.
   GenericFunctionType(GenericSignature *sig,
-                      ArrayRef<AnyFunctionType::Param> params,
+                      ArrayRef<Param> params,
                       Type input,
                       Type result,
-                      const ExtInfo &info,
+                      ExtInfo info,
                       const ASTContext *ctx,
                       RecursiveTypeProperties properties);
       
 public:
   /// Create a new generic function type.
   static GenericFunctionType *get(GenericSignature *sig,
-                                  Type input,
-                                  Type result,
-                                  const ExtInfo &info);
-
-  /// Create a new generic function type.
-  static GenericFunctionType *get(GenericSignature *sig,
                                   ArrayRef<Param> params,
                                   Type result,
-                                  const ExtInfo &info,
+                                  ExtInfo info = ExtInfo(),
                                   bool canonicalVararg = false);
 
   // Retrieve the input parameters of this function type.
-  ArrayRef<AnyFunctionType::Param> getParams() const {
-    return {getTrailingObjects<AnyFunctionType::Param>(), getNumParams()};
+  ArrayRef<Param> getParams() const {
+    return {getTrailingObjects<Param>(), getNumParams()};
   }
       
   /// Retrieve the generic signature of this function type.
@@ -3041,7 +3153,7 @@ public:
                       GenericSignature *sig,
                       Type input,
                       Type result,
-                      const ExtInfo &info);
+                      ExtInfo info);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -3050,19 +3162,11 @@ public:
 };
 
 BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
-  static CanGenericFunctionType get(CanGenericSignature sig,
-                                    CanType input, CanType result,
-                                    const ExtInfo &info) {
-    // Knowing that the argument types are independently canonical is
-    // not sufficient to guarantee that the function type will be canonical.
-    auto fnType = GenericFunctionType::get(sig, input, result, info);
-    return cast<GenericFunctionType>(fnType->getCanonicalType());
-  }
-
   /// Create a new generic function type.
   static CanGenericFunctionType get(CanGenericSignature sig,
-                                    CanParamArrayRef params, CanType result,
-                                    const ExtInfo &info) {
+                                    CanParamArrayRef params,
+                                    CanType result,
+                                    ExtInfo info = ExtInfo()) {
     // Knowing that the argument types are independently canonical is
     // not sufficient to guarantee that the function type will be canonical.
     auto fnType = GenericFunctionType::get(sig, params.getOriginalArray(),
@@ -3086,24 +3190,8 @@ BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
 END_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
 
 inline CanAnyFunctionType
-CanAnyFunctionType::get(CanGenericSignature signature,
-                        CanType input, CanType result) {
-  return get(signature, input, result, ExtInfo());
-}
-
-inline CanAnyFunctionType
-CanAnyFunctionType::get(CanGenericSignature signature,
-                        CanType input, CanType result, const ExtInfo &extInfo) {
-  if (signature) {
-    return CanGenericFunctionType::get(signature, input, result, extInfo);
-  } else {
-    return CanFunctionType::get(input, result, extInfo);
-  }
-}
-
-inline CanAnyFunctionType
 CanAnyFunctionType::get(CanGenericSignature signature, CanParamArrayRef params,
-                        CanType result, const ExtInfo &extInfo) {
+                        CanType result, ExtInfo extInfo) {
   if (signature) {
     return CanGenericFunctionType::get(signature, params, result, extInfo);
   } else {

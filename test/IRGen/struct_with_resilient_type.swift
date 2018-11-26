@@ -28,7 +28,7 @@ struct ProtAndResilStruct {
     fooImp.foo(ptr: bar)
   }
 // CHECK-LABEL: define{{.*}} @"$S26struct_with_resilient_type18ProtAndResilStructV3baryyFTc"(%T26struct_with_resilient_type18ProtAndResilStructV* noalias nocapture)
-// CHECK:   %flags.alignmentMask = and i64 %flags, 65535
+// CHECK:   %flags.alignmentMask = and i64 %flags, 255
 // CHECK: [[XOR_ALIGN:%.*]] = xor i64 %flags.alignmentMask, -1
 // CHECK: [[INIT_OFFSET:%.*]] = add i64 16, %flags.alignmentMask
 // CHECK: [[T0:%.*]] = and i64 [[INIT_OFFSET]], [[XOR_ALIGN]]

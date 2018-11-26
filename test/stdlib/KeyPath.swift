@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -g %s -o %t/a.out
+// RUN: %target-build-swift -swift-version 5 -g %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
@@ -12,6 +12,8 @@ final class C<T> {
   var x: Int
   var y: LifetimeTracked?
   var z: T
+  let immutable: String
+  private(set) var secretlyMutable: String
 
   var computed: T {
     get {
@@ -26,6 +28,8 @@ final class C<T> {
     self.x = x
     self.y = y
     self.z = z
+    self.immutable = "\(x) \(y) \(z)"
+    self.secretlyMutable = immutable
   }
 }
 
@@ -33,10 +37,14 @@ struct Point: Equatable {
   var x: Double
   var y: Double
   var trackLifetime = LifetimeTracked(123)
+  let hypotenuse: Double
+  private(set) var secretlyMutableHypotenuse: Double
   
   init(x: Double, y: Double) {
     self.x = x
     self.y = y
+    hypotenuse = x*x + y*y
+    secretlyMutableHypotenuse = x*x + y*y
   }
   
   static func ==(a: Point, b: Point) -> Bool {
@@ -676,6 +684,10 @@ struct NonOffsetableProperties {
   var z: Int { return 0 }
 }
 
+func getIdentityKeyPathOfType<T>(_: T.Type) -> KeyPath<T, T> {
+  return WritableKeyPath<T, T>._identity
+}
+
 keyPath.test("offsets") {
   let SLayout = MemoryLayout<S<Int>>.self
   expectNotNil(SLayout.offset(of: \S<Int>.x))
@@ -691,6 +703,50 @@ keyPath.test("offsets") {
   expectNil(NOPLayout.offset(of: \NonOffsetableProperties.x))
   expectNil(NOPLayout.offset(of: \NonOffsetableProperties.y))
   expectNil(NOPLayout.offset(of: \NonOffsetableProperties.z))
+
+  expectEqual(SLayout.offset(of: WritableKeyPath<S<Int>, S<Int>>._identity),
+              0)
+  expectEqual(SLayout.offset(of: getIdentityKeyPathOfType(S<Int>.self)), 0)
+}
+
+keyPath.test("identity key path") {
+  var x = LifetimeTracked(1738)
+
+  let id = WritableKeyPath<LifetimeTracked, LifetimeTracked>._identity
+  expectTrue(x === x[keyPath: id])
+
+  let newX = LifetimeTracked(679)
+  x[keyPath: id] = newX
+  expectTrue(x === newX)
+
+  let id2 = getIdentityKeyPathOfType(LifetimeTracked.self)
+  expectEqual(id, id2)
+  expectEqual(id.hashValue, id2.hashValue)
+  expectNotNil(id2 as? WritableKeyPath)
+
+  let id3 = id.appending(path: id2)
+  expectEqual(id, id3)
+  expectEqual(id.hashValue, id3.hashValue)
+  expectNotNil(id3 as? WritableKeyPath)
+
+  let valueKey = \LifetimeTracked.value
+  let valueKey2 = id.appending(path: valueKey)
+  let valueKey3 = (valueKey as KeyPath).appending(path: WritableKeyPath<Int, Int>._identity)
+
+  expectEqual(valueKey, valueKey2)
+  expectEqual(valueKey.hashValue, valueKey2.hashValue)
+  expectEqual(valueKey, valueKey3)
+  expectEqual(valueKey.hashValue, valueKey3.hashValue)
+
+  expectEqual(x[keyPath: valueKey2], 679)
+  expectEqual(x[keyPath: valueKey3], 679)
+}
+
+keyPath.test("let-ness") {
+  expectNil(\C<Int>.immutable as? ReferenceWritableKeyPath)
+  expectNotNil(\C<Int>.secretlyMutable as? ReferenceWritableKeyPath)
+  expectNil(\Point.hypotenuse as? WritableKeyPath)
+  expectNotNil(\Point.secretlyMutableHypotenuse as? WritableKeyPath)
 }
 
 // SR-6096
@@ -712,6 +768,7 @@ extension Int: Protocol6096 {}
 keyPath.test("optional chaining component that needs generic instantiation") {
   Value6096<Int>().doSomething()
 }
+
 
 runAllTests()
 

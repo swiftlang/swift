@@ -643,9 +643,9 @@ extension GenericClass {
   // CHECK-LABEL: sil hidden @$SSo12GenericClassC17objc_bridging_anyE23pseudogenericAnyErasure1xypx_tF :
   @objc func pseudogenericAnyErasure(x: T) -> Any {
     // CHECK: bb0([[ANY_OUT:%.*]] : @trivial $*Any, [[ARG:%.*]] : @guaranteed $T, [[SELF:%.*]] : @guaranteed $GenericClass<T>
-    // CHECK:   [[ANY_BUF:%.*]] = init_existential_addr [[ANY_OUT]] : $*Any, $AnyObject
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
     // CHECK:   [[ANYOBJECT:%.*]] = init_existential_ref [[ARG_COPY]] : $T : $T, $AnyObject
+    // CHECK:   [[ANY_BUF:%.*]] = init_existential_addr [[ANY_OUT]] : $*Any, $AnyObject
     // CHECK:   store [[ANYOBJECT]] to [init] [[ANY_BUF]]
     return x
   }

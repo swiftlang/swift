@@ -80,8 +80,8 @@ DRIVER_STATISTIC(ChildrenMaxRSS)
 /// EXIT_SUCCESS.
 FRONTEND_STATISTIC(Frontend, NumProcessFailures)
 
-/// Total instruction count in each frontend process.
-FRONTEND_STATISTIC(Frontend, NumInstructions)
+/// Total instructions-executed count in each frontend process.
+FRONTEND_STATISTIC(Frontend, NumInstructionsExecuted)
 
 /// Number of source buffers visible in the source manager.
 FRONTEND_STATISTIC(AST, NumSourceBuffers)

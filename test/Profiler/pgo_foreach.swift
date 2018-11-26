@@ -1,6 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -profile-generate -Xfrontend -disable-incremental-llvm-codegen -module-name pgo_foreach -o %t/main
-// RUN: env LLVM_PROFILE_FILE=%t/default.profraw %target-run %t/main
+
+// This unusual use of 'sh' allows the path of the profraw file to be
+// substituted by %target-run.
+// RUN: %target-run sh -c 'env LLVM_PROFILE_FILE=$1 $2' -- %t/default.profraw %t/main
+
 // RUN: %llvm-profdata merge %t/default.profraw -o %t/default.profdata
 // need to move counts attached to expr for this
 // RUN: %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -emit-sorted-sil -emit-sil -module-name pgo_foreach -o - | %FileCheck %s --check-prefix=SIL
@@ -12,6 +16,7 @@
 // %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -O -emit-ir -module-name pgo_foreach -o - | %FileCheck %s --check-prefix=IR-OPT
 
 // REQUIRES: profile_runtime
+// REQUIRES: executable_test
 // REQUIRES: OS=macosx
 
 // SIL-LABEL: // pgo_foreach.guessForEach1

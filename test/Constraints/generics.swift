@@ -248,12 +248,12 @@ struct S27515965 : P27515965 {
 
 struct V27515965 {
   init<T : P27515965>(_ tp: T) where T.R == Float {}
-  // expected-note@-1 {{candidate requires that the types 'Any' and 'Float' be equivalent (requirement specified as 'T.R' == 'Float' [with T = S27515965])}}
+  // expected-note@-1 {{where 'T.R' = 'Any'}}
 }
 
 func test(x: S27515965) -> V27515965 {
   return V27515965(x)
-  // expected-error@-1 {{cannot invoke initializer for type 'init(_:)' with an argument list of type '(S27515965)'}}
+  // expected-error@-1 {{initializer 'init' requires the types 'Any' and 'Float' be equivalent}}
 }
 
 protocol BaseProto {}

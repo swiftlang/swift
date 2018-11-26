@@ -39,7 +39,7 @@ static std::vector<StringRef> sortSymbols(llvm::StringSet<> &symbols) {
 }
 
 bool swift::writeTBD(ModuleDecl *M, StringRef OutputFilename,
-                     TBDGenOptions &Opts) {
+                     const TBDGenOptions &Opts) {
   std::error_code EC;
   llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::F_None);
   if (EC) {
@@ -124,7 +124,8 @@ static bool validateSymbolSet(DiagnosticEngine &diags,
 }
 
 bool swift::validateTBD(ModuleDecl *M, llvm::Module &IRModule,
-                        TBDGenOptions &opts, bool diagnoseExtraSymbolsInTBD) {
+                        const TBDGenOptions &opts,
+                        bool diagnoseExtraSymbolsInTBD) {
   llvm::StringSet<> symbols;
   enumeratePublicSymbols(M, symbols, opts);
 
@@ -133,10 +134,12 @@ bool swift::validateTBD(ModuleDecl *M, llvm::Module &IRModule,
 }
 
 bool swift::validateTBD(FileUnit *file, llvm::Module &IRModule,
-                        TBDGenOptions &opts, bool diagnoseExtraSymbolsInTBD) {
+                        const TBDGenOptions &opts,
+                        bool diagnoseExtraSymbolsInTBD) {
   llvm::StringSet<> symbols;
   enumeratePublicSymbols(file, symbols, opts);
 
   return validateSymbolSet(file->getParentModule()->getASTContext().Diags,
-                           symbols, IRModule, diagnoseExtraSymbolsInTBD);
+                           symbols, IRModule,
+                           diagnoseExtraSymbolsInTBD);
 }

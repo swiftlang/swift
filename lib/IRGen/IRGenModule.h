@@ -109,6 +109,7 @@ namespace irgen {
   class Address;
   class ClangTypeConverter;
   class ClassMetadataLayout;
+  class ConformanceInfo;
   class DebugTypeInfo;
   class EnumImplStrategy;
   class EnumMetadataLayout;
@@ -128,6 +129,7 @@ namespace irgen {
   class NominalMetadataLayout;
   class OutliningMetadataCollector;
   class ProtocolInfo;
+  enum class ProtocolInfoKind : uint8_t;
   class Signature;
   class StructMetadataLayout;
   struct SymbolicMangling;
@@ -702,7 +704,13 @@ private:
   
 //--- Types -----------------------------------------------------------------
 public:
-  const ProtocolInfo &getProtocolInfo(ProtocolDecl *D);
+  const ProtocolInfo &getProtocolInfo(ProtocolDecl *D, ProtocolInfoKind kind);
+
+  // Not strictly a type operation, but similar.
+  const ConformanceInfo &
+  getConformanceInfo(const ProtocolDecl *protocol,
+                     const ProtocolConformance *conformance);
+
   SILType getLoweredType(AbstractionPattern orig, Type subst);
   SILType getLoweredType(Type subst);
   const TypeInfo &getTypeInfoForUnlowered(AbstractionPattern orig,
@@ -739,7 +747,7 @@ public:
   clang::CanQual<clang::Type> getClangType(CanType type);
   clang::CanQual<clang::Type> getClangType(SILType type);
   clang::CanQual<clang::Type> getClangType(SILParameterInfo param);
-  
+
   const clang::ASTContext &getClangASTContext() {
     assert(ClangASTContext &&
            "requesting clang AST context without clang importer!");
@@ -752,6 +760,8 @@ public:
   ResilienceExpansion getResilienceExpansionForAccess(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(SILGlobalVariable *var);
+
+  Alignment getCappedAlignment(Alignment alignment);
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);
 
@@ -773,6 +783,9 @@ private:
 
   llvm::DenseMap<Decl*, MetadataLayout*> MetadataLayouts;
   void destroyMetadataLayoutMap();
+
+  llvm::DenseMap<const ProtocolConformance *,
+                 std::unique_ptr<const ConformanceInfo>> Conformances;
 
   friend class GenericContextScope;
   friend class CompletelyFragileScope;
@@ -1145,11 +1158,10 @@ public:
                                                      bool isForeign,
                                                      ForDefinition_t forDefinition);
   llvm::GlobalValue *defineTypeMetadata(CanType concreteType,
-                                  bool isIndirect,
-                                  bool isPattern,
-                                  bool isConstant,
-                                  ConstantInitFuture init,
-                                  llvm::StringRef section = {});
+                                        bool isPattern,
+                                        bool isConstant,
+                                        ConstantInitFuture init,
+                                        llvm::StringRef section = {});
 
   TypeEntityReference getTypeEntityReference(NominalTypeDecl *D);
 
@@ -1158,7 +1170,6 @@ public:
                                           SymbolReferenceKind kind);
   llvm::Constant *getAddrOfTypeMetadataPattern(NominalTypeDecl *D);
   llvm::Constant *getAddrOfTypeMetadataPattern(NominalTypeDecl *D,
-                                               bool isConstant,
                                                ConstantInit init,
                                                StringRef section);
   llvm::Function *getAddrOfTypeMetadataCompletionFunction(NominalTypeDecl *D,
@@ -1167,7 +1178,7 @@ public:
                                              ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeMetadataInstantiationCache(NominalTypeDecl *D,
                                              ForDefinition_t forDefinition);
-  llvm::Constant *getAddrOfTypeMetadataInPlaceInitializationCache(
+  llvm::Constant *getAddrOfTypeMetadataSingletonInitializationCache(
                                              NominalTypeDecl *D,
                                              ForDefinition_t forDefinition);
   llvm::Function *getAddrOfTypeMetadataAccessFunction(CanType type,
@@ -1190,6 +1201,13 @@ public:
   llvm::Constant *getAddrOfExtensionContextDescriptor(ExtensionDecl *ED,
                                       ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfModuleContextDescriptor(ModuleDecl *D,
+                                      ConstantInit definition = ConstantInit());
+  llvm::Constant *getAddrOfReflectionFieldDescriptor(CanType type,
+                                      ConstantInit definition = ConstantInit());
+  llvm::Constant *getAddrOfReflectionBuiltinDescriptor(CanType type,
+                                      ConstantInit definition = ConstantInit());
+  llvm::Constant *getAddrOfReflectionAssociatedTypeDescriptor(
+                                      const ProtocolConformance *c,
                                       ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfObjCModuleContextDescriptor();
   llvm::Constant *getAddrOfClangImporterModuleContextDescriptor();

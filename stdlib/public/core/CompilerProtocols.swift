@@ -660,10 +660,10 @@ public protocol ExpressibleByArrayLiteral {
 ///     print(frequencies.count)
 ///     // Prints "0"
 ///
-/// - Note: A dictionary literal is *not* the same as an instance of
-///   `Dictionary` or the similarly named `DictionaryLiteral` type. You can't
-///   initialize a type that conforms to `ExpressibleByDictionaryLiteral` simply
-///   by assigning an instance of one of these types.
+/// - Note:
+///   A dictionary literal is *not* the same as an instance of `Dictionary`.
+///   You can't initialize a type that conforms to `ExpressibleByDictionaryLiteral`
+///   simply by assigning an instance of `Dictionary`, `KeyValuePairs`, or similar.
 ///
 /// Conforming to the ExpressibleByDictionaryLiteral Protocol
 /// =========================================================

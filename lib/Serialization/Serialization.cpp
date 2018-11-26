@@ -485,10 +485,24 @@ static const Decl *getDeclForContext(const DeclContext *DC) {
 
 namespace {
   struct Accessors {
+    uint8_t OpaqueReadOwnership;
     uint8_t ReadImpl, WriteImpl, ReadWriteImpl;
     SmallVector<AccessorDecl *, 8> Decls;
   };
 } // end anonymous namespace
+
+static uint8_t getRawOpaqueReadOwnership(swift::OpaqueReadOwnership ownership) {
+  switch (ownership) {
+#define CASE(KIND)                                            \
+  case swift::OpaqueReadOwnership::KIND:                      \
+    return uint8_t(serialization::OpaqueReadOwnership::KIND);
+  CASE(Owned)
+  CASE(Borrowed)
+  CASE(OwnedOrBorrowed)
+#undef CASE
+  }
+  llvm_unreachable("bad kind");  
+}
 
 static uint8_t getRawReadImplKind(swift::ReadImplKind kind) {
   switch (kind) {
@@ -529,7 +543,6 @@ static unsigned getRawReadWriteImplKind(swift::ReadWriteImplKind kind) {
     return uint8_t(serialization::ReadWriteImplKind::KIND);
   CASE(Immutable)
   CASE(Stored)
-  CASE(MaterializeForSet)
   CASE(MutableAddress)
   CASE(MaterializeToTemporary)
   CASE(Modify)
@@ -540,6 +553,8 @@ static unsigned getRawReadWriteImplKind(swift::ReadWriteImplKind kind) {
 
 static Accessors getAccessors(const AbstractStorageDecl *storage) {
   Accessors accessors;
+  accessors.OpaqueReadOwnership =
+    getRawOpaqueReadOwnership(storage->getOpaqueReadOwnership());
   auto impl = storage->getImplInfo();
   accessors.ReadImpl = getRawReadImplKind(impl.getReadImpl());
   accessors.WriteImpl = getRawWriteImplKind(impl.getWriteImpl());
@@ -1200,8 +1215,6 @@ static uint8_t getRawStableAddressorKind(swift::AddressorKind kind) {
     return uint8_t(serialization::AddressorKind::Owning);
   case swift::AddressorKind::NativeOwning:
     return uint8_t(serialization::AddressorKind::NativeOwning);
-  case swift::AddressorKind::NativePinning:
-    return uint8_t(serialization::AddressorKind::NativePinning);
   }
   llvm_unreachable("bad addressor kind");
 }
@@ -1937,7 +1950,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     Type ty = SD->getInterfaceType()->getCanonicalType();
 
     abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
-    bool isProtocolExt = SD->getDeclContext()->getAsProtocolExtensionContext();
+    bool isProtocolExt = SD->getDeclContext()->getExtendedProtocolDecl();
     XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                          addTypeRef(ty), SUBSCRIPT_ID,
                                          isProtocolExt, SD->hasClangNode(),
@@ -1952,7 +1965,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
 
       Type ty = storage->getInterfaceType()->getCanonicalType();
       IdentifierID nameID = addDeclBaseNameRef(storage->getBaseName());
-      bool isProtocolExt = fn->getDeclContext()->getAsProtocolExtensionContext();
+      bool isProtocolExt = fn->getDeclContext()->getExtendedProtocolDecl();
       abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
       XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                            addTypeRef(ty), nameID,
@@ -1981,14 +1994,14 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
       abbrCode = DeclTypeAbbrCodes[XRefInitializerPathPieceLayout::Code];
       XRefInitializerPathPieceLayout::emitRecord(
         Out, ScratchRecord, abbrCode, addTypeRef(ty),
-        (bool)ctor->getDeclContext()->getAsProtocolExtensionContext(),
+        (bool)ctor->getDeclContext()->getExtendedProtocolDecl(),
         ctor->hasClangNode(),
         getStableCtorInitializerKind(ctor->getInitKind()));
       break;
     }
 
     abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
-    bool isProtocolExt = fn->getDeclContext()->getAsProtocolExtensionContext();
+    bool isProtocolExt = fn->getDeclContext()->getExtendedProtocolDecl();
     XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                          addTypeRef(ty),
                                          addDeclBaseNameRef(fn->getBaseName()),
@@ -2058,7 +2071,7 @@ void Serializer::writeCrossReference(const Decl *D) {
     return;
   }
 
-  bool isProtocolExt = D->getDeclContext()->getAsProtocolExtensionContext();
+  bool isProtocolExt = D->getDeclContext()->getExtendedProtocolDecl();
   if (auto type = dyn_cast<TypeDecl>(D)) {
     abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
 
@@ -2184,6 +2197,12 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
 
   // Completely ignore attributes that aren't serialized.
   if (DA->isNotSerialized())
+    return;
+
+  // Ignore attributes that have been marked invalid. (This usually means
+  // type-checking removed them, but only provided a warning rather than an
+  // error.)
+  if (DA->isInvalid())
     return;
 
   switch (DA->getKind()) {
@@ -2715,8 +2734,10 @@ void Serializer::writeDecl(const Decl *D) {
                           nullptr, /*sorted=*/true);
 
     SmallVector<TypeID, 8> inheritedAndDependencyTypes;
-    for (auto inherited : extension->getInherited())
+    for (auto inherited : extension->getInherited()) {
+      assert(!inherited.getType()->hasArchetype());
       inheritedAndDependencyTypes.push_back(addTypeRef(inherited.getType()));
+    }
     size_t numInherited = inheritedAndDependencyTypes.size();
 
     llvm::SmallSetVector<Type, 4> dependencies;
@@ -2959,8 +2980,10 @@ void Serializer::writeDecl(const Decl *D) {
                           nullptr, /*sorted=*/true);
 
     SmallVector<TypeID, 4> inheritedTypes;
-    for (auto inherited : theStruct->getInherited())
+    for (auto inherited : theStruct->getInherited()) {
+      assert(!inherited.getType()->hasArchetype());
       inheritedTypes.push_back(addTypeRef(inherited.getType()));
+    }
 
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(theStruct->getFormalAccess());
@@ -2995,8 +3018,10 @@ void Serializer::writeDecl(const Decl *D) {
                           nullptr, /*sorted=*/true);
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
-    for (auto inherited : theEnum->getInherited())
+    for (auto inherited : theEnum->getInherited()) {
+      assert(!inherited.getType()->hasArchetype());
       inheritedAndDependencyTypes.push_back(addTypeRef(inherited.getType()));
+    }
 
     llvm::SmallSetVector<Type, 4> dependencyTypes;
     for (const EnumElementDecl *nextElt : theEnum->getAllElements()) {
@@ -3048,8 +3073,10 @@ void Serializer::writeDecl(const Decl *D) {
                           nullptr, /*sorted=*/true);
 
     SmallVector<TypeID, 4> inheritedTypes;
-    for (auto inherited : theClass->getInherited())
+    for (auto inherited : theClass->getInherited()) {
+      assert(!inherited.getType()->hasArchetype());
       inheritedTypes.push_back(addTypeRef(inherited.getType()));
+    }
 
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(theClass->getFormalAccess());
@@ -3087,8 +3114,10 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(proto->getDeclContext());
 
     SmallVector<DeclID, 8> inherited;
-    for (auto element : proto->getInherited())
+    for (auto element : proto->getInherited()) {
+      assert(!element.getType()->hasArchetype());
       inherited.push_back(addTypeRef(element.getType()));
+    }
 
     uint8_t rawAccessLevel = getRawStableAccessLevel(proto->getFormalAccess());
 
@@ -3147,6 +3176,7 @@ void Serializer::writeDecl(const Decl *D) {
                           var->hasNonPatternBindingInit(),
                           var->isGetterMutating(),
                           var->isSetterMutating(),
+                          accessors.OpaqueReadOwnership,
                           accessors.ReadImpl,
                           accessors.WriteImpl,
                           accessors.ReadWriteImpl,
@@ -3382,6 +3412,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 subscript->isObjC(),
                                 subscript->isGetterMutating(),
                                 subscript->isSetterMutating(),
+                                accessors.OpaqueReadOwnership,
                                 accessors.ReadImpl,
                                 accessors.WriteImpl,
                                 accessors.ReadWriteImpl,
@@ -4807,8 +4838,7 @@ static void collectInterestingNestedDeclarations(
 
       if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
         if (func->isObjC()) {
-          if (auto owningClass =
-                func->getDeclContext()->getAsClassOrClassExtensionContext()) {
+          if (auto owningClass = func->getDeclContext()->getSelfClassDecl()) {
             Mangle::ASTMangler mangler;
             std::string ownerName = mangler.mangleNominalType(owningClass);
             assert(!ownerName.empty() && "Mangled type came back empty!");
@@ -4843,7 +4873,7 @@ static void collectInterestingNestedDeclarations(
       if (nestedType->getEffectiveAccess() > swift::AccessLevel::FilePrivate) {
         if (!nominalParent) {
           const DeclContext *DC = member->getDeclContext();
-          nominalParent = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+          nominalParent = DC->getSelfNominalTypeDecl();
           assert(nominalParent && "parent context is not a type or extension");
         }
         nestedTypeDecls[nestedType->getName()].push_back({

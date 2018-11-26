@@ -22,12 +22,12 @@
 // CHECK: --------
 // CHECK: out-file: {{.*}}s1.o
 // CHECK: DEPEND START
-// CHECK: Unit | system | {{.*}}Swift.swiftmodule | | {{[0-9]*$}}
+// CHECK: Unit | system | {{.*}}Swift.swiftmodule
 // CHECK: DEPEND END
 
 // CHECK: s2.o-{{[A-Z0-9]*}}
 // CHECK: --------
 // CHECK: out-file: {{.*}}s2.o
 // CHECK: DEPEND START
-// CHECK: Unit | system | {{.*}}Swift.swiftmodule | | {{[0-9]*$}}
+// CHECK: Unit | system | {{.*}}Swift.swiftmodule
 // CHECK: DEPEND END

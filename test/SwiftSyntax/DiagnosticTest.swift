@@ -2,6 +2,7 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 // REQUIRES: objc_interop
+// UNSUPPORTED: remote_run
 
 import Foundation
 import StdlibUnittest

@@ -288,7 +288,6 @@ func inoutPointerOrdering() {
   // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] [[ARRAY]] : $*Array<Int>
   // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @$S18pointer_conversion19takesMutablePointer_3andySpySiG_SitF
   // CHECK: apply [[TAKES_MUTABLE]]({{.*}}, [[RESULT2]])
-  // CHECK: strong_unpin
   // CHECK: end_access [[ACCESS]]
   takesMutablePointer(&array[sideEffect1()], and: sideEffect2())
 

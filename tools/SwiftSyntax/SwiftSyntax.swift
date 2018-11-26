@@ -41,6 +41,11 @@ public enum ParserError: Error, CustomStringConvertible {
   }
 }
 
+public enum SerializationFormat {
+  case json
+  case byteTree
+}
+
 /// Deserializes the syntax tree from its serialized form to an object tree in
 /// Swift. To deserialize incrementally transferred syntax trees, the same
 /// instance of the deserializer must be used for all subsequent
@@ -60,17 +65,44 @@ public final class SyntaxTreeDeserializer {
   public init() {
   }
 
-  /// Decode a serialized form of SourceFileSyntax to a syntax tree.
-  /// - Parameter data: The UTF-8 represenation of the serialized syntax tree
-  /// - Returns: A top-level Syntax node representing the contents of the tree,
-  ///            if the parse was successful.
-  public func deserialize(_ data: Data) throws -> SourceFileSyntax {
-    reusedNodeIds = []
+  /// Deserialize the given data as a JSON encoded syntax tree
+  private func deserializeJSON(_ data: Data) throws -> RawSyntax {
     let decoder = JSONDecoder()
     decoder.userInfo[.rawSyntaxDecodedCallback] = self.addToLookupTable
     decoder.userInfo[.omittedNodeLookupFunction] = self.lookupNode
-    let raw = try decoder.decode(RawSyntax.self, from: data)
-    guard let file = makeSyntax(raw) as? SourceFileSyntax else {
+    return try decoder.decode(RawSyntax.self, from: data)
+  }
+
+  /// Deserialize the given data as a ByteTree encoded syntax tree
+  private func deserializeByteTree(_ data: Data) throws -> RawSyntax {
+    var userInfo: [ByteTreeUserInfoKey: Any] = [:]
+    userInfo[.rawSyntaxDecodedCallback] = self.addToLookupTable
+    userInfo[.omittedNodeLookupFunction] = self.lookupNode
+    return try ByteTreeReader.read(RawSyntax.self, from: data,
+                                            userInfo: &userInfo) {
+      (version: ByteTreeReader.ProtocolVersion) in
+      return version == 1
+    }
+  }
+
+  /// Decode a serialized form of SourceFileSyntax to a syntax tree.
+  /// - Parameter data: The UTF-8 represenation of the serialized syntax tree
+  /// - Parameter serializationFormat: The format in which the syntax tree was
+  ///                                  serialized
+  /// - Returns: A top-level Syntax node representing the contents of the tree,
+  ///            if the parse was successful.
+  public func deserialize(
+    _ data: Data, serializationFormat: SerializationFormat
+  ) throws -> SourceFileSyntax {
+    reusedNodeIds = []
+    let rawSyntax: RawSyntax
+    switch serializationFormat {
+    case .json:
+      rawSyntax = try deserializeJSON(data)
+    case .byteTree:
+      rawSyntax = try deserializeByteTree(data)
+    }
+    guard let file = makeSyntax(rawSyntax) as? SourceFileSyntax else {
       throw ParserError.invalidFile
     }
     return file
@@ -103,7 +135,9 @@ public enum SyntaxTreeParser {
     let result = try swiftcRunner.invoke()
     let syntaxTreeData = result.stdoutData
     let deserializer = SyntaxTreeDeserializer()
-    return try deserializer.deserialize(syntaxTreeData)
+    // FIXME: We should use ByteTree as the internal transfer format
+    return try deserializer.deserialize(syntaxTreeData,
+                                        serializationFormat: .json)
   }
 }
 

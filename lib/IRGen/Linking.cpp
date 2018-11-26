@@ -96,8 +96,8 @@ std::string LinkEntity::mangleAsString() const {
       return mangler.mangleTypeMetadataInstantiationFunction(
                                               cast<NominalTypeDecl>(getDecl()));
 
-    case Kind::TypeMetadataInPlaceInitializationCache:
-      return mangler.mangleTypeMetadataInPlaceInitializationCache(
+    case Kind::TypeMetadataSingletonInitializationCache:
+      return mangler.mangleTypeMetadataSingletonInitializationCache(
                                               cast<NominalTypeDecl>(getDecl()));
 
     case Kind::TypeMetadataCompletionFunction:

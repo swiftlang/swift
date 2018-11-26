@@ -32,10 +32,6 @@ internal protocol _SyntaxBase: Syntax {
   ///         property must be a descendent of the root. This relationship must
   ///         be preserved in all circumstances where Syntax nodes are created.
   var _data: SyntaxData { get }
-
-#if DEBUG
-  func validate()
-#endif
 }
 extension _SyntaxBase {
   public func validate() {
@@ -302,9 +298,6 @@ public struct TokenSyntax: _SyntaxBase, Hashable {
   internal init(root: SyntaxData, data: SyntaxData) {
     self._root = root
     self._data = data
-#if DEBUG
-    validate()
-#endif
   }
 
   /// The text of the token as written in the source code.

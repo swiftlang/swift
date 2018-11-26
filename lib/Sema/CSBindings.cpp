@@ -139,9 +139,7 @@ findInferableTypeVars(Type type,
 static bool shouldBindToValueType(Constraint *constraint) {
   switch (constraint->getKind()) {
   case ConstraintKind::OperatorArgumentConversion:
-  case ConstraintKind::OperatorArgumentTupleConversion:
   case ConstraintKind::ArgumentConversion:
-  case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::Conversion:
   case ConstraintKind::BridgingConversion:
   case ConstraintKind::Subtype:
@@ -167,6 +165,8 @@ static bool shouldBindToValueType(Constraint *constraint) {
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
+  case ConstraintKind::FunctionInput:
+  case ConstraintKind::FunctionResult:
     llvm_unreachable("shouldBindToValueType() may only be called on "
                      "relational constraints");
   }
@@ -182,6 +182,7 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
   // check whether we can combine it with another
   // supertype binding by computing the 'join' of the types.
   if (binding.Kind == AllowedBindingKind::Supertypes &&
+      !binding.BindingType->hasUnresolvedType() &&
       !binding.BindingType->hasTypeVariable() &&
       !binding.BindingType->hasUnboundGenericType() &&
       !binding.DefaultedProtocol && !binding.isDefaultableBinding() &&
@@ -382,8 +383,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
     case ConstraintKind::ArgumentConversion:
-    case ConstraintKind::ArgumentTupleConversion:
-    case ConstraintKind::OperatorArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentConversion:
     case ConstraintKind::OptionalObject: {
       auto binding = getPotentialBindingForRelationalConstraint(
@@ -425,6 +424,8 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
     case ConstraintKind::OpenedExistentialOf:
     case ConstraintKind::KeyPath:
     case ConstraintKind::KeyPathApplication:
+    case ConstraintKind::FunctionInput:
+    case ConstraintKind::FunctionResult:
       // Constraints from which we can't do anything.
       break;
 

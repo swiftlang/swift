@@ -434,9 +434,12 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   Args.push_back("-resource-dir");
   Args.push_back(Impl.RuntimeResourcePath.c_str());
 
-  if (auto driverInvocation = driver::createCompilerInvocation(Args, Diags)) {
-    Invocation = *driverInvocation;
-  } else {
+  bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
+      Args, Diags, [&](ArrayRef<const char *> FrontendArgs) {
+    return Invocation.parseArgs(FrontendArgs, Diags);
+  });
+
+  if (HadError) {
     // FIXME: Get the actual diagnostic.
     Error = "error when parsing the compiler arguments";
     return true;

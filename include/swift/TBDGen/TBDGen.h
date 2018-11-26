@@ -14,6 +14,7 @@
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
+#include "swift/Basic/Version.h"
 
 namespace llvm {
 class raw_ostream;
@@ -23,26 +24,39 @@ namespace swift {
 class FileUnit;
 class ModuleDecl;
 
-/// \brief The current ABI version of Swift, as tapi labels it.
+/// The current ABI version of Swift, as tapi labels it.
 const uint8_t TAPI_SWIFT_ABI_VERSION = 5;
 
-/// \brief Options for controlling the exact set of symbols included in the TBD
+/// Options for controlling the exact set of symbols included in the TBD
 /// output.
 struct TBDGenOptions {
-  /// \brief Whether this compilation has multiple IRGen instances.
+  /// Whether this compilation has multiple IRGen instances.
   bool HasMultipleIGMs;
-  /// \brief The install-name used for the compilation.
-  llvm::StringRef InstallName;
-  /// \brief The module link name (for force loading).
-  llvm::StringRef ModuleLinkName;
+
+  /// The install_name to use in the TBD file.
+  std::string InstallName;
+
+  /// The module link name (for force loading).
+  std::string ModuleLinkName;
+
+  /// The current project version to use in the generated TBD file. Defaults
+  /// to 1, which matches the default if the DYLIB_CURRENT_VERSION build setting
+  /// is not set.
+  version::Version CurrentVersion = {1, 0, 0};
+
+  /// The dylib compatibility-version to use in the generated TBD file. Defaults
+  /// to 1, which matches the default if the DYLIB_COMPATIBILITY_VERSION build
+  /// setting is not set.
+  version::Version CompatibilityVersion = {1, 0, 0};
 };
 
 void enumeratePublicSymbols(FileUnit *module, llvm::StringSet<> &symbols,
-                            TBDGenOptions &opts);
+                            const TBDGenOptions &opts);
 void enumeratePublicSymbols(ModuleDecl *module, llvm::StringSet<> &symbols,
-                            TBDGenOptions &opts);
+                            const TBDGenOptions &opts);
 
-void writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os, TBDGenOptions &opts);
+void writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
+                  const TBDGenOptions &opts);
 
 } // end namespace swift
 

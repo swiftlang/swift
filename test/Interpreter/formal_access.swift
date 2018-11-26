@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift-swift3 | %FileCheck %s
 // REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
 
 class C: CustomStringConvertible {
   var value: Int
@@ -41,7 +42,7 @@ func doit(_ local: inout C) {
   print("5. local == \(local)")
   print("5. global[0] == \(global[0])")
   // CHECK-NEXT: 5. local == 2
-  // CHECK-NEXT: 5. global[0] == 2
+  // CHECK-NEXT: 5. global[0] == 4
 
   // This assignment structurally changes 'global' while a
   // simultaneous modification is occurring to it.  This is
@@ -50,18 +51,18 @@ func doit(_ local: inout C) {
   print("6. local == \(local)")
   print("6. global[0] == \(global[0])")
   // CHECK-NEXT: 6. local == 2
-  // CHECK-NEXT: 6. global[0] == 2
+  // CHECK-NEXT: 6. global[0] == 4
 
   // Note that here the connection is broken.
   local = C(7)
   print("7. local == \(local)")
   print("7. global[0] == \(global[0])")
   // CHECK-NEXT: 7. local == 7
-  // CHECK-NEXT: 7. global[0] == 2
+  // CHECK-NEXT: 7. global[0] == 4
 }
 doit(&global[0])
 
 print("8. global[0] == \(global[0])")
 print("End")
-// CHECK-NEXT: 8. global[0] == 2
+// CHECK-NEXT: 8. global[0] == 4
 // CHECK-NEXT: End

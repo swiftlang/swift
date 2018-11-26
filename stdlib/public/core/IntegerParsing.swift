@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 internal func _asciiDigit<CodeUnit : UnsignedInteger, Result : BinaryInteger>(
   codeUnit u_: CodeUnit, radix: Result
@@ -29,7 +29,7 @@ internal func _asciiDigit<CodeUnit : UnsignedInteger, Result : BinaryInteger>(
   return Result(truncatingIfNeeded: d)
 }
 
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 internal func _parseUnsignedASCII<
   Rest : IteratorProtocol, Result: FixedWidthInteger
@@ -65,7 +65,7 @@ where Rest.Element : UnsignedInteger {
 // always-inline code, most of which are MOV instructions.
 //
 
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 internal func _parseASCII<
   CodeUnits : IteratorProtocol, Result: FixedWidthInteger

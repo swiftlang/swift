@@ -103,6 +103,10 @@ static bool canSpecializeFunction(SILFunction *F,
   if (F->getConventions().hasIndirectSILResults())
     return false;
 
+  // For now ignore coroutines.
+  if (F->getLoweredFunctionType()->isCoroutine())
+    return false;
+
   // Do not specialize the signature of always inline functions. We
   // will just inline them and specialize each one of the individual
   // functions that these sorts of functions are inlined into.
@@ -752,8 +756,8 @@ public:
       return;
     }
 
-    CallerAnalysis *CA = PM->getAnalysis<CallerAnalysis>();
-    const CallerAnalysis::FunctionInfo &FuncInfo = CA->getCallerInfo(F);
+    const CallerAnalysis *CA = PM->getAnalysis<CallerAnalysis>();
+    const CallerAnalysis::FunctionInfo &FuncInfo = CA->getFunctionInfo(F);
 
     // Check the signature of F to make sure that it is a function that we
     // can specialize. These are conditions independent of the call graph.
@@ -803,7 +807,7 @@ public:
     if (OptForPartialApply) {
       Changed = FST.removeDeadArgs(FuncInfo.getMinPartialAppliedArgs());
     } else {
-      Changed = FST.run(FuncInfo.hasCaller());
+      Changed = FST.run(FuncInfo.hasDirectCaller());
     }
 
     if (!Changed) {

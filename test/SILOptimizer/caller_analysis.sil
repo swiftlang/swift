@@ -7,6 +7,8 @@ import Builtin
 // CHECK-LABEL: calleeName:      dead_func
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
@@ -18,6 +20,8 @@ sil hidden @dead_func : $@convention(thin) () -> () {
 // CHECK-LABEL: calleeName:      call_top
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
@@ -32,6 +36,8 @@ bb0:
 // CHECK-LABEL: calleeName:      call_middle
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - call_top
@@ -47,6 +53,8 @@ bb0:
 // CHECK-LABEL: calleeName:      call_bottom
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - call_middle
@@ -60,6 +68,8 @@ bb0:
 // CHECK-LABEL: calleeName:      self_recursive_func
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - self_recursive_func
@@ -75,6 +85,8 @@ bb0:
 // CHECK-LABEL: calleeName:      mutual_recursive_func1
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - mutual_recursive_func2
@@ -90,6 +102,8 @@ bb0:
 // CHECK-LABEL: calleeName:      mutual_recursive_func2
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - mutual_recursive_func1
@@ -105,6 +119,8 @@ bb0:
 // CHECK-LABEL: calleeName:      multi_called
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - multi_calles
@@ -118,6 +134,8 @@ bb0:
 // CHECK-LABEL: calleeName:      multi_calles
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
@@ -140,6 +158,8 @@ bb3:
 // CHECK-LABEL: calleeName:      multi_callers
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - multi_caller1
@@ -154,6 +174,8 @@ bb0:
 // CHECK-LABEL: calleeName:      multi_caller1
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
@@ -168,6 +190,8 @@ bb0:
 // CHECK-LABEL: calleeName:      multi_caller2
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
@@ -185,6 +209,8 @@ bb0:
 // CHECK-LABEL: calleeName:      closure1
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 1
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: false
+// CHECK-NEXT:  hasAllCallers:   false
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:    - partial_apply_one_arg
 // CHECK-NEXT:    - partial_apply_two_args1
@@ -198,6 +224,8 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      closure2
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 2
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: false
+// CHECK-NEXT:  hasAllCallers:   false
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:    - partial_apply_two_args2
 // CHECK-NEXT:  fullAppliers:
@@ -210,6 +238,8 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      partial_apply_one_arg
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
@@ -223,6 +253,8 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      partial_apply_two_args1
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
@@ -236,6 +268,8 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      partial_apply_two_args2
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
@@ -249,6 +283,8 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      called_closure
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 2
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:    - partial_apply_that_is_applied
 // CHECK-NEXT:  fullAppliers:
@@ -274,6 +310,8 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      called_closure_then_destroy
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 2
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:    - partial_apply_that_is_applied
 // CHECK-NEXT:  fullAppliers:
@@ -297,6 +335,8 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      called_escaping_closure
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 2
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: false
+// CHECK-NEXT:  hasAllCallers:   false
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:    - partial_apply_that_is_applied
 // CHECK-NEXT:  fullAppliers:
@@ -320,6 +360,8 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      called_closure_then_copy_destroy
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 2
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:    - partial_apply_that_is_applied
 // CHECK-NEXT:  fullAppliers:
@@ -351,6 +393,8 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      noescape_callee
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 2
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: false
+// CHECK-NEXT:  hasAllCallers:   false
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:    - partial_apply_that_is_applied_and_passed_noescape
 // CHECK-NEXT:  fullAppliers:
@@ -363,6 +407,8 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      noescape_caller
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   true
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - partial_apply_that_is_applied_and_passed_noescape
@@ -389,6 +435,8 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-LABEL: calleeName:      noescape_callee2
 // CHECK-NEXT:  hasCaller:       false
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: false
+// CHECK-NEXT:  hasAllCallers:   false
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
@@ -424,6 +472,8 @@ class Klass {
 // CHECK-LABEL: calleeName:      called_method
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   false
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - apply_called_method
@@ -448,6 +498,8 @@ bb0(%0 : $Klass):
 // CHECK-LABEL: calleeName:      final_called_method
 // CHECK-NEXT:  hasCaller:       true
 // CHECK-NEXT:  minPartialAppliedArgs: 0
+// CHECK-NEXT:  hasOnlyCompleteDirectCallerSets: true
+// CHECK-NEXT:  hasAllCallers:   false
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - final_apply_called_method

@@ -18,15 +18,28 @@
 #ifndef SWIFT_SEMA_CSDIAG_H
 #define SWIFT_SEMA_CSDIAG_H
 
+#include "ConstraintSystem.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "llvm/ADT/StringRef.h"
+#include <string>
+
 namespace swift {
-  
+  class Expr;
+  class Type;
+  class SourceLoc;
+
   std::string getTypeListString(Type type);
   
   /// Rewrite any type variables & archetypes in the specified type with
   /// UnresolvedType.
   Type replaceTypeParametersWithUnresolved(Type ty);
   Type replaceTypeVariablesWithUnresolved(Type ty);
-  
+
+  /// Diagnose lvalue expr error.
+  void diagnoseSubElementFailure(Expr *destExpr, SourceLoc loc,
+                                 constraints::ConstraintSystem &CS,
+                                 Diag<StringRef> diagID,
+                                 Diag<Type> unknownDiagID);
 };
 
 #endif /* SWIFT_SEMA_CSDIAG_H */

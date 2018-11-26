@@ -218,11 +218,17 @@ bool SILFunction::isNoReturnFunction() const {
 }
 
 SILBasicBlock *SILFunction::createBasicBlock() {
-  return new (getModule()) SILBasicBlock(this);
+  return new (getModule()) SILBasicBlock(this, nullptr, false);
 }
 
-SILBasicBlock *SILFunction::createBasicBlock(SILBasicBlock *AfterBlock) {
-  return new (getModule()) SILBasicBlock(this, AfterBlock);
+SILBasicBlock *SILFunction::createBasicBlockAfter(SILBasicBlock *afterBB) {
+  assert(afterBB);
+  return new (getModule()) SILBasicBlock(this, afterBB, /*after*/ true);
+}
+
+SILBasicBlock *SILFunction::createBasicBlockBefore(SILBasicBlock *beforeBB) {
+  assert(beforeBB);
+  return new (getModule()) SILBasicBlock(this, beforeBB, /*after*/ false);
 }
 
 //===----------------------------------------------------------------------===//

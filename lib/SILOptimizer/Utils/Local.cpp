@@ -313,15 +313,6 @@ FullApplySite swift::findApplyFromDevirtualizedResult(SILValue V) {
   return FullApplySite();
 }
 
-// Replace a dead apply with a new instruction that computes the same
-// value, and delete the old apply.
-void swift::replaceDeadApply(ApplySite Old, ValueBase *New) {
-  auto *OldApply = Old.getInstruction();
-  if (!isa<TryApplyInst>(OldApply))
-    cast<SingleValueInstruction>(OldApply)->replaceAllUsesWith(New);
-  recursivelyDeleteTriviallyDeadInstructions(OldApply, true);
-}
-
 bool swift::mayBindDynamicSelf(SILFunction *F) {
   if (!F->hasSelfMetadataParam())
     return false;
@@ -585,7 +576,8 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
                  "Swift thick functions that differ in escapeness are not ABI "
                  "compatible");
       // Insert convert_function.
-      return B->createConvertFunction(Loc, Value, DestTy);
+      return B->createConvertFunction(Loc, Value, DestTy,
+                                      /*WithoutActuallyEscaping=*/false);
     }
   }
 
@@ -1485,8 +1477,7 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
       // Constructors are special: a derived class in another module can
       // "override" a constructor if its class is "open", although the
       // constructor itself is not open.
-      auto *ND = AFD->getDeclContext()
-          ->getAsNominalTypeOrNominalTypeExtensionContext();
+      auto *ND = AFD->getDeclContext()->getSelfNominalTypeDecl();
       if (ND->getEffectiveAccess() == AccessLevel::Open)
         return false;
     }
@@ -1595,4 +1586,73 @@ StaticInitCloner::clone(SingleValueInstruction *InitVal) {
   return cast<SingleValueInstruction>(ValueMap[InitVal]);
 }
 
+Optional<FindLocalApplySitesResult>
+swift::findLocalApplySites(FunctionRefInst *FRI) {
+  SmallVector<Operand *, 32> worklist(FRI->use_begin(), FRI->use_end());
 
+  Optional<FindLocalApplySitesResult> f;
+  f.emplace();
+
+  // Optimistically state that we have no escapes before our def-use dataflow.
+  f->escapes = false;
+
+  while (!worklist.empty()) {
+    auto *op = worklist.pop_back_val();
+    auto *user = op->getUser();
+
+    // If we have a full apply site as our user.
+    if (auto apply = FullApplySite::isa(user)) {
+      if (apply.getCallee() == op->get()) {
+        f->fullApplySites.push_back(apply);
+        continue;
+      }
+    }
+
+    // If we have a partial apply as a user, start tracking it, but also look at
+    // its users.
+    if (auto *pai = dyn_cast<PartialApplyInst>(user)) {
+      if (pai->getCallee() == op->get()) {
+        // Track the partial apply that we saw so we can potentially eliminate
+        // dead closure arguments.
+        f->partialApplySites.push_back(pai);
+        // Look to see if we can find a full application of this partial apply
+        // as well.
+        copy(pai->getUses(), std::back_inserter(worklist));
+        continue;
+      }
+    }
+
+    // Otherwise, see if we have any function casts to look through...
+    switch (user->getKind()) {
+    case SILInstructionKind::ThinToThickFunctionInst:
+    case SILInstructionKind::ConvertFunctionInst:
+    case SILInstructionKind::ConvertEscapeToNoEscapeInst:
+      copy(cast<SingleValueInstruction>(user)->getUses(),
+           std::back_inserter(worklist));
+      continue;
+
+    // Look through any reference count instructions since these are not
+    // escapes:
+    case SILInstructionKind::CopyValueInst:
+      copy(cast<CopyValueInst>(user)->getUses(), std::back_inserter(worklist));
+      continue;
+    case SILInstructionKind::StrongRetainInst:
+    case SILInstructionKind::StrongReleaseInst:
+    case SILInstructionKind::RetainValueInst:
+    case SILInstructionKind::ReleaseValueInst:
+    case SILInstructionKind::DestroyValueInst:
+      continue;
+    default:
+      break;
+    }
+
+    // But everything else is considered an escape.
+    f->escapes = true;
+  }
+
+  // If we did escape and didn't find any apply sites, then we have no
+  // information for our users that is interesting.
+  if (f->escapes && f->partialApplySites.empty() && f->fullApplySites.empty())
+    return None;
+  return f;
+}

@@ -1439,8 +1439,7 @@ public:
           assert(knownConcreteErasure != ExistentialErasureOnly);
           knownConcreteErasure = ConcreteErasureOnly;
           concreteTy = concreteMeta->getInstanceType();
-        } else if (auto existentialMeta =
-                     concreteTy->getAs<ExistentialMetatypeType>()) {
+        } else if (concreteTy->is<ExistentialMetatypeType>()) {
           // If this is already forced to be a concrete erasure (say we're going
           // from (P & Q).Type.Protocol to P.Type.Type), then this is invalid,
           // because it would require the existential metatype to be
@@ -2336,14 +2335,6 @@ public:
           abort();
         }
       }
-      if (auto materializeForSet = ASD->getMaterializeForSetFunc()) {
-        if (materializeForSet->isMutating() !=
-            (ASD->isSetterMutating() || ASD->isGetterMutating())) {
-          Out << "AbstractStorageDecl::is{Getter,Setter}Mutating is out of sync"
-                 " with whether materializeForSet is mutating\n";
-          abort();
-        }
-      }
       if (auto addressor = ASD->getAddressor()) {
         if (addressor->isMutating() != ASD->isGetterMutating()) {
           Out << "AbstractStorageDecl::isGetterMutating is out of sync"
@@ -2366,7 +2357,8 @@ public:
         }
       }
       if (auto modifier = ASD->getModifyCoroutine()) {
-        if (modifier->isMutating() != ASD->isSetterMutating()) {
+        if (modifier->isMutating() !=
+            (ASD->isSetterMutating() || ASD->isGetterMutating())) {
           Out << "AbstractStorageDecl::isSetterMutating is out of sync"
                  " with whether modify addressor is mutating";
           abort();
@@ -2488,31 +2480,6 @@ public:
         if (ext->getExtendedType())
           ext->getExtendedType().print(Out);
       }
-    }
-
-    /// Check the given list of protocols.
-    void verifyProtocolList(Decl *decl, ArrayRef<ProtocolDecl *> protocols) {
-      PrettyStackTraceDecl debugStack("verifying ProtocolList", decl);
-
-      // Make sure that the protocol list is fully expanded.
-      SmallVector<ProtocolDecl *, 4> nominalProtocols(protocols.begin(),
-                                                      protocols.end());
-      ProtocolType::canonicalizeProtocols(nominalProtocols);
-
-      SmallVector<Type, 4> protocolTypes;
-      for (auto proto : protocols)
-        protocolTypes.push_back(proto->getDeclaredType());
-      auto type = ProtocolCompositionType::get(Ctx, protocolTypes,
-                                               /*HasExplicitAnyObject=*/false);
-      auto layout = type->getExistentialLayout();
-      SmallVector<ProtocolDecl *, 4> canonicalProtocols;
-      for (auto *protoTy : layout.getProtocols())
-        canonicalProtocols.push_back(protoTy->getDecl());
-      if (nominalProtocols != canonicalProtocols) {
-        dumpRef(decl);
-        Out << " doesn't have a complete set of protocols\n";
-        abort();
-      }      
     }
 
     /// Verify that the given conformance makes sense for the given
@@ -2731,9 +2698,6 @@ public:
     }
 
     void verifyChecked(NominalTypeDecl *nominal) {
-      // Make sure that the protocol list is fully expanded.
-      verifyProtocolList(nominal, nominal->getLocalProtocols());
-
       // Make sure that the protocol conformances are complete.
       // Only do so within the source file of the nominal type,
       // because anywhere else this can trigger new type-check requests.
@@ -2749,9 +2713,6 @@ public:
     }
 
     void verifyChecked(ExtensionDecl *ext) {
-      // Make sure that the protocol list is fully expanded.
-      verifyProtocolList(ext, ext->getLocalProtocols());
-
       // Make sure that the protocol conformances are complete.
       for (auto conformance : ext->getLocalConformances()) {
         verifyConformance(ext, conformance);
@@ -2833,7 +2794,7 @@ public:
     void verifyChecked(ConstructorDecl *CD) {
       PrettyStackTraceDecl debugStack("verifying ConstructorDecl", CD);
 
-      auto *ND = CD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+      auto *ND = CD->getDeclContext()->getSelfNominalTypeDecl();
       if (!isa<ClassDecl>(ND) && !isa<StructDecl>(ND) && !isa<EnumDecl>(ND) &&
           !isa<ProtocolDecl>(ND) && !CD->isInvalid()) {
         Out << "ConstructorDecls outside structs, classes or enums "
@@ -3024,7 +2985,7 @@ public:
     void verifyChecked(DestructorDecl *DD) {
       PrettyStackTraceDecl debugStack("verifying DestructorDecl", DD);
 
-      auto *ND = DD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+      auto *ND = DD->getDeclContext()->getSelfNominalTypeDecl();
       if (!isa<ClassDecl>(ND) && !DD->isInvalid()) {
         Out << "DestructorDecls outside classes should be marked invalid";
         abort();
@@ -3040,17 +3001,19 @@ public:
           Out << "mutating function is not an instance member\n";
           abort();
         }
-        if (FD->getDeclContext()->getAsClassOrClassExtensionContext()) {
+        if (FD->getDeclContext()->getSelfClassDecl()) {
           Out << "mutating function in a class\n";
           abort();
         }
-        const ParamDecl *selfParam = FD->getImplicitSelfDecl();
-        if (!selfParam->isInOut()) {
+        const ParamDecl *selfParam = FD->getImplicitSelfDecl(
+            /*createIfNeeded=*/false);
+        if (selfParam && !selfParam->isInOut()) {
           Out << "mutating function does not have inout 'self'\n";
           abort();
         }
       } else {
-        const ParamDecl *selfParam = FD->getImplicitSelfDecl();
+        const ParamDecl *selfParam = FD->getImplicitSelfDecl(
+            /*createIfNeeded=*/false);
         if (selfParam && selfParam->isInOut()) {
           Out << "non-mutating function has inout 'self'\n";
           abort();
@@ -3109,7 +3072,6 @@ public:
       case AccessorKind::Set:
       case AccessorKind::WillSet:
       case AccessorKind::DidSet:
-      case AccessorKind::MaterializeForSet:
       case AccessorKind::Read:
       case AccessorKind::Modify:
         if (FD->getAddressorKind() != AddressorKind::NotAddressor) {

@@ -1,11 +1,12 @@
 
 // RUN: %empty-directory(%t)
+// RUN: %{python} %utils/chex.py < %s > %t/enum_resilience.swift
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-frontend -emit-ir -enable-resilience -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift | %FileCheck %s --check-prefix=ENUM_RES
-// RUN: %target-swift-frontend -emit-ir -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift | %FileCheck %s --check-prefix=ENUM_NOT_RES
+// RUN: %target-swift-frontend -emit-ir -enable-resilience -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift | %FileCheck %t/enum_resilience.swift --check-prefix=ENUM_RES
+// RUN: %target-swift-frontend -emit-ir -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift | %FileCheck %t/enum_resilience.swift --check-prefix=ENUM_NOT_RES
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
-// RUN: %target-swift-frontend -module-name enum_resilience -I %t -emit-ir -enable-resilience %s | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -module-name enum_resilience -I %t -emit-ir -enable-resilience %s | %FileCheck %t/enum_resilience.swift -DINT=i%target-ptrsize
 // RUN: %target-swift-frontend -module-name enum_resilience -I %t -emit-ir -enable-resilience -O %s
 
 import resilient_enum
@@ -48,12 +49,11 @@ import resilient_struct
 // CHECK-SAME: internal global { %swift.type*, i8* } zeroinitializer, align
 
 // CHECK: @"$S15enum_resilience24EnumWithResilientPayloadOMn" = {{.*}}constant
-//    196690 == 0x00030052
-//              0x0002      - InPlaceMetadataInitialization
-//              0x0001      - IsReflectable
+//              0x00010052
+//              0x0001      - InPlaceMetadataInitialization
 //              0x    0040  - IsUnique
 //              0x    0012  - Enum
-// CHECK-SAME: i32 196690,
+// CHECK-SAME: <i32 0x0001_0052>,
 // CHECK-SAME: @"$S15enum_resilience24EnumWithResilientPayloadOMl"
 // CHECK-SAME: @"$S15enum_resilience24EnumWithResilientPayloadOMf", i32 0, i32 1)
 // CHECK-SAME: @"$S15enum_resilience24EnumWithResilientPayloadOMr"
@@ -286,7 +286,7 @@ public func getResilientEnumType() -> Any.Type {
 // CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK: cacheIsNull:
-// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getInPlaceMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$S15enum_resilience24EnumWithResilientPayloadOMn" to %swift.type_descriptor*))
+// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$S15enum_resilience24EnumWithResilientPayloadOMn" to %swift.type_descriptor*))
 // CHECK-NEXT: [[RESPONSE_METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
 // CHECK-NEXT: [[RESPONSE_STATE:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 1
 // CHECK-NEXT: br label %cont

@@ -287,6 +287,7 @@ public:
   virtual llvm::Value *getAlignmentMask(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *getStride(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *getIsPOD(IRGenFunction &IGF, SILType T) const = 0;
+  virtual llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                                  SILType T) const = 0;
 
@@ -409,7 +410,8 @@ public:
   /// has extra inhabitants.
   virtual llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                                Address src,
-                                               SILType T) const = 0;
+                                               SILType T,
+                                               bool isOutlined) const = 0;
   
   /// Store the extra inhabitant representation indexed by a 31-bit identifier
   /// to memory.
@@ -419,7 +421,8 @@ public:
   virtual void storeExtraInhabitant(IRGenFunction &IGF,
                                     llvm::Value *index,
                                     Address dest,
-                                    SILType T) const = 0;
+                                    SILType T,
+                                    bool isOutlined) const = 0;
   
   /// Get the tag of a single payload enum with a payload of this type (\p T) e.g
   /// Optional<T>.

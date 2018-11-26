@@ -2192,9 +2192,6 @@ public:
       case AccessorKind::MutableAddress:
         OS << "<mutableAddressor for ";
         break;
-      case AccessorKind::MaterializeForSet:
-        OS << "<materializeForSet for ";
-        break;
       case AccessorKind::Read:
         OS << "<read accessor for ";
         break;
@@ -2912,10 +2909,13 @@ static int doTestCreateCompilerInvocation(ArrayRef<const char *> Args) {
   DiagnosticEngine Diags(SM);
   Diags.addConsumer(PDC);
 
-  std::unique_ptr<CompilerInvocation> CI =
-    driver::createCompilerInvocation(Args, Diags);
+  CompilerInvocation CI;
+  bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
+      Args, Diags, [&](ArrayRef<const char *> FrontendArgs) {
+    return CI.parseArgs(FrontendArgs, Diags);
+  });
 
-  if (!CI) {
+  if (HadError) {
     llvm::errs() << "error: unable to create a CompilerInvocation\n";
     return 1;
   }

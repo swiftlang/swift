@@ -27,8 +27,12 @@
 #include "llvm/Support/raw_ostream.h"
 #include <chrono>
 #include <limits>
-#include <unistd.h>
 
+#if LLVM_ON_UNIX
+#if HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#endif
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
@@ -440,6 +444,7 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
   }
   // Print timers.
   TimerGroup::printAllJSONValues(OS, delim);
+  TimerGroup::clearAll();
   OS << "\n}\n";
   OS.flush();
 }
@@ -492,7 +497,7 @@ void updateProcessWideFrontendCounters(
 #if defined(HAVE_PROC_PID_RUSAGE) && defined(RUSAGE_INFO_V4)
   struct rusage_info_v4 ru;
   if (0 == proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ru)) {
-    C.NumInstructions = ru.ri_instructions;
+    C.NumInstructionsExecuted = ru.ri_instructions;
   }
 #endif
 }
@@ -660,6 +665,7 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_STATS)
   publishAlwaysOnStatsToLLVM();
   PrintStatisticsJSON(ostream);
+  TimerGroup::clearAll();
 #else
   printAlwaysOnStatsAndTimers(ostream);
 #endif

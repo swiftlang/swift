@@ -30,6 +30,7 @@ cardinal = { 2:'two', 3:'three', 4:'four'}
 %  vectype = ctype[scalar] + str(count)
 %  llvm_vectype = "Vec" + str(count) + "x" + llvm_type[scalar]
 %  vecsize = (8 if scalar == 'Double' else 4) * (4 if count == 3 else count)
+%  vecalign = (16 if vecsize > 16 else vecsize)
 %  extractelement = "extractelement_" + llvm_vectype + "_Int32"
 %  insertelement = "insertelement_" + llvm_vectype + "_" + llvm_type[scalar] + "_Int32"
 %  is_floating = scalar in floating_types
@@ -40,7 +41,7 @@ cardinal = { 2:'two', 3:'three', 4:'four'}
 /// A vector of ${cardinal[count]} `${scalar}`.  This corresponds to the C and
 /// Obj-C type `vector_${vectype}` and the C++ type `simd::${vectype}`.
 @_fixed_layout
-@_alignment(${vecsize})
+@_alignment(${vecalign})
 public struct ${vectype} {
 
   public var _value: Builtin.${llvm_vectype}

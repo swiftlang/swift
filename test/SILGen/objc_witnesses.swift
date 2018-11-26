@@ -109,12 +109,10 @@ extension NSObject : Atom {
   @objc var valence: Int { get { return 1 } set { } }
 }
 
-// CHECK-LABEL: sil private @$SSo8NSObjectC14objc_witnessesE7valenceSivmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed NSObject, @thick NSObject.Type) -> () {
-// CHECK: objc_method %4 : $NSObject, #NSObject.valence!setter.1.foreign
-// CHECK: }
-
-// CHECK-LABEL: sil hidden @$SSo8NSObjectC14objc_witnessesE7valenceSivm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed NSObject) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK: objc_method %2 : $NSObject, #NSObject.valence!getter.1.foreign
+// CHECK-LABEL: sil shared @$SSo8NSObjectC14objc_witnessesE7valenceSivM : $@yield_once @convention(method) (@guaranteed NSObject) -> @yields @inout Int {
+// CHECK: objc_method %0 : $NSObject, #NSObject.valence!getter.1.foreign
+// CHECK: yield
+// CHECK: objc_method %0 : $NSObject, #NSObject.valence!setter.1.foreign
 // CHECK: }
 
 protocol Atom : class {

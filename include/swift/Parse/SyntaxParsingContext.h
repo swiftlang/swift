@@ -19,6 +19,74 @@
 #include "swift/Syntax/TokenSyntax.h"
 
 namespace swift {
+
+using namespace swift::syntax;
+
+/// Cache node for RawSyntax.
+class RawSyntaxCacheNode : public llvm::FoldingSetNode {
+
+  friend llvm::FoldingSetTrait<RawSyntaxCacheNode>;
+
+  /// Associated RawSyntax.
+  RC<RawSyntax> Obj;
+  /// FoldingSet node identifier of the associated RawSyntax.
+  llvm::FoldingSetNodeIDRef IDRef;
+
+public:
+  RawSyntaxCacheNode(RC<RawSyntax> Obj, const llvm::FoldingSetNodeIDRef IDRef)
+      : Obj(Obj), IDRef(IDRef) {}
+
+  /// Retrieve assciated RawSyntax.
+  RC<RawSyntax> get() { return Obj; }
+
+  // Only allow allocation of Node using the allocator in SyntaxArena.
+  void *operator new(size_t Bytes, RC<SyntaxArena> &Arena,
+                     unsigned Alignment = alignof(RawSyntaxCacheNode)) {
+    return Arena->Allocate(Bytes, Alignment);
+  }
+
+  void *operator new(size_t Bytes) throw() = delete;
+  void operator delete(void *Data) throw() = delete;
+};
+
+class RawSyntaxTokenCache {
+  llvm::FoldingSet<RawSyntaxCacheNode> CachedTokens;
+  std::vector<RawSyntaxCacheNode *> CacheNodes;
+
+public:
+  RC<RawSyntax> getToken(RC<SyntaxArena> &Arena, tok TokKind, OwnedString Text,
+                         llvm::ArrayRef<TriviaPiece> LeadingTrivia,
+                         llvm::ArrayRef<TriviaPiece> TrailingTrivia);
+
+  ~RawSyntaxTokenCache();
+};
+
+} // namespace swift
+
+namespace llvm {
+
+using swift::RawSyntaxCacheNode;
+
+/// FoldingSet traits for RawSyntax wrapper.
+template <> struct FoldingSetTrait<RawSyntaxCacheNode> {
+
+  static inline void Profile(RawSyntaxCacheNode &X, FoldingSetNodeID &ID) {
+    ID.AddNodeID(X.IDRef);
+  }
+
+  static inline bool Equals(RawSyntaxCacheNode &X, const FoldingSetNodeID &ID,
+                            unsigned, FoldingSetNodeID &) {
+    return ID == X.IDRef;
+  }
+  static inline unsigned ComputeHash(RawSyntaxCacheNode &X,
+                                     FoldingSetNodeID &) {
+    return X.IDRef.ComputeHash();
+  }
+};
+
+} // namespace llvm
+
+namespace swift {
 class SourceFile;
 class SyntaxParsingCache;
 class Token;
@@ -75,15 +143,20 @@ public:
     // Storage for Collected parts.
     std::vector<RC<RawSyntax>> Storage;
 
-    SyntaxArena &Arena;
+    RC<SyntaxArena> Arena;
 
     /// A cache of nodes that can be reused when creating the current syntax
     /// tree
     SyntaxParsingCache *SyntaxCache = nullptr;
 
+    /// Tokens nodes that have already been created and may be reused in other
+    /// parts of the syntax tree.
+    RawSyntaxTokenCache TokenCache;
+
     RootContextData(SourceFile &SF, DiagnosticEngine &Diags,
                     SourceManager &SourceMgr, unsigned BufferID,
-                    SyntaxArena &Arena, SyntaxParsingCache *SyntaxCache)
+                    const RC<SyntaxArena> &Arena,
+                    SyntaxParsingCache *SyntaxCache)
         : SF(SF), Diags(Diags), SourceMgr(SourceMgr), BufferID(BufferID),
           Arena(Arena), SyntaxCache(SyntaxCache) {}
   };
@@ -217,7 +290,9 @@ public:
     return getRootData()->SyntaxCache;
   }
 
-  SyntaxArena &getArena() const { return getRootData()->Arena; }
+  RawSyntaxTokenCache &getTokenCache() { return getRootData()->TokenCache; }
+
+  const RC<SyntaxArena> &getArena() const { return getRootData()->Arena; }
 
   const SyntaxParsingContext *getRoot() const;
 

@@ -70,8 +70,8 @@ public class ASubscriptable<Element> : TestSubscriptable {
 // ASubscriptable.subscript.setter with _specialize
 // CHECK-LABEL: sil [_specialize exported: false, kind: full, where Element == Int] @$S15specialize_attr14ASubscriptableCyxSicis : $@convention(method) <Element> (@in Element, Int, @guaranteed ASubscriptable<Element>) -> () {
 
-// ASubscriptable.subscript.materializeForSet with no attribute
-// CHECK-LABEL: sil [transparent] [serialized] @$S15specialize_attr14ASubscriptableCyxSicim : $@convention(method) <Element> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, Int, @guaranteed ASubscriptable<Element>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// ASubscriptable.subscript.modify with no attribute
+// CHECK-LABEL: sil [transparent] [serialized] @$S15specialize_attr14ASubscriptableCyxSiciM : $@yield_once @convention(method) <Element> (Int, @guaranteed ASubscriptable<Element>) -> @yields @inout Element {
 
 public class Addressable<Element> : TestSubscriptable {
   var storage: UnsafeMutablePointer<Element>
@@ -105,5 +105,5 @@ public class Addressable<Element> : TestSubscriptable {
 // CHECK-LABEL: sil [_specialize exported: false, kind: full, where Element == Int] @$S15specialize_attr11AddressableCyxSiciau : $@convention(method) <Element> (Int, @guaranteed Addressable<Element>) -> UnsafeMutablePointer<Element> {
 
 // Addressable.subscript.materializeForSet with no attribute
-// CHECK-LABEL: sil [transparent] [serialized] @$S15specialize_attr11AddressableCyxSicim : $@convention(method) <Element> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, Int, @guaranteed Addressable<Element>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil [transparent] [serialized] @$S15specialize_attr11AddressableCyxSiciM : $@yield_once @convention(method) <Element> (Int, @guaranteed Addressable<Element>) -> @yields @inout Element {
 

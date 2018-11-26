@@ -1398,8 +1398,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case SILInstructionKind::Name##ReleaseInst:
 #include "swift/AST/ReferenceStorage.def"
     case SILInstructionKind::StrongReleaseInst:
-    case SILInstructionKind::ReleaseValueInst:
-    case SILInstructionKind::StrongUnpinInst: {
+    case SILInstructionKind::ReleaseValueInst: {
       SILValue OpV = I->getOperand(0);
       if (CGNode *AddrNode = ConGraph->getNode(OpV, this)) {
         // A release instruction may deallocate the pointer operand. This may
@@ -1557,7 +1556,6 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case SILInstructionKind::BridgeObjectToRefInst:
     case SILInstructionKind::UncheckedAddrCastInst:
     case SILInstructionKind::UnconditionalCheckedCastInst:
-    case SILInstructionKind::StrongPinInst:
     // DO NOT use LOADABLE_REF_STORAGE because unchecked references don't have
     // retain/release instructions that trigger the 'default' case.
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \

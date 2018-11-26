@@ -13,8 +13,7 @@ func f4<T>(x: T, y: T) { }
 // Non-protocol type constraints.
 func f6<T : Wonka>(x: T) {} // expected-error{{use of undeclared type 'Wonka'}}
 
-// FIXME: The term 'inherit' is unfortunate here.
-func f7<T : Int>(x: T) {} // expected-error{{inheritance from non-protocol, non-class type 'Int'}}
+func f7<T : Int>(x: T) {} // expected-error{{type 'T' constrained to non-protocol, non-class type 'Int'}}
 
 func f8<T> (x: Int) {} //expected-error{{generic parameter 'T' is not used in function signature}}
 

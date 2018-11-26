@@ -121,7 +121,7 @@ extension Dictionary : _ObjectiveCBridgeable {
       return result != nil
     }
 
-    result = Swift._dictionaryBridgeFromObjectiveCConditional(anyDict)
+    result = anyDict as? Dictionary
     return result != nil
   }
 

@@ -88,7 +88,8 @@ struct EvaluationRule
 {
   using SimpleRequest<Derived, Caching, double, ArithmeticExpr *>::SimpleRequest;
 
-  double evaluate(Evaluator &evaluator, ArithmeticExpr *expr) const {
+  llvm::Expected<double>
+  evaluate(Evaluator &evaluator, ArithmeticExpr *expr) const {
     switch (expr->kind) {
     case ArithmeticExpr::Kind::Literal:
       return static_cast<Literal *>(expr)->value;
@@ -97,32 +98,27 @@ struct EvaluationRule
       auto binary = static_cast<Binary *>(expr);
 
       // Evaluate the left- and right-hand sides.
-      double lhsValue, rhsValue;
-      std::tie(lhsValue, rhsValue) =
-        evaluator(Derived{binary->lhs}, Derived{binary->rhs});
+      auto lhsValue = evaluator(Derived{binary->lhs});
+      if (!lhsValue)
+        return lhsValue;
+      auto rhsValue = evaluator(Derived{binary->rhs});
+      if (!rhsValue)
+        return rhsValue;
+
       switch (binary->operatorKind) {
       case Binary::OperatorKind::Sum:
-        return lhsValue + rhsValue;
+        return *lhsValue + *rhsValue;
 
       case Binary::OperatorKind::Product:
-        return lhsValue * rhsValue;
+        return *lhsValue * *rhsValue;
       }
     }
     }
   }
 
-  static bool brokeCycle;
-  double breakCycle() const {
-    brokeCycle = true;
-    return NAN;
-  }
-
   void diagnoseCycle(DiagnosticEngine &diags) const { }
   void noteCycleStep(DiagnosticEngine &diags) const { }
 };
-
-template<typename Derived, CacheKind Caching>
-bool EvaluationRule<Derived, Caching>::brokeCycle = false;
 
 struct InternallyCachedEvaluationRule :
 EvaluationRule<InternallyCachedEvaluationRule, CacheKind::Cached>
@@ -197,6 +193,13 @@ static AbstractRequestFunction *arithmeticRequestFunctions[] = {
 #undef SWIFT_TYPEID
 };
 
+/// Helper to short-circuit errors to NaN.
+template<typename Request>
+static double evalOrNaN(Evaluator &evaluator, const Request &request) {
+  return evaluateOrDefault(evaluator, request, NAN);
+}
+
+
 TEST(ArithmeticEvaluator, Simple) {
   // (3.14159 + 2.71828) * 42
   ArithmeticExpr *pi = new Literal(3.14159);
@@ -213,27 +216,27 @@ TEST(ArithmeticEvaluator, Simple) {
                                      arithmeticRequestFunctions);
 
   const double expectedResult = (3.14159 + 2.71828) * 42.0;
-  EXPECT_EQ(evaluator(InternallyCachedEvaluationRule(product)),
+  EXPECT_EQ(evalOrNaN(evaluator, InternallyCachedEvaluationRule(product)),
             expectedResult);
 
   // Cached response.
-  EXPECT_EQ(evaluator(InternallyCachedEvaluationRule(product)),
+  EXPECT_EQ(evalOrNaN(evaluator, InternallyCachedEvaluationRule(product)),
             expectedResult);
 
   // Uncached
   evaluator.clearCache();
-  EXPECT_EQ(evaluator(UncachedEvaluationRule(product)),
+  EXPECT_EQ(evalOrNaN(evaluator, UncachedEvaluationRule(product)),
             expectedResult);
-  EXPECT_EQ(evaluator(UncachedEvaluationRule(product)),
+  EXPECT_EQ(evalOrNaN(evaluator, UncachedEvaluationRule(product)),
             expectedResult);
 
   // External cached query.
   evaluator.clearCache();
-  EXPECT_EQ(evaluator(ExternallyCachedEvaluationRule(product)),
+  EXPECT_EQ(evalOrNaN(evaluator, ExternallyCachedEvaluationRule(product)),
             expectedResult);
   EXPECT_EQ(*sum->cachedValue, 3.14159 + 2.71828);
   EXPECT_EQ(*product->cachedValue, expectedResult);
-  EXPECT_EQ(evaluator(ExternallyCachedEvaluationRule(product)),
+  EXPECT_EQ(evalOrNaN(evaluator, ExternallyCachedEvaluationRule(product)),
             expectedResult);
   EXPECT_EQ(*sum->cachedValue, 3.14159 + 2.71828);
   EXPECT_EQ(*product->cachedValue, expectedResult);
@@ -241,7 +244,8 @@ TEST(ArithmeticEvaluator, Simple) {
   // Dependency printing.
 
   // Cache some values first, so they show up in the result.
-  (void)evaluator(InternallyCachedEvaluationRule(product));
+  (void)llvm::cantFail(evaluator(InternallyCachedEvaluationRule(product)),
+                       "no explicit cycles were requested");
 
   std::string productDependencies;
   {
@@ -335,36 +339,15 @@ TEST(ArithmeticEvaluator, Cycle) {
                                      arithmeticRequestFunctions);
 
   // Evaluate when there is a cycle.
-  UncachedEvaluationRule::brokeCycle = false;
-  EXPECT_TRUE(std::isnan(evaluator(UncachedEvaluationRule(product))));
-  EXPECT_TRUE(UncachedEvaluationRule::brokeCycle);
-
-  // Cycle-breaking result is cached.
-  EXPECT_TRUE(std::isnan(evaluator(UncachedEvaluationRule(product))));
-  UncachedEvaluationRule::brokeCycle = false;
-  EXPECT_FALSE(UncachedEvaluationRule::brokeCycle);
-
-  // Evaluate when there is a cycle.
-  evaluator.clearCache();
-  InternallyCachedEvaluationRule::brokeCycle = false;
-  EXPECT_TRUE(std::isnan(evaluator(InternallyCachedEvaluationRule(product))));
-  EXPECT_TRUE(InternallyCachedEvaluationRule::brokeCycle);
-
-  // Cycle-breaking result is cached.
-  InternallyCachedEvaluationRule::brokeCycle = false;
-  EXPECT_TRUE(std::isnan(evaluator(InternallyCachedEvaluationRule(product))));
-  EXPECT_FALSE(InternallyCachedEvaluationRule::brokeCycle);
-
-  // Evaluate when there is a cycle.
-  evaluator.clearCache();
-  ExternallyCachedEvaluationRule::brokeCycle = false;
-  EXPECT_TRUE(std::isnan(evaluator(ExternallyCachedEvaluationRule(product))));
-  EXPECT_TRUE(ExternallyCachedEvaluationRule::brokeCycle);
-
-  // Cycle-breaking result is cached.
-  ExternallyCachedEvaluationRule::brokeCycle = false;
-  EXPECT_TRUE(std::isnan(evaluator(ExternallyCachedEvaluationRule(product))));
-  EXPECT_FALSE(ExternallyCachedEvaluationRule::brokeCycle);
+  bool cycleDetected = false;
+  auto result = evaluator(UncachedEvaluationRule(sum));
+  if (auto err = result.takeError()) {
+    llvm::handleAllErrors(std::move(err),
+      [&](const CyclicalRequestError<UncachedEvaluationRule> &E) {
+        cycleDetected = true;
+      });
+  }
+  EXPECT_TRUE(cycleDetected);
 
   // Dependency printing.
   std::string productDependencies;
@@ -374,12 +357,8 @@ TEST(ArithmeticEvaluator, Cycle) {
   }
 
   EXPECT_EQ(productDependencies,
-    " `--InternallyCachedEvaluationRule(Binary: product)\n"
-    "     `--InternallyCachedEvaluationRule(Binary: sum)\n"
-    "     |   `--InternallyCachedEvaluationRule(Literal: 3.141590e+00)\n"
-    "     |   `--InternallyCachedEvaluationRule(Binary: product) "
-      "(cyclic dependency)\n"
-    "     `--InternallyCachedEvaluationRule(Literal: 4.200000e+01)\n");
+    " `--InternallyCachedEvaluationRule(Binary: product) "
+      "(dependency not evaluated)\n");
 
   // Cleanup
   delete pi;

@@ -101,17 +101,17 @@ protocol Comprehensive {
 // CHECK-SAME: i32 11,
 // CHECK-SAME: i32 trunc
 // CHECK-SAME: [6 x i8]* [[COMPREHENSIVE_ASSOC_NAME]]
-// CHECK-SAME:   %swift.protocol_requirement { i32 6, i32 0, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 7, i32 0, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 8, i32 0, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 2, i32 0, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 17, i32 0, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 1, i32 0, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 19, i32 0, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 20, i32 0, i32 0 },
-// CHECK-SAME:   %swift.protocol_requirement { i32 21, i32 0, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 22, i32 0, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 3, i32 0, i32 0 },
 // CHECK-SAME:   %swift.protocol_requirement { i32 4, i32 0, i32 0 },
-// CHECK-SAME:   %swift.protocol_requirement { i32 5, i32 0, i32 0 }
+// CHECK-SAME:   %swift.protocol_requirement { i32 6, i32 0, i32 0 }
 
 
 func reify_metadata<T>(_ x: T) {}

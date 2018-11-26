@@ -21,5 +21,5 @@ class Sub : Base {
 // CHECK: #Base.foo!getter.1: (Base) -> () -> Int : {{.*}} // Sub.foo.getter
 // CHECK: #Base.bar!getter.1: (Base) -> () -> Int : {{.*}} // Sub.bar.getter
 // CHECK: #Base.bar!setter.1: (Base) -> (Int) -> () : {{.*}} // Sub.bar.setter
-// CHECK: #Base.bar!materializeForSet.1: (Base) -> {{.*}} : {{.*}} // Sub.bar.materializeForSet
+// CHECK: #Base.bar!modify.1: (Base) -> {{.*}} : {{.*}} // Sub.bar.modify
 // CHECK: }

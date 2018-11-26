@@ -63,9 +63,6 @@ void swift::printDeclDescription(llvm::raw_ostream &out, const Decl *D,
         case AccessorKind::DidSet:
           out << "didset";
           break;
-        case AccessorKind::MaterializeForSet:
-          out << "materializeForSet";
-          break;
         case AccessorKind::Address:
           out << "addressor";
           break;

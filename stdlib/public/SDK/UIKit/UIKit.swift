@@ -424,7 +424,7 @@ extension UIDragDropSession {
   public func canLoadObjects<
     T : _ObjectiveCBridgeable
   >(ofClass: T.Type) -> Bool where T._ObjectiveCType : NSItemProviderReading {
-    return self.canLoadObjects(ofClass: T._ObjectiveCType.self);
+    return self.canLoadObjects(ofClass: T._ObjectiveCType.self)
   }
 }
 

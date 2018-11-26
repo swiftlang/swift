@@ -69,14 +69,14 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
    }
   }
   for (auto Apply : Applies) {
-    auto NewInstPair = tryDevirtualizeApply(Apply, CHA, &ORE);
-    if (!NewInstPair.second)
+    auto NewInst = tryDevirtualizeApply(Apply, CHA, &ORE);
+    if (!NewInst)
       continue;
 
     Changed = true;
 
-    replaceDeadApply(Apply, NewInstPair.first);
-    NewApplies.push_back(NewInstPair.second);
+    deleteDevirtualizedApply(Apply);
+    NewApplies.push_back(NewInst);
   }
 
   // For each new apply, attempt to link in function bodies if we do

@@ -262,12 +262,11 @@ static SILValue getTerminatorCondition(TermInst *Term) {
 /// Is this basic block jump threadable.
 static bool isThreadableBlock(SILBasicBlock *BB,
                               SmallPtrSetImpl<SILBasicBlock *> &LoopHeaders) {
-  if (isa<ReturnInst>(BB->getTerminator()))
-    return false;
+  auto TI = BB->getTerminator();
 
-  // We know how to handle cond_br and switch_enum .
-  if (!isa<CondBranchInst>(BB->getTerminator()) &&
-      !isa<SwitchEnumInst>(BB->getTerminator()))
+  // We know how to handle cond_br and switch_enum.
+  if (!isa<CondBranchInst>(TI) &&
+      !isa<SwitchEnumInst>(TI))
     return false;
 
   if (LoopHeaders.count(BB))
@@ -279,7 +278,7 @@ static bool isThreadableBlock(SILBasicBlock *BB,
       return false;
 
     // Don't jumpthread function calls.
-    if (isa<ApplyInst>(Inst))
+    if (FullApplySite::isa(&Inst))
       return false;
 
     // Only thread 'small blocks'.
@@ -975,7 +974,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   auto *SrcBB = BI->getParent();
   // If the destination block ends with a return, we don't want to duplicate it.
   // We want to maintain the canonical form of a single return where possible.
-  if (isa<ReturnInst>(DestBB->getTerminator()))
+  if (DestBB->getTerminator()->isFunctionExiting())
     return false;
 
   // We need to update SSA if a value duplicated is used outside of the
@@ -2398,7 +2397,7 @@ static bool shouldTailDuplicate(SILBasicBlock &Block) {
   unsigned Cost = 0;
   bool SawRelease = false;
 
-  if (isa<ReturnInst>(Block.getTerminator()))
+  if (Block.getTerminator()->isFunctionExiting())
     return false;
 
   if (Block.getSinglePredecessorBlock())
@@ -2408,7 +2407,7 @@ static bool shouldTailDuplicate(SILBasicBlock &Block) {
     if (!Inst.isTriviallyDuplicatable())
       return false;
 
-    if (isa<ApplyInst>(&Inst))
+    if (FullApplySite::isa(&Inst))
       return false;
 
     if (isa<ReleaseValueInst>(&Inst) ||
@@ -2530,7 +2529,9 @@ static void removeArgument(SILBasicBlock *BB, unsigned i) {
   // Determine the set of predecessors in case any predecessor has
   // two edges to this block (e.g. a conditional branch where both
   // sides reach this block).
-  llvm::SmallPtrSet<SILBasicBlock *, 4> PredBBs;
+  llvm::SetVector<SILBasicBlock *,SmallVector<SILBasicBlock *, 8>,
+                  SmallPtrSet<SILBasicBlock *, 8>> PredBBs;
+
   for (auto *Pred : BB->getPredecessorBlocks())
     PredBBs.insert(Pred);
 

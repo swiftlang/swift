@@ -18,12 +18,12 @@
 // FILE1: --------
 // FILE1: out-file: {{.*}}file1.o
 // FILE1: DEPEND START
-// FILE1: Unit | system | {{.*}}Swift.swiftmodule | | {{[0-9]*$}}
+// FILE1: Unit | system | {{.*}}Swift.swiftmodule
 // FILE1: DEPEND END
 
 // FILE2: file2.o-{{[A-Z0-9]*}}
 // FILE2: --------
 // FILE2: out-file: {{.*}}file2.o
 // FILE2: DEPEND START
-// FILE2: Unit | system | {{.*}}Swift.swiftmodule | | {{[0-9]*$}}
+// FILE2: Unit | system | {{.*}}Swift.swiftmodule
 // FILE2: DEPEND END

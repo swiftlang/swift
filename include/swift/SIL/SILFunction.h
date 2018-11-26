@@ -231,6 +231,14 @@ private:
   /// serialization.
   bool WasDeserializedCanonical = false;
 
+  /// True if this is a reabstraction thunk of escaping function type whose
+  /// single argument is a potentially non-escaping closure. This is an escape
+  /// hatch to allow non-escaping functions to be stored or passed as an
+  /// argument with escaping function type. The thunk argument's function type
+  /// is not necessarily @noescape. The only relevant aspect of the argument is
+  /// that it may have unboxed capture (i.e. @inout_aliasable parameters).
+  bool IsWithoutActuallyEscapingThunk = false;
+
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
                         const GenericSpecializationInformation *genericInfo) {
@@ -383,6 +391,18 @@ public:
 
   void setWasDeserializedCanonical(bool val = true) {
     WasDeserializedCanonical = val;
+  }
+
+  /// Returns true if this is a reabstraction thunk of escaping function type
+  /// whose single argument is a potentially non-escaping closure. i.e. the
+  /// thunks' function argument may itself have @inout_aliasable parameters.
+  bool isWithoutActuallyEscapingThunk() const {
+    return IsWithoutActuallyEscapingThunk;
+  }
+
+  void setWithoutActuallyEscapingThunk(bool val = true) {
+    assert(!val || isThunk() == IsReabstractionThunk);
+    IsWithoutActuallyEscapingThunk = val;
   }
 
   /// Returns the calling convention used by this entry point.
@@ -754,7 +774,8 @@ public:
   const SILBasicBlock *getEntryBlock() const { return &front(); }
 
   SILBasicBlock *createBasicBlock();
-  SILBasicBlock *createBasicBlock(SILBasicBlock *After);
+  SILBasicBlock *createBasicBlockAfter(SILBasicBlock *afterBB);
+  SILBasicBlock *createBasicBlockBefore(SILBasicBlock *beforeBB);
 
   /// Splice the body of \p F into this function at end.
   void spliceBody(SILFunction *F) {

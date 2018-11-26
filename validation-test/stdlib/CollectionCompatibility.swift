@@ -1,6 +1,6 @@
 // RUN: rm -rf %t ; mkdir -p %t
-// RUN: %target-build-swift %s -o %t/a.out3 -swift-version 3 && %target-codesign %t/a.out3 &&  %target-run %t/a.out3
 // RUN: %target-build-swift %s -o %t/a.out4 -swift-version 4 && %target-codesign %t/a.out4 && %target-run %t/a.out4
+// RUN: %target-build-swift %s -o %t/a.out42 -swift-version 4.2 && %target-codesign %t/a.out42 && %target-run %t/a.out42
 
 // REQUIRES: executable_test
 

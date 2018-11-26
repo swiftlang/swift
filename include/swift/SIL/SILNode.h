@@ -221,9 +221,6 @@ protected:
   SWIFT_INLINE_BITFIELD(RefCountingInst, NonValueInstruction, 1,
       atomicity : 1
   );
-  SWIFT_INLINE_BITFIELD(StrongPinInst, SingleValueInstruction, 1,
-      atomicity : 1
-  );
 
   // Ensure that BindMemoryInst bitfield does not overflow.
   IBWTO_BITFIELD_EMPTY(BindMemoryInst, NonValueInstruction);
@@ -315,7 +312,8 @@ protected:
     IsInvariant : 1
   );
 
-  UIWTDOB_BITFIELD_EMPTY(ConvertFunctionInst, ConversionInst);
+  UIWTDOB_BITFIELD(ConvertFunctionInst, ConversionInst, 1,
+                   WithoutActuallyEscaping : 1);
   UIWTDOB_BITFIELD_EMPTY(PointerToThinFunctionInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(UnconditionalCheckedCastInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(UpcastInst, ConversionInst);

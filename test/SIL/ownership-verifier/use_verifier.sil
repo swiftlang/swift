@@ -55,7 +55,7 @@ struct TupleContainingNonTrivialStruct {
 
 class SuperKlass {
   func d() {}
-  static func f() {}
+  class func f() {}
 }
 class SubKlass : SuperKlass {}
 class X {

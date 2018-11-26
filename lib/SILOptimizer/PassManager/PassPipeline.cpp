@@ -213,7 +213,6 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addSimplifyCFG();
   P.addArrayElementPropagation();
   // End of unrolling passes.
-  P.addRemovePins();
   P.addABCOpt();
   // Cleanup.
   P.addDCE();
@@ -331,7 +330,6 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   P.addRetainSinking();
   P.addReleaseHoisting();
   P.addARCSequenceOpts();
-  P.addRemovePins();
 }
 
 static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {

@@ -509,8 +509,8 @@ enum class CacheStrategy {
   /// A simple lazy cache.
   Lazy,
 
-  /// An InPlaceValueMetadataCache initialization cache.
-  InPlaceInitialization,
+  /// An SingletonMetadataCache initialization cache.
+  SingletonInitialization,
 };
 
 /// Emit a type metadata access function using the given generator function.
@@ -547,15 +547,6 @@ llvm::Function *
 getGenericTypeMetadataAccessFunction(IRGenModule &IGM,
                                      NominalTypeDecl *nominal,
                                      ForDefinition_t shouldDefine);
-
-using OnceMetadataInitializer =
-  llvm::function_ref<llvm::Value*(IRGenFunction &IGF, llvm::Value *metadata)>;
-
-MetadataResponse
-emitOnceTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
-                                       CanNominalType type,
-                                       llvm::Constant *cacheVariable,
-                                       OnceMetadataInitializer initializer);
 
 using CacheEmitter =
   llvm::function_ref<MetadataResponse(IRGenFunction &IGF, Explosion &params)>;

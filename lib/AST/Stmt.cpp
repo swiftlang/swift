@@ -161,10 +161,10 @@ SourceLoc ReturnStmt::getEndLoc() const {
 
 YieldStmt *YieldStmt::create(const ASTContext &ctx, SourceLoc yieldLoc,
                              SourceLoc lpLoc, ArrayRef<Expr*> yields,
-                             SourceLoc rpLoc) {
+                             SourceLoc rpLoc, Optional<bool> implicit) {
   void *buffer = ctx.Allocate(totalSizeToAlloc<Expr*>(yields.size()),
                               alignof(YieldStmt));
-  return ::new(buffer) YieldStmt(yieldLoc, lpLoc, yields, rpLoc);
+  return ::new(buffer) YieldStmt(yieldLoc, lpLoc, yields, rpLoc, implicit);
 }
 
 SourceLoc YieldStmt::getEndLoc() const {

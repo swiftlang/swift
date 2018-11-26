@@ -18,6 +18,7 @@
 #ifndef SWIFT_SYNTAX_SERIALIZATION_SYNTAXSERIALIZATION_H
 #define SWIFT_SYNTAX_SERIALIZATION_SYNTAXSERIALIZATION_H
 
+#include "swift/Basic/ByteTreeSerialization.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Syntax/RawSyntax.h"
@@ -199,6 +200,177 @@ struct NullableTraits<RC<syntax::RawSyntax>> {
   }
 };
 } // end namespace json
+
+namespace byteTree {
+
+/// The key for a ByteTree serializion user info of type
+/// `std::unordered_set<unsigned> *`. Specifies the IDs of syntax nodes that
+/// shall be omitted when the syntax tree gets serialized.
+static void *UserInfoKeyReusedNodeIds = &UserInfoKeyReusedNodeIds;
+
+/// The key for a ByteTree serializion user info interpreted as `bool`.
+/// If specified, additional fields will be added to objects in the ByteTree
+/// to test forward compatibility.
+static void *UserInfoKeyAddInvalidFields = &UserInfoKeyAddInvalidFields;
+
+template <>
+struct WrapperTypeTraits<tok> {
+  static uint8_t numericValue(const tok &Value);
+
+  static void write(ByteTreeWriter &Writer, const tok &Value, unsigned Index) {
+    Writer.write(numericValue(Value), Index);
+  }
+};
+
+template <>
+  struct WrapperTypeTraits<syntax::SourcePresence> {
+  static uint8_t numericValue(const syntax::SourcePresence &Presence) {
+    switch (Presence) {
+    case syntax::SourcePresence::Missing: return 0;
+    case syntax::SourcePresence::Present: return 1;
+    }
+  }
+
+  static void write(ByteTreeWriter &Writer,
+                    const syntax::SourcePresence &Presence, unsigned Index) {
+    Writer.write(numericValue(Presence), Index);
+  }
+};
+
+template <>
+struct ObjectTraits<ArrayRef<syntax::TriviaPiece>> {
+  static unsigned numFields(const ArrayRef<syntax::TriviaPiece> &Trivia,
+                            UserInfoMap &UserInfo) {
+    return Trivia.size();
+  }
+
+  static void write(ByteTreeWriter &Writer,
+                    const ArrayRef<syntax::TriviaPiece> &Trivia,
+                    UserInfoMap &UserInfo) {
+    for (unsigned I = 0, E = Trivia.size(); I < E; ++I) {
+      Writer.write(Trivia[I], /*Index=*/I);
+    }
+  }
+};
+
+template <>
+struct ObjectTraits<ArrayRef<RC<syntax::RawSyntax>>> {
+  static unsigned numFields(const ArrayRef<RC<syntax::RawSyntax>> &Layout,
+                            UserInfoMap &UserInfo) {
+    return Layout.size();
+  }
+
+  static void write(ByteTreeWriter &Writer,
+                    const ArrayRef<RC<syntax::RawSyntax>> &Layout,
+                    UserInfoMap &UserInfo);
+};
+
+template <>
+struct ObjectTraits<std::pair<tok, StringRef>> {
+  static unsigned numFields(const std::pair<tok, StringRef> &Pair,
+                            UserInfoMap &UserInfo) {
+    return 2;
+  }
+
+  static void write(ByteTreeWriter &Writer,
+                    const std::pair<tok, StringRef> &Pair,
+                    UserInfoMap &UserInfo) {
+    Writer.write(Pair.first, /*Index=*/0);
+    Writer.write(Pair.second, /*Index=*/1);
+  }
+};
+
+template <>
+struct ObjectTraits<syntax::RawSyntax> {
+  enum NodeKind { Token = 0, Layout = 1, Omitted = 2 };
+
+  static bool shouldOmitNode(const syntax::RawSyntax &Syntax,
+                             UserInfoMap &UserInfo) {
+    if (auto ReusedNodeIds = static_cast<std::unordered_set<unsigned> *>(
+            UserInfo[UserInfoKeyReusedNodeIds])) {
+      return ReusedNodeIds->count(Syntax.getId()) > 0;
+    } else {
+      return false;
+    }
+  }
+
+  static NodeKind nodeKind(const syntax::RawSyntax &Syntax,
+                           UserInfoMap &UserInfo) {
+    if (shouldOmitNode(Syntax, UserInfo)) {
+      return Omitted;
+    } else if (Syntax.isToken()) {
+      return Token;
+    } else {
+      return Layout;
+    }
+  }
+
+  static unsigned numFields(const syntax::RawSyntax &Syntax,
+                            UserInfoMap &UserInfo) {
+    // FIXME: We know this is never set in production builds. Should we
+    // disable this code altogether in that case
+    // (e.g. if assertions are not enabled?)
+    if (UserInfo[UserInfoKeyAddInvalidFields]) {
+      switch (nodeKind(Syntax, UserInfo)) {
+      case Token: return 7;
+      case Layout: return 6;
+      case Omitted: return 2;
+      }
+    } else {
+      switch (nodeKind(Syntax, UserInfo)) {
+      case Token: return 6;
+      case Layout: return 5;
+      case Omitted: return 2;
+      }
+    }
+  }
+
+  static void write(ByteTreeWriter &Writer, const syntax::RawSyntax &Syntax,
+                    UserInfoMap &UserInfo) {
+    auto Kind = nodeKind(Syntax, UserInfo);
+
+    Writer.write(static_cast<uint8_t>(Kind), /*Index=*/0);
+    Writer.write(static_cast<uint32_t>(Syntax.getId()), /*Index=*/1);
+
+    switch (Kind) {
+    case Token:
+      Writer.write(Syntax.getPresence(), /*Index=*/2);
+      Writer.write(std::make_pair(Syntax.getTokenKind(), Syntax.getTokenText()),
+                   /*Index=*/3);
+      Writer.write(Syntax.getLeadingTrivia(), /*Index=*/4);
+      Writer.write(Syntax.getTrailingTrivia(), /*Index=*/5);
+      // FIXME: We know this is never set in production builds. Should we
+      // disable this code altogether in that case
+      // (e.g. if assertions are not enabled?)
+      if (UserInfo[UserInfoKeyAddInvalidFields]) {
+        // Test adding a new scalar field
+        StringRef Str = "invalid forward compatible field";
+        Writer.write(Str, /*Index=*/6);
+      }
+      break;
+    case Layout:
+      Writer.write(Syntax.getPresence(), /*Index=*/2);
+      Writer.write(Syntax.getKind(), /*Index=*/3);
+      Writer.write(Syntax.getLayout(), /*Index=*/4);
+      // FIXME: We know this is never set in production builds. Should we
+      // disable this code altogether in that case
+      // (e.g. if assertions are not enabled?)
+      if (UserInfo[UserInfoKeyAddInvalidFields]) {
+        // Test adding a new object
+        auto Piece = syntax::TriviaPiece::spaces(2);
+        ArrayRef<syntax::TriviaPiece> SomeTrivia(Piece);
+        Writer.write(SomeTrivia, /*Index=*/5);
+      }
+      break;
+    case Omitted:
+      // Nothing more to write
+      break;
+    }
+  }
+};
+
+} // end namespace byteTree
+
 } // end namespace swift
 
 #endif /* SWIFT_SYNTAX_SERIALIZATION_SYNTAXSERIALIZATION_H */

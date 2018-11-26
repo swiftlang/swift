@@ -142,7 +142,7 @@ bb0:
 // CHECK:   [[SIZE_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 8
 // CHECK:   [[SIZEWITNESS:%.*]] = load i8*, i8** [[SIZE_ADDR]]
 // CHECK:   [[SIZE:%.*]] = ptrtoint i8* [[SIZEWITNESS]]
-// CHECK:   [[ALIGN:%.*]] = and {{.*}} [[FLAGS]], 65535
+// CHECK:   [[ALIGN:%.*]] = and {{.*}} [[FLAGS]], 255
 // CHECK:   [[PTR:%.*]] = call noalias i8* @swift_slowAlloc({{.*}} [[SIZE]], {{.*}} [[ALIGN]])
 // CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* %1 to i8**
 // CHECK:   store i8* [[PTR]], i8** [[ADDR]]

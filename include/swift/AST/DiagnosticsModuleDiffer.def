@@ -1,0 +1,62 @@
+//===--- DiagnosticsModuleDiffer.def - Diagnostics Text ---------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This file defines diagnostics emitted during diffing two Swift modules.
+//  Each diagnostic is described using one of three kinds (error, warning, or
+//  note) along with a unique identifier, category, options, and text, and is
+//  followed by a signature describing the diagnostic argument kinds.
+//
+//===----------------------------------------------------------------------===//
+
+#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE)))
+#  error Must define either DIAG or the set {ERROR,WARNING,NOTE}
+#endif
+
+#ifndef ERROR
+#  define ERROR(ID,Options,Text,Signature)   \
+  DIAG(ERROR,ID,Options,Text,Signature)
+#endif
+
+#ifndef WARNING
+#  define WARNING(ID,Options,Text,Signature) \
+  DIAG(WARNING,ID,Options,Text,Signature)
+#endif
+
+#ifndef NOTE
+#  define NOTE(ID,Options,Text,Signature) \
+  DIAG(NOTE,ID,Options,Text,Signature)
+#endif
+
+ERROR(generic_sig_change,none,"%0 has generic signature change from %1 to %2", (StringRef, StringRef, StringRef))
+
+ERROR(raw_type_change,none,"%0(%1) is now %2 representable", (StringRef, StringRef, StringRef))
+
+ERROR(removed_decl,none,"%0 has been removed%select{| (deprecated)}1", (StringRef, bool))
+
+ERROR(moved_decl,none,"%0 has been moved to %1", (StringRef, StringRef))
+
+ERROR(renamed_decl,none,"%0 has been renamed to %1", (StringRef, StringRef))
+
+ERROR(decl_type_change,none,"%0 has %1 type change from %2 to %3", (StringRef, StringRef, StringRef, StringRef))
+
+ERROR(decl_attr_change,none,"%0 changes from %1 to %2", (StringRef, StringRef, StringRef))
+
+ERROR(decl_new_attr,none,"%0 is now %1", (StringRef, StringRef))
+
+#ifndef DIAG_NO_UNDEF
+# if defined(DIAG)
+#  undef DIAG
+# endif
+# undef NOTE
+# undef WARNING
+# undef ERROR
+#endif

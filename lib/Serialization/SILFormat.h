@@ -288,6 +288,7 @@ namespace sil_block {
                      BCFixed<1>,  // transparent
                      BCFixed<2>,  // serialized
                      BCFixed<2>,  // thunks: signature optimized/reabstraction
+                     BCFixed<1>,  // without_actually_escaping
                      BCFixed<1>,  // global_init
                      BCFixed<2>,  // inlineStrategy
                      BCFixed<2>,  // optimizationMode

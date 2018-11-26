@@ -236,7 +236,7 @@ sil public_external @captured_fixed_and_dependent_params : $@convention(thin) <A
 // CHECK:         [[T_FLAGS_ADDR:%.*]] = getelementptr {{.*}} [[T_VWTABLE]], i32 9
 // CHECK:         [[T_FLAGS_PTR:%.*]] = load {{.*}} [[T_FLAGS_ADDR]]
 // CHECK:         [[T_FLAGS:%.*]] = ptrtoint {{.*}} [[T_FLAGS_PTR]] to [[WORD]]
-// CHECK:         [[T_ALIGN_MASK:%.*]] = and [[WORD]] [[T_FLAGS]], 65535
+// CHECK:         [[T_ALIGN_MASK:%.*]] = and [[WORD]] [[T_FLAGS]], 255
 // CHECK:         [[T_ALIGN_MASK_NOT:%.*]] = xor [[WORD]] [[T_ALIGN_MASK]], -1
 // -- 32 is 64-bit offset of 'T' field, 16 for obj header + 8 for T metadata + 8 for SwiftClass field
 // CHECK-64:      [[T_UP_TO_ALIGN_1:%.*]] = add i64 32, [[T_ALIGN_MASK]]
@@ -360,7 +360,7 @@ bb0(%0 : $Base):
  return %5 : $()
 }
 
-sil public_external @partial_empty_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout ()) -> ()
+sil public_external @partial_empty_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout_aliasable ()) -> ()
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @empty_box()
 sil @empty_box : $@convention(thin) () -> () {
@@ -370,8 +370,8 @@ entry:
   // CHECK: store %swift.opaque* undef
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <()>
   %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <()>, 0
-  %f = function_ref @partial_empty_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout ()) -> ()
-  %g = partial_apply %f(%b, %ba) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout ()) -> ()
+  %f = function_ref @partial_empty_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout_aliasable ()) -> ()
+  %g = partial_apply %f(%b, %ba) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout_aliasable ()) -> ()
   return undef : $()
 }
 
@@ -516,8 +516,11 @@ bb(%0 : $Int):
 
 bb1(%err: $Error):
   %t = tuple ()
-  br bb2(%t: $())
+  br bb3(%t: $())
 
-bb2(%v : $()):
+bb2(%r : $()):
+  br bb3(%r : $())
+
+bb3(%v : $()):
   return %v : $()
 }

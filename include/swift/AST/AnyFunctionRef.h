@@ -83,29 +83,14 @@ public:
     return TheFunction.get<AbstractClosureExpr *>()->getResultType();
   }
 
-  struct YieldResult {
-    Type Ty;
-    VarDecl::Specifier Specifier;
-  };
+  ArrayRef<AnyFunctionType::Yield>
+  getYieldResults(SmallVectorImpl<AnyFunctionType::Yield> &buffer) const {
+    return getYieldResultsImpl(buffer, /*mapIntoContext*/ false);
+  }
 
-  ArrayRef<YieldResult>
-  getBodyYieldResults(SmallVectorImpl<YieldResult> &buffer) const {
-    assert(buffer.empty());
-    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
-      if (auto *AD = dyn_cast<AccessorDecl>(AFD)) {
-        if (AD->isCoroutine()) {
-          auto valueTy = AD->getStorage()->getValueInterfaceType();
-          valueTy = AD->mapTypeIntoContext(valueTy);
-          auto specifier =
-            AD->getAccessorKind() == AccessorKind::Modify
-              ? VarDecl::Specifier::InOut
-              : VarDecl::Specifier::Shared;
-          buffer.push_back({valueTy, specifier});
-          return buffer;
-        }
-      }
-    }
-    return {};
+  ArrayRef<AnyFunctionType::Yield>
+  getBodyYieldResults(SmallVectorImpl<AnyFunctionType::Yield> &buffer) const {
+    return getYieldResultsImpl(buffer, /*mapIntoContext*/ true);
   }
 
   BraceStmt *getBody() const {
@@ -195,6 +180,29 @@ public:
       return ce->getGenericSignatureOfContext();
     }
     llvm_unreachable("unexpected AnyFunctionRef representation");
+  }
+
+private:
+  ArrayRef<AnyFunctionType::Yield>
+  getYieldResultsImpl(SmallVectorImpl<AnyFunctionType::Yield> &buffer,
+                      bool mapIntoContext) const {
+    assert(buffer.empty());
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      if (auto *AD = dyn_cast<AccessorDecl>(AFD)) {
+        if (AD->isCoroutine()) {
+          auto valueTy = AD->getStorage()->getValueInterfaceType()
+                                         ->getReferenceStorageReferent();
+          if (mapIntoContext)
+            valueTy = AD->mapTypeIntoContext(valueTy);
+          YieldTypeFlags flags(AD->getAccessorKind() == AccessorKind::Modify
+                                 ? ValueOwnership::InOut
+                                 : ValueOwnership::Shared);
+          buffer.push_back(AnyFunctionType::Yield(valueTy, flags));
+          return buffer;
+        }
+      }
+    }
+    return {};
   }
 };
 #if SWIFT_COMPILER_IS_MSVC

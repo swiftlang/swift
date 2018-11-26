@@ -137,6 +137,18 @@ public:
   /// specific verification will do so.
   virtual void verify(SILFunction *F) const { verify(); }
 
+  /// Perform a potentially more expensive verification of the state of this
+  /// analysis.
+  ///
+  /// The purpose of this is to allow for more expensive verification that is
+  /// fast enough to run at the end of a pass manager once vs in between all
+  /// passes when -sil-verify-all is enabled.
+  ///
+  /// TODO: By default this is a no-op, but really it should call
+  /// verify(). Today doing a full verification seems to catch verification
+  /// errors when compiling the stdlib/overlays.
+  virtual void verifyFull() const {}
+
   /// Verify that the function \p F can be used by the analysis.
   static void verifyFunction(SILFunction *F);
 };

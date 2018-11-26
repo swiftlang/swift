@@ -91,6 +91,7 @@ public:
   llvm::Value *getAlignmentMask(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getStride(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getIsPOD(IRGenFunction &IGF, SILType T) const override;
+  llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                          SILType T) const override;
 
@@ -167,7 +168,8 @@ public:
   /// Map an extra inhabitant representation in memory to a unique 31-bit
   /// identifier, and map a valid representation of the type to -1.
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                       Address src, SILType T) const override {
+                                       Address src, SILType T,
+                                       bool isOutlined) const override {
     return getSpareBitExtraInhabitantIndex(IGF, src);
   }
   
@@ -180,7 +182,8 @@ public:
   /// to memory.
   void storeExtraInhabitant(IRGenFunction &IGF,
                             llvm::Value *index,
-                            Address dest, SILType T) const override {
+                            Address dest, SILType T,
+                            bool isOutlined) const override {
     storeSpareBitExtraInhabitant(IGF, index, dest);
   }
   

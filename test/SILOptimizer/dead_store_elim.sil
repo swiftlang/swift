@@ -1445,20 +1445,6 @@ bb0(%0 : $AB):                     // Preds: bb6 bb5 bb4 bb3
   return %2 : $Builtin.Int1
 }
 
-// CHECK-LABEL: test_is_unique_or_pinned
-// CHECK: %1 = alloc_stack
-// CHECK: store %0 to %1 
-// CHECK: is_unique_or_pinned
-// CHECK: return
-sil @test_is_unique_or_pinned : $@convention(thin) (@guaranteed AB) -> Builtin.Int1 {
-bb0(%0 : $AB):                     // Preds: bb6 bb5 bb4 bb3
-  %1 = alloc_stack $AB
-  store %0 to %1 : $*AB
-  %2 = is_unique_or_pinned %1 : $*AB
-  dealloc_stack %1 : $*AB
-  return %2 : $Builtin.Int1
-}
-
 // CHECK-LABEL: dont_remove_store
 // CHECK: load
 // CHECK: store

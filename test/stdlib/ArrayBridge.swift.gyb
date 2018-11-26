@@ -14,7 +14,7 @@
 //
 // RUN: %gyb %s -o %t/ArrayBridge.swift
 // RUN: %target-clang %S/Inputs/ArrayBridge/ArrayBridge.m -c -o %t/ArrayBridgeObjC.o -g
-// RUN:  %line-directive %t/ArrayBridge.swift -- %target-build-swift %t/ArrayBridge.swift -I %S/Inputs/ArrayBridge/ -Xlinker %t/ArrayBridgeObjC.o -o %t/ArrayBridge -swift-version 3 --
+// RUN:  %line-directive %t/ArrayBridge.swift -- %target-build-swift %t/ArrayBridge.swift -I %S/Inputs/ArrayBridge/ -Xlinker %t/ArrayBridgeObjC.o -o %t/ArrayBridge -swift-version 4.2 --
 
 // RUN: %target-codesign %t/ArrayBridge
 // RUN: %target-run %t/ArrayBridge
@@ -127,7 +127,7 @@ func == (lhs: BridgeableValue, rhs: BridgeableValue) -> Bool {
 
 // A class used to test various Objective-C thunks.
 class Thunks : NSObject {
-  func createSubclass(_ value: Int) -> AnyObject {
+  @objc func createSubclass(_ value: Int) -> AnyObject {
     return Subclass(value)
   }
 
@@ -296,8 +296,8 @@ tests.test("testExplicitlyBridged/${Any}") {
 
   let bridgeableValuesAsNSArray = bridgeableValues as NSArray
   expectEqual(2, bridgeableValuesAsNSArray.count)
-  expectEqual(42, (bridgeableValuesAsNSArray[0] as AnyObject).value)
-  expectEqual(17, (bridgeableValuesAsNSArray[1] as AnyObject).value)
+  expectEqual(42, (bridgeableValuesAsNSArray[0] as! Subclass).value)
+  expectEqual(17, (bridgeableValuesAsNSArray[1] as! Subclass).value)
 
   // Make sure we can bridge back.
   let roundTrippedValues = Swift._forceBridgeFromObjectiveC(

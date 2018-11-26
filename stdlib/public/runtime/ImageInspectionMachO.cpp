@@ -38,9 +38,6 @@ constexpr const char ProtocolConformancesSection[] = "__swift5_proto";
 /// The Mach-O section name for the section containing type references.
 /// This lives within SEG_TEXT.
 constexpr const char TypeMetadataRecordSection[] = "__swift5_types";
-/// The Mach-O section name for the section containing type field references.
-/// This lives within SEG_TEXT.
-constexpr const char TypeFieldRecordSection[] = "__swift5_fieldmd";
 
 #if __POINTER_WIDTH__ == 64
 using mach_header_platform = mach_header_64;
@@ -88,12 +85,6 @@ void swift::initializeTypeMetadataRecordLookup() {
     addImageCallback<TypeMetadataRecordSection,
                      addImageTypeMetadataRecordBlockCallback>);
   
-}
-
-void swift::initializeTypeFieldLookup() {
-  _dyld_register_func_for_add_image(
-      addImageCallback<TypeFieldRecordSection,
-                       addImageTypeFieldDescriptorBlockCallback>);
 }
 
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {

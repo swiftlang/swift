@@ -274,10 +274,6 @@ void SILDeclRef::print(raw_ostream &OS) const {
         printValueDecl(accessor->getStorage(), OS);
         OS << "!setter";
         break;
-      case AccessorKind::MaterializeForSet:
-        printValueDecl(accessor->getStorage(), OS);
-        OS << "!materializeForSet";
-        break;
       case AccessorKind::Address:
         printValueDecl(accessor->getStorage(), OS);
         OS << "!addressor";
@@ -1424,7 +1420,10 @@ public:
   }
 
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+    *this << getIDAndType(CI->getOperand()) << " to ";
+    if (CI->withoutActuallyEscaping())
+      *this << "[without_actually_escaping] ";
+    *this << CI->getType();
   }
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *CI) {
     *this << (CI->isLifetimeGuaranteed() ? "" : "[not_guaranteed] ")
@@ -1781,15 +1780,7 @@ public:
       *this << "[nonatomic] ";
     *this << getIDAndType(I->getOperand(0));
   }
-  void visitStrongPinInst(StrongPinInst *I) {
-    if (I->isNonAtomic())
-      *this << "[nonatomic] ";
-    *this << getIDAndType(I->getOperand());
-  }
   void visitIsUniqueInst(IsUniqueInst *CUI) {
-    *this << getIDAndType(CUI->getOperand());
-  }
-  void visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *CUI) {
     *this << getIDAndType(CUI->getOperand());
   }
   void visitIsEscapingClosureInst(IsEscapingClosureInst *CUI) {
@@ -2299,6 +2290,8 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     break;
   case IsReabstractionThunk: OS << "[reabstraction_thunk] "; break;
   }
+  if (isWithoutActuallyEscapingThunk())
+    OS << "[without_actually_escaping] ";
 
   if (isGlobalInit())
     OS << "[global_init] ";

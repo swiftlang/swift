@@ -170,19 +170,39 @@ SILBasicBlock *replaceSwitchDest(SwitchEnumTy *S,
     return DefaultBB;
 }
 
+static bool hasBranchArguments(TermInst *T, unsigned EdgeIdx) {
+  if (auto Br = dyn_cast<BranchInst>(T)) {
+    assert(EdgeIdx == 0);
+    return Br->getNumArgs() != 0;
+  } else if (auto CondBr = dyn_cast<CondBranchInst>(T)) {
+    assert(EdgeIdx <= 1);
+    return EdgeIdx == CondBranchInst::TrueIdx
+             ? !CondBr->getTrueArgs().empty()
+             : !CondBr->getFalseArgs().empty();
+  } else {
+    // No other terminator have branch arguments.
+    return false;
+  }
+}
+
 void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
                                SILBasicBlock *NewDest, bool PreserveArgs) {
+  // In many cases, we can just rewrite the successor in place.
+  if (PreserveArgs || !hasBranchArguments(T, EdgeIdx)) {
+    T->getSuccessors()[EdgeIdx] = NewDest;
+    return;
+  }
+
+  // Otherwise, we have to build a new branch instruction.
   SILBuilderWithScope B(T);
 
   switch (T->getTermKind()) {
   // Only Branch and CondBranch may have arguments.
   case TermKind::BranchInst: {
-    auto Br = dyn_cast<BranchInst>(T);
+    auto Br = cast<BranchInst>(T);
     SmallVector<SILValue, 8> Args;
-    if (PreserveArgs) {
-      for (auto Arg : Br->getArgs())
-        Args.push_back(Arg);
-    }
+    for (auto Arg : Br->getArgs())
+      Args.push_back(Arg);
     B.createBranch(T->getLoc(), NewDest, Args);
     Br->dropAllReferences();
     Br->eraseFromParent();
@@ -190,23 +210,21 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
   }
 
   case TermKind::CondBranchInst: {
-    auto CondBr = dyn_cast<CondBranchInst>(T);
+    auto CondBr = cast<CondBranchInst>(T);
+    SILBasicBlock *TrueDest = CondBr->getTrueBB();
+    SILBasicBlock *FalseDest = CondBr->getFalseBB();
+
     SmallVector<SILValue, 8> TrueArgs;
-    if (EdgeIdx == CondBranchInst::FalseIdx || PreserveArgs) {
+    SmallVector<SILValue, 8> FalseArgs;
+    if (EdgeIdx == CondBranchInst::FalseIdx) {
+      FalseDest = NewDest;
       for (auto Arg : CondBr->getTrueArgs())
         TrueArgs.push_back(Arg);
-    }
-    SmallVector<SILValue, 8> FalseArgs;
-    if (EdgeIdx == CondBranchInst::TrueIdx || PreserveArgs) {
+    } else {
+      TrueDest = NewDest;
       for (auto Arg : CondBr->getFalseArgs())
         FalseArgs.push_back(Arg);
     }
-    SILBasicBlock *TrueDest = CondBr->getTrueBB();
-    SILBasicBlock *FalseDest = CondBr->getFalseBB();
-    if (EdgeIdx == CondBranchInst::TrueIdx)
-      TrueDest = NewDest;
-    else
-      FalseDest = NewDest;
 
     B.createCondBranch(CondBr->getLoc(), CondBr->getCondition(), TrueDest,
                        TrueArgs, FalseDest, FalseArgs, CondBr->getTrueBBCount(),
@@ -216,120 +234,9 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     return;
   }
 
-  case TermKind::SwitchValueInst: {
-    auto SII = dyn_cast<SwitchValueInst>(T);
-    SmallVector<std::pair<SILValue, SILBasicBlock *>, 8> Cases;
-    auto *DefaultBB = replaceSwitchDest(SII, Cases, EdgeIdx, NewDest);
-    B.createSwitchValue(SII->getLoc(), SII->getOperand(), DefaultBB, Cases);
-    SII->eraseFromParent();
-    return;
+  default:
+    llvm_unreachable("only branch and cond_branch have branch arguments");
   }
-
-  case TermKind::SwitchEnumInst: {
-    auto SEI = dyn_cast<SwitchEnumInst>(T);
-    SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> Cases;
-    auto *DefaultBB = replaceSwitchDest(SEI, Cases, EdgeIdx, NewDest);
-    B.createSwitchEnum(SEI->getLoc(), SEI->getOperand(), DefaultBB, Cases);
-    SEI->eraseFromParent();
-    return;
-  }
-
-  case TermKind::SwitchEnumAddrInst: {
-    auto SEI = dyn_cast<SwitchEnumAddrInst>(T);
-    SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> Cases;
-    auto *DefaultBB = replaceSwitchDest(SEI, Cases, EdgeIdx, NewDest);
-    B.createSwitchEnumAddr(SEI->getLoc(), SEI->getOperand(), DefaultBB, Cases);
-    SEI->eraseFromParent();
-    return;
-  }
-
-  case TermKind::DynamicMethodBranchInst: {
-    auto DMBI = dyn_cast<DynamicMethodBranchInst>(T);
-    assert(EdgeIdx == 0 || EdgeIdx == 1 && "Invalid edge index");
-    auto HasMethodBB = !EdgeIdx ? NewDest : DMBI->getHasMethodBB();
-    auto NoMethodBB = EdgeIdx ? NewDest : DMBI->getNoMethodBB();
-    B.createDynamicMethodBranch(DMBI->getLoc(), DMBI->getOperand(),
-                                DMBI->getMember(), HasMethodBB, NoMethodBB);
-    DMBI->eraseFromParent();
-    return;
-  }
-
-  case TermKind::CheckedCastBranchInst: {
-    auto CBI = dyn_cast<CheckedCastBranchInst>(T);
-    assert(EdgeIdx == 0 || EdgeIdx == 1 && "Invalid edge index");
-    auto SuccessBB = !EdgeIdx ? NewDest : CBI->getSuccessBB();
-    auto FailureBB = EdgeIdx ? NewDest : CBI->getFailureBB();
-    B.createCheckedCastBranch(CBI->getLoc(), CBI->isExact(), CBI->getOperand(),
-                              CBI->getCastType(), SuccessBB, FailureBB,
-                              CBI->getTrueBBCount(), CBI->getFalseBBCount());
-    CBI->eraseFromParent();
-    return;
-  }
-
-  case TermKind::CheckedCastValueBranchInst: {
-    auto CBI = dyn_cast<CheckedCastValueBranchInst>(T);
-    assert(EdgeIdx == 0 || EdgeIdx == 1 && "Invalid edge index");
-    auto SuccessBB = !EdgeIdx ? NewDest : CBI->getSuccessBB();
-    auto FailureBB = EdgeIdx ? NewDest : CBI->getFailureBB();
-    B.createCheckedCastValueBranch(CBI->getLoc(), CBI->getOperand(),
-                                   CBI->getCastType(), SuccessBB, FailureBB);
-    CBI->eraseFromParent();
-    return;
-  }
-
-  case TermKind::CheckedCastAddrBranchInst: {
-    auto CBI = dyn_cast<CheckedCastAddrBranchInst>(T);
-    assert(EdgeIdx == 0 || EdgeIdx == 1 && "Invalid edge index");
-    auto SuccessBB = !EdgeIdx ? NewDest : CBI->getSuccessBB();
-    auto FailureBB = EdgeIdx ? NewDest : CBI->getFailureBB();
-    auto TrueCount = CBI->getTrueBBCount();
-    auto FalseCount = CBI->getFalseBBCount();
-    B.createCheckedCastAddrBranch(CBI->getLoc(), CBI->getConsumptionKind(),
-                                  CBI->getSrc(), CBI->getSourceType(),
-                                  CBI->getDest(), CBI->getTargetType(),
-                                  SuccessBB, FailureBB, TrueCount, FalseCount);
-    CBI->eraseFromParent();
-    return;
-  }
-
-  case TermKind::TryApplyInst: {
-    auto *TAI = dyn_cast<TryApplyInst>(T);
-    assert((EdgeIdx == 0 || EdgeIdx == 1) && "Invalid edge index");
-    auto *NormalBB = !EdgeIdx ? NewDest : TAI->getNormalBB();
-    auto *ErrorBB = EdgeIdx ? NewDest : TAI->getErrorBB();
-    SmallVector<SILValue, 4> Arguments;
-    for (auto &Op : TAI->getArgumentOperands())
-      Arguments.push_back(Op.get());
-
-    B.createTryApply(TAI->getLoc(), TAI->getCallee(), TAI->getSubstitutionMap(),
-                     Arguments, NormalBB, ErrorBB);
-
-    TAI->eraseFromParent();
-    return;
-  }
-
-  case TermKind::YieldInst: {
-    auto *YI = cast<YieldInst>(T);
-    assert((EdgeIdx == 0 || EdgeIdx == 1) && "Invalid edge index");
-    auto *resumeBB = !EdgeIdx ? NewDest : YI->getResumeBB();
-    auto *unwindBB = EdgeIdx ? NewDest : YI->getUnwindBB();
-    SmallVector<SILValue, 4> yieldedValues;
-    for (auto value : YI->getYieldedValues())
-      yieldedValues.push_back(value);
-
-    B.createYield(YI->getLoc(), yieldedValues, resumeBB, unwindBB);
-
-    YI->eraseFromParent();
-    return;
-  }
-
-  case TermKind::ReturnInst:
-  case TermKind::ThrowInst:
-  case TermKind::UnreachableInst:
-  case TermKind::UnwindInst:
-    llvm_unreachable("Branch target cannot be changed for this terminator instruction!");
-  }
-  llvm_unreachable("Not yet implemented!");
 }
 
 
@@ -518,13 +425,16 @@ SILBasicBlock *getNthEdgeBlock(SwitchInstTy *S, unsigned EdgeIdx) {
 
 static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
                         SmallVectorImpl<SILValue> &Args) {
-  if (auto Br = dyn_cast<BranchInst>(T)) {
+  switch (T->getKind()) {
+  case SILInstructionKind::BranchInst: {
+    auto Br = cast<BranchInst>(T);
     for (auto V : Br->getArgs())
       Args.push_back(V);
     return;
   }
 
-  if (auto CondBr = dyn_cast<CondBranchInst>(T)) {
+  case SILInstructionKind::CondBranchInst: {
+    auto CondBr = cast<CondBranchInst>(T);
     assert(EdgeIdx < 2);
     auto OpdArgs = EdgeIdx ? CondBr->getFalseArgs() : CondBr->getTrueArgs();
     for (auto V: OpdArgs)
@@ -532,7 +442,8 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     return;
   }
 
-  if (auto SEI = dyn_cast<SwitchValueInst>(T)) {
+  case SILInstructionKind::SwitchValueInst: {
+    auto SEI = cast<SwitchValueInst>(T);
     auto *SuccBB = getNthEdgeBlock(SEI, EdgeIdx);
     assert(SuccBB->getNumArguments() == 0 && "Can't take an argument");
     (void) SuccBB;
@@ -541,7 +452,9 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
 
   // A switch_enum can implicitly pass the enum payload. We need to look at the
   // destination block to figure this out.
-  if (auto SEI = dyn_cast<SwitchEnumInstBase>(T)) {
+  case SILInstructionKind::SwitchEnumInst:
+  case SILInstructionKind::SwitchEnumAddrInst: {
+    auto SEI = cast<SwitchEnumInstBase>(T);
     auto *SuccBB = getNthEdgeBlock(SEI, EdgeIdx);
     assert(SuccBB->getNumArguments() < 2 && "Can take at most one argument");
     if (!SuccBB->getNumArguments())
@@ -552,7 +465,8 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
   }
 
   // A dynamic_method_br passes the function to the first basic block.
-  if (auto DMBI = dyn_cast<DynamicMethodBranchInst>(T)) {
+  case SILInstructionKind::DynamicMethodBranchInst: {
+    auto DMBI = cast<DynamicMethodBranchInst>(T);
     auto *SuccBB =
         (EdgeIdx == 0) ? DMBI->getHasMethodBB() : DMBI->getNoMethodBB();
     if (!SuccBB->getNumArguments())
@@ -563,7 +477,8 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
   }
 
   /// A checked_cast_br passes the result of the cast to the first basic block.
-  if (auto CBI = dyn_cast<CheckedCastBranchInst>(T)) {
+  case SILInstructionKind::CheckedCastBranchInst: {
+    auto CBI = cast<CheckedCastBranchInst>(T);
     auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!SuccBB->getNumArguments())
       return;
@@ -571,7 +486,8 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
         SuccBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
     return;
   }
-  if (auto CBI = dyn_cast<CheckedCastAddrBranchInst>(T)) {
+  case SILInstructionKind::CheckedCastAddrBranchInst: {
+    auto CBI = cast<CheckedCastAddrBranchInst>(T);
     auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!SuccBB->getNumArguments())
       return;
@@ -579,7 +495,8 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
         SuccBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
     return;
   }
-  if (auto CBI = dyn_cast<CheckedCastValueBranchInst>(T)) {
+  case SILInstructionKind::CheckedCastValueBranchInst: {
+    auto CBI = cast<CheckedCastValueBranchInst>(T);
     auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!SuccBB->getNumArguments())
       return;
@@ -588,7 +505,8 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     return;
   }
 
-  if (auto *TAI = dyn_cast<TryApplyInst>(T)) {
+  case SILInstructionKind::TryApplyInst: {
+    auto *TAI = cast<TryApplyInst>(T);
     auto *SuccBB = EdgeIdx == 0 ? TAI->getNormalBB() : TAI->getErrorBB();
     if (!SuccBB->getNumArguments())
       return;
@@ -597,9 +515,23 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     return;
   }
 
-  // For now this utility is only used to split critical edges involving
-  // cond_br.
-  llvm_unreachable("Not yet implemented");
+  case SILInstructionKind::YieldInst:
+    // The edges from 'yield' never have branch arguments.
+    return;
+
+  case SILInstructionKind::ReturnInst:
+  case SILInstructionKind::ThrowInst:
+  case SILInstructionKind::UnwindInst:
+  case SILInstructionKind::UnreachableInst:
+    llvm_unreachable("terminator never has successors");
+
+#define TERMINATOR(ID, ...)
+#define INST(ID, BASE) \
+  case SILInstructionKind::ID:
+#include "swift/SIL/SILNodes.def"
+    llvm_unreachable("not a terminator");
+  }
+  llvm_unreachable("bad instruction kind");
 }
 
 /// Splits the basic block at the iterator with an unconditional branch and
@@ -645,7 +577,7 @@ SILBasicBlock *swift::splitEdge(TermInst *T, unsigned EdgeIdx,
   SILBasicBlock *DestBB = T->getSuccessors()[EdgeIdx];
 
   // Create a new basic block in the edge, and insert it after the SrcBB.
-  auto *EdgeBB = Fn->createBasicBlock(SrcBB);
+  auto *EdgeBB = Fn->createBasicBlockAfter(SrcBB);
 
   SmallVector<SILValue, 16> Args;
   getEdgeArgs(T, EdgeIdx, EdgeBB, Args);

@@ -1073,12 +1073,9 @@ public:
   void visitCopyBlockWithoutEscapingInst(CopyBlockWithoutEscapingInst *i) {
     llvm_unreachable("not valid in canonical SIL");
   }
-  void visitStrongPinInst(StrongPinInst *i);
-  void visitStrongUnpinInst(StrongUnpinInst *i);
   void visitStrongRetainInst(StrongRetainInst *i);
   void visitStrongReleaseInst(StrongReleaseInst *i);
   void visitIsUniqueInst(IsUniqueInst *i);
-  void visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *i);
   void visitIsEscapingClosureInst(IsEscapingClosureInst *i);
   void visitDeallocStackInst(DeallocStackInst *i);
   void visitDeallocBoxInst(DeallocBoxInst *i);
@@ -1246,8 +1243,12 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
   // Apply sanitizer attributes to the function.
   // TODO: Check if the function is supposed to be excluded from ASan either by
   // being in the external file or via annotations.
-  if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Address)
-    CurFn->addFnAttr(llvm::Attribute::SanitizeAddress);
+  if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Address) {
+    // Disable ASan in coroutines; stack poisoning is not going to do
+    // reasonable things to the structural invariants.
+    if (!f->getLoweredFunctionType()->isCoroutine())
+      CurFn->addFnAttr(llvm::Attribute::SanitizeAddress);
+  }
   if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread) {
     auto declContext = f->getDeclContext();
     if (declContext && isa<DestructorDecl>(declContext))
@@ -1257,6 +1258,11 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
       CurFn->addFnAttr("sanitize_thread_no_checking_at_run_time");
     else
       CurFn->addFnAttr(llvm::Attribute::SanitizeThread);
+  }
+
+  // Disable inlining of coroutine functions until we split.
+  if (f->getLoweredFunctionType()->isCoroutine()) {
+    CurFn->addFnAttr(llvm::Attribute::NoInline);
   }
 }
 
@@ -3792,25 +3798,6 @@ void IRGenSILFunction::visitCopyBlockInst(CopyBlockInst *i) {
   setLoweredExplosion(i, result);
 }
 
-void IRGenSILFunction::visitStrongPinInst(swift::StrongPinInst *i) {
-  Explosion lowered = getLoweredExplosion(i->getOperand());
-  llvm::Value *object = lowered.claimNext();
-  llvm::Value *pinHandle =
-      emitNativeTryPin(object, i->isAtomic() ? irgen::Atomicity::Atomic
-                                             : irgen::Atomicity::NonAtomic);
-
-  Explosion result;
-  result.add(pinHandle);
-  setLoweredExplosion(i, result);
-}
-
-void IRGenSILFunction::visitStrongUnpinInst(swift::StrongUnpinInst *i) {
-  Explosion lowered = getLoweredExplosion(i->getOperand());
-  llvm::Value *pinHandle = lowered.claimNext();
-  emitNativeUnpin(pinHandle, i->isAtomic() ? irgen::Atomicity::Atomic
-                                           : irgen::Atomicity::NonAtomic);
-}
-
 void IRGenSILFunction::visitStrongRetainInst(swift::StrongRetainInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
   auto &ti = cast<ReferenceTypeInfo>(getTypeInfo(i->getOperand()->getType()));
@@ -3927,7 +3914,7 @@ static bool hasReferenceSemantics(IRGenSILFunction &IGF,
 }
 
 static llvm::Value *emitIsUnique(IRGenSILFunction &IGF, SILValue operand,
-                                 SourceLoc loc, bool checkPinned) {
+                                 SourceLoc loc) {
   if (!hasReferenceSemantics(IGF, operand->getType())) {
     IGF.emitTrap(/*EmitUnreachable=*/false);
     return llvm::UndefValue::get(IGF.IGM.Int1Ty);
@@ -3938,21 +3925,12 @@ static llvm::Value *emitIsUnique(IRGenSILFunction &IGF, SILValue operand,
     operTI.loadRefcountedPtr(IGF, loc, IGF.getLoweredAddress(operand));
 
   return
-    IGF.emitIsUniqueCall(ref.getValue(), loc, ref.isNonNull(), checkPinned);
+    IGF.emitIsUniqueCall(ref.getValue(), loc, ref.isNonNull());
 }
 
 void IRGenSILFunction::visitIsUniqueInst(swift::IsUniqueInst *i) {
   llvm::Value *result = emitIsUnique(*this, i->getOperand(),
-                                     i->getLoc().getSourceLoc(), false);
-  Explosion out;
-  out.add(result);
-  setLoweredExplosion(i, out);
-}
-
-void IRGenSILFunction::
-visitIsUniqueOrPinnedInst(swift::IsUniqueOrPinnedInst *i) {
-  llvm::Value *result = emitIsUnique(*this, i->getOperand(),
-                                     i->getLoc().getSourceLoc(), true);
+                                     i->getLoc().getSourceLoc());
   Explosion out;
   out.add(result);
   setLoweredExplosion(i, out);
@@ -4001,9 +3979,15 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
   VarDecl *Decl = i->getDecl();
   // Describe the underlying alloca. This way an llvm.dbg.declare instrinsic
   // is used, which is valid for the entire lifetime of the alloca.
-  if (auto *BitCast = dyn_cast<llvm::BitCastInst>(addr))
-    if (auto *Alloca = dyn_cast<llvm::AllocaInst>(BitCast->getOperand(0)))
+  if (auto *BitCast = dyn_cast<llvm::BitCastInst>(addr)) {
+    auto *Op0 = BitCast->getOperand(0);
+    if (auto *Alloca = dyn_cast<llvm::AllocaInst>(Op0))
       addr = Alloca;
+    else if (auto *CoroAllocaGet = dyn_cast<llvm::IntrinsicInst>(Op0)) {
+      if (CoroAllocaGet->getIntrinsicID() == llvm::Intrinsic::coro_alloca_get)
+        addr = CoroAllocaGet;
+    }
+  }
 
   auto DS = i->getDebugScope();
   if (!DS)
@@ -4016,7 +4000,9 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
   StringRef Name = getVarName(i, IsAnonymous);
 
   // At this point addr must be an alloca or an undef.
-  assert(isa<llvm::AllocaInst>(addr) || isa<llvm::UndefValue>(addr));
+  assert(isa<llvm::AllocaInst>(addr) || isa<llvm::UndefValue>(addr) ||
+         isa<llvm::IntrinsicInst>(addr));
+
   auto Indirection = DirectValue;
   if (!IGM.IRGen.Opts.shouldOptimize())
     if (auto *Alloca = dyn_cast<llvm::AllocaInst>(addr))

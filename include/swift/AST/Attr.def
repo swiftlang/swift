@@ -345,12 +345,7 @@ DECL_ATTR(_restatedObjCConformance, RestatedObjCConformance,
   OnProtocol |
   LongAttribute | RejectByParser |
   NotSerialized, 70)
-// HACK: Attribute needed to preserve source compatibility by downgrading errors
-// due to an SDK change in Dispatch
-SIMPLE_DECL_ATTR(_downgrade_exhaustivity_check, DowngradeExhaustivityCheck,
-  OnEnumElement |
-  LongAttribute | UserInaccessible,
-  71)
+// NOTE: 71 is unused
 SIMPLE_DECL_ATTR(_implicitly_unwrapped_optional, ImplicitlyUnwrappedOptional,
   OnFunc | OnAccessor | OnVar | OnParam | OnSubscript | OnConstructor |
   RejectByParser,

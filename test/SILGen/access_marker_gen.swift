@@ -134,22 +134,22 @@ func testClassLetProperty(c: C) -> Int {
 class D {
   var x: Int = 0
 }
-//   materializeForSet callback
-// CHECK-LABEL: sil private [transparent] @$S17access_marker_gen1DC1xSivmytfU_
-// CHECK:       end_unpaired_access [dynamic] %1 : $*Builtin.UnsafeValueBuffer
 
-//   materializeForSet
-// CHECK-LABEL: sil hidden [transparent] @$S17access_marker_gen1DC1xSivm
-// CHECK:       [[T0:%.*]] = ref_element_addr %2 : $D, #D.x
-// CHECK-NEXT:  begin_unpaired_access [modify] [dynamic] [[T0]] : $*Int
+//   modify
+// CHECK-LABEL: sil hidden [transparent] @$S17access_marker_gen1DC1xSivM
+// CHECK:       [[T0:%.*]] = ref_element_addr %0 : $D, #D.x
+// CHECK-NEXT:  [[T1:%.*]] = begin_access [modify] [dynamic] [[T0]] : $*Int
+// CHECK:       yield [[T1]] : $*Int
+// CHECK:       end_access [[T1]] : $*Int
+// CHECK:       end_access [[T1]] : $*Int
 
 func testDispatchedClassInstanceProperty(d: D) {
   modify(&d.x)
 }
 // CHECK-LABEL: sil hidden @$S17access_marker_gen35testDispatchedClassInstanceProperty1dyAA1DC_tF
 // CHECK:     bb0([[D:%.*]] : @guaranteed $D
-// CHECK:       [[METHOD:%.*]] = class_method [[D]] : $D, #D.x!materializeForSet.1
-// CHECK:       apply [[METHOD]]({{.*}}, [[D]])
-// CHECK:       begin_access [modify] [unsafe]
+// CHECK:       [[METHOD:%.*]] = class_method [[D]] : $D, #D.x!modify.1
+// CHECK:       begin_apply [[METHOD]]([[D]])
 // CHECK-NOT:   begin_access
+// CHECK:       end_apply
 

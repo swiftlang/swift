@@ -211,8 +211,11 @@ enum DIUseKind {
   /// The instruction is a store to a member of a larger struct value.
   PartialStore,
 
-  /// An indirect 'inout' parameter of an Apply instruction.
-  InOutUse,
+  /// An 'inout' argument of a function application.
+  InOutArgument,
+
+  /// An 'inout' self argument of a function application.
+  InOutSelfArgument,
 
   /// An indirect 'in' parameter of an Apply instruction.
   IndirectIn,

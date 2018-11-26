@@ -449,8 +449,7 @@ public:
 
 private:
   bool validateNominalParent(NominalTypeDecl *decl, Type parent) {
-    auto parentDecl =
-      decl->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto parentDecl = decl->getDeclContext()->getSelfNominalTypeDecl();
 
     // If we don't have a parent type, fast-path.
     if (!parent) {

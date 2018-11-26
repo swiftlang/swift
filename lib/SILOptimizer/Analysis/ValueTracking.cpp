@@ -55,10 +55,6 @@ static bool isLocalObject(SILValue Obj) {
     V = getUnderlyingObject(V);
     if (isa<AllocationInst>(V))
       continue;
-    if (auto I = dyn_cast<StrongPinInst>(V)) {
-      WorkList.push_back(I->getOperand());
-      continue;
-    }
     if (isa<StructInst>(V) || isa<TupleInst>(V) || isa<EnumInst>(V)) {
       // A compound value is local, if all of its components are local.
       for (auto &Op : cast<SingleValueInstruction>(V)->getAllOperands()) {

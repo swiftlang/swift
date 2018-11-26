@@ -291,8 +291,7 @@ void SourceLookupCache::lookupClassMembers(AccessPathTy accessPath,
         continue;
 
       for (ValueDecl *vd : member.second) {
-        auto *nominal = vd->getDeclContext()
-           ->getAsNominalTypeOrNominalTypeExtensionContext();
+        auto *nominal = vd->getDeclContext()->getSelfNominalTypeDecl();
         if (nominal && nominal->getName() == accessPath.front().first)
           consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup);
       }
@@ -326,8 +325,7 @@ void SourceLookupCache::lookupClassMember(AccessPathTy accessPath,
   
   if (!accessPath.empty()) {
     for (ValueDecl *vd : iter->second) {
-      auto *nominal = vd->getDeclContext()
-         ->getAsNominalTypeOrNominalTypeExtensionContext();
+      auto *nominal = vd->getDeclContext()->getSelfNominalTypeDecl();
       if (nominal && nominal->getName() == accessPath.front().first)
         results.push_back(vd);
     }
@@ -411,7 +409,7 @@ void ModuleDecl::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   size_t oldSize = results.size();
   bool alreadyInPrivateContext = false;
 
-  auto containerDecl = container->getAsDeclOrDeclExtensionContext();
+  auto containerDecl = container->getAsDecl();
   // If FileUnit, then use FileUnit::lookupValue instead.
   assert(containerDecl != nullptr && "This context does not support lookup.");
 

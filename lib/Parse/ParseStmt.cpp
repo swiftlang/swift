@@ -922,7 +922,6 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
                        /*NameLoc=*/ SourceLoc(),
                        /*Throws=*/ false, /*ThrowsLoc=*/ SourceLoc(),
                        /*generic params*/ nullptr,
-                       /*selfDecl*/ nullptr,
                        params,
                        TypeLoc(),
                        CurDeclContext);
@@ -1474,23 +1473,25 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
   }
 
   // Conditional bindings must have an initializer.
-  Expr *Init;
+  ParserResult<Expr> Init;
   if (Tok.is(tok::equal)) {
     SyntaxParsingContext InitCtxt(SyntaxContext, SyntaxKind::InitializerClause);
     consumeToken();
-    ParserResult<Expr> InitExpr =
-        parseExprBasic(diag::expected_expr_conditional_var);
-    Init = InitExpr.getPtrOrNull();
-    if (InitExpr.hasCodeCompletion())
-      Status.setHasCodeCompletion();
+    Init = parseExprBasic(diag::expected_expr_conditional_var);
   } else {
-    // Although we require an initializer, recover by parsing as if it were
-    // merely omitted.
     diagnose(Tok, diag::conditional_var_initializer_required);
-    Init = new (Context) ErrorExpr(ThePattern.get()->getEndLoc());
   }
-  
-  result.push_back({IntroducerLoc, ThePattern.get(), Init});
+
+  if (Init.hasCodeCompletion())
+    Status.setHasCodeCompletion();
+
+  if (Init.isNull()) {
+    // Recover by creating ErrorExpr.
+    Init = makeParserResult(new (Context)
+                                ErrorExpr(ThePattern.get()->getEndLoc()));
+  }
+
+  result.push_back({IntroducerLoc, ThePattern.get(), Init.get()});
   
   // Add variable bindings from the pattern to our current scope and mark
   // them as being having a non-pattern-binding initializer.

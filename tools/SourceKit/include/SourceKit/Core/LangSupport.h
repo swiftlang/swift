@@ -212,6 +212,8 @@ enum class SyntaxTreeTransferMode {
   Full
 };
 
+enum class SyntaxTreeSerializationFormat { JSON, ByteTree };
+
 class EditorConsumer {
   virtual void anchor();
 public:
@@ -270,10 +272,6 @@ public:
     return syntaxTreeTransferMode() != SyntaxTreeTransferMode::Off;
   }
   virtual SyntaxTreeTransferMode syntaxTreeTransferMode() = 0;
-
-  virtual bool syntaxReuseInfoEnabled() = 0;
-  virtual void
-  handleSyntaxReuseRegions(std::vector<SourceFileRange> ReuseRegions) = 0;
 
   virtual void finished() {}
 };

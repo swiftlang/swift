@@ -858,7 +858,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     auto object = *(reinterpret_cast<HeapObject**>(srcDynamicValue));
     destExistential->Value = object;
     if (!canConsumeDynamicValue || !(flags & DynamicCastFlags::TakeOnSuccess)) {
-      swift_unknownRetain(object);
+      swift_unknownObjectRetain(object);
     }
     maybeDeallocateSource(true);
     return true;
@@ -1226,7 +1226,7 @@ static bool _dynamicCastUnknownClassIndirect(OpaqueValue *dest,
     *destSlot = result;
 
     if (!(flags & DynamicCastFlags::TakeOnSuccess)) {
-      swift_unknownRetain(result);
+      swift_unknownObjectRetain(result);
     }
     return true;
   }
@@ -1239,7 +1239,7 @@ static bool _dynamicCastUnknownClassIndirect(OpaqueValue *dest,
   // If the cast failed, destroy the input and return false.
   if (!result) {
     if (flags & DynamicCastFlags::DestroyOnFailure) {
-      swift_unknownRelease(object);
+      swift_unknownObjectRelease(object);
     }
     return false;
   }
@@ -1247,7 +1247,7 @@ static bool _dynamicCastUnknownClassIndirect(OpaqueValue *dest,
   // Otherwise, store to the destination and return true.
   *destSlot = result;
   if (!(flags & DynamicCastFlags::TakeOnSuccess)) {
-    swift_unknownRetain(result);
+    swift_unknownObjectRetain(result);
   }
   return true;
 }
@@ -1472,7 +1472,7 @@ static bool _dynamicCastUnknownClassToMetatype(OpaqueValue *dest,
   if (flags & DynamicCastFlags::Unconditional)
     swift_dynamicCastFailure(_swift_getClass(object), targetType);
   if (flags & DynamicCastFlags::DestroyOnFailure)
-    swift_unknownRelease((HeapObject*) object);
+    swift_unknownObjectRelease((HeapObject*) object);
   return false;
 }
 
@@ -1637,7 +1637,7 @@ static bool _dynamicCastUnknownClassToExistentialMetatype(OpaqueValue *dest,
   if (flags & DynamicCastFlags::Unconditional)
     swift_dynamicCastFailure(_swift_getClass(object), targetType);
   if (flags & DynamicCastFlags::DestroyOnFailure)
-    swift_unknownRelease((HeapObject*) object);
+    swift_unknownObjectRelease((HeapObject*) object);
   return false;
 }
 
@@ -2569,7 +2569,7 @@ static bool _dynamicCastValueToClassViaObjCBridgeable(
     success = true;
   } else {
     // We don't need the object anymore.
-    swift_unknownRelease(srcBridgedObject);
+    swift_unknownObjectRelease(srcBridgedObject);
     success = false;
   }
 
@@ -2648,7 +2648,7 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
   bool alwaysConsumeSrc = (flags & DynamicCastFlags::TakeOnSuccess) &&
                           (flags & DynamicCastFlags::DestroyOnFailure);
   if (!alwaysConsumeSrc) {
-    swift_unknownRetain(srcObject);
+    swift_unknownObjectRetain(srcObject);
   }
 
   // The extra byte is for the tag.
@@ -2700,7 +2700,7 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
                 (HeapObject *)srcObject, (OpaqueValue *)optDestBuffer,
                 targetType, targetType, targetBridgeWitness);
   }
-  swift_unknownRelease(srcObject);
+  swift_unknownObjectRelease(srcObject);
 
   // If we succeeded, take from the optional buffer into the
   // destination buffer.
@@ -2709,7 +2709,7 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
   }
 
   if (!alwaysConsumeSrc && shouldDeallocateSource(success, flags)) {
-    swift_unknownRelease(srcObject);
+    swift_unknownObjectRelease(srcObject);
   }
 
   return success;
@@ -2730,7 +2730,7 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
     id result;
     memcpy(&result, src, sizeof(id));
     if (!consume)
-      swift_unknownRetain(result);
+      swift_unknownObjectRetain(result);
     return result;
   }
   

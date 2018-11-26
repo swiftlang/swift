@@ -519,7 +519,7 @@ class RestateFilteringConsumer : public VisibleDeclConsumer {
     }
     auto newSig = GenericSignature::get(params, newReqs, false);
 
-    return GenericFunctionType::get(newSig, GFT->getInput(),
+    return GenericFunctionType::get(newSig, GFT->getParams(),
                                     GFT->getResult(), GFT->getExtInfo())
       ->getCanonicalType();
   }
@@ -969,7 +969,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     // We don't look for generic parameters if we are in the context of a
     // nominal type: they will be looked up anyways via `lookupVisibleMemberDecls`.
     if (DC && !isa<NominalTypeDecl>(DC)) {
-      if (auto *decl = DC->getAsDeclOrDeclExtensionContext()) {
+      if (auto *decl = DC->getAsDecl()) {
         if (auto GC = decl->getAsGenericContext()) {
           auto params = GC->getGenericParams();
           namelookup::FindLocalVal(SM, Loc, Consumer).checkGenericParams(params);
@@ -980,7 +980,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     if (auto *SE = dyn_cast<SubscriptDecl>(DC)) {
       ExtendedType = SE->getDeclContext()->getSelfTypeInContext();
       DC = DC->getParent();
-      BaseDecl = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+      BaseDecl = DC->getSelfNominalTypeDecl();
     } else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
 
       // Look for local variables; normally, the parser resolves these

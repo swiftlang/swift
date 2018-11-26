@@ -28,3 +28,22 @@ public struct Somestruct2 {
 public class C4: OldType {
   public func foo() {}
 }
+
+@objc
+public class C5 {
+  @objc
+  public func dy_foo() {}
+}
+
+public struct C6 {}
+
+@_frozen
+public enum IceKind {}
+
+public protocol P1 {}
+
+public protocol P2 {}
+
+public extension P1 where Self: P2 {
+  func P1Constraint() {}
+}

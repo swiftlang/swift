@@ -30,7 +30,7 @@ extension P1 {
   }
 
   subscript(i: Int) -> Int {
-    // materializeForSet can do static dispatch to peer accessors (tested later, in the emission of the concrete conformance)
+    // modify can do static dispatch to peer accessors (tested later, in the emission of the concrete conformance)
     get {
       return 0
     }
@@ -69,9 +69,9 @@ class C : P1 {
   func reqP1a() { }
 }
 
-//   (materializeForSet test from above)
-// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_extensions1CCAA2P1A2aDPyS2icimTW
-// CHECK: bb0(%0 : @trivial $Builtin.RawPointer, %1 : @trivial $*Builtin.UnsafeValueBuffer, %2 : @trivial $Int, %3 : @trivial $*τ_0_0):
+//   (modify test from above)
+// CHECK-LABEL: sil private [transparent] [thunk] @$S19protocol_extensions1CCAA2P1A2aDPyS2iciMTW
+// CHECK: bb0(%0 : @trivial $Int, %1 : @trivial $*τ_0_0):
 // CHECK: function_ref @$S19protocol_extensions2P1PAAEyS2icig
 // CHECK: return
 
@@ -528,8 +528,8 @@ func testExistentials2(_ p1: P1) {
   // CHECK: [[P1A:%[0-9]+]] = alloc_box ${ var P1 }
   // CHECK: [[PB:%.*]] = project_box [[P1A]]
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
-  // CHECK: [[P1AINIT:%[0-9]+]] = init_existential_addr [[PB]] : $*P1, $@opened([[UUID2:".*"]]) P1
   // CHECK: [[FN:%[0-9]+]] = function_ref @$S19protocol_extensions2P1PAAE11returnsSelf{{[_0-9a-zA-Z]*}}F
+  // CHECK: [[P1AINIT:%[0-9]+]] = init_existential_addr [[PB]] : $*P1, $@opened([[UUID2:".*"]]) P1
   // CHECK: apply [[FN]]<@opened([[UUID]]) P1>([[P1AINIT]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> @out τ_0_0
   var p1a: P1 = p1.returnsSelf()
 }

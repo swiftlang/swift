@@ -82,20 +82,6 @@ void swift::initializeTypeMetadataRecordLookup() {
   }
 }
 
-void swift::initializeTypeFieldLookup() {
-  const swift::MetadataSections *sections = registered;
-  while (true) {
-    const swift::MetadataSections::Range &fields = sections->swift5_fieldmd;
-    if (fields.length)
-      addImageTypeFieldDescriptorBlockCallback(
-          reinterpret_cast<void *>(fields.start), fields.length);
-
-    if (sections->next == registered)
-      break;
-    sections = sections->next;
-  }
-}
-
 SWIFT_RUNTIME_EXPORT
 void swift_addNewDSOImage(const void *addr) {
   const swift::MetadataSections *sections =

@@ -10,9 +10,6 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
-// SR-8276
-// XFAIL: CPU=armv7k
-
 import Swift
 import Foundation
 

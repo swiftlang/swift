@@ -796,22 +796,15 @@ public:
     return ti.getLoweredType();
   }
 
-  AbstractionPattern getAbstractionPattern(AbstractStorageDecl *storage);
-  AbstractionPattern getAbstractionPattern(VarDecl *var);
-  AbstractionPattern getAbstractionPattern(SubscriptDecl *subscript);
-  AbstractionPattern getIndicesAbstractionPattern(SubscriptDecl *subscript);
+  AbstractionPattern getAbstractionPattern(AbstractStorageDecl *storage,
+                                           bool isNonObjC = false);
+  AbstractionPattern getAbstractionPattern(VarDecl *var,
+                                           bool isNonObjC = false);
+  AbstractionPattern getAbstractionPattern(SubscriptDecl *subscript,
+                                           bool isNonObjC = false);
   AbstractionPattern getAbstractionPattern(EnumElementDecl *element);
 
   SILType getLoweredTypeOfGlobal(VarDecl *var);
-
-  /// The return type of a materializeForSet contains a callback
-  /// whose type cannot be represented in the AST because it is
-  /// a polymorphic function value. This function returns the
-  /// unsubstituted lowered type of this callback.
-  CanSILFunctionType getMaterializeForSetCallbackType(
-      AbstractStorageDecl *storage, CanGenericSignature genericSig,
-      Type selfType, SILFunctionTypeRepresentation rep,
-      Optional<ProtocolConformanceRef> witnessMethodConformance);
 
   /// Return the SILFunctionType for a native function value of the
   /// given type.
@@ -1015,9 +1008,15 @@ private:
                               bool canBridgeBool,
                               bool bridgedCollectionsAreOptional);
 
-  CanType getBridgedInputType(SILFunctionTypeRepresentation rep,
-                              AbstractionPattern pattern,
-                              CanType input);
+  AnyFunctionType::Param
+  getBridgedParam(SILFunctionTypeRepresentation rep,
+                  AbstractionPattern pattern,
+                  AnyFunctionType::Param param);
+
+  void getBridgedParams(SILFunctionTypeRepresentation rep,
+                        AbstractionPattern pattern,
+                        ArrayRef<AnyFunctionType::Param> params,
+                        SmallVectorImpl<AnyFunctionType::Param> &bridged);
 
   CanType getBridgedResultType(SILFunctionTypeRepresentation rep,
                                AbstractionPattern pattern,

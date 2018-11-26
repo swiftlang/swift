@@ -425,8 +425,7 @@ struct StructMemberTest {
   // CHECK: bb0(%0 : @guaranteed $StructMemberTest):
   // CHECK-NEXT:   debug_value %0 : $StructMemberTest, let, name "self"
   // CHECK-NEXT:   [[T0:%.*]] = struct_extract %0 : $StructMemberTest, #StructMemberTest.t
-  // CHECK-NEXT:   [[T1:%.*]] = tuple_extract [[T0]] : $(Int, AnotherStruct), 0
-  // CHECK-NEXT:   [[T2:%.*]] = tuple_extract [[T0]] : $(Int, AnotherStruct), 1
+  // CHECK-NEXT:   ({{%.*}}, [[T2:%.*]]) = destructure_tuple [[T0]]
   // CHECK-NEXT:   [[T3:%.*]] = struct_extract [[T2]] : $AnotherStruct, #AnotherStruct.i
   // CHECK-NEXT:   return [[T3]] : $Int
 

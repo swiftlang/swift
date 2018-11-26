@@ -159,7 +159,7 @@ void GenericCloner::populateCloned() {
         getBuilder().createReturn(RI->getLoc(), ReturnValue);
         continue;
       }
-    } else if (isa<ThrowInst>(OrigTermInst)) {
+    } else if (OrigTermInst->isFunctionExiting()) {
       for (AllocStackInst *ASI : reverse(AllocStacks)) {
         getBuilder().createDeallocStack(ASI->getLoc(), ASI);
       }

@@ -670,7 +670,8 @@ SILValue ClosureSpecCloner::cloneCalleeConversion(
     calleeValue = cloneCalleeConversion(CFI->getOperand(), NewClosure, Builder,
                                         NeedsRelease);
     return Builder.createConvertFunction(CallSiteDesc.getLoc(), calleeValue,
-                                         CFI->getType());
+                                         CFI->getType(),
+                                         CFI->withoutActuallyEscaping());
   }
 
   if (auto *PAI = dyn_cast<PartialApplyInst>(calleeValue)) {
@@ -786,18 +787,9 @@ void ClosureSpecCloner::populateCloned() {
       TermInst *TI = OpBB->getTerminator();
       auto Loc = CleanupLocation::get(NewClosure->getLoc());
 
-      // If we have a return/throw, we place the release right before it so we know
+      // If we have an exit, we place the release right before it so we know
       // that it will be executed at the end of the epilogue.
-      if (isa<ReturnInst>(TI)) {
-        Builder.setInsertionPoint(TI);
-        if (ClosureHasRefSemantics)
-          Builder.createReleaseValue(Loc, SILValue(NewClosure),
-                                     Builder.getDefaultAtomicity());
-        for (auto PAI : NeedsRelease)
-          Builder.createReleaseValue(Loc, SILValue(PAI),
-                                     Builder.getDefaultAtomicity());
-        continue;
-      } else if (isa<ThrowInst>(TI)) {
+      if (TI->isFunctionExiting()) {
         Builder.setInsertionPoint(TI);
         if (ClosureHasRefSemantics)
           Builder.createReleaseValue(Loc, SILValue(NewClosure),

@@ -62,7 +62,7 @@ public protocol P {
 
 // Make sure we keep the closure alive up until after the write back.
 
-// CHECK-LABEL: sil @$S22closure_lifetime_fixup21testMaterializeForSet1pyxz_tAA1PRzSS7ElementRtzlF : $@convention(thin) <T where T : P, T.Element == String> (@inout T) -> () {
+// CHECK-LABEL: sil @$S22closure_lifetime_fixup10testModify1pyxz_tAA1PRzSS7ElementRtzlF : $@convention(thin) <T where T : P, T.Element == String> (@inout T) -> () {
 // CHECK: bb0
 // CHECK:  [[PA1:%.*]] = partial_apply [callee_guaranteed]
 // CHECK:  [[ENUM1:%.*]] = enum $Optional<@callee_guaranteed (@in_guaranteed String) -> @out Int>, #Optional.some!enumelt.1, [[PA1]] 
@@ -70,16 +70,12 @@ public protocol P {
 // CHECK:  [[PA2:%.*]] = partial_apply [callee_guaranteed]
 // CHECK:  [[ENUM2:%.*]] = enum $Optional<@callee_guaranteed (@in_guaranteed Int) -> @out String>, #Optional.some!enumelt.1, [[PA2]]
 // CHECK:  [[CVT2:%.*]] = convert_escape_to_noescape [[PA2]]
-// CHECK:  [[W:%.*]] = witness_method $T, #P.subscript!materializeForSet.1
-// CHECK:  [[BUFFER:%.*]] = apply [[W]]<T, Int>({{.*}}, [[CVT1]], [[CVT2]]
-// CHECK: bb1:
-// CHECK: br bb3
-// CHECK: bb2({{.*}}):
-// CHECK: br bb3
-// CHECK: bb3:
+// CHECK:  [[W:%.*]] = witness_method $T, #P.subscript!modify.1
+// CHECK:  ([[BUFFER:%.*]], [[TOKEN:%.*]]) = begin_apply [[W]]<T, Int>([[CVT1]], [[CVT2]], {{.*}})
+// CHECK:  end_apply [[TOKEN]]
 // CHECK:  release_value [[ENUM1]]
 // CHECK:  release_value [[ENUM2]]
-public func testMaterializeForSet<T : P>(p: inout T) where T.Element == String {
+public func testModify<T : P>(p: inout T) where T.Element == String {
   p[{Int($0)!}, {String($0)}] += 1
 }
 

@@ -123,25 +123,6 @@ extension _ArrayBuffer {
     return _isNative
   }
 
-  /// Returns `true` iff this buffer's storage is either
-  /// uniquely-referenced or pinned.
-  @inlinable
-  internal mutating func isUniquelyReferencedOrPinned() -> Bool {
-    if !_isClassOrObjCExistential(Element.self) {
-      return _storage.isUniquelyReferencedOrPinned_native_noSpareBits()
-    }
-
-    // This is a performance optimization. This code used to be:
-    //
-    //   return _storage.isUniquelyReferencedOrPinnedNative() && _isNative.
-    //
-    // SR-6437
-    if !_storage.isUniquelyReferencedOrPinnedNative() {
-      return false
-    }
-    return _isNative
-  }
-
   /// Convert to an NSArray.
   ///
   /// O(1) if the element type is bridged verbatim, O(*n*) otherwise.
@@ -169,11 +150,6 @@ extension _ArrayBuffer {
   @inlinable
   internal mutating func isMutableAndUniquelyReferenced() -> Bool {
     return isUniquelyReferenced()
-  }
-
-  @inlinable
-  internal mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
-    return isUniquelyReferencedOrPinned()
   }
 
   /// If this buffer is backed by a `_ContiguousArrayBuffer`

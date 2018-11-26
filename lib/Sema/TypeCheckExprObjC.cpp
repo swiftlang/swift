@@ -343,9 +343,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
               Swift3ObjCInferenceWarnings::Minimal) {
           diagnose(componentNameLoc, diag::expr_keypath_swift3_objc_inference,
                    var->getFullName(),
-                   var->getDeclContext()
-                    ->getAsNominalTypeOrNominalTypeExtensionContext()
-                   ->getName());
+                   var->getDeclContext()->getSelfNominalTypeDecl()->getName());
           diagnose(var, diag::make_decl_objc, var->getDescriptiveKind())
             .fixItInsert(var->getAttributeInsertionLoc(false),
                          "@objc ");

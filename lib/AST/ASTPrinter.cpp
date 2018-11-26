@@ -72,8 +72,9 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
   result.FullyQualifiedTypes = true;
   result.SkipImports = true;
 
-  class UsableFromInlineOnly : public ShouldPrintChecker {
-    bool shouldPrint(const Decl *D, PrintOptions &options) override {
+  class ShouldPrintForTextualInterface : public ShouldPrintChecker {
+    bool shouldPrint(const Decl *D, const PrintOptions &options) override {
+      // Skip anything that isn't 'public' or '@usableFromInline'.
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
         AccessScope accessScope =
             VD->getFormalAccessScope(/*useDC*/nullptr,
@@ -81,16 +82,35 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
         if (!accessScope.isPublic())
           return false;
       }
+
+      // Skip typealiases that just redeclare generic parameters.
+      if (auto *alias = dyn_cast<TypeAliasDecl>(D)) {
+        if (alias->isImplicit()) {
+          const Decl *parent =
+              D->getDeclContext()->getAsDecl();
+          if (auto *genericCtx = parent->getAsGenericContext()) {
+            bool matchesGenericParam =
+                llvm::any_of(genericCtx->getInnermostGenericParamTypes(),
+                             [alias](const GenericTypeParamType *param) {
+              return param->getName() == alias->getName();
+            });
+            if (matchesGenericParam)
+              return false;
+          }
+        }
+      }
+
       return ShouldPrintChecker::shouldPrint(D, options);
     }
   };
-  result.CurrentPrintabilityChecker = std::make_shared<UsableFromInlineOnly>();
+  result.CurrentPrintabilityChecker =
+      std::make_shared<ShouldPrintForTextualInterface>();
 
   // FIXME: We don't really need 'public' on everything; we could just change
   // the default to 'public' and mark the 'internal' things.
   result.PrintAccess = true;
 
-  // FIXME: We'll need the actual default parameter expression.
+  result.ExcludeAttrList = {DAK_ImplicitlyUnwrappedOptional, DAK_AccessControl};
   result.PrintDefaultParameterPlaceholder = false;
 
   return result;
@@ -494,7 +514,10 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
   void printAccess(const ValueDecl *D) {
     if (!Options.PrintAccess || !D->hasAccess() ||
-        D->getAttrs().hasAttribute<AccessControlAttr>())
+        isa<ProtocolDecl>(D->getDeclContext()))
+      return;
+    if (D->getAttrs().hasAttribute<AccessControlAttr>() &&
+        !llvm::is_contained(Options.ExcludeAttrList, DAK_AccessControl))
       return;
 
     printAccess(D->getFormalAccess());
@@ -613,9 +636,8 @@ public:
     PrintParams = 1,
     PrintRequirements = 2,
     InnermostOnly = 4,
-    SkipSelfRequirement = 8,
-    SwapSelfAndDependentMemberType = 16,
-    PrintInherited = 32,
+    SwapSelfAndDependentMemberType = 8,
+    PrintInherited = 16,
   };
 
   void printInheritedFromRequirementSignature(ProtocolDecl *proto,
@@ -766,7 +788,7 @@ void PrintAST::printAttributes(const Decl *D) {
   // Don't print a redundant 'final' if we are printing a 'static' decl.
   unsigned originalExcludeAttrCount = Options.ExcludeAttrList.size();
   if (Options.PrintImplicitAttrs &&
-      D->getDeclContext()->getAsClassOrClassExtensionContext() &&
+      D->getDeclContext()->getSelfClassDecl() &&
       getCorrectStaticSpelling(D) == StaticSpellingKind::KeywordStatic) {
     Options.ExcludeAttrList.push_back(DAK_Final);
   }
@@ -1202,13 +1224,6 @@ void PrintAST::printSingleDepthOfGenericSignature(
       if (req.getKind() != RequirementKind::Layout)
         second = req.getSecondType();
 
-      if ((flags & SkipSelfRequirement) &&
-          req.getKind() == RequirementKind::Conformance) {
-        auto proto = cast<ProtocolDecl>(second->getAnyNominal());
-        if (first->isEqual(proto->getSelfInterfaceType()))
-          continue;
-      }
-
       if (!subMap.empty()) {
         if (Type subFirst = substParam(first))
           first = subFirst;
@@ -1303,7 +1318,8 @@ void PrintAST::printPatternType(const Pattern *P) {
   }
 }
 
-bool ShouldPrintChecker::shouldPrint(const Pattern *P, PrintOptions &Options) {
+bool ShouldPrintChecker::shouldPrint(const Pattern *P,
+                                     const PrintOptions &Options) {
   bool ShouldPrint = false;
   P->forEachVariable([&](const VarDecl *VD) {
     ShouldPrint |= shouldPrint(VD, Options);
@@ -1311,7 +1327,8 @@ bool ShouldPrintChecker::shouldPrint(const Pattern *P, PrintOptions &Options) {
   return ShouldPrint;
 }
 
-bool ShouldPrintChecker::shouldPrint(const Decl *D, PrintOptions &Options) {
+bool ShouldPrintChecker::shouldPrint(const Decl *D,
+                                     const PrintOptions &Options) {
   if (auto *ED= dyn_cast<ExtensionDecl>(D)) {
     if (Options.printExtensionContentAsMembers(ED))
       return false;
@@ -1384,7 +1401,7 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D, PrintOptions &Options) {
         // If the Clang declaration is from a protocol but was mirrored into
         // class or extension thereof, treat it as an override.
         if (isa<clang::ObjCProtocolDecl>(clangDecl->getDeclContext()) &&
-            VD->getDeclContext()->getAsClassOrClassExtensionContext())
+            VD->getDeclContext()->getSelfClassDecl())
           return false;
 
         // Check whether Clang considers it an override.
@@ -1425,8 +1442,8 @@ bool PrintAST::shouldPrint(const Decl *D, bool Notify) {
   return Result;
 }
 
-static bool isAccessorAssumedNonMutating(AccessorDecl *accessor) {
-  switch (accessor->getAccessorKind()) {
+static bool isAccessorAssumedNonMutating(AccessorKind kind) {
+  switch (kind) {
   case AccessorKind::Get:
   case AccessorKind::Address:
   case AccessorKind::Read:
@@ -1435,7 +1452,6 @@ static bool isAccessorAssumedNonMutating(AccessorDecl *accessor) {
   case AccessorKind::Set:
   case AccessorKind::WillSet:
   case AccessorKind::DidSet:
-  case AccessorKind::MaterializeForSet:
   case AccessorKind::MutableAddress:
   case AccessorKind::Modify:
     return false;
@@ -1493,12 +1509,15 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     return;
   }
 
+  // AbstractAccessors is suppressed by FunctionDefinitions, but not the
+  // presence of an FunctionBody callback.
+  bool PrintAbstract =
+    Options.AbstractAccessors && !Options.FunctionDefinitions;
+
   // We sometimes want to print the accessors abstractly
   // instead of listing out how they're actually implemented.
   bool inProtocol = isa<ProtocolDecl>(ASD->getDeclContext());
-  if (!Options.FunctionBody &&
-      (inProtocol ||
-        (Options.AbstractAccessors && !Options.FunctionDefinitions))) {
+  if (!Options.FunctionBody && (inProtocol || PrintAbstract)) {
     bool mutatingGetter = ASD->getGetter() && ASD->isGetterMutating();
     bool settable = ASD->isSettable(nullptr);
     bool nonmutatingSetter = false;
@@ -1534,13 +1553,25 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     return;
   }
 
+  // Should we print the 'modify' accessor?
+  auto shouldHideModifyAccessor = [&] {
+    if (impl.getReadWriteImpl() != ReadWriteImplKind::Modify)
+      return true;
+    // Always hide in a protocol.
+    return isa<ProtocolDecl>(ASD->getDeclContext());
+  };
+
+  auto isGetSetImpl = [&] {
+    return ((impl.getReadImpl() == ReadImplKind::Stored ||
+             impl.getReadImpl() == ReadImplKind::Get) &&
+            (impl.getWriteImpl() == WriteImplKind::Stored ||
+             impl.getWriteImpl() == WriteImplKind::Set) &&
+            (shouldHideModifyAccessor()));
+  };
+
   // Honor !Options.PrintGetSetOnRWProperties in the only remaining
   // case where we could end up printing { get set }.
-  if ((impl.getReadImpl() == ReadImplKind::Stored ||
-       impl.getReadImpl() == ReadImplKind::Get) &&
-      (impl.getWriteImpl() == WriteImplKind::Stored ||
-       impl.getWriteImpl() == WriteImplKind::Set) &&
-      (impl.getReadWriteImpl() == ReadWriteImplKind::MaterializeToTemporary) &&
+  if ((PrintAbstract || isGetSetImpl()) &&
       !Options.PrintGetSetOnRWProperties &&
       !Options.FunctionDefinitions &&
       !ASD->getGetter()->isMutating() &&
@@ -1556,7 +1587,7 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     if (!Accessor)
       return;
     if (!PrintAccessorBody) {
-      if (isAccessorAssumedNonMutating(Accessor)) {
+      if (isAccessorAssumedNonMutating(Accessor->getAccessorKind())) {
         if (Accessor->isMutating()) {
           Printer << " ";
           Printer.printKeyword("mutating");
@@ -1578,8 +1609,9 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   };
 
   Printer << " {";
-  if (impl.getReadImpl() == ReadImplKind::Get && ASD->getGetter() &&
-      !ASD->supportsMutation() &&
+  if ((PrintAbstract ||
+       (impl.getReadImpl() == ReadImplKind::Get && ASD->getGetter())) &&
+      !ASD->supportsMutation() && !ASD->isGetterMutating() &&
       PrintAccessorBody && !Options.FunctionDefinitions) {
     // Omit the 'get' keyword. Directly print getter
     if (auto BodyFunc = Options.FunctionBody) {
@@ -1587,7 +1619,11 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
       IndentRAII IndentBody(*this);
       indent();
       Printer << BodyFunc(ASD->getGetter());
-    }    
+    }
+  } else if (PrintAbstract) {
+    PrintAccessor(ASD->getGetter());
+    if (ASD->supportsMutation())
+      PrintAccessor(ASD->getSetter());
   } else {
     switch (impl.getReadImpl()) {
     case ReadImplKind::Stored:
@@ -1615,7 +1651,7 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
       break;
     case WriteImplKind::Set:
       PrintAccessor(ASD->getSetter());
-      if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify)
+      if (!shouldHideModifyAccessor())
         PrintAccessor(ASD->getModifyCoroutine());
       break;
     case WriteImplKind::MutableAddress:
@@ -1843,14 +1879,16 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
     });
     printInherited(decl);
 
-    if (decl->getGenericParams())
-      if (auto *genericSig = decl->getGenericSignature()) {
-        // For protocol extensions, don't print the 'Self : ...' requirement.
-        unsigned flags = PrintRequirements | InnermostOnly;
-        if (decl->getAsProtocolExtensionContext())
-          flags |= SkipSelfRequirement;
-        printGenericSignature(genericSig, flags);
-      }
+    if (auto *genericSig = decl->getGenericSignature()) {
+      auto *baseGenericSig = decl->getExtendedNominal()->getGenericSignature();
+      assert(baseGenericSig &&
+             "an extension can't be generic if the base type isn't");
+      printGenericSignature(genericSig, PrintRequirements | InnermostOnly,
+                            [baseGenericSig](const Requirement &req) -> bool {
+        // Only include constraints that are not satisfied by the base type.
+        return !baseGenericSig->isRequirementSatisfied(req);
+      });
+    }
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false,
@@ -2156,7 +2194,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
 }
 
 static bool isStructOrClassContext(DeclContext *dc) {
-  auto *nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *nominal = dc->getSelfNominalTypeDecl();
   if (nominal == nullptr)
     return false;
   return isa<ClassDecl>(nominal) || isa<StructDecl>(nominal);
@@ -2303,7 +2341,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
   // through the paren types so that we don't print excessive @escapings.
   unsigned numParens = 0;
   if (!willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options)) {
-    auto type = TheTypeLoc.getType()->getInOutObjectType();
+    auto type = TheTypeLoc.getType();
 
     printParameterFlags(Printer, Options, paramFlags);
     while (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
@@ -2428,7 +2466,6 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   case AccessorKind::Read:
   case AccessorKind::Modify:
   case AccessorKind::DidSet:
-  case AccessorKind::MaterializeForSet:
   case AccessorKind::MutableAddress:
     recordDeclLoc(decl,
       [&]{
@@ -2680,10 +2717,25 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   if ((decl->getInitKind() == CtorInitializerKind::Convenience ||
        decl->getInitKind() == CtorInitializerKind::ConvenienceFactory) &&
       !decl->getAttrs().hasAttribute<ConvenienceAttr>()) {
-    Printer.printKeyword("convenience");
-    Printer << " ";
+    // Protocol extension initializers are modeled as convenience initializers,
+    // but they're not written that way in source. Check if we're actually
+    // printing onto a class.
+    bool isClassContext;
+    if (CurrentType) {
+      isClassContext = CurrentType->getClassOrBoundGenericClass() != nullptr;
+    } else {
+      const DeclContext *dc = decl->getDeclContext();
+      isClassContext = dc->getSelfClassDecl() != nullptr;
+    }
+    if (isClassContext) {
+      Printer.printKeyword("convenience");
+      Printer << " ";
+    } else {
+      assert(decl->getDeclContext()->getExtendedProtocolDecl() &&
+             "unexpected convenience initializer");
+    }
   } else if (decl->getInitKind() == CtorInitializerKind::Factory) {
-      Printer << "/*not inherited*/ ";
+    Printer << "/*not inherited*/ ";
   }
 
   printContextIfNeeded(decl);
@@ -3302,7 +3354,7 @@ public:
       if (i)
         Printer << ", ";
       const TupleTypeElt &TD = Fields[i];
-      Type EltType = TD.getType()->getInOutObjectType();
+      Type EltType = TD.getRawType();
 
       Printer.callPrintStructurePre(PrintStructureKind::TupleElement);
       SWIFT_DEFER {
@@ -3875,7 +3927,7 @@ public:
       Printer << "<anonymous>";
     else {
       if (T->getDecl() &&
-          T->getDecl()->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+          T->getDecl()->getDeclContext()->getSelfProtocolDecl()) {
         Printer.printTypeRef(T, T->getDecl(), Name);
         return;
       }

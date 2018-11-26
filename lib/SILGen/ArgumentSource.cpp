@@ -409,3 +409,67 @@ void ArgumentSource::dump(raw_ostream &out, unsigned indent) const {
   }
   llvm_unreachable("bad kind");
 }
+
+void PreparedArguments::emplaceEmptyArgumentList(SILGenFunction &SGF) {
+  emplace(CanType(TupleType::getEmpty(SGF.getASTContext())), /*scalar*/ false);
+  assert(isValid());
+}
+
+PreparedArguments
+PreparedArguments::copy(SILGenFunction &SGF, SILLocation loc) const {
+  if (isNull()) return PreparedArguments();
+
+  assert(isValid());
+  PreparedArguments result(getFormalType(), isScalar());
+  for (auto &elt : Arguments) {
+    assert(elt.isRValue());
+    result.add(elt.getKnownRValueLocation(),
+               elt.asKnownRValue().copy(SGF, loc));
+  }
+  assert(isValid());
+  return result;
+}
+
+bool PreparedArguments::isObviouslyEqual(const PreparedArguments &other) const {
+  if (isNull() != other.isNull())
+    return false;
+  if (isNull())
+    return true;
+
+  assert(isValid() && other.isValid());
+  if (Arguments.size() != other.Arguments.size())
+    return false;
+  for (auto i : indices(Arguments)) {
+    if (!Arguments[i].isObviouslyEqual(other.Arguments[i]))
+      return false;
+  }
+  return true;
+}
+
+bool ArgumentSource::isObviouslyEqual(const ArgumentSource &other) const {
+  if (StoredKind != other.StoredKind)
+    return false;
+
+  switch (StoredKind) {
+  case Kind::Invalid:
+    llvm_unreachable("argument source is invalid");
+  case Kind::RValue:
+    return asKnownRValue().isObviouslyEqual(other.asKnownRValue());
+  case Kind::LValue:
+    return false; // TODO?
+  case Kind::Expr:
+    return false; // TODO?
+  case Kind::Tuple: {
+    auto &selfTuple = Storage.get<TupleStorage>(StoredKind);
+    auto &otherTuple = other.Storage.get<TupleStorage>(other.StoredKind);
+    if (selfTuple.Elements.size() != otherTuple.Elements.size())
+      return false;
+    for (auto i : indices(selfTuple.Elements)) {
+      if (!selfTuple.Elements[i].isObviouslyEqual(otherTuple.Elements[i]))
+        return false;
+    }
+    return true;
+  }
+  }
+  llvm_unreachable("bad kind");
+}

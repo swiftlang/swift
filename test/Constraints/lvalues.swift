@@ -76,14 +76,14 @@ f2(&non_settable_x) // expected-error{{cannot pass immutable value as inout argu
 f1(&non_settable_x) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 // - inout assignment
 non_settable_x += x // expected-error{{left side of mutating operator isn't mutable: 'non_settable_x' is a get-only property}}
-+++non_settable_x // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
++++non_settable_x // expected-error{{cannot pass immutable value to mutating operator: 'non_settable_x' is a get-only property}}
 
 // non-settable property is non-settable:
 z.non_settable_x = x // expected-error{{cannot assign to property: 'non_settable_x' is a get-only property}}
 f2(&z.non_settable_x) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 f1(&z.non_settable_x) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 z.non_settable_x += x // expected-error{{left side of mutating operator isn't mutable: 'non_settable_x' is a get-only property}}
-+++z.non_settable_x // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
++++z.non_settable_x // expected-error{{cannot pass immutable value to mutating operator: 'non_settable_x' is a get-only property}}
 
 // non-settable subscript is non-settable:
 z[0] = 0.0 // expected-error{{cannot assign through subscript: subscript is get-only}}
@@ -97,7 +97,7 @@ fz().settable_x = x // expected-error{{cannot assign to property: 'fz' returns i
 f2(&fz().settable_x) // expected-error{{cannot pass immutable value as inout argument: 'fz' returns immutable value}}
 f1(&fz().settable_x) // expected-error{{cannot pass immutable value as inout argument: 'fz' returns immutable value}}
 fz().settable_x += x // expected-error{{left side of mutating operator isn't mutable: 'fz' returns immutable value}}
-+++fz().settable_x // expected-error{{cannot pass immutable value as inout argument: 'fz' returns immutable value}}
++++fz().settable_x // expected-error{{cannot pass immutable value to mutating operator: 'fz' returns immutable value}}
 
 // settable property of an rvalue reference type IS SETTABLE:
 fref().property = 0.0

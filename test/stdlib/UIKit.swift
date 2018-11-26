@@ -1,5 +1,4 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -swift-version 3 %s -o %t/a.out3 && %target-codesign %t/a.out3 && %target-run %t/a.out3
 // RUN: %target-build-swift -swift-version 4 %s -o %t/a.out4 && %target-codesign %t/a.out4 && %target-run %t/a.out4
 // RUN: %target-build-swift -swift-version 4.2 %s -o %t/a.out4_2 && %target-codesign %t/a.out4_2 && %target-run %t/a.out4_2
 // REQUIRES: executable_test
@@ -12,10 +11,8 @@ import StdlibUnittestFoundationExtras
 
 #if swift(>=4.2)
   let UIKitTests = TestSuite("UIKit_Swift4_2")
-#elseif swift(>=4)
-  let UIKitTests = TestSuite("UIKit_Swift4")
 #else
-  let UIKitTests = TestSuite("UIKit_Swift3")
+  let UIKitTests = TestSuite("UIKit_Swift4")
 #endif
 
 #if !os(watchOS) && !os(tvOS)
@@ -144,41 +141,26 @@ UIKitTests.test("UIFont.Weight") {
 
 #if !os(watchOS)
 UIKitTests.test("UILayoutPriority") {
-  #if swift(>=4) // Swift 4
-    let lowLayoutPriority: UILayoutPriority = .defaultLow
-    let highLayoutPriority: UILayoutPriority = .defaultHigh
+  let lowLayoutPriority: UILayoutPriority = .defaultLow
+  let highLayoutPriority: UILayoutPriority = .defaultHigh
 
-    expectTrue(lowLayoutPriority < highLayoutPriority)
+  expectTrue(lowLayoutPriority < highLayoutPriority)
 
-    expectTrue(lowLayoutPriority + 2.0 == UILayoutPriority(lowLayoutPriority.rawValue + 2.0))
-    expectTrue(2.0 + lowLayoutPriority == UILayoutPriority(lowLayoutPriority.rawValue + 2.0))
-    expectTrue(lowLayoutPriority - 2.0 == UILayoutPriority(lowLayoutPriority.rawValue - 2.0))
-    expectTrue(highLayoutPriority - lowLayoutPriority == highLayoutPriority.rawValue - lowLayoutPriority.rawValue)
+  expectTrue(lowLayoutPriority + 2.0 == UILayoutPriority(lowLayoutPriority.rawValue + 2.0))
+  expectTrue(2.0 + lowLayoutPriority == UILayoutPriority(lowLayoutPriority.rawValue + 2.0))
+  expectTrue(lowLayoutPriority - 2.0 == UILayoutPriority(lowLayoutPriority.rawValue - 2.0))
+  expectTrue(highLayoutPriority - lowLayoutPriority == highLayoutPriority.rawValue - lowLayoutPriority.rawValue)
 
-    expectTrue(lowLayoutPriority + (highLayoutPriority - lowLayoutPriority) == highLayoutPriority)
+  expectTrue(lowLayoutPriority + (highLayoutPriority - lowLayoutPriority) == highLayoutPriority)
 
-    var mutablePriority = lowLayoutPriority
-    mutablePriority -= 1.0
-    mutablePriority += 2.0
-    expectTrue(mutablePriority == lowLayoutPriority + 1.0)
+  var mutablePriority = lowLayoutPriority
+  mutablePriority -= 1.0
+  mutablePriority += 2.0
+  expectTrue(mutablePriority == lowLayoutPriority + 1.0)
 
-    let priorotyRange = lowLayoutPriority...highLayoutPriority
-    expectTrue(priorotyRange.contains(.defaultLow))
-    expectFalse(priorotyRange.contains(.required))
-  #else // Swift 3
-    let lowLayoutPriority: UILayoutPriority = UILayoutPriorityDefaultLow
-    let highLayoutPriority: UILayoutPriority = UILayoutPriorityDefaultHigh
-
-    expectTrue(lowLayoutPriority < highLayoutPriority)
-
-    expectTrue(2.0 + lowLayoutPriority == lowLayoutPriority + 2.0)
-    expectTrue(lowLayoutPriority + (highLayoutPriority - lowLayoutPriority) == highLayoutPriority)
-
-    var mutablePriority = lowLayoutPriority
-    mutablePriority -= 1.0
-    mutablePriority += 2.0
-    expectTrue(mutablePriority == lowLayoutPriority + 1.0)
-  #endif
+  let priorotyRange = lowLayoutPriority...highLayoutPriority
+  expectTrue(priorotyRange.contains(.defaultLow))
+  expectFalse(priorotyRange.contains(.required))
 }
 #endif
 

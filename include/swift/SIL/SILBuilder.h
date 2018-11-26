@@ -886,9 +886,11 @@ public:
   }
 
   ConvertFunctionInst *createConvertFunction(SILLocation Loc, SILValue Op,
-                                             SILType Ty) {
-    return insert(ConvertFunctionInst::create(
-        getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes));
+                                             SILType Ty,
+                                             bool WithoutActuallyEscaping) {
+    return insert(ConvertFunctionInst::create(getSILDebugLocation(Loc), Op, Ty,
+                                              getFunction(), C.OpenedArchetypes,
+                                              WithoutActuallyEscaping));
   }
 
   ConvertEscapeToNoEscapeInst *
@@ -1349,6 +1351,24 @@ public:
   }
 
   void
+  emitDestructureValueOperation(SILLocation Loc, SILValue Operand,
+                                function_ref<void(unsigned, SILValue)> Func) {
+    // Do a quick check to see if we have a tuple without elements. In that
+    // case, bail early since we are not going to ever invoke Func.
+    if (auto TTy = Operand->getType().castTo<TupleType>())
+      if (0 == TTy->getNumElements())
+        return;
+
+    auto *Destructure = emitDestructureValueOperation(Loc, Operand);
+    auto Results = Destructure->getResults();
+    // TODO: For some reason, llvm::enumerate(Results) does not
+    // compile.
+    for (unsigned i : indices(Results)) {
+      Func(i, Results[i]);
+    }
+  }
+
+  void
   emitShallowDestructureValueOperation(SILLocation Loc, SILValue Operand,
                                        llvm::SmallVectorImpl<SILValue> &Result);
 
@@ -1568,16 +1588,6 @@ public:
     return insert(new (getModule()) StrongReleaseInst(
         getSILDebugLocation(Loc), Operand, atomicity));
   }
-  StrongPinInst *createStrongPin(SILLocation Loc, SILValue Operand,
-                                 Atomicity atomicity) {
-    return insert(new (getModule()) StrongPinInst(getSILDebugLocation(Loc),
-                                                    Operand, atomicity));
-  }
-  StrongUnpinInst *createStrongUnpin(SILLocation Loc, SILValue Operand,
-                                     Atomicity atomicity) {
-    return insert(new (getModule()) StrongUnpinInst(getSILDebugLocation(Loc),
-                                                      Operand, atomicity));
-  }
 
   EndLifetimeInst *createEndLifetime(SILLocation Loc, SILValue Operand) {
     return insert(new (getModule())
@@ -1611,12 +1621,6 @@ public:
     auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
     return insert(new (getModule()) IsUniqueInst(getSILDebugLocation(Loc),
                                                    operand, Int1Ty));
-  }
-  IsUniqueOrPinnedInst *createIsUniqueOrPinned(SILLocation Loc,
-                                               SILValue value) {
-    auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
-    return insert(new (getModule()) IsUniqueOrPinnedInst(
-        getSILDebugLocation(Loc), value, Int1Ty));
   }
   IsEscapingClosureInst *createIsEscapingClosure(SILLocation Loc,
                                                  SILValue operand,

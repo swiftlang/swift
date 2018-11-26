@@ -484,6 +484,7 @@ public:
                               Context.getIdentifier(NameBuf),
                               TypeCheckDC);
     VD->setType(MaybeLoadInitExpr->getType());
+    VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfContext());
     VD->setImplicit();
 
     NamedPattern *NP = new (Context) NamedPattern(VD, /*implicit*/ true);

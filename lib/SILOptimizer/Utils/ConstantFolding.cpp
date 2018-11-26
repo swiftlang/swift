@@ -1632,6 +1632,12 @@ ConstantFolder::processWorkList() {
       // instructions.
       auto UserV = cast<SingleValueInstruction>(User);
 
+      // Handle a corner case: if this instruction is an unreachable CFG loop
+      // there is no defined dominance order and we can end up with loops in the
+      // use-def chain. Just bail in this case.
+      if (C == UserV)
+        continue;
+
       // Ok, we have succeeded. Add user to the FoldedUsers list and perform the
       // necessary cleanups, RAUWs, etc.
       FoldedUsers.insert(User);

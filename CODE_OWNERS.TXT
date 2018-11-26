@@ -20,7 +20,7 @@ D: XCTest overlay
 N: Erik Eckstein
 E: eeckstein@apple.com
 G: eeckstein
-D: SILOptimizer
+D: SILOptimizer, Swift Benchmark Suite
 
 N: Xi Ge
 E: xi_ge@apple.com
@@ -41,11 +41,6 @@ N: Argyrios Kyrzidis
 E: kyrtzidis@apple.com
 G: akyrtzi
 D: IDE, Index, SourceKit, swift-ide-test
-
-N: Luke Larson
-E: llarson@apple.com
-G: lplarson
-D: Swift Benchmark Suite
 
 N: John McCall
 E: rjmccall@apple.com

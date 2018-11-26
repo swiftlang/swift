@@ -57,8 +57,11 @@ class ClassLayout {
   /// runtime.
   bool IsFixedSize;
 
-  /// Does the class metadata require dynamic initialization?
-  bool MetadataRequiresDynamicInitialization;
+  /// Does the class metadata require initialization?
+  bool MetadataRequiresInitialization;
+
+  /// Does the class metadata require relocation?
+  bool MetadataRequiresRelocation;
 
   /// The LLVM type for instances of this class.
   llvm::Type *Ty;
@@ -77,7 +80,8 @@ class ClassLayout {
 public:
   ClassLayout(const StructLayoutBuilder &builder,
               bool isFixedSize,
-              bool metadataRequiresDynamicInitialization,
+              bool metadataRequiresInitialization,
+              bool metadataRequiresRelocation,
               llvm::Type *classTy,
               ArrayRef<VarDecl *> allStoredProps,
               ArrayRef<FieldAccess> allFieldAccesses,
@@ -94,8 +98,12 @@ public:
 
   bool isFixedSize() const { return IsFixedSize; }
 
-  bool doesMetadataRequireDynamicInitialization() const {
-    return MetadataRequiresDynamicInitialization;
+  bool doesMetadataRequireInitialization() const {
+    return MetadataRequiresInitialization;
+  }
+
+  bool doesMetadataRequireRelocation() const {
+    return MetadataRequiresRelocation;
   }
 
   std::pair<FieldAccess, ElementLayout>

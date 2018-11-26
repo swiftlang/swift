@@ -109,3 +109,28 @@ extension TokenKind: Equatable {
     }
   }
 }
+
+extension TokenKind: ByteTreeObjectDecodable {
+  static func read(from reader: UnsafeMutablePointer<ByteTreeObjectReader>,
+                   numFields: Int,
+                   userInfo: UnsafePointer<[ByteTreeUserInfoKey: Any]>
+  ) -> TokenKind {
+    // Explicitly spell out all TokenKinds to keep the serialized value stable
+    // even if its members get reordered or members get removed
+    let kind = reader.pointee.readField(UInt8.self, index: 0)
+    switch kind {
+    case 0: return .eof
+% for token in SYNTAX_TOKENS:
+    case ${token.serialization_code}:
+%   if token.text: # The token does not have text associated with it
+      return .${token.swift_kind()}
+%   else:
+      let text = reader.pointee.readField(String.self, index: 1)
+      return .${token.swift_kind()}(text)
+%   end
+% end
+    default:
+      fatalError("Unknown TokenKind \(kind)")
+    }
+  }
+}

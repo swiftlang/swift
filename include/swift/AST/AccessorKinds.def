@@ -68,9 +68,9 @@
 /// COROUTINE_ACCESSOR(ID, KEYWORD)
 ///   The given accessor is a coroutine accessor, i.e. a reader or modifier.
 ///
-///   Defaults to SINGLETON_ACCESSOR(ID, KEYWORD).
+///   Defaults to OPAQUE_ACCESSOR(ID, KEYWORD).
 #ifndef COROUTINE_ACCESSOR
-#define COROUTINE_ACCESSOR(ID, KEYWORD) SINGLETON_ACCESSOR(ID, KEYWORD)
+#define COROUTINE_ACCESSOR(ID, KEYWORD) OPAQUE_ACCESSOR(ID, KEYWORD)
 #endif
 
 /// ANY_ADDRESSOR(ACCESSOR_ID, ADDRESSOR_ID, KEYWORD)
@@ -127,18 +127,21 @@ OBJC_ACCESSOR(Get, get)
 /// always be synthesized if the storage is mutable at all.
 OBJC_ACCESSOR(Set, set)
 
-/// This is a materializeForSet accessor: a function which is called
-/// when a combined read-modify operation is performed on the storage,
-/// such as passing it as an inout argument (which includes calling
-/// a mutating function on it).  It is essentially a SILGen-lowered
-/// coroutine that yields a pointer to a mutable value of the storage
-/// type.
+/// This is a read accessor: a yield-once coroutine which is called when a
+/// value is loaded from the storage, like a getter, but which works
+/// by yielding a borrowed value of the storage type.
 ///
-/// We do not allow users to provide materializeForSet.  It can always
-/// be synthesized if the storage is mutable at all.
-#if !(SUPPRESS_ARTIFICIAL_ACCESSORS)
-OPAQUE_ACCESSOR(MaterializeForSet, materializeForSet)
-#endif
+/// If the storage is not implemented with a read accessor then
+/// one can always be synthesized (even if the storage type is move-only).
+COROUTINE_ACCESSOR(Read, _read)
+
+/// This is a modify accessor: a yield-once coroutine which is called when a
+/// the storage is modified which works by yielding an inout value
+/// of the storage type.
+///
+/// If the storage is not implemented with a modify accessor then
+/// one can be synthesized if the storage is mutable at all.
+COROUTINE_ACCESSOR(Modify, _modify)
 
 /// This is a willSet observer: a function which "decorates" an
 /// underlying assignment operation by being called prior to the
@@ -156,24 +159,6 @@ OBSERVING_ACCESSOR(WillSet, willSet)
 /// setter idiom.
 OBSERVING_ACCESSOR(DidSet, didSet)
 
-/// This is a read accessor: a coroutine which is called when a
-/// value is loaded from the storage, like a getter, but which works
-/// by yielding a borrowed value of the storage type.
-///
-/// If the storage is not implemented with a read accessor then
-/// one can always be synthesized (even if the storage type is move-only).
-COROUTINE_ACCESSOR(Read, _read)
-
-/// This is a modify accessor: a coroutine which is called when a
-/// the storage is assigned to (like a setter) or read-modified
-/// (like materializeForSet), but which works by yielding an inout
-/// value of the storage type.
-///
-/// If the storage is not implemented with a modify accessor then
-/// one can be synthesized if the storage is mutable at all.
-/// Modify accessors are intended to eventually replace materializeForSet.
-COROUTINE_ACCESSOR(Modify, _modify)
-
 /// This is an address-family accessor: a function that is called when
 /// a value is loaded from the storage, like a getter, but which works
 /// by returning a pointer to an immutable value of the storage type.
@@ -187,12 +172,10 @@ ACCESSOR(Address)
 IMMUTABLE_ADDRESSOR(Unsafe, unsafeAddress)
 IMMUTABLE_ADDRESSOR(Owning, addressWithOwner)
 IMMUTABLE_ADDRESSOR(NativeOwning, addressWithNativeOwner)
-IMMUTABLE_ADDRESSOR(NativePinning, addressWithPinnedNativeOwner)
 
 /// This is a mutableAddress-family accessor: a function that is
-/// called when the storage is assigned to (like a setter) or
-/// read-modified (like materializeForSet), but which works by
-/// returning a pointer to a mutable value of the storage type.
+/// called when the storage is modified and which works by returning
+/// a pointer to a mutable value of the storage type.
 /// This kind of accessor also has an addressor kind.
 ///
 /// Addressors are a way of proving more efficient access to storage
@@ -203,7 +186,6 @@ ACCESSOR(MutableAddress)
 MUTABLE_ADDRESSOR(Unsafe, unsafeMutableAddress)
 MUTABLE_ADDRESSOR(Owning, mutableAddressWithOwner)
 MUTABLE_ADDRESSOR(NativeOwning, mutableAddressWithNativeOwner)
-MUTABLE_ADDRESSOR(NativePinning, mutableAddressWithPinnedNativeOwner)
 
 #ifdef LAST_ACCESSOR
 LAST_ACCESSOR(MutableAddress)

@@ -96,10 +96,6 @@ STATISTIC(NumReleasesHoisted, "Number of releases hoisted");
 
 llvm::cl::opt<bool> DisableARCCodeMotion("disable-arc-cm", llvm::cl::init(false));
 
-/// Disable optimization if we have to break critical edges in the function.
-llvm::cl::opt<bool>
-DisableIfWithCriticalEdge("disable-with-critical-edge", llvm::cl::init(false));
-
 //===----------------------------------------------------------------------===//
 //                             Block State 
 //===----------------------------------------------------------------------===//
@@ -306,7 +302,8 @@ class RetainCodeMotionContext : public CodeMotionContext {
     // end, this function is called many times.
     //
     // These terminator instructions block.
-    if (isa<ReturnInst>(II) || isa<ThrowInst>(II) || isa<UnreachableInst>(II))
+    if (isa<ReturnInst>(II) || isa<ThrowInst>(II) || isa<UnwindInst>(II) ||
+        isa<UnreachableInst>(II))
       return true;
     // Identical RC root blocks code motion, we will be able to move this retain
     // further once we move the blocking retain.
@@ -1153,11 +1150,6 @@ public:
     // Respect function no.optimize.
     SILFunction *F = getFunction();
     if (!F->shouldOptimize())
-      return;
-
-    // Return if there is critical edge and we are disabling critical edge
-    // splitting.
-    if (DisableIfWithCriticalEdge && hasCriticalEdges(*F, false))
       return;
 
     LLVM_DEBUG(llvm::dbgs() << "*** ARCCM on function: " << F->getName()

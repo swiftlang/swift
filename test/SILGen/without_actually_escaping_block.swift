@@ -13,7 +13,7 @@ typealias Callback = @convention(block) () -> Void
 // CHECK:  [[C1:%.*]] = copy_block [[ARG]]
 // CHECK:  [[B1:%.*]] = begin_borrow [[C1]]
 // CHECK:  [[C2:%.*]] = copy_value [[B1]]
-// CHECK:  [[CVT:%.*]] = convert_function [[C2]] : $@convention(block) @noescape () -> () to $@convention(block) () -> ()
+// CHECK:  [[CVT:%.*]] = convert_function [[C2]] : $@convention(block) @noescape () -> () to [without_actually_escaping] $@convention(block) () -> ()
 // CHECK:  [[B2:%.*]] = begin_borrow [[CVT]]
 // CHECK:  [[FN:%.*]] = function_ref @$S25without_actually_escaping9testBlock5blockyyyXB_tFyyyXBXEfU_
 // CHECK:  apply [[FN]]([[B2]])

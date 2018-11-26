@@ -21,7 +21,9 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ReferenceCounting.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 
@@ -97,57 +99,6 @@ static ManagedValue emitBuiltinAutorelease(SILGenFunction &SGF,
   SGF.B.createUnmanagedAutoreleaseValue(loc, args[0].getValue(),
                                         SGF.B.getDefaultAtomicity());
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));    
-}
-
-static bool requireIsOptionalNativeObject(SILGenFunction &SGF,
-                                          SILLocation loc,
-                                          Type type) {
-  if (auto valueType = type->getOptionalObjectType())
-    if (valueType->is<BuiltinNativeObjectType>())
-      return true;
-
-  SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
-              "type of pin handle must be Optional<Builtin.NativeObject>");
-  return false;
-}
-
-static ManagedValue emitBuiltinTryPin(SILGenFunction &SGF,
-                                      SILLocation loc,
-                                      SubstitutionMap subs,
-                                      ArrayRef<ManagedValue> args,
-                                      SGFContext C) {
-  assert(args.size() == 1);
-
-  auto argTy = subs.getReplacementTypes()[0];
-  if (!requireIsOptionalNativeObject(SGF, loc, argTy)) {
-    return SGF.emitUndef(loc, argTy);
-  }
-
-  // The value was produced at +1, but pinning is only a conditional
-  // retain, so we have to leave the cleanup in place.  TODO: try to
-  // emit the argument at +0.
-  SILValue result =
-      SGF.B.createStrongPin(loc, args[0].getValue(), SGF.B.getDefaultAtomicity());
-
-  // The handle, if non-null, is effectively +1.
-  return SGF.emitManagedRValueWithCleanup(result);
-}
-
-static ManagedValue emitBuiltinUnpin(SILGenFunction &SGF,
-                                     SILLocation loc,
-                                     SubstitutionMap subs,
-                                     ArrayRef<ManagedValue> args,
-                                     SGFContext C) {
-  assert(args.size() == 1);
-
-  auto argTy = subs.getReplacementTypes()[0];
-  if (requireIsOptionalNativeObject(SGF, loc, argTy)) {
-    // Unpinning takes responsibility for the +1 handle.
-    SGF.B.createStrongUnpin(loc, args[0].ensurePlusOne(SGF, loc).forward(SGF),
-                            SGF.B.getDefaultAtomicity());
-  }
-
-  return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
 }
 
 /// Specialized emitter for Builtin.load and Builtin.take.
@@ -366,7 +317,7 @@ static ManagedValue emitBuiltinCastToNativeObject(SILGenFunction &SGF,
                                          SGFContext C) {
   auto ty = args[0].getType().getASTType();
   (void)ty;
-  assert(ty->usesNativeReferenceCounting(ResilienceExpansion::Maximal) &&
+  assert(ty->getReferenceCounting() == ReferenceCounting::Native &&
          "Can only cast types that use native reference counting to native "
          "object");
   return emitBuiltinUnsafeCastToNativeObject(SGF, loc, substitutions,
@@ -927,22 +878,6 @@ static ManagedValue emitBuiltinIsUnique(SILGenFunction &SGF,
     SGF.B.createIsUnique(loc, args[0].getValue()));
 }
 
-static ManagedValue
-emitBuiltinIsUniqueOrPinned(SILGenFunction &SGF,
-                               SILLocation loc,
-                               SubstitutionMap subs,
-                               ArrayRef<ManagedValue> args,
-                               SGFContext C) {
-  assert(subs.getReplacementTypes().size() == 1 &&
-         "isUnique should have a single substitution");
-  assert(args.size() == 1 && "isUnique should have a single argument");
-  assert((args[0].getType().isAddress() && !args[0].hasCleanup()) &&
-         "Builtin.isUnique takes an address.");
-
-  return ManagedValue::forUnmanaged(
-    SGF.B.createIsUniqueOrPinned(loc, args[0].getValue()));
-}
-
 // This force-casts the incoming address to NativeObject assuming the caller has
 // performed all necessary checks. For example, this may directly cast a
 // single-payload enum to a NativeObject reference.
@@ -961,24 +896,6 @@ emitBuiltinIsUnique_native(SILGenFunction &SGF,
     SILType::getNativeObjectType(SGF.getASTContext()).getAddressType();
   auto toAddr = SGF.B.createUncheckedAddrCast(loc, args[0].getValue(), ToType);
   SILValue result = SGF.B.createIsUnique(loc, toAddr);
-  return ManagedValue::forUnmanaged(result);
-}
-
-static ManagedValue
-emitBuiltinIsUniqueOrPinned_native(SILGenFunction &SGF,
-                                   SILLocation loc,
-                                   SubstitutionMap subs,
-                                   ArrayRef<ManagedValue> args,
-                                   SGFContext C) {
-
-  assert(subs.getReplacementTypes().size() == 1 &&
-         "isUniqueOrPinned_native should have one sub.");
-  assert(args.size() == 1 && "isUniqueOrPinned_native should have one arg.");
-
-  auto ToType =
-    SILType::getNativeObjectType(SGF.getASTContext()).getAddressType();
-  auto toAddr = SGF.B.createUncheckedAddrCast(loc, args[0].getValue(), ToType);
-  SILValue result = SGF.B.createIsUniqueOrPinned(loc, toAddr);
   return ManagedValue::forUnmanaged(result);
 }
 
@@ -1053,6 +970,58 @@ static ManagedValue emitBuiltinProjectTailElems(SILGenFunction &SGF,
   result = SGF.B.createAddressToPointer(loc, result, rawPointerType);
   return ManagedValue::forUnmanaged(result);
 }
+
+static ManagedValue emitBuiltinIdentityKeyPath(SILGenFunction &SGF,
+                                               SILLocation loc,
+                                               SubstitutionMap subs,
+                                               ArrayRef<ManagedValue> args,
+                                               SGFContext C) {
+  assert(subs.getReplacementTypes().size() == 1 &&
+         "identityKeyPath should have one substitution");
+  assert(args.size() == 0 &&
+         "identityKeyPath should have no args");
+
+  auto identityTy = subs.getReplacementTypes()[0]->getCanonicalType();
+  
+  // The `self` key can be used for identity in Cocoa KVC as well.
+  StringRef objcString = SGF.getASTContext().LangOpts.EnableObjCInterop
+    ? "self" : "";
+  
+  // The key path pattern has to capture some generic context if the type is
+  // dependent on this generic context. We only need the specific type, though,
+  // not the entire generic environment.
+  bool isDependent = identityTy->hasArchetype();
+  CanType identityPatternTy = identityTy;
+  CanGenericSignature patternSig = nullptr;
+  SubstitutionMap patternSubs;
+  if (isDependent) {
+    auto param = GenericTypeParamType::get(0, 0, SGF.getASTContext());
+    identityPatternTy = param->getCanonicalType();
+    patternSig = GenericSignature::get(param, {})->getCanonicalSignature();
+    patternSubs = SubstitutionMap::get(patternSig,
+                                       llvm::makeArrayRef((Type)identityTy),
+                                       {});
+  }
+  
+  auto identityPattern = KeyPathPattern::get(SGF.SGM.M,
+                                             patternSig,
+                                             identityPatternTy,
+                                             identityPatternTy,
+                                             {},
+                                             objcString);
+  
+  auto kpTy = BoundGenericType::get(SGF.getASTContext().getWritableKeyPathDecl(),
+                                    Type(),
+                                    {identityTy, identityTy})
+    ->getCanonicalType();
+  
+  auto keyPath = SGF.B.createKeyPath(loc, identityPattern,
+                                     patternSubs,
+                                     {},
+                                     SILType::getPrimitiveObjectType(kpTy));
+  return SGF.emitManagedRValueWithCleanup(keyPath);
+}
+
 
 /// Specialized emitter for type traits.
 template<TypeTraitResult (TypeBase::*Trait)(),

@@ -219,8 +219,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   } else {
     auto *dc = ctor->getParent();
     if (isa<ExtensionDecl>(dc) &&
-        dc->getAsStructOrStructExtensionContext()->getParentModule() !=
-          dc->getParentModule()) {
+        dc->getSelfStructDecl()->getParentModule() != dc->getParentModule()) {
       MUIKind = MarkUninitializedInst::CrossModuleRootSelf;
     } else {
       MUIKind = MarkUninitializedInst::RootSelf;
@@ -258,7 +257,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     SILGenSavedInsertionPoint savedIP(*this, failureBB,
                                       FunctionSection::Postmatter);
     failureExitBB = createBasicBlock();
-    Cleanups.emitCleanupsForReturn(ctor);
+    Cleanups.emitCleanupsForReturn(ctor, IsForUnwind);
     // Return nil.
     if (F.getConventions().hasIndirectSILResults()) {
       // Inject 'nil' into the indirect return.
@@ -288,7 +287,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // If this is not a delegating constructor, emit member initializers.
   if (!isDelegating) {
     auto *typeDC = ctor->getDeclContext();
-    auto *nominal = typeDC->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto *nominal = typeDC->getSelfNominalTypeDecl();
     emitMemberInitializers(ctor, selfDecl, nominal);
   }
 
@@ -479,7 +478,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // Use alloc_ref to allocate the object.
   // TODO: allow custom allocation?
   // FIXME: should have a cleanup in case of exception
-  auto selfClassDecl = ctor->getDeclContext()->getAsClassOrClassExtensionContext();
+  auto selfClassDecl = ctor->getDeclContext()->getSelfClassDecl();
 
   SILValue selfValue;
 
@@ -567,7 +566,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // this behavior, we could avoid runtime overhead here.
   VarDecl *selfDecl = ctor->getImplicitSelfDecl();
   auto *dc = ctor->getDeclContext();
-  auto selfClassDecl = dc->getAsClassOrClassExtensionContext();
+  auto selfClassDecl = dc->getSelfClassDecl();
   bool NeedsBoxForSelf = isDelegating ||
     (selfClassDecl->hasSuperclass() && !ctor->hasStubImplementation());
   bool usesObjCAllocator = Lowering::usesObjCAllocator(selfClassDecl);
@@ -658,7 +657,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     failureExitArg = failureExitBB->createPHIArgument(
         resultLowering.getLoweredType(), ValueOwnershipKind::Owned);
 
-    Cleanups.emitCleanupsForReturn(ctor);
+    Cleanups.emitCleanupsForReturn(ctor, IsForUnwind);
     SILValue nilResult =
         B.createEnum(loc, SILValue(), getASTContext().getOptionalNoneDecl(),
                      resultLowering.getLoweredType());

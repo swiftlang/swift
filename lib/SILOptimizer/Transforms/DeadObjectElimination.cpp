@@ -199,7 +199,7 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts) {
 
   // It is ok to eliminate various retains/releases. We are either removing
   // everything or nothing.
-  if (isa<RefCountingInst>(Inst) || isa<StrongPinInst>(Inst) ||
+  if (isa<RefCountingInst>(Inst) ||
       // dealloc_partial_ref invokes releases implicitly
       isa<DeallocPartialRefInst>(Inst))
     return acceptRefCountInsts;
@@ -397,7 +397,6 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
 
     // Lifetime endpoints that don't allow the address to escape.
     if (isa<RefCountingInst>(User) ||
-        isa<StrongPinInst>(User) ||
         isa<DebugValueInst>(User)) {
       AllUsers.insert(User);
       continue;

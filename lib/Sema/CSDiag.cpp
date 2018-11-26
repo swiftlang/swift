@@ -14,19 +14,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "ConstraintSystem.h"
 #include "CSDiag.h"
 #include "CalleeCandidateInfo.h"
+#include "ConstraintSystem.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
 #include "TypoCorrection.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/TypeWalker.h"
 #include "swift/AST/TypeMatcher.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/DenseSet.h"
@@ -295,16 +296,6 @@ void constraints::simplifyLocator(Expr *&anchor,
       }
       break;
 
-    case ConstraintLocator::SubscriptIndex:
-      if (auto subscript = dyn_cast<SubscriptExpr>(anchor)) {
-        targetAnchor = subscript->getBase();
-        targetPath.clear();
-
-        anchor = subscript->getIndex();
-        path = path.slice(1);
-        continue;
-      }
-      break;
     case ConstraintLocator::SubscriptMember:
       if (isa<SubscriptExpr>(anchor)) {
         targetAnchor = nullptr;
@@ -341,238 +332,6 @@ void constraints::simplifyLocator(Expr *&anchor,
   }
 }
 
-/// Simplify the given locator down to a specific anchor expression,
-/// if possible.
-///
-/// \returns the anchor expression if it fully describes the locator, or
-/// null otherwise.
-static Expr *simplifyLocatorToAnchor(ConstraintSystem &cs,
-                                     ConstraintLocator *locator) {
-  if (!locator || !locator->getAnchor())
-    return nullptr;
-
-  SourceRange range;
-  locator = simplifyLocator(cs, locator, range);
-  if (!locator->getAnchor() || !locator->getPath().empty())
-    return nullptr;
-
-  return locator->getAnchor();
-}
-
-
-
-
-/// \brief Determine the number of distinct overload choices in the
-/// provided set.
-static unsigned countDistinctOverloads(ArrayRef<OverloadChoice> choices) {
-  llvm::SmallPtrSet<void *, 4> uniqueChoices;
-  unsigned result = 0;
-  for (auto choice : choices) {
-    if (uniqueChoices.insert(choice.getOpaqueChoiceSimple()).second)
-      ++result;
-  }
-  return result;
-}
-
-/// \brief Determine the name of the overload in a set of overload choices.
-static DeclName getOverloadChoiceName(ArrayRef<OverloadChoice> choices) {
-  DeclName name;
-  for (auto choice : choices) {
-    if (!choice.isDecl())
-      continue;
-
-    DeclName nextName = choice.getDecl()->getFullName();
-    if (!name) {
-      name = nextName;
-      continue;
-    }
-
-    if (name != nextName) {
-      // Assume all choices have the same base name and only differ in
-      // argument labels. This may not be a great assumption, but we don't
-      // really have a way to recover for diagnostics otherwise.
-      return name.getBaseName();
-    }
-  }
-
-  return name;
-}
-
-/// Returns true if any diagnostics were emitted.
-static bool
-tryDiagnoseTrailingClosureAmbiguity(TypeChecker &tc,
-                                    const Expr *expr,
-                                    const Expr *anchor,
-                                    ArrayRef<OverloadChoice> choices) {
-  auto *callExpr = dyn_cast<CallExpr>(expr);
-  if (!callExpr)
-    return false;
-  if (!callExpr->hasTrailingClosure())
-    return false;
-  if (callExpr->getFn() != anchor)
-    return false;
-
-  llvm::SmallMapVector<Identifier, const ValueDecl *, 8> choicesByLabel;
-  for (const OverloadChoice &choice : choices) {
-    auto *callee = dyn_cast<AbstractFunctionDecl>(choice.getDecl());
-    if (!callee)
-      return false;
-
-    const ParameterList *paramList = callee->getParameters();
-    const ParamDecl *param = paramList->getArray().back();
-
-    // Sanity-check that the trailing closure corresponds to this parameter.
-    if (!param->hasValidSignature() ||
-        !param->getInterfaceType()->is<AnyFunctionType>())
-      return false;
-
-    Identifier trailingClosureLabel = param->getArgumentName();
-    auto &choiceForLabel = choicesByLabel[trailingClosureLabel];
-
-    // FIXME: Cargo-culted from diagnoseAmbiguity: apparently the same decl can
-    // appear more than once?
-    if (choiceForLabel == callee)
-      continue;
-
-    // If just providing the trailing closure label won't solve the ambiguity,
-    // don't bother offering the fix-it.
-    if (choiceForLabel != nullptr)
-      return false;
-
-    choiceForLabel = callee;
-  }
-
-  // If we got here, then all of the choices have unique labels. Offer them in
-  // order.
-  for (const auto &choicePair : choicesByLabel) {
-    auto diag = tc.diagnose(expr->getLoc(),
-                            diag::ambiguous_because_of_trailing_closure,
-                            choicePair.first.empty(),
-                            choicePair.second->getFullName());
-    swift::fixItEncloseTrailingClosure(tc, diag, callExpr, choicePair.first);
-  }
-
-  return true;
-}
-
-static bool diagnoseAmbiguity(ConstraintSystem &cs,
-                              ArrayRef<Solution> solutions,
-                              Expr *expr) {
-  // Produce a diff of the solutions.
-  SolutionDiff diff(solutions);
-
-  // Find the locators which have the largest numbers of distinct overloads.
-  Optional<unsigned> bestOverload;
-  // Overloads are scored by lexicographical comparison of (# of distinct
-  // overloads, depth, *reverse* of the index). N.B. - cannot be used for the
-  // reversing: the score version of index == 0 should be > than that of 1, but
-  // -0 == 0 < UINT_MAX == -1, whereas ~0 == UINT_MAX > UINT_MAX - 1 == ~1.
-  auto score = [](unsigned distinctOverloads, unsigned depth, unsigned index) {
-    return std::make_tuple(distinctOverloads, depth, ~index);
-  };
-  auto bestScore = score(0, 0, std::numeric_limits<unsigned>::max());
-
-  // Get a map of expressions to their depths and post-order traversal indices.
-  // Heuristically, all other things being equal, we should complain about the
-  // ambiguous expression that (1) has the most overloads, (2) is deepest, or
-  // (3) comes earliest in the expression.
-  auto depthMap = expr->getDepthMap();
-  auto indexMap = expr->getPreorderIndexMap();
-
-  for (unsigned i = 0, n = diff.overloads.size(); i != n; ++i) {
-    auto &overload = diff.overloads[i];
-
-    // If we can't resolve the locator to an anchor expression with no path,
-    // we can't diagnose this well.
-    auto *anchor = simplifyLocatorToAnchor(cs, overload.locator);
-    if (!anchor)
-      continue;
-    auto it = indexMap.find(anchor);
-    if (it == indexMap.end())
-      continue;
-    unsigned index = it->second;
-    it = depthMap.find(anchor);
-    if (it == depthMap.end())
-      continue;
-    unsigned depth = it->second;
-
-    // If we don't have a name to hang on to, it'll be hard to diagnose this
-    // overload.
-    if (!getOverloadChoiceName(overload.choices))
-      continue;
-
-    unsigned distinctOverloads = countDistinctOverloads(overload.choices);
-
-    // We need at least two overloads to make this interesting.
-    if (distinctOverloads < 2)
-      continue;
-
-    // If we have more distinct overload choices for this locator than for
-    // prior locators, just keep this locator.
-    auto thisScore = score(distinctOverloads, depth, index);
-    if (thisScore > bestScore) {
-      bestScore = thisScore;
-      bestOverload = i;
-      continue;
-    }
-
-    // We have better results. Ignore this one.
-  }
-
-  // FIXME: Should be able to pick the best locator, e.g., based on some
-  // depth-first numbering of expressions.
-  if (bestOverload) {
-    auto &overload = diff.overloads[*bestOverload];
-    auto name = getOverloadChoiceName(overload.choices);
-    auto anchor = simplifyLocatorToAnchor(cs, overload.locator);
-
-    // Emit the ambiguity diagnostic.
-    auto &tc = cs.getTypeChecker();
-    tc.diagnose(anchor->getLoc(),
-                name.isOperator() ? diag::ambiguous_operator_ref
-                                  : diag::ambiguous_decl_ref,
-                name);
-
-    if (tryDiagnoseTrailingClosureAmbiguity(tc, expr, anchor, overload.choices))
-      return true;
-
-    // Emit candidates.  Use a SmallPtrSet to make sure only emit a particular
-    // candidate once.  FIXME: Why is one candidate getting into the overload
-    // set multiple times? (See also tryDiagnoseTrailingClosureAmbiguity.)
-    SmallPtrSet<Decl*, 8> EmittedDecls;
-    for (auto choice : overload.choices) {
-      switch (choice.getKind()) {
-      case OverloadChoiceKind::Decl:
-      case OverloadChoiceKind::DeclViaDynamic:
-      case OverloadChoiceKind::DeclViaBridge:
-      case OverloadChoiceKind::DeclViaUnwrappedOptional:
-        // FIXME: show deduced types, etc, etc.
-        if (EmittedDecls.insert(choice.getDecl()).second)
-          tc.diagnose(choice.getDecl(), diag::found_candidate);
-        break;
-
-      case OverloadChoiceKind::KeyPathApplication:
-      case OverloadChoiceKind::DynamicMemberLookup:
-        // Skip key path applications and dynamic member lookups, since we don't
-        // want them to noise up unrelated subscript diagnostics.
-        break;
-
-      case OverloadChoiceKind::BaseType:
-      case OverloadChoiceKind::TupleIndex:
-        // FIXME: Actually diagnose something here.
-        break;
-      }
-    }
-
-    return true;
-  }
-
-  // FIXME: If we inferred different types for literals (for example),
-  // could diagnose ambiguity that way as well.
-
-  return false;
-}
-
 /// Given an expression that has a non-lvalue type, dig into it until we find
 /// the part of the expression that prevents the entire subexpression from being
 /// mutable.  For example, in a sequence like "x.v.v = 42" we want to complain
@@ -604,6 +363,17 @@ resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
       if (!member->isSettable() ||
           !member->isSetterAccessibleFrom(CS.DC))
         return { expr, member };
+    }
+
+    if (auto tupleExpr = dyn_cast<TupleExpr>(SE->getIndex())) {
+      if (tupleExpr->getNumElements() == 1 && tupleExpr->getElementName(0).str() == "keyPath") {
+        auto indexType = CS.simplifyType(CS.getType(tupleExpr->getElement(0)));
+        if (auto bgt = indexType->getAs<BoundGenericType>()) {
+          auto decl = bgt->getDecl();
+          if (decl == CS.getASTContext().getKeyPathDecl())
+            return resolveImmutableBase(tupleExpr->getElement(0), CS);
+        }
+      }
     }
 
     // If it is settable, then the base must be the problem, recurse.
@@ -660,6 +430,9 @@ resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
   if (auto *ICE = dyn_cast<ImplicitConversionExpr>(expr))
     if (!isa<LoadExpr>(ICE->getSubExpr()))
       return resolveImmutableBase(ICE->getSubExpr(), CS);
+
+  if (auto *SAE = dyn_cast<SelfApplyExpr>(expr))
+    return resolveImmutableBase(SAE->getFn(), CS);
 
   return { expr, nullptr };
 }
@@ -738,7 +511,7 @@ static void fixItChangeInoutArgType(const Expr * arg,
     .fixItReplaceChars(startLoc, endLoc, scratch);
 }
 
-static void diagnoseSubElementFailure(Expr *destExpr,
+void swift::diagnoseSubElementFailure(Expr *destExpr,
                                       SourceLoc loc,
                                       ConstraintSystem &CS,
                                       Diag<StringRef> diagID,
@@ -757,7 +530,11 @@ static void diagnoseSubElementFailure(Expr *destExpr,
     message += VD->getName().str().str();
     message += "'";
 
-    if (VD->isCaptureList())
+    auto type = CS.simplifyType(CS.getType(immInfo.first));
+    auto bgt = type ? type->getAs<BoundGenericType>() : nullptr;
+    if (bgt && bgt->getDecl() == CS.getASTContext().getKeyPathDecl())
+      message += " is a read-only key path";
+    else if (VD->isCaptureList())
       message += " is an immutable capture";
     else if (VD->isImplicit())
       message += " is immutable";
@@ -815,6 +592,14 @@ static void diagnoseSubElementFailure(Expr *destExpr,
     return;
   }
 
+  // If a keypath was the problem but wasn't resolved into a vardecl
+  // it is ambiguous or unable to be used for setting.
+  if (auto *KPE = dyn_cast_or_null<KeyPathExpr>(immInfo.first)) {
+    TC.diagnose(loc, diagID, "immutable key path")
+      .highlight(KPE->getSourceRange());
+    return;
+  }
+
   // If the expression is the result of a call, it is an rvalue, not a mutable
   // lvalue.
   if (auto *AE = dyn_cast<ApplyExpr>(immInfo.first)) {
@@ -850,28 +635,30 @@ static void diagnoseSubElementFailure(Expr *destExpr,
     return;
   }
 
-  if (auto *ICE = dyn_cast<ImplicitConversionExpr>(immInfo.first))
-    if (auto *LE = dyn_cast<LoadExpr>(ICE->getSubExpr())) {
-      Type actualType = CS.getType(LE);
-      Type neededType = CS.getType(ICE);
-      
+  if (auto contextualType = CS.getContextualType(immInfo.first)) {
+    Type neededType = contextualType->getInOutObjectType();
+    Type actualType = CS.getType(immInfo.first)->getInOutObjectType();
+    if (!neededType->isEqual(actualType)) {
       if (diagID.ID == diag::cannot_pass_rvalue_inout_subelement.ID) {
         // We have a special diagnostic with tailored wording for this
         // common case.
-        TC.diagnose(loc, diag::cannot_pass_rvalue_inout_converted,
-                    actualType, neededType)
-          .highlight(ICE->getSourceRange());
-        
-        fixItChangeInoutArgType(LE->getSubExpr(), actualType, neededType, CS);
-      }
-      else
+        TC.diagnose(loc, diag::cannot_pass_rvalue_inout_converted, actualType,
+                    neededType)
+            .highlight(immInfo.first->getSourceRange());
+
+        if (auto inoutExpr = dyn_cast<InOutExpr>(immInfo.first))
+          fixItChangeInoutArgType(inoutExpr->getSubExpr(), actualType,
+                                  neededType, CS);
+      } else {
         TC.diagnose(loc, diagID,
-                    "implicit conversion from '" +
-                    actualType->getString() + "' to '" +
-                    neededType->getString() + "' requires a temporary")
-          .highlight(ICE->getSourceRange());
+                    "implicit conversion from '" + actualType->getString() +
+                        "' to '" + neededType->getString() +
+                        "' requires a temporary")
+            .highlight(immInfo.first->getSourceRange());
+      }
       return;
     }
+  }
 
   if (auto IE = dyn_cast<IfExpr>(immInfo.first)) {
     if (isLoadedLValue(IE)) {
@@ -883,7 +670,8 @@ static void diagnoseSubElementFailure(Expr *destExpr,
     }
   }
 
-  TC.diagnose(loc, unknownDiagID, CS.getType(destExpr))
+  auto type = destExpr->getType() ?: CS.simplifyType(CS.getType(destExpr));
+  TC.diagnose(loc, unknownDiagID, type)
       .highlight(immInfo.first->getSourceRange());
 }
 
@@ -1356,7 +1144,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
     if (auto parent = CS.DC->getInnermostTypeContext()) {
       // If we are in a protocol extension of 'Proto' and we see
       // 'Proto.static', suggest 'Self.static'
-      if (auto extensionContext = parent->getAsProtocolExtensionContext()) {
+      if (auto extensionContext = parent->getExtendedProtocolDecl()) {
         if (extensionContext->getDeclaredType()->isEqual(instanceTy)) {
           Diag->fixItReplace(baseRange, "Self");
         }
@@ -1428,9 +1216,7 @@ diagnoseTypeMemberOnInstanceLookup(Type baseObjTy,
   }
 
   // Fall back to a fix-it with a full type qualifier
-  auto nominal =
-      member->getDeclContext()
-      ->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto nominal = member->getDeclContext()->getSelfNominalTypeDecl();
   SmallString<32> typeName;
   llvm::raw_svector_ostream typeNameStream(typeName);
   typeNameStream << nominal->getSelfInterfaceType() << ".";
@@ -1618,8 +1404,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
         }
         assert(TypeDC->isTypeContext() && "Expected type decl context!");
 
-        if (TypeDC->getAsNominalTypeOrNominalTypeExtensionContext() ==
-            instanceTy->getAnyNominal()) {
+        if (TypeDC->getSelfNominalTypeDecl() == instanceTy->getAnyNominal()) {
           if (propertyInitializer)
             CS.TC.diagnose(nameLoc, diag::instance_member_in_initializer,
                            memberName);
@@ -2869,6 +2654,10 @@ static bool addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem &CS,
                                Type fromType, Type toType, Expr *expr) {
   // Look through optional types; casts can add them, but can't remove extra
   // ones.
+  bool bothOptional =
+      fromType->getOptionalObjectType() && toType->getOptionalObjectType();
+  if (bothOptional)
+    fromType = fromType->getOptionalObjectType();
   toType = toType->lookThroughAllOptionalTypes();
 
   CheckedCastKind Kind = CS.getTypeChecker().typeCheckCheckedCast(
@@ -2877,9 +2666,11 @@ static bool addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem &CS,
   if (Kind != CheckedCastKind::Unresolved) {
     SmallString<32> buffer;
     llvm::raw_svector_ostream OS(buffer);
-    toType->print(OS);
     bool canUseAs = Kind == CheckedCastKind::Coercion ||
       Kind == CheckedCastKind::BridgingCoercion;
+    if (bothOptional && canUseAs)
+      toType = OptionalType::get(toType);
+    toType->print(OS);
     diag.fixItInsert(
         Lexer::getLocForEndOfToken(CS.DC->getASTContext().SourceMgr,
                                    expr->getEndLoc()),
@@ -3312,44 +3103,30 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
 
 /// When an assignment to an expression is detected and the destination is
 /// invalid, emit a detailed error about the condition.
-void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
+bool ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
                                                  SourceLoc equalLoc) {
   auto &TC = getTypeChecker();
 
-  // Diagnose obvious assignments to literals.
-  if (isa<LiteralExpr>(dest->getValueProvidingExpr())) {
-    TC.diagnose(equalLoc, diag::cannot_assign_to_literal);
-    return;
-  }
-
-  // Diagnose assignments to let-properties in delegating initializers.
-  if (auto *member = dyn_cast<UnresolvedDotExpr>(dest)) {
-    if (auto *ctor = dyn_cast<ConstructorDecl>(DC)) {
-      if (auto *baseRef = dyn_cast<DeclRefExpr>(member->getBase())) {
-        if (baseRef->getDecl() == ctor->getImplicitSelfDecl() &&
-            ctor->getDelegatingOrChainedInitKind(nullptr) ==
-              ConstructorDecl::BodyInitKind::Delegating) {
-          auto resolved = resolveImmutableBase(member, *this);
-          assert(resolved.first == member);
-          TC.diagnose(equalLoc, diag::assignment_let_property_delegating_init,
-                      member->getName());
-          if (resolved.second) {
-            TC.diagnose(resolved.second, diag::decl_declared_here,
-                        member->getName());
-          }
-          return;
-        }
-      }
+  // Assignments to let-properties in delegating initializers will be caught
+  // elsewhere now, so if we see them here, it isn't an assignment problem.
+  if (auto *ctor = dyn_cast<ConstructorDecl>(DC)) {
+    DeclRefExpr *baseRef = nullptr;
+    if (auto *member = dyn_cast<UnresolvedDotExpr>(dest)) {
+      baseRef = dyn_cast<DeclRefExpr>(member->getBase());
+    } else if (auto *member = dyn_cast<MemberRefExpr>(dest)) {
+      if (auto *load = dyn_cast<LoadExpr>(member->getBase()))
+        baseRef = dyn_cast<DeclRefExpr>(load->getSubExpr());
+    }
+    if (baseRef && baseRef->getDecl() == ctor->getImplicitSelfDecl() &&
+        ctor->getDelegatingOrChainedInitKind(nullptr) ==
+          ConstructorDecl::BodyInitKind::Delegating) {
+      return false;
     }
   }
 
   Diag<StringRef> diagID;
-  if (isa<ApplyExpr>(dest))
+  if (isa<ApplyExpr>(dest) || isa<SelfApplyExpr>(dest))
     diagID = diag::assignment_lhs_is_apply_expression;
-  else if (isa<DeclRefExpr>(dest))
-    diagID = diag::assignment_lhs_is_immutable_variable;
-  else if (isa<ForceValueExpr>(dest))
-    diagID = diag::assignment_bang_has_immutable_subcomponent;
   else if (isa<UnresolvedDotExpr>(dest) || isa<MemberRefExpr>(dest))
     diagID = diag::assignment_lhs_is_immutable_property;
   else if (auto sub = dyn_cast<SubscriptExpr>(dest)) {
@@ -3362,12 +3139,12 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
         sub->getArgumentLabels().size() == 1 &&
         sub->getArgumentLabels().front() == TC.Context.Id_dynamicMember)
       diagID = diag::assignment_dynamic_property_has_immutable_base;
-  } else {
+  } else
     diagID = diag::assignment_lhs_is_immutable_variable;
-  }
 
   diagnoseSubElementFailure(dest, equalLoc, *this, diagID,
                             diag::assignment_lhs_not_lvalue);
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -3762,7 +3539,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
 }
 
 static DeclName getBaseName(DeclContext *context) {
-  if (auto generic = context->getAsNominalTypeOrNominalTypeExtensionContext()) {
+  if (auto generic = context->getSelfNominalTypeDecl()) {
     return generic->getName();
   } else if (context->isModuleScopeContext())
     return context->getParentModule()->getName();
@@ -3790,14 +3567,13 @@ void ConstraintSystem::diagnoseDeprecatedConditionalConformanceOuterAccess(
   auto exampleInner = result.front();
   auto innerChoice = exampleInner.getValueDecl();
   auto innerDC = exampleInner.getDeclContext()->getInnermostTypeContext();
-  auto innerParentDecl =
-      innerDC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto innerParentDecl = innerDC->getSelfNominalTypeDecl();
   auto innerBaseName = getBaseName(innerDC);
 
   auto choiceKind = choice->getDescriptiveKind();
   auto choiceDC = choice->getDeclContext();
   auto choiceBaseName = getBaseName(choiceDC);
-  auto choiceParentDecl = choiceDC->getAsDeclOrDeclExtensionContext();
+  auto choiceParentDecl = choiceDC->getAsDecl();
   auto choiceParentKind = choiceParentDecl
                               ? choiceParentDecl->getDescriptiveKind()
                               : DescriptiveDeclKind::Module;
@@ -4099,8 +3875,7 @@ diagnoseInstanceMethodAsCurriedMemberOnType(CalleeCandidateInfo &CCI,
         }
         assert(TypeDC->isTypeContext() && "Expected type decl context!");
 
-        if (TypeDC->getAsNominalTypeOrNominalTypeExtensionContext() ==
-            instanceType->getAnyNominal()) {
+        if (TypeDC->getSelfNominalTypeDecl() == instanceType->getAnyNominal()) {
           if (propertyInitializer)
             TC.diagnose(UDE->getLoc(), diag::instance_member_in_initializer,
                         UDE->getName());
@@ -4346,7 +4121,7 @@ public:
     // Explode inout type.
     if (param.isInOut()) {
       insertText << "&";
-      Ty = param.getType()->getInOutObjectType();
+      Ty = param.getPlainType();
     }
     // @autoclosure; the type should be the result type.
     if (auto FT = param.getType()->getAs<AnyFunctionType>())
@@ -5069,36 +4844,31 @@ namespace {
 
     bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       // If we have no contextual type, there is nothing to do.
-      if (!contextualType) return false;
+      if (!contextualType)
+        return false;
 
       // If the expression is obviously something that produces a metatype,
       // then don't put a constraint on it.
       auto semExpr = expr->getValueProvidingExpr();
       if (isa<TypeExpr>(semExpr))
         return false;
-      
-      // We're making the expr have a function type, whose result is the same
-      // as our contextual type.
-      auto inputLocator =
+
+      auto resultLocator =
         cs.getConstraintLocator(expr, ConstraintLocator::FunctionResult);
-
-      auto tv = cs.createTypeVariable(inputLocator,
-                                      TVO_CanBindToLValue |
-                                      TVO_PrefersSubtypeBinding);
-
-      // In order to make this work, we pick the most general function type and
-      // use a conversion constraint.  This gives us:
-      //    "$T0 throws -> contextualType"
-      // this allows things that are throws and not throws, and allows escape
-      // and noescape functions.
-      auto extInfo = FunctionType::ExtInfo().withThrows();
-      auto fTy = FunctionType::get(tv, contextualType, extInfo);
+      auto resultType = cs.createTypeVariable(resultLocator,
+                                              TVO_CanBindToLValue);
 
       auto locator = cs.getConstraintLocator(expr);
+      cs.addConstraint(ConstraintKind::FunctionResult,
+                       cs.getType(expr),
+                       resultType,
+                       locator);
 
-      // Add a conversion constraint between the types.
-      cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr), fTy,
-                       locator, /*isFavored*/ true);
+      cs.addConstraint(ConstraintKind::Conversion,
+                       resultType,
+                       contextualType,
+                       locator);
+
       return false;
     }
   };
@@ -5539,8 +5309,9 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
                                         TVO_PrefersSubtypeBinding);
 
         auto extInfo = FunctionType::ExtInfo().withThrows();
-        auto fTy = FunctionType::get(ParenType::get(cs.getASTContext(), tv),
-                                     expectedResultType, extInfo);
+
+        FunctionType::Param tvParam(tv);
+        auto fTy = FunctionType::get({tvParam}, expectedResultType, extInfo);
 
         // Add a conversion constraint between the types.
         cs.addConstraint(ConstraintKind::Conversion, typeVar, fTy, locator,
@@ -5617,18 +5388,19 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
         return false;
 
       class ClosureCalleeListener : public ExprTypeCheckListener {
-        Type InputType;
+        FunctionType *InputType;
         Type ResultType;
 
       public:
-        explicit ClosureCalleeListener(Type inputType, Type resultType)
+        explicit ClosureCalleeListener(FunctionType *inputType, Type resultType)
             : InputType(inputType), ResultType(resultType) {}
 
         bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
-          if (!InputType || !ResultType)
+          if (!ResultType)
             return false;
 
-          auto expectedType = FunctionType::get(InputType, ResultType);
+          AnyFunctionType::Param Input(InputType);
+          auto expectedType = FunctionType::get({Input}, ResultType);
           cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                            expectedType, cs.getConstraintLocator(expr),
                            /*isFavored*/ true);
@@ -5665,11 +5437,9 @@ bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
   auto *DC = CS.DC;
 
   auto typeCheckExpr = [](TypeChecker &TC, Expr *expr, DeclContext *DC,
-                          SmallPtrSetImpl<TypeBase *> &types,
-                          Type contextualType = Type()) {
-    CalleeListener listener(contextualType);
+                          SmallPtrSetImpl<TypeBase *> &types) {
     TC.getPossibleTypesOfExpressionWithoutApplying(
-        expr, DC, types, FreeTypeVariableBinding::Disallow, &listener);
+        expr, DC, types, FreeTypeVariableBinding::Disallow);
   };
 
   // First let's type-check expression without contextual type, and
@@ -5684,22 +5454,9 @@ bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
   if (withoutContextual.empty())
     return false;
 
-  SmallPtrSet<TypeBase *, 4> withContextual;
-  typeCheckExpr(TC, callExpr, DC, withContextual, contextualType);
-  // If type-checking with contextual type didn't produce any results
-  // it means that we have a contextual mismatch.
-  if (withContextual.empty()) {
-    // If there is just a single choice, we can hit contextual diagnostics
-    // about it in case re-typecheck fails.
-    Type exprType = withoutContextual.size() == 1 ? *withoutContextual.begin() : Type();
-    return diagnoseContextualConversionError(callExpr, contextualType, CTP,
-                                             exprType);
-  }
-
-  // If call produces a single type when type-checked with contextual
-  // expression, it means that the problem is elsewhere, any other
-  // outcome is ambiguous.
-  return false;
+  Type exprType = withoutContextual.size() == 1 ? *withoutContextual.begin() : Type();
+  return diagnoseContextualConversionError(callExpr, contextualType, CTP,
+                                           exprType);
 }
 
 bool FailureDiagnosis::diagnoseSubscriptMisuse(ApplyExpr *callExpr) {
@@ -6113,12 +5870,12 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // makes it a lot easier to determine contextual mismatch.
   if (CS.failedConstraint && !hasTrailingClosure) {
     auto *constraint = CS.failedConstraint;
-    if (constraint->getKind() == ConstraintKind::ArgumentTupleConversion) {
+    if (constraint->getKind() == ConstraintKind::ApplicableFunction) {
       if (auto *locator = constraint->getLocator()) {
         if (locator->getAnchor() == callExpr) {
-          argType = constraint->getSecondType();
-          if (auto *typeVar = argType->getAs<TypeVariableType>())
-            argType = CS.getFixedType(typeVar);
+          auto calleeType = CS.simplifyType(constraint->getSecondType());
+          if (auto *fnType = calleeType->getAs<FunctionType>())
+            argType = fnType->getInput();
         }
       }
     }
@@ -6150,33 +5907,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
                                                 calleeInfo, TCC_ForceRecheck);
   if (!argExpr)
     return true; // already diagnosed.
-  
-  // A common error is to apply an operator that only has inout forms (e.g. +=)
-  // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
-  // case.
-  if (calleeInfo.closeness == CC_NonLValueInOut) {
-    Diag<StringRef> subElementDiagID;
-    Diag<Type> rvalueDiagID;
-    Expr *diagExpr = nullptr;
-    
-    if (isa<PrefixUnaryExpr>(callExpr) || isa<PostfixUnaryExpr>(callExpr)) {
-      subElementDiagID = diag::cannot_apply_lvalue_unop_to_subelement;
-      rvalueDiagID = diag::cannot_apply_lvalue_unop_to_rvalue;
-      diagExpr = argExpr;
-    } else if (isa<BinaryExpr>(callExpr)) {
-      subElementDiagID = diag::cannot_apply_lvalue_binop_to_subelement;
-      rvalueDiagID = diag::cannot_apply_lvalue_binop_to_rvalue;
-      
-      if (auto argTuple = dyn_cast<TupleExpr>(argExpr))
-        diagExpr = argTuple->getElement(0);
-    }
-    
-    if (diagExpr) {
-      diagnoseSubElementFailure(diagExpr, callExpr->getFn()->getLoc(), CS,
-                                subElementDiagID, rvalueDiagID);
-      return true;
-    }
-  }
   
   // Handle argument label mismatches when we have multiple candidates.
   if (calleeInfo.closeness == CC_ArgumentLabelMismatch) {
@@ -6484,8 +6214,8 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
       if (diagnoseSubscriptErrors(subscriptExpr, /* inAssignmentDestination = */ true))
         return true;
     }
-    CS.diagnoseAssignmentFailure(destExpr, destType, assignExpr->getLoc());
-    return true;
+    if (CS.diagnoseAssignmentFailure(destExpr, destType, assignExpr->getLoc()))
+      return true;
   }
 
   auto *srcExpr = assignExpr->getSrc();
@@ -6547,9 +6277,7 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
     if (auto unwrapped = contextualType->getOptionalObjectType())
       unwrappedType = unwrapped;
 
-    PointerTypeKind pointerKind;
-    if (auto pointerEltType =
-          unwrappedType->getAnyPointerElementType(pointerKind)) {
+    if (auto pointerEltType = unwrappedType->getAnyPointerElementType()) {
 
       // If the element type is Void, then we allow any input type, since
       // everything is convertible to UnsafeRawPointer
@@ -6561,20 +6289,7 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
       // Furthermore, if the subexpr type is already known to be an array type,
       // then we must have an attempt at an array to pointer conversion.
       if (isKnownToBeArrayType(CS.getType(IOE->getSubExpr()))) {
-        // If we're converting to an UnsafeMutablePointer, then the pointer to
-        // the first element is being passed in.  The array is ok, so long as
-        // it is mutable.
-        if (pointerKind == PTK_UnsafeMutablePointer) {
-          contextualType = ArraySliceType::get(contextualType);
-        } else if (pointerKind == PTK_UnsafePointer || pointerKind == PTK_UnsafeRawPointer) {
-          // If we're converting to an UnsafePointer, then the programmer
-          // specified an & unnecessarily.  Produce a fixit hint to remove it.
-          diagnose(IOE->getLoc(), diag::extra_address_of_unsafepointer,
-                   unwrappedType)
-            .highlight(IOE->getSourceRange())
-            .fixItRemove(IOE->getStartLoc());
-          return true;
-        }
+        contextualType = ArraySliceType::get(contextualType);
       }
     } else if (contextualType->is<InOutType>()) {
       contextualType = contextualType->getInOutObjectType();
@@ -6588,21 +6303,11 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
     }
   }
 
-  auto subExpr = typeCheckChildIndependently(IOE->getSubExpr(), contextualType,
-                                             CS.getContextualTypePurpose(),
-                                             TCC_AllowLValue);
-  if (!subExpr) return true;
-
-  auto subExprType = CS.getType(subExpr);
-
-  // The common cause is that the operand is not an lvalue.
-  if (!subExprType->hasLValueType()) {
-    diagnoseSubElementFailure(subExpr, IOE->getLoc(), CS,
-                              diag::cannot_pass_rvalue_inout_subelement,
-                              diag::cannot_pass_rvalue_inout);
+  if (!typeCheckChildIndependently(IOE->getSubExpr(), contextualType,
+                                   CS.getContextualTypePurpose(),
+                                   TCC_AllowLValue)) {
     return true;
   }
-  
   return false;
 }
 
@@ -7008,7 +6713,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
     if (VD->hasType() && (VD->getType()->hasTypeVariable() ||
                           VD->getType()->hasError())) {
       VD->setType(CS.getASTContext().TheUnresolvedType);
-      VD->setInterfaceType(VD->getType()->getInOutObjectType());
+      VD->setInterfaceType(VD->getType());
     }
   }
 
@@ -7611,9 +7316,8 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
   if (!DLC)
     return visitExpr(E);
 
-  if (auto Conformance
-        = CS.TC.conformsToProtocol(contextualType, DLC, CS.DC,
-                                   ConformanceCheckFlags::InExpression)) {
+  if (CS.TC.conformsToProtocol(contextualType, DLC, CS.DC,
+                               ConformanceCheckFlags::InExpression)) {
     // If the contextual type conforms to ExpressibleByDictionaryLiteral and
     // this is an empty array, then they meant "[:]".
     auto numElements = E->getNumElements();
@@ -9033,135 +8737,6 @@ ValueDecl *ConstraintSystem::findResolvedMemberRef(ConstraintLocator *locator) {
   return nullptr;
 }
 
-
-bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
-  if (TC.getLangOpts().DebugConstraintSolver) {
-    auto &log = TC.Context.TypeCheckerDebug->getStream();
-    log << "---Attempting to salvage and emit diagnostics---\n";
-  }
-
-  // Attempt to solve again, capturing all states that come from our attempts to
-  // select overloads or bind type variables.
-  //
-  // FIXME: can this be removed?  We need to arrange for recordFixes to be
-  // eliminated.
-  viable.clear();
-
-  {
-    // Set up solver state.
-    SolverState state(expr, *this);
-    state.recordFixes = true;
-
-    // Solve the system.
-    solveRec(viable, FreeTypeVariableBinding::Disallow);
-
-    // Check whether we have a best solution; this can happen if we found
-    // a series of fixes that worked.
-    if (auto best = findBestSolution(viable, state.ExprWeights,
-                                     /*minimize=*/true)) {
-      if (*best != 0)
-        viable[0] = std::move(viable[*best]);
-      viable.erase(viable.begin() + 1, viable.end());
-      return false;
-    }
-
-    // FIXME: If we were able to actually fix things along the way,
-    // we may have to hunt for the best solution. For now, we don't care.
-
-    // Remove solutions that require fixes; the fixes in those systems should
-    // be diagnosed rather than any ambiguity.
-    auto hasFixes = [](const Solution &sol) { return !sol.Fixes.empty(); };
-    auto newEnd = std::remove_if(viable.begin(), viable.end(), hasFixes);
-    viable.erase(newEnd, viable.end());
-
-    // If there are multiple solutions, try to diagnose an ambiguity.
-    if (viable.size() > 1) {
-      if (getASTContext().LangOpts.DebugConstraintSolver) {
-        auto &log = getASTContext().TypeCheckerDebug->getStream();
-        log << "---Ambiguity error: "
-            << viable.size() << " solutions found---\n";
-        int i = 0;
-        for (auto &solution : viable) {
-          log << "---Ambiguous solution #" << i++ << "---\n";
-          solution.dump(log);
-          log << "\n";
-        }
-      }        
-
-      if (diagnoseAmbiguity(*this, viable, expr)) {
-        return true;
-      }
-    }
-
-    // Fall through to produce diagnostics.
-  }
-
-  if (getExpressionTooComplex(viable)) {
-    TC.diagnose(expr->getLoc(), diag::expression_too_complex).
-    highlight(expr->getSourceRange());
-    return true;
-  }
-
-  // If all else fails, diagnose the failure by looking through the system's
-  // constraints.
-  diagnoseFailureForExpr(expr);
-  return true;
-}
-
-bool swift::diagnoseUnwrap(TypeChecker &TC, DeclContext *DC,
-                           Expr *expr, Type type) {
-  Type unwrappedType = type->getOptionalObjectType();
-  if (!unwrappedType)
-    return false;
-
-  TC.diagnose(expr->getLoc(), diag::optional_not_unwrapped, type,
-              unwrappedType);
-
-  // Suggest a default value via ?? <default value>
-  {
-    auto diag =
-      TC.diagnose(expr->getLoc(), diag::unwrap_with_default_value);
-
-    // Figure out what we need to parenthesize.
-    bool needsParensInside =
-      exprNeedsParensBeforeAddingNilCoalescing(TC, DC, expr);
-    bool needsParensOutside =
-      exprNeedsParensAfterAddingNilCoalescing(TC, DC, expr, expr);
-
-    llvm::SmallString<2> insertBefore;
-    llvm::SmallString<32> insertAfter;
-    if (needsParensOutside) {
-      insertBefore += "(";
-    }
-    if (needsParensInside) {
-      insertBefore += "(";
-      insertAfter += ")";
-    }
-    insertAfter += " ?? <" "#default value#" ">";
-    if (needsParensOutside)
-      insertAfter += ")";
-
-    if (!insertBefore.empty()) {
-      diag.fixItInsert(expr->getStartLoc(), insertBefore);
-    }
-    diag.fixItInsertAfter(expr->getEndLoc(), insertAfter);
-  }
-
-  // Suggest a force-unwrap.
-  {
-    auto diag =
-      TC.diagnose(expr->getLoc(), diag::unwrap_with_force_value);
-    if (expr->canAppendPostfixExpression(true)) {
-      diag.fixItInsertAfter(expr->getEndLoc(), "!");
-    } else {
-      diag.fixItInsert(expr->getStartLoc(), "(")
-          .fixItInsertAfter(expr->getEndLoc(), ")!");
-    }
-  }
-
-  return true;
-}
-
 bool swift::diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
                                               DeclName memberName,
                                               bool resultOptional,
@@ -9178,7 +8753,8 @@ bool swift::diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
   // FIXME: It would be nice to immediately offer "base?.member ?? defaultValue"
   // for non-optional results where that would be appropriate. For the moment
   // always offering "?" means that if the user chooses chaining, we'll end up
-  // in diagnoseUnwrap() to offer a default value during the next compile.
+  // in MissingOptionalUnwrapFailure:diagnose() to offer a default value during
+  // the next compile.
   diags.diagnose(baseExpr->getLoc(), diag::optional_base_chain, memberName)
     .fixItInsertAfter(baseExpr->getEndLoc(), "?");
 

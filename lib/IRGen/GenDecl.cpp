@@ -134,7 +134,7 @@ class CategoryInitializerVisitor
   llvm::Constant *class_replaceMethod;
   llvm::Constant *class_addProtocol;
   
-  llvm::Constant *classMetadata;
+  llvm::Value *classMetadata;
   llvm::Constant *metaclassMetadata;
   
 public:
@@ -144,25 +144,18 @@ public:
     class_replaceMethod = IGM.getClassReplaceMethodFn();
     class_addProtocol = IGM.getClassAddProtocolFn();
 
-    CanType origTy = ext->getAsNominalTypeOrNominalTypeExtensionContext()
+    CanType origTy = ext->getSelfNominalTypeDecl()
         ->getDeclaredType()->getCanonicalType();
-    classMetadata =
-      tryEmitConstantHeapMetadataRef(IGM, origTy, /*allowUninit*/ true);
-    assert(classMetadata &&
-           "extended objc class doesn't have constant metadata?!");
-    classMetadata = llvm::ConstantExpr::getBitCast(classMetadata,
-                                                   IGM.ObjCClassPtrTy);
+    classMetadata = emitClassHeapMetadataRef(IGF, origTy,
+                                             MetadataValueType::ObjCClass,
+                                             MetadataState::Complete,
+                                             /*allow uninitialized*/ false);
+    classMetadata = Builder.CreateBitCast(classMetadata, IGM.ObjCClassPtrTy);
     metaclassMetadata = IGM.getAddrOfMetaclassObject(
                                        origTy.getClassOrBoundGenericClass(),
                                                          NotForDefinition);
     metaclassMetadata = llvm::ConstantExpr::getBitCast(metaclassMetadata,
                                                    IGM.ObjCClassPtrTy);
-
-    // We need to make sure the Objective-C runtime has initialized our
-    // class. If you try to add or replace a method to a class that isn't
-    // initialized yet, the Objective-C runtime will crash in the calls
-    // to class_replaceMethod or class_addProtocol.
-    Builder.CreateCall(IGM.getGetInitializedObjCClassFn(), classMetadata);
 
     // Register ObjC protocol conformances.
     for (auto *p : ext->getLocalProtocols()) {
@@ -727,11 +720,7 @@ void IRGenModule::emitRuntimeRegistration() {
   }
 
   if (!FieldDescriptors.empty()) {
-    auto *records = emitFieldDescriptors();
-    auto *begin =
-        llvm::ConstantExpr::getBitCast(records, FieldDescriptorPtrPtrTy);
-    auto *size = llvm::ConstantInt::get(SizeTy, FieldDescriptors.size());
-    RegIGF.Builder.CreateCall(getRegisterFieldDescriptorsFn(), {begin, size});
+    emitFieldDescriptors();
   }
 
   RegIGF.Builder.CreateRetVoid();
@@ -920,7 +909,8 @@ llvm::Constant *IRGenModule::getAddrOfAssociatedTypeGenericParamRef(
     
     // Find the offset of the associated type entry in witness tables of this
     // protocol.
-    auto &protoInfo = getProtocolInfo(assocType->getProtocol());
+    auto &protoInfo = getProtocolInfo(assocType->getProtocol(),
+                                      ProtocolInfoKind::RequirementSignature);
     auto index = protoInfo.getAssociatedTypeIndex(AssociatedType(assocType))
       .getValue();
     
@@ -1416,7 +1406,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   case Kind::TypeMetadataInstantiationCache:
   case Kind::TypeMetadataInstantiationFunction:
-  case Kind::TypeMetadataInPlaceInitializationCache:
+  case Kind::TypeMetadataSingletonInitializationCache:
   case Kind::TypeMetadataCompletionFunction:
   case Kind::TypeMetadataPattern:
     return SILLinkage::Private;
@@ -1641,7 +1631,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::AnonymousDescriptor:
   case Kind::TypeMetadataInstantiationCache:
   case Kind::TypeMetadataInstantiationFunction:
-  case Kind::TypeMetadataInPlaceInitializationCache:
+  case Kind::TypeMetadataSingletonInitializationCache:
   case Kind::TypeMetadataCompletionFunction:
   case Kind::TypeMetadataPattern:
     return false;
@@ -3251,20 +3241,20 @@ IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type,
 }
 
 llvm::Constant *
-IRGenModule::getAddrOfTypeMetadataInPlaceInitializationCache(
+IRGenModule::getAddrOfTypeMetadataSingletonInitializationCache(
                                            NominalTypeDecl *D,
                                            ForDefinition_t forDefinition) {
   // Build the cache type.
   llvm::Type *cacheTy;
-  if (isa<StructDecl>(D) || isa<EnumDecl>(D)) {
-    // This is struct InPlaceValueMetadataCache.
+  if (isa<StructDecl>(D) || isa<EnumDecl>(D) || isa<ClassDecl>(D)) {
+    // This is struct SingletonMetadataCache.
     cacheTy = llvm::StructType::get(getLLVMContext(),
                                     {TypeMetadataPtrTy, Int8PtrTy});
   } else {
     llvm_unreachable("in-place initialization for classes not yet supported");
   }
 
-  LinkEntity entity = LinkEntity::forTypeMetadataInPlaceInitializationCache(D);
+  auto entity = LinkEntity::forTypeMetadataSingletonInitializationCache(D);
   auto variable =
     getAddrOfLLVMVariable(entity, getPointerAlignment(), forDefinition,
                           cacheTy, DebugTypeInfo());
@@ -3285,17 +3275,16 @@ IRGenModule::getAddrOfTypeMetadataInPlaceInitializationCache(
 /// existing external declaration to the address point as an alias into the
 /// full metadata object.
 llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
-                                 bool isIndirect,
-                                 bool isPattern,
-                                 bool isConstant,
-                                 ConstantInitFuture init,
-                                 llvm::StringRef section) {
+                                                   bool isPattern,
+                                                   bool isConstant,
+                                                   ConstantInitFuture init,
+                                                   llvm::StringRef section) {
   assert(init);
-  assert(!isIndirect && "indirect type metadata not used yet");
 
   if (isPattern) {
+    assert(isConstant && "Type metadata patterns must be constant");
     auto addr = getAddrOfTypeMetadataPattern(concreteType->getAnyNominal(),
-                                             isConstant, init, section);
+                                             init, section);
 
     return cast<llvm::GlobalValue>(addr);
   }
@@ -3500,12 +3489,11 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
 llvm::Constant *
 IRGenModule::getAddrOfTypeMetadataPattern(NominalTypeDecl *D) {
-  return getAddrOfTypeMetadataPattern(D, false, ConstantInit(), "");
+  return getAddrOfTypeMetadataPattern(D, ConstantInit(), "");
 }
 
 llvm::Constant *
 IRGenModule::getAddrOfTypeMetadataPattern(NominalTypeDecl *D,
-                                          bool isConstant,
                                           ConstantInit init,
                                           StringRef section) {
   if (!init)
@@ -3514,7 +3502,7 @@ IRGenModule::getAddrOfTypeMetadataPattern(NominalTypeDecl *D,
   auto alignment = getPointerAlignment();
   LinkEntity entity = LinkEntity::forTypeMetadataPattern(D);
   auto addr = getAddrOfLLVMVariable(entity, alignment, init,
-                                   Int8PtrTy, DebugTypeInfo());
+                                   Int8Ty, DebugTypeInfo());
 
   if (init) {
     auto var = cast<llvm::GlobalVariable>(addr);
@@ -3565,16 +3553,38 @@ IRGenModule::getAddrOfTypeMetadataInstantiationFunction(NominalTypeDecl *D,
     return entry;
   }
 
-  llvm::Type *argTys[] = {
-    /// Type descriptor.
-    TypeContextDescriptorPtrTy,
-    /// Generic arguments.
-    Int8PtrPtrTy,
-    /// Generic metadata pattern.
-    Int8PtrPtrTy
-  };
-  auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy,
-                                        argTys, /*isVarArg*/ false);
+  // This function is used in two cases -- allocating generic type metadata,
+  // and relocating non-generic resilient class metadata.
+  llvm::FunctionType *fnType;
+
+  if (D->isGenericContext()) {
+    // MetadataInstantiator in ABI/Metadata.h
+    llvm::Type *argTys[] = {
+      /// Type descriptor.
+      TypeContextDescriptorPtrTy,
+      /// Generic arguments.
+      Int8PtrPtrTy,
+      /// Generic metadata pattern.
+      Int8PtrTy
+    };
+
+    fnType = llvm::FunctionType::get(TypeMetadataPtrTy, argTys,
+                                     /*isVarArg*/ false);
+  } else {
+    assert(isa<ClassDecl>(D));
+
+    // MetadataRelocator in ABI/Metadata.h
+    llvm::Type *argTys[] = {
+      /// Type descriptor.
+      TypeContextDescriptorPtrTy,
+      /// Resilient metadata pattern.
+      Int8PtrTy
+    };
+
+    fnType = llvm::FunctionType::get(TypeMetadataPtrTy, argTys,
+                                     /*isVarArg*/ false);
+  }
+
   Signature signature(fnType, llvm::AttributeList(), DefaultCC);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
@@ -3617,6 +3627,36 @@ llvm::Constant *IRGenModule::getAddrOfTypeContextDescriptor(NominalTypeDecl *D,
   return getAddrOfLLVMVariable(entity, Alignment(4),
                                definition,
                                TypeContextDescriptorTy,
+                               DebugTypeInfo());
+}
+
+llvm::Constant *IRGenModule::
+getAddrOfReflectionBuiltinDescriptor(CanType type,
+                                     ConstantInit definition) {
+  auto entity = LinkEntity::forReflectionBuiltinDescriptor(type);
+  return getAddrOfLLVMVariable(entity, Alignment(4),
+                               definition,
+                               FieldDescriptorTy,
+                               DebugTypeInfo());
+}
+
+llvm::Constant *IRGenModule::
+getAddrOfReflectionFieldDescriptor(CanType type,
+                                   ConstantInit definition) {
+  auto entity = LinkEntity::forReflectionFieldDescriptor(type);
+  return getAddrOfLLVMVariable(entity, Alignment(4),
+                               definition,
+                               FieldDescriptorTy,
+                               DebugTypeInfo());
+}
+
+llvm::Constant *IRGenModule::
+getAddrOfReflectionAssociatedTypeDescriptor(const ProtocolConformance *c,
+                                            ConstantInit definition) {
+  auto entity = LinkEntity::forReflectionAssociatedTypeDescriptor(c);
+  return getAddrOfLLVMVariable(entity, Alignment(4),
+                               definition,
+                               FieldDescriptorTy,
                                DebugTypeInfo());
 }
 
@@ -3842,7 +3882,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
   // Generate a category if the extension either introduces a
   // conformance to an ObjC protocol or introduces a method
   // that requires an Objective-C entry point.
-  ClassDecl *origClass = ext->getAsClassOrClassExtensionContext();
+  ClassDecl *origClass = ext->getSelfClassDecl();
   if (!origClass)
     return;
 

@@ -111,3 +111,7 @@ protocol SR4226_Protocol : class {}
 extension SR4226_Protocol {
   @nonobjc func function() {} // expected-error {{only class members and extensions of classes can be declared @nonobjc}}
 }
+
+@objc enum SomeEnum: Int {
+  @nonobjc case what // expected-error {{'@nonobjc' attribute cannot be applied to this declaration}}
+}

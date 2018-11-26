@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/Notifications.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -100,6 +101,14 @@ class SILPassManager {
 
   /// The IRGen SIL passes. These have to be dynamically added by IRGen.
   llvm::DenseMap<unsigned, SILTransform *> IRGenPasses;
+
+  /// The notification handler for this specific SILPassManager.
+  ///
+  /// This is not owned by the pass manager, it is owned by the SILModule which
+  /// is guaranteed to outlive any pass manager associated with it. We keep this
+  /// bare pointer to ensure that we can deregister the notification after this
+  /// pass manager is destroyed.
+  DeserializationNotificationHandler *deserializationNotificationHandler;
 
 public:
   /// C'tor. It creates and registers all analysis passes, which are defined

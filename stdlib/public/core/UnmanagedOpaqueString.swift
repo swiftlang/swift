@@ -223,8 +223,8 @@ extension _UnmanagedOpaqueString : RandomAccessCollection {
 }
 
 extension _UnmanagedOpaqueString : _StringVariant {
-  internal typealias Encoding = Unicode.UTF16
-  internal typealias CodeUnit = Encoding.CodeUnit
+  @usableFromInline internal typealias Encoding = Unicode.UTF16
+  @usableFromInline internal typealias CodeUnit = Encoding.CodeUnit
 
   @inlinable
   var isASCII: Bool {

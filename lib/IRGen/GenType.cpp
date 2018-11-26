@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -49,6 +50,10 @@
 
 using namespace swift;
 using namespace irgen;
+
+Alignment IRGenModule::getCappedAlignment(Alignment align) {
+  return std::min(align, Alignment(MaximumAlignment));
+}
 
 llvm::DenseMap<TypeBase*, TypeCacheEntry> &
 TypeConverter::Types_t::getCacheFor(bool isDependent, bool completelyFragile) {
@@ -219,6 +224,10 @@ llvm::Value *FixedTypeInfo::getStride(IRGenFunction &IGF, SILType T) const {
 llvm::Value *FixedTypeInfo::getIsPOD(IRGenFunction &IGF, SILType T) const {
   return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
                                 isPOD(ResilienceExpansion::Maximal) == IsPOD);
+}
+llvm::Value *FixedTypeInfo::getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const {
+  return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
+                                isBitwiseTakable(ResilienceExpansion::Maximal) == IsBitwiseTakable);
 }
 llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
   return asSizeConstant(IGM, getFixedStride());
@@ -510,7 +519,7 @@ llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
   // If there are extra inhabitants, see whether the payload is valid.
   llvm::Value *result0;
   if (mayHaveExtraInhabitants(IGM)) {
-    result0 = getExtraInhabitantIndex(IGF, enumAddr, T);
+    result0 = getExtraInhabitantIndex(IGF, enumAddr, T, false);
     noExtraTagBitsBB = Builder.GetInsertBlock();
   } else {
     result0 = llvm::ConstantInt::getSigned(IGM.Int32Ty, -1);
@@ -665,7 +674,8 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
   if (mayHaveExtraInhabitants(IGM)) {
     // Store an index in the range [0..ElementsWithNoPayload-1].
     auto *nonPayloadElementIndex = Builder.CreateSub(whichCase, one);
-    storeExtraInhabitant(IGF, nonPayloadElementIndex, enumAddr, T);
+    storeExtraInhabitant(IGF, nonPayloadElementIndex, enumAddr, T,
+                         /*outlined*/ false);
   }
   Builder.CreateBr(returnBB);
 
@@ -868,7 +878,8 @@ namespace {
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address src,
-                                         SILType T) const override {
+                                         SILType T,
+                                         bool isOutlined) const override {
       // Copied from BridgeObjectTypeInfo.
       src = IGF.Builder.CreateBitCast(src, IGF.IGM.IntPtrTy->getPointerTo());
       auto val = IGF.Builder.CreateLoad(src);
@@ -880,7 +891,8 @@ namespace {
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
-                              Address dest, SILType T) const override {
+                              Address dest, SILType T,
+                              bool isOutlined) const override {
       // Copied from BridgeObjectTypeInfo.
       // There's only one extra inhabitant, 0.
       dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.IntPtrTy->getPointerTo());
@@ -1058,12 +1070,10 @@ TypeConverter::createImmovable(llvm::Type *type, Size size, Alignment align) {
 }
 
 static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
-static ProtocolInfo *invalidProtocolInfo() { return (ProtocolInfo*) 1; }
 
 TypeConverter::TypeConverter(IRGenModule &IGM)
   : IGM(IGM),
-    FirstType(invalidTypeInfo()),
-    FirstProtocol(invalidProtocolInfo()) {
+    FirstType(invalidTypeInfo()) {
   // FIXME: In LLDB, everything is completely fragile, so that IRGen can query
   // the size of resilient types. Of course this is not the right long term
   // solution, because it won't work once the swiftmodule file is not in
@@ -1077,12 +1087,6 @@ TypeConverter::~TypeConverter() {
   // Delete all the converted type infos.
   for (const TypeInfo *I = FirstType; I != invalidTypeInfo(); ) {
     const TypeInfo *Cur = I;
-    I = Cur->NextConverted;
-    delete Cur;
-  }
-  
-  for (const ProtocolInfo *I = FirstProtocol; I != invalidProtocolInfo(); ) {
-    const ProtocolInfo *Cur = I;
     I = Cur->NextConverted;
     delete Cur;
   }
@@ -1639,6 +1643,7 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
     Size size;
     Alignment align;
     std::tie(llvmTy, size, align) = convertPrimitiveBuiltin(IGM, ty);
+    align = IGM.getCappedAlignment(align);
     return createPrimitive(llvmTy, size, align);
   }
 

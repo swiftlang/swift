@@ -262,8 +262,8 @@ ERROR(conflicting_accessor,none,
       (unsigned, StringRef, StringRef))
 NOTE(previous_accessor,none,
      "%select{|previous definition of }1%0 %select{defined |}1here", (StringRef, bool))
-ERROR(expected_accessor_name,none,
-      "expected %select{%error|setter|%error|willSet|didSet}0 parameter name",
+ERROR(expected_accessor_parameter_name,none,
+      "expected %select{setter|willSet|didSet}0 parameter name",
       (unsigned))
 ERROR(expected_rparen_set_name,none,
       "expected ')' after setter parameter name",())
@@ -583,8 +583,6 @@ ERROR(sil_keypath_computed_property_missing_part,none,
 ERROR(sil_keypath_external_missing_part,none,
       "keypath external component with indices needs an indices_equals and "
       "indices_hash function", ())
-ERROR(sil_keypath_no_components,none,
-      "keypath must have at least one component", ())
 ERROR(sil_keypath_no_root,none,
       "keypath must have a root component declared",())
 ERROR(sil_keypath_index_not_hashable,none,
@@ -867,6 +865,18 @@ ERROR(initializer_as_typed_pattern,none,
 
 ERROR(unlabeled_parameter_following_variadic_parameter,none,
       "a parameter following a variadic parameter requires a label", ())
+
+ERROR(enum_element_empty_arglist,none,
+      "enum element with associated values must have at least one "
+      "associated value", ())
+WARNING(enum_element_empty_arglist_swift4,none,
+        "enum element with associated values must have at least one "
+        "associated value; this will be an error in the future "
+        "version of Swift", ())
+NOTE(enum_element_empty_arglist_delete,none,
+     "did you mean to remove the empty associated value list?", ())
+NOTE(enum_element_empty_arglist_add_void,none,
+     "did you mean to explicitly add a 'Void' associated value?", ())
 
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics

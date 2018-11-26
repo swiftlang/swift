@@ -104,8 +104,7 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
     // actually refer the same address) because these will be dynamically
     // checked.
     auto *REA = cast<RefElementAddrInst>(base);
-    SILValue Object = stripBorrow(REA->getOperand());
-    objProj = ObjectProjection(Object, Projection(REA));
+    objProj = ObjectProjection(REA);
   }
   }
 }
@@ -705,14 +704,12 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::InitExistentialValueInst:
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::IsEscapingClosureInst:
-  case SILInstructionKind::IsUniqueOrPinnedInst:
   case SILInstructionKind::KeyPathInst:
   case SILInstructionKind::OpenExistentialBoxInst:
   case SILInstructionKind::OpenExistentialBoxValueInst:
   case SILInstructionKind::OpenExistentialValueInst:
   case SILInstructionKind::PartialApplyInst:
   case SILInstructionKind::ProjectValueBufferInst:
-  case SILInstructionKind::StrongPinInst:
   case SILInstructionKind::YieldInst:
   case SILInstructionKind::UnwindInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:

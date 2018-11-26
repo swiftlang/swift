@@ -89,6 +89,10 @@ ERROR(inout_argument_alias,none,
 NOTE(previous_inout_alias,none,
       "previous aliasing argument", ())
 
+ERROR(unimplemented_generator_witnesses,none,
+      "protocol conformance emission for generator coroutines is unimplemented",
+      ())
+
 WARNING(exclusivity_access_required_warn,none,
         "overlapping accesses to %0, but "
         "%select{initialization|read|modification|deinitialization}1 requires "
@@ -199,8 +203,15 @@ ERROR(immutable_property_already_initialized,none,
       (StringRef))
 NOTE(initial_value_provided_in_let_decl,none,
      "initial value already provided in 'let' declaration", ())
+ERROR(mutation_of_property_of_immutable_value,none,
+      "cannot mutate %select{property %0|subscript}1 of immutable value '%2'",
+      (DeclBaseName, bool, StringRef))
+ERROR(using_mutating_accessor_on_immutable_value,none,
+      "mutating accessor for %select{property %0|subscript}1 may not"
+      " be used on immutable value '%2'",
+      (DeclBaseName, bool, StringRef))
 ERROR(mutating_method_called_on_immutable_value,none,
-      "mutating %select{method|property access|subscript|operator}1 %0 may not"
+      "mutating %select{method|operator}1 %0 may not"
       " be used on immutable value '%2'",
       (DeclBaseName, unsigned, StringRef))
 ERROR(immutable_value_passed_inout,none,
@@ -208,9 +219,6 @@ ERROR(immutable_value_passed_inout,none,
       (StringRef))
 ERROR(assignment_to_immutable_value,none,
       "immutable value '%0' must not be assigned to",
-      (StringRef))
-ERROR(mutating_protocol_witness_method_on_let_constant,none,
-      "cannot perform mutating operation: '%0' is a 'let' constant",
       (StringRef))
 
 WARNING(designated_init_in_cross_module_extension,none,

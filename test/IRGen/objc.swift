@@ -73,10 +73,10 @@ class Octogenarian : Contrarian {
 func unknown(_ x: id) -> id
 
 // CHECK:    define hidden swiftcc %objc_object* @"$S4objc5test0{{[_0-9a-zA-Z]*}}F"(%objc_object*)
-// CHECK-NOT:  call {{.*}} @swift_unknownRetain
-// CHECK:      call {{.*}} @swift_unknownRetain
-// CHECK-NOT:  call {{.*}} @swift_unknownRelease
-// CHECK:      call {{.*}} @swift_unknownRelease
+// CHECK-NOT:  call {{.*}} @swift_unknownObjectRetain
+// CHECK:      call {{.*}} @swift_unknownObjectRetain
+// CHECK-NOT:  call {{.*}} @swift_unknownObjectRelease
+// CHECK:      call {{.*}} @swift_unknownObjectRelease
 // CHECK:      ret %objc_object*
 func test0(_ arg: id) -> id {
   var x : id

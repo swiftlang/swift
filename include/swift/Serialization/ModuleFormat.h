@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 435; // Last change: serialize new-style function parameters
+const uint16_t VERSION_MINOR = 440; // Last change: removed materializeForSet
 
 using DeclIDField = BCFixed<31>;
 
@@ -114,6 +114,15 @@ using FileModTimeField = BCVBR<16>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
+enum class OpaqueReadOwnership : uint8_t {
+  Owned,
+  Borrowed,
+  OwnedOrBorrowed,
+};
+using OpaqueReadOwnershipField = BCFixed<2>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
 enum class ReadImplKind : uint8_t {
   Stored = 0,
   Get,
@@ -141,7 +150,6 @@ using WriteImplKindField = BCFixed<3>;
 enum class ReadWriteImplKind : uint8_t {
   Immutable = 0,
   Stored,
-  MaterializeForSet,
   MutableAddress,
   MaterializeToTemporary,
   Modify,
@@ -220,7 +228,6 @@ enum AccessorKind : uint8_t {
   Set,
   WillSet,
   DidSet,
-  MaterializeForSet,
   Address,
   MutableAddress,
   Read,
@@ -286,7 +293,7 @@ using MetatypeRepresentationField = BCFixed<2>;
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
 enum class AddressorKind : uint8_t {
-  NotAddressor, Unsafe, Owning, NativeOwning, NativePinning
+  NotAddressor, Unsafe, Owning, NativeOwning
 };
 using AddressorKindField = BCFixed<3>;
  
@@ -987,6 +994,7 @@ namespace decls_block {
     BCFixed<1>,   // HasNonPatternBindingInit?
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
+    OpaqueReadOwnershipField,   // opaque read ownership
     ReadImplKindField,   // read implementation
     WriteImplKindField,   // write implementation
     ReadWriteImplKindField,   // read-write implementation
@@ -1128,6 +1136,7 @@ namespace decls_block {
     BCFixed<1>,  // objc?
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
+    OpaqueReadOwnershipField,   // opaque read ownership
     ReadImplKindField,   // read implementation
     WriteImplKindField,   // write implementation
     ReadWriteImplKindField,   // read-write implementation

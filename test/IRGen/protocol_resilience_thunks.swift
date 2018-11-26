@@ -76,9 +76,9 @@ public protocol MyResilientProtocol {
 // CHECK-NEXT: call swiftcc void [[FN]](i1 %0, %swift.opaque* nocapture swiftself %1, %swift.type* %2, i8** %3)
 // CHECK-NEXT: ret void
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, {{i32|i64}} } @"$S26protocol_resilience_thunks19MyResilientProtocolP8propertySbvmTj"(i8*, [{{12|24}} x i8]* nocapture dereferenceable({{12|24}}), %swift.opaque* nocapture swiftself, %swift.type*, i8**)
-// CHECK:      [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %4, i32 8
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %TSb* } @"$S26protocol_resilience_thunks19MyResilientProtocolP8propertySbvMTj"(i8* noalias dereferenceable({{16|32}}), %swift.opaque* nocapture swiftself, %swift.type*, i8**)
+// CHECK:      [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %3, i32 8
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
-// CHECK-NEXT: [[FN:%.*]] = bitcast i8* [[WITNESS]] to { i8*, [[INT]] } (i8*, [{{12|24}} x i8]*, %swift.opaque*, %swift.type*, i8**)*
-// CHECK-NEXT: [[RESULT:%.*]] = call swiftcc { i8*, [[INT]] } [[FN]](i8* %0, [{{12|24}} x i8]* nocapture dereferenceable({{12|24}}) %1, %swift.opaque* nocapture swiftself %2, %swift.type* %3, i8** %4)
-// CHECK-NEXT: ret { i8*, [[INT]] } [[RESULT]]
+// CHECK-NEXT: [[FN:%.*]] = bitcast i8* [[WITNESS]] to { i8*, %TSb* } (i8*, %swift.opaque*, %swift.type*, i8**)*
+// CHECK-NEXT: [[RESULT:%.*]] = call swiftcc { i8*, %TSb* } [[FN]](i8* noalias dereferenceable({{16|32}}) %0, %swift.opaque* nocapture swiftself %1, %swift.type* %2, i8** %3)
+// CHECK-NEXT: ret { i8*, %TSb* } [[RESULT]]

@@ -226,14 +226,8 @@ private:
   /// The stage of processing this module is at.
   SILStage Stage;
 
-  /// The callback used by the SILLoader.
-  std::unique_ptr<SerializationCallback> Callback;
-
-  // Callbacks registered by the SIL optimizer to run on each deserialized
-  // function body. This is intentionally a stateless type because the
-  // ModuleDecl and SILFunction should be sufficient context.
-  using SILFunctionBodyCallback = void (*)(ModuleDecl *, SILFunction *F);
-  SmallVector<SILFunctionBodyCallback, 0> DeserializationCallbacks;
+  /// The set of deserialization notification handlers.
+  DeserializationNotificationHandlerSet deserializationNotificationHandlers;
 
   /// The SILLoader used when linking functions into this module.
   ///
@@ -283,10 +277,19 @@ public:
   ~SILModule();
 
   /// Add a callback for each newly deserialized SIL function body.
-  void registerDeserializationCallback(SILFunctionBodyCallback callBack);
+  void registerDeserializationNotificationHandler(
+      std::unique_ptr<DeserializationNotificationHandler> &&handler);
 
-  /// Return set of registered deserialization callbacks.
-  ArrayRef<SILFunctionBodyCallback> getDeserializationCallbacks();
+  /// Return the set of registered deserialization callbacks.
+  DeserializationNotificationHandlerSet::range
+  getDeserializationHandlers() const {
+    return deserializationNotificationHandlers.getRange();
+  }
+
+  void removeDeserializationNotificationHandler(
+      DeserializationNotificationHandler *handler) {
+    deserializationNotificationHandlers.erase(handler);
+  }
 
   /// Add a delete notification handler \p Handler to the module context.
   void registerDeleteNotificationHandler(DeleteNotificationHandler* Handler);

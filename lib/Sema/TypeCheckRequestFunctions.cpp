@@ -9,8 +9,8 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-#include "GenericTypeResolver.h"
 #include "TypeChecker.h"
+#include "TypeCheckType.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -20,81 +20,84 @@
 
 using namespace swift;
 
-Type InheritedTypeRequest::evaluate(
-                        Evaluator &evaluator,
-                        llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                        unsigned index) const {
+llvm::Expected<Type>
+InheritedTypeRequest::evaluate(
+    Evaluator &evaluator, llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+    unsigned index,
+    TypeResolutionStage stage) const {
   // Figure out how to resolve types.
   TypeResolutionOptions options = None;
   DeclContext *dc;
   if (auto typeDecl = decl.dyn_cast<TypeDecl *>()) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
       dc = nominal;
-      options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
+
       options |= TypeResolutionFlags::AllowUnavailableProtocol;
     } else {
       dc = typeDecl->getDeclContext();
-
-      if (isa<GenericTypeParamDecl>(typeDecl)) {
-        // For generic parameters, we want name lookup to look at just the
-        // signature of the enclosing entity.
-        if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
-          dc = nominal;
-          options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
-        } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-          dc = ext;
-          options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
-        } else if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
-          dc = func;
-          options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
-        } else if (!dc->isModuleScopeContext()) {
-          // Skip the generic parameter's context entirely.
-          dc = dc->getParent();
-        }
-      }
     }
   } else {
     auto ext = decl.get<ExtensionDecl *>();
     dc = ext;
-    options = TypeResolutionOptions(TypeResolverContext::GenericSignature);
     options |= TypeResolutionFlags::AllowUnavailableProtocol;
   }
 
-  ProtocolRequirementTypeResolver protoResolver;
-  GenericTypeToArchetypeResolver archetypeResolver(dc);
-  GenericTypeResolver *resolver;
-  if (isa<ProtocolDecl>(dc)) {
-    resolver = &protoResolver;
-  } else {
-    resolver = &archetypeResolver;
+  Optional<TypeResolution> resolution;
+  switch (stage) {
+  case TypeResolutionStage::Structural:
+    resolution = TypeResolution::forStructural(dc);
+    break;
+
+  case TypeResolutionStage::Interface:
+    resolution = TypeResolution::forInterface(dc);
+    break;
+
+  case TypeResolutionStage::Contextual: {
+    // Compute the contextual type by mapping the interface type into context.
+    auto result =
+      evaluator(InheritedTypeRequest{decl, index,
+                                     TypeResolutionStage::Interface});
+    if (!result)
+      return result;
+
+    return dc->mapTypeIntoContext(*result);
+  }
   }
 
-  auto lazyResolver = dc->getASTContext().getLazyResolver();
-  assert(lazyResolver && "Cannot resolve inherited type at this point");
-
-  TypeChecker &tc = *static_cast<TypeChecker *>(lazyResolver);
   TypeLoc &typeLoc = getTypeLoc(decl, index);
 
-  Type inheritedType =
-    tc.resolveType(typeLoc.getTypeRepr(), dc, options, resolver);
-  if (inheritedType && !isa<ProtocolDecl>(dc))
-    inheritedType = inheritedType->mapTypeOutOfContext();
-  return inheritedType ? inheritedType : ErrorType::get(tc.Context);
+  Type inheritedType;
+  if (typeLoc.getTypeRepr())
+    inheritedType = resolution->resolveType(typeLoc.getTypeRepr(), options);
+  else
+    inheritedType = typeLoc.getType();
+
+  return inheritedType ? inheritedType : ErrorType::get(dc->getASTContext());
 }
 
-Type SuperclassTypeRequest::evaluate(Evaluator &evaluator,
-                                     NominalTypeDecl *nominalDecl) const {
+llvm::Expected<Type>
+SuperclassTypeRequest::evaluate(Evaluator &evaluator,
+                                NominalTypeDecl *nominalDecl,
+                                TypeResolutionStage stage) const {
   assert(isa<ClassDecl>(nominalDecl) || isa<ProtocolDecl>(nominalDecl));
 
   for (unsigned int idx : indices(nominalDecl->getInherited())) {
-    Type inheritedType = evaluator(InheritedTypeRequest{nominalDecl, idx});
+    auto result = evaluator(InheritedTypeRequest{nominalDecl, idx, stage});
+
+    if (auto err = result.takeError()) {
+      // FIXME: Should this just return once a cycle is detected?
+      llvm::handleAllErrors(std::move(err),
+        [](const CyclicalRequestError<InheritedTypeRequest> &E) {
+          /* cycle detected */
+        });
+      continue;
+    }
+
+    Type inheritedType = *result;
     if (!inheritedType) continue;
 
     // If we found a class, return it.
     if (inheritedType->getClassOrBoundGenericClass()) {
-      if (inheritedType->hasArchetype())
-        return inheritedType->mapTypeOutOfContext();
-
       return inheritedType;
     }
 
@@ -103,9 +106,6 @@ Type SuperclassTypeRequest::evaluate(Evaluator &evaluator,
       if (auto superclassType =
             inheritedType->getExistentialLayout().explicitSuperclass) {
         if (superclassType->getClassOrBoundGenericClass()) {
-          if (superclassType->hasArchetype())
-            return superclassType->mapTypeOutOfContext();
-
           return superclassType;
         }
       }
@@ -116,19 +116,28 @@ Type SuperclassTypeRequest::evaluate(Evaluator &evaluator,
   return Type();
 }
 
-Type EnumRawTypeRequest::evaluate(Evaluator &evaluator,
-                                  EnumDecl *enumDecl) const {
+llvm::Expected<Type>
+EnumRawTypeRequest::evaluate(Evaluator &evaluator, EnumDecl *enumDecl,
+                             TypeResolutionStage stage) const {
   for (unsigned int idx : indices(enumDecl->getInherited())) {
-    Type inheritedType = evaluator(InheritedTypeRequest{enumDecl, idx});
+    auto inheritedTypeResult =
+      evaluator(InheritedTypeRequest{enumDecl, idx, stage});
+    
+    if (auto err = inheritedTypeResult.takeError()) {
+      llvm::handleAllErrors(std::move(err),
+        [](const CyclicalRequestError<InheritedTypeRequest> &E) {
+          // cycle detected
+        });
+      continue;
+    }
+
+    auto &inheritedType = *inheritedTypeResult;
     if (!inheritedType) continue;
 
     // Skip existential types.
     if (inheritedType->isExistentialType()) continue;
 
     // We found a raw type; return it.
-    if (inheritedType->hasArchetype())
-      return inheritedType->mapTypeOutOfContext();
-
     return inheritedType;
   }
 

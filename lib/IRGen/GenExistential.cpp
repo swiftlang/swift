@@ -554,20 +554,21 @@ namespace {
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
-                                         SILType T)
+                                         SILType T, bool isOutlined)
     const override {
       // NB: We assume that the witness table slots are zero if an extra
       // inhabitant is stored in the container.
       src = projectValue(IGF, src);
       return asDerived().getValueTypeInfoForExtraInhabitants(IGF.IGM)
-                        .getExtraInhabitantIndex(IGF, src, SILType());
+                      .getExtraInhabitantIndex(IGF, src, SILType(), isOutlined);
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
-                              Address dest, SILType T) const override {
+                              Address dest, SILType T, bool isOutlined)
+    const override {
       Address valueDest = projectValue(IGF, dest);
       asDerived().getValueTypeInfoForExtraInhabitants(IGF.IGM)
-                 .storeExtraInhabitant(IGF, index, valueDest, SILType());
+            .storeExtraInhabitant(IGF, index, valueDest, SILType(), isOutlined);
     }
 
     APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
@@ -615,23 +616,25 @@ namespace {
       } \
     } \
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src, \
-                                         SILType T) const override { \
+                                         SILType T, bool isOutlined) \
+    const override { \
       Address valueSrc = projectValue(IGF, src); \
       if (shouldStoreExtraInhabitantsInRef(IGF.IGM)) { \
         return IGF.getReferenceStorageExtraInhabitantIndex(valueSrc, \
                                        ReferenceOwnership::Name, Refcounting); \
       } else { \
-        return Super::getExtraInhabitantIndex(IGF, src, T); \
+        return Super::getExtraInhabitantIndex(IGF, src, T, isOutlined); \
       } \
     } \
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index, \
-                              Address dest, SILType T) const override { \
+                              Address dest, SILType T, bool isOutlined) \
+    const override { \
       Address valueDest = projectValue(IGF, dest); \
       if (shouldStoreExtraInhabitantsInRef(IGF.IGM)) { \
         return IGF.storeReferenceStorageExtraInhabitant(index, valueDest, \
                                        ReferenceOwnership::Name, Refcounting); \
       } else { \
-        return Super::storeExtraInhabitant(IGF, index, dest, T); \
+        return Super::storeExtraInhabitant(IGF, index, dest, T, isOutlined); \
       } \
     } \
     APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override { \
@@ -1353,7 +1356,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
   if (layout.requiresClass()) {
     // If we're not using the Objective-C runtime, we can use the
     // native reference counting entry points.
-    ReferenceCounting refcounting = getReferenceCountingForType(IGM, T);
+    ReferenceCounting refcounting = T->getReferenceCounting();
 
     llvm::PointerType *reprTy = nullptr;
     if (auto superclass = layout.getSuperclass()) {

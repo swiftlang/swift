@@ -265,9 +265,9 @@ func testKeyPathSubscript(readonly: Z, writable: inout Z,
   sink = readonly[keyPath: rkp]
   sink = writable[keyPath: rkp]
 
-  readonly[keyPath: kp] = sink // expected-error{{cannot assign to immutable}}
-  writable[keyPath: kp] = sink // expected-error{{cannot assign to immutable}}
-  readonly[keyPath: wkp] = sink // expected-error{{cannot assign to immutable}}
+  readonly[keyPath: kp] = sink // expected-error{{cannot assign through subscript: 'kp' is a read-only key path}}
+  writable[keyPath: kp] = sink // expected-error{{cannot assign through subscript: 'kp' is a read-only key path}}
+  readonly[keyPath: wkp] = sink // expected-error{{cannot assign through subscript: 'readonly' is a 'let' constant}}
   writable[keyPath: wkp] = sink
   readonly[keyPath: rkp] = sink
   writable[keyPath: rkp] = sink
@@ -279,8 +279,8 @@ func testKeyPathSubscript(readonly: Z, writable: inout Z,
   var anySink2 = writable[keyPath: pkp]
   expect(&anySink2, toHaveType: Exactly<Any>.self)
 
-  readonly[keyPath: pkp] = anySink1 // expected-error{{cannot assign to immutable}}
-  writable[keyPath: pkp] = anySink2 // expected-error{{cannot assign to immutable}}
+  readonly[keyPath: pkp] = anySink1 // expected-error{{cannot assign through subscript: 'readonly' is a 'let' constant}}
+  writable[keyPath: pkp] = anySink2 // expected-error{{cannot assign through subscript: 'writable' is immutable}}
 
   let akp: AnyKeyPath = pkp
 
@@ -289,8 +289,8 @@ func testKeyPathSubscript(readonly: Z, writable: inout Z,
   var anyqSink2 = writable[keyPath: akp]
   expect(&anyqSink2, toHaveType: Exactly<Any?>.self)
 
-  readonly[keyPath: akp] = anyqSink1 // expected-error{{cannot assign to immutable}}
-  writable[keyPath: akp] = anyqSink2 // expected-error{{cannot assign to immutable}}
+  readonly[keyPath: akp] = anyqSink1 // expected-error{{cannot assign through subscript: 'readonly' is a 'let' constant}}
+  writable[keyPath: akp] = anyqSink2 // expected-error{{cannot assign through subscript: 'writable' is immutable}}
 }
 
 struct ZwithSubscript {
@@ -314,10 +314,9 @@ func testKeyPathSubscript(readonly: ZwithSubscript, writable: inout ZwithSubscri
   sink = writable[keyPath: wkp]
   sink = readonly[keyPath: rkp]
   sink = writable[keyPath: rkp]
-
-  readonly[keyPath: kp] = sink // expected-error{{cannot assign through subscript: subscript is get-only}}
-  writable[keyPath: kp] = sink // expected-error{{cannot assign through subscript: subscript is get-only}}
-  readonly[keyPath: wkp] = sink // expected-error{{cannot assign through subscript: subscript is get-only}}
+  readonly[keyPath: kp] = sink // expected-error{{cannot assign through subscript: 'kp' is a read-only key path}}
+  writable[keyPath: kp] = sink // expected-error{{cannot assign through subscript: 'kp' is a read-only key path}}
+  readonly[keyPath: wkp] = sink // expected-error{{cannot assign through subscript: 'readonly' is a 'let' constant}}
   // FIXME: silently falls back to keypath application, which seems inconsistent
   writable[keyPath: wkp] = sink
   // FIXME: silently falls back to keypath application, which seems inconsistent
@@ -332,8 +331,8 @@ func testKeyPathSubscript(readonly: ZwithSubscript, writable: inout ZwithSubscri
   var anySink2 = writable[keyPath: pkp]
   expect(&anySink2, toHaveType: Exactly<Any>.self)
 
-  readonly[keyPath: pkp] = anySink1 // expected-error{{cannot assign through subscript: subscript is get-only}}
-  writable[keyPath: pkp] = anySink2 // expected-error{{cannot assign through subscript: subscript is get-only}}
+  readonly[keyPath: pkp] = anySink1 // expected-error{{cannot assign through subscript: 'readonly' is a 'let' constant}}
+  writable[keyPath: pkp] = anySink2 // expected-error{{cannot assign through subscript: 'writable' is immutable}}
 
   let akp: AnyKeyPath = pkp
 
@@ -343,9 +342,9 @@ func testKeyPathSubscript(readonly: ZwithSubscript, writable: inout ZwithSubscri
   expect(&anyqSink2, toHaveType: Exactly<Any?>.self)
 
   // FIXME: silently falls back to keypath application, which seems inconsistent
-  readonly[keyPath: akp] = anyqSink1 // expected-error{{cannot assign to immutable}}
+  readonly[keyPath: akp] = anyqSink1 // expected-error{{cannot assign through subscript: 'readonly' is a 'let' constant}}
   // FIXME: silently falls back to keypath application, which seems inconsistent
-  writable[keyPath: akp] = anyqSink2 // expected-error{{cannot assign to immutable}}
+  writable[keyPath: akp] = anyqSink2 // expected-error{{cannot assign through subscript: 'writable' is immutable}}
 
   _ = wrongType[keyPath: kp] // expected-error{{cannot be applied}}
   _ = wrongType[keyPath: wkp] // expected-error{{cannot be applied}}
@@ -366,9 +365,9 @@ func testKeyPathSubscriptMetatype(readonly: Z.Type, writable: inout Z.Type,
   sink = readonly[keyPath: rkp]
   sink = writable[keyPath: rkp]
 
-  readonly[keyPath: kp] = sink // expected-error{{cannot assign to immutable}}
-  writable[keyPath: kp] = sink // expected-error{{cannot assign to immutable}}
-  readonly[keyPath: wkp] = sink // expected-error{{cannot assign to immutable}}
+  readonly[keyPath: kp] = sink // expected-error{{cannot assign through subscript: 'kp' is a read-only key path}}
+  writable[keyPath: kp] = sink // expected-error{{cannot assign through subscript: 'kp' is a read-only key path}}
+  readonly[keyPath: wkp] = sink // expected-error{{cannot assign through subscript: 'readonly' is a 'let' constant}}
   writable[keyPath: wkp] = sink
   readonly[keyPath: rkp] = sink
   writable[keyPath: rkp] = sink
@@ -386,9 +385,9 @@ func testKeyPathSubscriptTuple(readonly: (Z,Z), writable: inout (Z,Z),
   sink = readonly[keyPath: rkp]
   sink = writable[keyPath: rkp]
 
-  readonly[keyPath: kp] = sink // expected-error{{cannot assign to immutable}}
-  writable[keyPath: kp] = sink // expected-error{{cannot assign to immutable}}
-  readonly[keyPath: wkp] = sink // expected-error{{cannot assign to immutable}}
+  readonly[keyPath: kp] = sink // expected-error{{cannot assign through subscript: 'kp' is a read-only key path}}
+  writable[keyPath: kp] = sink // expected-error{{cannot assign through subscript: 'kp' is a read-only key path}}
+  readonly[keyPath: wkp] = sink // expected-error{{cannot assign through subscript: 'readonly' is a 'let' constant}}
   writable[keyPath: wkp] = sink
   readonly[keyPath: rkp] = sink
   writable[keyPath: rkp] = sink

@@ -19,7 +19,7 @@ static llvm::cl::opt<bool>
     EnableVerifier("enable-sil-passmanager-verifier-analysis",
                    llvm::cl::desc("Enable verification of the passmanagers "
                                   "function notification infrastructure"),
-                   llvm::cl::init(false));
+                   llvm::cl::init(true));
 
 using namespace swift;
 
@@ -31,7 +31,7 @@ PassManagerVerifierAnalysis::PassManagerVerifierAnalysis(SILModule *mod)
   for (auto &fn : *mod) {
     LLVM_DEBUG(llvm::dbgs() << "PMVerifierAnalysis. Add: " << fn.getName()
                             << '\n');
-    liveFunctions.insert(&fn);
+    liveFunctionNames.insert(fn.getName());
   }
 #endif
 }
@@ -52,7 +52,7 @@ void PassManagerVerifierAnalysis::notifyAddedOrModifiedFunction(
     return;
   LLVM_DEBUG(llvm::dbgs() << "PMVerifierAnalysis. Add|Mod: " << f->getName()
                           << '\n');
-  liveFunctions.insert(f);
+  liveFunctionNames.insert(f->getName());
 #endif
 }
 
@@ -63,9 +63,13 @@ void PassManagerVerifierAnalysis::notifyWillDeleteFunction(SILFunction *f) {
     return;
   LLVM_DEBUG(llvm::dbgs() << "PMVerifierAnalysis. Delete: " << f->getName()
                           << '\n');
-  assert(liveFunctions.count(f) &&
-         "Tried to delete function that analysis was not aware of?!");
-  liveFunctions.erase(f);
+  if (liveFunctionNames.erase(f->getName()))
+    return;
+
+  llvm::errs()
+      << "Error! Tried to delete function that analysis was not aware of: "
+      << f->getName() << '\n';
+  llvm_unreachable("triggering standard assertion failure routine");
 #endif
 }
 
@@ -74,22 +78,49 @@ void PassManagerVerifierAnalysis::notifyWillDeleteFunction(SILFunction *f) {
 void PassManagerVerifierAnalysis::invalidateFunctionTables() {}
 
 /// Run the entire verification.
-void PassManagerVerifierAnalysis::verify() const {
+void PassManagerVerifierAnalysis::verifyFull() const {
 #ifndef NDEBUG
   if (!EnableVerifier)
     return;
 
-  // We check that all functions in the module are in liveFunctions /and/ then
-  // make sure that liveFunctions has the same number of elements. If we have
-  // too many elements, this means we missed a delete event.
-  unsigned funcCount = 0;
+  // We check that liveFunctionNames is in sync with the module's function list
+  // by going through the module's function list and attempting to remove all
+  // functions in the module. If we fail to remove fn, then we know that a
+  // function was added to the module without an appropriate message being sent
+  // by the pass manager.
+  bool foundError = false;
+
+  unsigned count = 0;
   for (auto &fn : mod) {
-    ++funcCount;
-    assert(liveFunctions.count(&fn) &&
-           "Found function in module that verifier is not aware of?!");
+    if (liveFunctionNames.count(fn.getName())) {
+      ++count;
+      continue;
+    }
+    llvm::errs() << "Found function in module that was not added to verifier: "
+                 << fn.getName() << '\n';
+    foundError = true;
   }
-  assert(liveFunctions.size() == funcCount &&
-         "Analysis has state for deleted functions?!");
+
+  // Ok, so now we know that function(mod) is a subset of
+  // liveFunctionNames. Relying on the uniqueness provided by the module's
+  // function list, we know that liveFunction should be exactly count in
+  // size. Otherwise, we must have an error. If and only if we detect this
+  // error, do the expensive work of finding the missing deletes. This is an
+  // important performance optimization to avoid a large copy on the hot path.
+  if (liveFunctionNames.size() != count) {
+    auto liveFunctionNamesCopy = llvm::StringSet<>(liveFunctionNames);
+    for (auto &fn : mod) {
+      liveFunctionNamesCopy.erase(fn.getName());
+    }
+    for (auto &iter : liveFunctionNamesCopy) {
+      llvm::errs() << "Missing delete message for function: " << iter.first()
+                   << '\n';
+      foundError = true;
+    }
+  }
+
+  // We assert here so we emit /all/ errors before asserting.
+  assert(!foundError && "triggering standard assertion failure routine");
 #endif
 }
 

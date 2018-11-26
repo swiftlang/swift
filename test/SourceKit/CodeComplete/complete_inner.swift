@@ -38,7 +38,7 @@ func test010(x: E1, y: FooBar) {
 // RUN: %sourcekitd-test -req=complete.open -pos=26:11 -req-opts=filtertext=one %s -- %s | %FileCheck %s -check-prefix=INNER_POSTFIX_0b
 // INNER_POSTFIX_0b-NOT: key.description: "one{{.+}}"
 // INNER_POSTFIX_0b: key.description: "one",{{$}}
-// INNER_POSTFIX_0b: key.description: "one...",{{$}}
+// INNER_POSTFIX_0b: key.description: "one.",{{$}}
 // INNER_POSTFIX_0b-NOT: key.description: "one{{.+}}"
 
 // RUN: %sourcekitd-test -req=complete.open -pos=29:9 -req-opts=filtertext=pro %s -- %s | %FileCheck %s -check-prefix=INNER_POSTFIX_1

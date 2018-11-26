@@ -491,7 +491,7 @@ public:
     return this->get();
   }
 
-  RetTy operator()(ArgTy...arg) {
+  RetTy operator()(ArgTy...arg) const {
     return this->get()(std::forward<ArgTy>(arg)...);
   }
 

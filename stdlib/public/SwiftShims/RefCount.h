@@ -191,8 +191,6 @@ namespace swift {
 // RefCountNotInline: refcount stored in an object's side table entry
 enum RefCountInlinedness { RefCountNotInline = false, RefCountIsInline = true };
 
-enum ClearPinnedFlag { DontClearPinnedFlag = false, DoClearPinnedFlag = true };
-
 enum PerformDeinit { DontPerformDeinit = false, DoPerformDeinit = true };
 
 
@@ -240,11 +238,14 @@ struct RefCountBitOffsets;
 // 32-bit out of line
 template <>
 struct RefCountBitOffsets<8> {
-  static const size_t IsPinnedShift = 0;
-  static const size_t IsPinnedBitCount = 1; 
-  static const uint64_t IsPinnedMask = maskForField(IsPinned);
+  // We reserve 1 bit (which we likely be using in future) to make the
+  // unowned field 31 bit. The reason is that unowned overflow checking does
+  // not work with 32 bit in the current implementation.
+  static const size_t ReservedShift = 0;
+  static const size_t ReservedBitCount = 1;
+  static const uint32_t ReservedMask = maskForField(Reserved);
 
-  static const size_t UnownedRefCountShift = shiftAfterField(IsPinned);
+  static const size_t UnownedRefCountShift = shiftAfterField(Reserved);
   static const size_t UnownedRefCountBitCount = 31;
   static const uint64_t UnownedRefCountMask = maskForField(UnownedRefCount);
 
@@ -273,12 +274,12 @@ struct RefCountBitOffsets<8> {
 // 32-bit inline
 template <>
 struct RefCountBitOffsets<4> {
-  static const size_t IsPinnedShift = 0;
-  static const size_t IsPinnedBitCount = 1; 
-  static const uint32_t IsPinnedMask = maskForField(IsPinned);
+  static const size_t ReservedShift = 0;
+  static const size_t ReservedBitCount = 0;
+  static const uint32_t ReservedMask = maskForField(Reserved);
 
-  static const size_t UnownedRefCountShift = shiftAfterField(IsPinned);
-  static const size_t UnownedRefCountBitCount = 7;
+  static const size_t UnownedRefCountShift = shiftAfterField(Reserved);
+  static const size_t UnownedRefCountBitCount = 8;
   static const uint32_t UnownedRefCountMask = maskForField(UnownedRefCount);
 
   static const size_t IsDeinitingShift = shiftAfterField(UnownedRefCount);
@@ -313,7 +314,7 @@ struct RefCountBitOffsets<4> {
   static_assert(SideTableBitCount + SideTableMarkBitCount +
                 UseSlowRCBitCount == sizeof(bits)*8,
                "wrong bit count for RefCountBits side table encoding");
-  static_assert(UnownedRefCountBitCount + IsPinnedBitCount +
+  static_assert(UnownedRefCountBitCount +
                 IsDeinitingBitCount + StrongExtraRefCountBitCount +
                 UseSlowRCBitCount == sizeof(bits)*8,
                 "wrong bit count for RefCountBits refcount encoding");
@@ -405,7 +406,6 @@ class RefCountBitsT {
       // this is out-of-line and not the same layout as inline newbits.
       // Copy field-by-field.
       copyFieldFrom(newbits, UnownedRefCount);
-      copyFieldFrom(newbits, IsPinned);
       copyFieldFrom(newbits, IsDeiniting);
       copyFieldFrom(newbits, StrongExtraRefCount);
       copyFieldFrom(newbits, UseSlowRC);
@@ -437,12 +437,6 @@ class RefCountBitsT {
   uint32_t getUnownedRefCount() const {
     assert(!hasSideTable());
     return uint32_t(getField(UnownedRefCount));
-  }
-
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
-  bool getIsPinned() const {
-    assert(!hasSideTable());
-    return bool(getField(IsPinned));
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
@@ -482,12 +476,6 @@ class RefCountBitsT {
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
-  void setIsPinned(bool value) {
-    assert(!hasSideTable());
-    setField(IsPinned, value);
-  }
-
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
   void setIsDeiniting(bool value) {
     assert(!hasSideTable());
     setField(IsDeiniting, value);
@@ -514,16 +502,11 @@ class RefCountBitsT {
   // Returns false if the decrement should fall back to some slow path
   // (for example, because UseSlowRC is set
   // or because the refcount is now zero and should deinit).
-  template <ClearPinnedFlag clearPinnedFlag>
   LLVM_NODISCARD LLVM_ATTRIBUTE_ALWAYS_INLINE
   bool decrementStrongExtraRefCount(uint32_t dec) {
 #ifndef NDEBUG
     if (!hasSideTable()) {
       // Can't check these assertions with side table present.
-
-      // clearPinnedFlag assumes the flag is already set.
-      if (clearPinnedFlag)
-        assert(getIsPinned() && "unpinning reference that was not pinned");
 
       if (getIsDeiniting())
         assert(getStrongExtraRefCount() >= dec  &&
@@ -534,11 +517,8 @@ class RefCountBitsT {
     }
 #endif
 
-    BitsType unpin = (clearPinnedFlag
-                      ? (BitsType(1) << Offsets::IsPinnedShift)
-                      : 0);
     // This deliberately underflows by borrowing from the UseSlowRC field.
-    bits -= unpin + (BitsType(dec) << Offsets::StrongExtraRefCountShift);
+    bits -= BitsType(dec) << Offsets::StrongExtraRefCountShift;
     return (SignedBitsType(bits) >= 0);
   }
 
@@ -557,14 +537,13 @@ class RefCountBitsT {
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   bool isUniquelyReferenced() {
-    static_assert(Offsets::IsPinnedBitCount +
+    static_assert(Offsets::ReservedBitCount +
                   Offsets::UnownedRefCountBitCount +
                   Offsets::IsDeinitingBitCount +
                   Offsets::StrongExtraRefCountBitCount +
                   Offsets::UseSlowRCBitCount == sizeof(bits)*8,
                   "inspect isUniquelyReferenced after adding fields");
 
-    // isPinned: don't care
     // Unowned: don't care (FIXME: should care and redo initForNotFreeing)
     // IsDeiniting: false
     // StrongExtra: 0
@@ -573,53 +552,6 @@ class RefCountBitsT {
     // Compiler is clever enough to optimize this.
     return
       !getUseSlowRC() && !getIsDeiniting() && getStrongExtraRefCount() == 0;
-  }
-
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
-  bool isUniquelyReferencedOrPinned() {
-    static_assert(Offsets::IsPinnedBitCount +
-                  Offsets::UnownedRefCountBitCount +
-                  Offsets::IsDeinitingBitCount +
-                  Offsets::StrongExtraRefCountBitCount +
-                  Offsets::UseSlowRCBitCount == sizeof(bits)*8,
-                  "inspect isUniquelyReferencedOrPinned after adding fields");
-
-    // isPinned: don't care
-    // Unowned: don't care (FIXME: should care and redo initForNotFreeing)
-    // IsDeiniting: false
-    // isPinned/StrongExtra: true/any OR false/0
-    // UseSlowRC: false
-
-    // Compiler is not clever enough to optimize this.
-    // return (isUniquelyReferenced() ||
-    //         (!getUseSlowRC() && !getIsDeiniting() && getIsPinned()));
-
-    // Bit twiddling solution:
-    // 1. Define the fields in this order:
-    //    bits that must be zero when not pinned | bits to ignore | IsPinned
-    // 2. Rotate IsPinned into the sign bit:
-    //    IsPinned | bits that must be zero when not pinned | bits to ignore
-    // 3. Perform a signed comparison against X = (1 << count of ignored bits).
-    //    IsPinned makes the value negative and thus less than X.
-    //    Zero in the must-be-zero bits makes the value less than X.
-    //    Non-zero and not pinned makes the value greater or equal to X.
-
-    // Count the ignored fields.
-    constexpr auto ignoredBitsCount =
-      Offsets::UnownedRefCountBitCount + Offsets::IsDeinitingBitCount;
-    // Make sure all fields are positioned as expected.
-    // -1 compensates for the rotation.
-    static_assert(Offsets::IsPinnedShift == 0, "IsPinned must be the LSB bit");
-    static_assert(
-      shiftAfterField(Offsets::UnownedRefCount)-1 <= ignoredBitsCount &&
-      shiftAfterField(Offsets::IsDeiniting)-1 <= ignoredBitsCount &&
-      Offsets::StrongExtraRefCountShift-1 >= ignoredBitsCount &&
-      Offsets::UseSlowRCShift-1 >= ignoredBitsCount,
-      "refcount bit layout incorrect for isUniquelyReferencedOrPinned");
-
-    BitsType X = BitsType(1) << ignoredBitsCount;
-    BitsType rotatedBits = ((bits >> 1) | (bits << (8*sizeof(bits) - 1)));
-    return SignedBitsType(rotatedBits) < SignedBitsType(X);
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
@@ -721,12 +653,6 @@ class RefCounts {
   void incrementNonAtomicSlow(RefCountBits oldbits, uint32_t inc);
 
   LLVM_ATTRIBUTE_NOINLINE
-  bool tryIncrementAndPinSlow(RefCountBits oldbits);
-
-  LLVM_ATTRIBUTE_NOINLINE
-  bool tryIncrementAndPinNonAtomicSlow(RefCountBits);
-
-  LLVM_ATTRIBUTE_NOINLINE
   bool tryIncrementSlow(RefCountBits oldbits);
 
   LLVM_ATTRIBUTE_NOINLINE
@@ -787,51 +713,6 @@ class RefCounts {
     refCounts.store(newbits, std::memory_order_relaxed);
  }
 
-  // Try to simultaneously set the pinned flag and increment the
-  // reference count.  If the flag is already set, don't increment the
-  // reference count.
-  //
-  // This is only a sensible protocol for strictly-nested modifications.
-  //
-  // Returns true if the flag was set by this operation.
-  //
-  // Postcondition: the flag is set.
-  bool tryIncrementAndPin() {
-    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
-    RefCountBits newbits;
-    do {
-      // If the flag is already set, just fail.
-      if (!oldbits.hasSideTable() && oldbits.getIsPinned())
-        return false;
-
-      // Try to simultaneously set the flag and increment the reference count.
-      newbits = oldbits;
-      newbits.setIsPinned(true);
-      bool fast = newbits.incrementStrongExtraRefCount(1);
-      if (!fast)
-        return tryIncrementAndPinSlow(oldbits);
-    } while (!refCounts.compare_exchange_weak(oldbits, newbits,
-                                              std::memory_order_relaxed));
-    return true;
-  }
-
-  bool tryIncrementAndPinNonAtomic() {
-    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
-
-    // If the flag is already set, just fail.
-    if (!oldbits.hasSideTable() && oldbits.getIsPinned())
-      return false;
-
-    // Try to simultaneously set the flag and increment the reference count.
-    auto newbits = oldbits;
-    newbits.setIsPinned(true);
-    bool fast = newbits.incrementStrongExtraRefCount(1);
-    if (!fast)
-      return tryIncrementAndPinNonAtomicSlow(oldbits);
-    refCounts.store(newbits, std::memory_order_relaxed);
-    return true;
-  }
-
   // Increment the reference count, unless the object is deiniting.
   bool tryIncrement() {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
@@ -862,40 +743,26 @@ class RefCounts {
     return true;
   }
 
-  // Simultaneously clear the pinned flag and decrement the reference
-  // count. Call _swift_release_dealloc() if the reference count goes to zero.
-  //
-  // Precondition: the pinned flag is set.
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
-  void decrementAndUnpinAndMaybeDeinit() {
-    doDecrement<DoClearPinnedFlag, DoPerformDeinit>(1);
-  }
-
-  LLVM_ATTRIBUTE_ALWAYS_INLINE
-  void decrementAndUnpinAndMaybeDeinitNonAtomic() {
-    doDecrementNonAtomic<DoClearPinnedFlag, DoPerformDeinit>(1);
-  }
-
   // Decrement the reference count.
   // Return true if the caller should now deinit the object.
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   bool decrementShouldDeinit(uint32_t dec) {
-    return doDecrement<DontClearPinnedFlag, DontPerformDeinit>(dec);
+    return doDecrement<DontPerformDeinit>(dec);
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   bool decrementShouldDeinitNonAtomic(uint32_t dec) {
-    return doDecrementNonAtomic<DontClearPinnedFlag, DontPerformDeinit>(dec);
+    return doDecrementNonAtomic<DontPerformDeinit>(dec);
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   void decrementAndMaybeDeinit(uint32_t dec) {
-    doDecrement<DontClearPinnedFlag, DoPerformDeinit>(dec);
+    doDecrement<DoPerformDeinit>(dec);
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   void decrementAndMaybeDeinitNonAtomic(uint32_t dec) {
-    doDecrementNonAtomic<DontClearPinnedFlag, DoPerformDeinit>(dec);
+    doDecrementNonAtomic<DoPerformDeinit>(dec);
   }
 
   // Non-atomically release the last strong reference and mark the
@@ -934,27 +801,6 @@ class RefCounts {
     
     assert(!bits.getIsDeiniting());
     return bits.isUniquelyReferenced();
-  }
-
-  // Return whether the reference count is exactly 1 or the pin flag
-  // is set. Once deinit begins the reference count is undefined.
-  bool isUniquelyReferencedOrPinned() const {
-    auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
-    // FIXME: implement side table path if useful
-    // In the meantime we don't check it here.
-    // bits.isUniquelyReferencedOrPinned() checks it too,
-    // and the compiler optimizer does better if this check is not here.
-    // if (bits.hasSideTable())
-    //   return false;
-    
-    assert(!bits.getIsDeiniting());
-
-    // bits.isUniquelyReferencedOrPinned() also checks the side table bit
-    // and this path is optimized better if we don't check it here first.
-    if (bits.isUniquelyReferencedOrPinned()) return true;
-    if (!bits.hasSideTable())
-      return false;
-    return bits.getSideTable()->isUniquelyReferencedOrPinned();
   }
 
   // Return true if the object has started deiniting.
@@ -997,17 +843,17 @@ class RefCounts {
 
   // Second slow path of doDecrement, where the
   // object may have a side table entry.
-  template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+  template <PerformDeinit performDeinit>
   bool doDecrementSideTable(RefCountBits oldbits, uint32_t dec);
 
   // Second slow path of doDecrementNonAtomic, where the
   // object may have a side table entry.
-  template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+  template <PerformDeinit performDeinit>
   bool doDecrementNonAtomicSideTable(RefCountBits oldbits, uint32_t dec);
 
   // First slow path of doDecrement, where the object may need to be deinited.
   // Side table is handled in the second slow path, doDecrementSideTable().
-  template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+  template <PerformDeinit performDeinit>
   bool doDecrementSlow(RefCountBits oldbits, uint32_t dec) {
     RefCountBits newbits;
     
@@ -1016,15 +862,14 @@ class RefCounts {
       newbits = oldbits;
       
       bool fast =
-        newbits.template decrementStrongExtraRefCount<clearPinnedFlag>(dec);
+        newbits.decrementStrongExtraRefCount(dec);
       if (fast) {
         // Decrement completed normally. New refcount is not zero.
         deinitNow = false;
       }
       else if (oldbits.hasSideTable()) {
         // Decrement failed because we're on some other slow path.
-        return doDecrementSideTable<clearPinnedFlag,
-                                    performDeinit>(oldbits, dec);
+        return doDecrementSideTable<performDeinit>(oldbits, dec);
       }
       else {
         // Decrement underflowed. Begin deinit.
@@ -1034,8 +879,6 @@ class RefCounts {
         newbits = oldbits;  // Undo failed decrement of newbits.
         newbits.setStrongExtraRefCount(0);
         newbits.setIsDeiniting(true);
-        if (clearPinnedFlag)
-          newbits.setIsPinned(false);
       }
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_release,
@@ -1050,21 +893,20 @@ class RefCounts {
 
   // First slow path of doDecrementNonAtomic, where the object may need to be deinited.
   // Side table is handled in the second slow path, doDecrementNonAtomicSideTable().
-  template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+  template <PerformDeinit performDeinit>
   bool doDecrementNonAtomicSlow(RefCountBits oldbits, uint32_t dec) {
     bool deinitNow;
     auto newbits = oldbits;
 
     bool fast =
-      newbits.template decrementStrongExtraRefCount<clearPinnedFlag>(dec);
+      newbits.decrementStrongExtraRefCount(dec);
     if (fast) {
       // Decrement completed normally. New refcount is not zero.
       deinitNow = false;
     }
     else if (oldbits.hasSideTable()) {
       // Decrement failed because we're on some other slow path.
-      return doDecrementNonAtomicSideTable<clearPinnedFlag,
-                                           performDeinit>(oldbits, dec);
+      return doDecrementNonAtomicSideTable<performDeinit>(oldbits, dec);
     }
     else {
       // Decrement underflowed. Begin deinit.
@@ -1074,8 +916,6 @@ class RefCounts {
       newbits = oldbits;  // Undo failed decrement of newbits.
       newbits.setStrongExtraRefCount(0);
       newbits.setIsDeiniting(true);
-      if (clearPinnedFlag)
-        newbits.setIsPinned(false);
     }
     refCounts.store(newbits, std::memory_order_relaxed);
     if (performDeinit && deinitNow) {
@@ -1091,7 +931,7 @@ class RefCounts {
   // 
   // Deinit is optionally handled directly instead of always deferring to 
   // the caller because the compiler can optimize this arrangement better.
-  template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+  template <PerformDeinit performDeinit>
   bool doDecrement(uint32_t dec) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     RefCountBits newbits;
@@ -1099,10 +939,10 @@ class RefCounts {
     do {
       newbits = oldbits;
       bool fast =
-        newbits.template decrementStrongExtraRefCount<clearPinnedFlag>(dec);
+        newbits.decrementStrongExtraRefCount(dec);
       if (!fast)
         // Slow paths include side table; deinit; underflow
-        return doDecrementSlow<clearPinnedFlag, performDeinit>(oldbits, dec);
+        return doDecrementSlow<performDeinit>(oldbits, dec);
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_release,
                                               std::memory_order_relaxed));
@@ -1111,7 +951,7 @@ class RefCounts {
   }
 
   // This is independently specialized below for inline and out-of-line use.
-  template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+  template <PerformDeinit performDeinit>
   bool doDecrementNonAtomic(uint32_t dec);
 
 
@@ -1325,18 +1165,18 @@ class HeapObjectSideTableEntry {
     refCounts.increment(inc);
   }
 
-  template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+  template <PerformDeinit performDeinit>
   bool decrementStrong(uint32_t dec) {
-    return refCounts.doDecrement<clearPinnedFlag, performDeinit>(dec);
+    return refCounts.doDecrement<performDeinit>(dec);
   }
 
-  template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+  template <PerformDeinit performDeinit>
   bool decrementNonAtomicStrong(uint32_t dec) {
-    return refCounts.doDecrementNonAtomic<clearPinnedFlag, performDeinit>(dec);
+    return refCounts.doDecrementNonAtomic<performDeinit>(dec);
   }
 
   void decrementFromOneNonAtomic() {
-    decrementNonAtomicStrong<DontClearPinnedFlag, DontPerformDeinit>(1);
+    decrementNonAtomicStrong<DontPerformDeinit>(1);
   }
   
   bool isDeiniting() const {
@@ -1347,16 +1187,8 @@ class HeapObjectSideTableEntry {
     return refCounts.tryIncrement();
   }
 
-  bool tryIncrementAndPin() {
-    return refCounts.tryIncrementAndPin();
-  }
-
   bool tryIncrementNonAtomic() {
     return refCounts.tryIncrementNonAtomic();
-  }
-
-  bool tryIncrementAndPinNonAtomic() {
-    return refCounts.tryIncrementAndPinNonAtomic();
   }
 
   // Return weak reference count.
@@ -1367,10 +1199,6 @@ class HeapObjectSideTableEntry {
 
   bool isUniquelyReferenced() const {
     return refCounts.isUniquelyReferenced();
-  }
-
-  bool isUniquelyReferencedOrPinned() const {
-    return refCounts.isUniquelyReferencedOrPinned();
   }
 
   // UNOWNED
@@ -1464,7 +1292,7 @@ class HeapObjectSideTableEntry {
 // Inline version of non-atomic strong decrement.
 // This version can actually be non-atomic.
 template <>
-template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+template <PerformDeinit performDeinit>
 LLVM_ATTRIBUTE_ALWAYS_INLINE
 inline bool RefCounts<InlineRefCountBits>::doDecrementNonAtomic(uint32_t dec) {
   
@@ -1481,12 +1309,12 @@ inline bool RefCounts<InlineRefCountBits>::doDecrementNonAtomic(uint32_t dec) {
 
   // Use slow path if we can't guarantee atomicity.
   if (oldbits.hasSideTable() || oldbits.getUnownedRefCount() != 1)
-    return doDecrementNonAtomicSlow<clearPinnedFlag, performDeinit>(oldbits, dec);
+    return doDecrementNonAtomicSlow<performDeinit>(oldbits, dec);
 
   auto newbits = oldbits;
-  bool fast = newbits.decrementStrongExtraRefCount<clearPinnedFlag>(dec);
+  bool fast = newbits.decrementStrongExtraRefCount(dec);
   if (!fast)
-    return doDecrementNonAtomicSlow<clearPinnedFlag, performDeinit>(oldbits, dec);
+    return doDecrementNonAtomicSlow<performDeinit>(oldbits, dec);
 
   refCounts.store(newbits, std::memory_order_relaxed);
   return false;  // don't deinit
@@ -1496,31 +1324,31 @@ inline bool RefCounts<InlineRefCountBits>::doDecrementNonAtomic(uint32_t dec) {
 // This version needs to be atomic because of the 
 // threat of concurrent read of a weak reference.
 template <>
-template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+template <PerformDeinit performDeinit>
 inline bool RefCounts<SideTableRefCountBits>::
 doDecrementNonAtomic(uint32_t dec) {
-  return doDecrement<clearPinnedFlag, performDeinit>(dec);
+  return doDecrement<performDeinit>(dec);
 }
 
 
 template <>
-template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+template <PerformDeinit performDeinit>
 inline bool RefCounts<InlineRefCountBits>::
 doDecrementSideTable(InlineRefCountBits oldbits, uint32_t dec) {
   auto side = oldbits.getSideTable();
-  return side->decrementStrong<clearPinnedFlag, performDeinit>(dec);
+  return side->decrementStrong<performDeinit>(dec);
 }
 
 template <>
-template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+template <PerformDeinit performDeinit>
 inline bool RefCounts<InlineRefCountBits>::
 doDecrementNonAtomicSideTable(InlineRefCountBits oldbits, uint32_t dec) {
   auto side = oldbits.getSideTable();
-  return side->decrementNonAtomicStrong<clearPinnedFlag, performDeinit>(dec);
+  return side->decrementNonAtomicStrong<performDeinit>(dec);
 }
 
 template <>
-template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+template <PerformDeinit performDeinit>
 inline bool RefCounts<SideTableRefCountBits>::
 doDecrementSideTable(SideTableRefCountBits oldbits, uint32_t dec) {
   swift::crash("side table refcount must not have "
@@ -1528,7 +1356,7 @@ doDecrementSideTable(SideTableRefCountBits oldbits, uint32_t dec) {
 }
 
 template <>
-template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>
+template <PerformDeinit performDeinit>
 inline bool RefCounts<SideTableRefCountBits>::
 doDecrementNonAtomicSideTable(SideTableRefCountBits oldbits, uint32_t dec) {
   swift::crash("side table refcount must not have "

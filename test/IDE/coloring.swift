@@ -285,8 +285,8 @@ class Observers {
 
 // CHECK: <kw>func</kw> test3(o: <type>AnyObject</type>) {
 func test3(o: AnyObject) {
-  // CHECK: <kw>let</kw> x = o <kw>as</kw>! <type>MyCls</type>
-  let x = o as! MyCls
+  // CHECK: <kw>_</kw> = o <kw>is</kw> <type>MyCls</type> ? o <kw>as</kw> <type>MyCls</type> : o <kw>as</kw>! <type>MyCls</type> <kw>as</kw> <type>MyCls</type> + <int>1</int>
+  _ = o is MyCls ? o as MyCls : o as! MyCls as MyCls + 1
 }
 
 // CHECK: <kw>class</kw> MySubClass : <type>MyCls</type> {

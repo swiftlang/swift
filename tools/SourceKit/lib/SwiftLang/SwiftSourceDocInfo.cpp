@@ -387,7 +387,7 @@ static Type findBaseTypeForReplacingArchetype(const ValueDecl *VD, const Type Ty
   if (!VD->getDeclContext()->isTypeContext())
     return Type();
 
-  return Ty->getRValueType()->getRValueInstanceType();
+  return Ty->getRValueType()->getInOutObjectType()->getMetatypeInstanceType();
 }
 
 static void printAnnotatedDeclaration(const ValueDecl *VD,
@@ -479,7 +479,7 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   }
 
   // Now provide the results along with whether the name is duplicate or not.
-  ValueDecl *OriginalBase = VD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  ValueDecl *OriginalBase = VD->getDeclContext()->getSelfNominalTypeDecl();
   for (auto Related : RelatedDecls) {
     ValueDecl *RelatedVD = Related.getValueDecl();
     bool SameBase = Related.getBaseDecl() && Related.getBaseDecl() == OriginalBase;

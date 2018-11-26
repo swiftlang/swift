@@ -60,8 +60,8 @@ public:
   /// consistency and provides the value a type.
   virtual void resolveDeclSignature(ValueDecl *VD) = 0;
 
-  /// Resolve the trailing where clause of the given protocol in-place.
-  virtual void resolveTrailingWhereClause(ProtocolDecl *proto) = 0;
+  /// Resolve the generic environment of the given protocol.
+  virtual void resolveProtocolEnvironment(ProtocolDecl *proto) = 0;
 
   /// Bind an extension to its extended type.
   virtual void bindExtension(ExtensionDecl *ext) = 0;
@@ -71,16 +71,6 @@ public:
   /// This can be called to ensure that the members of an extension can be
   /// considered to be members of the extended type.
   virtual void resolveExtension(ExtensionDecl *ext) = 0;
-
-  using ConformanceConstructionInfo = std::pair<SourceLoc, ProtocolDecl *>;
-  /// Resolve enough of an extension to find which protocols it is declaring
-  /// conformance to.
-  ///
-  /// This can be called to ensure that the "extension Foo: Bar, Baz" part of
-  /// the extension is understood.
-  virtual void resolveExtensionForConformanceConstruction(
-      ExtensionDecl *ext,
-      SmallVectorImpl<ConformanceConstructionInfo> &protocols) = 0;
 
   /// Resolve any implicitly-declared constructors within the given nominal.
   virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) = 0;

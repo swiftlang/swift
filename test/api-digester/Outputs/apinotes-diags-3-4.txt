@@ -1,4 +1,6 @@
 
+/* Generic Signature Changes */
+
 /* RawRepresentable Changes */
 APINotesTest(APINotesTest.h): TypeAlias AnimalAttributeName(NSString) is now String representable
 

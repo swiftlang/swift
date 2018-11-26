@@ -96,7 +96,7 @@ struct X3a : P3 {
   typealias Assoc = X1a
 }
 
-prefix func ~~(_: X3a) -> X1a {} // expected-note{{candidate has non-matching type '(X3a) -> X1a'}} expected-note{{candidate is prefix, not postfix as required}}
+prefix func ~~(_: X3a) -> X1a {}
 
 // FIXME: Add example with overloaded prefix/postfix
 
@@ -105,7 +105,7 @@ struct X3z : P3 { // expected-error{{type 'X3z' does not conform to protocol 'P3
   typealias Assoc = X1a
 }
 
-postfix func ~~(_: X3z) -> X1a {} // expected-note{{candidate is postfix, not prefix as required}} expected-note{{candidate has non-matching type '(X3z) -> X1a'}}
+postfix func ~~(_: X3z) -> X1a {} // expected-note{{candidate is postfix, not prefix as required}}
 
 // Protocol with postfix unary function
 postfix operator ~~
@@ -119,14 +119,14 @@ struct X4a : P4 {
   typealias Assoc = X1a
 }
 
-postfix func ~~(_: X4a) -> X1a {} // expected-note{{candidate has non-matching type '(X4a) -> X1a'}} expected-note{{candidate is postfix, not prefix as required}}
+postfix func ~~(_: X4a) -> X1a {}
 
 // Prefix/postfix mismatch.
 struct X4z : P4 { // expected-error{{type 'X4z' does not conform to protocol 'P4'}}
   typealias Assoc = X1a
 }
 
-prefix func ~~(_: X4z) -> X1a {} // expected-note{{candidate has non-matching type '(X4z) -> X1a'}} expected-note{{candidate is prefix, not postfix as required}}
+prefix func ~~(_: X4z) -> X1a {} // expected-note{{candidate is prefix, not postfix as required}}
 
 // Objective-C protocol
 @objc protocol P5 {
@@ -270,3 +270,10 @@ struct X12 : P12 { // expected-error{{type 'X12' does not conform to protocol 'P
 }
 
 func ==(x: X12.Index, y: X12.Index) -> Bool { return true }
+
+protocol P13 {}
+protocol P14 {
+  static prefix func %%%(_: Self.Type)
+}
+prefix func %%%<P: P13>(_: P.Type) { }
+struct X13: P14, P13 { }

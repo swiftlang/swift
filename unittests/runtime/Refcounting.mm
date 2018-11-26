@@ -33,12 +33,12 @@ static HeapObject *make_objc_object() {
 
 TEST(RefcountingTest, objc_unknown_retain_release_n) {
   auto object = make_objc_object();
-  swift_unknownRetain_n(object, 32);
-  swift_unknownRetain(object);
-  swift_unknownRelease_n(object, 31);
-  swift_unknownRelease(object);
-  swift_unknownRelease_n(object, 1);
-  swift_unknownRelease(object);
+  swift_unknownObjectRetain_n(object, 32);
+  swift_unknownObjectRetain(object);
+  swift_unknownObjectRelease_n(object, 31);
+  swift_unknownObjectRelease(object);
+  swift_unknownObjectRelease_n(object, 1);
+  swift_unknownObjectRelease(object);
   // The object should be destroyed by now.
   EXPECT_EQ(1u, DestroyedObjCCount);
 }

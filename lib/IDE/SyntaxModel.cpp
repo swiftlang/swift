@@ -425,6 +425,18 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
   if (isVisitedBeforeInIfConfig(E))
     return {false, E};
 
+  // In SequenceExpr, explicit cast expressions (e.g. 'as', 'is') appear twice.
+  // Skip pointers we've already seen.
+  if (auto SE = dyn_cast<SequenceExpr>(E)) {
+    SmallPtrSet<Expr *, 5> seenExpr;
+    for (auto subExpr : SE->getElements()) {
+      if (!seenExpr.insert(subExpr).second)
+        continue;
+      subExpr->walk(*this);
+    }
+    return { false, SE };
+  }
+
   auto addCallArgExpr = [&](Expr *Elem, TupleExpr *ParentTupleExpr) {
     if (isCurrentCallArgExpr(ParentTupleExpr)) {
       CharSourceRange NR = parameterNameRangeOfCallArg(ParentTupleExpr, Elem);
@@ -962,7 +974,8 @@ bool ModelASTWalker::walkToTypeReprPre(TypeRepr *T) {
   } else if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
     if (!passTokenNodesUntil(IdT->getIdLoc(), ExcludeNodeAtLocation))
       return false;
-    if (TokenNodes.front().Range.getStart() != IdT->getIdLoc())
+    if (TokenNodes.empty() ||
+        TokenNodes.front().Range.getStart() != IdT->getIdLoc())
       return false;
     if (!passNode({SyntaxNodeKind::TypeId, TokenNodes.front().Range}))
       return false;

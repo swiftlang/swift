@@ -10,9 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 
 using namespace swift;
@@ -35,8 +37,24 @@ void swift::simple_display(
   }
 
   auto ext = value.get<ExtensionDecl *>();
-  out << "extension of ";
-  ext->getAsNominalTypeOrNominalTypeExtensionContext()->dumpRef(out);
+  simple_display(out, ext);
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const TypeResolutionStage &value) {
+  switch (value) {
+  case TypeResolutionStage::Structural:
+    out << "structural";
+    break;
+
+  case TypeResolutionStage::Interface:
+    out << "interface";
+    break;
+
+  case TypeResolutionStage::Contextual:
+    out << "contextual";
+    break;
+  }
 }
 
 //----------------------------------------------------------------------------//
@@ -62,6 +80,10 @@ void InheritedTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
   const auto &storage = getStorage();
   auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
   diags.diagnose(typeLoc.getLoc(), diag::circular_reference_through);
+}
+
+bool InheritedTypeRequest::isCached() const {
+  return std::get<2>(getStorage()) == TypeResolutionStage::Interface;
 }
 
 Optional<Type> InheritedTypeRequest::getCachedResult() const {
@@ -93,6 +115,10 @@ void SuperclassTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto nominalDecl = std::get<0>(getStorage());
   // FIXME: Customize this further.
   diags.diagnose(nominalDecl, diag::circular_reference_through);
+}
+
+bool SuperclassTypeRequest::isCached() const {
+  return std::get<1>(getStorage()) == TypeResolutionStage::Interface;
 }
 
 Optional<Type> SuperclassTypeRequest::getCachedResult() const {
@@ -134,6 +160,10 @@ void EnumRawTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
   diags.diagnose(enumDecl, diag::circular_reference_through);
 }
 
+bool EnumRawTypeRequest::isCached() const {
+  return std::get<1>(getStorage()) == TypeResolutionStage::Interface;
+}
+
 Optional<Type> EnumRawTypeRequest::getCachedResult() const {
   auto enumDecl = std::get<0>(getStorage());
   if (enumDecl->LazySemanticInfo.RawType.getInt())
@@ -164,11 +194,6 @@ void OverriddenDeclsRequest::noteCycleStep(DiagnosticEngine &diags) const {
 // isObjC computation.
 //----------------------------------------------------------------------------//
 
-bool IsObjCRequest::breakCycle() const {
-  auto decl = std::get<0>(getStorage());
-  return decl->getAttrs().hasAttribute<ObjCAttr>();
-}
-
 void IsObjCRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   // FIXME: Improve this diagnostic.
   auto decl = std::get<0>(getStorage());
@@ -198,11 +223,6 @@ void IsObjCRequest::cacheResult(bool value) const {
 // isDynamic computation.
 //----------------------------------------------------------------------------//
 
-bool IsDynamicRequest::breakCycle() const {
-  auto decl = std::get<0>(getStorage());
-  return decl->getAttrs().hasAttribute<DynamicAttr>();
-}
-
 void IsDynamicRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   // FIXME: Improve this diagnostic.
   auto decl = std::get<0>(getStorage());
@@ -226,4 +246,185 @@ Optional<bool> IsDynamicRequest::getCachedResult() const {
 void IsDynamicRequest::cacheResult(bool value) const {
   auto decl = std::get<0>(getStorage());
   decl->setIsDynamic(value);
+}
+
+//----------------------------------------------------------------------------//
+// Requirement computation.
+//----------------------------------------------------------------------------//
+
+WhereClauseOwner::WhereClauseOwner(Decl *decl)
+  : dc(decl->getInnermostDeclContext()), source(decl) { }
+
+SourceLoc WhereClauseOwner::getLoc() const {
+  if (auto decl = source.dyn_cast<Decl *>())
+    return decl->getLoc();
+
+  if (auto attr = source.dyn_cast<SpecializeAttr *>())
+    return attr->getLocation();
+
+  return source.get<GenericParamList *>()->getWhereLoc();
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const WhereClauseOwner &owner) {
+  if (auto decl = owner.source.dyn_cast<Decl *>()) {
+    simple_display(out, decl);
+  } else if (owner.source.is<SpecializeAttr *>()) {
+    out << "@_specialize";
+  } else {
+    out << "(SIL generic parameter list)";
+  }
+}
+
+void RequirementRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  // FIXME: Improve this diagnostic.
+  auto owner = std::get<0>(getStorage());
+  diags.diagnose(owner.getLoc(), diag::circular_reference);
+}
+
+void RequirementRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto owner = std::get<0>(getStorage());
+  // FIXME: Customize this further.
+  diags.diagnose(owner.getLoc(), diag::circular_reference_through);
+}
+
+MutableArrayRef<RequirementRepr>
+RequirementRequest::getRequirements(WhereClauseOwner owner) {
+  if (auto genericParams = owner.source.dyn_cast<GenericParamList *>()) {
+    return genericParams->getRequirements();
+  }
+
+  if (auto attr = owner.source.dyn_cast<SpecializeAttr *>()) {
+    if (auto whereClause = attr->getTrailingWhereClause())
+      return whereClause->getRequirements();
+    
+    return { };
+  }
+
+  auto decl = owner.source.dyn_cast<Decl *>();
+  if (!decl)
+    return { };
+
+  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
+    if (auto whereClause = proto->getTrailingWhereClause())
+      return whereClause->getRequirements();
+
+    return { };
+  }
+
+  if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
+    if (auto whereClause = assocType->getTrailingWhereClause())
+      return whereClause->getRequirements();
+  }
+
+  if (auto genericContext = decl->getAsGenericContext()) {
+    if (auto genericParams = genericContext->getGenericParams())
+      return genericParams->getRequirements();
+  }
+
+  return { };
+}
+
+bool RequirementRequest::visitRequirements(
+      WhereClauseOwner owner, TypeResolutionStage stage,
+      llvm::function_ref<bool(Requirement, RequirementRepr*)> callback) {
+  auto &evaluator = owner.dc->getASTContext().evaluator;
+  auto requirements = getRequirements(owner);
+  for (unsigned index : indices(requirements)) {
+    // Resolve to a requirement.
+    auto req = evaluator(RequirementRequest{owner, index, stage});
+    if (req) {
+      // Invoke the callback. If it returns true, we're done.
+      if (callback(*req, &requirements[index]))
+        return true;
+
+      continue;
+    }
+
+    llvm::handleAllErrors(req.takeError(),
+      [](const CyclicalRequestError<RequirementRequest> &E) {
+        // cycle detected
+      });
+  }
+
+  return false;
+}
+
+RequirementRepr &RequirementRequest::getRequirement() const {
+  auto owner = std::get<0>(getStorage());
+  auto index = std::get<1>(getStorage());
+  return getRequirements(owner)[index];
+}
+
+bool RequirementRequest::isCached() const {
+  return std::get<2>(getStorage()) == TypeResolutionStage::Interface;
+}
+
+Optional<Requirement> RequirementRequest::getCachedResult() const {
+  auto &reqRepr = getRequirement();
+  switch (reqRepr.getKind()) {
+  case RequirementReprKind::TypeConstraint:
+    if (!reqRepr.getSubjectLoc().wasValidated() ||
+        !reqRepr.getConstraintLoc().wasValidated())
+      return None;
+
+    return Requirement(reqRepr.getConstraint()->getClassOrBoundGenericClass()
+                         ? RequirementKind::Superclass
+                         : RequirementKind::Conformance,
+                       reqRepr.getSubject(),
+                       reqRepr.getConstraint());
+
+  case RequirementReprKind::SameType:
+    if (!reqRepr.getFirstTypeLoc().wasValidated() ||
+        !reqRepr.getSecondTypeLoc().wasValidated())
+      return None;
+
+    return Requirement(RequirementKind::SameType, reqRepr.getFirstType(),
+                       reqRepr.getSecondType());
+
+  case RequirementReprKind::LayoutConstraint:
+    if (!reqRepr.getSubjectLoc().wasValidated())
+      return None;
+
+    return Requirement(RequirementKind::Layout, reqRepr.getSubject(),
+                       reqRepr.getLayoutConstraint());
+  }
+}
+
+void RequirementRequest::cacheResult(Requirement value) const {
+  auto &reqRepr = getRequirement();
+  switch (value.getKind()) {
+  case RequirementKind::Conformance:
+  case RequirementKind::Superclass:
+    reqRepr.getSubjectLoc().setType(value.getFirstType());
+    reqRepr.getConstraintLoc().setType(value.getSecondType());
+    break;
+
+  case RequirementKind::SameType:
+    reqRepr.getFirstTypeLoc().setType(value.getFirstType());
+    reqRepr.getSecondTypeLoc().setType(value.getSecondType());
+    break;
+
+  case RequirementKind::Layout:
+    reqRepr.getSubjectLoc().setType(value.getFirstType());
+    reqRepr.getLayoutConstraintLoc()
+      .setLayoutConstraint(value.getLayoutConstraint());
+    break;
+  }
+}
+
+//----------------------------------------------------------------------------//
+// USR computation.
+//----------------------------------------------------------------------------//
+
+void USRGenerationRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  const auto &storage = getStorage();
+  auto &d = std::get<0>(storage);
+  diags.diagnose(d, diag::circular_reference);
+}
+
+void USRGenerationRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  const auto &storage = getStorage();
+  auto &d = std::get<0>(storage);
+  diags.diagnose(d, diag::circular_reference);
 }

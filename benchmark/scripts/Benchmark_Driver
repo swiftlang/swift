@@ -12,291 +12,465 @@
 #  See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 # ===---------------------------------------------------------------------===//
+"""
+Benchmark_Driver is a tool for running and analysing Swift Benchmarking Suite.
+
+Example:
+    $ Benchmark_Driver run
+
+Use `Benchmark_Driver -h` for help on available commands and options.
+
+class `BenchmarkDriver` runs performance tests and impements the `run` COMMAND.
+class `BenchmarkDoctor` analyzes performance tests, implements `check` COMMAND.
+
+"""
 
 import argparse
-import datetime
 import glob
-import json
+import logging
+import math
 import os
 import re
 import subprocess
 import sys
 import time
-import urllib
-import urllib2
+
+from compare_perf_tests import LogParser
 
 DRIVER_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
-def parse_results(res, optset):
-    # Parse lines like this
-    # #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),PEAK_MEMORY(B)
-    score_re = re.compile(r"(\d+),[ \t]*(\w+)," +
-                          ",".join([r"[ \t]*([\d.]+)"] * 7))
-    # The Totals line would be parsed like this.
-    total_re = re.compile(r"()(Totals)," +
-                          ",".join([r"[ \t]*([\d.]+)"] * 7))
-    key_group = 2
-    val_group = 4
-    mem_group = 9
+class BenchmarkDriver(object):
+    """Executes tests from Swift Benchmark Suite.
 
-    tests = []
-    for line in res.split():
-        m = score_re.match(line)
-        if not m:
-            m = total_re.match(line)
-            if not m:
-                continue
-        testresult = int(m.group(val_group))
-        testname = m.group(key_group)
-        test = {}
-        test['Data'] = [testresult]
-        test['Info'] = {}
-        test['Name'] = "nts.swift/" + optset + "." + testname + ".exec"
-        tests.append(test)
-        if testname != 'Totals':
-            mem_testresult = int(m.group(mem_group))
-            mem_test = {}
-            mem_test['Data'] = [mem_testresult]
-            mem_test['Info'] = {}
-            mem_test['Name'] = "nts.swift/mem_maxrss." + \
-                optset + "." + testname + ".mem"
-            tests.append(mem_test)
-    return tests
+    It's a higher level wrapper for the Benchmark_X family of binaries
+    (X = [O, Onone, Osize]).
+    """
 
+    def __init__(self, args, tests=None, _subprocess=None, parser=None):
+        """Initialize with command line arguments.
 
-def submit_to_lnt(data, url):
-    print("\nSubmitting results to LNT server...")
-    json_report = {'input_data': json.dumps(data), 'commit': '1'}
-    data = urllib.urlencode(json_report)
-    response_str = urllib2.urlopen(urllib2.Request(url, data))
-    response = json.loads(response_str.read())
-    if 'success' in response:
-        print("Server response:\tSuccess")
-    else:
-        print("Server response:\tError")
-        print("Error:\t", response['error'])
-        sys.exit(1)
+        Optional parameters are for injecting dependencies -- used for testing.
+        """
+        self.args = args
+        self._subprocess = _subprocess or subprocess
+        self.all_tests = []
+        self.tests = tests or self._get_tests()
+        self.parser = parser or LogParser()
+        self.results = {}
+        # Set a constant hash seed. Some tests are currently sensitive to
+        # fluctuations in the number of hash collisions.
+        os.environ['SWIFT_DETERMINISTIC_HASHING'] = '1'
 
+    def _invoke(self, cmd):
+        return self._subprocess.check_output(
+            cmd, stderr=self._subprocess.STDOUT)
 
-def instrument_test(driver_path, test, num_samples):
-    """Run a test and instrument its peak memory use"""
-    test_outputs = []
-    for _ in range(num_samples):
-        test_output_raw = subprocess.check_output(
-            ['time', '-lp', driver_path, test],
-            stderr=subprocess.STDOUT
-        )
-        peak_memory = re.match('\s*(\d+)\s*maximum resident set size',
-                               test_output_raw.split('\n')[-15]).group(1)
-        test_outputs.append(test_output_raw.split()[1].split(',') +
-                            [peak_memory])
+    @property
+    def test_harness(self):
+        """Full path to test harness binary."""
+        suffix = (self.args.optimization if hasattr(self.args, 'optimization')
+                  else 'O')
+        return os.path.join(self.args.tests, "Benchmark_" + suffix)
 
-    # Average sample results
-    num_samples_index = 2
-    min_index = 3
-    max_index = 4
-    avg_start_index = 5
+    def _git(self, cmd):
+        """Execute the Git command in the `swift-repo`."""
+        return self._invoke(
+            ('git -C {0} '.format(self.args.swift_repo) + cmd).split()).strip()
 
-    # TODO: Correctly take stdev
-    avg_test_output = test_outputs[0]
-    avg_test_output[avg_start_index:] = map(int,
-                                            avg_test_output[avg_start_index:])
-    for test_output in test_outputs[1:]:
-        for i in range(avg_start_index, len(test_output)):
-            avg_test_output[i] += int(test_output[i])
-    for i in range(avg_start_index, len(avg_test_output)):
-        avg_test_output[i] = int(round(avg_test_output[i] /
-                                       float(len(test_outputs))))
-    avg_test_output[num_samples_index] = num_samples
-    avg_test_output[min_index] = min(
-        test_outputs, key=lambda x: int(x[min_index]))[min_index]
-    avg_test_output[max_index] = max(
-        test_outputs, key=lambda x: int(x[max_index]))[max_index]
-    avg_test_output = map(str, avg_test_output)
+    @property
+    def log_file(self):
+        """Full path to log file.
 
-    return avg_test_output
+        If `swift-repo` is set, log file is tied to Git branch and revision.
+        """
+        if not self.args.output_dir:
+            return None
+        log_dir = self.args.output_dir
+        harness_name = os.path.basename(self.test_harness)
+        suffix = '-' + time.strftime('%Y%m%d%H%M%S', time.localtime())
+        if self.args.swift_repo:
+            log_dir = os.path.join(
+                log_dir, self._git('rev-parse --abbrev-ref HEAD'))  # branch
+            suffix += '-' + self._git('rev-parse --short HEAD')  # revision
+        return os.path.join(log_dir, harness_name + suffix + '.log')
 
+    @property
+    def _cmd_list_benchmarks(self):
+        # Use tab delimiter for easier parsing to override the default comma.
+        # (The third 'column' is always comma-separated list of tags in square
+        # brackets -- currently unused here.)
+        return [self.test_harness, '--list', '--delim=\t'] + (
+            ['--skip-tags='] if (self.args.benchmarks or
+                                 self.args.filters) else [])
 
-def get_tests(driver_path, args):
-    """Return a list of available performance tests"""
-    driver = ([driver_path, '--list'])
-    # Use tab delimiter for easier parsing to override the default comma.
-    # (The third 'column' is always comma-separated list of tags in square
-    # brackets -- currently unused here.)
-    driver.append('--delim=\t')
-    if args.benchmarks or args.filters:
-        driver.append('--skip-tags=')  # list all tests, don't skip any tags
-    index_name_pairs = [
-        line.split('\t')[:2] for line in
-        subprocess.check_output(driver).split('\n')[1:-1]
-    ]
-    indices, names = zip(*index_name_pairs)  # unzip list of pairs into 2 lists
-    if args.filters:
-        regexes = [re.compile(pattern) for pattern in args.filters]
+    def _get_tests(self):
+        """Return a list of performance tests to run."""
+        index_name_pairs = [
+            line.split('\t')[:2] for line in
+            self._invoke(self._cmd_list_benchmarks).split('\n')[1:-1]
+        ]
+        # unzip list of pairs into 2 lists
+        indices, self.all_tests = map(list, zip(*index_name_pairs))
+        if self.args.filters:
+            return self._tests_matching_patterns()
+        if self.args.benchmarks:
+            return self._tests_by_name_or_index(indices)
+        return self.all_tests
+
+    def _tests_matching_patterns(self):
+        regexes = [re.compile(pattern) for pattern in self.args.filters]
         return sorted(list(set([name for pattern in regexes
-                                for name in names if pattern.match(name)])))
-    if not args.benchmarks:
-        return names
-    benchmarks = set(args.benchmarks)
-    index_to_name = dict(index_name_pairs)
-    indexed_names = [index_to_name[i]
-                     for i in benchmarks.intersection(set(indices))]
-    return sorted(list(
-        benchmarks.intersection(set(names)).union(indexed_names)))
+                                for name in self.all_tests
+                                if pattern.match(name)])))
 
+    def _tests_by_name_or_index(self, indices):
+        benchmarks = set(self.args.benchmarks)
+        index_to_name = dict(zip(indices, self.all_tests))
+        indexed_names = [index_to_name[i]
+                         for i in benchmarks.intersection(set(indices))]
+        return sorted(list(
+            benchmarks.intersection(set(self.all_tests)).union(indexed_names)))
 
-def get_current_git_branch(git_repo_path):
-    """Return the selected branch for the repo `git_repo_path`"""
-    return subprocess.check_output(
-        ['git', '-C', git_repo_path, 'rev-parse',
-         '--abbrev-ref', 'HEAD'], stderr=subprocess.STDOUT).strip()
+    def run(self, test, num_samples=None, num_iters=None,
+            verbose=None, measure_memory=False):
+        """Execute benchmark and gather results."""
+        num_samples = num_samples or 1
+        num_iters = num_iters or 0  # automatically determine N to run for 1s
 
+        cmd = self._cmd_run(
+            test, num_samples, num_iters, verbose, measure_memory)
+        output = self._invoke(cmd)
+        result = self.parser.results_from_string(output).items()[0][1]
+        return result
 
-def get_git_head_ID(git_repo_path):
-    """Return the short identifier for the HEAD commit of the repo
-        `git_repo_path`"""
-    return subprocess.check_output(
-        ['git', '-C', git_repo_path, 'rev-parse',
-         '--short', 'HEAD'], stderr=subprocess.STDOUT).strip()
-
-
-def log_results(log_directory, driver, formatted_output, swift_repo=None):
-    """Log `formatted_output` to a branch specific directory in
-    `log_directory`
-    """
-    try:
-        branch = get_current_git_branch(swift_repo)
-    except (OSError, subprocess.CalledProcessError):
-        branch = None
-    try:
-        head_ID = '-' + get_git_head_ID(swift_repo)
-    except (OSError, subprocess.CalledProcessError):
-        head_ID = ''
-    timestamp = time.strftime("%Y%m%d%H%M%S", time.localtime())
-    if branch:
-        output_directory = os.path.join(log_directory, branch)
-    else:
-        output_directory = log_directory
-    driver_name = os.path.basename(driver)
-    try:
-        os.makedirs(output_directory)
-    except OSError:
-        pass
-    log_file = os.path.join(output_directory,
-                            driver_name + '-' + timestamp + head_ID + '.log')
-    print('Logging results to: %s' % log_file)
-    with open(log_file, 'w') as f:
-        f.write(formatted_output)
-
-
-def run_benchmarks(driver, benchmarks=[], num_samples=10, verbose=False,
-                   log_directory=None, swift_repo=None):
-    """Run perf tests individually and return results in a format that's
-    compatible with `parse_results`. If `benchmarks` is not empty,
-    only run tests included in it.
-    """
-    # Set a constant hash seed. Some tests are currently sensitive to
-    # fluctuations in the number of hash collisions.
-    #
-    # FIXME: This should only be set in the environment of the child process
-    # that runs the tests.
-    os.environ["SWIFT_DETERMINISTIC_HASHING"] = "1"
-
-    (total_tests, total_min, total_max, total_mean) = (0, 0, 0, 0)
-    output = []
-    headings = ['#', 'TEST', 'SAMPLES', 'MIN(μs)', 'MAX(μs)', 'MEAN(μs)',
-                'SD(μs)', 'MEDIAN(μs)', 'MAX_RSS(B)']
-    line_format = '{:>3} {:<25} {:>7} {:>7} {:>7} {:>8} {:>6} {:>10} {:>10}'
-    if verbose and log_directory:
-        print(line_format.format(*headings))
-    for test in benchmarks:
-        test_output = instrument_test(driver, test, num_samples)
-        if test_output[0] == 'Totals':
-            continue
+    def _cmd_run(self, test, num_samples, num_iters, verbose, measure_memory):
+        cmd = [self.test_harness, test]
+        if num_samples > 1:
+            cmd.append('--num-samples={0}'.format(num_samples))
+        if num_iters > 0:
+            cmd.append('--num-iters={0}'.format(num_iters))
         if verbose:
-            if log_directory:
-                print(line_format.format(*test_output))
-            else:
-                print(','.join(test_output))
-        output.append(test_output)
-        (samples, _min, _max, mean) = map(int, test_output[2:6])
-        total_tests += 1
-        total_min += _min
-        total_max += _max
-        total_mean += mean
-    if not output:
-        return
-    formatted_output = '\n'.join([','.join(l) for l in output])
-    totals = map(str, ['Totals', total_tests, total_min, total_max,
-                       total_mean, '0', '0', '0'])
-    totals_output = '\n\n' + ','.join(totals)
-    if verbose:
-        if log_directory:
-            print(line_format.format(*([''] + totals)))
-        else:
-            print(totals_output[1:])
-    formatted_output += totals_output
-    if log_directory:
-        log_results(log_directory, driver, formatted_output, swift_repo)
-    return formatted_output
+            cmd.append('--verbose')
+        if measure_memory:
+            cmd.append('--memory')
+        return cmd
+
+    def run_independent_samples(self, test):
+        """Run benchmark multiple times, gathering independent samples.
+
+        Returns the aggregated result of independent benchmark invocations.
+        """
+        def merge_results(a, b):
+            a.merge(b)
+            return a
+
+        return reduce(merge_results,
+                      [self.run(test, measure_memory=True)
+                       for _ in range(self.args.iterations)])
+
+    def log_results(self, output, log_file=None):
+        """Log output to `log_file`.
+
+        Creates `args.output_dir` if it doesn't exist yet.
+        """
+        log_file = log_file or self.log_file
+        dir = os.path.dirname(log_file)
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        print('Logging results to: %s' % log_file)
+        with open(log_file, 'w') as f:
+            f.write(output)
+
+    RESULT = '{:>3} {:<25} {:>7} {:>7} {:>7} {:>8} {:>6} {:>10} {:>10}'
+
+    def run_and_log(self, csv_console=True):
+        """Run benchmarks and continuously log results to the console.
+
+        There are two console log formats: CSV and justified columns. Both are
+        compatible with `LogParser`. Depending on the `csv_console` parameter,
+        the CSV log format is either printed to console or returned as a string
+        from this method. When `csv_console` is False, the console output
+        format is justified columns.
+        """
+
+        format = (
+            (lambda values: ','.join(values)) if csv_console else
+            (lambda values: self.RESULT.format(*values)))  # justified columns
+
+        def console_log(values):
+            print(format(values))
+
+        console_log(['#', 'TEST', 'SAMPLES', 'MIN(μs)', 'MAX(μs)',  # header
+                    'MEAN(μs)', 'SD(μs)', 'MEDIAN(μs)', 'MAX_RSS(B)'])
+
+        def result_values(r):
+            return map(str, [r.test_num, r.name, r.num_samples, r.min, r.max,
+                             int(r.mean), int(r.sd), r.median, r.max_rss])
+
+        results = []
+        for test in self.tests:
+            result = result_values(self.run_independent_samples(test))
+            console_log(result)
+            results.append(result)
+
+        print(
+            '\nTotal performance tests executed: {0}'.format(len(self.tests)))
+        return (None if csv_console else
+                ('\n'.join([','.join(r) for r in results]) + '\n'))  # csv_log
+
+    @staticmethod
+    def run_benchmarks(args):
+        """Run benchmarks and log results."""
+        driver = BenchmarkDriver(args)
+        csv_log = driver.run_and_log(csv_console=(args.output_dir is None))
+        if csv_log:
+            driver.log_results(csv_log)
+        return 0
 
 
-def submit(args):
-    print("SVN revision:\t", args.revision)
-    print("Machine name:\t", args.machine)
-    print("Iterations:\t", args.iterations)
-    print("Optimizations:\t", ','.join(args.optimization))
-    print("LNT host:\t", args.lnt_host)
-    starttime = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
-    print("Start time:\t", starttime)
-    data = {}
-    data['Tests'] = []
-    data['Machine'] = {'Info': {'name': args.machine}, 'Name': args.machine}
-    print("\nRunning benchmarks...")
-    for optset in args.optimization:
-        print("Opt level:\t", optset)
-        file = os.path.join(args.tests, "Benchmark_" + optset)
-        try:
-            res = run_benchmarks(
-                file, benchmarks=get_tests(file, args),
-                num_samples=args.iterations)
-            data['Tests'].extend(parse_results(res, optset))
-        except subprocess.CalledProcessError as e:
-            print("Execution failed.. Test results are empty.")
-            print("Process output:\n", e.output)
+class LoggingReportFormatter(logging.Formatter):
+    """Format logs as plain text or with colors on the terminal.
 
-    endtime = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
-    data['Run'] = {'End Time': endtime,
-                   'Info': {'inferred_run_order': str(args.revision),
-                            'run_order': str(args.revision),
-                            'tag': 'nts',
-                            'test_suite_revision': 'None'},
-                   'Start Time': starttime}
-    print("End time:\t", endtime)
+    Plain text outputs level, category and massage: 'DEBUG category: Hi!'
+    Colored output uses color coding based on the level.
+    """
 
-    submit_to_lnt(data, args.lnt_host)
-    return 0
+    import logging as log
+    colors = {log.DEBUG: '9', log.INFO: '2', log.WARNING: '3', log.ERROR: '1',
+              log.CRITICAL: '5'}
+
+    def __init__(self, use_color=False):
+        """Specify if report should use colors; defaults to False."""
+        super(LoggingReportFormatter, self).__init__('%(message)s')
+        self.use_color = use_color
+
+    def format(self, record):
+        """Format the log record with level and category."""
+        msg = super(LoggingReportFormatter, self).format(record)
+        category = ((record.name.split('.')[-1] + ': ') if '.' in record.name
+                    else '')
+        return ('\033[1;3{0}m{1}{2}\033[1;0m'.format(
+            self.colors[record.levelno], category, msg) if self.use_color else
+            '{0} {1}{2}'.format(record.levelname, category, msg))
 
 
-def run(args):
-    optset = args.optimization
-    file = os.path.join(args.tests, "Benchmark_" + optset)
-    run_benchmarks(
-        file, benchmarks=get_tests(file, args),
-        num_samples=args.iterations, verbose=True,
-        log_directory=args.output_dir,
-        swift_repo=args.swift_repo)
-    return 0
+class BenchmarkDoctor(object):
+    """Checks that the benchmark conforms to the standard set of requirements.
+
+    Benchmarks that are part of Swift Benchmark Suite are required to follow
+    a set of rules that ensure quality measurements. These include naming
+    convention, robustness when varying execution parameters like
+    `num-iters` and `num-samples` (no setup overhead, constant memory
+    consumption).
+    """
+
+    log = logging.getLogger('BenchmarkDoctor')
+    log_naming = log.getChild('naming')
+    log_runtime = log.getChild('runtime')
+    log_memory = log.getChild('memory')
+    log.setLevel(logging.DEBUG)
+
+    def __init__(self, args, driver=None):
+        """Initialize with command line parameters.
+
+        Optional `driver` parameter for injecting dependency; used for testing.
+        """
+        super(BenchmarkDoctor, self).__init__()
+        self.driver = driver or BenchmarkDriver(args)
+        self.results = {}
+        self.console_handler = logging.StreamHandler(sys.stdout)
+        self.console_handler.setLevel(logging.DEBUG if args.verbose else
+                                      logging.INFO)
+        self.console_handler.setFormatter(
+            LoggingReportFormatter(use_color=sys.stdout.isatty()))
+        self.log.addHandler(self.console_handler)
+        self.log.debug('Checking tests: %s', ', '.join(self.driver.tests))
+        self.requirements = [
+            self._name_matches_capital_words_convention,
+            self._name_is_at_most_40_chars_long,
+            self._no_setup_overhead,
+            self._optimized_runtime_in_range,
+            self._constant_memory_use
+        ]
+
+    def __del__(self):
+        """Unregister handler on exit."""
+        self.log.removeHandler(self.console_handler)
+
+    capital_words_re = re.compile('[A-Z][a-zA-Z0-9]+')
+
+    @staticmethod
+    def _name_matches_capital_words_convention(measurements):
+        name = measurements['name']
+        match = BenchmarkDoctor.capital_words_re.match(name)
+        matched = match.group(0) if match else ''
+
+        if name != matched:
+            BenchmarkDoctor.log_naming.error(
+                "'%s' name doesn't conform to UpperCamelCase convention.",
+                name)
+            BenchmarkDoctor.log_naming.info(
+                'See http://bit.ly/UpperCamelCase')
+
+    @staticmethod
+    def _name_is_at_most_40_chars_long(measurements):
+        name = measurements['name']
+
+        if len(name) > 40:
+            BenchmarkDoctor.log_naming.error(
+                "'%s' name is %d characters long.", name, len(name))
+            BenchmarkDoctor.log_naming.info(
+                'Benchmark name should not be longer than 40 characters.')
+
+    @staticmethod
+    def _select(measurements, num_iters=None, opt_level='O'):
+        prefix = measurements['name'] + ' ' + opt_level
+        prefix += '' if num_iters is None else (' i' + str(num_iters))
+        return [series for name, series in measurements.items()
+                if name.startswith(prefix)]
+
+    @staticmethod
+    def _optimized_runtime_in_range(measurements):
+        name = measurements['name']
+        setup, ratio = BenchmarkDoctor._setup_overhead(measurements)
+        setup = 0 if ratio < 0.05 else setup
+        runtime = min(
+            [(result.min - correction) for i_series in
+             [BenchmarkDoctor._select(measurements, num_iters=i)
+              for correction in [(setup / i) for i in [1, 2]]
+              ] for result in i_series])
+
+        if 2500 < runtime:
+            log = (BenchmarkDoctor.log_runtime.warning if runtime < 500000 else
+                   BenchmarkDoctor.log_runtime.error)
+            caveat = '' if setup == 0 else ' (excluding the setup overhead)'
+            log("'%s' execution took at least %d μs%s.", name, runtime, caveat)
+            factor = int(pow(2, math.ceil(math.log(runtime / 2500.0, 2))))
+            BenchmarkDoctor.log_runtime.info(
+                "Decrease the workload of '%s' by a factor of %d, "
+                "to be less than 2500 μs.", name, factor)
+
+    @staticmethod
+    def _setup_overhead(measurements):
+        select = BenchmarkDoctor._select
+        ti1, ti2 = [float(min(mins)) for mins in
+                    [[result.min for result in i_series] for i_series in
+                     [select(measurements, num_iters=i) for i in [1, 2]]]]
+        setup = int(round(2.0 * (ti1 - ti2)))
+        ratio = (setup / ti1) if ti1 > 0 else 0
+        return (setup, ratio)
+
+    @staticmethod
+    def _no_setup_overhead(measurements):
+        setup, ratio = BenchmarkDoctor._setup_overhead(measurements)
+        if ratio > 0.05:
+            BenchmarkDoctor.log_runtime.error(
+                "'%s' has setup overhead of %d μs (%.1f%%).",
+                measurements['name'], setup, round((100 * ratio), 1))
+            BenchmarkDoctor.log_runtime.info(
+                'Move initialization of benchmark data to the `setUpFunction` '
+                'registered in `BenchmarkInfo`.')
+
+    @staticmethod
+    def _constant_memory_use(measurements):
+        select = BenchmarkDoctor._select
+        (min_i1, max_i1), (min_i2, max_i2) = [
+            (min(memory_use), max(memory_use)) for memory_use in
+            [[r.mem_pages for r in i_series] for i_series in
+             [select(measurements, num_iters=i) for i in
+              [1, 2]]]]
+        range_i1, range_i2 = max_i1 - min_i1, max_i2 - min_i2
+        normal_range = 15  # pages
+        name = measurements['name']
+
+        if abs(min_i1 - min_i2) > max(range_i1, range_i2, normal_range):
+            BenchmarkDoctor.log_memory.error(
+                "'%s' varies the memory footprint of the base "
+                "workload depending on the `num-iters`.", name)
+
+        if max(range_i1, range_i2) > normal_range:
+            BenchmarkDoctor.log_memory.warning(
+                "'%s' has very wide range of memory used between "
+                "independent, repeated measurements.", name)
+
+        BenchmarkDoctor.log_memory.debug(
+            "%s mem_pages [i1, i2]:  min=[%d, %d] 𝚫=%d R=[%d, %d]", name,
+            *[min_i1, min_i2, abs(min_i1 - min_i2), range_i1, range_i2])
+
+    @staticmethod
+    def _adjusted_1s_samples(runtime):
+        u"""Return sample count that can be taken in approximately 1 second.
+
+        Based on the runtime (μs) of one sample taken with num-iters=1.
+        """
+        if runtime == 0:
+            return 2
+        s = 1000000 / float(runtime)  # samples for 1s run
+        s = int(pow(2, round(math.log(s, 2))))  # rounding to power of 2
+        return s if s > 2 else 2  # always take at least 2 samples
+
+    def measure(self, benchmark):
+        """Measure benchmark with varying iterations and optimization levels.
+
+        Returns a dictionary with benchmark name and `PerformanceTestResult`s.
+        """
+        self.log.debug('Calibrating num-samples for {0}:'.format(benchmark))
+        r = self.driver.run(benchmark, num_samples=3, num_iters=1)  # calibrate
+        num_samples = self._adjusted_1s_samples(r.min)
+
+        def capped(s):
+            return min(s, 2048)
+        run_args = [(capped(num_samples), 1), (capped(num_samples / 2), 2)]
+        opts = self.driver.args.optimization
+        opts = opts if isinstance(opts, list) else [opts]
+        self.log.debug(
+            'Runtime {0} μs yields {1} adjusted samples per second.'.format(
+                r.min, num_samples))
+        self.log.debug(
+            'Measuring {0}, 5 x i1 ({1} samples), 5 x i2 ({2} samples)'.format(
+                benchmark, run_args[0][0], run_args[1][0]))
+
+        measurements = dict(
+            [('{0} {1} i{2}{3}'.format(benchmark, o, i, suffix),
+              self.driver.run(benchmark, num_samples=s, num_iters=i,
+                              verbose=True))
+             for o in opts
+             for s, i in run_args
+             for suffix in list('abcde')
+             ]
+        )
+        measurements['name'] = benchmark
+        return measurements
+
+    def analyze(self, benchmark_measurements):
+        """Analyze whether benchmark fullfills all requirtements."""
+        self.log.debug('Analyzing %s', benchmark_measurements['name'])
+        for rule in self.requirements:
+            rule(benchmark_measurements)
+
+    def check(self):
+        """Measure and analyse all enabled tests."""
+        for test in self.driver.tests:
+            self.analyze(self.measure(test))
+
+    @staticmethod
+    def run_check(args):
+        """Validate benchmarks conform to health rules, report violations."""
+        doctor = BenchmarkDoctor(args)
+        doctor.check()
+        # TODO non-zero error code when errors are logged
+        # See https://stackoverflow.com/a/31142078/41307
+        return 0
 
 
 def format_name(log_path):
-    """Return the filename and directory for a log file"""
+    """Return the filename and directory for a log file."""
     return '/'.join(log_path.split('/')[-2:])
 
 
 def compare_logs(compare_script, new_log, old_log, log_dir, opt):
-    """Return diff of log files at paths `new_log` and `old_log`"""
+    """Return diff of log files at paths `new_log` and `old_log`."""
     print('Comparing %s %s ...' % (format_name(old_log), format_name(new_log)))
     subprocess.call([compare_script, '--old-file', old_log,
                     '--new-file', new_log, '--format', 'markdown',
@@ -306,10 +480,10 @@ def compare_logs(compare_script, new_log, old_log, log_dir, opt):
 
 def compare(args):
     log_dir = args.log_dir
-    swift_repo = args.swift_repo
     compare_script = args.compare_script
     baseline_branch = args.baseline_branch
-    current_branch = get_current_git_branch(swift_repo)
+    current_branch = \
+        BenchmarkDriver(args, tests=[''])._git('rev-parse --abbrev-ref HEAD')
     current_branch_dir = os.path.join(log_dir, current_branch)
     baseline_branch_dir = os.path.join(log_dir, baseline_branch)
 
@@ -386,22 +560,24 @@ def compare(args):
 
 
 def positive_int(value):
+    """Verify the value is a positive integer."""
     ivalue = int(value)
     if not (ivalue > 0):
         raise ValueError
     return ivalue
 
 
-def main():
+def parse_args(args):
+    """Parse command line arguments and set default values."""
     parser = argparse.ArgumentParser(
         epilog='Example: ./Benchmark_Driver run -i 5 -f Prefix -f .*Suffix.*'
     )
     subparsers = parser.add_subparsers(
         title='Swift benchmark driver commands',
-        help='See COMMAND -h for additional arguments', metavar='<command>')
+        help='See COMMAND -h for additional arguments', metavar='COMMAND')
 
-    parent_parser = argparse.ArgumentParser(add_help=False)
-    benchmarks_group = parent_parser.add_mutually_exclusive_group()
+    shared_benchmarks_parser = argparse.ArgumentParser(add_help=False)
+    benchmarks_group = shared_benchmarks_parser.add_mutually_exclusive_group()
     benchmarks_group.add_argument(
         'benchmarks',
         default=[],
@@ -410,45 +586,22 @@ def main():
         '-f', '--filter', dest='filters', action='append',
         help='run all tests whose name match regular expression PATTERN, ' +
         'multiple filters are supported', metavar="PATTERN")
-    parent_parser.add_argument(
+    shared_benchmarks_parser.add_argument(
         '-t', '--tests',
         help='directory containing Benchmark_O{,none,size} ' +
         '(default: DRIVER_DIR)',
         default=DRIVER_DIR)
-
-    submit_parser = subparsers.add_parser(
-        'submit',
-        help='Run benchmarks and submit results to LNT',
-        parents=[parent_parser])
-    submit_parser.add_argument(
-        '-o', '--optimization', nargs='+',
-        help='optimization levels to use (default: O Onone Osize)',
-        default=['O', 'Onone', 'Osize'])
-    submit_parser.add_argument(
-        '-i', '--iterations',
-        help='number of times to run each test (default: 10)',
-        type=positive_int, default=10)
-    submit_parser.add_argument(
-        '-m', '--machine', required=True,
-        help='LNT machine name')
-    submit_parser.add_argument(
-        '-r', '--revision', required=True,
-        help='SVN revision of compiler to identify the LNT run', type=int)
-    submit_parser.add_argument(
-        '-l', '--lnt_host', required=True,
-        help='LNT host to submit results to')
-    submit_parser.set_defaults(func=submit)
-
-    run_parser = subparsers.add_parser(
-        'run',
-        help='Run benchmarks and output results to stdout',
-        parents=[parent_parser])
-    run_parser.add_argument(
+    shared_benchmarks_parser.add_argument(
         '-o', '--optimization',
         metavar='OPT',
         choices=['O', 'Onone', 'Osize'],
         help='optimization level to use: {O,Onone,Osize}, (default: O)',
         default='O')
+
+    run_parser = subparsers.add_parser(
+        'run',
+        help='Run benchmarks and output results to stdout',
+        parents=[shared_benchmarks_parser])
     run_parser.add_argument(
         '-i', '--iterations',
         help='number of times to run each test (default: 1)',
@@ -458,8 +611,17 @@ def main():
         help='log results to directory (default: no logging)')
     run_parser.add_argument(
         '--swift-repo',
-        help='absolute path to Swift source repo for branch comparison')
-    run_parser.set_defaults(func=run)
+        help='absolute path to the Swift source repository')
+    run_parser.set_defaults(func=BenchmarkDriver.run_benchmarks)
+
+    check_parser = subparsers.add_parser(
+        'check',
+        help='',
+        parents=[shared_benchmarks_parser])
+    check_parser.add_argument(
+        '-v', '--verbose', action='store_true',
+        help='show more details during benchmark analysis',)
+    check_parser.set_defaults(func=BenchmarkDoctor.run_check)
 
     compare_parser = subparsers.add_parser(
         'compare',
@@ -469,7 +631,7 @@ def main():
         help='directory containing benchmark logs')
     compare_parser.add_argument(
         '--swift-repo', required=True,
-        help='absolute path to Swift source repo')
+        help='absolute path to the Swift source repository')
     compare_parser.add_argument(
         '--compare-script', required=True,
         help='absolute path to compare script')
@@ -479,9 +641,12 @@ def main():
              'branch (default: master)')
     compare_parser.set_defaults(func=compare)
 
-    args = parser.parse_args()
-    if args.func != compare and isinstance(args.optimization, list):
-        args.optimization = sorted(list(set(args.optimization)))
+    return parser.parse_args(args)
+
+
+def main():
+    """Parse command line arguments and execute the specified COMMAND."""
+    args = parse_args(sys.argv[1:])
     return args.func(args)
 
 

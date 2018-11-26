@@ -244,8 +244,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
 
   SmallVector<AnyFunctionType::Param, 1> args;
   params->getParams(args);
-  CE->setType(FunctionType::get(args, TupleType::getEmpty(Context),
-                                FunctionType::ExtInfo()));
+  CE->setType(FunctionType::get(args, TupleType::getEmpty(Context)));
 
   // Convert the pattern to a string we can print.
   llvm::SmallString<16> PrefixString;

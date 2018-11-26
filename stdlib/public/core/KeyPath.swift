@@ -57,6 +57,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     ObjectIdentifier(type(of: self)).hash(into: &hasher)
     return withBuffer {
       var buffer = $0
+      if buffer.data.isEmpty { return }
       while true {
         let (component, type) = buffer.next()
         hasher.combine(component.value)
@@ -88,6 +89,11 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
           return false
         }
         
+        // Identity is equal to identity
+        if aBuffer.data.isEmpty {
+          return bBuffer.data.isEmpty
+        }
+
         while true {
           let (aComponent, aType) = aBuffer.next()
           let (bComponent, bType) = bBuffer.next()
@@ -153,6 +159,11 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   internal var _storedInlineOffset: Int? {
     return withBuffer {
       var buffer = $0
+
+      // The identity key path is effectively a stored keypath of type Self
+      // at offset zero
+      if buffer.data.isEmpty { return 0 }
+
       var offset = 0
       while true {
         let (rawComponent, optNextType) = buffer.next()
@@ -220,6 +231,9 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
     var curBase: Any = root
     return withBuffer {
       var buffer = $0
+      if buffer.data.isEmpty {
+        return unsafeBitCast(root, to: Value.self)
+      }
       while true {
         let (rawComponent, optNextType) = buffer.next()
         let valueType = optNextType ?? Value.self
@@ -279,6 +293,13 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
       _sanityCheck(!buffer.hasReferencePrefix,
                    "WritableKeyPath should not have a reference prefix")
       
+      if buffer.data.isEmpty {
+        return (
+          UnsafeMutablePointer<Value>(
+            mutating: p.assumingMemoryBound(to: Value.self)),
+          nil)
+      }
+
       while true {
         let (rawComponent, optNextType) = buffer.next()
         let nextType = optNextType ?? Value.self
@@ -306,7 +327,16 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
               owner: keepAlive)
     }
   }
+}
 
+extension WritableKeyPath where Root == Value {
+  // FIXME: Replace with proper surface syntax
+
+  /// Returns an identity key path that references the entire input value.
+  @inlinable
+  public static var _identity: WritableKeyPath<Root, Root> {
+    return Builtin.identityKeyPath()
+  }
 }
 
 /// A key path that supports reading from and writing to the resulting value
@@ -758,6 +788,12 @@ internal struct RawKeyPathComponent {
     internal static var endOfReferencePrefixFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_EndOfReferencePrefixFlag
     }
+    internal static var storedMutableFlag: UInt32 {
+      return _SwiftKeyPathComponentHeader_StoredMutableFlag
+    }
+    internal static var storedOffsetPayloadMask: UInt32 {
+      return _SwiftKeyPathComponentHeader_StoredOffsetPayloadMask
+    }
     internal static var outOfLineOffsetPayload: UInt32 {
       return _SwiftKeyPathComponentHeader_OutOfLineOffsetPayload
     }
@@ -769,6 +805,11 @@ internal struct RawKeyPathComponent {
     }
     internal static var maximumOffsetPayload: UInt32 {
       return _SwiftKeyPathComponentHeader_MaximumOffsetPayload
+    }
+
+    internal var isStoredMutable: Bool {
+      _sanityCheck(kind == .struct || kind == .class)
+      return _value & Header.storedMutableFlag != 0
     }
 
     internal static var computedMutatingFlag: UInt32 {
@@ -852,6 +893,20 @@ internal struct RawKeyPathComponent {
         _value = _value & ~Header.payloadMask | newValue
       }
     }
+    internal var storedOffsetPayload: UInt32 {
+      get {
+        _sanityCheck(kind == .struct || kind == .class,
+                     "not a stored component")
+        return _value & Header.storedOffsetPayloadMask
+      }
+      set {
+        _sanityCheck(kind == .struct || kind == .class,
+                     "not a stored component")
+        _sanityCheck(newValue & Header.storedOffsetPayloadMask == newValue,
+                     "payload too big")
+        _value = _value & ~Header.storedOffsetPayloadMask | newValue
+      }
+    }
     internal var endOfReferencePrefix: Bool {
       get {
         return _value & Header.endOfReferencePrefixFlag != 0
@@ -913,12 +968,12 @@ internal struct RawKeyPathComponent {
     internal func _componentBodySize(forPropertyDescriptor: Bool) -> Int {
       switch kind {
       case .struct, .class:
-        if payload == Header.unresolvedFieldOffsetPayload
-           || payload == Header.outOfLineOffsetPayload {
+        if storedOffsetPayload == Header.unresolvedFieldOffsetPayload
+           || storedOffsetPayload == Header.outOfLineOffsetPayload {
           // A 32-bit offset is stored in the body.
           return MemoryLayout<UInt32>.size
         }
-        if payload == Header.unresolvedIndirectOffsetPayload {
+        if storedOffsetPayload == Header.unresolvedIndirectOffsetPayload {
           // A pointer-aligned, pointer-sized pointer is stored in the body.
           return Header.pointerAlignmentSkew + MemoryLayout<Int>.size
         }
@@ -959,7 +1014,9 @@ internal struct RawKeyPathComponent {
     let ptrSize = MemoryLayout<Int>.size
     switch header.kind {
     case .struct, .class:
-      if header.payload == Header.payloadMask { return 4 } // overflowed
+      if header.storedOffsetPayload == Header.outOfLineOffsetPayload {
+        return 4 // overflowed
+      }
       return 0
     case .external:
       // align to pointer + pointer to external descriptor
@@ -993,13 +1050,13 @@ internal struct RawKeyPathComponent {
                  "no offset for this kind")
     // An offset too large to fit inline is represented by a signal and stored
     // in the body.
-    if header.payload == Header.outOfLineOffsetPayload {
+    if header.storedOffsetPayload == Header.outOfLineOffsetPayload {
       // Offset overflowed into body
       _sanityCheck(body.count >= MemoryLayout<UInt32>.size,
                    "component not big enough")
       return Int(body.load(as: UInt32.self))
     }
-    return Int(header.payload)
+    return Int(header.storedOffsetPayload)
   }
 
   internal var _computedIDValue: Int {
@@ -1165,7 +1222,7 @@ internal struct RawKeyPathComponent {
     switch header.kind {
     case .struct,
          .class:
-      if header.payload == Header.outOfLineOffsetPayload {
+      if header.storedOffsetPayload == Header.outOfLineOffsetPayload {
         let overflowOffset = body.load(as: UInt32.self)
         buffer.storeBytes(of: overflowOffset, toByteOffset: 4,
                           as: UInt32.self)
@@ -1914,6 +1971,16 @@ internal func _appendingKeyPaths<
     var rootBuffer = $0
     return leaf.withBuffer {
       var leafBuffer = $0
+
+      // If either operand is the identity key path, then we should return
+      // the other operand back untouched.
+      if leafBuffer.data.isEmpty {
+        return unsafeDowncast(root, to: Result.self)
+      }
+      if rootBuffer.data.isEmpty {
+        return unsafeDowncast(leaf, to: Result.self)
+      }
+
       // Reserve room for the appended KVC string, if both key paths are
       // KVC-compatible.
       let appendedKVCLength: Int, rootKVCLength: Int, leafKVCLength: Int
@@ -2069,7 +2136,10 @@ internal var keyPathObjectHeaderSize: Int {
 }
 
 // Runtime entry point to instantiate a key path object.
-@_cdecl("swift_getKeyPath")
+// Note that this has a compatibility override shim in the runtime so that
+// future compilers can backward-deploy support for instantiating new key path
+// pattern features.
+@_cdecl("swift_getKeyPathImpl")
 public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
                               arguments: UnsafeRawPointer)
     -> UnsafeRawPointer {
@@ -2245,7 +2315,8 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
   var buffer = KeyPathBuffer(base: bufferPtr)
   var size = buffer.data.count + MemoryLayout<Int>.size
 
-  while true {
+  if !buffer.data.isEmpty {
+   while true {
     let header = buffer.pop(RawKeyPathComponent.Header.self)
 
     // Ensure that we pop an amount of data consistent with what
@@ -2258,6 +2329,17 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
       expectedPop = header.patternComponentBodySize
       return true
     }())
+
+    func setStoredCapability(for header: RawKeyPathComponent.Header) {
+      // Mutable class properties can be the root of a reference mutation.
+      // Mutable struct properties pass through the existing capability.
+      if header.isStoredMutable {
+        if header.kind == .class { capability = .reference }
+      } else {
+        // Immutable properties can only be read.
+        capability = .readOnly
+      }
+    }
 
     func setComputedCapability(for header: RawKeyPathComponent.Header) {
       let settable = header.isComputedSettable
@@ -2279,21 +2361,15 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
     }
 
     switch header.kind {
-    case .class:
-      // The rest of the key path could be reference-writable.
-      capability = .reference
-      fallthrough
-    case .struct:
-      // No effect on the capability.
-      // TODO: we should dynamically prevent "let" properties from being
-      // reassigned.
+    case .class, .struct:
+      setStoredCapability(for: header)
 
       // Check the final instantiated size of the offset.
-      if header.payload == RawKeyPathComponent.Header.unresolvedFieldOffsetPayload
-        || header.payload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
+      if header.storedOffsetPayload == RawKeyPathComponent.Header.unresolvedFieldOffsetPayload
+        || header.storedOffsetPayload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
         _ = buffer.pop(UInt32.self)
       }
-      if header.payload == RawKeyPathComponent.Header.unresolvedIndirectOffsetPayload {
+      if header.storedOffsetPayload == RawKeyPathComponent.Header.unresolvedIndirectOffsetPayload {
         _ = buffer.pop(Int.self)
         // On 64-bit systems the pointer to the ivar offset variable is
         // pointer-sized and -aligned, but the resulting offset ought to be
@@ -2346,13 +2422,9 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
       // Measure the instantiated size of the external component.
       let newComponentSize: Int
       switch descriptorHeader.kind {
-      case .class:
-        // A stored class property is reference-writable.
-        // TODO: we should dynamically prevent "let" properties from being
-        // reassigned (in both the struct and class cases).
-        capability = .reference
-        fallthrough
-      case .struct:
+      case .class, .struct:
+        setStoredCapability(for: descriptorHeader)
+
         // Discard the local candidate.
         _ = buffer.popRaw(size: localCandidateSize,
                           alignment: Int32.self)
@@ -2360,7 +2432,7 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
         // The final component will be a stored component with just an offset.
         // If the offset requires resolution, then it'll be stored out of
         // line after the header.
-        if descriptorHeader.payload
+        if descriptorHeader.storedOffsetPayload
             > RawKeyPathComponent.Header.maximumOffsetPayload {
           newComponentSize = MemoryLayout<RawKeyPathComponent.Header>.size
                            + MemoryLayout<UInt32>.size
@@ -2521,6 +2593,7 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
     // Pop the type accessor reference.
     _ = buffer.popRaw(size: MemoryLayout<Int>.size,
                       alignment: Int.self)
+   }
   }
 
   _sanityCheck(buffer.data.isEmpty, "didn't read entire pattern")
@@ -2597,7 +2670,8 @@ internal func _instantiateKeyPathBuffer(
   var base: Any.Type = rootType
   // Some pattern forms are pessimistically larger than what we need in the
   // instantiated key path. Keep track of this.
-  while true {
+  if !patternBuffer.data.isEmpty {
+   while true {
     let componentAddr = destData.baseAddress.unsafelyUnwrapped
     let header = patternBuffer.pop(RawKeyPathComponent.Header.self)
 
@@ -2614,7 +2688,7 @@ internal func _instantiateKeyPathBuffer(
 
     func tryToResolveOffset(header: RawKeyPathComponent.Header,
                             getOutOfLineOffset: () -> UInt32) {
-      if header.payload == RawKeyPathComponent.Header.unresolvedFieldOffsetPayload {
+      if header.storedOffsetPayload == RawKeyPathComponent.Header.unresolvedFieldOffsetPayload {
         // Look up offset in type metadata. The value in the pattern is the
         // offset within the metadata object.
         let metadataPtr = unsafeBitCast(base, to: UnsafeRawPointer.self)
@@ -2631,20 +2705,20 @@ internal func _instantiateKeyPathBuffer(
 
         // Rewrite the header for a resolved offset.
         var newHeader = header
-        newHeader.payload = RawKeyPathComponent.Header.outOfLineOffsetPayload
+        newHeader.storedOffsetPayload = RawKeyPathComponent.Header.outOfLineOffsetPayload
         pushDest(newHeader)
         pushDest(offset)
         return
       }
 
-      if header.payload == RawKeyPathComponent.Header.unresolvedIndirectOffsetPayload {
+      if header.storedOffsetPayload == RawKeyPathComponent.Header.unresolvedIndirectOffsetPayload {
         // Look up offset in the indirectly-referenced variable we have a
         // pointer.
         let offsetVar = patternBuffer.pop(UnsafeRawPointer.self)
         let offsetValue = UInt32(offsetVar.load(as: UInt.self))
         // Rewrite the header for a resolved offset.
         var newHeader = header
-        newHeader.payload = RawKeyPathComponent.Header.outOfLineOffsetPayload
+        newHeader.storedOffsetPayload = RawKeyPathComponent.Header.outOfLineOffsetPayload
         pushDest(newHeader)
         pushDest(offsetValue)
         return
@@ -2652,7 +2726,7 @@ internal func _instantiateKeyPathBuffer(
 
       // Otherwise, just transfer the pre-resolved component.
       pushDest(header)
-      if header.payload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
+      if header.storedOffsetPayload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
         let offset = getOutOfLineOffset() //patternBuffer.pop(UInt32.self)
         pushDest(offset)
       }
@@ -2747,9 +2821,11 @@ internal func _instantiateKeyPathBuffer(
       tryToResolveOffset(header: header,
                          getOutOfLineOffset: { patternBuffer.pop(UInt32.self) })
     case .class:
-      // Crossing a class can end the reference prefix, and makes the following
-      // key path potentially reference-writable.
-      endOfReferencePrefixComponent = previousComponentAddr
+      // Accessing a mutable class property can end the reference prefix, and
+      // makes the following key path potentially reference-writable.
+      if header.isStoredMutable {
+        endOfReferencePrefixComponent = previousComponentAddr
+      }
       // The offset may need to be resolved dynamically.
       tryToResolveOffset(header: header,
                          getOutOfLineOffset: { patternBuffer.pop(UInt32.self) })
@@ -2799,9 +2875,11 @@ internal func _instantiateKeyPathBuffer(
       // descriptor.
       switch descriptorHeader.kind {
       case .class:
-        // Crossing a class can end the reference prefix, and makes the following
-        // key path potentially reference-writable.
-        endOfReferencePrefixComponent = previousComponentAddr
+        // Accessing a mutable class property can end the reference prefix,
+        // and makes the following key path potentially reference-writable.
+        if descriptorHeader.isStoredMutable {
+          endOfReferencePrefixComponent = previousComponentAddr
+        }
         fallthrough
 
       case .struct:
@@ -2961,6 +3039,7 @@ internal func _instantiateKeyPathBuffer(
     base = unsafeBitCast(componentTyAccessor(arguments), to: Any.Type.self)
     pushDest(base)
     previousComponentAddr = componentAddr
+   }
   }
 
   // We should have traversed both buffers.

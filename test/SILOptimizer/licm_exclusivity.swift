@@ -1,6 +1,9 @@
 // RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil -Xllvm -debug-only=sil-licm -primary-file %s 2>&1 | %FileCheck %s --check-prefix=TEST1
 // RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil -Xllvm -debug-only=sil-licm  -primary-file %s 2>&1 | %FileCheck %s --check-prefix=TEST2
 // RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil  -primary-file %s | %FileCheck %s --check-prefix=TESTSIL
+// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil -Xllvm -debug-only=sil-licm  -whole-module-optimization %s 2>&1 | %FileCheck %s --check-prefix=TEST3
+// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil  -whole-module-optimization %s | %FileCheck %s --check-prefix=TESTSIL2
+
 // REQUIRES: optimized_stdlib,asserts
 
 // TEST1-LABEL: Processing loops in {{.*}}run_ReversedArray{{.*}}
@@ -43,4 +46,38 @@ public func count_unicodeScalars(_ s: String.UnicodeScalarView) {
   for _ in s {
     count += 1
   }
+}
+
+
+public class ClassWithArrs {
+    var N: Int = 0
+    var A: [Int]
+    var B: [Int]
+
+    init(N: Int) {
+        self.N = N
+
+        A = [Int](repeating: 0, count: N)
+        B = [Int](repeating: 0, count: N)
+    }
+
+// TEST3-LABEL: Processing loops in {{.*}}ClassWithArrsC7readArr{{.*}}
+// TEST3: Hoist and Sink pairs attempt
+// TEST3: Hoisted
+// TEST3: Successfully hosited and sank pair
+// TEST3: Hoisted
+// TEST3: Successfully hosited and sank pair
+// TESTSIL2-LABEL: sil @$S16licm_exclusivity13ClassWithArrsC7readArryyF : $@convention(method) (@guaranteed ClassWithArrs) -> () {
+// TESTSIL2: [[R1:%.*]] = ref_element_addr %0 : $ClassWithArrs, #ClassWithArrs.A
+// TESTSIL2: [[R2:%.*]] = ref_element_addr %0 : $ClassWithArrs, #ClassWithArrs.B
+// TESTSIL2:  begin_access [read] [static] [no_nested_conflict] [[R1]]
+// TESTSIL2:  begin_access [read] [static] [no_nested_conflict] [[R2]]
+    public func readArr() {
+        for i in 0..<self.N {
+            for j in 0..<i {
+				let _ = A[j]
+				let _ = B[j]
+			}
+        }
+    }
 }

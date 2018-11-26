@@ -23,7 +23,6 @@ silopt_register_sources(
   RedundantLoadElimination.cpp
   RedundantOverflowCheckRemoval.cpp
   ReleaseDevirtualizer.cpp
-  RemovePin.cpp
   SILCodeMotion.cpp
   SILLowerAggregateInstrs.cpp
   SILMem2Reg.cpp

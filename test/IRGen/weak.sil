@@ -67,7 +67,7 @@ bb0(%0 : $*B, %1 : $Optional<P>):
 // CHECK:    define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_weak_load_store_proto([[B]]* nocapture dereferenceable({{.*}}), i64, i64)
 // CHECK:      [[X:%.*]] = getelementptr inbounds [[B]], [[B]]* %0, i32 0, i32 0
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 0
-// CHECK-NEXT: [[T1:%.*]] = call [[UNKNOWN]]* @swift_unknownWeakLoadStrong([[WEAK]]* [[T0]])
+// CHECK-NEXT: [[T1:%.*]] = call [[UNKNOWN]]* @swift_unknownObjectWeakLoadStrong([[WEAK]]* [[T0]])
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 1
 // CHECK-NEXT: [[W:%.*]] = load i8**, i8*** [[T0]], align 8
 // CHECK: [[TMPOBJ:%.*]] = inttoptr {{.*}} to %objc_object*
@@ -75,7 +75,7 @@ bb0(%0 : $*B, %1 : $Optional<P>):
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 1
 // CHECK-NEXT: store i8** [[TMPTAB]], i8*** [[T0]], align 8
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 0
-// CHECK-NEXT: call [[WEAK]]* @swift_unknownWeakAssign([[WEAK]]* returned [[T0]], [[UNKNOWN]]* [[TMPOBJ]])
+// CHECK-NEXT: call [[WEAK]]* @swift_unknownObjectWeakAssign([[WEAK]]* returned [[T0]], [[UNKNOWN]]* [[TMPOBJ]])
 // CHECK: call void @"$S4weak1P_pSgWOe"
 
 sil @test_weak_alloc_stack : $@convention(thin) (Optional<P>) -> () {
@@ -94,7 +94,7 @@ bb0(%0 : $Optional<P>):
 // CHECK: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 1
 // CHECK-NEXT: store i8** [[TMPTAB:%.*]], i8*** [[T0]], align 8
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 0
-// CHECK-NEXT: call [[WEAK]]* @swift_unknownWeakInit([[WEAK]]* returned [[T0]], [[UNKNOWN]]* [[TMPOBJ:%.*]])
+// CHECK-NEXT: call [[WEAK]]* @swift_unknownObjectWeakInit([[WEAK]]* returned [[T0]], [[UNKNOWN]]* [[TMPOBJ:%.*]])
 // CHECK-NEXT: call { %swift.weak, i8** }* @"$S4weak1P_pSgXwWOh"({ %swift.weak, i8** }* [[X]])
 // CHECK-NEXT: bitcast
 // CHECK-NEXT: llvm.lifetime.end

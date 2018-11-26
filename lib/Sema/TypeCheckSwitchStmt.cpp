@@ -87,9 +87,8 @@ namespace {
     enum class DowngradeToWarning {
       No,
       ForUnknownCase,
-      ForSwift3Case,
 
-      LAST = ForSwift3Case
+      LAST = ForUnknownCase
     };
 
     enum UnknownCase_t {
@@ -194,13 +193,11 @@ namespace {
         : Kind(SpaceKind::UnknownCase),
           TypeAndVal(Type(), allowedButNotRequired), Head(Identifier()),
           Spaces({}) {}
-      explicit Space(Type T, Identifier H, bool downgrade,
-                     ArrayRef<Space> SP)
-        : Kind(SpaceKind::Constructor), TypeAndVal(T, downgrade), Head(H),
+      explicit Space(Type T, Identifier H, ArrayRef<Space> SP)
+        : Kind(SpaceKind::Constructor), TypeAndVal(T), Head(H),
           Spaces(SP.begin(), SP.end()) {}
-      explicit Space(Type T, Identifier H, bool downgrade,
-                     std::forward_list<Space> SP)
-        : Kind(SpaceKind::Constructor), TypeAndVal(T, downgrade), Head(H),
+      explicit Space(Type T, Identifier H, std::forward_list<Space> SP)
+        : Kind(SpaceKind::Constructor), TypeAndVal(T), Head(H),
           Spaces(SP) {}
       explicit Space(ArrayRef<Space> SP)
         : Kind(SpaceKind::Disjunct), TypeAndVal(Type()),
@@ -221,20 +218,19 @@ namespace {
       static Space forUnknown(bool allowedButNotRequired) {
         return Space(UnknownCase, allowedButNotRequired);
       }
-      static Space forConstructor(Type T, Identifier H, bool downgrade,
-                                  ArrayRef<Space> SP) {
+      static Space forConstructor(Type T, Identifier H, ArrayRef<Space> SP) {
         if (llvm::any_of(SP, std::mem_fn(&Space::isEmpty))) {
           // A constructor with an unconstructible parameter can never actually
           // be used.
           return Space();
         }
-        return Space(T, H, downgrade, SP);
+        return Space(T, H, SP);
       }
-      static Space forConstructor(Type T, Identifier H, bool downgrade,
+      static Space forConstructor(Type T, Identifier H,
                                   std::forward_list<Space> SP) {
         // No need to filter SP here; this is only used to copy other
         // Constructor spaces.
-        return Space(T, H, downgrade, SP);
+        return Space(T, H, SP);
       }
       static Space forBool(bool C) {
         return Space(C);
@@ -273,13 +269,6 @@ namespace {
       }
 
       bool isEmpty() const { return getKind() == SpaceKind::Empty; }
-      
-      bool canDowngradeToWarning() const {
-        assert((getKind() == SpaceKind::Type
-                || getKind() == SpaceKind::Constructor)
-               && "Wrong kind of space tried to access downgrade");
-        return TypeAndVal.getInt();
-      }
 
       bool isAllowedButNotRequired() const {
         assert(getKind() == SpaceKind::UnknownCase
@@ -560,7 +549,6 @@ namespace {
             newSubSpaces.push_back(nextSpace.getValue());
           }
           return Space::forConstructor(this->getType(), this->getHead(),
-                                       this->canDowngradeToWarning(),
                                        newSubSpaces);
         }
 
@@ -619,7 +607,6 @@ namespace {
 
             copyParams[idx] = reducedSpace;
             Space CS = Space::forConstructor(this->getType(), this->getHead(),
-                                             this->canDowngradeToWarning(),
                                              copyParams);
             constrSpaces.push_back(CS);
           }
@@ -757,13 +744,6 @@ namespace {
         }
       }
 
-      static bool isSwift3DowngradeExhaustivityCase(TypeChecker &TC,
-                                                    const EnumElementDecl *eed){
-        if (TC.getLangOpts().isSwiftVersionAtLeast(4))
-          return false;
-        return eed->getAttrs().hasAttribute<DowngradeExhaustivityCheckAttr>();
-      }
-
       // Decompose a type into its component spaces.
       static void decompose(TypeChecker &TC, const DeclContext *DC, Type tp,
                             SmallVectorImpl<Space> &arr) {
@@ -813,8 +793,7 @@ namespace {
                     Space::forType(TTy->getUnderlyingType(), Identifier()));
               }
             }
-            bool canDowngrade = isSwift3DowngradeExhaustivityCase(TC, eed);
-            return Space::forConstructor(tp, eed->getName(), canDowngrade,
+            return Space::forConstructor(tp, eed->getName(),
                                          constElemSpaces);
           });
 
@@ -834,7 +813,6 @@ namespace {
           });
           // Create an empty constructor head for the tuple space.
           arr.push_back(Space::forConstructor(tp, Identifier(),
-                                              /*canDowngrade*/false,
                                               constElemSpaces));
         } else {
           llvm_unreachable("Can't decompose type?");
@@ -853,8 +831,8 @@ namespace {
                tp->getEnumOrBoundGenericEnum();
       }
 
-      // HACK: Search the space for any remaining cases that were labelled
-      // @_downgrade_exhaustivity_check, or 'exhaustive' enums in Swift 4 mode.
+      // Search the space for a reason to downgrade exhaustiveness errors to
+      // a warning e.g. 'unknown case' statements.
       DowngradeToWarning checkDowngradeToWarning() const {
         switch (getKind()) {
         case SpaceKind::Type:
@@ -865,8 +843,6 @@ namespace {
           return DowngradeToWarning::ForUnknownCase;
         case SpaceKind::Constructor: {
           auto result = DowngradeToWarning::No;
-          if (canDowngradeToWarning())
-            result = DowngradeToWarning::ForSwift3Case;
           // Traverse the constructor and its subspaces.
           for (const Space &space : getSpaces())
             result = std::max(result, space.checkDowngradeToWarning());
@@ -1058,7 +1034,6 @@ namespace {
         return;
       }
 
-      bool sawDowngradablePattern = false;
       bool sawRedundantPattern = false;
       const CaseStmt *unknownCase = nullptr;
       SmallVector<Space, 4> spaces;
@@ -1079,8 +1054,7 @@ namespace {
           if (caseItem.isDefault())
             return;
 
-          Space projection = projectPattern(TC, caseItem.getPattern(),
-                                            sawDowngradablePattern);
+          Space projection = projectPattern(TC, caseItem.getPattern());
 
           if (!projection.isEmpty() &&
               projection.isSubspace(Space::forDisjunct(spaces), TC, DC)) {
@@ -1148,19 +1122,17 @@ namespace {
           SmallVector<Space, 4> spaces;
           Space::decompose(TC, DC, uncovered.getType(), spaces);
           diagnoseMissingCases(RequiresDefault::No, Space::forDisjunct(spaces),
-                               unknownCase, /*sawDowngradablePattern*/false);
+                               unknownCase);
         } else {
           diagnoseMissingCases(Switch->getCases().empty()
                                  ? RequiresDefault::EmptySwitchBody
                                  : RequiresDefault::UncoveredSwitch,
-                               uncovered, unknownCase,
-                               /*sawDowngradablePattern*/false);
+                               uncovered, unknownCase);
         }
         return;
       }
 
-      diagnoseMissingCases(RequiresDefault::No, uncovered, unknownCase,
-                           sawDowngradablePattern);
+      diagnoseMissingCases(RequiresDefault::No, uncovered, unknownCase);
     }
     
     enum class RequiresDefault {
@@ -1190,8 +1162,7 @@ namespace {
     }
     
     void diagnoseMissingCases(RequiresDefault defaultReason, Space uncovered,
-                              const CaseStmt *unknownCase = nullptr,
-                              bool sawDowngradablePattern = false) {
+                              const CaseStmt *unknownCase = nullptr) {
       SourceLoc startLoc = Switch->getStartLoc();
       SourceLoc insertLoc;
       if (unknownCase)
@@ -1231,12 +1202,6 @@ namespace {
 
       switch (uncovered.checkDowngradeToWarning()) {
       case DowngradeToWarning::No:
-        break;
-      case DowngradeToWarning::ForSwift3Case:
-        // If someone's used one of the cases introduced in the Swift 4
-        // timeframe, force them to handle all of them.
-        if (!sawDowngradablePattern)
-          mainDiagType = diag::non_exhaustive_switch_warn;
         break;
       case DowngradeToWarning::ForUnknownCase:
         if (TC.Context.LangOpts.DebuggerSupport ||
@@ -1475,7 +1440,6 @@ namespace {
         for (auto &row : matrix) {
           flats.push_back(Space::forConstructor(space.getType(),
                                                 space.getHead(),
-                                                space.canDowngradeToWarning(),
                                                 row));
         }
       }
@@ -1495,13 +1459,7 @@ namespace {
     }
 
     /// Recursively project a pattern into a Space.
-    ///
-    /// The resulting Space does not mark any subspaces as downgradable.
-    /// Instead, whether or not a Swift 3 downgradable pattern was seen is
-    /// recorded in \p sawDowngradablePattern. (This does not include
-    /// downgradable warnings for exhaustive enums in Swift 4.)
-    static Space projectPattern(TypeChecker &TC, const Pattern *item,
-                                bool &sawDowngradablePattern) {
+    static Space projectPattern(TypeChecker &TC, const Pattern *item) {
       switch (item->getKind()) {
       case PatternKind::Any:
         return Space::forType(item->getType(), Identifier());
@@ -1517,8 +1475,7 @@ namespace {
         case CheckedCastKind::BridgingCoercion: {
           if (auto *subPattern = IP->getSubPattern()) {
             // Project the cast target's subpattern.
-            Space castSubSpace = projectPattern(TC, subPattern,
-                                                sawDowngradablePattern);
+            Space castSubSpace = projectPattern(TC, subPattern);
             // If we recieved a type space from a named pattern or a wildcard
             // we have to re-project with the cast's target type to maintain
             // consistency with the scrutinee's type.
@@ -1548,45 +1505,35 @@ namespace {
         return Space();
       case PatternKind::Var: {
         auto *VP = cast<VarPattern>(item);
-        return projectPattern(TC, VP->getSubPattern(), sawDowngradablePattern);
+        return projectPattern(TC, VP->getSubPattern());
       }
       case PatternKind::Paren: {
         auto *PP = cast<ParenPattern>(item);
-        return projectPattern(TC, PP->getSubPattern(), sawDowngradablePattern);
+        return projectPattern(TC, PP->getSubPattern());
       }
       case PatternKind::OptionalSome: {
         auto *OSP = cast<OptionalSomePattern>(item);
         Identifier name = TC.Context.getOptionalSomeDecl()->getName();
 
-        auto subSpace = projectPattern(TC, OSP->getSubPattern(),
-                                       sawDowngradablePattern);
+        auto subSpace = projectPattern(TC, OSP->getSubPattern());
         // To match patterns like (_, _, ...)?, we must rewrite the underlying
         // tuple pattern to .some(_, _, ...) first.
         if (subSpace.getKind() == SpaceKind::Constructor
             && subSpace.getHead().empty()) {
           return Space::forConstructor(item->getType(), name,
-                                       /*canDowngrade*/false,
                                        std::move(subSpace.getSpaces()));
         }
-        return Space::forConstructor(item->getType(), name,
-                                     /*canDowngrade*/false, subSpace);
+        return Space::forConstructor(item->getType(), name, subSpace);
       }
       case PatternKind::EnumElement: {
         auto *VP = cast<EnumElementPattern>(item);
         TC.validateDecl(item->getType()->getEnumOrBoundGenericEnum());
         
-        if (auto *eed = VP->getElementDecl()) {
-          if (Space::isSwift3DowngradeExhaustivityCase(TC, eed)) {
-            sawDowngradablePattern |= true;
-          }
-        }
-        
         auto *SP = VP->getSubPattern();
         if (!SP) {
           // If there's no sub-pattern then there's no further recursive
           // structure here.  Yield the constructor space.
-          return Space::forConstructor(item->getType(), VP->getName(),
-                                       /*canDowngrade*/false, None);
+          return Space::forConstructor(item->getType(), VP->getName(), None);
         }
 
         SmallVector<Space, 4> conArgSpace;
@@ -1596,11 +1543,10 @@ namespace {
           std::transform(TP->getElements().begin(), TP->getElements().end(),
                          std::back_inserter(conArgSpace),
                          [&](TuplePatternElt pate) {
-                           return projectPattern(TC, pate.getPattern(),
-                                                 sawDowngradablePattern);
+                           return projectPattern(TC, pate.getPattern());
                          });
           return Space::forConstructor(item->getType(), VP->getName(),
-                                       /*canDowngrade*/false, conArgSpace);
+                                       conArgSpace);
         }
         case PatternKind::Paren: {
           auto *PP = dyn_cast<ParenPattern>(SP);
@@ -1619,25 +1565,22 @@ namespace {
                                                      ty.getName()));
               }
             } else {
-              conArgSpace.push_back(projectPattern(TC, SP,
-                                                   sawDowngradablePattern));
+              conArgSpace.push_back(projectPattern(TC, SP));
             }
           } else if (SP->getKind() == PatternKind::Tuple) {
-            Space argTupleSpace = projectPattern(TC, SP,
-                                                 sawDowngradablePattern);
+            Space argTupleSpace = projectPattern(TC, SP);
             assert(argTupleSpace.getKind() == SpaceKind::Constructor);
             conArgSpace.insert(conArgSpace.end(),
                                argTupleSpace.getSpaces().begin(),
                                argTupleSpace.getSpaces().end());
           } else {
-            conArgSpace.push_back(projectPattern(TC, SP,
-                                                 sawDowngradablePattern));
+            conArgSpace.push_back(projectPattern(TC, SP));
           }
           return Space::forConstructor(item->getType(), VP->getName(),
-                                       /*canDowngrade*/false, conArgSpace);
+                                       conArgSpace);
         }
         default:
-          return projectPattern(TC, SP, sawDowngradablePattern);
+          return projectPattern(TC, SP);
         }
       }
       case PatternKind::Tuple: {
@@ -1646,10 +1589,10 @@ namespace {
         std::transform(TP->getElements().begin(), TP->getElements().end(),
                        std::back_inserter(conArgSpace),
                        [&](TuplePatternElt pate) {
-          return projectPattern(TC, pate.getPattern(), sawDowngradablePattern);
+          return projectPattern(TC, pate.getPattern());
         });
         return Space::forConstructor(item->getType(), Identifier(),
-                                     /*canDowngrade*/false, conArgSpace);
+                                     conArgSpace);
       }
       }
     }

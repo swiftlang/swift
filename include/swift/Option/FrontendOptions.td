@@ -74,6 +74,20 @@ def tbd_install_name
 def tbd_install_name_EQ : Joined<["-"], "tbd-install_name=">,
   Alias<tbd_install_name>;
 
+def tbd_current_version
+  : Separate<["-"], "tbd-current-version">, MetaVarName<"<version>">,
+  HelpText<"The current_version to use in an emitted TBD file">;
+
+def tbd_current_version_EQ : Joined<["-"], "tbd-current-version=">,
+  Alias<tbd_current_version>;
+
+def tbd_compatibility_version
+  : Separate<["-"], "tbd-compatibility-version">, MetaVarName<"<version>">,
+  HelpText<"The compatibility_version to use in an emitted TBD file">;
+
+def tbd_compatibility_version_EQ : Joined<["-"], "tbd-compatibility-version=">,
+  Alias<tbd_compatibility_version>;
+
 def verify : Flag<["-"], "verify">,
   HelpText<"Verify diagnostics against expected-{error|warning|note} "
            "annotations">;

@@ -2881,16 +2881,6 @@ The second operand may have either object or address type.  In the
 latter case, the dependency is on the current value stored in the
 address.
 
-strong_pin
-``````````
-
-TODO: Fill me in!
-
-strong_unpin
-````````````
-
-TODO: Fill me in!
-
 is_unique
 `````````
 
@@ -2908,22 +2898,6 @@ strong reference count is greater than 1.
 
 A discussion of the semantics can be found here:
 :ref:`arcopts.is_unique`.
-
-is_unique_or_pinned
-```````````````````
-
-::
-
-  sil-instruction ::= 'is_unique_or_pinned' sil-operand
-
-  %1 = is_unique_or_pinned %0 : $*T
-  // $T must be a reference-counted type
-  // %1 will be of type Builtin.Int1
-
-Checks whether %0 is the address of either a unique reference to a
-memory object or a reference to a pinned object. Returns 1 if the
-strong reference count is 1 or the object has been marked pinned by
-strong_pin.
 
 is_escaping_closure
 ```````````````````
@@ -4714,7 +4688,9 @@ convert_function
 ````````````````
 ::
 
-  sil-instruction ::= 'convert_function' sil-operand 'to' sil-type
+  sil-instruction ::= 'convert_function' sil-operand 'to'
+                      ('[' 'without_actually_escaping' ']')?
+                      sil-type
 
   %1 = convert_function %0 : $T -> U to $T' -> U'
   // %0 must be of a function type $T -> U ABI-compatible with $T' -> U'
@@ -4743,6 +4719,18 @@ escaping function types with context) -- however, thin function types with and
 without ``@noescape`` are ABI compatible because they have no context. To
 convert from an escaping to a ``@noescape`` thick function type use
 ``convert_escape_to_noescape``.
+
+With the ``without_actually_escaping`` attribute, the
+``convert_function`` may be used to convert a non-escaping closure
+into an escaping function type. This attribute must be present
+whenever the closure operand has an unboxed capture (via
+@inout_aliasable) *and* the resulting function type is escaping. (This
+only happens as a result of withoutActuallyEscaping()). If the
+attribute is present then the resulting function type must be
+escaping, but the operand's function type may or may not be
+@noescape. Note that a non-escaping closure may have unboxed captured
+even though its SIL function type is "escaping".
+
 
 convert_escape_to_noescape
 ```````````````````````````

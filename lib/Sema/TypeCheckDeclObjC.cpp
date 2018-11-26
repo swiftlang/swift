@@ -49,6 +49,7 @@ bool swift::shouldDiagnoseObjCReason(ObjCReason reason, ASTContext &ctx) {
 
   case ObjCReason::MemberOfObjCSubclass:
   case ObjCReason::MemberOfObjCMembersClass:
+  case ObjCReason::ElementOfObjCEnum:
   case ObjCReason::Accessor:
     return false;
   }
@@ -73,6 +74,7 @@ unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
 
   case ObjCReason::MemberOfObjCSubclass:
   case ObjCReason::MemberOfObjCMembersClass:
+  case ObjCReason::ElementOfObjCEnum:
   case ObjCReason::Accessor:
     llvm_unreachable("should not diagnose this @objc reason");
   }
@@ -363,7 +365,7 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
 }
 
 /// Check whether the given declaration occurs within a constrained
-/// extension, or an extension of a class with generic ancestry, or an
+/// extension, or an extension of a generic class, or an
 /// extension of an Objective-C runtime visible class, and
 /// therefore is not representable in Objective-C.
 static bool checkObjCInExtensionContext(const ValueDecl *value,
@@ -378,15 +380,12 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
       return true;
     }
 
-    // Check if any Swift classes in the inheritance hierarchy have generic
-    // parameters.
-    // FIXME: This is a current limitation, not inherent. We don't have
-    // a concrete class to attach Objective-C category metadata to.
-    if (auto classDecl = ED->getAsClassOrClassExtensionContext()) {
-      if (auto generic = classDecl->getGenericAncestor()) {
-        if (!generic->usesObjCGenericsModel()) {
+    if (auto classDecl = ED->getSelfClassDecl()) {
+      if (classDecl->isGenericContext()) {
+        if (!classDecl->usesObjCGenericsModel()) {
           if (diagnose) {
-            value->diagnose(diag::objc_in_generic_extension);
+            value->diagnose(diag::objc_in_generic_extension,
+                            classDecl->isGeneric());
           }
           return true;
         }
@@ -476,10 +475,6 @@ bool swift::isRepresentableInObjC(
     case AccessorKind::Get:
     case AccessorKind::Set:
       return true;
-
-    case AccessorKind::MaterializeForSet:
-      // materializeForSet is synthesized, so never complain about it
-      return false;
 
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
@@ -977,14 +972,13 @@ static bool isMemberOfObjCClassExtension(const ValueDecl *VD) {
   auto ext = dyn_cast<ExtensionDecl>(VD->getDeclContext());
   if (!ext) return false;
 
-  return ext->getAsClassOrClassExtensionContext() &&
-    ext->getAttrs().hasAttribute<ObjCAttr>();
+  return ext->getSelfClassDecl() && ext->getAttrs().hasAttribute<ObjCAttr>();
 }
 
 /// Whether this declaration is a member of a class with the `@objcMembers`
 /// attribute.
 static bool isMemberOfObjCMembersClass(const ValueDecl *VD) {
-  auto classDecl = VD->getDeclContext()->getAsClassOrClassExtensionContext();
+  auto classDecl = VD->getDeclContext()->getSelfClassDecl();
   if (!classDecl) return false;
 
   return classDecl->getAttrs().hasAttribute<ObjCMembersAttr>();
@@ -1043,7 +1037,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   }
 
   // Destructors are always @objc, with -dealloc as their entry point.
-  if (auto deinit = dyn_cast<DestructorDecl>(VD))
+  if (isa<DestructorDecl>(VD))
     return ObjCReason(ObjCReason::ImplicitlyObjC);
 
   ProtocolDecl *protocolContext =
@@ -1113,7 +1107,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   if (VD->getOverriddenDecl() && VD->getOverriddenDecl()->isObjC())
     return ObjCReason(ObjCReason::OverridesObjC);
   // A witness to an @objc protocol requirement is implicitly @objc.
-  if (VD->getDeclContext()->getAsClassOrClassExtensionContext()) {
+  if (VD->getDeclContext()->getSelfClassDecl()) {
     auto requirements =
       findWitnessedObjCRequirements(VD, /*anySingleRequirement=*/true);
     if (!requirements.empty())
@@ -1165,8 +1159,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   // If this declaration is part of a class with implicitly @objc members,
   // make it implicitly @objc. However, if the declaration cannot be represented
   // as @objc, don't diagnose.
-  if (auto classDecl = VD->getDeclContext()
-          ->getAsClassOrClassExtensionContext()) {
+  if (auto classDecl = VD->getDeclContext()->getSelfClassDecl()) {
     // One cannot define @objc members of any foreign classes.
     if (classDecl->isForeign())
       return None;
@@ -1259,10 +1252,11 @@ static void markAsObjC(ValueDecl *D, ObjCReason reason,
                        Optional<ForeignErrorConvention> errorConvention);
 
 
-bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
+llvm::Expected<bool>
+IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   auto dc = VD->getDeclContext();
   Optional<ObjCReason> isObjC;
-  if (dc->getAsClassOrClassExtensionContext() && !isa<TypeDecl>(VD)) {
+  if (dc->getSelfClassDecl() && !isa<TypeDecl>(VD)) {
     // Members of classes can be @objc.
     isObjC = shouldMarkAsObjC(VD, isa<ConstructorDecl>(VD));
   }
@@ -1277,6 +1271,14 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     // as an arithmetic type in C.
     if (isEnumObjC(enumDecl))
       isObjC = ObjCReason(ObjCReason::ExplicitlyObjC);
+  } else if (auto enumElement = dyn_cast<EnumElementDecl>(VD)) {
+    // Enum elements can be @objc so long as the containing enum is @objc.
+    if (enumElement->getParentEnum()->isObjC()) {
+      if (enumElement->getAttrs().hasAttribute<ObjCAttr>())
+        isObjC = ObjCReason::ExplicitlyObjC;
+      else
+        isObjC = ObjCReason::ElementOfObjCEnum;
+    }
   } else if (auto proto = dyn_cast<ProtocolDecl>(VD)) {
     if (proto->getAttrs().hasAttribute<ObjCAttr>()) {
       isObjC = ObjCReason(ObjCReason::ExplicitlyObjC);
@@ -1521,18 +1523,17 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
     attr->setInvalid();
   }
 
-  if (!D->hasInterfaceType()) {
+  if (!isa<TypeDecl>(D) && !D->hasInterfaceType()) {
     ctx.getLazyResolver()->resolveDeclSignature(D);
   }
 
-  if (!isa<AccessorDecl>(D)) {
+  if (!isa<TypeDecl>(D) && !isa<AccessorDecl>(D) && !isa<EnumElementDecl>(D)) {
     useObjectiveCBridgeableConformances(D->getInnermostDeclContext(),
                                         D->getInterfaceType());
   }
 
   // Record the name of this Objective-C method in its class.
-  if (auto classDecl
-        = D->getDeclContext()->getAsClassOrClassExtensionContext()) {
+  if (auto classDecl = D->getDeclContext()->getSelfClassDecl()) {
     if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
       // Determine the foreign error convention.
       if (auto baseMethod = method->getOverriddenDecl()) {

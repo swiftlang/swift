@@ -192,6 +192,7 @@ bool swift::performDumpTypeInfo(IRGenOptions &Opts,
                                 llvm::LLVMContext &LLVMContext) {
   auto &Ctx = SILMod.getASTContext();
   assert(!Ctx.hadError());
+  (void)Ctx;
 
   IRGenerator IRGen(Opts, SILMod);
   IRGenModule IGM(IRGen, IRGen.createTargetMachine(), LLVMContext);

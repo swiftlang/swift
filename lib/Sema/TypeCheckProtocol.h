@@ -33,6 +33,7 @@ class AccessScope;
 class AssociatedTypeDecl;
 class AvailabilityContext;
 class DeclContext;
+class FuncDecl;
 class NormalProtocolConformance;
 class ProtocolDecl;
 class TypeChecker;
@@ -333,14 +334,14 @@ public:
 /// \brief Describes a match between a requirement and a witness.
 struct RequirementMatch {
   RequirementMatch(ValueDecl *witness, MatchKind kind,
-                   Optional<RequirementEnvironment> &&env = None)
+                   Optional<RequirementEnvironment> env = None)
     : Witness(witness), Kind(kind), WitnessType(), ReqEnv(std::move(env)) {
     assert(!hasWitnessType() && "Should have witness type");
   }
 
   RequirementMatch(ValueDecl *witness, MatchKind kind,
                    Type witnessType,
-                   Optional<RequirementEnvironment> &&env = None,
+                   Optional<RequirementEnvironment> env = None,
                    ArrayRef<OptionalAdjustment> optionalAdjustments = {})
     : Witness(witness), Kind(kind), WitnessType(witnessType),
       ReqEnv(std::move(env)),
@@ -430,6 +431,12 @@ struct RequirementMatch {
 struct RequirementCheck;
 
 class WitnessChecker {
+public:
+  using RequirementEnvironmentCacheKey =
+      std::pair<const GenericSignature *, const ClassDecl *>;
+  using RequirementEnvironmentCache =
+      llvm::DenseMap<RequirementEnvironmentCacheKey, RequirementEnvironment>;
+
 protected:
   TypeChecker &TC;
   ProtocolDecl *Proto;
@@ -441,8 +448,12 @@ protected:
   // @_implements(Protocol, DeclName)
   llvm::DenseMap<DeclName, llvm::TinyPtrVector<ValueDecl *>> ImplementsTable;
 
+  RequirementEnvironmentCache ReqEnvironmentCache;
+
   WitnessChecker(TypeChecker &tc, ProtocolDecl *proto,
                  Type adoptee, DeclContext *dc);
+
+  bool isMemberOperator(FuncDecl *decl, Type type);
 
   /// Gather the value witnesses for the given requirement.
   ///
@@ -839,12 +850,11 @@ RequirementMatch matchWitness(
                      RequirementMatch(bool, ArrayRef<OptionalAdjustment>)
                    > finalize);
 
-RequirementMatch matchWitness(TypeChecker &tc,
-                              ProtocolDecl *proto,
-                              ProtocolConformance *conformance,
-                              DeclContext *dc,
-                              ValueDecl *req,
-                              ValueDecl *witness);
+RequirementMatch
+  matchWitness(TypeChecker &tc,
+               WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
+               ProtocolDecl *proto, ProtocolConformance *conformance,
+               DeclContext *dc, ValueDecl *req, ValueDecl *witness);
 
 /// If the given type is a direct reference to an associated type of
 /// the given protocol, return the referenced associated type.

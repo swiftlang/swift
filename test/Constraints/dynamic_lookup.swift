@@ -291,9 +291,9 @@ let _: String = o[s]!
 let _: String? = o[s]
 // FIXME: These should all produce lvalues that we can write through
 o.s = s // expected-error {{cannot assign to immutable expression of type 'String?'}}
-o.s! = s // expected-error {{cannot assign to immutable expression of type 'String'}}
+o.s! = s // expected-error {{cannot assign through '!': 'o' is immutable}}
 o[s] = s // expected-error {{cannot assign to immutable expression of type 'String?'}}
-o[s]! = s // expected-error {{cannot assign to immutable expression of type 'String'}}
+o[s]! = s // expected-error {{cannot assign through '!': 'o' is immutable}}
 
 let _: String = o.t
 let _: String = o.t!
@@ -310,8 +310,8 @@ let _: DynamicIUO = o[dyn_iuo]!!
 let _: DynamicIUO? = o[dyn_iuo]
 // FIXME: These should all produce lvalues that we can write through
 o[dyn_iuo] = dyn_iuo // expected-error {{cannot assign to immutable expression of type 'DynamicIUO??'}}
-o[dyn_iuo]! = dyn_iuo // expected-error {{cannot assign to immutable expression of type 'DynamicIUO?'}}
-o[dyn_iuo]!! = dyn_iuo // expected-error {{cannot assign to immutable expression of type 'DynamicIUO'}}
+o[dyn_iuo]! = dyn_iuo // expected-error {{cannot assign through '!': 'o' is immutable}}
+o[dyn_iuo]!! = dyn_iuo // expected-error {{cannot assign through '!': 'o' is immutable}}
 
 
 // Check that we avoid picking an unavailable overload if there's an
@@ -340,3 +340,19 @@ func dynamicInitCrash(ao: AnyObject.Type) {
   let sdk = ao.init(blahblah: ())
   // expected-error@-1 {{incorrect argument label in call (have 'blahblah:', expected 'toMemory:')}}
 }
+
+// Test that we correctly diagnose ambiguity for different typed properties available
+// through dynamic lookup.
+@objc protocol P3 {
+  var i: UInt { get } // expected-note {{found this candidate}}
+  var j: Int { get }
+}
+
+class C1 {
+  @objc var i: Int { return 0 } // expected-note {{found this candidate}}
+  @objc var j: Int { return 0 }
+}
+
+_ = (C1() as AnyObject).i // expected-error {{ambiguous use of 'i'}}
+_ = (C1() as AnyObject).j // okay
+

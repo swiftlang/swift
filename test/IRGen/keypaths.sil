@@ -45,8 +45,8 @@ sil_vtable C {}
 //               -- instantiable in-line, size 4
 // CHECK-SAME: <i32 0x8000_0004>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
-// -- offset of S.x
-// CHECK-SAME: <i32 0x0100_0000> }>
+// -- offset of S.x, mutable
+// CHECK-SAME: <i32 0x0180_0000> }>
 
 // -- %b: S.y
 // CHECK: [[KP_B:@keypath.*]] = private global <{ {{.*}} }> <{
@@ -56,7 +56,7 @@ sil_vtable C {}
 //               -- instantiable in-line, size 4
 // CHECK-SAME: <i32 0x8000_0004>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
-// -- offset of S.y
+// -- offset of S.y, immutable
 // CHECK-32-SAME: <i32 0x0100_0004> }>
 // CHECK-64-SAME: <i32 0x0100_0008> }>
 
@@ -68,9 +68,9 @@ sil_vtable C {}
 //               -- instantiable in-line, size 4
 // CHECK-SAME: <i32 0x8000_0004>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
-// -- offset of S.z
-// CHECK-32-SAME: <i32 0x0100_0010> }>
-// CHECK-64-SAME: <i32 0x0100_0018> }>
+// -- offset of S.z, mutable
+// CHECK-32-SAME: <i32 0x0180_0010> }>
+// CHECK-64-SAME: <i32 0x0180_0018> }>
 
 // -- %d: C.x
 // CHECK: [[KP_D:@keypath.*]] = private global <{ {{.*}} }> <{
@@ -80,9 +80,9 @@ sil_vtable C {}
 //               -- instantiable in-line, size 4
 // CHECK-SAME: <i32 0x8000_0004>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
-// -- 0x0300_0000 (class) + offset of C.x
-// CHECK-32-SAME: <i32 0x0300_0008> }>
-// CHECK-64-SAME: <i32 0x0300_0010> }>
+// -- 0x0300_0000 (class) + mutable + offset of C.x
+// CHECK-32-SAME: <i32 0x0380_0008> }>
+// CHECK-64-SAME: <i32 0x0380_0010> }>
 
 // -- %e: C.y
 // CHECK: [[KP_E:@keypath.*]] = private global <{ {{.*}} }> <{
@@ -92,7 +92,7 @@ sil_vtable C {}
 //               -- instantiable in-line, size 4
 // CHECK-SAME: <i32 0x8000_0004>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
-// -- 0x0300_0000 (class) + offset of C.y
+// -- 0x0300_0000 (class) + immutable + offset of C.y
 // CHECK-32-SAME: <i32 0x0300_000c> }>
 // CHECK-64-SAME: <i32 0x0300_0018> }>
 
@@ -104,9 +104,9 @@ sil_vtable C {}
 //               -- instantiable in-line, size 4
 // CHECK-SAME: <i32 0x8000_0004>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
-// -- 0x0300_0000 (class) + offset of C.z
-// CHECK-32-SAME: <i32 0x0300_0018> }>
-// CHECK-64-SAME: <i32 0x0300_0028> }>
+// -- 0x0300_0000 (class) + mutable offset of C.z
+// CHECK-32-SAME: <i32 0x0380_0018> }>
+// CHECK-64-SAME: <i32 0x0380_0028> }>
 
 // -- %g: S.z.x
 // CHECK: [[KP_G:@keypath.*]] = private global <{ {{.*}} }> <{
@@ -119,13 +119,13 @@ sil_vtable C {}
 // CHECK-64-SAME: <i32 0x8000_0014>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- offset of S.z
-// CHECK-32-SAME: <i32 0x0100_0010>,
-// CHECK-64-SAME: <i32 0x0100_0018>,
+// CHECK-32-SAME: <i32 0x0180_0010>,
+// CHECK-64-SAME: <i32 0x0180_0018>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // CHECK: %swift.type* (i8*)*
 // -- 0x0300_0000 (class) + offset of C.x
-// CHECK-32-SAME: <i32 0x0300_0008> }>
-// CHECK-64-SAME: <i32 0x0300_0010> }>
+// CHECK-32-SAME: <i32 0x0380_0008> }>
+// CHECK-64-SAME: <i32 0x0380_0010> }>
 
 // -- %h: C.z.x
 // CHECK: [[KP_H:@keypath.*]] = private global <{ {{.*}} }> <{
@@ -138,12 +138,12 @@ sil_vtable C {}
 // CHECK-64-SAME: <i32 0x8000_0014>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // -- 0x0300_0000 (class) + offset of C.z
-// CHECK-32-SAME: <i32 0x0300_0018>,
-// CHECK-64-SAME: <i32 0x0300_0028>,
+// CHECK-32-SAME: <i32 0x0380_0018>,
+// CHECK-64-SAME: <i32 0x0380_0028>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 // CHECK: %swift.type* (i8*)*
 // -- offset of S.x
-// CHECK-SAME: <i32 0x0100_0000> }>
+// CHECK-SAME: <i32 0x0180_0000> }>
 
 // -- %k: computed
 // CHECK: [[KP_K:@keypath.*]] = private global <{ {{.*}} }> <{
@@ -204,7 +204,7 @@ sil_vtable C {}
 //             -- size 8
 // CHECK-SAME: i32 8,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
-//             -- struct with runtime-resolved offset
+//             -- struct with runtime-resolved offset, mutable
 // CHECK-SAME: <i32 0x01fffffe>,
 // CHECK-32-SAME: i32 16 }>
 // CHECK-64-SAME: i32 32 }>
@@ -444,6 +444,14 @@ entry(%0 : @trivial $*A, %1 : @trivial $*B, %2 : @trivial $*A, %3 : @trivial $*B
       indices_hash @s_hash : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer) -> Int,
       external #G.subscript<Y, X>
   ) <B, A> (%1)
+
+  return undef : $()
+}
+
+sil @identity : $@convention(thin) <T> () -> () {
+entry:
+  %v = keypath $WritableKeyPath<T, T>, <A> (root $A; objc "self") <T>
+  %w = keypath $WritableKeyPath<Int, Int>, (root $Int; objc "self")
 
   return undef : $()
 }

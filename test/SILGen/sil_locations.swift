@@ -231,9 +231,8 @@ func tuple_element(_ x: (Int, Float)) {
   // CHECK-LABEL: sil hidden @$S13sil_locations13tuple_element{{[_0-9a-zA-Z]*}}F
 
   // CHECK: apply {{.*}} line:[[@LINE-3]]:7
-  // CHECK: tuple_extract{{.*}}, 0, {{.*}}line:[[@LINE-4]]:7
-  // CHECK: tuple_extract{{.*}}, 1, {{.*}}line:[[@LINE-5]]:7
-  // CHECK: apply {{.*}} line:[[@LINE-6]]:3
+  // CHECK: destructure_tuple {{.*}}line:[[@LINE-4]]:7
+  // CHECK: apply {{.*}} line:[[@LINE-5]]:3
      
 }
 
