@@ -206,7 +206,7 @@ public class NSKeyValueObservation : NSObject {
         
         @objc private func _swizzle_me_observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSString : Any]?, context: UnsafeMutableRawPointer?) {
             guard let object = object as? NSObject, object === self.object, let change = change else { return }
-            let rawKind:UInt = change[NSKeyValueChangeKey.kindKey.rawValue as NSString] as! UInt
+            let rawKind = change[NSKeyValueChangeKey.kindKey.rawValue as NSString] as! UInt
             let kind = NSKeyValueChange(rawValue: rawKind)!
             let notification = NSKeyValueObservedChange(kind: kind,
                                                         newValue: change[NSKeyValueChangeKey.newKey.rawValue as NSString],
@@ -234,21 +234,51 @@ public class NSKeyValueObservation : NSObject {
 }
 
 extension _KeyValueCodingAndObserving {
+
+    private func observation<Value>(for keyPath: AnyKeyPath,
+                                    options: NSKeyValueObservingOptions,
+                                    changeHandler: @escaping (Self, NSKeyValueObservedChange<Value>) -> Void,
+                                    valueConverter: @escaping (Any?) -> Value?) -> NSKeyValueObservation {
+        return NSKeyValueObservation(object: self as! NSObject, keyPath: keyPath, options: options) { (obj, change) in
+            let notification = NSKeyValueObservedChange(kind: change.kind,
+                                                        newValue: valueConverter(change.newValue),
+                                                        oldValue: valueConverter(change.oldValue),
+                                                        indexes: change.indexes,
+                                                        isPrior: change.isPrior)
+            changeHandler(obj as! Self, notification)
+        }
+    }
     
     ///when the returned NSKeyValueObservation is deinited or invalidated, it will stop observing
     public func observe<Value>(
             _ keyPath: KeyPath<Self, Value>,
             options: NSKeyValueObservingOptions = [],
-            changeHandler: @escaping (Self, NSKeyValueObservedChange<Value>) -> Void)
-        -> NSKeyValueObservation {
-        return NSKeyValueObservation(object: self as! NSObject, keyPath: keyPath, options: options) { (obj, change) in
-            let notification = NSKeyValueObservedChange(kind: change.kind,
-                                                        newValue: change.newValue as? Value,
-                                                        oldValue: change.oldValue as? Value,
-                                                        indexes: change.indexes,
-                                                        isPrior: change.isPrior)
-            changeHandler(obj as! Self, notification)
-        }
+            changeHandler: @escaping (Self, NSKeyValueObservedChange<Value>) -> Void) -> NSKeyValueObservation {
+        return observation(for: keyPath, options: options, changeHandler: changeHandler, valueConverter: { $0 as? Value })
+    }
+
+    ///when the returned NSKeyValueObservation is deinited or invalidated, it will stop observing
+    public func observe<Value>(
+            _ keyPath: KeyPath<Self, Value>,
+            options: NSKeyValueObservingOptions = [],
+            changeHandler: @escaping (Self, NSKeyValueObservedChange<Value>) -> Void) -> NSKeyValueObservation
+            where Value: RawRepresentable
+    {
+        return observation(for: keyPath, options: options, changeHandler: changeHandler, valueConverter: {
+            ($0 as? Value.RawValue).flatMap(Value.init)
+        })
+    }
+
+    ///when the returned NSKeyValueObservation is deinited or invalidated, it will stop observing
+    public func observe<Value>(
+            _ keyPath: KeyPath<Self, Value?>,
+            options: NSKeyValueObservingOptions = [],
+            changeHandler: @escaping (Self, NSKeyValueObservedChange<Value>) -> Void) -> NSKeyValueObservation
+            where Value: RawRepresentable
+    {
+        return observation(for: keyPath, options: options, changeHandler: changeHandler, valueConverter: {
+            ($0 as? Value.RawValue).flatMap(Value.init)
+        })
     }
     
     public func willChangeValue<Value>(for keyPath: __owned KeyPath<Self, Value>) {

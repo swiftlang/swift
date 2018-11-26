@@ -22,6 +22,16 @@ struct Guts {
     }
 }
 
+@objc enum TargetState: Int {
+    case whatTarget = 1
+    case why = 19
+    case deadInside = -42
+}
+
+@objc class OptionalStateHolder : NSObject {
+    @objc dynamic var objcState: TargetState = .whatTarget
+}
+
 class Target : NSObject, NSKeyValueObservingCustomization {
     // This dynamic property is observed by KVO
     @objc dynamic var objcValue: String
@@ -34,6 +44,9 @@ class Target : NSObject, NSKeyValueObservingCustomization {
         }
     }
     @objc dynamic var objcValue3: String
+
+    @objc dynamic var objcState: TargetState
+    @objc dynamic var optionalStateHolder: OptionalStateHolder?
     
     // This Swift-typed property causes vtable usage on this class.
     var swiftValue: Guts
@@ -43,6 +56,8 @@ class Target : NSObject, NSKeyValueObservingCustomization {
         self.objcValue = ""
         self.objcValue2 = ""
         self.objcValue3 = ""
+        self.objcState = .whatTarget
+        self.optionalStateHolder = OptionalStateHolder()
         super.init()
     }
     
@@ -60,28 +75,39 @@ class Target : NSObject, NSKeyValueObservingCustomization {
         }
         return true
     }
-    
-    func print() {
-        Swift.print("swiftValue \(self.swiftValue.value), objcValue \(objcValue)")
-    }
 }
 
 
 class ObserverKVO : NSObject {
     var target: Target?
-    var observation: NSKeyValueObservation? = nil
+    var valueObservation: NSKeyValueObservation? = nil
+    var stateObservation: NSKeyValueObservation? = nil
+    var optionalStateObservation: NSKeyValueObservation? = nil
     
     override init() { target = nil; super.init() }
     
     func observeTarget(_ target: Target) {
         self.target = target
-        observation = target.observe(\.objcValue) { (object, change) in
+        valueObservation = target.observe(\.objcValue) { (object, change) in
             Swift.print("swiftValue \(object.swiftValue.value), objcValue \(object.objcValue)")
+        }
+        stateObservation = target.observe(\.objcState, options: [.old, .new]) { (object, change) in
+            let oldString = change.oldValue.map { String(describing: $0.rawValue) } ?? "nil"
+            let newString = change.newValue.map { String(describing: $0.rawValue) } ?? "nil"
+            Swift.print("state \(object.objcState.rawValue), old \(oldString), new \(newString)")
+        }
+        optionalStateObservation = target.observe(\.optionalStateHolder?.objcState, options: [.old, .new]) { (object, change) in
+            let currentStateString = object.optionalStateHolder.map { String(describing: $0.objcState.rawValue) } ?? "nil"
+            let oldString = change.oldValue.map { String(describing: $0.rawValue) } ?? "nil"
+            let newString = change.newValue.map { String(describing: $0.rawValue) } ?? "nil"
+            Swift.print("optionalState \(currentStateString), old \(oldString), new \(newString)")
         }
     }
     
     func removeTarget() {
-        observation!.invalidate()
+        valueObservation!.invalidate()
+        stateObservation!.invalidate()
+        optionalStateObservation!.invalidate()
     }
 }
 
@@ -99,8 +125,14 @@ t2.objcValue = "four"
 t2.swiftValue = Guts(value: 13)
 t2.objcValue2 = "six" //should fire
 t2.objcValue3 = "nothing" //should not fire
+t2.objcState = .why
+t2.objcState = .deadInside
+t2.optionalStateHolder?.objcState = .why
+t2.optionalStateHolder?.objcState = .deadInside
+t2.optionalStateHolder = nil
 o2.removeTarget()
 t2.objcValue = "five" //make sure that we don't crash or keep posting changes if you deallocate an observation after invalidating it
+t2.objcState = .whatTarget
 print("target removed")
 
 // CHECK: registering observer 2
@@ -111,6 +143,11 @@ print("target removed")
 // The next 2 logs are actually a bug and shouldn't happen
 // CHECK-NEXT: swiftValue 13, objcValue four
 // CHECK-NEXT: swiftValue 13, objcValue four
+// CHECK-NEXT: state 19, old 1, new 19
+// CHECK-NEXT: state -42, old 19, new -42
+// CHECK-NEXT: optionalState 19, old 1, new 19
+// CHECK-NEXT: optionalState -42, old 19, new -42
+// CHECK-NEXT: optionalState nil, old -42, new nil
 // CHECK-NEXT: target removed
 
 //===----------------------------------------------------------------------===//
