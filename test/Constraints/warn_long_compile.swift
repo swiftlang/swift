@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -warn-long-expression-type-checking=1 -warn-long-function-bodies=1 %s
-// REQUIRES: rdar44305428
+
 @_silgen_name("generic_foo")
 func foo<T>(_ x: T) -> T
 
