@@ -2280,6 +2280,15 @@ static bool validateAccessorIsMutating(TypeChecker &TC, FuncDecl *accessor) {
 
 static bool computeIsGetterMutating(TypeChecker &TC,
                                     AbstractStorageDecl *storage) {
+  // 'lazy' overrides the normal accessor-based rules and heavily
+  // restricts what accessors can be used.  The getter is considered
+  // mutating if this is instance storage on a value type.
+  if (storage->getAttrs().hasAttribute<LazyAttr>()) {
+    return storage->getDeclContext()->isTypeContext() &&
+           !storage->getDeclContext()->getSelfClassDecl() &&
+           !storage->isStatic();
+  }
+
   switch (storage->getReadImpl()) {
   case ReadImplKind::Stored:
     return false;
