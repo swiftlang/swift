@@ -453,23 +453,41 @@ static DeclVisibilityKind getLocalDeclVisibilityKind(const ASTScope *scope) {
 }
 
 UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
-                                     LazyResolver *TypeResolver,
-                                     bool IsKnownNonCascading,
-                                     SourceLoc Loc, bool IsTypeLookup,
-                                     bool AllowProtocolMembers,
-                                     bool IgnoreAccessControl) {
+                                     LazyResolver *TypeResolver, SourceLoc Loc,
+                                     Options options)
+  : IndexOfFirstOuterResult(0)
+{
   ModuleDecl &M = *DC->getParentModule();
   ASTContext &Ctx = M.getASTContext();
   const SourceManager &SM = Ctx.SourceMgr;
   DebuggerClient *DebugClient = M.getDebugClient();
 
-  NamedDeclConsumer Consumer(Name, Results, IsTypeLookup);
+  auto isOriginallyTypeLookup = options.contains(Flags::TypeLookup);
+  NamedDeclConsumer Consumer(Name, Results, isOriginallyTypeLookup);
+
+  NLOptions baseNLOptions = NL_UnqualifiedDefault;
+  if (options.contains(Flags::AllowProtocolMembers))
+    baseNLOptions |= NL_ProtocolMembers;
+  if (isOriginallyTypeLookup)
+    baseNLOptions |= NL_OnlyTypes;
+  if (options.contains(Flags::IgnoreAccessControl))
+    baseNLOptions |= NL_IgnoreAccessControl;
 
   Optional<bool> isCascadingUse;
-  if (IsKnownNonCascading)
+  if (options.contains(Flags::KnownPrivate))
     isCascadingUse = false;
 
   SmallVector<LookupResultEntry, 4> UnavailableInnerResults;
+
+  auto shouldReturnBasedOnResults = [&](bool noMoreOuterResults = false) {
+    if (Results.empty())
+      return false;
+
+    if (IndexOfFirstOuterResult == 0)
+      IndexOfFirstOuterResult = Results.size();
+
+    return !options.contains(Flags::IncludeOuterResults) || noMoreOuterResults;
+  };
 
   if (Loc.isValid() &&
       DC->getParentSourceFile()->Kind != SourceFileKind::REPL &&
@@ -506,7 +524,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
       }
 
       // If we found anything, we're done.
-      if (!Results.empty())
+      if (shouldReturnBasedOnResults())
         return;
 
       // When we are in the body of a method, get the 'self' declaration.
@@ -575,22 +593,17 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         if (lookupType->hasError()) continue;
 
+        NLOptions options = baseNLOptions;
         // Perform lookup into the type.
-        NLOptions options = NL_UnqualifiedDefault;
         if (isCascadingUse.getValue())
           options |= NL_KnownCascadingDependency;
         else
           options |= NL_KnownNonCascadingDependency;
 
-        if (AllowProtocolMembers)
-          options |= NL_ProtocolMembers;
-        if (IsTypeLookup)
-          options |= NL_OnlyTypes;
-        if (IgnoreAccessControl)
-          options |= NL_IgnoreAccessControl;
-
         SmallVector<ValueDecl *, 4> lookup;
         dc->lookupQualified(lookupType, Name, options, TypeResolver, lookup);
+
+        auto startIndex = Results.size();
         for (auto result : lookup) {
           auto *baseDC = dc;
           if (!isa<TypeDecl>(result) && selfDC) baseDC = selfDC;
@@ -607,15 +620,17 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                 .isUnavailableInSwiftVersion(effectiveVersion);
           };
 
-          // If all of the results we found are unavailable, keep looking.
-          if (std::all_of(Results.begin(), Results.end(),
-                          unavailableLookupResult)) {
-            UnavailableInnerResults.append(Results.begin(), Results.end());
-            Results.clear();
+          // If all of the results we just found are unavailable, keep looking.
+          auto begin = Results.begin() + startIndex;
+          if (std::all_of(begin, Results.end(), unavailableLookupResult)) {
+            UnavailableInnerResults.append(begin, Results.end());
+            Results.erase(begin, Results.end());
           } else {
             if (DebugClient)
               filterForDiscriminator(Results, DebugClient);
-            return;
+
+            if (shouldReturnBasedOnResults())
+              return;
           }
         }
 
@@ -652,7 +667,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           if (auto *selfParam = PBI->getImplicitSelfDecl()) {
             Consumer.foundDecl(selfParam,
                                DeclVisibilityKind::FunctionParameter);
-            if (!Results.empty())
+            if (shouldReturnBasedOnResults())
               return;
 
             DC = DC->getParent();
@@ -698,11 +713,11 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
             namelookup::FindLocalVal localVal(SM, Loc, Consumer);
             localVal.visit(AFD->getBody());
-            if (!Results.empty())
+            if (shouldReturnBasedOnResults())
               return;
             for (auto *PL : AFD->getParameterLists())
               localVal.checkParameterList(PL);
-            if (!Results.empty())
+            if (shouldReturnBasedOnResults())
               return;
           }
           if (!isCascadingUse.hasValue() || isCascadingUse.getValue())
@@ -741,10 +756,10 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
               namelookup::FindLocalVal localVal(SM, Loc, Consumer);
               localVal.visit(CE->getBody());
-              if (!Results.empty())
+              if (shouldReturnBasedOnResults())
                 return;
               localVal.checkParameterList(CE->getParameters());
-              if (!Results.empty())
+              if (shouldReturnBasedOnResults())
                 return;
             }
           }
@@ -781,27 +796,21 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           namelookup::FindLocalVal localVal(SM, Loc, Consumer);
           localVal.checkGenericParams(GenericParams);
 
-          if (!Results.empty())
+          if (shouldReturnBasedOnResults())
             return;
         }
 
         if (BaseDC && !ExtendedType->hasError()) {
-          NLOptions options = NL_UnqualifiedDefault;
+          NLOptions options = baseNLOptions;
           if (isCascadingUse.getValue())
             options |= NL_KnownCascadingDependency;
           else
             options |= NL_KnownNonCascadingDependency;
 
-          if (AllowProtocolMembers)
-            options |= NL_ProtocolMembers;
-          if (IsTypeLookup)
-            options |= NL_OnlyTypes;
-          if (IgnoreAccessControl)
-            options |= NL_IgnoreAccessControl;
-
           SmallVector<ValueDecl *, 4> Lookup;
           DC->lookupQualified(ExtendedType, Name, options, TypeResolver, Lookup);
           bool FoundAny = false;
+          auto startIndex = Results.size();
           for (auto Result : Lookup) {
             // In Swift 3 mode, unqualified lookup skips static methods when
             // performing lookup from instance context.
@@ -846,15 +855,16 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             };
 
             // If all of the results we found are unavailable, keep looking.
-            if (std::all_of(Results.begin(), Results.end(),
-                            unavailableLookupResult)) {
-              UnavailableInnerResults.append(Results.begin(), Results.end());
-              Results.clear();
-              FoundAny = false;
+            auto begin = Results.begin() + startIndex;
+            if (std::all_of(begin, Results.end(), unavailableLookupResult)) {
+              UnavailableInnerResults.append(begin, Results.end());
+              Results.erase(begin, Results.end());
             } else {
               if (DebugClient)
                 filterForDiscriminator(Results, DebugClient);
-              return;
+
+              if (shouldReturnBasedOnResults())
+                return;
             }
           }
         }
@@ -873,7 +883,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           namelookup::FindLocalVal localVal(SM, Loc, Consumer);
           localVal.checkGenericParams(dcGenericParams);
 
-          if (!Results.empty())
+          if (shouldReturnBasedOnResults())
             return;
 
           if (!isa<ExtensionDecl>(DC))
@@ -896,16 +906,16 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         // local types.
         namelookup::FindLocalVal localVal(SM, Loc, Consumer);
         localVal.checkSourceFile(*SF);
-        if (!Results.empty())
+        if (shouldReturnBasedOnResults())
           return;
       }
     }
   }
 
   // TODO: Does the debugger client care about compound names?
-  if (Name.isSimpleName()
-      && DebugClient && DebugClient->lookupOverrides(Name.getBaseName(), DC,
-                                                   Loc, IsTypeLookup, Results))
+  if (Name.isSimpleName() && DebugClient &&
+      DebugClient->lookupOverrides(Name.getBaseName(), DC, Loc,
+                                   isOriginallyTypeLookup, Results))
     return;
 
   recordLookupOfTopLevelName(DC, Name, isCascadingUse.getValue());
@@ -917,8 +927,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
   using namespace namelookup;
   SmallVector<ValueDecl *, 8> CurModuleResults;
-  auto resolutionKind =
-    IsTypeLookup ? ResolutionKind::TypesOnly : ResolutionKind::Overloadable;
+  auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
+                                               : ResolutionKind::Overloadable;
   lookupInModule(&M, {}, Name, CurModuleResults, NLKind::UnqualifiedLookup,
                  resolutionKind, TypeResolver, DC, extraImports);
 
@@ -930,20 +940,19 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
   // Now add any names the DebugClient knows about to the lookup.
   if (Name.isSimpleName() && DebugClient)
-      DebugClient->lookupAdditions(Name.getBaseName(), DC, Loc, IsTypeLookup,
-                                   Results);
+    DebugClient->lookupAdditions(Name.getBaseName(), DC, Loc,
+                                 isOriginallyTypeLookup, Results);
 
   // If we've found something, we're done.
-  if (!Results.empty())
+  if (shouldReturnBasedOnResults(/*noMoreOuterResults=*/true))
     return;
 
   // If we still haven't found anything, but we do have some
   // declarations that are "unavailable in the current Swift", drop
   // those in.
-  if (!UnavailableInnerResults.empty()) {
-    Results = std::move(UnavailableInnerResults);
+  Results = std::move(UnavailableInnerResults);
+  if (shouldReturnBasedOnResults(/*noMoreOuterResults=*/true))
     return;
-  }
 
   if (!Name.isSimpleName())
     return;
@@ -951,7 +960,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   // Look for a module with the given name.
   if (Name.isSimpleName(M.getName())) {
     Results.push_back(LookupResultEntry(&M));
-    return;
+    if (shouldReturnBasedOnResults(/*noMoreOuterResults=*/true))
+      return;
   }
 
   ModuleDecl *desiredModule = Ctx.getLoadedModule(Name.getBaseIdentifier());
@@ -966,6 +976,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
       return true;
     });
   }
+  // Make sure we've recorded the inner-result-boundary.
+  (void)shouldReturnBasedOnResults(/*noMoreOuterResults=*/true);
 }
 
 TypeDecl* UnqualifiedLookup::getSingleTypeResult() {
@@ -1507,12 +1519,36 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method) {
   vec.push_back(method);
 }
 
-static bool checkAccess(const DeclContext *useDC, const DeclContext *sourceDC,
-                        AccessLevel access) {
+AccessLevel
+ValueDecl::adjustAccessLevelForProtocolExtension(AccessLevel access) const {
+  if (auto *ext = dyn_cast<ExtensionDecl>(getDeclContext())) {
+    if (auto *protocol = ext->getAsProtocolOrProtocolExtensionContext()) {
+      // Note: it gets worse. The standard library has public methods
+      // in protocol extensions of a @usableFromInline internal protocol,
+      // and expects these extension methods to witness public protocol
+      // requirements. Which works at the ABI level, so let's keep
+      // supporting that here by passing 'isUsageFromInline'.
+      auto protoAccess = protocol->getFormalAccess(/*useDC=*/nullptr,
+                                                   /*isUsageFromInline=*/true);
+      if (protoAccess == AccessLevel::Private)
+        protoAccess = AccessLevel::FilePrivate;
+      access = std::min(access, protoAccess);
+    }
+  }
+
+  return access;
+}
+
+static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
+                        AccessLevel access, bool forConformance) {
   if (!useDC)
     return access >= AccessLevel::Public;
 
-  assert(sourceDC && "ValueDecl being accessed must have a valid DeclContext");
+  auto *sourceDC = VD->getDeclContext();
+
+  if (!forConformance)
+    access = VD->adjustAccessLevelForProtocolExtension(access);
+
   switch (access) {
   case AccessLevel::Private:
     return (useDC == sourceDC ||
@@ -1536,11 +1572,14 @@ static bool checkAccess(const DeclContext *useDC, const DeclContext *sourceDC,
   llvm_unreachable("bad access level");
 }
 
-bool ValueDecl::isAccessibleFrom(const DeclContext *DC) const {
-  return checkAccess(DC, getDeclContext(), getFormalAccess());
+bool ValueDecl::isAccessibleFrom(const DeclContext *DC,
+                                 bool forConformance) const {
+  auto access = getFormalAccess();
+  return checkAccess(DC, this, access, forConformance);
 }
 
-bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
+bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC,
+                                                 bool forConformance) const {
   assert(isSettable(DC));
 
   // If a stored property does not have a setter, it is still settable from the
@@ -1552,7 +1591,8 @@ bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
   if (isa<ParamDecl>(this))
     return true;
 
-  return checkAccess(DC, getDeclContext(), getSetterFormalAccess());
+  auto access = getSetterFormalAccess();
+  return checkAccess(DC, this, access, forConformance);
 }
 
 Type AbstractStorageDecl::getStorageInterfaceType() const {

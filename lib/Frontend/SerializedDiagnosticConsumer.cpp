@@ -83,8 +83,8 @@ public:
   }
 };
 
-typedef SmallVector<uint64_t, 64> RecordData;
-typedef SmallVectorImpl<uint64_t> RecordDataImpl;
+using RecordData = SmallVector<uint64_t, 64>;
+using RecordDataImpl = SmallVectorImpl<uint64_t>;
 
 struct SharedState : llvm::RefCountedBase<SharedState> {
   SharedState(StringRef serializedDiagnosticsPath)
@@ -113,8 +113,8 @@ struct SharedState : llvm::RefCountedBase<SharedState> {
   /// \brief The collection of files used.
   llvm::DenseMap<const char *, unsigned> Files;
 
-  typedef llvm::DenseMap<const void *, std::pair<unsigned, StringRef> >
-  DiagFlagsTy;
+  using DiagFlagsTy =
+      llvm::DenseMap<const void *, std::pair<unsigned, StringRef>>;
 
   /// \brief Map for uniquing strings.
   DiagFlagsTy DiagFlags;
@@ -560,4 +560,3 @@ void SerializedDiagnosticConsumer::handleDiagnostic(
   if (bracketDiagnostic)
     exitDiagBlock();
 }
-

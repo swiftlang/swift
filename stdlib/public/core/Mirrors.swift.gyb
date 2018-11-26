@@ -39,7 +39,7 @@ for self_ty in all_integer_types(word_bits):
 
 extension ${Type[0]} : CustomReflectable {
   /// A mirror that reflects the `${Type[0]}` instance.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(self, unlabeledChildren: EmptyCollection<Void>())
   }
@@ -47,7 +47,7 @@ extension ${Type[0]} : CustomReflectable {
 
 extension ${Type[0]} : CustomPlaygroundQuickLookable {
   /// A custom playground Quick Look for the `${Type[0]}` instance.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(*, deprecated, message: "${Type[0]}.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return ${Type[1]}(${Type[2]})

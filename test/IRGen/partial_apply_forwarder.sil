@@ -78,9 +78,9 @@ sil hidden_external @takingQ : $@convention(thin) <τ_0_0 where  τ_0_0 : Q> (@o
 sil hidden_external @takingQAndEmpty : $@convention(thin) <τ_0_0 where  τ_0_0 : Q> (@owned WeakBox<τ_0_0>, EmptyType) -> ()
 sil hidden_external @takingEmptyAndQ : $@convention(thin) <τ_0_0 where  τ_0_0 : Q> (EmptyType, @owned WeakBox<τ_0_0>) -> ()
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @bind_polymorphic_param_from_context(%swift.opaque* noalias nocapture, %swift.type* %"\CF\84_0_1")
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @bind_polymorphic_param_from_context(%swift.opaque* noalias nocapture, %swift.type* %"\CF\84_0_1")
 // CHECK: entry:
-// CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S23partial_apply_forwarder12BaseProducerVMa"([[INT]] 0, %swift.type* %"\CF\84_0_1")
+// CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S23partial_apply_forwarder12BaseProducerVMa"([[INT]] 255, %swift.type* %"\CF\84_0_1")
 // CHECK:   [[BPTYPE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S23partial_apply_forwarder7WeakBoxCMa"([[INT]] 0, %swift.type* [[BPTYPE]])
 // CHECK:   [[WEAKBOXTYPE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
@@ -111,7 +111,7 @@ bb0(%0 : $*τ_0_1):
   return %9 : $@callee_owned () -> ()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @bind_polymorphic_param_from_context_2(%swift.opaque* noalias nocapture, %swift.type* %"\CF\84_0_1")
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @bind_polymorphic_param_from_context_2(%swift.opaque* noalias nocapture, %swift.type* %"\CF\84_0_1")
 // CHECK:   [[OBJ:%.*]] = call {{.*}} @swift_allocObject
 // CHECK:   [[WB:%.*]] = bitcast %swift.refcounted* [[OBJ]]
 // CHECK:   [[REF:%.*]] = bitcast {{.*}}* [[WB]] to %swift.refcounted*
@@ -125,7 +125,7 @@ bb0(%0 : $*τ_0_1, %2: $EmptyType):
   return %9 : $@callee_owned () -> ()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @bind_polymorphic_param_from_context_3(%swift.opaque* noalias nocapture, %swift.type* %"\CF\84_0_1")
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @bind_polymorphic_param_from_context_3(%swift.opaque* noalias nocapture, %swift.type* %"\CF\84_0_1")
 // CHECK:   [[OBJ:%.*]] = call {{.*}} @swift_allocObject
 // CHECK:   [[WB:%.*]] = bitcast %swift.refcounted* [[OBJ]]
 // CHECK:   [[REF:%.*]] = bitcast {{.*}}* [[WB]] to %swift.refcounted*
@@ -140,9 +140,9 @@ bb0(%0 : $*τ_0_1, %2: $EmptyType):
   return %9 : $@callee_owned () -> ()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @bind_polymorphic_param_from_forwarder_parameter(%swift.opaque* noalias nocapture, %swift.type* %"\CF\84_0_1")
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @bind_polymorphic_param_from_forwarder_parameter(%swift.opaque* noalias nocapture, %swift.type* %"\CF\84_0_1")
 // CHECK: entry:
-// CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S23partial_apply_forwarder12BaseProducerVMa"([[INT]] 0, %swift.type* %"\CF\84_0_1")
+// CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S23partial_apply_forwarder12BaseProducerVMa"([[INT]] 255, %swift.type* %"\CF\84_0_1")
 // CHECK:   [[BPTY:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S23partial_apply_forwarder7WeakBoxCMa"([[INT]] 0, %swift.type* [[BPTY]]
 // CHECK:   [[WBTY:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
@@ -176,9 +176,9 @@ struct S {
 
 sil hidden_external @takingQAndS : $@convention(thin) <τ_0_0 where  τ_0_0 : Q> (S, @owned WeakBox<τ_0_0>) -> ()
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @bind_polymorphic_param_from_context_with_layout(%swift.opaque* noalias nocapture, i64, %swift.type* %"\CF\84_0_1")
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @bind_polymorphic_param_from_context_with_layout(%swift.opaque* noalias nocapture, i64, %swift.type* %"\CF\84_0_1")
 // CHECK: entry:
-// CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S23partial_apply_forwarder12BaseProducerVMa"([[INT]] 0, %swift.type* %"\CF\84_0_1")
+// CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S23partial_apply_forwarder12BaseProducerVMa"([[INT]] 255, %swift.type* %"\CF\84_0_1")
 // CHECK:   [[BPTY:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S23partial_apply_forwarder7WeakBoxCMa"([[INT]] 0, %swift.type* [[BPTY]]
 // CHECK:   [[WBTY:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0

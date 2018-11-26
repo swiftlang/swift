@@ -45,6 +45,15 @@ open class SyntaxRewriter {
   ///   - node: the node we are about to visit.
   open func visitPre(_ node: Syntax) {}
 
+  /// Override point to choose custom visitation dispatch instead of the
+  /// specialized `visit(_:)` methods. Use this instead of those methods if
+  /// you intend to dynamically dispatch rewriting behavior.
+  /// - note: If this method returns a non-nil result, the specialized
+  ///         `visit(_:)` methods will not be called for this node.
+  open func visitAny(_ node: Syntax) -> Syntax? {
+    return nil
+  }
+
   /// The function called after visting the node and its descendents.
   ///   - node: the node we just finished visiting.
   open func visitPost(_ node: Syntax) {}
@@ -52,6 +61,12 @@ open class SyntaxRewriter {
   public func visit(_ node: Syntax) -> Syntax {
     visitPre(node)
     defer { visitPost(node) }
+
+    // If the global visitor returned non-nil, skip specialized dispatch.
+    if let newNode = visitAny(node) {
+      return newNode
+    }
+
     switch node.raw.kind {
     case .token: return visit(node as! TokenSyntax)
 % for node in SYNTAX_NODES:

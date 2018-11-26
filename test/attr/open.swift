@@ -49,7 +49,6 @@ open class OpenClassesMustHaveOpenSuperClasses : NonOpenSuperClass {} // expecte
 open class AnOpenClass {
   open func openMethod() {}
   open var openVar: Int = 0
-  open let openLet: Int = 1 // Should this be allowed?
   open typealias MyInt = Int // expected-error {{only classes and overridable class members can be declared 'open'; use 'public'}}
   open subscript(_: MarkerForOpenSubscripts) -> Int {
     return 0

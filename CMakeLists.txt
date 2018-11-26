@@ -311,6 +311,10 @@ option(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS
   "Enable runtime function counters and expose the API."
   FALSE)
 
+option(SWIFT_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING
+  "Build stdlibCore with exclusivity checking enabled"
+  FALSE)
+
 #
 # End of user-configurable options.
 #
@@ -847,8 +851,20 @@ endif()
 #
 # Find required dependencies.
 #
-if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND "${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "")
-  find_package(ICU REQUIRED COMPONENTS uc i18n)
+
+# ICU is provided through CoreFoundation on Darwin.  On other hosts, assume that
+# we are compiling for the build as the host.  In such a case, if the ICU
+# unicode and i18n include and library paths are not defined, perform a standard
+# package lookup.  Otherwise, rely on the paths specified by the user.  These
+# need to be defined when cross-compiling.
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  if("${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "" AND
+     ("${SWIFT_${SWIFT_HOST_VARIANT_SDK_default}_ICU_UC_INCLUDE}" STREQUAL "" OR
+      "${SWIFT_${SWIFT_HOST_VARIANT_SDK_default}_ICU_UC}" STREQUAL "" OR
+      "${SWIFT_${SWIFT_HOST_VARIANT_SDK_default}_ICU_I18N_INCLUDE}" STREQUAL "" OR
+      "${SWIFT_${SWIFT_HOST_VARIANT_SDK_default}_ICU_I18N}" STREQUAL ""))
+    find_package(ICU REQUIRED COMPONENTS uc i18n)
+  endif()
 endif()
 
 find_package(PythonInterp REQUIRED)

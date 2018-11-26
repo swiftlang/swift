@@ -495,10 +495,26 @@ protocol ForceAccessors {
 }
 
 struct DidSetWillSetTests: ForceAccessors {
+  // CHECK-LABEL: sil hidden @$S10properties010DidSetWillC5TestsV{{[_0-9a-zA-Z]*}}fC
+  init(x : Int) {
+    // Accesses to didset/willset variables are direct in init methods and dtors.
+    a = x
+    a = x
+
+    // CHECK: bb0(%0 : $Int, %1 : $@thin DidSetWillSetTests.Type):
+    // CHECK:        [[SELF:%.*]] = mark_uninitialized [rootself]
+    // CHECK:        [[PB_SELF:%.*]] = project_box [[SELF]]
+    // CHECK:        [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB_SELF]]
+    // CHECK:        [[P1:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
+    // CHECK-NEXT:   assign %0 to [[P1]]
+    // CHECK:        [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB_SELF]]
+    // CHECK:        [[P2:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
+    // CHECK-NEXT:   assign %0 to [[P2]]
+  }
+
   var a: Int {
+    // CHECK-LABEL: sil private @$S10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vw
     willSet(newA) {
-      // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.willset
-      // CHECK-NEXT: sil hidden @$S10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vw
       // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
       // CHECK-NEXT: debug_value %0
       // CHECK-NEXT: debug_value_addr %1 : $*DidSetWillSetTests
@@ -517,24 +533,6 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK-NEXT: // function_ref properties.takeInt(Swift.Int) -> ()
       // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @$S10properties7takeInt{{[_0-9a-zA-Z]*}}F
       // CHECK-NEXT: apply [[TAKEINTFN]](%0) : $@convention(thin) (Int) -> ()
-    }
-
-    didSet {
-      // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.didset
-      // CHECK-NEXT: sil hidden @$S10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW
-      // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
-      // CHECK-NEXT: debug
-      // CHECK-NEXT: debug_value_addr %1 : $*DidSetWillSetTests
-
-      takeInt(a)
-
-      // CHECK: [[READ:%.*]] = begin_access [read] [unknown] %1
-      // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[READ]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
-      // CHECK-NEXT: [[A:%.*]] = load [trivial] [[AADDR]] : $*Int
-      // CHECK-NEXT: end_access [[READ]]
-      // CHECK-NEXT: // function_ref properties.takeInt(Swift.Int) -> ()
-      // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @$S10properties7takeInt{{[_0-9a-zA-Z]*}}F
-      // CHECK-NEXT: apply [[TAKEINTFN]]([[A]]) : $@convention(thin) (Int) -> ()
 
       a = zero  // reassign, but don't infinite loop.
 
@@ -549,25 +547,48 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
       // CHECK-NEXT: assign [[ZERO]] to [[AADDR]]
     }
+
+    // CHECK-LABEL: sil private @$S10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW
+    didSet {
+      // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
+      // CHECK-NEXT: debug
+      // CHECK-NEXT: debug_value_addr %1 : $*DidSetWillSetTests
+
+      takeInt(a)
+
+      // CHECK: [[READ:%.*]] = begin_access [read] [unknown] %1
+      // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[READ]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
+      // CHECK-NEXT: [[A:%.*]] = load [trivial] [[AADDR]] : $*Int
+      // CHECK-NEXT: end_access [[READ]]
+      // CHECK-NEXT: // function_ref properties.takeInt(Swift.Int) -> ()
+      // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @$S10properties7takeInt{{[_0-9a-zA-Z]*}}F
+      // CHECK-NEXT: apply [[TAKEINTFN]]([[A]]) : $@convention(thin) (Int) -> ()
+
+      (self).a = zero  // reassign, but don't infinite loop.
+
+      // CHECK-NEXT: // function_ref properties.zero.unsafeMutableAddressor : Swift.Int
+      // CHECK-NEXT: [[ZEROFN:%.*]] = function_ref @$S10properties4zero{{[_0-9a-zA-Z]*}}vau
+      // CHECK-NEXT: [[ZERORAW:%.*]] = apply [[ZEROFN]]() : $@convention(thin) () -> Builtin.RawPointer
+      // CHECK-NEXT: [[ZEROADDR:%.*]] = pointer_to_address [[ZERORAW]] : $Builtin.RawPointer to [strict] $*Int
+      // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [dynamic] [[ZEROADDR]] : $*Int
+      // CHECK-NEXT: [[ZERO:%.*]] = load [trivial] [[READ]]
+      // CHECK-NEXT: end_access [[READ]] : $*Int
+      // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
+      // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
+      // CHECK-NEXT: assign [[ZERO]] to [[AADDR]]
+    }
   }
 
-  init(x : Int) {
-    // Accesses to didset/willset variables are direct in init methods and dtors.
-    a = x
-    a = x
-  }
+  // This is the synthesized getter and setter for the willset/didset variable.
 
-  // These are the synthesized getter and setter for the willset/didset variable.
-
-  // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.getter
-  // CHECK-NEXT: sil hidden [transparent] @$S10properties010DidSetWillC5TestsV1aSivg
+  // CHECK-LABEL: sil hidden [transparent] @$S10properties010DidSetWillC5TestsV1aSivg
   // CHECK: bb0(%0 : $DidSetWillSetTests):
   // CHECK-NEXT:   debug_value %0
   // CHECK-NEXT:   %2 = struct_extract %0 : $DidSetWillSetTests, #DidSetWillSetTests.a
   // CHECK-NEXT:   return %2 : $Int{{.*}}                      // id: %3
 
-  // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.setter
-  // CHECK-NEXT: sil hidden @$S10properties010DidSetWillC5TestsV1aSivs
+
+  // CHECK-LABEL: sil hidden @$S10properties010DidSetWillC5TestsV1aSivs
   // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
   // CHECK-NEXT: debug_value %0
   // CHECK-NEXT: debug_value_addr %1
@@ -591,25 +612,47 @@ struct DidSetWillSetTests: ForceAccessors {
   // CHECK-NEXT: // function_ref {{.*}}.DidSetWillSetTests.a.didset : Swift.Int
   // CHECK-NEXT: [[DIDSETFN:%.*]] = function_ref @$S10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
   // CHECK-NEXT: apply [[DIDSETFN]]([[OLDVAL]], [[WRITE]]) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
-
-  // CHECK-LABEL: sil hidden @$S10properties010DidSetWillC5TestsV{{[_0-9a-zA-Z]*}}fC
-  // CHECK: bb0(%0 : $Int, %1 : $@thin DidSetWillSetTests.Type):
-  // CHECK:        [[SELF:%.*]] = mark_uninitialized [rootself]
-  // CHECK:        [[PB_SELF:%.*]] = project_box [[SELF]]
-  // CHECK:        [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB_SELF]]
-  // CHECK:        [[P1:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
-  // CHECK-NEXT:   assign %0 to [[P1]]
-  // CHECK:        [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB_SELF]]
-  // CHECK:        [[P2:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
-  // CHECK-NEXT:   assign %0 to [[P2]]
 }
 
 
 // Test global observing properties.
 
 var global_observing_property : Int = zero {
+  // The variable is initialized with "zero".
+  // CHECK-LABEL: sil private @globalinit_{{.*}}_func1 : $@convention(c) () -> () {
+  // CHECK: bb0:
+  // CHECK-NEXT: alloc_global @$S10properties25global_observing_propertySiv
+  // CHECK-NEXT: %1 = global_addr @$S10properties25global_observing_propertySivp : $*Int
+  // CHECK: properties.zero.unsafeMutableAddressor
+  // CHECK: return
+
+  // CHECK-LABEL: sil private @$S10properties25global_observing_property{{[_0-9a-zA-Z]*}}vW
   didSet {
+    // The didSet implementation needs to call takeInt.
     takeInt(global_observing_property)
+
+    // CHECK: function_ref properties.takeInt
+    // CHECK-NEXT: function_ref @$S10properties7takeInt{{[_0-9a-zA-Z]*}}F
+
+    // Setting the variable from within its own didSet doesn't recursively call didSet.
+    global_observing_property = zero
+
+    // CHECK: // function_ref properties.global_observing_property.unsafeMutableAddressor : Swift.Int
+    // CHECK-NEXT: [[ADDRESSOR:%.*]] = function_ref @$S10properties25global_observing_propertySivau : $@convention(thin) () -> Builtin.RawPointer
+    // CHECK-NEXT: [[ADDRESS:%.*]] = apply [[ADDRESSOR]]() : $@convention(thin) () -> Builtin.RawPointer
+    // CHECK-NEXT: [[POINTER:%.*]] = pointer_to_address [[ADDRESS]] : $Builtin.RawPointer to [strict] $*Int
+    // CHECK-NEXT: // function_ref properties.zero.unsafeMutableAddressor : Swift.Int
+    // CHECK-NEXT: [[ZEROFN:%.*]] = function_ref @$S10properties4zero{{[_0-9a-zA-Z]*}}vau
+    // CHECK-NEXT: [[ZERORAW:%.*]] = apply [[ZEROFN]]() : $@convention(thin) () -> Builtin.RawPointer
+    // CHECK-NEXT: [[ZEROADDR:%.*]] = pointer_to_address [[ZERORAW]] : $Builtin.RawPointer to [strict] $*Int
+    // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [dynamic] [[ZEROADDR]] : $*Int
+    // CHECK-NEXT: [[ZERO:%.*]] = load [trivial] [[READ]]
+    // CHECK-NEXT: end_access [[READ]] : $*Int
+    // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[POINTER]] : $*Int
+    // CHECK-NEXT: assign [[ZERO]] to [[WRITE]] : $*Int
+    // CHECK-NEXT: end_access [[WRITE]] : $*Int
+    // CHECK-NOT: function_ref @$S10properties25global_observing_property{{[_0-9a-zA-Z]*}}vW
+    // CHECK: end sil function
   }
 }
 
@@ -618,21 +661,7 @@ func force_global_observing_property_setter() {
   global_observing_property = x
 }
 
-// The property is initialized with "zero".
-// CHECK-LABEL: sil private @globalinit_{{.*}}_func1 : $@convention(c) () -> () {
-// CHECK: bb0:
-// CHECK-NEXT: alloc_global @$S10properties25global_observing_propertySiv
-// CHECK-NEXT: %1 = global_addr @$S10properties25global_observing_propertySivp : $*Int
-// CHECK: properties.zero.unsafeMutableAddressor
-// CHECK: return
-
-// The didSet implementation needs to call takeInt.
-
-// CHECK-LABEL: sil hidden @$S10properties25global_observing_property{{[_0-9a-zA-Z]*}}vW
-// CHECK: function_ref properties.takeInt
-// CHECK-NEXT: function_ref @$S10properties7takeInt{{[_0-9a-zA-Z]*}}F
-
-// The setter needs to call didSet implementation.
+// global_observing_property's setter needs to call didSet.
 
 // CHECK-LABEL: sil hidden @$S10properties25global_observing_property{{[_0-9a-zA-Z]*}}vs
 // CHECK: function_ref properties.global_observing_property.unsafeMutableAddressor
@@ -643,25 +672,44 @@ func force_global_observing_property_setter() {
 
 // Test local observing properties.
 
+// CHECK-LABEL: sil hidden @$S10properties24local_observing_property{{[_0-9a-zA-Z]*}}SiF
 func local_observing_property(_ arg: Int) {
   var localproperty: Int = arg {
     didSet {
       takeInt(localproperty)
+      localproperty = zero
     }
   }
-  
+
   takeInt(localproperty)
   localproperty = arg
+
+  // Alloc and initialize the property to the argument value.
+  // CHECK: bb0([[ARG:%[0-9]+]] : $Int)
+  // CHECK: [[BOX:%[0-9]+]] = alloc_box ${ var Int }
+  // CHECK: [[PB:%.*]] = project_box [[BOX]]
+  // CHECK: store [[ARG]] to [trivial] [[PB]]
 }
 
-// This is the local_observing_property function itself.  First alloc and 
-// initialize the property to the argument value.
+// didSet of localproperty (above)
+// Ensure that setting the variable from within its own didSet doesn't recursively call didSet.
 
-// CHECK-LABEL: sil hidden @{{.*}}local_observing_property
-// CHECK: bb0([[ARG:%[0-9]+]] : $Int)
-// CHECK: [[BOX:%[0-9]+]] = alloc_box ${ var Int }
-// CHECK: [[PB:%.*]] = project_box [[BOX]]
-// CHECK: store [[ARG]] to [trivial] [[PB]]
+// CHECK-LABEL: sil private @$S10properties24local_observing_property{{[_0-9a-zA-Z]*}}SiF13localproperty{{[_0-9a-zA-Z]*}}SivW
+// CHECK: bb0(%0 : $Int, %1 : ${ var Int })
+// CHECK: [[POINTER:%.*]] = project_box %1 : ${ var Int }, 0
+// CHECK: // function_ref properties.zero.unsafeMutableAddressor : Swift.Int
+// CHECK-NEXT: [[ZEROFN:%.*]] = function_ref @$S10properties4zero{{[_0-9a-zA-Z]*}}vau
+// CHECK-NEXT: [[ZERORAW:%.*]] = apply [[ZEROFN]]() : $@convention(thin) () -> Builtin.RawPointer
+// CHECK-NEXT: [[ZEROADDR:%.*]] = pointer_to_address [[ZERORAW]] : $Builtin.RawPointer to [strict] $*Int
+// CHECK-NEXT: [[READ:%.*]] = begin_access [read] [dynamic] [[ZEROADDR]] : $*Int
+// CHECK-NEXT: [[ZERO:%.*]] = load [trivial] [[READ]]
+// CHECK-NEXT: end_access [[READ]] : $*Int
+
+// CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] [[POINTER]] : $*Int
+// CHECK-NEXT: assign [[ZERO]] to [[WRITE]] : $*Int
+// CHECK-NEXT: end_access [[WRITE]] : $*Int
+// CHECK-NOT: function_ref @$S10properties24local_observing_property{{[_0-9a-zA-Z]*}}SiF13localproperty{{[_0-9a-zA-Z]*}}SivW
+// CHECK: end sil function
 
 func local_generic_observing_property<T>(_ arg: Int, _: T) {
   var localproperty1: Int = arg {
@@ -1181,4 +1229,12 @@ protocol NonmutatingProtocol {
 
 func overlappingLoadExpr(c: inout ReferenceType) {
   _ = c.p.x
+}
+
+var globalOptionalComputed: Int? {
+  didSet { print("hello") }
+}
+
+func updateGlobalOptionalComputed() {
+  globalOptionalComputed? = 123
 }

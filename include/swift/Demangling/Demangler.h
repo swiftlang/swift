@@ -207,8 +207,7 @@ protected:
   size_t Capacity = 0;
 
 public:
-  
-  typedef T *iterator;
+  using iterator = T *;
 
   Vector() { }
 

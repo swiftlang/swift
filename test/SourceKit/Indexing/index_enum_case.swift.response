@@ -26,7 +26,7 @@
         },
         {
           key.kind: source.lang.swift.decl.enumelement,
-          key.name: "two",
+          key.name: "two(a:)",
           key.usr: "s:15index_enum_case1EO3twoyACSS_tcACmF",
           key.line: 6,
           key.column: 15,
@@ -70,7 +70,7 @@
                 },
                 {
                   key.kind: source.lang.swift.ref.enumelement,
-                  key.name: "two",
+                  key.name: "two(a:)",
                   key.usr: "s:15index_enum_case1EO3twoyACSS_tcACmF",
                   key.line: 12,
                   key.column: 15
@@ -130,7 +130,7 @@
     },
     {
       key.kind: source.lang.swift.ref.enumelement,
-      key.name: "two",
+      key.name: "two(a:)",
       key.usr: "s:15index_enum_case1EO3twoyACSS_tcACmF",
       key.line: 21,
       key.column: 13

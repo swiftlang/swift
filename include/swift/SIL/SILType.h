@@ -251,6 +251,10 @@ public:
   bool isLoadable(SILModule &M) const {
     return !isAddressOnly(M);
   }
+  /// True if either:
+  /// 1) The type, or the referenced type of an address type, is loadable.
+  /// 2) The SIL Module conventions uses lowered addresses
+  bool isLoadableOrOpaque(SILModule &M) const;
   /// True if the type, or the referenced type of an address type, is
   /// address-only. This is the opposite of isLoadable.
   bool isAddressOnly(SILModule &M) const;
@@ -486,14 +490,7 @@ public:
   /// Unwraps one level of optional type.
   /// Returns the lowered T if the given type is Optional<T>.
   /// Otherwise directly returns the given type.
-  SILType unwrapAnyOptionalType() const;
-
-  /// Wraps one level of optional type.
-  ///
-  /// Returns the lowered Optional<T> if the given type is T.
-  ///
-  /// \arg F The SILFunction where the SILType is used.
-  SILType wrapAnyOptionalType(SILFunction &F) const;
+  SILType unwrapOptionalType() const;
 
   /// Returns true if this is the AnyObject SILType;
   bool isAnyObject() const { return getSwiftRValueType()->isAnyObject(); }

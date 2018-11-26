@@ -50,6 +50,7 @@ KNOWN_STDLIB_TYPE_DECL(Sequence, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(Dictionary, NominalTypeDecl, 2)
 KNOWN_STDLIB_TYPE_DECL(AnyHashable, NominalTypeDecl, 0)
 KNOWN_STDLIB_TYPE_DECL(MutableCollection, ProtocolDecl, 1)
+KNOWN_STDLIB_TYPE_DECL(Hasher, NominalTypeDecl, 0)
 
 KNOWN_STDLIB_TYPE_DECL(AnyKeyPath, NominalTypeDecl, 0)
 KNOWN_STDLIB_TYPE_DECL(PartialKeyPath, NominalTypeDecl, 1)

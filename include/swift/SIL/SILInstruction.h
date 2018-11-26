@@ -597,6 +597,18 @@ public:
   /// you perform such optimizations like e.g. jump-threading.
   bool isTriviallyDuplicatable() const;
 
+  /// Returns true if the instruction is only relevant for debug
+  /// informations and has no other impact on program semantics.
+  bool isDebugInstruction() const {
+    return getKind() == SILInstructionKind::DebugValueInst ||
+           getKind() == SILInstructionKind::DebugValueAddrInst;
+  }
+
+  /// Returns true if the instruction is a meta instruction which is
+  /// relevant for debug information and does not get lowered to a real
+  /// instruction.
+  bool isMetaInstruction() const;
+
   /// Verify that all operands of this instruction have compatible ownership
   /// with this instruction.
   void verifyOperandOwnership() const;
@@ -1076,8 +1088,8 @@ class InstructionBaseWithTrailingOperands
 protected:
   friend llvm::TrailingObjects<Derived, Operand, OtherTrailingTypes...>;
 
-  typedef llvm::TrailingObjects<Derived, Operand, OtherTrailingTypes...>
-      TrailingObjects;
+  using TrailingObjects =
+      llvm::TrailingObjects<Derived, Operand, OtherTrailingTypes...>;
 
   using TrailingObjects::totalSizeToAlloc;
 
@@ -1153,8 +1165,9 @@ protected:
   friend InstructionBaseWithTrailingOperands<Kind, Derived, Operand,
                                              OtherTrailingTypes...>;
 
-  typedef InstructionBaseWithTrailingOperands<
-      Kind, Derived, Operand, OtherTrailingTypes...> TrailingObjects;
+  using TrailingObjects =
+      InstructionBaseWithTrailingOperands<Kind, Derived, Operand,
+                                          OtherTrailingTypes...>;
 
 public:
   template <typename... Args>
@@ -1741,6 +1754,13 @@ public:
   static unsigned getArgumentOperandNumber() { return NumStaticOperands; }
 
   SILValue getCallee() const { return getAllOperands()[Callee].get(); }
+
+  /// Gets the origin of the callee by looking through function type conversions
+  /// until we find a function_ref, partial_apply, or unrecognized value.
+  ///
+  /// This is defined out of line to work around incomplete definition
+  /// issues. It is at the bottom of the file.
+  SILValue getCalleeOrigin() const;
 
   /// Gets the referenced function by looking through partial apply,
   /// convert_function, and thin to thick function until we find a function_ref.
@@ -2478,7 +2498,7 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
-      llvm_unreachable("not a computed property");
+      return {};
     case Kind::GettableProperty:
     case Kind::SettableProperty:
     case Kind::External:
@@ -3232,10 +3252,13 @@ class BeginAccessInst
   friend class SILBuilder;
 
   BeginAccessInst(SILDebugLocation loc, SILValue lvalue,
-                  SILAccessKind accessKind, SILAccessEnforcement enforcement)
+                  SILAccessKind accessKind, SILAccessEnforcement enforcement,
+                  bool noNestedConflict)
       : UnaryInstructionBase(loc, lvalue, lvalue->getType()) {
     SILInstruction::Bits.BeginAccessInst.AccessKind = unsigned(accessKind);
     SILInstruction::Bits.BeginAccessInst.Enforcement = unsigned(enforcement);
+    SILInstruction::Bits.BeginAccessInst.NoNestedConflict =
+      unsigned(noNestedConflict);
 
     static_assert(unsigned(SILAccessKind::Last) < (1 << 2),
                   "reserve sufficient bits for serialized SIL");
@@ -3264,6 +3287,19 @@ public:
   }
   void setEnforcement(SILAccessEnforcement enforcement) {
     SILInstruction::Bits.BeginAccessInst.Enforcement = unsigned(enforcement);
+  }
+
+  /// If hasNoNestedConflict is true, then it is a static guarantee against
+  /// inner conflicts. No subsequent access between this point and the
+  /// corresponding end_access could cause an enforcement failure. Consequently,
+  /// the access will not need to be tracked by the runtime for the duration of
+  /// its scope. This access may still conflict with an outer access scope;
+  /// therefore may still require dynamic enforcement at a single point.
+  bool hasNoNestedConflict() const {
+    return SILInstruction::Bits.BeginAccessInst.NoNestedConflict;
+  }
+  void setNoNestedConflict(bool noNestedConflict) {
+    SILInstruction::Bits.BeginAccessInst.NoNestedConflict = noNestedConflict;
   }
 
   SILValue getSource() const {
@@ -3343,30 +3379,49 @@ class BeginUnpairedAccessInst
 
   FixedOperandList<2> Operands;
 
-  SILAccessKind AccessKind;
-  SILAccessEnforcement Enforcement;
-
   BeginUnpairedAccessInst(SILDebugLocation loc, SILValue addr, SILValue buffer,
                           SILAccessKind accessKind,
-                          SILAccessEnforcement enforcement)
-    : InstructionBase(loc),
-      Operands(this, addr, buffer),
-      AccessKind(accessKind), Enforcement(enforcement) {
+                          SILAccessEnforcement enforcement,
+                          bool noNestedConflict)
+      : InstructionBase(loc), Operands(this, addr, buffer) {
+    SILInstruction::Bits.BeginUnpairedAccessInst.AccessKind =
+      unsigned(accessKind);
+    SILInstruction::Bits.BeginUnpairedAccessInst.Enforcement =
+      unsigned(enforcement);
+    SILInstruction::Bits.BeginUnpairedAccessInst.NoNestedConflict =
+      unsigned(noNestedConflict);
   }
 
 public:
   SILAccessKind getAccessKind() const {
-    return AccessKind;
+    return SILAccessKind(
+      SILInstruction::Bits.BeginUnpairedAccessInst.AccessKind);
   }
   void setAccessKind(SILAccessKind kind) {
-    AccessKind = kind;
+    SILInstruction::Bits.BeginUnpairedAccessInst.AccessKind = unsigned(kind);
   }
 
   SILAccessEnforcement getEnforcement() const {
-    return Enforcement;
+    return SILAccessEnforcement(
+        SILInstruction::Bits.BeginUnpairedAccessInst.Enforcement);
   }
   void setEnforcement(SILAccessEnforcement enforcement) {
-    Enforcement = enforcement;
+    SILInstruction::Bits.BeginUnpairedAccessInst.Enforcement
+      = unsigned(enforcement);
+  }
+
+  /// If hasNoNestedConflict is true, then it is a static guarantee against
+  /// inner conflicts. No subsequent access between this point and the
+  /// corresponding end_access could cause an enforcement failure. Consequently,
+  /// the access will not need to be tracked by the runtime for the duration of
+  /// its scope. This access may still conflict with an outer access scope;
+  /// therefore may still require dynamic enforcement at a single point.
+  bool hasNoNestedConflict() const {
+    return SILInstruction::Bits.BeginUnpairedAccessInst.NoNestedConflict;
+  }
+  void setNoNestedConflict(bool noNestedConflict) {
+    SILInstruction::Bits.BeginUnpairedAccessInst.NoNestedConflict =
+      noNestedConflict;
   }
 
   SILValue getSource() const {
@@ -3395,15 +3450,13 @@ class EndUnpairedAccessInst
                                   NonValueInstruction> {
   friend class SILBuilder;
 
-  SILAccessEnforcement Enforcement;
-  bool Aborting;
-
 private:
   EndUnpairedAccessInst(SILDebugLocation loc, SILValue buffer,
-                        SILAccessEnforcement enforcement,
-                        bool aborting = false)
-    : UnaryInstructionBase(loc, buffer), Enforcement(enforcement),
-      Aborting(aborting) {
+                        SILAccessEnforcement enforcement, bool aborting = false)
+      : UnaryInstructionBase(loc, buffer) {
+    SILInstruction::Bits.EndUnpairedAccessInst.Enforcement
+      = unsigned(enforcement);
+    SILInstruction::Bits.EndUnpairedAccessInst.Aborting = aborting;
   }
 
 public:
@@ -3414,17 +3467,19 @@ public:
   /// Only AccessKind::Init and AccessKind::Deinit accesses can be
   /// aborted.
   bool isAborting() const {
-    return Aborting;
+    return SILInstruction::Bits.EndUnpairedAccessInst.Aborting;
   }
   void setAborting(bool aborting) {
-    Aborting = aborting;
+    SILInstruction::Bits.EndUnpairedAccessInst.Aborting = aborting;
   }
 
   SILAccessEnforcement getEnforcement() const {
-    return Enforcement;
+    return SILAccessEnforcement(
+        SILInstruction::Bits.EndUnpairedAccessInst.Enforcement);
   }
   void setEnforcement(SILAccessEnforcement enforcement) {
-    Enforcement = enforcement;
+    SILInstruction::Bits.EndUnpairedAccessInst.Enforcement =
+        unsigned(enforcement);
   }
 
   SILValue getBuffer() const {
@@ -3946,18 +4001,37 @@ class ConvertEscapeToNoEscapeInst final
           ConvertEscapeToNoEscapeInst, ConversionInst> {
   friend SILBuilder;
 
+  bool lifetimeGuaranteed;
+  bool isEscaped; // Even if we can analyze this
+                        // instruction the user might have
+                        // escaped it.
+
   ConvertEscapeToNoEscapeInst(SILDebugLocation DebugLoc, SILValue Operand,
-                               ArrayRef<SILValue> TypeDependentOperands,
-                               SILType Ty)
+                              ArrayRef<SILValue> TypeDependentOperands,
+                              SILType Ty, bool isEscapedByUser,
+                              bool isLifetimeGuaranteed)
       : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Operand, TypeDependentOperands, Ty) {
+            DebugLoc, Operand, TypeDependentOperands, Ty),
+        lifetimeGuaranteed(isLifetimeGuaranteed),
+        isEscaped(isEscapedByUser) {
     assert(!Operand->getType().castTo<SILFunctionType>()->isNoEscape());
     assert(Ty.castTo<SILFunctionType>()->isNoEscape());
   }
 
   static ConvertEscapeToNoEscapeInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
+         bool isEscapedByUser, bool lifetimeGuaranteed);
+public:
+  bool isLifetimeGuaranteed() const {
+    return lifetimeGuaranteed;
+  }
+
+  bool isEscapedByUser() const {
+    return isEscaped;
+  }
+
+  void setEscapedByUser(bool isEscaped = true) { this->isEscaped = isEscaped; }
 };
 
 /// ThinFunctionToPointerInst - Convert a thin function pointer to a
@@ -7526,6 +7600,12 @@ public:
     FOREACH_IMPL_RETURN(getCallee());
   }
 
+  /// Return the callee value by looking through function conversions until we
+  /// find a function_ref, partial_apply, or unrecognized callee value.
+  SILValue getCalleeOrigin() const {
+    FOREACH_IMPL_RETURN(getCalleeOrigin());
+  }
+
   /// Gets the referenced function by looking through partial apply,
   /// convert_function, and thin to thick function until we find a function_ref.
   SILFunction *getCalleeFunction() const {
@@ -7802,29 +7882,37 @@ public:
 // PartialApplyInst being defined, but PartialApplyInst is a subclass of
 // ApplyInstBase, so we can not place ApplyInstBase after it.
 template <class Impl, class Base>
-SILFunction *ApplyInstBase<Impl, Base, false>::getCalleeFunction() const {
+SILValue ApplyInstBase<Impl, Base, false>::getCalleeOrigin() const {
   SILValue Callee = getCallee();
-
   while (true) {
-    if (auto *FRI = dyn_cast<FunctionRefInst>(Callee)) {
-      return FRI->getReferencedFunction();
-    }
-
-    if (auto *PAI = dyn_cast<PartialApplyInst>(Callee)) {
-      Callee = PAI->getCallee();
-      continue;
-    }
-
     if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(Callee)) {
       Callee = TTTFI->getCallee();
       continue;
     }
-
     if (auto *CFI = dyn_cast<ConvertFunctionInst>(Callee)) {
       Callee = CFI->getConverted();
       continue;
     }
+    if (auto *CETN = dyn_cast<ConvertEscapeToNoEscapeInst>(Callee)) {
+      Callee = CETN->getOperand();
+      continue;
+    }
+    return Callee;
+  }
+}
 
+template <class Impl, class Base>
+SILFunction *ApplyInstBase<Impl, Base, false>::getCalleeFunction() const {
+  SILValue Callee = getCalleeOrigin();
+
+  while (true) {
+    if (auto *FRI = dyn_cast<FunctionRefInst>(Callee))
+      return FRI->getReferencedFunction();
+
+    if (auto *PAI = dyn_cast<PartialApplyInst>(Callee)) {
+      Callee = PAI->getCalleeOrigin();
+      continue;
+    }
     return nullptr;
   }
 }

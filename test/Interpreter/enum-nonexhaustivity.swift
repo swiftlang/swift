@@ -22,7 +22,9 @@ EnumTestSuite.test("PlainOldSwitch/NonExhaustive") {
   expectTrue(gotCorrectValue)
 }
 
-EnumTestSuite.test("TrapOnUnexpected/NonExhaustive") {
+EnumTestSuite.test("TrapOnUnexpected/NonExhaustive")
+    .crashOutputMatches("'NonExhaustiveEnum(rawValue: 3)'")
+    .code {
   expectCrashLater()
   switch getUnexpectedValue() {
   case .A, .C:
@@ -33,7 +35,9 @@ EnumTestSuite.test("TrapOnUnexpected/NonExhaustive") {
   expectUnreachable()
 }
 
-EnumTestSuite.test("TrapOnUnexpectedNested/NonExhaustive") {
+EnumTestSuite.test("TrapOnUnexpectedNested/NonExhaustive")
+    .crashOutputMatches("'(NonExhaustiveEnum, NonExhaustiveEnum)'")
+    .code {
   expectCrashLater()
   switch (getExpectedValue(), getUnexpectedValue()) {
   case (.A, .A), (.C, .C):
@@ -46,7 +50,9 @@ EnumTestSuite.test("TrapOnUnexpectedNested/NonExhaustive") {
   expectUnreachable()
 }
 
-EnumTestSuite.test("TrapOnUnexpectedNested2/NonExhaustive") {
+EnumTestSuite.test("TrapOnUnexpectedNested2/NonExhaustive")
+    .crashOutputMatches("'(NonExhaustiveEnum, NonExhaustiveEnum)'")
+    .code {
   expectCrashLater()
   switch (getUnexpectedValue(), getExpectedValue()) {
   case (.A, .A), (.C, .C):
@@ -97,7 +103,9 @@ EnumTestSuite.test("PlainOldSwitch/LyingExhaustive") {
   expectTrue(gotCorrectValue)
 }
 
-EnumTestSuite.test("TrapOnUnexpected/LyingExhaustive") {
+EnumTestSuite.test("TrapOnUnexpected/LyingExhaustive")
+    .crashOutputMatches("'LyingExhaustiveEnum(rawValue: 3)'")
+    .code {
   expectCrashLater()
   switch getUnexpectedLiarValue() {
   case .A, .C:
@@ -108,7 +116,9 @@ EnumTestSuite.test("TrapOnUnexpected/LyingExhaustive") {
   expectUnreachable()
 }
 
-EnumTestSuite.test("TrapOnUnexpectedNested/LyingExhaustive") {
+EnumTestSuite.test("TrapOnUnexpectedNested/LyingExhaustive")
+    .crashOutputMatches("'(LyingExhaustiveEnum, LyingExhaustiveEnum)'")
+    .code {
   expectCrashLater()
   switch (getExpectedLiarValue(), getUnexpectedLiarValue()) {
   case (.A, .A), (.C, .C):
@@ -121,7 +131,9 @@ EnumTestSuite.test("TrapOnUnexpectedNested/LyingExhaustive") {
   expectUnreachable()
 }
 
-EnumTestSuite.test("TrapOnUnexpectedNested2/LyingExhaustive") {
+EnumTestSuite.test("TrapOnUnexpectedNested2/LyingExhaustive")
+    .crashOutputMatches("'(LyingExhaustiveEnum, LyingExhaustiveEnum)'")
+    .code {
   expectCrashLater()
   switch (getUnexpectedLiarValue(), getExpectedLiarValue()) {
   case (.A, .A), (.C, .C):
@@ -168,7 +180,7 @@ EnumTestSuite.test("UnexpectedOkayNested2/LyingExhaustive") {
     return .B
   }
   @inline(never) static func getUnexpectedValue() -> SwiftEnum {
-    return unsafeBitCast(42 as Int32, to: SwiftEnum.self)
+    return unsafeBitCast(-42 as Int32, to: SwiftEnum.self)
   }
 }
 
@@ -183,7 +195,9 @@ EnumTestSuite.test("PlainOldSwitch/SwiftExhaustive") {
   expectTrue(gotCorrectValue)
 }
 
-EnumTestSuite.test("TrapOnUnexpected/SwiftExhaustive") {
+EnumTestSuite.test("TrapOnUnexpected/SwiftExhaustive")
+    .crashOutputMatches("'SwiftEnum(rawValue: -42)'")
+    .code {
   expectCrashLater()
   switch SwiftEnum.getUnexpectedValue() {
   case .A, .C:
@@ -194,7 +208,9 @@ EnumTestSuite.test("TrapOnUnexpected/SwiftExhaustive") {
   expectUnreachable()
 }
 
-EnumTestSuite.test("TrapOnUnexpectedNested/SwiftExhaustive") {
+EnumTestSuite.test("TrapOnUnexpectedNested/SwiftExhaustive")
+    .crashOutputMatches("'(SwiftEnum, SwiftEnum)'")
+    .code {
   expectCrashLater()
   switch (SwiftEnum.getExpectedValue(), SwiftEnum.getUnexpectedValue()) {
   case (.A, .A), (.C, .C):
@@ -207,7 +223,9 @@ EnumTestSuite.test("TrapOnUnexpectedNested/SwiftExhaustive") {
   expectUnreachable()
 }
 
-EnumTestSuite.test("TrapOnUnexpectedNested2/SwiftExhaustive") {
+EnumTestSuite.test("TrapOnUnexpectedNested2/SwiftExhaustive")
+    .crashOutputMatches("'(SwiftEnum, SwiftEnum)'")
+    .code {
   expectCrashLater()
   switch (SwiftEnum.getUnexpectedValue(), SwiftEnum.getExpectedValue()) {
   case (.A, .A), (.C, .C):
@@ -246,5 +264,99 @@ EnumTestSuite.test("UnexpectedOkayNested2/SwiftExhaustive") {
   expectTrue(gotCorrectValue)
 }
 
+@inline(never)
+func switchOnTwoThings<T>(_ a: T, _ b: SwiftEnum) {
+  switch (a, b) {
+  case (is String, _):
+    expectUnreachable()
+  case (_, .B):
+    return
+  case (_, .A), (_, .C):
+    expectUnreachable()
+  }
+}
+
+EnumTestSuite.test("Generic/Trap")
+    .crashOutputMatches("'(Int, SwiftEnum)'")
+    .code {
+  expectCrashLater()
+  switchOnTwoThings(1, SwiftEnum.getUnexpectedValue())
+}
+
+EnumTestSuite.test("Generic/Okay") {
+  switchOnTwoThings(1, SwiftEnum.getExpectedValue())
+}
+
+@objc enum UnsignedSwiftEnum : UInt64 {
+  case A, B, C
+
+  @inline(never) static func getExpectedValue() -> UnsignedSwiftEnum {
+    return .B
+  }
+  @inline(never) static func getUnexpectedValue() -> UnsignedSwiftEnum {
+    return unsafeBitCast(~(0 as UInt64), to: UnsignedSwiftEnum.self)
+  }
+}
+
+EnumTestSuite.test("PlainOldSwitch/LargeSwiftExhaustive") {
+  var gotCorrectValue = false
+  switch UnsignedSwiftEnum.getExpectedValue() {
+  case .A, .C:
+    expectUnreachable()
+  case .B:
+    gotCorrectValue = true
+  }
+  expectTrue(gotCorrectValue)
+}
+
+EnumTestSuite.test("TrapOnUnexpected/LargeSwiftExhaustive")
+    .crashOutputMatches("'UnsignedSwiftEnum(rawValue: 18446744073709551615)'")
+    .code {
+  expectCrashLater()
+  switch UnsignedSwiftEnum.getUnexpectedValue() {
+  case .A, .C:
+    expectUnreachable()
+  case .B:
+    expectUnreachable()
+  }
+  expectUnreachable()
+}
+
+struct Outer {
+  @objc enum NestedSwiftEnum: Int32 {
+    case A, B, C
+
+    @inline(never) static func getExpectedValue() -> NestedSwiftEnum {
+      return .B
+    }
+    @inline(never) static func getUnexpectedValue() -> NestedSwiftEnum {
+      return unsafeBitCast(-1 as Int32, to: NestedSwiftEnum.self)
+    }
+  }
+}
+
+EnumTestSuite.test("PlainOldSwitch/NestedSwiftExhaustive") {
+  var gotCorrectValue = false
+  switch Outer.NestedSwiftEnum.getExpectedValue() {
+  case .A, .C:
+    expectUnreachable()
+  case .B:
+    gotCorrectValue = true
+  }
+  expectTrue(gotCorrectValue)
+}
+
+EnumTestSuite.test("TrapOnUnexpected/NestedSwiftExhaustive")
+    .crashOutputMatches("'NestedSwiftEnum(rawValue: -1)'")
+    .code {
+  expectCrashLater()
+  switch Outer.NestedSwiftEnum.getUnexpectedValue() {
+  case .A, .C:
+    expectUnreachable()
+  case .B:
+    expectUnreachable()
+  }
+  expectUnreachable()
+}
 
 runAllTests()

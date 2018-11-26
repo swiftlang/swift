@@ -228,7 +228,7 @@ func shortFormWithWildcardInMiddle() {}
 @available(iOS 8.0, OSX 10.10.3) // expected-error {{must handle potential future platforms with '*'}} {{32-32=, *}}
 func shortFormMissingWildcard() {}
 
-@availability(OSX, introduced: 10.10) // expected-error {{@availability has been renamed to @available}} {{2-14=available}}
+@availability(OSX, introduced: 10.10) // expected-error {{'@availability' has been renamed to '@available'}} {{2-14=available}}
 func someFuncUsingOldAttribute() { }
 
 
@@ -871,6 +871,61 @@ _ = deprecatedProperty // expected-warning {{'deprecatedProperty' is deprecated:
 deprecatedProperty = 0 // expected-warning {{'deprecatedProperty' is deprecated: bad variable}} {{none}}
 deprecatedProperty += 1 // expected-warning {{'deprecatedProperty' is deprecated: bad variable}} {{none}}
 
+var unavailableGetter: Int {
+  @available(*, unavailable) get { return 0 } // expected-note * {{here}}
+  set {}
+}
+var unavailableGetterOnly: Int {
+  @available(*, unavailable) get { return 0 } // expected-note * {{here}}
+}
+var unavailableSetter: Int {
+  get { return 0 }
+  @available(*, unavailable) set {} // expected-note * {{here}}
+}
+var unavailableBoth: Int {
+  @available(*, unavailable) get { return 0 } // expected-note * {{here}}
+  @available(*, unavailable) set {} // expected-note * {{here}}
+}
+var unavailableMessage: Int {
+  @available(*, unavailable, message: "bad getter") get { return 0 } // expected-note * {{here}}
+  @available(*, unavailable, message: "bad setter") set {} // expected-note * {{here}}
+}
+var unavailableRename: Int {
+  @available(*, unavailable, renamed: "betterThing()") get { return 0 } // expected-note * {{here}}
+  @available(*, unavailable, renamed: "setBetterThing(_:)") set {} // expected-note * {{here}}
+}
+@available(*, unavailable, message: "bad variable")
+var unavailableProperty: Int { // expected-note * {{here}}
+  @available(*, unavailable, message: "bad getter") get { return 0 }
+  @available(*, unavailable, message: "bad setter") set {}
+}
+
+_ = unavailableGetter // expected-error {{getter for 'unavailableGetter' is unavailable}} {{none}}
+unavailableGetter = 0
+unavailableGetter += 1 // expected-error {{getter for 'unavailableGetter' is unavailable}} {{none}}
+
+_ = unavailableGetterOnly // expected-error {{getter for 'unavailableGetterOnly' is unavailable}} {{none}}
+
+_ = unavailableSetter
+unavailableSetter = 0 // expected-error {{setter for 'unavailableSetter' is unavailable}} {{none}}
+unavailableSetter += 1 // expected-error {{setter for 'unavailableSetter' is unavailable}} {{none}}
+
+_ = unavailableBoth // expected-error {{getter for 'unavailableBoth' is unavailable}} {{none}}
+unavailableBoth = 0 // expected-error {{setter for 'unavailableBoth' is unavailable}} {{none}}
+unavailableBoth += 1 // expected-error {{getter for 'unavailableBoth' is unavailable}} {{none}} expected-error {{setter for 'unavailableBoth' is unavailable}} {{none}}
+
+_ = unavailableMessage // expected-error {{getter for 'unavailableMessage' is unavailable: bad getter}} {{none}}
+unavailableMessage = 0 // expected-error {{setter for 'unavailableMessage' is unavailable: bad setter}} {{none}}
+unavailableMessage += 1 // expected-error {{getter for 'unavailableMessage' is unavailable: bad getter}} {{none}} expected-error {{setter for 'unavailableMessage' is unavailable: bad setter}} {{none}}
+
+_ = unavailableRename // expected-error {{getter for 'unavailableRename' has been renamed to 'betterThing()'}} {{none}}
+unavailableRename = 0  // expected-error {{setter for 'unavailableRename' has been renamed to 'setBetterThing(_:)'}} {{none}}
+unavailableRename += 1 // expected-error {{getter for 'unavailableRename' has been renamed to 'betterThing()'}} {{none}} expected-error {{setter for 'unavailableRename' has been renamed to 'setBetterThing(_:)'}} {{none}}
+
+_ = unavailableProperty // expected-error {{'unavailableProperty' is unavailable: bad variable}} {{none}}
+unavailableProperty = 0 // expected-error {{'unavailableProperty' is unavailable: bad variable}} {{none}}
+unavailableProperty += 1 // expected-error {{'unavailableProperty' is unavailable: bad variable}} {{none}}
+
 struct DeprecatedAccessors {
   var deprecatedMessage: Int {
     @available(*, deprecated, message: "bad getter") get { return 0 }
@@ -923,5 +978,60 @@ struct DeprecatedAccessors {
     _ = other[alsoDeprecated: 0] // expected-warning {{'subscript(alsoDeprecated:)' is deprecated: bad subscript!}} {{none}}
     other[alsoDeprecated: 0] = 0 // expected-warning {{'subscript(alsoDeprecated:)' is deprecated: bad subscript!}} {{none}}
     other[alsoDeprecated: 0] += 1 // expected-warning {{'subscript(alsoDeprecated:)' is deprecated: bad subscript!}} {{none}}
+  }
+}
+
+struct UnavailableAccessors {
+  var unavailableMessage: Int {
+    @available(*, unavailable, message: "bad getter") get { return 0 } // expected-note * {{here}}
+    @available(*, unavailable, message: "bad setter") set {} // expected-note * {{here}}
+  }
+
+  static var staticUnavailable: Int {
+    @available(*, unavailable, message: "bad getter") get { return 0 } // expected-note * {{here}}
+    @available(*, unavailable, message: "bad setter") set {} // expected-note * {{here}}
+  }
+
+  @available(*, unavailable, message: "bad property")
+  var unavailableProperty: Int { // expected-note * {{here}}
+    @available(*, unavailable, message: "bad getter") get { return 0 }
+    @available(*, unavailable, message: "bad setter") set {}
+  }
+
+  subscript(_: Int) -> Int {
+    @available(*, unavailable, message: "bad subscript getter") get { return 0 } // expected-note * {{here}}
+    @available(*, unavailable, message: "bad subscript setter") set {} // expected-note * {{here}}
+  }
+
+  @available(*, unavailable, message: "bad subscript!")
+  subscript(alsoUnavailable _: Int) -> Int { // expected-note * {{here}}
+    @available(*, unavailable, message: "bad subscript getter") get { return 0 }
+    @available(*, unavailable, message: "bad subscript setter") set {}
+  }
+
+  mutating func testAccessors(other: inout UnavailableAccessors) {
+    _ = unavailableMessage // expected-error {{getter for 'unavailableMessage' is unavailable: bad getter}} {{none}}
+    unavailableMessage = 0 // expected-error {{setter for 'unavailableMessage' is unavailable: bad setter}} {{none}}
+    unavailableMessage += 1 // expected-error {{getter for 'unavailableMessage' is unavailable: bad getter}} {{none}} expected-error {{setter for 'unavailableMessage' is unavailable: bad setter}} {{none}}
+
+    _ = other.unavailableMessage // expected-error {{getter for 'unavailableMessage' is unavailable: bad getter}} {{none}}
+    other.unavailableMessage = 0 // expected-error {{setter for 'unavailableMessage' is unavailable: bad setter}} {{none}}
+    other.unavailableMessage += 1 // expected-error {{getter for 'unavailableMessage' is unavailable: bad getter}} {{none}} expected-error {{setter for 'unavailableMessage' is unavailable: bad setter}} {{none}}
+
+    _ = other.unavailableProperty // expected-error {{'unavailableProperty' is unavailable: bad property}} {{none}}
+    other.unavailableProperty = 0 // expected-error {{'unavailableProperty' is unavailable: bad property}} {{none}}
+    other.unavailableProperty += 1 // expected-error {{'unavailableProperty' is unavailable: bad property}} {{none}}
+
+    _ = UnavailableAccessors.staticUnavailable // expected-error {{getter for 'staticUnavailable' is unavailable: bad getter}} {{none}}
+    UnavailableAccessors.staticUnavailable = 0 // expected-error {{setter for 'staticUnavailable' is unavailable: bad setter}} {{none}}
+    UnavailableAccessors.staticUnavailable += 1 // expected-error {{getter for 'staticUnavailable' is unavailable: bad getter}} {{none}} expected-error {{setter for 'staticUnavailable' is unavailable: bad setter}} {{none}}
+
+    _ = other[0] // expected-error {{getter for 'subscript' is unavailable: bad subscript getter}} {{none}}
+    other[0] = 0 // expected-error {{setter for 'subscript' is unavailable: bad subscript setter}} {{none}}
+    other[0] += 1 // expected-error {{getter for 'subscript' is unavailable: bad subscript getter}} {{none}} expected-error {{setter for 'subscript' is unavailable: bad subscript setter}} {{none}}
+
+    _ = other[alsoUnavailable: 0] // expected-error {{'subscript(alsoUnavailable:)' is unavailable: bad subscript!}} {{none}}
+    other[alsoUnavailable: 0] = 0 // expected-error {{'subscript(alsoUnavailable:)' is unavailable: bad subscript!}} {{none}}
+    other[alsoUnavailable: 0] += 1 // expected-error {{'subscript(alsoUnavailable:)' is unavailable: bad subscript!}} {{none}}
   }
 }

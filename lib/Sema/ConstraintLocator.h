@@ -530,7 +530,7 @@ private:
   friend class ConstraintSystem;
 };
 
-typedef ConstraintLocator::PathElement LocatorPathElt;
+using LocatorPathElt = ConstraintLocator::PathElement;
 
 /// \brief A simple stack-only builder object that constructs a
 /// constraint locator without allocating memory.

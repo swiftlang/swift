@@ -13,6 +13,7 @@
 #ifndef SWIFT_BASIC_OPTIMIZATIONMODE_H
 #define SWIFT_BASIC_OPTIMIZATIONMODE_H
 
+#include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/DataTypes.h"
 
 namespace swift {
@@ -26,6 +27,9 @@ enum class OptimizationMode : uint8_t {
   ForSize = 3,         // -Osize
   LastMode = ForSize
 };
+
+enum : unsigned { NumOptimizationModeBits =
+  countBitsUsed(static_cast<unsigned>(OptimizationMode::LastMode)) };
 
 } // end namespace swift
 

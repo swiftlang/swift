@@ -22,6 +22,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PostOrder.h"
@@ -59,7 +60,10 @@ static llvm::cl::opt<bool> AbortOnFailure(
 
 static llvm::cl::opt<bool> VerifyDIHoles(
                               "verify-di-holes",
-                              llvm::cl::init(false));
+                              llvm::cl::init(true));
+
+static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
+    "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
 
 // The verifier is basically all assertions, so don't compile it with NDEBUG to
 // prevent release builds from triggering spurious unused variable warnings.
@@ -541,7 +545,7 @@ public:
                                                 const Twine &valueDescription) {
     require(value->getType().isObject(), valueDescription +" must be an object");
     
-    auto objectTy = value->getType().unwrapAnyOptionalType();
+    auto objectTy = value->getType().unwrapOptionalType();
     
     require(objectTy.isReferenceCounted(F.getModule()),
             valueDescription + " must have reference semantics");
@@ -1417,14 +1421,17 @@ public:
 
     SILFunction *RefF = FRI->getReferencedFunction();
 
-    // A direct reference to a shared_external declaration is an error; we
-    // should have deserialized a body.
-    if (RefF->isExternalDeclaration()) {
-      require(SingleFunction ||
-              !hasSharedVisibility(RefF->getLinkage()) ||
-              RefF->hasForeignBody(),
-              "external declarations of SILFunctions with shared visibility is "
-              "not allowed");
+    // In canonical SIL, direct reference to a shared_external declaration
+    // is an error; we should have deserialized a body. In raw SIL, we may
+    // not have deserialized the body yet.
+    if (F.getModule().getStage() >= SILStage::Canonical) {
+      if (RefF->isExternalDeclaration()) {
+        require(SingleFunction ||
+                !hasSharedVisibility(RefF->getLinkage()) ||
+                RefF->hasForeignBody(),
+                "external declarations of SILFunctions with shared visibility is "
+                "not allowed");
+      }
     }
 
     // A direct reference to a non-public or shared but not fragile function
@@ -1993,8 +2000,12 @@ public:
     SILType caseTy =
       UI->getOperand()->getType().getEnumElementType(UI->getElement(),
                                                     F.getModule());
-    requireSameType(caseTy, UI->getType(),
-            "InitEnumDataAddrInst result does not match type of enum case");
+
+    if (UI->getModule().getStage() != SILStage::Lowered) {
+      requireSameType(
+          caseTy, UI->getType(),
+          "InitEnumDataAddrInst result does not match type of enum case");
+    }
   }
 
   void checkUncheckedEnumDataInst(UncheckedEnumDataInst *UI) {
@@ -2012,8 +2023,11 @@ public:
     SILType caseTy =
       UI->getOperand()->getType().getEnumElementType(UI->getElement(),
                                                     F.getModule());
-    require(caseTy == UI->getType(),
-            "UncheckedEnumData result does not match type of enum case");
+
+    if (UI->getModule().getStage() != SILStage::Lowered) {
+      require(caseTy == UI->getType(),
+              "UncheckedEnumData result does not match type of enum case");
+    }
   }
 
   void checkUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UI) {
@@ -2031,8 +2045,11 @@ public:
     SILType caseTy =
       UI->getOperand()->getType().getEnumElementType(UI->getElement(),
                                                     F.getModule());
-    require(caseTy == UI->getType(),
-            "UncheckedTakeEnumDataAddrInst result does not match type of enum case");
+
+    if (UI->getModule().getStage() != SILStage::Lowered) {
+      require(caseTy == UI->getType(), "UncheckedTakeEnumDataAddrInst result "
+                                       "does not match type of enum case");
+    }
   }
 
   void checkInjectEnumAddrInst(InjectEnumAddrInst *IUAI) {
@@ -2395,10 +2412,7 @@ public:
       require(AMI->getTypeDependentOperands().empty(),
               "Should not have an operand for the opened existential");
     }
-    if (isa<ArchetypeType>(lookupType) || lookupType->isAnyExistentialType()) {
-      require(AMI->getConformance().isAbstract(),
-              "archetype or existential lookup should have abstract conformance");
-    } else {
+    if (!isa<ArchetypeType>(lookupType)) {
       require(AMI->getConformance().isConcrete(),
               "concrete type lookup requires concrete conformance");
       auto conformance = AMI->getConformance().getConcrete();
@@ -3522,6 +3536,18 @@ public:
     requireABICompatibleFunctionTypes(
         opTI, resTI->getWithExtInfo(resTI->getExtInfo().withNoEscape(false)),
         "convert_escape_to_noescape cannot change function ABI");
+
+    // After mandatory passes convert_escape_to_noescape should not have the
+    // '[not_guaranteed]' or '[escaped]' attributes.
+    if (!SkipConvertEscapeToNoescapeAttributes &&
+        F.getModule().getStage() != SILStage::Raw) {
+      require(!ICI->isEscapedByUser(),
+              "convert_escape_to_noescape [escaped] not "
+              "allowed after mandatory passes");
+      require(ICI->isLifetimeGuaranteed(),
+              "convert_escape_to_noescape [not_guaranteed] not "
+              "allowed after mandatory passes");
+    }
   }
 
   void checkThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
@@ -4544,16 +4570,14 @@ public:
 
     const SILDebugScope *LastSeenScope = nullptr;
     for (SILInstruction &SI : *BB) {
-      if (isa<AllocStackInst>(SI))
+      if (SI.isMetaInstruction())
         continue;
       LastSeenScope = SI.getDebugScope();
       AlreadySeenScopes.insert(LastSeenScope);
       break;
     }
     for (SILInstruction &SI : *BB) {
-      // `alloc_stack` can create false positive, so we skip it
-      // for now.
-      if (isa<AllocStackInst>(SI))
+      if (SI.isMetaInstruction())
         continue;
 
       // If we haven't seen this debug scope yet, update the
@@ -4591,6 +4615,9 @@ public:
       }
       if (DS != LastSeenScope) {
         DEBUG(llvm::dbgs() << "Broken instruction!\n"; SI.dump());
+        DEBUG(llvm::dbgs() << "Please report a bug on bugs.swift.org\n");
+        DEBUG(llvm::dbgs() <<
+          "Pass -Xllvm -verify-di-holes=false to disable the verification\n");
         require(
             DS == LastSeenScope,
             "Basic block contains a non-contiguous lexical scope at -Onone");

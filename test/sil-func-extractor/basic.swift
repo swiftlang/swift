@@ -61,8 +61,8 @@
 // EXTRACT-NOW-NEXT:      return
 
 public struct X {
-  @_versioned
-  @_inlineable
+  @usableFromInline
+  @inlinable
   func test() {
     foo()
   }
@@ -70,25 +70,25 @@ public struct X {
 
 @_fixed_layout
 public class Vehicle {
-    @_versioned
+    @usableFromInline
     var numOfWheels: Int
 
-    @_versioned
-    @_inlineable
+    @usableFromInline
+    @inlinable
     init(n: Int) {
       numOfWheels = n
     }
 
-    @_versioned
-    @_inlineable
+    @usableFromInline
+    @inlinable
     func now() -> Int {
         return numOfWheels
     }
 }
 
 @discardableResult
-@_versioned
-@_inlineable
+@usableFromInline
+@inlinable
 func foo() -> Int {
   return 7
 }

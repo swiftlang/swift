@@ -344,6 +344,11 @@ public:
   /// Used by llvm::LoopInfo.
   bool isLegalToHoistInto() const;
 
+  /// Returns the debug scope of the first non-meta instructions in the
+  /// basic block. SILBuilderWithScope uses this to correctly set up
+  /// the debug scope for newly created instructions.
+  const SILDebugScope *getScopeOfFirstNonMetaInstruction();
+
   //===--------------------------------------------------------------------===//
   // Debugging
   //===--------------------------------------------------------------------===//

@@ -54,7 +54,7 @@
 /// above, information other than the class pointer could be contained in the
 /// ISA.
 #ifndef SWIFT_HAS_OPAQUE_ISAS
-#if __ARM_ARCH_7K__ >= 2
+#if defined(__arm__) && __ARM_ARCH_7K__ >= 2
 #define SWIFT_HAS_OPAQUE_ISAS 1
 #else
 #define SWIFT_HAS_OPAQUE_ISAS 0
@@ -68,7 +68,7 @@
 /// Which bits in the class metadata are used to distinguish Swift classes
 /// from ObjC classes?
 #ifndef SWIFT_CLASS_IS_SWIFT_MASK
-# if __APPLE__ && SWIFT_OBJC_INTEROP && SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
+# if defined(__APPLE__) && SWIFT_OBJC_INTEROP && SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
 #  define SWIFT_CLASS_IS_SWIFT_MASK 2ULL
 # else
 #  define SWIFT_CLASS_IS_SWIFT_MASK 1ULL

@@ -12,8 +12,7 @@ TRAITS = [
     Trait('DeclGroup',
           children=[
               Child('Attributes', kind='AttributeList', is_optional=True),
-              Child('AccessLevelModifier', kind='DeclModifier',
-                    is_optional=True),
+              Child('Modifiers', kind='ModifierList', is_optional=True),
               Child('Members', kind='MemberDeclBlock'),
           ]),
 

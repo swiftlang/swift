@@ -1824,7 +1824,29 @@ bool EscapeAnalysis::canEscapeToUsePoint(SILValue V, SILNode *UsePoint,
     return true;
 
   // No hidden escapes: check if the Node is reachable from the UsePoint.
-  return ConGraph->isUsePoint(UsePoint, Node);
+  // Check if the object itself can escape to the called function.
+  if (ConGraph->isUsePoint(UsePoint, Node))
+    return true;
+
+  assert(isPointer(V) && "should not have a node for a non-pointer");
+
+  // Check if the object "content" can escape to the called function.
+  // This will catch cases where V is a reference and a pointer to a stored
+  // property escapes.
+  // It's also important in case of a pointer assignment, e.g.
+  //    V = V1
+  //    apply(V1)
+  // In this case the apply is only a use-point for V1 and V1's content node.
+  // As V1's content node is the same as V's content node, we also make the
+  // check for the content node.
+  CGNode *ContentNode = ConGraph->getContentNode(Node);
+  if (ContentNode->escapesInsideFunction(false))
+    return true;
+
+  if (ConGraph->isUsePoint(UsePoint, ContentNode))
+    return true;
+
+  return false;
 }
 
 bool EscapeAnalysis::canEscapeTo(SILValue V, FullApplySite FAS) {
@@ -1838,46 +1860,6 @@ bool EscapeAnalysis::canEscapeTo(SILValue V, FullApplySite FAS) {
 static bool hasReferenceSemantics(SILType T) {
   // Exclude address types.
   return T.isObject() && T.hasReferenceSemantics();
-}
-
-bool EscapeAnalysis::canObjectOrContentEscapeTo(SILValue V, FullApplySite FAS) {
-  // If it's not a local object we don't know anything about the value.
-  if (!pointsToLocalObject(V))
-    return true;
-
-  auto *ConGraph = getConnectionGraph(FAS.getFunction());
-  CGNode *Node = ConGraph->getNodeOrNull(V, this);
-  if (!Node)
-    return true;
-
-  // First check if there are escape paths which we don't explicitly see
-  // in the graph.
-  if (Node->escapesInsideFunction(isNotAliasingArgument(V)))
-    return true;
-
-  // Check if the object itself can escape to the called function.
-  SILInstruction *UsePoint = FAS.getInstruction();
-  if (ConGraph->isUsePoint(UsePoint, Node))
-    return true;
-
-  if (isPointer(V)) {
-    // Check if the object "content" can escape to the called function.
-    // This will catch cases where V is a reference and a pointer to a stored
-    // property escapes.
-    // It's also important in case of a pointer assignment, e.g.
-    //    V = V1
-    //    apply(V1)
-    // In this case the apply is only a use-point for V1 and V1's content node.
-    // As V1's content node is the same as V's content node, we also make the
-    // check for the content node.
-    CGNode *ContentNode = ConGraph->getContentNode(Node);
-    if (ContentNode->escapesInsideFunction(false))
-      return true;
-
-    if (ConGraph->isUsePoint(UsePoint, ContentNode))
-      return true;
-  }
-  return false;
 }
 
 bool EscapeAnalysis::canEscapeTo(SILValue V, RefCountingInst *RI) {

@@ -682,6 +682,12 @@ static bool isLeftBound(const char *tokBegin, const char *bufferBegin) {
     else
       return true;
 
+  case '\xA0':
+    if (tokBegin - 1 != bufferBegin && tokBegin[-2] == '\xC2')
+      return false; // Non-breaking whitespace (U+00A0)
+    else
+      return true;
+
   default:
     return true;
   }
@@ -713,6 +719,12 @@ static bool isRightBound(const char *tokEnd, bool isLeftBound,
     // A following comment counts as whitespace, so this token is not right bound.
     if (tokEnd[1] == '/' || tokEnd[1] == '*')
       return false;
+    else
+      return true;
+
+  case '\xC2':
+    if (tokEnd[1] == '\xA0')
+      return false; // Non-breaking whitespace (U+00A0)
     else
       return true;
 
@@ -1894,6 +1906,12 @@ bool Lexer::lexUnknown(bool EmitDiagnosticsIfToken) {
         .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(Tmp), " ");
     CurPtr = Tmp;
     return false; // Skip presumed whitespace.
+  } else if (Codepoint == 0x000000A0) {
+      // Non-breaking whitespace (U+00A0)
+      diagnose(CurPtr - 1, diag::lex_nonbreaking_space)
+          .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(Tmp), " ");
+      CurPtr = Tmp;
+      return false;
   } else if (Codepoint == 0x0000201D) {
     // If this is an end curly quote, just diagnose it with a fixit hint.
     if (EmitDiagnosticsIfToken) {
@@ -2621,7 +2639,17 @@ SourceLoc Lexer::getLocForEndOfLine(SourceManager &SM, SourceLoc Loc) {
   return getSourceLoc(L.CurPtr);
 }
 
-StringRef Lexer::getIndentationForLine(SourceManager &SM, SourceLoc Loc) {
+StringRef Lexer::getIndentationForLine(SourceManager &SM, SourceLoc Loc,
+                                       StringRef *ExtraIndentation) {
+  // FIXME: do something more intelligent here.
+  //
+  // Four spaces is the typical indentation in Swift code, so for now just use
+  // that directly here, but if someone was to do something better, updating
+  // here will update everyone.
+
+  if (ExtraIndentation)
+    *ExtraIndentation = "    ";
+
   // Don't try to do anything with an invalid location.
   if (Loc.isInvalid())
     return "";

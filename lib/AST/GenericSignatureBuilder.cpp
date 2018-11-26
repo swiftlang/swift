@@ -1309,7 +1309,7 @@ const RequirementSource *RequirementSource::withoutRedundantSubpath(
 
   case Concrete:
     return parent->withoutRedundantSubpath(builder, start, end)
-      ->viaParent(builder, getAssociatedType());
+      ->viaConcrete(builder, getProtocolConformance());
 
   case Derived:
     return parent->withoutRedundantSubpath(builder, start, end)
@@ -2073,7 +2073,7 @@ static int compareAssociatedTypes(AssociatedTypeDecl *assocType1,
   // - by protocol, so t_n_m.`P.T` < t_n_m.`Q.T` (given P < Q)
   auto proto1 = assocType1->getProtocol();
   auto proto2 = assocType2->getProtocol();
-  if (int compareProtocols = ProtocolType::compareProtocols(&proto1, &proto2))
+  if (int compareProtocols = TypeDecl::compare(proto1, proto2))
     return compareProtocols;
 
   // Error case: if we have two associated types with the same name in the
@@ -2596,13 +2596,14 @@ ConstraintResult GenericSignatureBuilder::handleUnresolvedRequirement(
 // Function for feeding through any other requirements that the conformance
 // requires to be satisfied. These are things we're inferring.
 static void addConditionalRequirements(GenericSignatureBuilder &builder,
-                                       ProtocolConformanceRef conformance) {
+                                       ProtocolConformanceRef conformance,
+                                       ModuleDecl *inferForModule) {
   // Abstract conformances don't have associated decl-contexts/modules, but also
   // don't have conditional requirements.
   if (conformance.isConcrete()) {
     auto source = FloatingRequirementSource::forInferred(nullptr);
     for (auto requirement : conformance.getConditionalRequirements()) {
-      builder.addRequirement(requirement, source, /*inferForModule=*/nullptr);
+      builder.addRequirement(requirement, source, inferForModule);
       ++NumConditionalRequirementsAdded;
     }
   }
@@ -2646,7 +2647,7 @@ GenericSignatureBuilder::resolveConcreteConformance(ResolvedType type,
 
   concreteSource = concreteSource->viaConcrete(*this, *conformance);
   equivClass->recordConformanceConstraint(*this, type, proto, concreteSource);
-  addConditionalRequirements(*this, *conformance);
+  addConditionalRequirements(*this, *conformance, /*inferForModule=*/nullptr);
   return concreteSource;
 }
 const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
@@ -2677,7 +2678,7 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
   superclassSource =
     superclassSource->viaSuperclass(*this, *conformance);
   equivClass->recordConformanceConstraint(*this, type, proto, superclassSource);
-  addConditionalRequirements(*this, *conformance);
+  addConditionalRequirements(*this, *conformance, /*inferForModule=*/nullptr);
   return superclassSource;
 }
 
@@ -3899,24 +3900,34 @@ static Type substituteConcreteType(GenericSignatureBuilder &builder,
 
   // The protocol concrete type has an underlying type written in terms
   // of the protocol's 'Self' type.
-  auto type = concreteDecl->getDeclaredInterfaceType();
+  auto typealias = dyn_cast<TypeAliasDecl>(concreteDecl);
+  auto type = typealias ? typealias->getUnderlyingTypeLoc().getType()
+                        : concreteDecl->getDeclaredInterfaceType();
 
+  Type parentType;
+  SubstitutionMap subMap;
   if (proto) {
     // Substitute in the type of the current PotentialArchetype in
     // place of 'Self' here.
-    Type parentType = basePA->getDependentType(builder.getGenericParams());
+    parentType = basePA->getDependentType(builder.getGenericParams());
 
-    auto subMap = SubstitutionMap::getProtocolSubstitutions(
+    subMap = SubstitutionMap::getProtocolSubstitutions(
         proto, parentType, ProtocolConformanceRef(proto));
 
     type = type.subst(subMap, SubstFlags::UseErrorType);
   } else {
     // Substitute in the superclass type.
-    auto superclass = basePA->getEquivalenceClassIfPresent()->superclass;
-    auto superclassDecl = superclass->getClassOrBoundGenericClass();
-    type = superclass->getTypeOfMember(
-        superclassDecl->getParentModule(), concreteDecl,
-        concreteDecl->getDeclaredInterfaceType());
+    parentType = basePA->getEquivalenceClassIfPresent()->superclass;
+    auto superclassDecl = parentType->getClassOrBoundGenericClass();
+
+    subMap = parentType->getMemberSubstitutionMap(
+                           superclassDecl->getParentModule(), concreteDecl);
+    type = type.subst(subMap, SubstFlags::UseErrorType);
+  }
+
+  // If we had a typealias, form a sugared type.
+  if (typealias) {
+    type = NameAliasType::get(typealias, parentType, subMap, type);
   }
 
   return type;
@@ -4171,7 +4182,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 
     auto inheritedReqResult =
       addInheritedRequirements(proto, selfType.getUnresolvedType(), source,
-                               /*inferForModule=*/nullptr);
+                               proto->getModuleContext());
     if (isErrorResult(inheritedReqResult))
       return inheritedReqResult;
   }
@@ -4187,7 +4198,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
       auto innerSource = FloatingRequirementSource::viaProtocolRequirement(
           source, proto, &req, /*inferred=*/false);
       addRequirement(&req, innerSource, &protocolSubMap,
-                     /*inferForModule=*/nullptr);
+                     proto->getModuleContext());
     }
   }
 
@@ -4708,10 +4719,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
 
         // FIXME: diagnose if there's no conformance.
         if (conformance) {
-          auto inferredSource = FloatingRequirementSource::forInferred(nullptr);
-          for (auto req : conformance->getConditionalRequirements()) {
-            addRequirement(req, inferredSource, inferForModule);
-          }
+          addConditionalRequirements(*this, *conformance, inferForModule);
         }
       }
     }
@@ -5430,9 +5438,25 @@ public:
   }
 
   Action walkToTypePost(Type ty) override {
-    auto decl = ty->getAnyNominal();
-    if (!decl)
+    // Infer from generic typealiases.
+    if (auto NameAlias = dyn_cast<NameAliasType>(ty.getPointer())) {
+      auto decl = NameAlias->getDecl();
+      auto genericSig = decl->getGenericSignature();
+      if (!genericSig)
+        return Action::Continue;
+
+      auto subMap = NameAlias->getSubstitutionMap();
+      for (const auto &rawReq : genericSig->getRequirements()) {
+        if (auto req = rawReq.subst(subMap))
+          Builder.addRequirement(*req, source, nullptr);
+      }
+
       return Action::Continue;
+    }
+
+    // Infer from generic nominal types.
+    auto decl = ty->getAnyNominal();
+    if (!decl) return Action::Continue;
 
     auto genericSig = decl->getGenericSignature();
     if (!genericSig)
@@ -7262,7 +7286,7 @@ void GenericSignatureBuilder::enumerateRequirements(
 
     // Sort the protocols in canonical order.
     llvm::array_pod_sort(protocols.begin(), protocols.end(), 
-                         ProtocolType::compareProtocols);
+                         TypeDecl::compare);
 
     // Enumerate the conformance requirements.
     for (auto proto : protocols) {

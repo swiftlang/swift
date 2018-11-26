@@ -92,7 +92,7 @@ namespace irgen {
   Address emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
                                   SILType ClassType, SILType TailType);
 
-  typedef llvm::ArrayRef<std::pair<SILType, llvm::Value *>> TailArraysRef;
+  using TailArraysRef = llvm::ArrayRef<std::pair<SILType, llvm::Value *>>;
 
   /// Adds the size for tail allocated arrays to \p size and returns the new
   /// size value. Also updades the alignment mask to represent the alignment of

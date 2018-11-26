@@ -14,7 +14,7 @@
 // RUN: %FileCheck %s < %t.complex.txt
 // RUN: %FileCheck -check-prefix THREE-OUTPUTS %s < %t.complex.txt
 
-// RUN: %swiftc_driver -emit-module -driver-print-jobs -driver-use-filelists %s %S/../Inputs/empty.swift -module-name main 2>&1 | %FileCheck -check-prefix FILELISTS %s
+// RUN: %swiftc_driver -emit-module -driver-print-jobs -driver-filelist-threshold=0 %s %S/../Inputs/empty.swift -module-name main 2>&1 | %FileCheck -check-prefix FILELISTS %s
 
 // CHECK: bin/swift{{c?}} -frontend
 // CHECK: -module-name {{[^ ]+}}

@@ -37,11 +37,11 @@ public:
     const Orig *Ptr;
     iterator(const Orig *ptr) : Ptr(ptr) {}
   public:
-    typedef Projected value_type;
-    typedef Projected reference;
-    typedef void pointer;
-    typedef ptrdiff_t difference_type;
-    typedef std::random_access_iterator_tag iterator_category;
+    using value_type = Projected;
+    using reference = Projected;
+    using pointer = void;
+    using difference_type = ptrdiff_t;
+    using iterator_category = std::random_access_iterator_tag;
 
     Projected operator*() const { return Project(*Ptr); }
     Projected operator->() const { return operator*(); }

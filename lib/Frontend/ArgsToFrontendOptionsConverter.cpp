@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Frontend/ArgsToFrontendOptionsConverter.h"
+#include "ArgsToFrontendOptionsConverter.h"
 
+#include "ArgsToFrontendInputsConverter.h"
+#include "ArgsToFrontendOutputsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
-#include "swift/Frontend/ArgsToFrontendInputsConverter.h"
-#include "swift/Frontend/ArgsToFrontendOutputsConverter.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
@@ -78,6 +78,8 @@ bool ArgsToFrontendOptionsConverter::convert(
                              Opts.WarnLongExpressionTypeChecking);
   setUnsignedIntegerArgument(OPT_solver_expression_time_threshold_EQ, 10,
                              Opts.SolverExpressionTimeThreshold);
+
+  Opts.DebuggerTestingTransform = Args.hasArg(OPT_debugger_testing_transform);
 
   computePlaygroundOptions();
 

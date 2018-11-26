@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
+#include "MiscDiagnostics.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -247,8 +248,14 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
     }
   }
 
+  // Check whether this is a member access on 'self'.
+  bool isAccessOnSelf = false;
+  if (auto *baseDRE = dyn_cast<DeclRefExpr>(base->getValueProvidingExpr()))
+    if (auto *baseVar = dyn_cast<VarDecl>(baseDRE->getDecl()))
+      isAccessOnSelf = baseVar->isSelfParameter();
+
   // If the value is always directly accessed from this context, do it.
-  return member->getAccessSemanticsFromContext(DC);
+  return member->getAccessSemanticsFromContext(DC, isAccessOnSelf);
 }
 
 void ConstraintSystem::propagateLValueAccessKind(Expr *E, AccessKind accessKind,
@@ -535,6 +542,25 @@ namespace {
     /// underlying value type, in the correct way for an implicit
     /// look-through.
     Expr *coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy);
+
+    /// Peephole an array upcast.
+    void peepholeArrayUpcast(ArrayExpr *expr, Type toType, bool bridged,
+                             Type elementType,
+                             ConstraintLocatorBuilder locator);
+
+    /// Peephole a dictionary upcast.
+    void peepholeDictionaryUpcast(DictionaryExpr *expr, Type toType,
+                                  bool bridged, Type keyType,
+                                  Type valueType,
+                                  ConstraintLocatorBuilder locator);
+
+    /// Try to peephole the collection upcast, eliminating the need for
+    /// a separate collection-upcast expression.
+    ///
+    /// \returns true if the peephole operation succeeded, in which case
+    /// \c expr already subsumes the upcast.
+    bool peepholeCollectionUpcast(Expr *expr, Type toType,  bool bridged,
+                                  ConstraintLocatorBuilder locator);
 
     /// \brief Build a collection upcast expression.
     ///
@@ -1170,7 +1196,7 @@ namespace {
     }
     
     /// \brief Describes either a type or the name of a type to be resolved.
-    typedef llvm::PointerUnion<Identifier, Type> TypeOrName;
+    using TypeOrName = llvm::PointerUnion<Identifier, Type>;
 
     /// \brief Convert the given literal expression via a protocol pair.
     ///
@@ -2794,6 +2820,22 @@ namespace {
       }
 
       auto selected = *selectedElt;
+      if (!selected.choice.getBaseType()) {
+        // This is one of the "outer alternatives", meaning the innermost
+        // methods didn't work out.
+        //
+        // The only way to get here is via an UnresolvedDotExpr with outer
+        // alternatives.
+        auto UDE = cast<UnresolvedDotExpr>(expr);
+        cs.diagnoseDeprecatedConditionalConformanceOuterAccess(
+            UDE, selected.choice.getDecl());
+
+        return buildDeclRef(selected.choice, nameLoc, selected.openedFullType,
+                            memberLocator, implicit,
+                            selected.choice.getFunctionRefKind(),
+                            AccessSemantics::Ordinary);
+      }
+
       switch (selected.choice.getKind()) {
       case OverloadChoiceKind::DeclViaBridge: {
         base = cs.coerceToRValue(base);
@@ -2939,9 +2981,9 @@ namespace {
                             expr->getAccessSemantics());
     }
 
-    Expr *visitArrayExpr(ArrayExpr *expr) {
-      Type openedType = cs.getType(expr);
-      Type arrayTy = simplifyType(openedType);
+    /// "Finish" an array expression by filling in the semantic expression.
+    ArrayExpr *finishArrayExpr(ArrayExpr *expr) {
+      Type arrayTy = cs.getType(expr);
       auto &tc = cs.getTypeChecker();
 
       ProtocolDecl *arrayProto
@@ -2980,7 +3022,7 @@ namespace {
 
           first = false;
           continue;
-        } 
+        }
 
         typeElements.push_back(cs.getType(elt));
         names.push_back(Identifier());
@@ -2990,13 +3032,13 @@ namespace {
       assert(isa<TupleType>(argType.getPointer()));
 
       Expr *arg =
-          TupleExpr::create(tc.Context, SourceLoc(),
-                            expr->getElements(),
-                            names,
-                            { },
-                            SourceLoc(), /*HasTrailingClosure=*/false,
-                            /*Implicit=*/true,
-                            argType);
+        TupleExpr::create(tc.Context, SourceLoc(),
+                          expr->getElements(),
+                          names,
+                          { },
+                          SourceLoc(), /*HasTrailingClosure=*/false,
+                          /*Implicit=*/true,
+                          argType);
 
       cs.cacheExprTypes(arg);
 
@@ -3011,7 +3053,14 @@ namespace {
       cs.cacheExprTypes(result);
 
       expr->setSemanticExpr(result);
+      return expr;
+    }
+
+    Expr *visitArrayExpr(ArrayExpr *expr) {
+      Type openedType = cs.getType(expr);
+      Type arrayTy = simplifyType(openedType);
       cs.setType(expr, arrayTy);
+      if (!finishArrayExpr(expr)) return nullptr;
 
       // If the array element type was defaulted, note that in the expression.
       if (solution.DefaultedConstraints.count(cs.getConstraintLocator(expr)))
@@ -3020,11 +3069,11 @@ namespace {
       return expr;
     }
 
-    Expr *visitDictionaryExpr(DictionaryExpr *expr) {
-      Type openedType = cs.getType(expr);
-      Type dictionaryTy = simplifyType(openedType);
-      auto &tc = cs.getTypeChecker();
+    /// "Finish" a dictionary expression by filling in the semantic expression.
+    DictionaryExpr *finishDictionaryExpr(DictionaryExpr *expr) {
+      Type dictionaryTy = cs.getType(expr);
 
+      auto &tc = cs.getTypeChecker();
       ProtocolDecl *dictionaryProto
         = tc.getProtocol(expr->getLoc(),
                          KnownProtocolKind::ExpressibleByDictionaryLiteral);
@@ -3061,7 +3110,7 @@ namespace {
 
           first = false;
           continue;
-        } 
+        }
 
         typeElements.push_back(cs.getType(elt));
         names.push_back(Identifier());
@@ -3094,7 +3143,14 @@ namespace {
       cs.cacheExprTypes(result);
 
       expr->setSemanticExpr(result);
+      return expr;
+    }
+
+    Expr *visitDictionaryExpr(DictionaryExpr *expr) {
+      Type openedType = cs.getType(expr);
+      Type dictionaryTy = simplifyType(openedType);
       cs.setType(expr, dictionaryTy);
+      if (!finishDictionaryExpr(expr)) return nullptr;
 
       // If the dictionary key or value type was defaulted, note that in the
       // expression.
@@ -3672,24 +3728,11 @@ namespace {
 
     // Rewrite ForcedCheckedCastExpr based on what the solver computed.
     Expr *visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
-      // If we need to insert a force-unwrap for coercions of the form
-      // 'as! T!', do so now.
-      if (hasForcedOptionalResult(expr)) {
-        auto *coerced = handleForcedCheckedCastExpr(expr);
-        if (!coerced)
-          return nullptr;
-
-        return coerceImplicitlyUnwrappedOptionalToValue(
-            coerced, cs.getType(coerced)->getOptionalObjectType());
-      }
-
-      return handleForcedCheckedCastExpr(expr);
-    }
-
-    // Most of the logic for dealing with ForcedCheckedCastExpr.
-    Expr *handleForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
       // Simplify the type we're casting to.
       auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
+      if (hasForcedOptionalResult(expr))
+        toType = toType->getOptionalObjectType();
+
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
       checkForImportedUsedConformances(toType);
 
@@ -3856,7 +3899,15 @@ namespace {
       Expr *src = coerceToType(expr->getSrc(), destTy, locator);
       if (!src)
         return nullptr;
+
       expr->setSrc(src);
+
+      if (!SuppressDiagnostics) {
+        // If we're performing an assignment to a weak or unowned variable from
+        // a constructor call, emit a warning that the instance will be
+        // immediately deallocated.
+        diagnoseUnownedImmediateDeallocation(cs.getTypeChecker(), expr);
+      }
       return expr;
     }
     
@@ -4655,6 +4706,8 @@ namespace {
       
         auto hashable =
           cs.getASTContext().getProtocol(KnownProtocolKind::Hashable);
+        auto equatable =
+          cs.getASTContext().getProtocol(KnownProtocolKind::Equatable);
         for (auto indexType : indexTypes) {
           auto conformance =
             cs.TC.conformsToProtocol(indexType.getType(), hashable,
@@ -4669,6 +4722,17 @@ namespace {
             continue;
           }
           hashables.push_back(*conformance);
+          
+          // FIXME: Hashable implies Equatable, but we need to make sure the
+          // Equatable conformance is forced into existence during type checking
+          // so that it's available for SILGen.
+          auto eqConformance =
+            cs.TC.conformsToProtocol(indexType.getType(), equatable,
+                                     cs.DC,
+                                     (ConformanceCheckFlags::Used|
+                                      ConformanceCheckFlags::InExpression));
+          assert(eqConformance.hasValue());
+          (void)eqConformance;
         }
 
         if (allIndexesHashable) {
@@ -4964,8 +5028,8 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
                     SourceLoc loc, ConcreteDeclRef &owner,
                     unsigned index) {
   auto &tc = cs.getTypeChecker();
-  auto ownerFn = cast<AbstractFunctionDecl>(owner.getDecl());
-  auto defArg = ownerFn->getDefaultArg(index);
+
+  auto defArg = getDefaultArgumentInfo(cast<ValueDecl>(owner.getDecl()), index);
   Expr *init = nullptr;
   switch (defArg.first) {
   case DefaultArgumentKind::None:
@@ -5025,7 +5089,8 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
   }
 
   // Convert the literal to the appropriate type.
-  auto defArgType = ownerFn->mapTypeIntoContext(defArg.second);
+  auto defArgType = owner.getDecl()->getDeclContext()
+                       ->mapTypeIntoContext(defArg.second);
   auto resultTy = tc.typeCheckExpression(
       init, dc, TypeLoc::withoutLoc(defArgType), CTP_CannotFail);
   assert(resultTy && "Conversion cannot fail");
@@ -6185,14 +6250,38 @@ maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
   }
 }
 
+/// Build the conversion of an element in a collection upcast.
+static Expr *buildElementConversion(ExprRewriter &rewriter,
+                                    SourceLoc srcLoc,
+                                    Type srcType,
+                                    Type destType,
+                                    bool bridged,
+                                    ConstraintLocatorBuilder locator,
+                                    Expr *element) {
+  auto &cs = rewriter.getConstraintSystem();
+
+  auto &tc = rewriter.getConstraintSystem().getTypeChecker();
+  if (bridged &&
+      tc.typeCheckCheckedCast(srcType, destType,
+                              CheckedCastContextKind::None, cs.DC,
+                              SourceLoc(), nullptr, SourceRange())
+        != CheckedCastKind::Coercion) {
+    if (auto conversion =
+          rewriter.buildObjCBridgeExpr(element, destType, locator))
+        return conversion;
+  }
+
+  return rewriter.coerceToType(element, destType, locator);
+}
+
 static CollectionUpcastConversionExpr::ConversionPair
-buildElementConversion(ExprRewriter &rewriter,
-                       SourceLoc srcLoc,
-                       Type srcCollectionType,
-                       Type destCollectionType,
-                       bool bridged,
-                       ConstraintLocatorBuilder locator,
-                       unsigned typeArgIndex) {
+buildOpaqueElementConversion(ExprRewriter &rewriter,
+                             SourceLoc srcLoc,
+                             Type srcCollectionType,
+                             Type destCollectionType,
+                             bool bridged,
+                             ConstraintLocatorBuilder locator,
+                             unsigned typeArgIndex) {
   // We don't need this stuff unless we've got generalized casts.
   Type srcType = srcCollectionType->castTo<BoundGenericType>()
                                   ->getGenericArgs()[typeArgIndex];
@@ -6204,35 +6293,138 @@ buildElementConversion(ExprRewriter &rewriter,
   ASTContext &ctx = cs.getASTContext();
   auto opaque =
     rewriter.cs.cacheType(new (ctx) OpaqueValueExpr(srcLoc, srcType));
-  Expr *conversion = nullptr;
 
-  auto &tc = rewriter.getConstraintSystem().getTypeChecker();
-  if (bridged &&
-      tc.typeCheckCheckedCast(srcType, destType,
-                              CheckedCastContextKind::None, cs.DC,
-                              SourceLoc(), nullptr, SourceRange())
-        != CheckedCastKind::Coercion) {
-    conversion = rewriter.buildObjCBridgeExpr(opaque, destType,
-           locator.withPathElement(
-             ConstraintLocator::PathElement::getGenericArgument(typeArgIndex)));
-  }
-
-  if (!conversion) {
-    conversion = rewriter.coerceToType(opaque, destType,
-           locator.withPathElement(
-             ConstraintLocator::PathElement::getGenericArgument(typeArgIndex)));
-  }
+  Expr *conversion =
+    buildElementConversion(rewriter, srcLoc, srcType, destType, bridged,
+                           locator.withPathElement(
+                             ConstraintLocator::PathElement::getGenericArgument(
+                                typeArgIndex)),
+                           opaque);
 
   return { opaque, conversion };
 }
 
-Expr *ExprRewriter::buildCollectionUpcastExpr(Expr *expr, Type toType,
-                                              bool bridged,
-                                              ConstraintLocatorBuilder locator) {
+void ExprRewriter::peepholeArrayUpcast(ArrayExpr *expr, Type toType,
+                                       bool bridged, Type elementType,
+                                       ConstraintLocatorBuilder locator) {
+  // Update the type of the array literal.
+  cs.setType(expr, toType);
+
+  // Convert the elements.
+  ConstraintLocatorBuilder innerLocator =
+    locator.withPathElement(
+                        ConstraintLocator::PathElement::getGenericArgument(0));
+  for (auto &element : expr->getElements()) {
+    if (auto newElement = buildElementConversion(*this, expr->getLoc(),
+                                                 cs.getType(element),
+                                                 elementType,
+                                                 bridged, innerLocator,
+                                                 element)) {
+      element = newElement;
+    }
+  }
+
+  (void)finishArrayExpr(expr);
+}
+
+void ExprRewriter::peepholeDictionaryUpcast(DictionaryExpr *expr,
+                                            Type toType, bool bridged,
+                                            Type keyType, Type valueType,
+                                            ConstraintLocatorBuilder locator) {
+  // Update the type of the dictionary literal.
+  cs.setType(expr, toType);
+
+  ConstraintLocatorBuilder keyLocator =
+    locator.withPathElement(
+      ConstraintLocator::PathElement::getGenericArgument(0));
+  ConstraintLocatorBuilder valueLocator =
+    locator.withPathElement(
+      ConstraintLocator::PathElement::getGenericArgument(1));
+
+  // Convert the elements.
+  TupleTypeElt tupleTypeElts[2] = { keyType, valueType };
+  auto tupleType = TupleType::get(tupleTypeElts, cs.getASTContext());
+  for (auto element : expr->getElements()) {
+    if (auto tuple = dyn_cast<TupleExpr>(element)) {
+      auto key = tuple->getElement(0);
+      if (auto newKey = buildElementConversion(*this, expr->getLoc(),
+                                               cs.getType(key), keyType,
+                                               bridged, valueLocator, key))
+        tuple->setElement(0, newKey);
+
+      auto value = tuple->getElement(1);
+      if (auto newValue = buildElementConversion(*this, expr->getLoc(),
+                                                 cs.getType(value), valueType,
+                                                 bridged, valueLocator,
+                                                 value)) {
+        tuple->setElement(1, newValue);
+      }
+
+      cs.setType(tuple, tupleType);
+    }
+  }
+
+  (void)finishDictionaryExpr(expr);
+}
+
+bool ExprRewriter::peepholeCollectionUpcast(Expr *expr, Type toType,
+                                            bool bridged,
+                                            ConstraintLocatorBuilder locator) {
+  // Recurse into parenthesized expressions.
+  if (auto paren = dyn_cast<ParenExpr>(expr)) {
+    // If we can't peephole the subexpression, we're done.
+    if (!peepholeCollectionUpcast(paren->getSubExpr(), toType, bridged,
+                                  locator))
+      return false;
+
+    // Update the type of this expression.
+    cs.setType(paren, ParenType::get(cs.getASTContext(),
+                                     cs.getType(paren->getSubExpr())));
+    return true;
+  }
+
+  // Array literals.
+  if (auto arrayLiteral = dyn_cast<ArrayExpr>(expr)) {
+    if (Optional<Type> elementType = ConstraintSystem::isArrayType(toType)) {
+      peepholeArrayUpcast(arrayLiteral, toType, bridged, *elementType, locator);
+      return true;
+    }
+
+    if (Optional<Type> elementType = ConstraintSystem::isSetType(toType)) {
+      peepholeArrayUpcast(arrayLiteral, toType, bridged, *elementType, locator);
+      return true;
+    }
+
+    return false;
+  }
+
+  // Dictionary literals.
+  if (auto dictLiteral = dyn_cast<DictionaryExpr>(expr)) {
+    if (auto elementType = ConstraintSystem::isDictionaryType(toType)) {
+      peepholeDictionaryUpcast(dictLiteral, toType, bridged,
+                               elementType->first, elementType->second,
+                               locator);
+      return true;
+    }
+
+    return false;
+  }
+
+  return false;
+}
+
+Expr *ExprRewriter::buildCollectionUpcastExpr(
+                                            Expr *expr, Type toType,
+                                            bool bridged,
+                                            ConstraintLocatorBuilder locator) {
+  if (peepholeCollectionUpcast(expr, toType, bridged, locator))
+    return expr;
+
   ASTContext &ctx = cs.getASTContext();
   // Build the first value conversion.
-  auto conv = buildElementConversion(*this, expr->getLoc(), cs.getType(expr),
-                                     toType, bridged, locator, 0);
+  auto conv =
+    buildOpaqueElementConversion(*this, expr->getLoc(), cs.getType(expr),
+                                 toType, bridged, locator, 0);
 
   // For single-parameter collections, form the upcast.
   if (ConstraintSystem::isArrayType(toType) ||
@@ -6245,8 +6437,9 @@ Expr *ExprRewriter::buildCollectionUpcastExpr(Expr *expr, Type toType,
          "Unhandled collection upcast");
 
   // Build the second value conversion.
-  auto conv2 = buildElementConversion(*this, expr->getLoc(), cs.getType(expr),
-                                      toType, bridged, locator, 1);
+  auto conv2 =
+    buildOpaqueElementConversion(*this, expr->getLoc(), cs.getType(expr),
+                                 toType, bridged, locator, 1);
 
   return cs.cacheType(
            new (ctx) CollectionUpcastConversionExpr(expr, toType, conv, conv2));
@@ -8274,6 +8467,11 @@ Solution::convertBooleanTypeToBuiltinI1(Expr *expr,
   auto &ctx = tc.Context;
 
   auto type = cs.getType(expr);
+
+  // We allow UnresolvedType <c $T for all $T, so we might end up here
+  // in diagnostics. Just bail out.
+  if (type->is<UnresolvedType>())
+    return expr;
 
   // Look for the builtin name. If we don't have it, we need to call the
   // general name via the witness table.

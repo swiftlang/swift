@@ -1722,14 +1722,16 @@ static CanAnyFunctionType getGlobalAccessorType(CanType varType) {
 /// Get the type of a default argument generator, () -> T.
 static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
                                                      TypeConverter &TC,
-                                                     AbstractFunctionDecl *AFD,
+                                                     ValueDecl *VD,
+                                                     DeclContext *DC,
                                                      unsigned DefaultArgIndex) {
-  auto resultTy = AFD->getDefaultArg(DefaultArgIndex).second;
+  auto resultTy = getDefaultArgumentInfo(VD, DefaultArgIndex).second;
   assert(resultTy && "Didn't find default argument?");
 
   // The result type might be written in terms of type parameters
   // that have been made fully concrete.
-  CanType canResultTy = resultTy->getCanonicalType(AFD->getGenericSignature());
+  CanType canResultTy = resultTy->getCanonicalType(
+                            DC->getGenericSignatureOfContext());
 
   // Remove @noescape from function return types. A @noescape
   // function return type is a contradiction.
@@ -1740,7 +1742,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   }
 
   // Get the generic signature from the surrounding context.
-  auto funcInfo = TC.getConstantInfo(SILDeclRef(AFD));
+  auto funcInfo = TC.getConstantInfo(SILDeclRef(VD));
   return CanAnyFunctionType::get(funcInfo.FormalType.getOptGenericSignature(),
                                  TupleType::getEmpty(TC.Context),
                                  canResultTy);
@@ -1914,8 +1916,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     return getGlobalAccessorType(var->getInterfaceType()->getCanonicalType());
   }
   case SILDeclRef::Kind::DefaultArgGenerator:
-    return getDefaultArgGeneratorInterfaceType(*this,
-                                               cast<AbstractFunctionDecl>(vd),
+    return getDefaultArgGeneratorInterfaceType(*this, vd, vd->getDeclContext(),
                                                c.defaultArgIndex);
   case SILDeclRef::Kind::StoredPropertyInitializer:
     return getStoredPropertyInitializerInterfaceType(*this,

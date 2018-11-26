@@ -1383,9 +1383,10 @@ recur:
                 EEP->getName().str() == "Some") {
               SmallString<4> Rename;
               camel_case::toLowercaseWord(EEP->getName().str(), Rename);
-              diagnose(EEP->getLoc(), diag::availability_decl_unavailable_rename,
-                          EEP->getName(), /*replaced*/false,
-                          /*special kind*/0, Rename.str())
+              diagnose(EEP->getLoc(),
+                       diag::availability_decl_unavailable_rename,
+                       /*"getter" prefix*/2, EEP->getName(), /*replaced*/false,
+                       /*special kind*/0, Rename.str())
                 .fixItReplace(EEP->getLoc(), Rename.str());
 
               return true;

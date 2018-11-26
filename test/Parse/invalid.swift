@@ -21,11 +21,11 @@ func test3() {
   undeclared_func( // expected-error {{use of unresolved identifier 'undeclared_func'}}
 } // expected-error {{expected expression in list of expressions}}
 
-func runAction() {} // expected-note {{did you mean 'runAction'?}}
+func runAction() {} // expected-note {{'runAction' declared here}}
 
 // rdar://16601779
 func foo() {
-  runAction(SKAction.sequence() // expected-error {{use of unresolved identifier 'SKAction'}} expected-error {{expected ',' separator}} {{32-32=,}}
+  runAction(SKAction.sequence() // expected-error {{use of unresolved identifier 'SKAction'; did you mean 'runAction'?}} {{13-21=runAction}} expected-error {{expected ',' separator}} {{32-32=,}}
     
     skview!
     // expected-error @-1 {{use of unresolved identifier 'skview'}}

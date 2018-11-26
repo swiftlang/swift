@@ -13,7 +13,7 @@
 import SwiftShims
 
 extension _StringVariant {
-  @_versioned
+  @usableFromInline
   func _repeated(_ count: Int) -> _SwiftStringStorage<CodeUnit> {
     _sanityCheck(count > 0)
     let c = self.count
@@ -46,44 +46,26 @@ extension String {
   ///   - repeatedValue: The string to repeat.
   ///   - count: The number of times to repeat `repeatedValue` in the resulting
   ///     string.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init(repeating repeatedValue: String, count: Int) {
+    precondition(count >= 0, "Negative count not allowed")
     guard count > 1 else {
       self = count == 0 ? "" : repeatedValue
       return
     }
-
-    precondition(count > 0, "Negative count not allowed")
-    self = _visitGuts(repeatedValue._guts, range: nil, args: count,
-      ascii: { ascii, count in
-        return String(_StringGuts(_large: ascii._repeated(count))) },
-      utf16: { utf16, count in
-        return String(_StringGuts(_large: utf16._repeated(count))) },
-      opaque: { opaque, count in
-        return String(_StringGuts(_large: opaque._repeated(count))) })
+    self = String(repeatedValue._guts._repeated(count))
   }
 
   /// A Boolean value indicating whether a string has no characters.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var isEmpty: Bool {
     return _guts.count == 0
   }
 }
 
-extension String {
-  @_inlineable // FIXME(sil-serialize-all)
-  public init(_ _c: Unicode.Scalar) {
-    self = String._fromWellFormedCodeUnitSequence(
-      UTF32.self,
-      input: repeatElement(_c.value, count: 1))
-  }
-}
-
-
 // TODO: since this is generally useful, make public via evolution proposal.
 extension BidirectionalCollection {
-  @_inlineable
-  @_versioned
+  @inlinable
   internal func _ends<Suffix: BidirectionalCollection>(
     with suffix: Suffix, by areEquivalent: (Element,Element) -> Bool
   ) -> Bool where Suffix.Element == Element {
@@ -98,8 +80,7 @@ extension BidirectionalCollection {
 }
 
 extension BidirectionalCollection where Element: Equatable {
-  @_inlineable
-  @_versioned
+  @inlinable
   internal func _ends<Suffix: BidirectionalCollection>(
     with suffix: Suffix
   ) -> Bool where Suffix.Element == Element {
@@ -138,7 +119,7 @@ extension StringProtocol {
   ///
   /// - Parameter prefix: A possible prefix to test against this string.
   /// - Returns: `true` if the string begins with `prefix`; otherwise, `false`.
-  @_inlineable
+  @inlinable
   public func hasPrefix<Prefix: StringProtocol>(_ prefix: Prefix) -> Bool {
     return self.starts(with: prefix)
   }
@@ -172,17 +153,34 @@ extension StringProtocol {
   ///
   /// - Parameter suffix: A possible suffix to test against this string.
   /// - Returns: `true` if the string ends with `suffix`; otherwise, `false`.
-  @_inlineable
+  @inlinable
   public func hasSuffix<Suffix: StringProtocol>(_ suffix: Suffix) -> Bool {
     return self._ends(with: suffix)
   }
 }
 
 extension String {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func hasPrefix(_ prefix: String) -> Bool {
     let prefixCount = prefix._guts.count
     if prefixCount == 0 { return true }
+
+    // TODO: replace with 2-way vistor
+    if self._guts._isSmall && prefix._guts._isSmall {
+      let selfSmall = self._guts._smallUTF8String
+      let prefixSmall = prefix._guts._smallUTF8String
+      if selfSmall.isASCII && prefixSmall.isASCII {
+        return selfSmall.withUnmanagedASCII { selfASCII in
+          return prefixSmall.withUnmanagedASCII { prefixASCII in
+            if prefixASCII.count > selfASCII.count { return false }
+            return (0 as CInt) == _stdlib_memcmp(
+                selfASCII.rawStart,
+                prefixASCII.rawStart,
+                prefixASCII.count)
+          }
+        }
+      }
+    }
 
     if _fastPath(!self._guts._isOpaque && !prefix._guts._isOpaque) {
       if self._guts.isASCII && prefix._guts.isASCII {
@@ -210,17 +208,34 @@ extension String {
     return self.starts(with: prefix)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func hasSuffix(_ suffix: String) -> Bool {
     let suffixCount = suffix._guts.count
     if suffixCount == 0 { return true }
+
+    // TODO: replace with 2-way vistor
+    if self._guts._isSmall && suffix._guts._isSmall {
+      let selfSmall = self._guts._smallUTF8String
+      let suffixSmall = suffix._guts._smallUTF8String
+      if selfSmall.isASCII && suffixSmall.isASCII {
+        return selfSmall.withUnmanagedASCII { selfASCII in
+          return suffixSmall.withUnmanagedASCII { suffixASCII in
+            if suffixASCII.count > selfASCII.count { return false }
+            return (0 as CInt) == _stdlib_memcmp(
+                selfASCII.rawStart + (selfASCII.count - suffixASCII.count),
+                suffixASCII.rawStart,
+                suffixASCII.count)
+          }
+        }
+      }
+    }
 
     if _fastPath(!self._guts._isOpaque && !suffix._guts._isOpaque) {
       if self._guts.isASCII && suffix._guts.isASCII {
         let result: Bool
         let selfASCII = self._guts._unmanagedASCIIView
         let suffixASCII = suffix._guts._unmanagedASCIIView
-        if suffixASCII.count > self._guts.count {
+        if suffixASCII.count > selfASCII.count {
           // Suffix is longer than self.
           result = false
         } else {
@@ -270,10 +285,28 @@ extension String {
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init<T : BinaryInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) {
     self = value._description(radix: radix, uppercase: uppercase)
   }
 }
+
+extension _StringGuts {
+  @inlinable
+  func _repeated(_ n: Int) -> _StringGuts {
+    _sanityCheck(n > 1)
+    if self._isSmall {
+      // TODO: visitor pattern for something like this...
+      if let small = self._smallUTF8String._repeated(n) {
+        return _StringGuts(small)
+      }
+    }
+    return _visitGuts(self, range: nil, args: n,
+      ascii: { ascii, n in return _StringGuts(_large: ascii._repeated(n)) },
+      utf16: { utf16, n in return _StringGuts(_large: utf16._repeated(n)) },
+      opaque: { opaque, n in return _StringGuts(_large: opaque._repeated(n)) })
+  }
+}
+

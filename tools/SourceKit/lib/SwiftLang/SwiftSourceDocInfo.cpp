@@ -1230,15 +1230,6 @@ static void resolveCursor(SwiftLangSupport &Lang,
         return;
       }
 
-      trace::TracedOperation TracedOp;
-      if (trace::enabled()) {
-        trace::SwiftInvocation SwiftArgs;
-        ASTInvok->raw(SwiftArgs.Args.Args, SwiftArgs.Args.PrimaryFile);
-        trace::initTraceFiles(SwiftArgs, CompIns);
-        TracedOp.start(trace::OperationKind::CursorInfoForSource, SwiftArgs,
-                       {std::make_pair("Offset", std::to_string(Offset))});
-      }
-
       // Sanitize length.
       if (Length) {
         SourceLoc TokEnd = Lexer::getLocForEndOfToken(SM, Loc);
@@ -1424,15 +1415,6 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
         return;
       }
 
-      trace::TracedOperation TracedOp;
-      if (trace::enabled()) {
-        trace::SwiftInvocation SwiftArgs;
-        ASTInvok->raw(SwiftArgs.Args.Args, SwiftArgs.Args.PrimaryFile);
-        trace::initTraceFiles(SwiftArgs, CompIns);
-        TracedOp.start(trace::OperationKind::CursorInfoForSource, SwiftArgs,
-                       {std::make_pair("Offset", std::to_string(Offset))});
-      }
-
       CursorInfoResolver Resolver(AstUnit->getPrimarySourceFile());
       ResolvedCursorInfo CursorInfo = Resolver.resolve(Loc);
       if (CursorInfo.isInvalid()) {
@@ -1508,9 +1490,7 @@ static void resolveRange(SwiftLangSupport &Lang,
       Receiver(std::move(Receiver)){ }
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
-      if (trace::enabled()) {
-        // FIXME: Implement tracing
-      }
+      // FIXME: Implement tracing
       RangeResolver Resolver(AstUnit->getPrimarySourceFile(), Offset, Length);
       ResolvedRangeInfo Info = Resolver.resolve();
 
@@ -1584,19 +1564,6 @@ void SwiftLangSupport::getCursorInfo(
     std::function<void(const CursorInfoData &)> Receiver) {
 
   if (auto IFaceGenRef = IFaceGenContexts.get(InputFile)) {
-    trace::TracedOperation TracedOp;
-    if (trace::enabled()) {
-      trace::SwiftInvocation SwiftArgs;
-      trace::initTraceInfo(SwiftArgs, InputFile, Args);
-      // Do we need to record any files? If yes -- which ones?
-      trace::StringPairs OpArgs {
-        std::make_pair("DocumentName", IFaceGenRef->getDocumentName()),
-        std::make_pair("ModuleOrHeaderName", IFaceGenRef->getModuleOrHeaderName()),
-        std::make_pair("Offset", std::to_string(Offset))};
-      TracedOp.start(trace::OperationKind::CursorInfoForIFaceGen,
-                     SwiftArgs, OpArgs);
-    }
-
     IFaceGenRef->accessASTAsync([this, IFaceGenRef, Offset, Actionables, Receiver] {
       SwiftInterfaceGenContext::ResolvedEntity Entity;
       Entity = IFaceGenRef->resolveEntityForOffset(Offset);
@@ -1666,19 +1633,6 @@ getNameInfo(StringRef InputFile, unsigned Offset, NameTranslatingInfo &Input,
             std::function<void(const NameTranslatingInfo &)> Receiver) {
 
   if (auto IFaceGenRef = IFaceGenContexts.get(InputFile)) {
-    trace::TracedOperation TracedOp;
-    if (trace::enabled()) {
-      trace::SwiftInvocation SwiftArgs;
-      trace::initTraceInfo(SwiftArgs, InputFile, Args);
-      // Do we need to record any files? If yes -- which ones?
-      trace::StringPairs OpArgs {
-        std::make_pair("DocumentName", IFaceGenRef->getDocumentName()),
-        std::make_pair("ModuleOrHeaderName", IFaceGenRef->getModuleOrHeaderName()),
-        std::make_pair("Offset", std::to_string(Offset))};
-      TracedOp.start(trace::OperationKind::CursorInfoForIFaceGen,
-                     SwiftArgs, OpArgs);
-    }
-
     IFaceGenRef->accessASTAsync([IFaceGenRef, Offset, Input, Receiver] {
       SwiftInterfaceGenContext::ResolvedEntity Entity;
       Entity = IFaceGenRef->resolveEntityForOffset(Offset);
@@ -1761,15 +1715,6 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
 
       unsigned BufferID =
           AstUnit->getPrimarySourceFile().getBufferID().getValue();
-
-      trace::TracedOperation TracedOp;
-      if (trace::enabled()) {
-        trace::SwiftInvocation SwiftArgs;
-        ASTInvok->raw(SwiftArgs.Args.Args, SwiftArgs.Args.PrimaryFile);
-        trace::initTraceFiles(SwiftArgs, CompIns);
-        TracedOp.start(trace::OperationKind::CursorInfoForSource, SwiftArgs,
-                       {std::make_pair("USR", USR)});
-      }
 
       if (USR.startswith("c:")) {
         LOG_WARN_FUNC("lookup for C/C++/ObjC USRs not implemented");
@@ -1956,19 +1901,10 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
       auto &CompInst = AstUnit->getCompilerInstance();
       auto &SrcFile = AstUnit->getPrimarySourceFile();
 
-      trace::TracedOperation TracedOp;
 
       SmallVector<std::pair<unsigned, unsigned>, 8> Ranges;
 
       auto Action = [&]() {
-        if (trace::enabled()) {
-          trace::SwiftInvocation SwiftArgs;
-          Invok->raw(SwiftArgs.Args.Args, SwiftArgs.Args.PrimaryFile);
-          trace::initTraceFiles(SwiftArgs, CompInst);
-          TracedOp.start(trace::OperationKind::RelatedIdents, SwiftArgs,
-                        {std::make_pair("Offset", std::to_string(Offset))});
-        }
-
         unsigned BufferID = SrcFile.getBufferID().getValue();
         SourceLoc Loc =
           Lexer::getLocForStartOfToken(CompInst.getSourceMgr(), BufferID, Offset);

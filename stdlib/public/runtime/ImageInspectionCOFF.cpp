@@ -139,4 +139,10 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
 #endif // __CYGWIN__
 }
 
+// This is only used for backward deployment hooks, which we currently only support for
+// MachO. Add a stub here to make sure it still compiles.
+void *swift::lookupSection(const char *segment, const char *section, size_t *outSize) {
+  return nullptr;
+}
+
 #endif // !defined(__ELF__) && !defined(__MACH__)

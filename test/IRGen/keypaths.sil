@@ -1,7 +1,7 @@
 
 // RUN: %empty-directory(%t)
 // -- Convert <i32 0x...> constants to decimal constants that LLVM will print
-// RUN: %utils/chex.py < %s > %t/keypaths.sil
+// RUN: %{python} %utils/chex.py < %s > %t/keypaths.sil
 // RUN: %target-swift-frontend -module-name keypaths -emit-ir %s | %FileCheck %t/keypaths.sil --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-os
 
 sil_stage canonical
@@ -220,9 +220,9 @@ sil_vtable C {}
 //             -- struct with runtime-resolved offset
 // CHECK-SAME: <i32 0x00fffffe>,
 // CHECK-32-SAME: i32 20 }>
-// CHECK-64-SAME: i32 40 }>
+// CHECK-64-SAME: i32 36 }>
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @stored_property_fixed_offsets()
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @stored_property_fixed_offsets()
 sil @stored_property_fixed_offsets : $@convention(thin) () -> () {
 entry:
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_A]] to i8*), i8* undef)
@@ -269,7 +269,7 @@ struct Foo<T> {
   var foo: T
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @stored_property_generics(%swift.type* %T, %swift.type* %U)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @stored_property_generics(%swift.type* %T, %swift.type* %U)
 sil @stored_property_generics : $@convention(thin) <T, U> () -> () {
 entry:
   // CHECK: [[PTR:%.*]] = bitcast i8* [[ARGS:%.*]] to
@@ -305,7 +305,7 @@ entry:
 // CHECK:   [[A:%.*]] = load %swift.type*, %swift.type** [[BUF]]
 // CHECK:   ret %swift.type* [[A]]
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @computed_property_generics
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @computed_property_generics
 sil @computed_property_generics : $@convention(thin) <T, U> () -> () {
 entry:
   %n = keypath $WritableKeyPath<T, U>, <UUU, TTT> (root $TTT; settable_property $UUU, id @n_get : $@convention(thin) <UU, TT> (@in_guaranteed TT) -> @out UU, getter @n_get : $@convention(thin) <UU, TT> (@in_guaranteed TT) -> @out UU, setter @n_set : $@convention(thin) <UU, TT> (@in_guaranteed UU, @in_guaranteed TT) -> ()) <U, T>

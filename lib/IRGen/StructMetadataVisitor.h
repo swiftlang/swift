@@ -59,17 +59,23 @@ public:
     asImpl().noteStartOfFieldOffsets();
     for (VarDecl *prop : Target->getStoredProperties())
       asImpl().addFieldOffset(prop);
+
+    asImpl().noteEndOfFieldOffsets();
   }
   
   // Note the start of the field offset vector.
   void noteStartOfFieldOffsets() {}
+
+  // Note the end of the field offset vector.
+  void noteEndOfFieldOffsets() {}
 };
 
 /// An "implementation" of StructMetadataVisitor that just scans through
 /// the metadata layout, maintaining the offset of the next field.
 template <class Impl>
 class StructMetadataScanner : public StructMetadataVisitor<Impl> {
-  typedef StructMetadataVisitor<Impl> super;
+  using super = StructMetadataVisitor<Impl>;
+
 protected:
   Size NextOffset = Size(0);
 
@@ -80,17 +86,22 @@ public:
   void addMetadataFlags() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
   void addNominalTypeDescriptor() { addPointer(); }
-  void addFieldOffset(VarDecl*) { addPointer(); }
+  void addFieldOffset(VarDecl *) { addInt32(); }
   void addGenericArgument(CanType argument) { addPointer(); }
   void addGenericWitnessTable(CanType argument, ProtocolConformanceRef conf) {
     addPointer();
   }
   void noteStartOfTypeSpecificMembers() {}
 
+  void noteEndOfFieldOffsets() {
+    NextOffset = NextOffset.roundUpToAlignment(super::IGM.getPointerAlignment());
+  }
+
 private:
   void addPointer() {
     NextOffset += super::IGM.getPointerSize();
   }
+  void addInt32() { NextOffset += Size(4); }
 };
 
 } // end namespace irgen

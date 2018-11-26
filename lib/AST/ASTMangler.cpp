@@ -503,6 +503,7 @@ std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
   } else if (isa<AssociatedTypeDecl>(Decl)) {
     appendContextOf(Decl);
     appendDeclName(Decl);
+    appendOperator("Qa");
   } else {
     appendEntity(Decl);
   }
@@ -735,11 +736,14 @@ void ASTMangler::appendType(Type type) {
                             cast<BuiltinVectorType>(tybase)->getNumElements());
     case TypeKind::NameAlias: {
       assert(DWARFMangling && "sugared types are only legal for the debugger");
-      auto NameAliasTy = cast<NameAliasType>(tybase);
-      TypeAliasDecl *decl = NameAliasTy->getDecl();
+      auto aliasTy = cast<NameAliasType>(tybase);
+
+      // It's not possible to mangle the context of the builtin module.
+      // FIXME: We also cannot yet mangle references to typealiases that
+      // involve generics.
+      TypeAliasDecl *decl = aliasTy->getDecl();
       if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
-        // It's not possible to mangle the context of the builtin module.
-        return appendType(NameAliasTy->getSinglyDesugaredType());
+        return appendType(aliasTy->getSinglyDesugaredType());
       }
 
       // For the DWARF output we want to mangle the type alias + context,
@@ -833,20 +837,23 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::Struct:
     case TypeKind::BoundGenericClass:
     case TypeKind::BoundGenericEnum:
-    case TypeKind::BoundGenericStruct:
+    case TypeKind::BoundGenericStruct: {
+      // We can't use getAnyNominal here because this can be TypeAliasDecl only
+      // in case of UnboundGenericType. Such mangling happens in, for instance,
+      // SourceKit 'cursorinfo' request.
+      auto *Decl = type->getAnyGeneric();
       if (type->isSpecialized()) {
         // Try to mangle the entire name as a substitution.
-        if (tryMangleSubstitution(type.getPointer()))
+        if (tryMangleSubstitution(tybase))
           return;
 
-        NominalTypeDecl *NDecl = type->getAnyNominal();
-        if (isStdlibType(NDecl) && NDecl->getName().str() == "Optional") {
+        if (isStdlibType(Decl) && Decl->getName().str() == "Optional") {
           auto GenArgs = type->castTo<BoundGenericType>()->getGenericArgs();
           assert(GenArgs.size() == 1);
           appendType(GenArgs[0]);
           appendOperator("Sg");
         } else {
-          appendAnyGenericType(NDecl);
+          appendAnyGenericType(Decl);
           bool isFirstArgList = true;
           appendBoundGenericArgs(type, isFirstArgList);
           appendRetroactiveConformances(type);
@@ -855,8 +862,9 @@ void ASTMangler::appendType(Type type) {
         addSubstitution(type.getPointer());
         return;
       }
-      appendAnyGenericType(tybase->getAnyNominal());
+      appendAnyGenericType(Decl);
       return;
+    }
 
     case TypeKind::SILFunction:
       return appendImplFunctionType(cast<SILFunctionType>(tybase));

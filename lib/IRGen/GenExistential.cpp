@@ -47,6 +47,7 @@
 #include "IRGenModule.h"
 #include "MetadataRequest.h"
 #include "NonFixedTypeInfo.h"
+#include "Outlining.h"
 #include "ProtocolInfo.h"
 #include "TypeInfo.h"
 #include "WeakTypeInfo.h"
@@ -333,9 +334,9 @@ public:
                                                srcBuffer);
     } else {
       // Create an outlined function to avoid explosion
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction);
+      OutliningMetadataCollector collector(IGF);
+      collector.emitCallToOutlinedCopy(dest, src, T, *this,
+                                       IsInitialization, IsNotTake);
     }
   }
 
@@ -354,9 +355,9 @@ public:
                                                srcBuffer);
     } else {
       // Create an outlined function to avoid explosion
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction);
+      OutliningMetadataCollector collector(IGF);
+      collector.emitCallToOutlinedCopy(dest, src, T, *this,
+                                       IsInitialization, IsTake);
     }
   }
 
@@ -415,9 +416,9 @@ public:
       asDerived().emitValueAssignWithCopy(IGF, destValue, srcValue);
       emitCopyOfTables(IGF, dest, src);
     } else {
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedAssignWithCopyFunction);
+      OutliningMetadataCollector collector(IGF);
+      collector.emitCallToOutlinedCopy(dest, src, T, *this,
+                                       IsNotInitialization, IsNotTake);
     }
   }
 
@@ -429,9 +430,9 @@ public:
       asDerived().emitValueInitializeWithCopy(IGF, destValue, srcValue);
       emitCopyOfTables(IGF, dest, src);
     } else {
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction);
+      OutliningMetadataCollector collector(IGF);
+      collector.emitCallToOutlinedCopy(dest, src, T, *this,
+                                       IsInitialization, IsNotTake);
     }
   }
 
@@ -443,9 +444,9 @@ public:
       asDerived().emitValueAssignWithTake(IGF, destValue, srcValue);
       emitCopyOfTables(IGF, dest, src);
     } else {
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedAssignWithTakeFunction);
+      OutliningMetadataCollector collector(IGF);
+      collector.emitCallToOutlinedCopy(dest, src, T, *this,
+                                       IsNotInitialization, IsTake);
     }
   }
 
@@ -457,9 +458,9 @@ public:
       asDerived().emitValueInitializeWithTake(IGF, destValue, srcValue);
       emitCopyOfTables(IGF, dest, src);
     } else {
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction);
+      OutliningMetadataCollector collector(IGF);
+      collector.emitCallToOutlinedCopy(dest, src, T, *this,
+                                       IsInitialization, IsTake);
     }
   }
 
@@ -469,7 +470,8 @@ public:
       Address valueAddr = projectValue(IGF, existential);
       asDerived().emitValueDestroy(IGF, valueAddr);
     } else {
-      IGF.IGM.generateCallToOutlinedDestroy(IGF, *this, existential, T);
+      OutliningMetadataCollector collector(IGF);
+      collector.emitCallToOutlinedDestroy(existential, T, *this);
     }
   }
 
@@ -1161,7 +1163,7 @@ public:
                          Explosion &out) const override {
     Address valueAddr = projectValue(IGF, existential);
     out.add(IGF.emitUnownedLoadStrong(valueAddr,
-                                      IGF.IGM.getReferenceType(Refcounting),
+                                      getPayloadType(),
                                       Refcounting));
     emitLoadOfTables(IGF, existential, out);
   }
@@ -1170,7 +1172,7 @@ public:
                          Explosion &out) const override {
     Address valueAddr = projectValue(IGF, existential);
     out.add(IGF.emitUnownedTakeStrong(valueAddr,
-                                      IGF.IGM.getReferenceType(Refcounting),
+                                      getPayloadType(),
                                       Refcounting));
     emitLoadOfTables(IGF, existential, out);
   }
@@ -1622,7 +1624,8 @@ Address irgen::emitOpenExistentialBox(IRGenFunction &IGF,
                                                  2 * IGF.IGM.getPointerSize());
   auto witness = IGF.Builder.CreateLoad(witnessAddr);
   
-  IGF.bindArchetype(openedArchetype, metadata, witness);
+  IGF.bindArchetype(openedArchetype, metadata, MetadataState::Complete,
+                    witness);
   return box.getAddress();
 }
 
@@ -1878,15 +1881,8 @@ void irgen::emitMetatypeOfClassExistential(IRGenFunction &IGF, Explosion &value,
   assert((IGF.IGM.ObjCInterop || repr != MetatypeRepresentation::ObjC) &&
          "Class metatypes should not have ObjC representation without runtime");
 
-  if (repr == MetatypeRepresentation::Thick) {
-    auto dynamicType = emitDynamicTypeOfOpaqueHeapObject(IGF, instance);
-    out.add(dynamicType);
-  } else if (repr == MetatypeRepresentation::ObjC) {
-    auto dynamicType = emitHeapMetadataRefForUnknownHeapObject(IGF, instance);
-    out.add(dynamicType);
-  } else {
-    llvm_unreachable("Unknown metatype representation");
-  }
+  auto dynamicType = emitDynamicTypeOfOpaqueHeapObject(IGF, instance, repr);
+  out.add(dynamicType);
 
   // Get the witness tables.
   out.add(tablesAndValue.first);
@@ -1923,8 +1919,10 @@ irgen::emitClassExistentialProjection(IRGenFunction &IGF,
   ArrayRef<llvm::Value*> wtables;
   llvm::Value *value;
   std::tie(wtables, value) = baseTI.getWitnessTablesAndValue(base);
-  auto metadata = emitDynamicTypeOfOpaqueHeapObject(IGF, value);
-  IGF.bindArchetype(openedArchetype, metadata, wtables);
+  auto metadata = emitDynamicTypeOfOpaqueHeapObject(IGF, value,
+                                                MetatypeRepresentation::Thick);
+  IGF.bindArchetype(openedArchetype, metadata, MetadataState::Complete,
+                    wtables);
 
   return value;
 }
@@ -1973,7 +1971,8 @@ irgen::emitExistentialMetatypeProjection(IRGenFunction &IGF,
   }
 
   auto openedArchetype = cast<ArchetypeType>(targetType.getInstanceType());
-  IGF.bindArchetype(openedArchetype, metatype, wtables);
+  IGF.bindArchetype(openedArchetype, metatype, MetadataState::Complete,
+                    wtables);
 
   return value;
 }
@@ -2260,7 +2259,8 @@ Address irgen::emitOpaqueBoxedExistentialProjection(
         IGF.getTypeInfo(existentialTy).as<ClassExistentialTypeInfo>();
     auto valueAddr = baseTI.projectValue(IGF, base);
     auto value = IGF.Builder.CreateLoad(valueAddr);
-    auto metadata = emitDynamicTypeOfOpaqueHeapObject(IGF, value);
+    auto metadata = emitDynamicTypeOfOpaqueHeapObject(IGF, value,
+                                                MetatypeRepresentation::Thick);
 
     // If we are projecting into an opened archetype, capture the
     // witness tables.
@@ -2271,7 +2271,8 @@ Address irgen::emitOpaqueBoxedExistentialProjection(
         wtables.push_back(IGF.Builder.CreateLoad(wtableAddr));
       }
 
-      IGF.bindArchetype(openedArchetype, metadata, wtables);
+      IGF.bindArchetype(openedArchetype, metadata, MetadataState::Complete,
+                        wtables);
     }
 
     return valueAddr;
@@ -2289,7 +2290,8 @@ Address irgen::emitOpaqueBoxedExistentialProjection(
     for (unsigned i = 0, n = layout.getNumTables(); i != n; ++i) {
       wtables.push_back(layout.loadWitnessTable(IGF, base, i));
     }
-    IGF.bindArchetype(openedArchetype, metadata, wtables);
+    IGF.bindArchetype(openedArchetype, metadata, MetadataState::Complete,
+                      wtables);
   }
 
   Address buffer = layout.projectExistentialBuffer(IGF, base);

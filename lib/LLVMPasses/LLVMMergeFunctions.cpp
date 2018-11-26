@@ -263,7 +263,7 @@ private:
       return FCmp.compareIgnoringConsts() == -1;
     }
   };
-  typedef std::set<EquivalenceClass, FunctionNodeCmp> FnTreeType;
+  using FnTreeType = std::set<EquivalenceClass, FunctionNodeCmp>;
 
   /// 
   struct FunctionEntry {
@@ -334,7 +334,7 @@ private:
     int NumParamsNeeded;
   };
 
-  typedef SmallVector<FunctionInfo, 8> FunctionInfos;
+  using FunctionInfos = SmallVector<FunctionInfo, 8>;
 
   /// Describes a parameter which we create to parameterize the merged function.
   struct ParamInfo {
@@ -361,7 +361,7 @@ private:
     }
   };
 
-  typedef SmallVector<ParamInfo, maxAddedParams> ParamInfos;
+  using ParamInfos = SmallVector<ParamInfo, maxAddedParams>;
 
   GlobalNumberState GlobalNumbers;
 
@@ -1098,4 +1098,3 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
   assert(Old->use_empty() && "should have replaced all uses of old function");
   return Old->hasLocalLinkage();
 }
-

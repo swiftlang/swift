@@ -791,7 +791,8 @@ void SILCloner<ImplClass>::visitBeginAccessInst(BeginAccessInst *Inst) {
       Inst, getBuilder().createBeginAccess(getOpLocation(Inst->getLoc()),
                                            getOpValue(Inst->getOperand()),
                                            Inst->getAccessKind(),
-                                           Inst->getEnforcement()));
+                                           Inst->getEnforcement(),
+                                           Inst->hasNoNestedConflict()));
 }
 
 template <typename ImplClass>
@@ -812,7 +813,8 @@ void SILCloner<ImplClass>::visitBeginUnpairedAccessInst(
                                            getOpValue(Inst->getSource()),
                                            getOpValue(Inst->getBuffer()),
                                            Inst->getAccessKind(),
-                                           Inst->getEnforcement()));
+                                           Inst->getEnforcement(),
+                                           Inst->hasNoNestedConflict()));
 }
 
 template <typename ImplClass>
@@ -984,10 +986,11 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitConvertEscapeToNoEscapeInst(
     ConvertEscapeToNoEscapeInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst, getBuilder().createConvertEscapeToNoEscape(
-                          getOpLocation(Inst->getLoc()),
-                          getOpValue(Inst->getOperand()),
-                          getOpType(Inst->getType())));
+  doPostProcess(Inst,
+                getBuilder().createConvertEscapeToNoEscape(
+                    getOpLocation(Inst->getLoc()),
+                    getOpValue(Inst->getOperand()), getOpType(Inst->getType()),
+                    Inst->isEscapedByUser(), Inst->isLifetimeGuaranteed()));
 }
 
 template<typename ImplClass>

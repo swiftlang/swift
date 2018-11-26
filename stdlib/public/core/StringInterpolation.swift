@@ -25,7 +25,7 @@ extension String : _ExpressibleByStringInterpolation {
   ///                   "\(number) cookies cost \(price * number) dollars."
   ///     print(message)
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
-  @_inlineable
+  @inlinable
   @effects(readonly)
   public init(stringInterpolation strings: String...) {
     self.init()
@@ -39,7 +39,7 @@ extension String : _ExpressibleByStringInterpolation {
   ///
   /// Do not call this initializer directly. It is used by the compiler when
   /// interpreting string interpolations.
-  @_inlineable
+  @inlinable
   public init<T>(stringInterpolationSegment expr: T) {
     self = String(describing: expr)
   }
@@ -48,7 +48,7 @@ extension String : _ExpressibleByStringInterpolation {
   ///
   /// Do not call this initializer directly. It is used by the compiler when
   /// interpreting string interpolations.
-  @_inlineable
+  @inlinable
   public init<T: TextOutputStreamable> (stringInterpolationSegment expr: T) {
     self = _toStringReadOnlyStreamable(expr)
   }
@@ -57,7 +57,7 @@ extension String : _ExpressibleByStringInterpolation {
   ///
   /// Do not call this initializer directly. It is used by the compiler when
   /// interpreting string interpolations.
-  @_inlineable
+  @inlinable
   public init<T: CustomStringConvertible> (stringInterpolationSegment expr: T) {
     self = _toStringReadOnlyPrintable(expr)
   }
@@ -66,7 +66,7 @@ extension String : _ExpressibleByStringInterpolation {
   ///
   /// Do not call this initializer directly. It is used by the compiler when
   /// interpreting string interpolations.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init<T: TextOutputStreamable & CustomStringConvertible> (stringInterpolationSegment expr: T) {
     self = _toStringReadOnlyStreamable(expr)
   }

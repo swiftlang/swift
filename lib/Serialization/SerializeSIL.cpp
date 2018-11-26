@@ -13,15 +13,16 @@
 #define DEBUG_TYPE "sil-serialize"
 #include "SILFormat.h"
 #include "Serialization.h"
-#include "swift/Strings.h"
-#include "swift/AST/Module.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/CFG.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
+#include "swift/Strings.h"
 
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PostOrderIterator.h"
@@ -250,7 +251,8 @@ namespace {
     void writeSILBlock(const SILModule *SILMod);
     void writeIndexTables();
 
-    void writeConversionLikeInstruction(const SingleValueInstruction *I);
+    void writeConversionLikeInstruction(const SingleValueInstruction *I,
+                                        bool guaranteed, bool escaped);
     void writeOneTypeLayout(SILInstructionKind valueKind, SILType type);
     void writeOneTypeOneOperandLayout(SILInstructionKind valueKind,
                                       unsigned attrs,
@@ -263,6 +265,8 @@ namespace {
     void writeOneOperandLayout(SILInstructionKind valueKind,
                                unsigned attrs,
                                SILValue operand);
+    void writeOneOperandExtraAttributeLayout(SILInstructionKind valueKind,
+                                             unsigned attrs, SILValue operand);
 
     void writeKeyPathPatternComponent(
                     const KeyPathPatternComponent &component,
@@ -361,6 +365,8 @@ ValueID SILSerializer::addValueRef(const ValueBase *Val) {
 }
 
 void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
+  PrettyStackTraceSILFunction stackTrace("Serializing", &F);
+
   ValueIDs.clear();
   InstID = 0;
 
@@ -544,6 +550,21 @@ void SILSerializer::writeOneOperandLayout(SILInstructionKind valueKind,
         operandRef);
 }
 
+void SILSerializer::
+writeOneOperandExtraAttributeLayout(SILInstructionKind valueKind,
+                                    unsigned attrs,
+                                    SILValue operand) {
+
+  auto operandType = operand->getType();
+  auto operandTypeRef = S.addTypeRef(operandType.getSwiftRValueType());
+  auto operandRef = addValueRef(operand);
+
+  SILOneOperandExtraAttributeLayout::emitRecord(
+      Out, ScratchRecord, SILAbbrCodes[SILOneOperandExtraAttributeLayout::Code],
+      unsigned(valueKind), attrs, operandTypeRef,
+      unsigned(operandType.getCategory()), operandRef);
+}
+
 void SILSerializer::writeOneTypeOneOperandLayout(SILInstructionKind valueKind,
                                                  unsigned attrs,
                                                  SILType type,
@@ -579,10 +600,12 @@ void SILSerializer::writeOneTypeOneOperandLayout(SILInstructionKind valueKind,
 
 /// Write an instruction that looks exactly like a conversion: all
 /// important information is encoded in the operand and the result type.
-void SILSerializer::writeConversionLikeInstruction(const SingleValueInstruction *I) {
+void SILSerializer::writeConversionLikeInstruction(
+    const SingleValueInstruction *I, bool guaranteed, bool escaped) {
   assert(I->getNumOperands() - I->getTypeDependentOperands().size() == 1);
-  writeOneTypeOneOperandLayout(I->getKind(), 0, I->getType(),
-                               I->getOperand(0));
+  writeOneTypeOneOperandLayout(I->getKind(),
+                               (guaranteed ? 1 : 0) | (escaped ? 2 : 0),
+                               I->getType(), I->getOperand(0));
 }
 
 void
@@ -675,6 +698,8 @@ SILSerializer::writeKeyPathPatternComponent(
 }
 
 void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
+  PrettyStackTraceSILNode stackTrace("Serializing", &SI);
+
   switch (SI.getKind()) {
   case SILInstructionKind::ObjectInst:
     llvm_unreachable("static initializers of sil_global are not serialized");
@@ -1214,7 +1239,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::LoadUnownedInst:
   case SILInstructionKind::LoadWeakInst:
-  case SILInstructionKind::MarkUninitializedInst:
   case SILInstructionKind::ClassifyBridgeObjectInst:
   case SILInstructionKind::ValueToBridgeObjectInst:
   case SILInstructionKind::FixLifetimeInst:
@@ -1242,8 +1266,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = LWI->isTake();
     else if (auto *LUI = dyn_cast<LoadUnownedInst>(&SI))
       Attr = LUI->isTake();
-    else if (auto *MUI = dyn_cast<MarkUninitializedInst>(&SI))
-      Attr = (unsigned)MUI->getKind();
     else if (auto *DRI = dyn_cast<DeallocRefInst>(&SI))
       Attr = (unsigned)DRI->canAllocOnStack();
     else if (auto *RCI = dyn_cast<RefCountingInst>(&SI))
@@ -1254,6 +1276,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = unsigned(SILValue(UOCI).getOwnershipKind());
     }
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
+    break;
+  }
+  case SILInstructionKind::MarkUninitializedInst: {
+    unsigned Attr = (unsigned)cast<MarkUninitializedInst>(&SI)->getKind();
+    writeOneOperandExtraAttributeLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;
   }
   case SILInstructionKind::YieldInst: {
@@ -1446,7 +1473,14 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::ObjCMetatypeToObjectInst:
   case SILInstructionKind::ObjCExistentialMetatypeToObjectInst:
   case SILInstructionKind::ProjectBlockStorageInst: {
-    writeConversionLikeInstruction(cast<SingleValueInstruction>(&SI));
+    bool guaranteed = false;
+    bool escaped = false;
+    if (SI.getKind() == SILInstructionKind::ConvertEscapeToNoEscapeInst) {
+      escaped = cast<ConvertEscapeToNoEscapeInst>(SI).isEscapedByUser();
+      guaranteed = cast<ConvertEscapeToNoEscapeInst>(SI).isLifetimeGuaranteed();
+    }
+    writeConversionLikeInstruction(cast<SingleValueInstruction>(&SI),
+                                   guaranteed, escaped);
     break;
   }
   case SILInstructionKind::PointerToAddressInst: {
@@ -1551,14 +1585,14 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
 
   case SILInstructionKind::BeginAccessInst: {
-    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandExtraAttributeLayout::Code];
     auto *BAI = cast<BeginAccessInst>(&SI);
-    unsigned attr =
-         unsigned(BAI->getAccessKind())
-       + (unsigned(BAI->getEnforcement()) << 2);
+    unsigned attr = unsigned(BAI->getAccessKind())
+                    + (unsigned(BAI->getEnforcement()) << 2)
+                    + (BAI->hasNoNestedConflict() << 4);
     SILValue operand = BAI->getOperand();
 
-    SILOneOperandLayout::emitRecord(
+    SILOneOperandExtraAttributeLayout::emitRecord(
         Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(), attr,
         S.addTypeRef(operand->getType().getSwiftRValueType()),
         (unsigned)operand->getType().getCategory(),
@@ -1581,15 +1615,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
 
   case SILInstructionKind::BeginUnpairedAccessInst: {
-    unsigned abbrCode = SILAbbrCodes[SILTwoOperandsLayout::Code];
+    unsigned abbrCode = SILAbbrCodes[SILTwoOperandsExtraAttributeLayout::Code];
     auto *BAI = cast<BeginUnpairedAccessInst>(&SI);
-    unsigned attr =
-         unsigned(BAI->getAccessKind())
-       + (unsigned(BAI->getEnforcement()) << 2);
+    unsigned attr = unsigned(BAI->getAccessKind())
+                    + (unsigned(BAI->getEnforcement()) << 2)
+                    + (unsigned(BAI->hasNoNestedConflict()) << 4);
     SILValue source = BAI->getSource();
     SILValue buffer = BAI->getBuffer();
 
-    SILTwoOperandsLayout::emitRecord(
+    SILTwoOperandsExtraAttributeLayout::emitRecord(
         Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(), attr,
         S.addTypeRef(source->getType().getSwiftRValueType()),
         (unsigned)source->getType().getCategory(),
@@ -1601,13 +1635,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
 
   case SILInstructionKind::EndUnpairedAccessInst: {
-    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandExtraAttributeLayout::Code];
     auto *EAI = cast<EndUnpairedAccessInst>(&SI);
     unsigned attr = unsigned(EAI->isAborting())
                   + (unsigned(EAI->getEnforcement()) << 1);
     SILValue operand = EAI->getOperand();
 
-    SILOneOperandLayout::emitRecord(
+    SILOneOperandExtraAttributeLayout::emitRecord(
         Out, ScratchRecord, abbrCode, (unsigned)SI.getKind(), attr,
         S.addTypeRef(operand->getType().getSwiftRValueType()),
         (unsigned)operand->getType().getCategory(),
@@ -2368,13 +2402,17 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILOneValueOneOperandLayout>();
   registerSILAbbr<SILOneTypeLayout>();
   registerSILAbbr<SILOneOperandLayout>();
+  registerSILAbbr<SILOneOperandExtraAttributeLayout>();
   registerSILAbbr<SILOneTypeOneOperandLayout>();
   registerSILAbbr<SILInitExistentialLayout>();
   registerSILAbbr<SILOneTypeValuesLayout>();
   registerSILAbbr<SILTwoOperandsLayout>();
+  registerSILAbbr<SILTwoOperandsExtraAttributeLayout>();
   registerSILAbbr<SILTailAddrLayout>();
   registerSILAbbr<SILInstApplyLayout>();
   registerSILAbbr<SILInstNoOperandLayout>();
+  registerSILAbbr<SILOneOperandLayout>();
+  registerSILAbbr<SILTwoOperandsLayout>();
 
   registerSILAbbr<VTableLayout>();
   registerSILAbbr<VTableEntryLayout>();
@@ -2420,21 +2458,23 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   assert(assocDC && "cannot serialize SIL without an associated DeclContext");
   for (const SILVTable &vt : SILMod->getVTables()) {
     if ((ShouldSerializeAll || vt.isSerialized()) &&
-        vt.getClass()->isChildContextOf(assocDC))
+        SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(vt.getClass()))
       writeSILVTable(vt);
   }
   
   // Write out property descriptors.
   for (const SILProperty &prop : SILMod->getPropertyList()) {
     if ((ShouldSerializeAll || prop.isSerialized()) &&
-        prop.getDecl()->getInnermostDeclContext()->isChildContextOf(assocDC))
+        SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
+                                     prop.getDecl()->getInnermostDeclContext()))
       writeSILProperty(prop);
   }
 
   // Write out fragile WitnessTables.
   for (const SILWitnessTable &wt : SILMod->getWitnessTables()) {
     if ((ShouldSerializeAll || wt.isSerialized()) &&
-        wt.getConformance()->getDeclContext()->isChildContextOf(assocDC))
+        SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
+                                         wt.getConformance()->getDeclContext()))
       writeSILWitnessTable(wt);
   }
 
@@ -2442,7 +2482,8 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   for (const SILDefaultWitnessTable &wt : SILMod->getDefaultWitnessTables()) {
     // FIXME: Don't need to serialize private and internal default witness
     // tables.
-    if (wt.getProtocol()->getDeclContext()->isChildContextOf(assocDC))
+    if (SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
+                                                              wt.getProtocol()))
       writeSILDefaultWitnessTable(wt);
   }
 

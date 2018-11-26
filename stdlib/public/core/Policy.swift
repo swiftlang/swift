@@ -481,7 +481,7 @@ extension _BitwiseOperations {
   /// - Parameters:
   ///   - lhs: A value to update with the union of bits set in the two arguments.
   ///   - rhs: Another value.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4.1)
   public static func |= (lhs: inout Self, rhs: Self) {
     lhs = lhs | rhs
@@ -494,7 +494,7 @@ extension _BitwiseOperations {
   ///   - lhs: A value to update with the intersections of bits set in the two
   ///     arguments.
   ///   - rhs: Another value.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4.1)
   public static func &= (lhs: inout Self, rhs: Self) {
     lhs = lhs & rhs
@@ -507,7 +507,7 @@ extension _BitwiseOperations {
   ///   - lhs: A value to update with the bits that are set in exactly one of the
   ///     two arguments.
   ///   - rhs: Another value.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4.1)
   public static func ^= (lhs: inout Self, rhs: Self) {
     lhs = lhs ^ rhs
@@ -545,7 +545,7 @@ extension _BitwiseOperations {
 /// - Parameters:
 ///   - lhs: A value to compare.
 ///   - rhs: Another value to compare.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public func ~= <T : Equatable>(a: T, b: T) -> Bool {
   return a == b

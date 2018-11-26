@@ -27,6 +27,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMContext.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/IRGen/IRGenPublic.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Config/config.h"
@@ -223,16 +224,6 @@ bool swift::immediate::IRGenImportedModules(
     import.second->collectLinkLibraries(addLinkLibrary);
   });
 
-  // Hack to handle thunks eagerly synthesized by the Clang importer.
-  swift::ModuleDecl *prev = nullptr;
-  for (auto external : CI.getASTContext().ExternalDefinitions) {
-    swift::ModuleDecl *next = external->getModuleContext();
-    if (next == prev)
-      continue;
-    next->collectLinkLibraries(addLinkLibrary);
-    prev = next;
-  }
-
   tryLoadLibraries(AllLinkLibraries, CI.getASTContext().SearchPathOpts,
                    CI.getDiags());
 
@@ -253,7 +244,6 @@ bool swift::immediate::IRGenImportedModules(
 
     std::unique_ptr<SILModule> SILMod = performSILGeneration(import,
                                                              CI.getSILOptions());
-    performSILLinking(SILMod.get());
     if (runSILDiagnosticPasses(*SILMod)) {
       hadError = true;
       break;

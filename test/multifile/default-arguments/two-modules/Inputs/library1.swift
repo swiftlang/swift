@@ -1,4 +1,4 @@
-@_inlineable
+@inlinable
 public func callsHasDefaultArgument() {
   hasDefaultArgument()
 }

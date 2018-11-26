@@ -1,6 +1,3 @@
-# HACK: Force this library to build with undefined symbols.
-string(REGEX REPLACE "-Wl,-z,defs" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
-
 # libswiftRemoteMirror.dylib should not have runtime dependencies; it's
 # always built as a shared library.
 if(SWIFT_BUILD_DYNAMIC_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)

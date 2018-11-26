@@ -171,6 +171,9 @@ struct foo {
     @available(*, unavailable)
     @objc(fooObjc)
     private static func foo() {}
+    
+    @objc(fooObjcBar:baz:)
+    private static func foo(bar: String, baz: Int)
   }
 }
 
@@ -238,6 +241,7 @@ func closure() {
     return 2
   }
   _ = { a, b in }
+  _ = { (a, b) in }
   _ = {}
   _ = { s1, s2 in s1 > s2 }
   _ = { $0 > $1 }
@@ -291,7 +295,7 @@ protocol P {
   var a: Int {}
 }
 
-class C {
+private final class D {
   @objc
   static private var a: Int = 3 { return 3 }, b: Int, c = 4, d : Int { get {} get {}}, (a, b): (Int, Int)
   let (a, b) = (1,2), _ = 4 {}
@@ -362,6 +366,48 @@ func statementTests() {
 
   for var i in foo where i.foo {}
   for case is Int in foo {}
+
+  switch Foo {
+    case n1:
+      break
+    case n2, n3l:
+      break
+#if FOO
+    case let (x, y)  where !x, n3l where false:
+      break
+#elseif BAR
+    case let y:
+      break
+#else
+    case .foo(let x):
+      break
+#endif
+    default:
+      break
+  }
+
+  switch foo {
+  case 1, 2, 3: break
+  default: break
+  }
+
+  switch foo {
+  case 1, 2, 3: break
+  @unknown default: break
+  }
+
+  switch foo {
+  case 1, 2, 3: break
+  @unknown case _: break
+  }
+
+  switch foo {
+  case 1, 2, 3: break
+  // This is rejected in Sema, but should be preserved by Syntax.
+  @unknown case (42, -42) where 1 == 2: break
+  @garbage case 0: break
+  @garbage(foobar) case -1: break
+  }
 }
 
 // MARK: - ExtensionDecl
@@ -397,6 +443,15 @@ func keypath() {
   _ = \.a.b
   _ = #keyPath(a.b.c)
 }
+func objcSelector() {
+  _ = [
+    #selector(getter: Foo.bar),
+    #selector(setter: Foo.Bar.baz),
+    #selector(Foo.method(x:y:)),
+    #selector(foo[42].bar(x)),
+    #selector({ [x] in return nil })
+  ]
+}
 
 func objectLiterals() {
   #fileLiteral(a)
@@ -407,3 +462,74 @@ func objectLiterals() {
   #function
   #dsohandle
 }
+
+enum E1 : String {
+  case foo = 1
+  case bar = "test", baz(x: Int, String) = 12
+  indirect case qux(E1)
+
+  indirect private enum E2<T>: String where T: SomeProtocol {
+    case foo, bar, baz
+  }
+}
+
+precedencegroup FooPrecedence {
+  higherThan: DefaultPrecedence, UnknownPrecedence
+  assignment: false
+  associativity: none
+}
+precedencegroup BarPrecedence {}
+precedencegroup BazPrecedence {
+  associativity: left
+  assignment: true
+  associativity: right
+  lowerThan: DefaultPrecedence
+}
+
+infix operator<++>:FooPrecedence
+prefix operator..<<
+postfix operator <-
+
+func higherOrderFunc() {
+  let x = [1,2,3]
+  x.reduce(0, +)
+}
+
+if #available(iOS 11, macOS 10.11.2, *) {}
+
+@_specialize(where T == Int)
+@_specialize(exported: true, where T == String)
+public func specializedGenericFunc<T>(_ t: T) -> T {
+  return t
+}
+
+protocol Q {
+  func g()
+  var x: String { get }
+  func f(x:Int, y:Int) -> Int
+  #if FOO_BAR
+  var conditionalVar: String
+  #endif
+}
+
+struct S : Q, Equatable {
+  @_implements(Q, f(x:y:))
+  func h(x:Int, y:Int) -> Int {
+    return 6
+  }
+
+  @_implements(Equatable, ==(_:_:))
+  public static func isEqual(_ lhs: S, _ rhs: S) -> Bool {
+    return false
+  }
+
+  @_implements(P, x)
+  var y: String
+  @_implements(P, g())
+  func h() {}
+
+  @available(*, deprecated: 1.2, message: "ABC")
+  fileprivate(set) var x: String
+}
+
+@_alignment(16) public struct float3 { public var x, y, z: Float }

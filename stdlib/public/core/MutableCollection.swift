@@ -25,7 +25,7 @@ public typealias MutableIndexable = MutableCollection
 /// modify one of the names in an array of students.
 ///
 ///     var students = ["Ben", "Ivy", "Jordell", "Maxime"]
-///     if let i = students.index(of: "Maxime") {
+///     if let i = students.firstIndex(of: "Maxime") {
 ///         students[i] = "Max"
 ///     }
 ///     print(students)
@@ -112,7 +112,7 @@ where SubSequence: MutableCollection
   ///     print(streetsSlice)
   ///     // Prints "["Channing", "Douglas", "Evarts"]"
   ///
-  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     let index = streetsSlice.firstIndex(of: "Evarts")    // 4
   ///     streets[index!] = "Eustace"
   ///     print(streets[index!])
   ///     // Prints "Eustace"
@@ -189,7 +189,7 @@ where SubSequence: MutableCollection
 
 // TODO: swift-3-indexing-model - review the following
 extension MutableCollection {
-  @_inlineable
+  @inlinable
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -211,14 +211,14 @@ extension MutableCollection {
   ///     print(streetsSlice)
   ///     // Prints "["Channing", "Douglas", "Evarts"]"
   ///
-  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     let index = streetsSlice.firstIndex(of: "Evarts")    // 4
   ///     streets[index!] = "Eustace"
   ///     print(streets[index!])
   ///     // Prints "Eustace"
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
-  @_inlineable
+  @inlinable
   public subscript(bounds: Range<Index>) -> Slice<Self> {
     get {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
@@ -238,7 +238,7 @@ extension MutableCollection {
   /// - Parameters:
   ///   - i: The index of the first value to swap.
   ///   - j: The index of the second value to swap.
-  @_inlineable
+  @inlinable
   public mutating func swapAt(_ i: Index, _ j: Index) {
     guard i != j else { return }
     let tmp = self[i]

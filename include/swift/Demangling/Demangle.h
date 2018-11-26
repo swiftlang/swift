@@ -75,7 +75,7 @@ struct DemangleOptions {
 };
 
 class Node;
-typedef Node *NodePointer;
+using NodePointer = Node *;
 
 enum class FunctionSigSpecializationParamKind : unsigned {
   // Option Flags use bits 0-5. This give us 6 bits implying 64 entries to
@@ -133,7 +133,7 @@ public:
 #include "swift/Demangling/DemangleNodes.def"
   };
 
-  typedef uint64_t IndexType;
+  using IndexType = uint64_t;
 
   friend class NodeFactory;
   
@@ -182,10 +182,10 @@ public:
     assert(hasIndex());
     return IndexPayload;
   }
-  
-  typedef NodePointer *iterator;
-  typedef const NodePointer *const_iterator;
-  typedef size_t size_type;
+
+  using iterator = NodePointer *;
+  using const_iterator = const NodePointer *;
+  using size_type = size_t;
 
   bool hasChildren() const { return NumChildren != 0; }
   size_t getNumChildren() const { return NumChildren; }
@@ -465,6 +465,14 @@ void mangleIdentifier(const char *data, size_t length,
 ///
 /// This should always round-trip perfectly with demangleSymbolAsNode.
 std::string mangleNode(const NodePointer &root);
+
+using SymbolicResolver = llvm::function_ref<Demangle::NodePointer (const void *)>;
+
+/// \brief Remangle a demangled parse tree, using a callback to resolve
+/// symbolic references.
+///
+/// This should always round-trip perfectly with demangleSymbolAsNode.
+std::string mangleNode(const NodePointer &root, SymbolicResolver resolver);
 
 /// Remangle in the old mangling scheme.
 ///

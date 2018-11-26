@@ -65,7 +65,6 @@ namespace swift {
   class GenericTypeParamType;
   class LazyResolver;
   class ModuleDecl;
-  class NameAliasType;
   class EnumCaseDecl;
   class EnumElementDecl;
   class ParameterList;
@@ -194,25 +193,65 @@ struct OverloadSignature {
   DeclName Name;
 
   /// The kind of unary operator.
-  UnaryOperatorKind UnaryOperator = UnaryOperatorKind::None;
+  UnaryOperatorKind UnaryOperator;
 
   /// Whether this is an instance member.
-  bool IsInstanceMember = false;
+  unsigned IsInstanceMember : 1;
 
-  /// Whether this is a property.
-  bool IsProperty = false;
+  /// Whether this is a variable.
+  unsigned IsVariable : 1;
+
+  /// Whether this is a function.
+  unsigned IsFunction : 1;
 
   /// Whether this signature is part of a protocol extension.
-  bool InProtocolExtension = false;
+  unsigned InProtocolExtension : 1;
+
+  /// Whether this signature is of a member defined in an extension of a generic
+  /// type.
+  unsigned InExtensionOfGenericType : 1;
+
+  OverloadSignature()
+      : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
+        IsVariable(false), IsFunction(false), InProtocolExtension(false),
+        InExtensionOfGenericType(false) {}
 };
 
 /// Determine whether two overload signatures conflict.
+///
+/// \param sig1 The overload signature of the first declaration.
+/// \param sig2 The overload signature of the second declaration.
+/// \param skipProtocolExtensionCheck If \c true, members of protocol extensions
+///        will be allowed to conflict with members of protocol declarations.
 bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2,
                  bool skipProtocolExtensionCheck = false);
 
+/// Determine whether two overload signatures and overload types conflict.
+///
+/// \param ctx The AST context.
+/// \param sig1 The overload signature of the first declaration.
+/// \param sig1Type The overload type of the first declaration.
+/// \param sig2 The overload signature of the second declaration.
+/// \param sig2Type The overload type of the second declaration.
+/// \param wouldConflictInSwift5 If non-null, the referenced boolean will be set
+///        to \c true iff the function returns \c false for this version of
+///        Swift, but the given overloads will conflict in Swift 5 mode.
+/// \param skipProtocolExtensionCheck If \c true, members of protocol extensions
+///        will be allowed to conflict with members of protocol declarations.
+bool conflicting(ASTContext &ctx,
+                 const OverloadSignature& sig1, CanType sig1Type,
+                 const OverloadSignature& sig2, CanType sig2Type,
+                 bool *wouldConflictInSwift5 = nullptr,
+                 bool skipProtocolExtensionCheck = false);
 
 /// Decl - Base class for all declarations in Swift.
 class alignas(1 << DeclAlignInBits) Decl {
+  enum class ValidationState {
+    Unchecked,
+    Checking,
+    Checked,
+  };
+
 protected:
   union { uint64_t OpaqueBits;
 
@@ -235,12 +274,8 @@ protected:
     /// FIXME: This is ugly.
     EarlyAttrValidation : 1,
 
-    /// \brief Whether this declaration is currently being validated.
-    BeingValidated : 1,
-
-    /// \brief Whether we have started validating the declaration; this *isn't*
-    /// reset after finishing it.
-    ValidationStarted : 1,
+    /// \brief The validation state of this declaration.
+    ValidationState : 2,
 
     /// \brief Whether this declaration was added to the surrounding
     /// DeclContext of an active #if config clause.
@@ -328,11 +363,11 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD(EnumElementDecl, ValueDecl, 1,
-    /// \brief Whether or not this element has an associated value.
-    HasArgumentType : 1
+    /// \brief The ResilienceExpansion to use for default arguments.
+    DefaultArgumentResilienceExpansion : 1
   );
   
-  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+5+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+5+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
 
@@ -355,7 +390,11 @@ protected:
     HasComputedNeedsNewVTableEntry : 1,
 
     /// The ResilienceExpansion to use for default arguments.
-    DefaultArgumentResilienceExpansion : 1
+    DefaultArgumentResilienceExpansion : 1,
+
+    /// Whether this member was synthesized as part of a derived
+    /// protocol conformance.
+    Synthesized : 1
   );
 
   SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+2+1+1+2,
@@ -425,9 +464,11 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(GenericTypeDecl, TypeDecl);
 
-  SWIFT_INLINE_BITFIELD(TypeAliasDecl, GenericTypeDecl, 1,
+  SWIFT_INLINE_BITFIELD(TypeAliasDecl, GenericTypeDecl, 1+1,
     /// Whether the typealias forwards perfectly to its underlying type.
-    IsCompatibilityAlias : 1
+    IsCompatibilityAlias : 1,
+    /// Whether this was a global typealias synthesized by the debugger.
+    IsDebuggerAlias : 1
   );
 
   SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1,
@@ -609,8 +650,7 @@ protected:
     Bits.Decl.Implicit = false;
     Bits.Decl.FromClang = false;
     Bits.Decl.EarlyAttrValidation = false;
-    Bits.Decl.BeingValidated = false;
-    Bits.Decl.ValidationStarted = false;
+    Bits.Decl.ValidationState = unsigned(ValidationState::Unchecked);
     Bits.Decl.EscapedFromIfConfig = false;
   }
 
@@ -759,25 +799,32 @@ public:
   /// Whether the declaration has a valid interface type and
   /// generic signature.
   bool isBeingValidated() const {
-    return Bits.Decl.BeingValidated;
+    return Bits.Decl.ValidationState == unsigned(ValidationState::Checking);
   }
 
   /// Toggle whether or not the declaration is being validated.
   void setIsBeingValidated(bool ibv = true) {
-    assert(Bits.Decl.BeingValidated != ibv);
-    Bits.Decl.BeingValidated = ibv;
     if (ibv) {
-      Bits.Decl.ValidationStarted = true;
+      assert(Bits.Decl.ValidationState == unsigned(ValidationState::Unchecked));
+      Bits.Decl.ValidationState = unsigned(ValidationState::Checking);
+    } else {
+      assert(Bits.Decl.ValidationState == unsigned(ValidationState::Checking));
+      Bits.Decl.ValidationState = unsigned(ValidationState::Checked);
     }
   }
 
-  bool hasValidationStarted() const { return Bits.Decl.ValidationStarted; }
+  bool hasValidationStarted() const {
+    return Bits.Decl.ValidationState >= unsigned(ValidationState::Checking);
+  }
 
   /// Manually indicate that validation has started for the declaration.
   ///
   /// This is implied by setIsBeingValidated(true) (i.e. starting validation)
   /// and so rarely needs to be called directly.
-  void setValidationStarted() { Bits.Decl.ValidationStarted = true; }
+  void setValidationStarted() {
+    if (Bits.Decl.ValidationState != unsigned(ValidationState::Checking))
+      Bits.Decl.ValidationState = unsigned(ValidationState::Checked);
+  }
 
   bool escapedFromIfConfig() const {
     return Bits.Decl.EscapedFromIfConfig;
@@ -1416,6 +1463,10 @@ public:
 
   /// Set the generic context of this context.
   void setGenericEnvironment(GenericEnvironment *genericEnv);
+
+  /// Retrieve the position of any where clause for this context's
+  /// generic parameters.
+  SourceRange getGenericTrailingWhereClauseSourceRange() const;
 };
 static_assert(sizeof(_GenericContext) + sizeof(DeclContext) ==
               sizeof(GenericContext), "Please add fields to _GenericContext");
@@ -2100,6 +2151,9 @@ class ValueDecl : public Decl {
   SourceLoc NameLoc;
   llvm::PointerIntPair<Type, 3, OptionalEnum<AccessLevel>> TypeAndAccess;
 
+private:
+    bool isUsableFromInline() const;
+
 protected:
   ValueDecl(DeclKind K,
             llvm::PointerUnion<DeclContext *, ASTContext *> context,
@@ -2185,8 +2239,6 @@ public:
   /// \see getFormalAccess
   AccessLevel getFormalAccessImpl(const DeclContext *useDC) const;
 
-  bool isVersionedInternalDecl() const;
-
   /// Returns the access level specified explicitly by the user, or provided by
   /// default according to language rules.
   ///
@@ -2195,14 +2247,19 @@ public:
   /// being used), features that affect formal access such as \c \@testable are
   /// taken into account.
   ///
+  /// If \p treatUsableFromInlineAsPublic is true, declarations marked with the
+  /// \c @usableFromInline attribute are treated as public. This is normally
+  /// false for name lookup and other source language concerns, but true when
+  /// computing the linkage of generated functions.
+  ///
   /// \sa getFormalAccessScope
   AccessLevel getFormalAccess(const DeclContext *useDC = nullptr,
-                              bool respectVersionedAttr = false) const {
+                              bool treatUsableFromInlineAsPublic = false) const {
     assert(hasAccess() && "access not computed yet");
     AccessLevel result = TypeAndAccess.getInt().getValue();
-    if (respectVersionedAttr &&
+    if (treatUsableFromInlineAsPublic &&
         result == AccessLevel::Internal &&
-        isVersionedInternalDecl()) {
+        isUsableFromInline()) {
       assert(!useDC);
       return AccessLevel::Public;
     }
@@ -2211,6 +2268,18 @@ public:
       return getFormalAccessImpl(useDC);
     return result;
   }
+
+  /// If this declaration is a member of a protocol extension, return the
+  /// minimum of the given access level and the protocol's access level.
+  ///
+  /// Otherwise, return the given access level unmodified.
+  ///
+  /// This is used when checking name lookup visibility. Protocol extension
+  /// members can be found when performing name lookup on a concrete type;
+  /// if the concrete type is visible from the lookup context but the
+  /// protocol is not, we do not want the protocol extension members to be
+  /// visible.
+  AccessLevel adjustAccessLevelForProtocolExtension(AccessLevel access) const;
 
   /// Determine whether this Decl has either Private or FilePrivate access.
   bool isOutermostPrivateOrFilePrivateScope() const;
@@ -2224,17 +2293,29 @@ public:
   /// taken into account.
   ///
   /// \invariant
-  /// <code>value.isAccessibleFrom(value.getFormalAccessScope())</code>
+  /// <code>value.isAccessibleFrom(
+  ///     value.getFormalAccessScope().getDeclContext())</code>
+  ///
+  /// If \p treatUsableFromInlineAsPublic is true, declarations marked with the
+  /// \c @usableFromInline attribute are treated as public. This is normally
+  /// false for name lookup and other source language concerns, but true when
+  /// computing the linkage of generated functions.
   ///
   /// \sa getFormalAccess
   /// \sa isAccessibleFrom
   AccessScope
   getFormalAccessScope(const DeclContext *useDC = nullptr,
-                       bool respectVersionedAttr = false) const;
+                       bool treatUsableFromInlineAsPublic = false) const;
 
 
-  /// Copy the formal access level and @_versioned attribute from source.
-  void copyFormalAccessAndVersionedAttrFrom(ValueDecl *source);
+  /// Copy the formal access level and @usableFromInline attribute from
+  /// \p source.
+  ///
+  /// If \p sourceIsParentContext is true, an access level of \c private will
+  /// be copied as \c fileprivate, to ensure that this declaration will be
+  /// available everywhere \p source is.
+  void copyFormalAccessFrom(const ValueDecl *source,
+                            bool sourceIsParentContext = false);
 
   /// Returns the access level that actually controls how a declaration should
   /// be emitted and may be used.
@@ -2266,7 +2347,14 @@ public:
   /// A public declaration is accessible everywhere.
   ///
   /// If \p DC is null, returns true only if this declaration is public.
-  bool isAccessibleFrom(const DeclContext *DC) const;
+  ///
+  /// If \p forConformance is true, we ignore the visibility of the protocol
+  /// when evaluating protocol extension members. This language rule allows a
+  /// protocol extension of a private protocol to provide default
+  /// implementations for the requirements of a public protocol, even when
+  /// the default implementations are not visible to name lookup.
+  bool isAccessibleFrom(const DeclContext *DC,
+                        bool forConformance = false) const;
 
   /// Retrieve the "interface" type of this value, which uses
   /// GenericTypeParamType if the declaration is generic. For a generic
@@ -2343,7 +2431,13 @@ public:
   /// Determines the kind of access that should be performed by a
   /// DeclRefExpr or MemberRefExpr use of this value in the specified
   /// context.
-  AccessSemantics getAccessSemanticsFromContext(const DeclContext *DC) const;
+  ///
+  /// \param DC The declaration context.
+  ///
+  /// \param isAccessOnSelf Whether this is a member access on the implicit
+  ///        'self' declaration of the declaration context.
+  AccessSemantics getAccessSemanticsFromContext(const DeclContext *DC,
+                                                bool isAccessOnSelf) const;
 
   /// Print a reference to the given declaration.
   std::string printRef() const;
@@ -2426,6 +2520,14 @@ public:
 
   /// Compute an ordering between two type declarations that is ABI-stable.
   static int compare(const TypeDecl *type1, const TypeDecl *type2);
+
+  /// Compute an ordering between two type declarations that is ABI-stable.
+  /// This version takes a pointer-to-a-pointer for use with
+  /// llvm::array_pod_sort() and similar.
+  template<typename T>
+  static int compare(T * const* type1, T * const* type2) {
+    return compare(*type1, *type2);
+  }
 };
 
 /// A type declaration that can have generic parameters attached to it.  Because
@@ -2504,6 +2606,12 @@ public:
 
   void markAsCompatibilityAlias(bool newValue = true) {
     Bits.TypeAliasDecl.IsCompatibilityAlias = newValue;
+  }
+
+  /// Is this a special debugger variable?
+  bool isDebuggerAlias() const { return Bits.TypeAliasDecl.IsDebuggerAlias; }
+  void markAsDebuggerAlias(bool isDebuggerAlias) {
+    Bits.TypeAliasDecl.IsDebuggerAlias = isDebuggerAlias;
   }
 
   static bool classof(const Decl *D) {
@@ -4378,7 +4486,11 @@ public:
   /// context.
   ///
   /// If \p DC is null, returns true only if the setter is public.
-  bool isSetterAccessibleFrom(const DeclContext *DC) const;
+  ///
+  /// See \c isAccessibleFrom for a discussion of the \p forConformance
+  /// parameter.
+  bool isSetterAccessibleFrom(const DeclContext *DC,
+                              bool forConformance=false) const;
 
   /// Determine how this storage declaration should actually be accessed.
   AccessStrategy getAccessStrategy(AccessSemantics semantics,
@@ -4997,6 +5109,7 @@ protected:
     Bits.AbstractFunctionDecl.HasComputedNeedsNewVTableEntry = false;
     Bits.AbstractFunctionDecl.DefaultArgumentResilienceExpansion =
         unsigned(ResilienceExpansion::Maximal);
+    Bits.AbstractFunctionDecl.Synthesized = false;
 
     // Verify no bitfield truncation.
     assert(Bits.AbstractFunctionDecl.NumParameterLists == NumParameterLists);
@@ -5145,6 +5258,14 @@ public:
     return Bits.AbstractFunctionDecl.NeedsNewVTableEntry;
   }
 
+  bool isSynthesized() const {
+    return Bits.AbstractFunctionDecl.Synthesized;
+  }
+
+  void setSynthesized(bool value = true) {
+    Bits.AbstractFunctionDecl.Synthesized = value;
+  }
+
 private:
   void computeNeedsNewVTableEntry();
 
@@ -5164,16 +5285,6 @@ public:
   /// Determine whether the given method would produce an Objective-C
   /// instance method.
   bool isObjCInstanceMethod() const;
-
-  /// Determine the default argument kind and type for the given argument index
-  /// in this declaration, which must be a function or constructor.
-  ///
-  /// \param Index The index of the argument for which we are querying the
-  /// default argument.
-  ///
-  /// \returns the default argument kind and, if there is a default argument,
-  /// the type of the corresponding parameter.
-  std::pair<DefaultArgumentKind, Type> getDefaultArg(unsigned Index) const;
 
   /// Determine whether the name of an argument is an API name by default
   /// depending on the function context.
@@ -5234,7 +5345,7 @@ public:
   /// The ResilienceExpansion for default arguments.
   ///
   /// In Swift 4 mode, default argument expressions are serialized, and must
-  /// obey the restrictions imposed upon inlineable function bodies.
+  /// obey the restrictions imposed upon inlinable function bodies.
   ResilienceExpansion getDefaultArgumentResilienceExpansion() const {
     return ResilienceExpansion(
         Bits.AbstractFunctionDecl.DefaultArgumentResilienceExpansion);
@@ -5732,7 +5843,7 @@ class EnumElementDecl : public ValueDecl {
   /// example 'Int' in 'case Y(Int)'.  This is null if there is no type
   /// associated with this element, as in 'case Z' or in all elements of enum
   /// definitions.
-  TypeLoc ArgumentType;
+  ParameterList *Params;
   
   SourceLoc EqualsLoc;
   
@@ -5742,18 +5853,18 @@ class EnumElementDecl : public ValueDecl {
   Expr *TypeCheckedRawValueExpr = nullptr;
   
 public:
-  EnumElementDecl(SourceLoc IdentifierLoc, Identifier Name,
-                  TypeLoc ArgumentType,
-                  bool HasArgumentType,
+  EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,
+                  ParameterList *Params,
                   SourceLoc EqualsLoc,
                   LiteralExpr *RawValueExpr,
                   DeclContext *DC)
   : ValueDecl(DeclKind::EnumElement, DC, Name, IdentifierLoc),
-    ArgumentType(ArgumentType),
+    Params(Params),
     EqualsLoc(EqualsLoc),
     RawValueExpr(RawValueExpr)
   {
-    Bits.EnumElementDecl.HasArgumentType = HasArgumentType;
+    Bits.EnumElementDecl.DefaultArgumentResilienceExpansion =
+        static_cast<unsigned>(ResilienceExpansion::Maximal);
   }
 
   Identifier getName() const { return getFullName().getBaseIdentifier(); }
@@ -5770,8 +5881,7 @@ public:
 
   Type getArgumentInterfaceType() const;
 
-  TypeLoc &getArgumentTypeLoc() { return ArgumentType; }
-  const TypeLoc &getArgumentTypeLoc() const { return ArgumentType; }
+  ParameterList *getParameterList() const { return Params; }
 
   bool hasRawValueExpr() const { return RawValueExpr; }
   LiteralExpr *getRawValueExpr() const { return RawValueExpr; }
@@ -5782,6 +5892,21 @@ public:
   }
   void setTypeCheckedRawValueExpr(Expr *e) {
     TypeCheckedRawValueExpr = e;
+  }
+
+  /// The ResilienceExpansion for default arguments.
+  ///
+  /// In Swift 4 mode, default argument expressions are serialized, and must
+  /// obey the restrictions imposed upon inlinable function bodies.
+  ResilienceExpansion getDefaultArgumentResilienceExpansion() const {
+    return ResilienceExpansion(
+        Bits.EnumElementDecl.DefaultArgumentResilienceExpansion);
+  }
+
+  /// Set the ResilienceExpansion for default arguments.
+  void setDefaultArgumentResilienceExpansion(ResilienceExpansion expansion) {
+    Bits.EnumElementDecl.DefaultArgumentResilienceExpansion =
+        unsigned(expansion);
   }
   
   /// Return the containing EnumDecl.
@@ -5798,7 +5923,7 @@ public:
   SourceRange getSourceRange() const;
   
   bool hasAssociatedValues() const {
-    return Bits.EnumElementDecl.HasArgumentType;
+    return getParameterList() != nullptr;
   }
 
   static bool classof(const Decl *D) {
@@ -6591,7 +6716,8 @@ inline bool ValueDecl::isImportAsMember() const {
 inline bool Decl::isPotentiallyOverridable() const {
   if (isa<VarDecl>(this) ||
       isa<SubscriptDecl>(this) ||
-      isa<FuncDecl>(this)) {
+      isa<FuncDecl>(this) ||
+      isa<DestructorDecl>(this)) {
     return getDeclContext()->getAsClassOrClassExtensionContext();
   } else {
     return false;
@@ -6655,6 +6781,17 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
   }
   return result;
 }
+
+/// Determine the default argument kind and type for the given argument index
+/// in this declaration, which must be a function or constructor.
+///
+/// \param Index The index of the argument for which we are querying the
+/// default argument.
+///
+/// \returns the default argument kind and, if there is a default argument,
+/// the type of the corresponding parameter.
+std::pair<DefaultArgumentKind, Type>
+getDefaultArgumentInfo(ValueDecl *source, unsigned Index);
 
 } // end namespace swift
 

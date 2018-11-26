@@ -21,15 +21,19 @@
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/ProfileCounter.h"
-#include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILAllocated.h"
+#include "swift/SIL/SILDeclRef.h"
 #include "llvm/ADT/DenseMap.h"
 
 namespace swift {
 
 class AbstractFunctionDecl;
 class SILCoverageMap;
+class SILFunction;
 class SILModule;
+
+/// Returns whether the given AST node requires profiling instrumentation.
+bool doesASTRequireProfiling(SILModule &M, ASTNode N);
 
 /// SILProfiler - Maps AST nodes to profile counters.
 class SILProfiler : public SILAllocated<SILProfiler> {
@@ -62,7 +66,8 @@ private:
       : M(M), Root(Root), EmitCoverageMapping(EmitCoverageMapping) {}
 
 public:
-  static SILProfiler *create(SILModule &M, ASTNode N);
+  static SILProfiler *create(SILModule &M, ForDefinition_t forDefinition,
+                             ASTNode N);
 
   /// Check if the function is set up for profiling.
   bool hasRegionCounters() const { return NumRegionCounters != 0; }

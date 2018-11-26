@@ -20,19 +20,19 @@ extension Unicode.UTF8 : _UnicodeEncoding {
   public typealias CodeUnit = UInt8
   public typealias EncodedScalar = _ValidUTF8Buffer<UInt32>
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public static var encodedReplacementCharacter : EncodedScalar {
     return EncodedScalar.encodedReplacementCharacter
   }
 
   @inline(__always)
-  @_inlineable
+  @inlinable
   public static func _isScalar(_ x: CodeUnit) -> Bool {
     return x & 0x80 == 0
   }
 
   @inline(__always)
-  @_inlineable
+  @inlinable
   public static func decode(_ source: EncodedScalar) -> Unicode.Scalar {
     switch source.count {
     case 1:
@@ -60,7 +60,7 @@ extension Unicode.UTF8 : _UnicodeEncoding {
   }
   
   @inline(__always)
-  @_inlineable
+  @inlinable
   public static func encode(
     _ source: Unicode.Scalar
   ) -> EncodedScalar? {
@@ -88,7 +88,7 @@ extension Unicode.UTF8 : _UnicodeEncoding {
       _biasedBits: (o | c ) &+ 0b0__1000_0001__1000_0001__1000_0001__1111_0001)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   public static func transcode<FromEncoding : _UnicodeEncoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
@@ -124,7 +124,7 @@ extension Unicode.UTF8 : _UnicodeEncoding {
   public struct ForwardParser {
     public typealias _Buffer = _UIntBuffer<UInt32, UInt8>
     @inline(__always)
-    @_inlineable
+    @inlinable
     public init() { _buffer = _Buffer() }
     public var _buffer: _Buffer
   }
@@ -133,7 +133,7 @@ extension Unicode.UTF8 : _UnicodeEncoding {
   public struct ReverseParser {
     public typealias _Buffer = _UIntBuffer<UInt32, UInt8>
     @inline(__always)
-    @_inlineable
+    @inlinable
     public init() { _buffer = _Buffer() }
     public var _buffer: _Buffer
   }
@@ -142,7 +142,7 @@ extension Unicode.UTF8 : _UnicodeEncoding {
 extension UTF8.ReverseParser : Unicode.Parser, _UTFParser {
   public typealias Encoding = Unicode.UTF8
   @inline(__always)
-  @_inlineable
+  @inlinable
   public func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
     _sanityCheck(_buffer._storage & 0x80 != 0) // this case handled elsewhere
     if _buffer._storage                & 0b0__1110_0000__1100_0000
@@ -177,8 +177,7 @@ extension UTF8.ReverseParser : Unicode.Parser, _UTFParser {
   /// Returns the length of the invalid sequence that ends with the LSB of
   /// buffer.
   @inline(never)
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
   internal func _invalidLength() -> UInt8 {
     if _buffer._storage                 & 0b0__1111_0000__1100_0000
                                        == 0b0__1110_0000__1000_0000 {
@@ -208,7 +207,7 @@ extension UTF8.ReverseParser : Unicode.Parser, _UTFParser {
   }
   
   @inline(__always)
-  @_inlineable
+  @inlinable
   public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
     let x = UInt32(truncatingIfNeeded: _buffer._storage.byteSwapped)
     let shift = 32 &- bitCount
@@ -220,7 +219,7 @@ extension Unicode.UTF8.ForwardParser : Unicode.Parser, _UTFParser {
   public typealias Encoding = Unicode.UTF8
 
   @inline(__always)
-  @_inlineable
+  @inlinable
   public func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
     _sanityCheck(_buffer._storage & 0x80 != 0) // this case handled elsewhere
     
@@ -255,8 +254,7 @@ extension Unicode.UTF8.ForwardParser : Unicode.Parser, _UTFParser {
   /// Returns the length of the invalid sequence that starts with the LSB of
   /// buffer.
   @inline(never)
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
   internal func _invalidLength() -> UInt8 {
     if _buffer._storage               & 0b0__1100_0000__1111_0000
                                      == 0b0__1000_0000__1110_0000 {
@@ -279,7 +277,7 @@ extension Unicode.UTF8.ForwardParser : Unicode.Parser, _UTFParser {
     return 1
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
     let x = UInt32(_buffer._storage) &+ 0x01010101
     return _ValidUTF8Buffer(_biasedBits: x & ._lowBits(bitCount))

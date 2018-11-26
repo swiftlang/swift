@@ -2,6 +2,7 @@
 
 // REQUIRES: optimized_stdlib
 // REQUIRES: objc_interop
+// REQUIRES: swift_stdlib_asserts
 
 // Opaque, unoptimizable functions to call.
 @_silgen_name("takesConstRawPointer")

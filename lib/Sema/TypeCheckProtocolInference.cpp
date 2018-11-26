@@ -1185,7 +1185,7 @@ void AssociatedTypeInference::findSolutionsRec(
           unsigned numTypeWitnesses,
           unsigned numValueWitnessesInProtocolExtensions,
           unsigned reqDepth) {
-  typedef decltype(typeWitnesses)::ScopeTy TypeWitnessesScope;
+  using TypeWitnessesScope = decltype(typeWitnesses)::ScopeTy;
 
   // If we hit the last requirement, record and check this solution.
   if (reqDepth == inferred.size()) {

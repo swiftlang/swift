@@ -199,11 +199,49 @@
                 "llbuild": "master",
                 "swiftpm": "master",
                 "compiler-rt": "swift-4.2-branch",
-                "swift-corelibs-xctest": "master",
-                "swift-corelibs-foundation": "master",
-                "swift-corelibs-libdispatch": "master",
+                "swift-corelibs-xctest": "swift-4.2-branch",
+                "swift-corelibs-foundation": "swift-4.2-branch",
+                "swift-corelibs-libdispatch": "swift-4.2-branch",
+                "swift-integration-tests": "swift-4.2-branch",
+                "swift-xcode-playground-support": "swift-4.2-branch",
+                "ninja": "release"
+            }
+        },
+        "swift-4.2-branch-03-26-2018" : {
+            "aliases": ["swift-4.2-branch-03-26-2018"],
+            "repos": {
+                "llvm": "swift-4.2-branch-03-26-2018",
+                "clang": "swift-4.2-branch-03-26-2018",
+                "swift": "swift-4.2-branch-03-26-2018",
+                "lldb": "swift-4.2-branch-03-26-2018",
+                "cmark": "master",
+                "llbuild": "master",
+                "swiftpm": "master",
+                "compiler-rt": "swift-4.2-branch-03-26-2018",
+                "swift-corelibs-xctest": "swift-4.2-branch",
+                "swift-corelibs-foundation": "swift-4.2-branch",
+                "swift-corelibs-libdispatch": "swift-4.2-branch",
                 "swift-integration-tests": "master",
                 "swift-xcode-playground-support": "master",
+                "ninja": "release"
+            }
+        },
+        "swift-4.2-branch-04-20-2018" : {
+            "aliases": ["swift-4.2-branch-04-20-2018"],
+            "repos": {
+                "llvm": "swift-4.2-branch-04-20-2018",
+                "clang": "swift-4.2-branch-04-20-2018",
+                "swift": "swift-4.2-branch-04-20-2018",
+                "lldb": "swift-4.2-branch-04-20-2018",
+                "cmark": "master",
+                "llbuild": "master",
+                "swiftpm": "master",
+                "compiler-rt": "swift-4.2-branch-04-20-2018",
+                "swift-corelibs-xctest": "swift-4.2-branch-04-20-2018",
+                "swift-corelibs-foundation": "swift-4.2-branch-04-20-2018",
+                "swift-corelibs-libdispatch": "swift-4.2-branch-04-20-2018",
+                "swift-integration-tests": "swift-4.2-branch",
+                "swift-xcode-playground-support": "swift-4.2-branch",
                 "ninja": "release"
             }
         },

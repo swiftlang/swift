@@ -65,7 +65,7 @@ final class SyntaxData: Equatable {
   }
 
   var position: AbsolutePosition {
-    return positionCache.value { return calculatePosition(UTF8Position()) }
+    return positionCache.value { return calculatePosition(AbsolutePosition()) }
   }
 
   var positionAfterSkippingLeadingTrivia: AbsolutePosition {
@@ -94,7 +94,7 @@ final class SyntaxData: Equatable {
   }
 
   var byteSize: Int {
-    return getNextSiblingPos().byteOffset - self.position.byteOffset
+    return getNextSiblingPos().utf8Offset - self.position.utf8Offset
   }
 
   /// Creates a SyntaxData with the provided raw syntax, pointing to the
@@ -256,83 +256,5 @@ final class SyntaxData: Equatable {
   /// - Returns: True if both datas are exactly the same.
   static func ==(lhs: SyntaxData, rhs: SyntaxData) -> Bool {
     return lhs === rhs
-  }
-}
-
-/// An absolute position in a source file as text - the absolute byteOffset from
-/// the start, line, and column.
-public class AbsolutePosition {
-  public fileprivate(set) var byteOffset: Int
-  public fileprivate(set) var line: Int
-  public fileprivate(set) var column: Int
-
-  required public init(line: Int = 1, column: Int = 1, byteOffset: Int = 0) {
-    self.line = line
-    self.column = column
-    self.byteOffset = byteOffset
-  }
-
-  internal func add(text: String) {
-     preconditionFailure("this function must be overridden")
-  }
-
-  internal func copy() -> Self {
-    return type(of: self).init(line: line, column: column, byteOffset: byteOffset)
-  }
-}
-
-extension AbsolutePosition {
-
-  /// Add some number of columns to the position.
-  internal func add(columns: Int) {
-    column += columns
-    byteOffset += columns
-  }
-
-  /// Add some number of newlines to the position, resetting the column.
-  /// Size is byte size of newline char.
-  /// '\n' and '\r' are 1, '\r\n' is 2.
-  internal func add(lines: Int, size: Int) {
-    line += lines
-    column = 1
-    byteOffset += lines * size
-  }
-
-  /// Use some text as a reference for adding to the absolute position,
-  /// taking note of newlines, etc.
-  fileprivate func add<C: BidirectionalCollection>(text chars: C)
-      where C.Element: UnsignedInteger  {
-    let cr: C.Element = 13
-    let nl: C.Element = 10
-    var idx = chars.startIndex
-    while idx != chars.endIndex {
-      let c = chars[idx]
-      idx = chars.index(after: idx)
-      switch c {
-      case cr:
-        if chars[idx] == nl {
-          add(lines: 1, size: 2)
-          idx = chars.index(after: idx)
-        } else {
-          add(lines: 1, size: 1)
-        }
-      case nl:
-        add(lines: 1, size: 1)
-      default:
-        add(columns: 1)
-      }
-    }
-  }
-}
-
-class UTF8Position: AbsolutePosition {
-  internal override func add(text: String) {
-    add(text: text.utf8)
-  }
-}
-
-class UTF16Position: AbsolutePosition {
-  internal override func add(text: String) {
-    add(text: text.utf16)
   }
 }

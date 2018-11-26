@@ -255,6 +255,14 @@ public:
   /// the syntax tree before closing the root context.
   void finalizeRoot();
 
+  /// Make a missing node corresponding to the given token kind and text, and
+  /// push this node into the context. The synthesized node can help
+  /// the creation of valid syntax nodes.
+  void synthesize(tok Kind, StringRef Text = "");
+
+  /// Make a missing node corresponding to the given node kind, and
+  /// push this node into the context.
+  void synthesize(SyntaxKind Kind);
 };
 
 } // namespace swift

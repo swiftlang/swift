@@ -39,6 +39,7 @@
 #include "GenOpaque.h"
 #include "HeapTypeInfo.h"
 #include "IndirectTypeInfo.h"
+#include "Outlining.h"
 #include "ProtocolInfo.h"
 #include "ReferenceTypeInfo.h"
 #include "ScalarTypeInfo.h"
@@ -51,8 +52,16 @@ using namespace swift;
 using namespace irgen;
 
 llvm::DenseMap<TypeBase*, TypeCacheEntry> &
-TypeConverter::Types_t::getCacheFor(TypeBase *t) {
-  return t->hasTypeParameter() ? DependentCache : IndependentCache;
+TypeConverter::Types_t::getCacheFor(bool isDependent, bool completelyFragile) {
+  if (completelyFragile) {
+    return (isDependent
+            ? FragileDependentCache
+            : FragileIndependentCache);
+  }
+
+  return (isDependent
+          ? DependentCache
+          : IndependentCache);
 }
 
 void TypeInfo::assign(IRGenFunction &IGF, Address dest, Address src,
@@ -162,9 +171,11 @@ void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF, Address destAddr,
     loadAsCopy(IGF, srcAddr, copy);
     initialize(IGF, copy, destAddr, true);
   } else {
-    IGF.IGM.generateCallToOutlinedCopyAddr(
-        IGF, *this, destAddr, srcAddr, T,
-        &IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction);
+    OutliningMetadataCollector collector(IGF);
+    // No need to collect anything because we assume loadable types can be
+    // loaded without enums.
+    collector.emitCallToOutlinedCopy(
+        destAddr, srcAddr, T, *this, IsInitialization, IsNotTake);
   }
 }
 
@@ -1053,7 +1064,15 @@ static ProtocolInfo *invalidProtocolInfo() { return (ProtocolInfo*) 1; }
 TypeConverter::TypeConverter(IRGenModule &IGM)
   : IGM(IGM),
     FirstType(invalidTypeInfo()),
-    FirstProtocol(invalidProtocolInfo()) {}
+    FirstProtocol(invalidProtocolInfo()) {
+  // FIXME: In LLDB, everything is completely fragile, so that IRGen can query
+  // the size of resilient types. Of course this is not the right long term
+  // solution, because it won't work once the swiftmodule file is not in
+  // sync with the binary module. Once LLDB can calculate type layouts at
+  // runtime (using remote mirrors or some other mechanism), we can remove this.
+  if (IGM.IRGen.Opts.EnableResilienceBypass)
+    CompletelyFragile = true;
+}
 
 TypeConverter::~TypeConverter() {
   // Delete all the converted type infos.
@@ -1077,6 +1096,11 @@ void TypeConverter::pushGenericContext(CanGenericSignature signature) {
   // Push the generic context down to the SIL TypeConverter, so we can share
   // archetypes with SIL.
   IGM.getSILTypes().pushGenericContext(signature);
+
+  // Clear the dependent type info cache since we have a new active signature
+  // now.
+  Types.getCacheFor(/*isDependent*/ true, /*isFragile*/ false).clear();
+  Types.getCacheFor(/*isDependent*/ true, /*isFragile*/ true).clear();
 }
 
 void TypeConverter::popGenericContext(CanGenericSignature signature) {
@@ -1086,7 +1110,8 @@ void TypeConverter::popGenericContext(CanGenericSignature signature) {
   // Pop the SIL TypeConverter's generic context too.
   IGM.getSILTypes().popGenericContext(signature);
   
-  Types.DependentCache.clear();
+  Types.getCacheFor(/*isDependent*/ true, /*isFragile*/ false).clear();
+  Types.getCacheFor(/*isDependent*/ true, /*isFragile*/ true).clear();
 }
 
 GenericEnvironment *TypeConverter::getGenericEnvironment() {
@@ -1103,8 +1128,9 @@ GenericEnvironment *IRGenModule::getGenericEnvironment() {
 void TypeConverter::addForwardDecl(TypeBase *key, llvm::Type *type) {
   assert(key->isCanonical());
   assert(!key->hasTypeParameter());
-  assert(!Types.IndependentCache.count(key) && "entry already exists for type!");
-  Types.IndependentCache.insert(std::make_pair(key, type));
+  auto &Cache = Types.getCacheFor(/*isDependent*/ false, CompletelyFragile);
+  assert(!Cache.count(key) && "entry already exists for type!");
+  Cache.insert(std::make_pair(key, type));
 }
 
 const TypeInfo &IRGenModule::getWitnessTablePtrTypeInfo() {
@@ -1395,9 +1421,20 @@ CanType TypeConverter::getExemplarType(CanType contextTy) {
   }
 }
 
+void TypeConverter::pushCompletelyFragile() {
+  assert(!CompletelyFragile);
+  CompletelyFragile = true;
+}
+
+void TypeConverter::popCompletelyFragile() {
+  assert(CompletelyFragile);
+  CompletelyFragile = false;
+}
+
 TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   // Cache this entry in the dependent or independent cache appropriate to it.
-  auto &Cache = Types.getCacheFor(canonicalTy.getPointer());
+  auto &Cache = Types.getCacheFor(canonicalTy->hasTypeParameter(),
+                                  CompletelyFragile);
 
   {
     auto it = Cache.find(canonicalTy.getPointer());
@@ -1423,8 +1460,9 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   
   // See whether we lowered a type equivalent to this one.
   if (exemplarTy != canonicalTy) {
-    auto it = Types.IndependentCache.find(exemplarTy.getPointer());
-    if (it != Types.IndependentCache.end()) {
+    auto &Cache = Types.getCacheFor(/*isDependent*/ false, CompletelyFragile);
+    auto it = Cache.find(exemplarTy.getPointer());
+    if (it != Cache.end()) {
       // Record the object under the original type.
       auto result = it->second;
       Cache[canonicalTy.getPointer()] = result;
@@ -1452,8 +1490,11 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
     entry = convertedTI;
   };
   insertEntry(Cache[canonicalTy.getPointer()]);
-  if (canonicalTy != exemplarTy)
-    insertEntry(Types.IndependentCache[exemplarTy.getPointer()]);
+  if (canonicalTy != exemplarTy) {
+    auto &IndependentCache = Types.getCacheFor(/*isDependent*/ false,
+                                               CompletelyFragile);
+    insertEntry(IndependentCache[exemplarTy.getPointer()]);
+  }
   
   // If the type info hasn't been added to the list of types, do so.
   if (!convertedTI->NextConverted) {
@@ -1848,7 +1889,7 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
   assert(decl->getDeclaredType()->isCanonical());
   assert(decl->getDeclaredType()->hasUnboundGenericType());
   TypeBase *key = decl->getDeclaredType().getPointer();
-  auto &Cache = Types.IndependentCache;
+  auto &Cache = Types.getCacheFor(/*isDependent*/ false, CompletelyFragile);
   auto entry = Cache.find(key);
   if (entry != Cache.end())
     return entry->second;
@@ -2079,18 +2120,6 @@ void IRGenFunction::setLocalSelfMetadata(llvm::Value *value,
 }
 
 #ifndef NDEBUG
-CanType TypeConverter::getTypeThatLoweredTo(llvm::Type *t) const {
-  for (auto &mapping : Types.IndependentCache) {
-    if (auto fwd = mapping.second.dyn_cast<llvm::Type*>())
-      if (fwd == t)
-        return CanType(mapping.first);
-    if (auto *ti = mapping.second.dyn_cast<const TypeInfo *>())
-      if (ti->getStorageType() == t)
-        return CanType(mapping.first);
-  }
-  return CanType();
-}
-
 bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
   auto genericEnv = arch->getGenericEnvironment();
   if (!genericEnv) return true;

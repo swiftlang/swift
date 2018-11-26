@@ -447,14 +447,51 @@ static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &SGF,
 static ManagedValue emitBuiltinAddressOf(SILGenFunction &SGF,
                                          SILLocation loc,
                                          SubstitutionList substitutions,
-                                         ArrayRef<ManagedValue> args,
+                                         Expr *argument,
                                          SGFContext C) {
-  assert(args.size() == 1 && "addressof should have a single argument");
+  auto rawPointerTy = SILType::getRawPointerType(SGF.getASTContext());
+  // If the argument is inout, try forming its lvalue. This builtin only works
+  // if it's trivially physically projectable.
+  auto inout = cast<InOutExpr>(argument->getSemanticsProvidingExpr());
+  auto lv = SGF.emitLValue(inout->getSubExpr(), AccessKind::ReadWrite);
+  if (!lv.isPhysical() || !lv.isLoadingPure()) {
+    SGF.SGM.diagnose(argument->getLoc(), diag::non_physical_addressof);
+    return ManagedValue::forUnmanaged(SILUndef::get(rawPointerTy, &SGF.SGM.M));
+  }
+  
+  auto addr = SGF.emitAddressOfLValue(argument, std::move(lv),
+                                      AccessKind::ReadWrite)
+                 .getValue();
   
   // Take the address argument and cast it to RawPointer.
   SILType rawPointerType = SILType::getRawPointerType(SGF.F.getASTContext());
-  SILValue result = SGF.B.createAddressToPointer(loc,
-                                                 args[0].getUnmanagedValue(),
+  SILValue result = SGF.B.createAddressToPointer(loc, addr,
+                                                 rawPointerType);
+  return ManagedValue::forUnmanaged(result);
+}
+
+/// Specialized emitter for Builtin.addressOfBorrow.
+static ManagedValue emitBuiltinAddressOfBorrow(SILGenFunction &SGF,
+                                               SILLocation loc,
+                                               SubstitutionList substitutions,
+                                               Expr *argument,
+                                               SGFContext C) {
+  auto rawPointerTy = SILType::getRawPointerType(SGF.getASTContext());
+  SILValue addr;
+  // Try to borrow the argument at +0. We only support if it's
+  // naturally emitted borrowed in memory.
+  auto borrow = SGF.emitRValue(argument, SGFContext::AllowGuaranteedPlusZero)
+     .getAsSingleValue(SGF, argument);
+  if (!borrow.isPlusZero() || !borrow.getType().isAddress()) {
+    SGF.SGM.diagnose(argument->getLoc(), diag::non_borrowed_indirect_addressof);
+    return ManagedValue::forUnmanaged(SILUndef::get(rawPointerTy, &SGF.SGM.M));
+  }
+  
+  addr = borrow.getValue();
+  
+  // Take the address argument and cast it to RawPointer.
+  SILType rawPointerType = SILType::getRawPointerType(SGF.F.getASTContext());
+  SILValue result = SGF.B.createAddressToPointer(loc, addr,
                                                  rawPointerType);
   return ManagedValue::forUnmanaged(result);
 }
@@ -515,6 +552,98 @@ static ManagedValue emitBuiltinGetTailAddr(SILGenFunction &SGF,
   addr = SGF.B.createAddressToPointer(loc, addr, RawPtrType);
 
   return ManagedValue::forUnmanaged(addr);
+}
+
+/// Specialized emitter for Builtin.beginUnpairedModifyAccess.
+static ManagedValue emitBuiltinBeginUnpairedModifyAccess(SILGenFunction &SGF,
+                                                    SILLocation loc,
+                                           SubstitutionList substitutions,
+                                           ArrayRef<ManagedValue> args,
+                                           SGFContext C) {
+  assert(substitutions.size() == 1 &&
+        "Builtin.beginUnpairedModifyAccess should have one substitution");
+  assert(args.size() == 3 &&
+         "beginUnpairedModifyAccess should be given three arguments");
+
+  SILType elemTy = SGF.getLoweredType(substitutions[0].getReplacement());
+  SILValue addr = SGF.B.createPointerToAddress(loc, args[0].getUnmanagedValue(),
+                                               elemTy.getAddressType(),
+                                               /*strict*/ true,
+                                               /*invariant*/ false);
+
+  SILType valueBufferTy =
+      SGF.getLoweredType(SGF.getASTContext().TheUnsafeValueBufferType);
+
+  SILValue buffer =
+    SGF.B.createPointerToAddress(loc, args[1].getUnmanagedValue(),
+                                 valueBufferTy.getAddressType(),
+                                 /*strict*/ true,
+                                 /*invariant*/ false);
+  SGF.B.createBeginUnpairedAccess(loc, addr, buffer, SILAccessKind::Modify,
+                                  SILAccessEnforcement::Dynamic,
+                                  /*noNestedConflict*/ false);
+
+  return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+}
+
+/// Specialized emitter for Builtin.performInstantaneousReadAccess
+static ManagedValue emitBuiltinPerformInstantaneousReadAccess(
+  SILGenFunction &SGF, SILLocation loc, SubstitutionList substitutions,
+  ArrayRef<ManagedValue> args, SGFContext C) {
+
+  assert(substitutions.size() == 1 &&
+         "Builtin.performInstantaneousReadAccess should have one substitution");
+  assert(args.size() == 2 &&
+         "Builtin.performInstantaneousReadAccess should be given "
+         "two arguments");
+
+  SILType elemTy = SGF.getLoweredType(substitutions[0].getReplacement());
+  SILValue addr = SGF.B.createPointerToAddress(loc, args[0].getUnmanagedValue(),
+                                               elemTy.getAddressType(),
+                                               /*strict*/ true,
+                                               /*invariant*/ false);
+
+  SILType valueBufferTy =
+    SGF.getLoweredType(SGF.getASTContext().TheUnsafeValueBufferType);
+  SILValue unusedBuffer = SGF.emitTemporaryAllocation(loc, valueBufferTy);
+
+  // Begin an "unscoped" read access. No nested conflict is possible because
+  // the compiler should generate the actual read for the KeyPath expression
+  // immediately after the call to this builtin, which forms the address of
+  // that real access. When noNestedConflict=true, no EndUnpairedAccess should
+  // be emitted.
+  //
+  // Unpaired access is necessary because a BeginAccess/EndAccess pair with no
+  // use will be trivially optimized away.
+  SGF.B.createBeginUnpairedAccess(loc, addr, unusedBuffer, SILAccessKind::Read,
+                                  SILAccessEnforcement::Dynamic,
+                                  /*noNestedConflict*/ true);
+
+  return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+}
+
+/// Specialized emitter for Builtin.endUnpairedAccessModifyAccess.
+static ManagedValue emitBuiltinEndUnpairedAccess(SILGenFunction &SGF,
+                                                    SILLocation loc,
+                                           SubstitutionList substitutions,
+                                           ArrayRef<ManagedValue> args,
+                                           SGFContext C) {
+  assert(substitutions.size() == 0 &&
+        "Builtin.endUnpairedAccess should have no substitutions");
+  assert(args.size() == 1 &&
+         "endUnpairedAccess should be given one argument");
+
+  SILType valueBufferTy =
+      SGF.getLoweredType(SGF.getASTContext().TheUnsafeValueBufferType);
+
+  SILValue buffer = SGF.B.createPointerToAddress(loc, args[0].getUnmanagedValue(),
+                                                 valueBufferTy.getAddressType(),
+                                                 /*strict*/ true,
+                                                 /*invariant*/ false);
+  SGF.B.createEndUnpairedAccess(loc, buffer, SILAccessEnforcement::Dynamic,
+                                /*aborted*/ false);
+
+  return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
 }
 
 /// Specialized emitter for Builtin.condfail.

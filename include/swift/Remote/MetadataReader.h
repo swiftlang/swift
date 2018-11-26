@@ -1491,7 +1491,7 @@ private:
 namespace llvm {
   template<typename Runtime, typename T>
   struct simplify_type<swift::remote::RemoteRef<Runtime, T>> {
-    typedef const T *SimpleType;
+    using SimpleType = const T *;
     static SimpleType
     getSimplifiedValue(swift::remote::RemoteRef<Runtime, T> value) {
       return value.getLocalBuffer();

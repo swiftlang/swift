@@ -195,4 +195,4 @@ enum AllRefcountedTwoSimple {
 }
 
 // CHECK-LABEL: define linkonce_odr hidden void @"$S34enum_value_semantics_special_cases22AllRefcountedTwoSimpleOwxx"
-// CHECK:   call void @"$S34enum_value_semantics_special_cases22AllRefcountedTwoSimpleOWy"
+// CHECK:   call void @"$S34enum_value_semantics_special_cases22AllRefcountedTwoSimpleOWOy"

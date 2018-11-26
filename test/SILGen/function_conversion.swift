@@ -628,16 +628,16 @@ func rdar35702810_anyhashable() {
 
   // CHECK: [[FN:%.*]] = function_ref @$SSays11AnyHashableVGSgIegg_Say19function_conversion1BCGSgIegg_TR : $@convention(thin) (@guaranteed Optional<Array<B>>, @guaranteed @callee_guaranteed (@guaranteed Optional<Array<AnyHashable>>) -> ()) -> ()
   // CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] [[FN]](%{{[0-9]+}}) : $@convention(thin) (@guaranteed Optional<Array<B>>, @guaranteed @callee_guaranteed (@guaranteed Optional<Array<AnyHashable>>) -> ()) -> ()
-  // CHECK: convert_escape_to_noescape [[PA]] : $@callee_guaranteed (@guaranteed Optional<Array<B>>) -> () to $@noescape @callee_guaranteed (@guaranteed Optional<Array<B>>) -> ()
+  // CHECK: convert_escape_to_noescape [not_guaranteed] [[PA]] : $@callee_guaranteed (@guaranteed Optional<Array<B>>) -> () to $@noescape @callee_guaranteed (@guaranteed Optional<Array<B>>) -> ()
   bar_arr(type: B.self, fn_arr)
 
   // CHECK: [[FN:%.*]] = function_ref @$Ss10DictionaryVys11AnyHashableVSiGIegg_ABy19function_conversion1BCSiGIegg_TR : $@convention(thin) (@guaranteed Dictionary<B, Int>, @guaranteed @callee_guaranteed (@guaranteed Dictionary<AnyHashable, Int>) -> ()) -> ()
   // CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] [[FN]](%{{[0-9]+}}) : $@convention(thin) (@guaranteed Dictionary<B, Int>, @guaranteed @callee_guaranteed (@guaranteed Dictionary<AnyHashable, Int>) -> ()) -> ()
-  // CHECK: convert_escape_to_noescape [[PA]] : $@callee_guaranteed (@guaranteed Dictionary<B, Int>) -> () to $@noescape @callee_guaranteed (@guaranteed Dictionary<B, Int>) -> ()
+  // CHECK: convert_escape_to_noescape [not_guaranteed] [[PA]] : $@callee_guaranteed (@guaranteed Dictionary<B, Int>) -> () to $@noescape @callee_guaranteed (@guaranteed Dictionary<B, Int>) -> ()
   bar_map(type: B.self, fn_map)
 
   // CHECK: [[FN:%.*]] = function_ref @$Ss3SetVys11AnyHashableVGIegg_ABy19function_conversion1BCGIegg_TR : $@convention(thin) (@guaranteed Set<B>, @guaranteed @callee_guaranteed (@guaranteed Set<AnyHashable>) -> ()) -> ()
   // CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] [[FN]](%{{[0-9]+}}) : $@convention(thin) (@guaranteed Set<B>, @guaranteed @callee_guaranteed (@guaranteed Set<AnyHashable>) -> ()) -> ()
-  // CHECK: convert_escape_to_noescape [[PA]] : $@callee_guaranteed (@guaranteed Set<B>) -> () to $@noescape @callee_guaranteed (@guaranteed Set<B>) -> ()
+  // CHECK: convert_escape_to_noescape [not_guaranteed] [[PA]] : $@callee_guaranteed (@guaranteed Set<B>) -> () to $@noescape @callee_guaranteed (@guaranteed Set<B>) -> ()
   bar_set(type: B.self, fn_set)
 }

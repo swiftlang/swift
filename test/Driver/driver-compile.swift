@@ -35,7 +35,7 @@
 // RUN: cp %s %t
 // RUN: not %swiftc_driver -driver-print-jobs -c -target x86_64-apple-macosx10.9 %s %t/driver-compile.swift 2>&1 | %FileCheck -check-prefix DUPLICATE-NAME %s
 
-// RUN: %swiftc_driver -driver-print-jobs -c -target x86_64-apple-macosx10.9 %s %S/../Inputs/empty.swift -module-name main -driver-use-filelists 2>&1 | %FileCheck -check-prefix=FILELIST %s
+// RUN: %swiftc_driver -driver-print-jobs -c -target x86_64-apple-macosx10.9 %s %S/../Inputs/empty.swift -module-name main -driver-filelist-threshold=0 2>&1 | %FileCheck -check-prefix=FILELIST %s
 
 // RUN: %empty-directory(%t)/DISTINCTIVE-PATH/usr/bin/
 // RUN: %hardlink-or-copy(from: %swift_driver_plain, to: %t/DISTINCTIVE-PATH/usr/bin/swiftc)

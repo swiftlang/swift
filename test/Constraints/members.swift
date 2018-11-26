@@ -433,8 +433,7 @@ struct Aardvark {
 func rdar33914444() {
   struct A {
     enum R<E: Error> {
-      case e(E)
-      // expected-note@-1  {{did you mean 'e'}}
+      case e(E) // expected-note {{'e' declared here}}
     }
 
     struct S {
@@ -447,7 +446,7 @@ func rdar33914444() {
   }
 
   _ = A.S(e: .e1)
-  // expected-error@-1 {{type 'A.R<A.S.E>' has no member 'e1'}}
+  // expected-error@-1 {{type 'A.R<A.S.E>' has no member 'e1'; did you mean 'e'?}}
 }
 
 // SR-5324: Better diagnostic when instance member of outer type is referenced from nested type
@@ -464,3 +463,6 @@ struct Outer {
     }
   }
 }
+
+// rdar://problem/39514009 - don't crash when trying to diagnose members with special names
+print("hello")[0] // expected-error {{value of tuple type '()' has no member 'subscript'}}

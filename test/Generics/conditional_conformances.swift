@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -typecheck %s -verify
+// RUN: %target-typecheck-verify-swift -typecheck -verify
 // RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures %s > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
@@ -7,10 +7,7 @@ protocol P2 {}
 protocol P3 {}
 protocol P4: P1 {}
 protocol P5: P2 {}
-// expected-note@-1{{type 'InheritImplicitGood<T>' does not conform to inherited protocol 'P2'}}
-// expected-note@-2{{type 'InheritImplicitBad<T>' does not conform to inherited protocol 'P2'}}
 protocol P6: P2 {}
-// expected-note@-1{{type 'InheritImplicitBad<T>' does not conform to inherited protocol 'P2'}}
 
 protocol Assoc { associatedtype AT }
 
@@ -276,35 +273,62 @@ func inheritequal_bad_bad<U>(_: U) {
   // expected-note@-3{{requirement from conditional conformance of 'InheritMore<U>' to 'P5'}}
 }
 
-struct InheritImplicitGood<T> {}
-// FIXME: per SE-0143, this should result in an implicit conformance
-// InheritImplicitGood: P2.
-extension InheritImplicitGood: P5 where T: P1 {}
-// expected-error@-1{{type 'InheritImplicitGood<T>' does not conform to protocol 'P2'}}
+struct InheritImplicitOne<T> {}
+// This shouldn't give anything implicit since we disallow implication for
+// conditional conformances (in many cases, the implied bounds are
+// incorrect/insufficiently general).
+extension InheritImplicitOne: P5 where T: P1 {}
+// expected-error@-1{{conditional conformance of type 'InheritImplicitOne<T>' to protocol 'P5' does not imply conformance to inherited protocol 'P2'}}
+// expected-note@-2{{did you mean to explicitly state the conformance like 'extension InheritImplicitOne: P2 where ...'?}}
 
-struct InheritImplicitBad<T> {}
-// This shouldn't give anything implicit since either conformance could imply
-// InheritImplicitBad: P2.
-extension InheritImplicitBad: P5 where T: P1 {}
-// expected-error@-1{{type 'InheritImplicitBad<T>' does not conform to protocol 'P2'}}
-extension InheritImplicitBad: P6 where T: P1 {}
-// expected-error@-1{{type 'InheritImplicitBad<T>' does not conform to protocol 'P2'}}
+struct InheritImplicitTwo<T> {}
+// Even if we relax the rule about implication, this double-up should still be
+// an error, because either conformance could imply InheritImplicitTwo: P2.
+extension InheritImplicitTwo: P5 where T: P1 {}
+// expected-error@-1{{conditional conformance of type 'InheritImplicitTwo<T>' to protocol 'P5' does not imply conformance to inherited protocol 'P2'}}
+// expected-note@-2{{did you mean to explicitly state the conformance like 'extension InheritImplicitTwo: P2 where ...'?}}
+extension InheritImplicitTwo: P6 where T: P1 {}
 
+// However, if there's a non-conditional conformance that implies something, we
+// can imply from that one.
+struct InheritImplicitGood1<T> {}
+extension InheritImplicitGood1: P5 {}
+extension InheritImplicitGood1: P6 where T: P1 {}
 
+func inheritimplicitgood1<T>(_ : T) {
+    takes_P2(InheritImplicitGood1<T>()) // unconstrained!
+    takes_P2(InheritImplicitGood1<Int>())
+}
+struct InheritImplicitGood2<T> {}
+extension InheritImplicitGood2: P6 where T: P1 {}
+extension InheritImplicitGood2: P5 {}
+
+func inheritimplicitgood2<T>(_: T) {
+    takes_P2(InheritImplicitGood2<T>()) // unconstrained!
+    takes_P2(InheritImplicitGood2<Int>())
+
+}
+struct InheritImplicitGood3<T>: P5 {}
+extension InheritImplicitGood3: P6 where T: P1 {}
+
+func inheritimplicitgood3<T>(_: T) {
+    takes_P2(InheritImplicitGood3<T>()) // unconstrained!
+    takes_P2(InheritImplicitGood3<Int>())
+}
 
 // "Multiple conformances" from SE0143
 
 struct TwoConformances<T> {}
 extension TwoConformances: P2 where T: P1 {}
-// expected-error@-1{{redundant conformance of 'TwoConformances<T>' to protocol 'P2'}}
-extension TwoConformances: P2 where T: P3 {}
 // expected-note@-1{{'TwoConformances<T>' declares conformance to protocol 'P2' here}}
+extension TwoConformances: P2 where T: P3 {}
+// expected-error@-1{{redundant conformance of 'TwoConformances<T>' to protocol 'P2'}}
 
 struct TwoDisjointConformances<T> {}
 extension TwoDisjointConformances: P2 where T == Int {}
-// expected-error@-1{{redundant conformance of 'TwoDisjointConformances<T>' to protocol 'P2'}}
-extension TwoDisjointConformances: P2 where T == String {}
 // expected-note@-1{{'TwoDisjointConformances<T>' declares conformance to protocol 'P2' here}}
+extension TwoDisjointConformances: P2 where T == String {}
+// expected-error@-1{{redundant conformance of 'TwoDisjointConformances<T>' to protocol 'P2'}}
 
 
 // FIXME: these cases should be equivalent (and both with the same output as the

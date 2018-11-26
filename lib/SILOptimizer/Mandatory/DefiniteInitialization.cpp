@@ -2952,7 +2952,6 @@ static bool lowerRawSILOperations(SILFunction &Fn) {
   return Changed;
 }
 
-
 namespace {
 /// Perform definitive initialization analysis and promote alloc_box uses into
 /// SSA registers for later SSA-based dataflow passes.
@@ -2974,6 +2973,7 @@ class DefiniteInitialization : public SILFunctionTransform {
     // Lower raw-sil only instructions used by this pass, like "assign".
     if (lowerRawSILOperations(*getFunction()))
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+
   }
 
 };

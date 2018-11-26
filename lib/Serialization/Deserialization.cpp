@@ -625,6 +625,8 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
 
   ASTContext &ctx = getContext();
   DeclContext *dc = getDeclContext(contextID);
+  assert(!isa<ClangModuleUnit>(dc->getModuleScopeContext())
+         && "should not have serialized a conformance from a clang module");
   Type conformingType = dc->getDeclaredInterfaceType();
   PrettyStackTraceType trace(ctx, "reading conformance for", conformingType);
 
@@ -3675,28 +3677,53 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
   }
 
   case decls_block::ENUM_ELEMENT_DECL: {
-    IdentifierID nameID;
     DeclContextID contextID;
     TypeID interfaceTypeID;
-    bool hasArgumentType;
-    bool isImplicit; bool isNegative;
+    bool isImplicit; bool hasPayload; bool isNegative;
     unsigned rawValueKindID;
+    IdentifierID blobData;
+    uint8_t rawResilienceExpansion;
+    unsigned numArgNames;
+    ArrayRef<uint64_t> argNameAndDependencyIDs;
 
-    decls_block::EnumElementLayout::readRecord(scratch, nameID,
-                                               contextID,
+    decls_block::EnumElementLayout::readRecord(scratch, contextID,
                                                interfaceTypeID,
-                                               hasArgumentType,
-                                               isImplicit, rawValueKindID,
-                                               isNegative);
+                                               isImplicit, hasPayload,
+                                               rawValueKindID, isNegative,
+                                               blobData,
+                                               rawResilienceExpansion,
+                                               numArgNames,
+                                               argNameAndDependencyIDs);
+
+    // Resolve the name ids.
+    Identifier baseName = getIdentifier(argNameAndDependencyIDs.front());
+    SmallVector<Identifier, 2> argNames;
+    for (auto argNameID : argNameAndDependencyIDs.slice(1, numArgNames-1))
+      argNames.push_back(getIdentifier(argNameID));
+    DeclName compoundName(ctx, baseName, argNames);
+    DeclName name = argNames.empty() ? baseName : compoundName;
+    
+    for (TypeID dependencyID : argNameAndDependencyIDs.slice(numArgNames+1)) {
+      auto dependency = getTypeChecked(dependencyID);
+      if (!dependency) {
+        return llvm::make_error<TypeError>(
+          name, takeErrorInfo(dependency.takeError()));
+      }
+    }
+
+    // Read payload parameter list, if it exists.
+    ParameterList *paramList = nullptr;
+    if (hasPayload) {
+      paramList = readParameterList();
+    }
 
     DeclContext *DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
     auto elem = createDecl<EnumElementDecl>(SourceLoc(),
-                                            getIdentifier(nameID),
-                                            TypeLoc(),
-                                            hasArgumentType,
+                                            name,
+                                            paramList,
                                             SourceLoc(),
                                             nullptr,
                                             DC);
@@ -3707,8 +3734,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     case EnumElementRawValueKind::None:
       break;
     case EnumElementRawValueKind::IntegerLiteral: {
-      auto literalText = getContext().AllocateCopy(blobData);
-      auto literal = new (getContext()) IntegerLiteralExpr(literalText,
+      auto literalText = getIdentifier(blobData);
+      auto literal = new (getContext()) IntegerLiteralExpr(literalText.get(),
                                                            SourceLoc(),
                                                            /*implicit*/ true);
       if (isNegative)
@@ -3725,6 +3752,13 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     elem->setAccess(std::max(cast<EnumDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
 
+    if (auto resilienceExpansion = getActualResilienceExpansion(
+                                       rawResilienceExpansion)) {
+      elem->setDefaultArgumentResilienceExpansion(*resilienceExpansion);
+    } else {
+      error();
+      return nullptr;
+    }
     break;
   }
 
@@ -4145,11 +4179,11 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     s->getFrontendCounters().NumTypesDeserialized++;
 
   switch (recordID) {
-  case decls_block::NAME_ALIAS_TYPE: {
+  case decls_block::BUILTIN_ALIAS_TYPE: {
     DeclID underlyingID;
     TypeID canonicalTypeID;
-    decls_block::NameAliasTypeLayout::readRecord(scratch, underlyingID,
-                                                 canonicalTypeID);
+    decls_block::BuiltinAliasTypeLayout::readRecord(scratch, underlyingID,
+                                                    canonicalTypeID);
     auto aliasOrError = getDeclChecked(underlyingID);
     if (!aliasOrError)
       return aliasOrError.takeError();
@@ -4180,6 +4214,62 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     break;
   }
 
+  case decls_block::NAME_ALIAS_TYPE: {
+    DeclID typealiasID;
+    TypeID parentTypeID;
+    TypeID underlyingTypeID;
+    decls_block::NameAliasTypeLayout::readRecord(scratch, typealiasID,
+                                                      parentTypeID,
+                                                      underlyingTypeID);
+    auto aliasOrError = getDeclChecked(typealiasID);
+    if (!aliasOrError)
+      return aliasOrError.takeError();
+    auto alias = dyn_cast<TypeAliasDecl>(aliasOrError.get());
+
+    Type underlyingType;
+    if (ctx.LangOpts.EnableDeserializationRecovery) {
+      Expected<Type> expectedType = getTypeChecked(underlyingTypeID);
+      if (!expectedType)
+        return expectedType.takeError();
+      if (expectedType.get()) {
+        if (!alias ||
+            !alias->getDeclaredInterfaceType()->isEqual(expectedType.get())) {
+          // Fall back to the canonical type.
+          typeOrOffset = expectedType.get()->getCanonicalType();
+          break;
+        }
+      }
+
+      underlyingType = expectedType.get();
+    } else {
+      underlyingType = getType(underlyingTypeID);
+    }
+
+    Type parentType = getType(parentTypeID);
+
+    // Read the substitutions.
+    SubstitutionMap subMap;
+    if (auto genericSig = alias->getGenericSignature()) {
+      SmallVector<Substitution, 4> substitutions;
+      for (unsigned i : range(genericSig->getSubstitutionListSize())) {
+        (void)i;
+        substitutions.push_back(*maybeReadSubstitution(DeclTypeCursor));
+      }
+
+      subMap = genericSig->getSubstitutionMap(substitutions);
+    }
+
+    // Look through compatibility aliases that are now unavailable.
+    if (alias->getAttrs().isUnavailable(ctx) &&
+        alias->isCompatibilityAlias()) {
+      typeOrOffset = alias->getUnderlyingTypeLoc().getType();
+      break;
+    }
+
+    typeOrOffset = NameAliasType::get(alias, parentType, subMap,
+                                           underlyingType);
+    break;
+  }
   case decls_block::NOMINAL_TYPE: {
     DeclID declID;
     TypeID parentID;
@@ -5219,13 +5309,13 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     if (auto syntheticSig = getGenericSignature(*rawIDIter++)) {
       // Create the synthetic environment.
       syntheticEnv = syntheticSig->createGenericEnvironment();
+    }
 
-      // Requirement -> synthetic substitutions.
-      if (unsigned numReqSubstitutions = *rawIDIter++) {
-        while (numReqSubstitutions--) {
-          auto sub = maybeReadSubstitution(DeclTypeCursor, nullptr);
-          reqToSyntheticSubs.push_back(*sub);
-        }
+    // Requirement -> synthetic substitutions.
+    if (unsigned numReqSubstitutions = *rawIDIter++) {
+      while (numReqSubstitutions--) {
+        auto sub = maybeReadSubstitution(DeclTypeCursor, nullptr);
+        reqToSyntheticSubs.push_back(*sub);
       }
     }
 
@@ -5241,13 +5331,6 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     // Handle opaque witnesses that couldn't be deserialized.
     if (isOpaque) {
       trySetOpaqueWitness();
-      continue;
-    }
-
-    // Handle simple witnesses.
-    if (witnessSubstitutions.empty() && !syntheticSig && !syntheticEnv &&
-        reqToSyntheticSubs.empty()) {
-      trySetWitness(Witness(witness));
       continue;
     }
 

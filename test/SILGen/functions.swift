@@ -348,7 +348,7 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @$S9functions19standalone_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC_THIN]]
-  // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [[FUNC_THICK]]
+  // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[FUNC_THICK]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]
@@ -359,7 +359,7 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @$S9functions19standalone_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%.*]] = thin_to_thick_function [[FUNC_THIN]]
-  // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [[FUNC_THICK]]
+  // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[FUNC_THICK]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[READJ:%.*]] = begin_access [read] [unknown] [[JADDR]]

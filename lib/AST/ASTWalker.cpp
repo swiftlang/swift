@@ -349,10 +349,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitEnumElementDecl(EnumElementDecl *ED) {
-    if (auto TR = ED->getArgumentTypeLoc().getTypeRepr()) {
-      if (doIt(TR)) {
-        return true;
-      }
+    if (auto *PL = ED->getParameterList()) {
+      visit(PL);
     }
 
     // The getRawValueExpr should remain the untouched original LiteralExpr for
@@ -1707,7 +1705,7 @@ bool Traversal::visitFixedTypeRepr(FixedTypeRepr *T) {
 
 bool Traversal::visitSILBoxTypeRepr(SILBoxTypeRepr *T) {
   for (auto &field : T->getFields()) {
-    if (doIt(field.FieldType))
+    if (doIt(field.getFieldType()))
       return true;
   }
   for (auto &arg : T->getGenericArguments()) {

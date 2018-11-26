@@ -446,13 +446,10 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
   // Translate the context.
   auto contextOpt = translateContext(effectiveContext);
   if (!contextOpt) {
-    // If it is a declaration with a swift_name attribute, we might be
-    // able to resolve this later.
+    // We might be able to resolve this later.
     if (auto decl = newEntry.dyn_cast<clang::NamedDecl *>()) {
-      if (decl->hasAttr<clang::SwiftNameAttr>()) {
-        UnresolvedEntries.push_back(
-          std::make_tuple(name, newEntry, effectiveContext));
-      }
+      UnresolvedEntries.push_back(
+        std::make_tuple(name, newEntry, effectiveContext));
     }
 
     return;
@@ -1787,9 +1784,11 @@ void importer::finalizeLookupTable(SwiftLookupTable &table,
       auto decl = entry.get<clang::NamedDecl *>();
       auto swiftName = decl->getAttr<clang::SwiftNameAttr>();
 
-      nameImporter.getContext().Diags.diagnose(
-          SourceLoc(), diag::unresolvable_clang_decl, decl->getNameAsString(),
-          swiftName->getName());
+      if (swiftName) {
+        nameImporter.getContext().Diags.diagnose(
+            SourceLoc(), diag::unresolvable_clang_decl, decl->getNameAsString(),
+            swiftName->getName());
+      }
     }
   }
 }

@@ -873,7 +873,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       DeclContext *topLevelContext = DC->getModuleScopeContext();
       UnqualifiedLookup lookup(VD->getBaseName(), topLevelContext, &TC,
-                               /*knownPrivate*/true);
+                               /*Loc=*/SourceLoc(),
+                               UnqualifiedLookup::Flags::KnownPrivate);
 
       // Group results by module. Pick an arbitrary result from each module.
       llvm::SmallDenseMap<const ModuleDecl*,const ValueDecl*,4> resultsByModule;
@@ -2008,6 +2009,182 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
   // This makes sure it's emitted before the message text buffers are destroyed.
   diagOpt.reset();
   return true;
+}
+
+static const Expr *lookThroughExprsToImmediateDeallocation(const Expr *E) {
+  // Look through various expressions that don't affect the fact that the user
+  // will be assigning a class instance that will be immediately deallocated.
+  while (true) {
+    E = E->getValueProvidingExpr();
+
+    // We don't currently deal with tuple shuffles.
+    if (isa<TupleShuffleExpr>(E))
+      return E;
+
+    // If we have a TupleElementExpr with a child TupleExpr, dig into that
+    // element.
+    if (auto *TEE = dyn_cast<TupleElementExpr>(E)) {
+      auto *subExpr = lookThroughExprsToImmediateDeallocation(TEE->getBase());
+      if (auto *TE = dyn_cast<TupleExpr>(subExpr)) {
+        auto *element = TE->getElements()[TEE->getFieldNumber()];
+        return lookThroughExprsToImmediateDeallocation(element);
+      }
+      return subExpr;
+    }
+
+    if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E)) {
+      E = ICE->getSubExpr();
+      continue;
+    }
+    if (auto *CE = dyn_cast<CoerceExpr>(E)) {
+      E = CE->getSubExpr();
+      continue;
+    }
+    if (auto *OEE = dyn_cast<OpenExistentialExpr>(E)) {
+      E = OEE->getSubExpr();
+      continue;
+    }
+
+    // Look through optional evaluations, we still want to diagnose on
+    // things like initializers called through optional chaining and the
+    // unwrapping of failable initializers.
+    if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(E)) {
+      E = OEE->getSubExpr();
+      continue;
+    }
+    if (auto *OBE = dyn_cast<BindOptionalExpr>(E)) {
+      E = OBE->getSubExpr();
+      continue;
+    }
+    if (auto *FOE = dyn_cast<ForceValueExpr>(E)) {
+      E = FOE->getSubExpr();
+      continue;
+    }
+
+    if (auto *ATE = dyn_cast<AnyTryExpr>(E)) {
+      E = ATE->getSubExpr();
+      continue;
+    }
+    if (auto *DSBIE = dyn_cast<DotSyntaxBaseIgnoredExpr>(E)) {
+      E = DSBIE->getRHS();
+      continue;
+    }
+    return E;
+  }
+}
+
+static void diagnoseUnownedImmediateDeallocationImpl(TypeChecker &TC,
+                                                     const VarDecl *varDecl,
+                                                     const Expr *initExpr,
+                                                     SourceLoc diagLoc,
+                                                     SourceRange diagRange) {
+  auto *ownershipAttr =
+      varDecl->getAttrs().getAttribute<ReferenceOwnershipAttr>();
+  if (!ownershipAttr || ownershipAttr->isInvalid())
+    return;
+
+  // Only diagnose for non-owning ownerships such as 'weak' and 'unowned'.
+  switch (ownershipAttr->get()) {
+  case ReferenceOwnership::Strong:
+    return;
+  case ReferenceOwnership::Weak:
+  case ReferenceOwnership::Unowned:
+  case ReferenceOwnership::Unmanaged:
+    break;
+  }
+
+  // Try to find a call to a constructor.
+  initExpr = lookThroughExprsToImmediateDeallocation(initExpr);
+  auto *CE = dyn_cast<CallExpr>(initExpr);
+  if (!CE)
+    return;
+
+  auto *CRCE = dyn_cast<ConstructorRefCallExpr>(CE->getFn());
+  if (!CRCE)
+    return;
+
+  auto *DRE = dyn_cast<DeclRefExpr>(CRCE->getFn());
+  if (!DRE)
+    return;
+
+  auto *constructorDecl = dyn_cast<ConstructorDecl>(DRE->getDecl());
+  if (!constructorDecl)
+    return;
+
+  // Make sure the constructor constructs an instance that allows ownership.
+  // This is to ensure we don't diagnose on constructors such as
+  // Optional.init(nilLiteral:).
+  auto selfType = constructorDecl->getDeclContext()->getSelfTypeInContext();
+  if (!selfType->allowsOwnership())
+    return;
+
+  // This must stay in sync with
+  // diag::unowned_assignment_immediate_deallocation.
+  enum {
+    SK_Variable = 0,
+    SK_Property
+  } storageKind = SK_Variable;
+
+  if (varDecl->getDeclContext()->isTypeContext())
+    storageKind = SK_Property;
+
+  TC.diagnose(diagLoc, diag::unowned_assignment_immediate_deallocation,
+              varDecl->getName(), ownershipAttr->get(), unsigned(storageKind))
+    .highlight(diagRange);
+
+  TC.diagnose(diagLoc, diag::unowned_assignment_requires_strong)
+    .highlight(diagRange);
+
+  TC.diagnose(varDecl, diag::decl_declared_here, varDecl->getFullName());
+}
+
+void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
+                                                 const AssignExpr *assignExpr) {
+  auto *destExpr = assignExpr->getDest()->getValueProvidingExpr();
+  auto *initExpr = assignExpr->getSrc();
+
+  // Try to find a referenced VarDecl.
+  const VarDecl *VD = nullptr;
+  if (auto *DRE = dyn_cast<DeclRefExpr>(destExpr)) {
+    VD = dyn_cast<VarDecl>(DRE->getDecl());
+  } else if (auto *MRE = dyn_cast<MemberRefExpr>(destExpr)) {
+    VD = dyn_cast<VarDecl>(MRE->getMember().getDecl());
+  }
+
+  if (VD)
+    diagnoseUnownedImmediateDeallocationImpl(TC, VD, initExpr,
+                                             assignExpr->getLoc(),
+                                             initExpr->getSourceRange());
+}
+
+void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
+                                                 const Pattern *pattern,
+                                                 const Expr *initExpr) {
+  pattern = pattern->getSemanticsProvidingPattern();
+
+  if (auto *TP = dyn_cast<TuplePattern>(pattern)) {
+    initExpr = lookThroughExprsToImmediateDeallocation(initExpr);
+
+    // If we've found a matching tuple initializer with the same number of
+    // elements as our pattern, diagnose each element individually.
+    auto TE = dyn_cast<TupleExpr>(initExpr);
+    if (TE && TE->getNumElements() == TP->getNumElements()) {
+      for (unsigned i = 0, e = TP->getNumElements(); i != e; ++i) {
+        const TuplePatternElt &elt = TP->getElement(i);
+        const Pattern *subPattern = elt.getPattern();
+        Expr *subInitExpr = TE->getElement(i);
+
+        diagnoseUnownedImmediateDeallocation(TC, subPattern, subInitExpr);
+      }
+    }
+  } else if (auto *NP = dyn_cast<NamedPattern>(pattern)) {
+    // FIXME: Ideally the diagnostic location should be on the equals '=' token
+    // of the pattern binding rather than at the start of the initializer
+    // expression (matching the above diagnostic logic for an assignment).
+    diagnoseUnownedImmediateDeallocationImpl(TC, NP->getDecl(), initExpr,
+                                             initExpr->getStartLoc(),
+                                             initExpr->getSourceRange());
+  }
 }
 
 bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
@@ -3976,23 +4153,24 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 
   /// Retrieve a replacement identifier.
   auto getReplacementIdentifier = [&](StringRef name,
-                                      Identifier old) -> Identifier{
+                                      DeclBaseName old) -> DeclBaseName{
     if (name.empty())
       return Identifier();
 
-    if (!old.empty() && name == old.str())
+    if (!old.empty() && name == old.userFacingName())
       return old;
 
     return Context.getIdentifier(name);
   };
 
-  Identifier newBaseName = getReplacementIdentifier(baseNameStr,
-                                                    name.getBaseIdentifier());
+  auto newBaseName = getReplacementIdentifier(
+      baseNameStr, name.getBaseName());
   SmallVector<Identifier, 4> newArgNames;
   auto oldArgNames = name.getArgumentNames();
   for (unsigned i = 0, n = argNameStrs.size(); i != n; ++i) {
-    newArgNames.push_back(getReplacementIdentifier(argNameStrs[i],
-                                                   oldArgNames[i]));
+    auto argBaseName = getReplacementIdentifier(argNameStrs[i],
+                                                oldArgNames[i]);
+    newArgNames.push_back(argBaseName.getIdentifier());
   }
 
   return DeclName(Context, newBaseName, newArgNames);

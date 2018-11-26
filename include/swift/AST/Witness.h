@@ -150,9 +150,6 @@ public:
   /// Determines whether there is a witness at all.
   explicit operator bool() const { return !storage.isNull(); }
 
-  /// Determine whether this witness requires any substitutions.
-  bool requiresSubstitution() const { return storage.is<StoredWitness *>(); }
-
   /// Retrieve the substitutions required to use this witness from the
   /// synthetic environment.
   ///
@@ -164,15 +161,17 @@ public:
 
   /// Retrieve the synthetic generic environment.
   GenericEnvironment *getSyntheticEnvironment() const {
-    assert(requiresSubstitution() && "No substitutions required for witness");
-    return storage.get<StoredWitness *>()->syntheticEnvironment;
+    if (auto *storedWitness = storage.dyn_cast<StoredWitness *>())
+      return storedWitness->syntheticEnvironment;
+    return nullptr;
   }
 
   /// Retrieve the substitution map that maps the interface types of the
   /// requirement to the interface types of the synthetic environment.
   SubstitutionList getRequirementToSyntheticSubs() const {
-    assert(requiresSubstitution() && "No substitutions required for witness");
-    return storage.get<StoredWitness *>()->reqToSyntheticEnvSubs;
+    if (auto *storedWitness = storage.dyn_cast<StoredWitness *>())
+      return storedWitness->reqToSyntheticEnvSubs;
+    return {};
   }
 
   LLVM_ATTRIBUTE_DEPRECATED(

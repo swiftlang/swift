@@ -149,7 +149,7 @@ func f(a : () -> Int) {
   42  // expected-warning {{integer literal is unused}}
   
   4 + 5 // expected-warning {{result of operator '+' is unused}}
-  a() // expected-warning {{result of call is unused, but produces 'Int'}}
+  a() // expected-warning {{result of call to function returning 'Int' is unused}}
 }
 
 @warn_unused_result func g() -> Int { } // expected-warning {{'warn_unused_result' attribute behavior is now the default}} {{1-21=}}

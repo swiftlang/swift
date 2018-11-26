@@ -1,9 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %utils/chex.py < %s > %t/cf.sil
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs %t/cf.sil -emit-ir -import-cf-types | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %t/cf.sil -DINT=i%target-ptrsize
+// RUN: %{python} %utils/chex.py < %s > %t/cf.sil
+// RUN: %target-swift-frontend -enable-objc-interop -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs %t/cf.sil -emit-ir -import-cf-types | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %t/cf.sil -DINT=i%target-ptrsize
 
 // REQUIRES: CPU=i386 || CPU=x86_64
-// REQUIRES: objc_interop
 
 // CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[REFRIGERATOR:%TSo17CCRefrigeratorRefa]] = type
@@ -47,7 +46,7 @@ bb0(%0 : $CCRefrigerator, %1: $CCMutableRefrigerator):
   return %5 : $()
 }
 
-// CHECK:    define{{( protected)?}} swiftcc void @call_generic([[REFRIGERATOR]]*, [[MUTABLE_REFRIGERATOR]]*) {{.*}} {
+// CHECK:    define{{( dllexport)?}}{{( protected)?}} swiftcc void @call_generic([[REFRIGERATOR]]*, [[MUTABLE_REFRIGERATOR]]*) {{.*}} {
 // CHECK:      [[T0:%.*]] = bitcast [[REFRIGERATOR]]* %0 to [[OBJC]]*
 // CHECK-NEXT: [[T1:%.*]] = call swiftcc %swift.metadata_response @"$SSo17CCRefrigeratorRefaMa"([[INT]] 0)
 // CHECK-NEXT: [[T2:%.*]] = extractvalue %swift.metadata_response [[T1]], 0

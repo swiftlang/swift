@@ -54,8 +54,8 @@ class ClassKey : CodingKey { //expected-error {{type 'ClassKey' does not conform
 // Types which are valid for CodingKey derived conformance should not get that
 // derivation unless they explicitly conform to CodingKey.
 enum X          { case a }
-enum Y : String { case a } // expected-note {{did you mean the implicitly-synthesized property 'rawValue'?}}
-enum Z : Int    { case a } // expected-note {{did you mean the implicitly-synthesized property 'rawValue'?}}
+enum Y : String { case a } // expected-note {{property 'rawValue' is implicitly declared}}
+enum Z : Int    { case a } // expected-note {{property 'rawValue' is implicitly declared}}
 
 let _ = X.a.stringValue // expected-error {{value of type 'X' has no member 'stringValue'}}
 let _ = Y.a.stringValue // expected-error {{value of type 'Y' has no member 'stringValue'}}
@@ -66,8 +66,8 @@ let _ = Y(stringValue: "a") // expected-error {{incorrect argument label in call
 let _ = Z(stringValue: "a") // expected-error {{incorrect argument label in call (have 'stringValue:', expected 'rawValue:')}}
 
 let _ = X.a.intValue // expected-error {{value of type 'X' has no member 'intValue'}}
-let _ = Y.a.intValue // expected-error {{value of type 'Y' has no member 'intValue'}}
-let _ = Z.a.intValue // expected-error {{value of type 'Z' has no member 'intValue'}}
+let _ = Y.a.intValue // expected-error {{value of type 'Y' has no member 'intValue'; did you mean 'rawValue'?}}
+let _ = Z.a.intValue // expected-error {{value of type 'Z' has no member 'intValue'; did you mean 'rawValue'?}}
 
 let _ = X(intValue: 0) // expected-error {{'X' cannot be constructed because it has no accessible initializers}}
 let _ = Y(intValue: 0) // expected-error {{incorrect argument label in call (have 'intValue:', expected 'rawValue:')}}

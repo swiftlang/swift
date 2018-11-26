@@ -241,12 +241,11 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
   ResultPlanPtr resultPlan =
       ResultPlanBuilder::computeResultPlan(SGF, calleeTypeInfo, loc, context);
   ArgumentScope argScope(SGF, loc);
-  PostponedCleanup postpone(SGF);
   RValue result =
       SGF.emitApply(std::move(resultPlan), std::move(argScope), loc,
                     ManagedValue::forUnmanaged(witnessRef), subs,
                     {objcValue, ManagedValue::forUnmanaged(metatypeValue)},
-                    calleeTypeInfo, ApplyOptions::None, context, postpone);
+                    calleeTypeInfo, ApplyOptions::None, context);
   return std::move(result).getAsSingleValue(SGF, loc);
 }
 
@@ -940,8 +939,8 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
 
   // Handle the escaping to noescape conversion.
   assert(loweredFuncTy->isNoEscape());
-  return B.createConvertEscapeToNoEscape(loc, thunkedFn,
-                          SILType::getPrimitiveObjectType(loweredFuncTy));
+  return B.createConvertEscapeToNoEscape(
+      loc, thunkedFn, SILType::getPrimitiveObjectType(loweredFuncTy), false);
 }
 
 static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
@@ -1336,12 +1335,16 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
 
   assert(bridgedArgs.size() == nativeInputs.size());
   for (unsigned i = 0, size = bridgedArgs.size(); i < size; ++i) {
+    // Consider the bridged values to be "call results" since they're coming
+    // from potentially nil-unsound ObjC callers.
     ManagedValue native =
       SGF.emitBridgedToNativeValue(loc,
-                                   bridgedArgs[i],
-                                   bridgedFormalTypes[i],
-                                   nativeFormalTypes[i],
-                        swiftFnTy->getParameters()[i].getSILStorageType());
+                        bridgedArgs[i],
+                        bridgedFormalTypes[i],
+                        nativeFormalTypes[i],
+                        swiftFnTy->getParameters()[i].getSILStorageType(),
+                        SGFContext(),
+                        /*isCallResult*/ true);
     SILValue argValue;
 
     if (nativeInputs[i].isConsumed()) {
@@ -1756,11 +1759,10 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     ResultPlanPtr resultPlan = ResultPlanBuilder::computeResultPlan(
         *this, calleeTypeInfo, fd, context);
     ArgumentScope argScope(*this, fd);
-    PostponedCleanup postpone(*this);
     ManagedValue resultMV =
         emitApply(std::move(resultPlan), std::move(argScope), fd,
                   ManagedValue::forUnmanaged(fn), subs, args, calleeTypeInfo,
-                  ApplyOptions::None, context, postpone)
+                  ApplyOptions::None, context)
             .getAsSingleValue(*this, fd);
 
     if (indirectResult) {

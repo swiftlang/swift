@@ -15,7 +15,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/Action.h"
-#include "swift/Frontend/Types.h"
+#include "swift/Frontend/FileTypes.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Option/Option.h"
 
@@ -53,9 +53,6 @@ protected:
   class JobContext {
   private:
     Compilation &C;
-
-    /// The limit for passing a list of files on the command line.
-    static const size_t TOO_MANY_FILES = 128;
 
   public:
     ArrayRef<const Job *> Inputs;
@@ -224,7 +221,7 @@ public:
   /// Return the default language type to use for the given extension.
   /// If the extension is empty or is otherwise not recognized, return
   /// the invalid type \c TY_INVALID.
-  virtual types::ID lookupTypeForExtension(StringRef Ext) const;
+  virtual file_types::ID lookupTypeForExtension(StringRef Ext) const;
 
   /// Check whether a clang library with a given name exists.
   ///

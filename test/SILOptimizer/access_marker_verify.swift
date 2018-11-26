@@ -1,7 +1,7 @@
 
 // RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -emit-silgen -swift-version 4 -parse-as-library %s | %FileCheck %s
-// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -Onone -emit-sil -swift-version 4 -parse-as-library %s
-// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -O -emit-sil -swift-version 4 -parse-as-library %s
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -Onone -emit-sil -swift-version 4 -parse-as-library %s -o /dev/null
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -O -emit-sil -swift-version 4 -parse-as-library %s -o /dev/null
 // REQUIRES: asserts
 
 // Test the combination of SILGen + DiagnoseStaticExclusivity with verification.
@@ -610,8 +610,9 @@ var globalString2 = globalString1
 // CHECK: apply
 // CHECK: [[PTR:%.*]] = pointer_to_address
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[PTR]] : $*String
-// CHECK-NOT: begin_access
-// CHECK: copy_addr [[ACCESS]] to [initialization] [[GA]] : $*String
+// CHECK: [[INIT:%.*]] = begin_access [modify] [unsafe] [[GA]] : $*String
+// CHECK: copy_addr [[ACCESS]] to [initialization] [[INIT]] : $*String
+// CHECK: end_access [[INIT]] : $*String
 // CHECK: end_access [[ACCESS]] : $*String
 // CHECK-NOT: end_access
 // CHECK-LABEL: } // end sil function 'globalinit_33_180BF7B9126DB0C8C6C26F15ACD01908_func1'
@@ -968,7 +969,7 @@ struct StructWithLayout {
 // CHECK: mark_uninitialized [rootself] %{{.*}} : ${ var StructWithLayout }
 // CHECK: [[PROJ:%.*]] = project_box %{{.*}} : ${ var StructWithLayout }, 0
 // CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[PROJ]]) : $@convention(thin) (@inout_aliasable StructWithLayout) -> Bool
-// CHECK: [[CLOSURE:%.*]] = convert_escape_to_noescape [[PA]] : $@callee_guaranteed () -> Bool to $@noescape @callee_guaranteed () -> Bool
+// CHECK: [[CLOSURE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PA]] : $@callee_guaranteed () -> Bool to $@noescape @callee_guaranteed () -> Bool
 // call default argument
 // CHECK: apply %{{.*}}() : $@convention(thin) () -> StaticString
 // call StaticString.init
@@ -994,3 +995,30 @@ func testPointerInit(x: Int, y: UnsafeMutablePointer<Int>) {
 // CHECK-NOT: begin_access
 // CHECK: assign %0 to [[ADR]] : $*Int
 // CHECK-LABEL: } // end sil function '$S20access_marker_verify15testPointerInit1x1yySi_SpySiGtF'
+
+// Verification should ignore the address operand of init_existential_addr.
+class testInitExistentialGlobal {
+  static var testProperty: P = StructP()
+}
+// CHECK-LABEL: sil private @globalinit{{.*}} : $@convention(c) () -> () {
+// CHECK:   alloc_global @$S20access_marker_verify25testInitExistentialGlobalC0D8PropertyAA1P_pvpZ
+// CHECK:   [[GADR:%.*]] = global_addr @$S20access_marker_verify25testInitExistentialGlobalC0D8PropertyAA1P_pvpZ : $*P
+// CHECK:   [[EADR:%.*]] = init_existential_addr [[GADR]] : $*P, $StructP
+// CHECK:   %{{.*}} = apply %{{.*}}({{.*}}) : $@convention(method) (@thin StructP.Type) -> StructP
+// CHECK:   store %{{.*}} to [trivial] [[EADR]] : $*StructP
+// CHECK-LABEL: } // end sil function 'globalinit
+
+public enum SomeError: Swift.Error {
+    case error
+}
+
+// Verification should ignore addresses produced by project_existential_box.
+public func testInitBox() throws {
+    throw SomeError.error
+}
+// CHECK-LABEL: sil @$S20access_marker_verify11testInitBoxyyKF : $@convention(thin) () -> @error Error {
+// CHECK: [[BOXALLOC:%.*]] = alloc_existential_box $Error, $SomeError
+// CHECK: [[PROJ:%.*]] = project_existential_box $SomeError in [[BOXALLOC]] : $Error
+// CHECK: store %{{.*}} to [trivial] [[PROJ]] : $*SomeError
+// CHECK: throw [[BOXALLOC]] : $Error
+// CHECK-LABEL: } // end sil function '$S20access_marker_verify11testInitBoxyyKF'

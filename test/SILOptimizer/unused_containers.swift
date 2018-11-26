@@ -2,8 +2,6 @@
 
 // REQUIRES: swift_stdlib_no_asserts
 
-// XFAIL: plus_zero_runtime
-
 //CHECK-LABEL: @$S17unused_containers16empty_array_testyyF
 //CHECK: bb0:
 //CHECK-NEXT: tuple

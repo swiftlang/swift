@@ -212,22 +212,27 @@ open class JSONEncoder {
         let encoder = _JSONEncoder(options: self.options)
 
         guard let topLevel = try encoder.box_(value) else {
-            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) did not encode any values."))
+            throw EncodingError.invalidValue(value, 
+                                             EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) did not encode any values."))
         }
 
         if topLevel is NSNull {
-            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) encoded as null JSON fragment."))
+            throw EncodingError.invalidValue(value, 
+                                             EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) encoded as null JSON fragment."))
         } else if topLevel is NSNumber {
-            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) encoded as number JSON fragment."))
+            throw EncodingError.invalidValue(value, 
+                                             EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) encoded as number JSON fragment."))
         } else if topLevel is NSString {
-            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) encoded as string JSON fragment."))
+            throw EncodingError.invalidValue(value, 
+                                             EncodingError.Context(codingPath: [], debugDescription: "Top-level \(T.self) encoded as string JSON fragment."))
         }
 
         let writingOptions = JSONSerialization.WritingOptions(rawValue: self.outputFormatting.rawValue)
         do {
            return try JSONSerialization.data(withJSONObject: topLevel, options: writingOptions)
         } catch {
-            throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Unable to encode the given top-level value to JSON.", underlyingError: error))
+            throw EncodingError.invalidValue(value, 
+                                             EncodingError.Context(codingPath: [], debugDescription: "Unable to encode the given top-level value to JSON.", underlyingError: error))
         }
     }
 }
@@ -1013,7 +1018,7 @@ open class JSONDecoder {
             // Find the last non-underscore character
             var lastNonUnderscore = stringKey.index(before: stringKey.endIndex)
             while lastNonUnderscore > firstNonUnderscore && stringKey[lastNonUnderscore] == "_" {
-                stringKey.formIndex(before: &lastNonUnderscore);
+                stringKey.formIndex(before: &lastNonUnderscore)
             }
         
             let keyRange = firstNonUnderscore...lastNonUnderscore

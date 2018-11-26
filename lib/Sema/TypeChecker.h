@@ -42,6 +42,7 @@ class NominalTypeDecl;
 class NormalProtocolConformance;
 class TopLevelContext;
 class TypeChecker;
+class TypoCorrectionResults;
 class ExprPattern;
 
 namespace constraints {
@@ -53,14 +54,14 @@ namespace constraints {
 
 /// \brief A mapping from substitutable types to the protocol-conformance
 /// mappings for those types.
-typedef llvm::DenseMap<SubstitutableType *,
-                       SmallVector<ProtocolConformance *, 2>> ConformanceMap;
+using ConformanceMap =
+    llvm::DenseMap<SubstitutableType *, SmallVector<ProtocolConformance *, 2>>;
 
 /// \brief Used for recursive lookups into an expr that is already
 /// being type-checked and the constraint system in which its type is
 /// stored.
-typedef std::pair<Expr *,
-                  constraints::ConstraintSystem *> ExprAndConstraintSystem;
+using ExprAndConstraintSystem =
+    std::pair<Expr *, constraints::ConstraintSystem *>;
 
 /// Special-case type checking semantics for certain declarations.
 enum class DeclTypeCheckingSemantics {
@@ -85,35 +86,57 @@ class LookupResult {
 private:
   /// The set of results found.
   SmallVector<LookupResultEntry, 4> Results;
+  size_t IndexOfFirstOuterResult = 0;
 
 public:
   LookupResult() {}
 
-  explicit
-  LookupResult(const SmallVectorImpl<LookupResultEntry> &Results)
-    : Results(Results.begin(), Results.end()) {}
+  explicit LookupResult(const SmallVectorImpl<LookupResultEntry> &Results,
+                        size_t indexOfFirstOuterResult)
+      : Results(Results.begin(), Results.end()),
+        IndexOfFirstOuterResult(indexOfFirstOuterResult) {}
 
-  typedef SmallVectorImpl<LookupResultEntry>::iterator iterator;
+  using iterator = SmallVectorImpl<LookupResultEntry>::iterator;
   iterator begin() { return Results.begin(); }
-  iterator end() { return Results.end(); }
-  unsigned size() const { return Results.size(); }
-  bool empty() const { return Results.empty(); }
+  iterator end() {
+    return Results.begin() + IndexOfFirstOuterResult;
+  }
+  unsigned size() const { return innerResults().size(); }
+  bool empty() const { return innerResults().empty(); }
+
+  ArrayRef<LookupResultEntry> innerResults() const {
+    return llvm::makeArrayRef(Results).take_front(IndexOfFirstOuterResult);
+  }
+
+  ArrayRef<LookupResultEntry> outerResults() const {
+    return llvm::makeArrayRef(Results).drop_front(IndexOfFirstOuterResult);
+  }
 
   const LookupResultEntry& operator[](unsigned index) const {
     return Results[index];
   }
 
-  LookupResultEntry front() const { return Results.front(); }
-  LookupResultEntry back() const { return Results.back(); }
+  LookupResultEntry front() const { return innerResults().front(); }
+  LookupResultEntry back() const { return innerResults().back(); }
 
   /// Add a result to the set of results.
-  void add(LookupResultEntry result) { Results.push_back(result); }
+  void add(LookupResultEntry result, bool isOuter) {
+    Results.push_back(result);
+    if (!isOuter) {
+      IndexOfFirstOuterResult++;
+      assert(IndexOfFirstOuterResult == Results.size() &&
+             "found an outer result before an inner one");
+    } else {
+      assert(IndexOfFirstOuterResult > 0 &&
+             "found outer results without an inner one");
+    }
+  }
 
   void clear() { Results.clear(); }
 
   /// Determine whether the result set is nonempty.
   explicit operator bool() const {
-    return !Results.empty();
+    return !empty();
   }
 
   TypeDecl *getSingleTypeResult() const {
@@ -124,7 +147,8 @@ public:
   }
 
   /// Filter out any results that aren't accepted by the given predicate.
-  void filter(const std::function<bool(LookupResultEntry)> &pred);
+  void
+  filter(const std::function<bool(LookupResultEntry, /*isOuter*/ bool)> &pred);
 };
 
 /// The result of name lookup for types.
@@ -135,7 +159,7 @@ class LookupTypeResult {
   friend class TypeChecker;
 
 public:
-  typedef SmallVectorImpl<std::pair<TypeDecl *, Type>>::iterator iterator;
+  using iterator = SmallVectorImpl<std::pair<TypeDecl *, Type>>::iterator;
   iterator begin() { return Results.begin(); }
   iterator end() { return Results.end(); }
   unsigned size() const { return Results.size(); }
@@ -232,7 +256,7 @@ enum class TypeCheckExprFlags {
   SkipApplyingSolution = 0x100,
 };
 
-typedef OptionSet<TypeCheckExprFlags> TypeCheckExprOptions;
+using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
 
 inline TypeCheckExprOptions operator|(TypeCheckExprFlags flag1,
                                       TypeCheckExprFlags flag2) {
@@ -259,10 +283,13 @@ enum class NameLookupFlags {
   /// Whether to ignore access control for this lookup, allowing inaccessible
   /// results to be returned.
   IgnoreAccessControl = 0x10,
+  /// Whether to include results from outside the innermost scope that has a
+  /// result.
+  IncludeOuterResults = 0x20,
 };
 
 /// A set of options that control name lookup.
-typedef OptionSet<NameLookupFlags> NameLookupOptions;
+using NameLookupOptions = OptionSet<NameLookupFlags>;
 
 inline NameLookupOptions operator|(NameLookupFlags flag1,
                                    NameLookupFlags flag2) {
@@ -539,10 +566,13 @@ enum class TypeResolutionFlags : unsigned {
 
   /// Is it okay to resolve an IUO sigil ("!") here?
   AllowIUO = 0x4000000,
+
+  /// Is it okay to resolve an IUO sigil ("!") here with a deprecation warning?
+  AllowIUODeprecated = 0x8000000,
 };
 
 /// Option set describing how type resolution should work.
-typedef OptionSet<TypeResolutionFlags> TypeResolutionOptions;
+using TypeResolutionOptions = OptionSet<TypeResolutionFlags>;
 
 /// Strip the contextual options from the given type resolution options.
 static inline TypeResolutionOptions
@@ -674,7 +704,7 @@ enum class ConformanceCheckFlags {
 };
 
 /// Options that control protocol conformance checking.
-typedef OptionSet<ConformanceCheckFlags> ConformanceCheckOptions;
+using ConformanceCheckOptions = OptionSet<ConformanceCheckFlags>;
 
 inline ConformanceCheckOptions operator|(ConformanceCheckFlags lhs,
                                          ConformanceCheckFlags rhs) {
@@ -707,6 +737,9 @@ public:
 
   /// \brief The list of function definitions we've encountered.
   std::vector<AbstractFunctionDecl *> definedFunctions;
+
+  /// Declarations that need their conformances checked.
+  llvm::SmallVector<Decl *, 8> ConformanceContexts;
 
   /// The list of protocol conformances that were "used" and will need to be
   /// completed before type checking is considered complete.
@@ -1277,19 +1310,6 @@ public:
                               DeclContext *dc,
                               bool *unwrappedIUO = nullptr);
 
-  /// \brief Determine whether one type would be a valid substitution for an
-  /// archetype.
-  ///
-  /// \param type The potential type.
-  ///
-  /// \param archetype The archetype for which type may (or may not) be
-  /// substituted.
-  ///
-  /// \param dc The context of the check.
-  ///
-  /// \returns true if \c t1 is a valid substitution for \c t2.
-  bool isSubstitutableFor(Type type, ArchetypeType *archetype, DeclContext *dc);
-
   /// If the inputs to an apply expression use a consistent "sugar" type
   /// (that is, a typealias or shorthand syntax) equivalent to the result type
   /// of the function, set the result type of the expression to that sugar type.
@@ -1312,7 +1332,7 @@ public:
                            unsigned StartElem);
   Identifier getNextResponseVariableName(DeclContext *DC);
 
-  void typeCheckDecl(Decl *D, bool isFirstPass);
+  void typeCheckDecl(Decl *D);
 
   void checkDeclAttributesEarly(Decl *D);
   void checkDeclAttributes(Decl *D);
@@ -1322,6 +1342,9 @@ public:
 
   void computeAccessLevel(ValueDecl *D);
   void computeDefaultAccessLevel(ExtensionDecl *D);
+
+  /// Check the default arguments that occur within this value decl.
+  void checkDefaultArguments(ArrayRef<ParameterList *> params, ValueDecl *VD);
 
   virtual void resolveAccessControl(ValueDecl *VD) override {
     validateAccessControl(VD);
@@ -1337,6 +1360,9 @@ public:
     validateExtension(ext);
     checkInheritanceClause(ext);
   }
+  virtual void resolveExtensionForConformanceConstruction(
+      ExtensionDecl *ext,
+      SmallVectorImpl<ConformanceConstructionInfo> &protocols) override;
 
   virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) override {
     addImplicitConstructors(nominal);
@@ -1419,7 +1445,8 @@ public:
                         bool allowConcreteGenericParams,
                         ExtensionDecl *ext,
                         llvm::function_ref<void(GenericSignatureBuilder &)>
-                          inferRequirements);
+                          inferRequirements,
+                        bool mustInferRequirements);
 
   /// Construct a new generic environment for the given declaration context.
   ///
@@ -1439,7 +1466,8 @@ public:
                         ExtensionDecl *ext) {
     return checkGenericEnvironment(genericParams, dc, outerSignature,
                                    allowConcreteGenericParams, ext,
-                                   [&](GenericSignatureBuilder &) { });
+                                   [&](GenericSignatureBuilder &) { },
+                                   /*mustInferRequirements=*/false);
   }
 
   /// Validate the signature of a generic type.
@@ -1533,17 +1561,13 @@ public:
   /// Retrieve the set of inherited protocols for this protocol type.
   llvm::TinyPtrVector<ProtocolDecl *> getDirectConformsTo(ProtocolDecl *proto);
 
+  /// Diagnose if the class has no designated initializers.
+  void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl);
+
+  ///
   /// \brief Add any implicitly-defined constructors required for the given
   /// struct or class.
   void addImplicitConstructors(NominalTypeDecl *typeDecl);
-
-  /// \brief Add the RawOptionSet (todo:, Equatable, and Hashable) methods to an
-  /// imported NS_OPTIONS struct.
-  void addImplicitStructConformances(StructDecl *ED);
-
-  /// \brief Add the RawRepresentable, Equatable, and Hashable methods to an
-  /// enum with a raw type.
-  void addImplicitEnumConformances(EnumDecl *ED);
 
   /// Synthesize the member with the given name on the target if applicable,
   /// i.e. if the member is synthesizable and has not yet been added to the
@@ -2267,12 +2291,6 @@ public:
   /// we're parsing the standard library.
   ModuleDecl *getStdlibModule(const DeclContext *dc);
 
-  /// \name AST Mutation Listener Implementation
-  /// @{
-  void handleExternalDecl(Decl *decl);
-
-  /// @}
-
   /// \name Lazy resolution.
   ///
   /// Routines that perform lazy resolution as required for AST operations.
@@ -2298,25 +2316,31 @@ public:
 
   /// \name Resilience diagnostics
 
-  void diagnoseInlineableLocalType(const NominalTypeDecl *NTD);
-
-  bool diagnoseInlineableDeclRef(SourceLoc loc, const ValueDecl *D,
-                                 const DeclContext *DC);
+  void diagnoseInlinableLocalType(const NominalTypeDecl *NTD);
 
   /// Used in diagnostic %selects.
   enum class FragileFunctionKind : unsigned {
     Transparent,
     InlineAlways,
-    Inlineable,
+    Inlinable,
     DefaultArgument,
     PropertyInitializer
   };
 
+  bool diagnoseInlinableDeclRef(SourceLoc loc, const ValueDecl *D,
+                                const DeclContext *DC,
+                                FragileFunctionKind Kind,
+                                bool TreatUsableFromInlineAsPublic);
+
   /// Given that \p DC is within a fragile context for some reason, describe
   /// why.
   ///
+  /// The second element of the pair is true if references to @usableFromInline
+  /// declarations are permitted.
+  ///
   /// \see FragileFunctionKind
-  FragileFunctionKind getFragileFunctionKind(const DeclContext *DC);
+  std::pair<FragileFunctionKind, bool>
+  getFragileFunctionKind(const DeclContext *DC);
 
   /// \name Availability checking
   ///
@@ -2487,16 +2511,11 @@ public:
   void performTypoCorrection(DeclContext *DC,
                              DeclRefKind refKind,
                              Type baseTypeOrNull,
-                             DeclName name,
-                             SourceLoc lookupLoc,
                              NameLookupOptions lookupOptions,
-                             LookupResult &result,
+                             TypoCorrectionResults &corrections,
                              GenericSignatureBuilder *gsb = nullptr,
                              unsigned maxResults = 4);
 
-  void noteTypoCorrection(DeclName name, DeclNameLoc nameLoc,
-                          ValueDecl *decl);
-  
   /// Check if the given decl has a @_semantics attribute that gives it
   /// special case type-checking behavior.
   DeclTypeCheckingSemantics getDeclTypeCheckingSemantics(ValueDecl *decl);
@@ -2544,7 +2563,27 @@ public:
 bool isAcceptableDynamicMemberLookupSubscript(SubscriptDecl *decl,
                                               DeclContext *DC,
                                               TypeChecker &TC);
-  
+
+/// Determine whether this is a "pass-through" typealias, which has the
+/// same type parameters as the nominal type it references and specializes
+/// the underlying nominal type with exactly those type parameters.
+/// For example, the following typealias \c GX is a pass-through typealias:
+///
+/// \code
+/// struct X<T, U> { }
+/// typealias GX<A, B> = X<A, B>
+/// \endcode
+///
+/// whereas \c GX2 and \c GX3 are not pass-through because \c GX2 has
+/// different type parameters and \c GX3 doesn't pass its type parameters
+/// directly through.
+///
+/// \code
+/// typealias GX2<A> = X<A, A>
+/// typealias GX3<A, B> = X<B, A>
+/// \endcode
+bool isPassThroughTypealias(TypeAliasDecl *typealias);
+
 } // end namespace swift
 
 #endif

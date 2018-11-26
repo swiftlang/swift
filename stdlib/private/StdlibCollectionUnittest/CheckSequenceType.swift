@@ -149,7 +149,7 @@ public struct FindTest {
 
   public init(
     expected: Int?, element: Int, sequence: [Int],
-    expectedLeftoverSequence: [Int],
+    expectedLeftoverSequence: [Int] = [],
     file: String = #file, line: UInt = #line
   ) {
     self.expected = expected
@@ -1935,17 +1935,17 @@ self.test("\(testNamePrefix).forEach/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
-// first()
+// first(where:)
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).first/semantics") {
+self.test("\(testNamePrefix).first(where:)/semantics") {
   for test in findTests {
     let s = makeWrappedSequenceWithEquatableElement(test.sequence)
     let closureLifetimeTracker = LifetimeTracked(0)
-    let found = s.first {
+    let found = s.first(where: {
       _blackHole(closureLifetimeTracker)
       return $0 == wrapValueIntoEquatable(test.element)
-    }
+    })
     expectEqual(
       test.expected == nil ? nil : wrapValueIntoEquatable(test.element),
       found,

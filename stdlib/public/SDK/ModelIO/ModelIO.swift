@@ -13,7 +13,7 @@
 @_exported import ModelIO
 import simd
 
-@available(OSX, introduced: 10.13)
+@available(macOS, introduced: 10.13)
 @available(iOS, introduced: 11.0)
 @available(tvOS, introduced: 11.0)
 extension MDLMatrix4x4Array {
@@ -44,7 +44,7 @@ extension MDLMatrix4x4Array {
 
 
 
-@available(OSX, introduced: 10.13)
+@available(macOS, introduced: 10.13)
 @available(iOS, introduced: 11.0)
 @available(tvOS, introduced: 11.0)
 extension MDLAnimatedValue {
@@ -57,7 +57,7 @@ extension MDLAnimatedValue {
     }
 }
 
-@available(OSX, introduced: 10.13)
+@available(macOS, introduced: 10.13)
 @available(iOS, introduced: 11.0)
 @available(tvOS, introduced: 11.0)
 extension MDLAnimatedScalarArray {
@@ -108,7 +108,7 @@ extension MDLAnimatedScalarArray {
     }
 }
 
-@available(OSX, introduced: 10.13)
+@available(macOS, introduced: 10.13)
 @available(iOS, introduced: 11.0)
 @available(tvOS, introduced: 11.0)
 extension MDLAnimatedVector3Array {
@@ -159,7 +159,7 @@ extension MDLAnimatedVector3Array {
     }
 }
 
-@available(OSX, introduced: 10.13)
+@available(macOS, introduced: 10.13)
 @available(iOS, introduced: 11.0)
 @available(tvOS, introduced: 11.0)
 extension MDLAnimatedQuaternionArray {
@@ -210,7 +210,7 @@ extension MDLAnimatedQuaternionArray {
     }
 }
 
-@available(OSX, introduced: 10.13)
+@available(macOS, introduced: 10.13)
 @available(iOS, introduced: 11.0)
 @available(tvOS, introduced: 11.0)
 extension MDLAnimatedScalar {
@@ -239,7 +239,7 @@ extension MDLAnimatedScalar {
     }
 }
 
-@available(OSX, introduced: 10.13)
+@available(macOS, introduced: 10.13)
 @available(iOS, introduced: 11.0)
 @available(tvOS, introduced: 11.0)
 extension MDLAnimatedVector2 {
@@ -268,7 +268,7 @@ extension MDLAnimatedVector2 {
     }
 }
 
-@available(OSX, introduced: 10.13)
+@available(macOS, introduced: 10.13)
 @available(iOS, introduced: 11.0)
 @available(tvOS, introduced: 11.0)
 extension MDLAnimatedVector3 {
@@ -297,7 +297,7 @@ extension MDLAnimatedVector3 {
     }
 }
 
-@available(OSX, introduced: 10.13)
+@available(macOS, introduced: 10.13)
 @available(iOS, introduced: 11.0)
 @available(tvOS, introduced: 11.0)
 extension MDLAnimatedVector4 {
@@ -326,7 +326,7 @@ extension MDLAnimatedVector4 {
     }
 }
 
-@available(OSX, introduced: 10.13)
+@available(macOS, introduced: 10.13)
 @available(iOS, introduced: 11.0)
 @available(tvOS, introduced: 11.0)
 extension MDLAnimatedMatrix4x4 {

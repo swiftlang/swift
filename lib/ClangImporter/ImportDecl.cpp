@@ -105,9 +105,9 @@ static bool isInSystemModule(DeclContext *D) {
   return cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule();
 }
 
-static AccessLevel getOverridableAccessLevel(DeclContext *dc) {
-  return (dc->getAsProtocolOrProtocolExtensionContext()
-            ? AccessLevel::Public : AccessLevel::Open);
+static AccessLevel getOverridableAccessLevel(const DeclContext *dc) {
+  return (dc->getAsClassOrClassExtensionContext()
+            ? AccessLevel::Open : AccessLevel::Public);
 }
 
 /// Create a typedpattern(namedpattern(decl))
@@ -487,6 +487,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRef,
                                                 { paramRef }, { Identifier() });
   reinterpreted->setType(enumTy);
+  reinterpreted->setThrows(false);
 
   auto assign = new (C) AssignExpr(selfRef, SourceLoc(), reinterpreted,
                                    /*implicit*/ true);
@@ -502,7 +503,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   ctorDecl->setBody(body);
   ctorDecl->setBodyTypeCheckedIfPresent();
   
-  C.addExternalDecl(ctorDecl);
+  Impl.registerExternalDecl(ctorDecl);
   
   return ctorDecl;
 }
@@ -573,6 +574,7 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRef,
                                                 { selfRef }, { Identifier() });
   reinterpreted->setType(rawTy);
+  reinterpreted->setThrows(false);
 
   auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
   auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
@@ -580,7 +582,7 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   
   getterDecl->setBody(body);
   getterDecl->setBodyTypeCheckedIfPresent();
-  C.addExternalDecl(getterDecl);
+  Impl.registerExternalDecl(getterDecl);
   return getterDecl;
 }
 
@@ -663,7 +665,7 @@ static AccessorDecl *makeStructRawValueGetter(
   getterDecl->setBody(body);
   getterDecl->setBodyTypeCheckedIfPresent();
 
-  C.addExternalDecl(getterDecl);
+  Impl.registerExternalDecl(getterDecl);
   return getterDecl;
 }
 
@@ -830,7 +832,7 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
                                   /*implicit*/ true);
     getterDecl->setBody(body);
     getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-    C.addExternalDecl(getterDecl);
+    Impl.registerExternalDecl(getterDecl);
   }
 
   // Synthesize the setter body
@@ -855,7 +857,7 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
                                   /*implicit*/ true);
     setterDecl->setBody(body);
     setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-    C.addExternalDecl(setterDecl);
+    Impl.registerExternalDecl(setterDecl);
   }
 
   return { getterDecl, setterDecl };
@@ -911,12 +913,13 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
     auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRef,
                                                   { selfRef },
                                                   { Identifier() });
+    reinterpreted->setThrows(false);
     auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
                                   /*implicit*/ true);
     getterDecl->setBody(body);
     getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-    C.addExternalDecl(getterDecl);
+    Impl.registerExternalDecl(getterDecl);
   }
 
   // Synthesize the setter body
@@ -950,7 +953,7 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
                                   /*implicit*/ true);
     setterDecl->setBody(body);
     setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-    C.addExternalDecl(setterDecl);
+    Impl.registerExternalDecl(setterDecl);
   }
 
   return { getterDecl, setterDecl };
@@ -2497,7 +2500,8 @@ namespace {
             // doing so will cause confusion (or even lookup ambiguity) between
             // the name in the imported module and the same name in the
             // standard library.
-            if (auto *NAT = dyn_cast<NameAliasType>(SwiftType.getPointer()))
+            if (auto *NAT =
+                  dyn_cast<NameAliasType>(SwiftType.getPointer()))
               return NAT->getDecl();
 
             auto *NTD = SwiftType->getAnyNominal();
@@ -2638,6 +2642,7 @@ namespace {
           AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
         structDecl->computeType();
         structDecl->setCheckedInheritanceClause();
+        structDecl->setAddedImplicitInitializers();
 
         auto options = getDefaultMakeStructRawValuedOptions();
         options |= MakeStructRawValuedFlags::MakeUnlabeledValueInit;
@@ -2688,6 +2693,7 @@ namespace {
           errorWrapper = new (C) StructDecl(loc, name, loc, None, nullptr, dc);
           errorWrapper->computeType();
           errorWrapper->setValidationStarted();
+          errorWrapper->setAddedImplicitInitializers();
           errorWrapper->setAccess(AccessLevel::Public);
           errorWrapper->getAttrs().add(
             new (Impl.SwiftContext) FixedLayoutAttr(/*IsImplicit*/true));
@@ -2832,7 +2838,7 @@ namespace {
                          AccessLevel::Public, loc, SourceLoc(),
                          C.Id_ErrorType, loc,
                          /*genericparams=*/nullptr, enumDecl);
-          alias->setUnderlyingType(errorWrapper->getDeclaredInterfaceType());
+          alias->setUnderlyingType(Impl.getSugaredTypeReference(errorWrapper));
           enumDecl->addMember(alias);
 
           // Add the 'Code' enum to the error wrapper.
@@ -3123,6 +3129,7 @@ namespace {
                                  Impl.importSourceLoc(decl->getLocation()),
                                  None, nullptr, dc);
       result->computeType();
+      result->setAddedImplicitInitializers();
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
       // FIXME: Figure out what to do with superclasses in C++. One possible
@@ -4967,7 +4974,7 @@ namespace {
                     Impl.importSourceLoc(decl->getLocation()),
                     /*genericparams=*/nullptr, dc);
 
-      typealias->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
+      typealias->setUnderlyingType(Impl.getSugaredTypeReference(typeDecl));
       return typealias;
     }
 
@@ -5190,7 +5197,7 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
     if (underlyingAlias->isGeneric())
       underlyingType = underlyingAlias->getUnboundGenericType();
     else
-      underlyingType = underlyingAlias->getDeclaredInterfaceType();
+      underlyingType = Impl.getSugaredTypeReference(underlyingAlias);
   } else {
     underlyingType = cast<NominalTypeDecl>(typeDecl)->getDeclaredType();
   }
@@ -5299,6 +5306,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
       decl, AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
   structDecl->computeType();
   structDecl->setCheckedInheritanceClause();
+  structDecl->setAddedImplicitInitializers();
 
   // Import the type of the underlying storage
   auto storedUnderlyingType = Impl.importTypeIgnoreIUO(
@@ -5480,7 +5488,7 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
     rawValueExpr->setNegative(SourceLoc());
 
   auto element = Impl.createDeclWithClangNode<EnumElementDecl>(
-      decl, AccessLevel::Public, SourceLoc(), name, TypeLoc(), false,
+      decl, AccessLevel::Public, SourceLoc(), name, nullptr,
       SourceLoc(), rawValueExpr, theEnum);
 
   // Give the enum element the appropriate type.
@@ -5577,6 +5585,7 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
       decl, AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
   structDecl->computeType();
   structDecl->setCheckedInheritanceClause();
+  structDecl->setAddedImplicitInitializers();
 
   makeStructRawValued(Impl, structDecl, underlyingType,
                       {KnownProtocolKind::OptionSet});
@@ -7741,34 +7750,10 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
 }
 
 void ClangImporter::Implementation::startedImportingEntity() {
-  ++NumCurrentImportingEntities;
   ++NumTotalImportedEntities;
   // FIXME: (transitional) increment the redundant "always-on" counter.
   if (SwiftContext.Stats)
     SwiftContext.Stats->getFrontendCounters().NumTotalClangImportedEntities++;
-}
-
-void ClangImporter::Implementation::finishedImportingEntity() {
-  assert(NumCurrentImportingEntities &&
-         "finishedImportingEntity not paired with startedImportingEntity");
-  if (NumCurrentImportingEntities == 1) {
-    // We decrease NumCurrentImportingEntities only after pending actions
-    // are finished, to avoid recursively re-calling finishPendingActions().
-    finishPendingActions();
-  }
-  --NumCurrentImportingEntities;
-}
-
-void ClangImporter::Implementation::finishPendingActions() {
-  if (RegisteredExternalDecls.empty())
-    return;
-
-  if (!hasFinishedTypeChecking()) {
-    for (auto *D : RegisteredExternalDecls)
-      SwiftContext.addExternalDecl(D);
-  }
-
-  RegisteredExternalDecls.clear();
 }
 
 /// Look up associated type requirements in the conforming type.
@@ -7981,7 +7966,7 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   bool TypedefIsSuperfluous = false;
   bool HadForwardDeclaration = false;
 
-  ImportingEntityRAII ImportingEntity(*this);
+  startedImportingEntity();
   Decl *Result = importDeclImpl(ClangDecl, version, TypedefIsSuperfluous,
                                 HadForwardDeclaration);
   if (!Result)
@@ -8478,7 +8463,7 @@ void ClangImporter::Implementation::loadAllMembersIntoExtension(
     return;
 
   // Get ready to actually load the members.
-  ImportingEntityRAII Importing(*this);
+  startedImportingEntity();
 
   // Load the members.
   for (auto entry : table->lookupGlobalsAsMembers(effectiveClangContext)) {
@@ -8578,13 +8563,11 @@ void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
     loadMembersOfBaseImportedFromClang(ext);
   }
 
-  ImportingEntityRAII Importing(*this);
+  startedImportingEntity();
 
   SmallVector<Decl *, 16> members;
   collectMembersToAdd(objcContainer, D, DC, members);
 
-  // Add the members now, before ~ImportingEntityRAII does work that might
-  // involve them.
   for (auto member : members) {
     IDC->addMember(member);
   }

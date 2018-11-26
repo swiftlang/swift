@@ -102,59 +102,6 @@ extension TriviaPiece: TextOutputStreamable {
 % end
     }
   }
-
-  /// Computes the information from this trivia to inform the source locations
-  /// of the associated tokens.
-  /// Specifically, walks through the trivia and keeps track of every newline
-  /// to give a number of how many newlines and UTF8 characters appear in the
-  /// trivia, along with the UTF8 offset of the last column.
-  func characterSizes() -> (lines: Int, lastColumn: Int, utf8Length: Int) {
-    func calculateTextSizes(_ text: String) ->
-        (lines: Int, lastColumn: Int, utf8Length: Int) {
-      var lines = 0
-      var col = 0
-      var total = 0
-      var prevChar: UInt8? = nil
-      // TODO: CR + LF should be regarded as one newline
-      for char in text.utf8 {
-        total += 1
-        switch char {
-        case 0x0a:
-          if prevChar == 0x0d {
-            /* ASCII CR LF */
-            assert(col == 0)
-          } else {
-            /* ASCII newline */
-            col = 0
-            lines += 1
-          }
-        /* ASCII carriage-return */
-        case 0x0d:
-          col = 0
-          lines += 1
-
-        default:
-          col += 1
-        }
-        prevChar = char
-      }
-      return (lines: lines, lastColumn: col, utf8Length: total)
-    }
-    switch self {
-% for trivia in TRIVIAS:
-%   if trivia.is_new_line:
-    case let .${trivia.lower_name}s(n):
-      return (lines: n, lastColumn: 0, utf8Length: n * ${trivia.characters_len()})
-%   elif trivia.is_collection():
-    case let .${trivia.lower_name}s(n):
-      return (lines: 0, lastColumn: n, utf8Length: n * ${trivia.characters_len()})
-%   else:
-    case let .${trivia.lower_name}(text):
-      return calculateTextSizes(text)
-%   end
-% end
-    }
-  }
 }
 
 /// A collection of leading or trailing trivia. This is the main data structure
@@ -209,20 +156,6 @@ public struct Trivia: Codable {
     }
 %   end
 % end
-
-  /// Computes the total sizes and offsets of all pieces in this Trivia.
-  func characterSizes() -> (lines: Int, lastColumn: Int, utf8Length: Int) {
-    var lines = 0
-    var lastColumn = 0
-    var length = 0
-    for piece in pieces {
-      let (ln, col, len) = piece.characterSizes()
-      lines += ln
-      lastColumn = col
-      length += len
-    }
-    return (lines: lines, lastColumn: lastColumn, utf8Length: length)
-  }
 }
 
 /// Conformance for Trivia to the Collection protocol.
@@ -245,11 +178,11 @@ extension Trivia: Collection {
 
   /// Get the byteSize of this trivia
   public var byteSize: Int {
-    let pos = UTF8Position()
+    let pos = AbsolutePosition()
     for piece in pieces {
       piece.accumulateAbsolutePosition(pos)
     }
-    return pos.byteOffset
+    return pos.utf8Offset
   }
 }
 
@@ -281,6 +214,6 @@ extension TriviaPiece {
       pos.add(text: text)
 %   end
 % end
-  }
+    }
   }
 }

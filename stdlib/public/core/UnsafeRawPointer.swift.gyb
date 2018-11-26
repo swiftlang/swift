@@ -231,7 +231,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   /// `other` and performs no allocation or copying.
   ///
   /// - Parameter other: The pointer to convert.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(_ other: Unsafe${Mutable}RawPointer) {
     self = other
@@ -245,7 +245,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   ///
   /// - Parameter other: The pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?(_ other: Unsafe${Mutable}RawPointer?) {
     guard let unwrapped = other else { return nil }
@@ -253,7 +253,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   }
 
   /// Creates a new raw pointer from a builtin raw pointer.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(_ _rawValue: Builtin.RawPointer) {
     self._rawValue = _rawValue
@@ -266,7 +266,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   /// `other` and performs no allocation or copying.
   ///
   /// - Parameter other: The opaque pointer to convert.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(_ other: OpaquePointer) {
     _rawValue = other._rawValue
@@ -280,7 +280,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   ///
   /// - Parameter other: The opaque pointer to convert. If `other` is `nil`,
   ///   the result is `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?(_ other: OpaquePointer?) {
     guard let unwrapped = other else { return nil }
@@ -292,7 +292,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   ///
   /// - Parameter bitPattern: A bit pattern to use for the address of the new
   ///   raw pointer. If `bitPattern` is zero, the result is `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?(bitPattern: Int) {
     if bitPattern == 0 { return nil }
@@ -304,7 +304,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   ///
   /// - Parameter bitPattern: A bit pattern to use for the address of the new
   ///   raw pointer. If `bitPattern` is zero, the result is `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?(bitPattern: UInt) {
     if bitPattern == 0 { return nil }
@@ -318,7 +318,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   /// `other` and performs no allocation or copying.
   ///
   /// - Parameter other: The typed pointer to convert.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init<T>(_ other: Unsafe${Mutable}Pointer<T>) {
     _rawValue = other._rawValue
@@ -332,7 +332,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   ///
   /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?<T>(_ other: Unsafe${Mutable}Pointer<T>?) {
     guard let unwrapped = other else { return nil }
@@ -347,7 +347,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   /// `other` and performs no allocation or copying.
   ///
   /// - Parameter other: The immutable raw pointer to convert.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(mutating other: UnsafeRawPointer) {
     _rawValue = other._rawValue
@@ -361,7 +361,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   ///
   /// - Parameter other: The immutable raw pointer to convert. If `other` is
   ///   `nil`, the result is `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?(mutating other: UnsafeRawPointer?) {
     guard let unwrapped = other else { return nil }
@@ -375,7 +375,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   /// `other` and performs no allocation or copying.
   ///
   /// - Parameter other: The mutable raw pointer to convert.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(_ other: UnsafeMutableRawPointer) {
     _rawValue = other._rawValue
@@ -389,7 +389,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   ///
   /// - Parameter other: The mutable raw pointer to convert. If `other` is
   ///   `nil`, the result is `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?(_ other: UnsafeMutableRawPointer?) {
     guard let unwrapped = other else { return nil }
@@ -403,7 +403,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   /// `other` and performs no allocation or copying.
   ///
   /// - Parameter other: The typed pointer to convert.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init<T>(_ other: UnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
@@ -417,7 +417,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   ///
   /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?<T>(_ other: UnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }
@@ -428,7 +428,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
 %  if mutable:
 
   @available(swift, deprecated: 4.1, obsoleted: 5.0.0, renamed: "allocate(byteCount:alignment:)")
-  @_inlineable
+  @inlinable
   public static func allocate(
     bytes size: Int, alignedTo alignment: Int
   ) -> UnsafeMutableRawPointer {
@@ -451,7 +451,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   ///     bytes.
   /// - Returns: A pointer to a newly allocated region of memory. The memory is
   ///   allocated, but not initialized.
-  @_inlineable
+  @inlinable
   public static func allocate(
     byteCount: Int, alignment: Int
   ) -> UnsafeMutableRawPointer {
@@ -469,7 +469,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   ///
   /// The memory to be deallocated must be uninitialized or initialized to a
   /// trivial type.
-  @_inlineable
+  @inlinable
   public func deallocate() {
     Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (-1)._builtinWordValue)
   }
@@ -510,7 +510,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   ///   region is bound to `T`, but has not been modified in any other way.
   ///   The number of bytes in this region is
   ///   `count * MemoryLayout<T>.stride`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @discardableResult
   public func bindMemory<T>(
@@ -531,7 +531,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   ///
   /// - Parameter to: The type `T` that the memory has already been bound to.
   /// - Returns: A typed pointer to the same memory as this raw pointer.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func assumingMemoryBound<T>(to: T.Type) -> Unsafe${Mutable}Pointer<T> {
     return Unsafe${Mutable}Pointer<T>(_rawValue)
@@ -581,7 +581,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   ///   - count: The number of copies of `value` to copy into memory. `count`
   ///     must not be negative. 
   /// - Returns: A typed pointer to the memory referenced by this raw pointer.
-  @_inlineable
+  @inlinable
   @discardableResult
   public func initializeMemory<T>(
     as type: T.Type, repeating repeatedValue: T, count: Int
@@ -641,7 +641,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   ///   - count: The number of copies of `value` to copy into memory. `count`
   ///     must not be negative.
   /// - Returns: A typed pointer to the memory referenced by this raw pointer.
-  @_inlineable
+  @inlinable
   @discardableResult
   public func initializeMemory<T>(
     as type: T.Type, from source: UnsafePointer<T>, count: Int
@@ -705,7 +705,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   ///     destination region.
   /// - Returns: A typed pointer to the memory referenced by this raw pointer.
   // This is fundamentally unsafe since collections can underreport their count.
-  @_inlineable
+  @inlinable
   @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'UnsafeMutableRawBufferPointer.initialize(from:)' instead")
   @discardableResult
   public func initializeMemory<C : Collection>(
@@ -750,7 +750,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   ///   - count: The number of copies of `value` to copy into memory. `count`
   ///     must not be negative.
   /// - Returns: A typed pointer to the memory referenced by this raw pointer.
-  @_inlineable
+  @inlinable
   @discardableResult
   public func moveInitializeMemory<T>(
     as type: T.Type, from source: UnsafeMutablePointer<T>, count: Int
@@ -800,7 +800,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   /// - Returns: A new instance of type `T`, read from the raw bytes at
   ///   `offset`. The returned instance is memory-managed and unassociated
   ///   with the value in the memory referenced by this pointer.
-  @_inlineable
+  @inlinable
   public func load<T>(fromByteOffset offset: Int = 0, as type: T.Type) -> T {
     _debugPrecondition(0 == (UInt(bitPattern: self + offset)
         & (UInt(MemoryLayout<T>.alignment) - 1)),
@@ -846,7 +846,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   ///   - offset: The offset from this pointer, in bytes. `offset` must be
   ///     nonnegative. The default is zero.
   ///   - type: The type of `value`.
-  @_inlineable
+  @inlinable
   public func storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
@@ -887,7 +887,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
   ///     region `source..<(source + byteCount)` must be initialized to a trivial
   ///     type.
   ///   - byteCount: The number of bytes to copy. `byteCount` must not be negative.
-  @_inlineable
+  @inlinable
   public func copyMemory(from source: UnsafeRawPointer, byteCount: Int) {
     _debugPrecondition(
       byteCount >= 0, "UnsafeMutableRawPointer.copyMemory with negative count")
@@ -905,7 +905,7 @@ extension ${Self}: Strideable {
   ///
   /// - Parameter x: The pointer to calculate the distance to.
   /// - Returns: The distance from this pointer to `x`, in bytes.
-  @_inlineable
+  @inlinable
   public func distance(to x: ${Self}) -> Int {
     return Int(Builtin.sub_Word(Builtin.ptrtoint_Word(x._rawValue),
         Builtin.ptrtoint_Word(_rawValue)))
@@ -923,7 +923,7 @@ extension ${Self}: Strideable {
   /// - Parameter n: The number of bytes to offset this pointer. `n` may be
   ///   positive, negative, or zero.
   /// - Returns: A pointer offset from this pointer by `n` bytes.
-  @_inlineable
+  @inlinable
   public func advanced(by n: Int) -> ${Self} {
     return ${Self}(Builtin.gepRaw_Word(_rawValue, n._builtinWordValue))
   }
@@ -939,7 +939,7 @@ extension ${Self}: Equatable {
   ///   - rhs: Another pointer.
   /// - Returns: `true` if `lhs` and `rhs` reference the same memory address;
   ///   otherwise, `false`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
@@ -957,7 +957,7 @@ extension ${Self}: Comparable {
   ///   - rhs: Another pointer.
   /// - Returns: `true` if `lhs` references a memory address earlier than
   ///   `rhs`; otherwise, `false`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func < (lhs: ${Self}, rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
@@ -970,7 +970,7 @@ extension ${Self}: Hashable {
   /// The hash value is not guaranteed to be stable across different
   /// invocations of the same program.  Do not persist the hash value across
   /// program runs.
-  @_inlineable
+  @inlinable
   public var hashValue: Int {
     return Int(bitPattern: self)
   }
@@ -978,14 +978,14 @@ extension ${Self}: Hashable {
 
 extension Unsafe${Mutable}RawPointer : CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return _rawPointerToString(_rawValue)
   }
 }
 
 extension Unsafe${Mutable}RawPointer : CustomReflectable {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     let ptrValue = UInt64(
       bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
@@ -994,8 +994,7 @@ extension Unsafe${Mutable}RawPointer : CustomReflectable {
 }
 
 extension Unsafe${Mutable}RawPointer : CustomPlaygroundQuickLookable {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(*, deprecated, message: "Unsafe${Mutable}RawPointer.customPlaygroundQuickLook will be removed in a future Swift version")
   internal var summary: String {
     let selfType = "${Self}"
@@ -1006,19 +1005,19 @@ extension Unsafe${Mutable}RawPointer : CustomPlaygroundQuickLookable {
     : "\(selfType)(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .text(summary)
   }
 }
 
 extension OpaquePointer {
-  @_inlineable
+  @inlinable
   public init(_ from: Unsafe${Mutable}RawPointer) {
     self._rawValue = from._rawValue
   }
 
-  @_inlineable
+  @inlinable
   public init?(_ from: Unsafe${Mutable}RawPointer?) {
     guard let unwrapped = from else { return nil }
     self._rawValue = unwrapped._rawValue
@@ -1033,7 +1032,7 @@ extension Int {
   ///
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
-  @_inlineable
+  @inlinable
   public init(bitPattern pointer: Unsafe${Mutable}RawPointer?) {
     if let pointer = pointer {
       self = Int(Builtin.ptrtoint_Word(pointer._rawValue))
@@ -1051,7 +1050,7 @@ extension UInt {
   ///
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
-  @_inlineable
+  @inlinable
   public init(bitPattern pointer: Unsafe${Mutable}RawPointer?) {
     if let pointer = pointer {
       self = UInt(Builtin.ptrtoint_Word(pointer._rawValue))

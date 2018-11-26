@@ -14,14 +14,14 @@
 #define SWIFT_IRGEN_IRGENMANGLER_H
 
 #include "IRGenModule.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "swift/AST/ASTMangler.h"
-#include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/ProtocolConformance.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/ValueWitness.h"
 
 namespace swift {
+
+class ProtocolConformance;
+class NormalProtocolConformance;
+
 namespace irgen {
 
 /// A mangling string that includes embedded symbolic references.
@@ -121,8 +121,15 @@ public:
     return finalize();
   }
 
+  std::string mangleProtocolRequirementArray(const ProtocolDecl *Decl) {
+    beginMangling();
+    appendProtocolName(Decl);
+    appendOperator("WR");
+    return finalize();
+  }
+
   std::string mangleProtocolConformanceDescriptor(
-                                 const NormalProtocolConformance *Conformance) {
+                                 const ProtocolConformance *Conformance) {
     beginMangling();
     appendProtocolConformance(Conformance);
     appendOperator("Mc");
@@ -154,6 +161,10 @@ public:
     return mangleConformanceSymbol(Type(), C, "WP");
   }
 
+  std::string mangleProtocolWitnessTablePattern(const ProtocolConformance *C) {
+    return mangleConformanceSymbol(Type(), C, "Wp");
+  }
+
   std::string mangleGenericProtocolWitnessTableCache(
                                                 const ProtocolConformance *C) {
     return mangleConformanceSymbol(Type(), C, "WG");
@@ -162,6 +173,11 @@ public:
   std::string mangleGenericProtocolWitnessTableInstantiationFunction(
                                                 const ProtocolConformance *C) {
     return mangleConformanceSymbol(Type(), C, "WI");
+  }
+
+  std::string mangleResilientProtocolWitnessTable(
+                                                const ProtocolConformance *C) {
+    return mangleConformanceSymbol(Type(), C, "Wr");
   }
 
   std::string mangleProtocolWitnessTableAccessFunction(
@@ -246,7 +262,7 @@ public:
     appendType(ty);
     if (sig)
       appendGenericSignature(sig);
-    appendOperator("Wy");
+    appendOperator("WOy");
     return finalize();
   }
   std::string mangleOutlinedConsumeFunction(CanType ty,
@@ -255,90 +271,72 @@ public:
     appendType(ty);
     if (sig)
       appendGenericSignature(sig);
-    appendOperator("We");
+    appendOperator("WOe");
     return finalize();
   }
 
-  std::string mangleOutlinedRetainFunction(Type t) {
+  std::string mangleOutlinedRetainFunction(CanType t,
+                                           CanGenericSignature sig) {
     beginMangling();
     appendType(t);
-    appendOperator("Wr");
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperator("WOr");
     return finalize();
   }
-  std::string mangleOutlinedReleaseFunction(Type t) {
+  std::string mangleOutlinedReleaseFunction(CanType t,
+                                            CanGenericSignature sig) {
     beginMangling();
     appendType(t);
-    appendOperator("Ws");
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperator("WOs");
     return finalize();
   }
 
-  std::string mangleOutlinedInitializeWithTakeFunction(const CanType t,
-                                                       IRGenModule *mod) {
+  std::string mangleOutlinedInitializeWithTakeFunction(CanType t,
+                                                       CanGenericSignature sig) {
     beginMangling();
-    if (!t->hasArchetype()) {
-      appendType(t);
-      appendOperator("Wb", Index(1));
-    } else {
-      appendModule(mod->getSwiftModule());
-      appendOperator("y");
-      appendOperator("t");
-      appendOperator("Wb", Index(mod->getCanTypeID(t)));
-    }
+    appendType(t);
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperator("WOb");
     return finalize();
   }
-  std::string mangleOutlinedInitializeWithCopyFunction(const CanType t,
-                                                       IRGenModule *mod) {
+  std::string mangleOutlinedInitializeWithCopyFunction(CanType t,
+                                                       CanGenericSignature sig) {
     beginMangling();
-    if (!t->hasArchetype()) {
-      appendType(t);
-      appendOperator("Wc", Index(1));
-    } else {
-      appendModule(mod->getSwiftModule());
-      appendOperator("y");
-      appendOperator("t");
-      appendOperator("Wc", Index(mod->getCanTypeID(t)));
-    }
+    appendType(t);
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperator("WOc");
     return finalize();
   }
-  std::string mangleOutlinedAssignWithTakeFunction(const CanType t,
-                                                   IRGenModule *mod) {
+  std::string mangleOutlinedAssignWithTakeFunction(CanType t,
+                                                   CanGenericSignature sig) {
     beginMangling();
-    if (!t->hasArchetype()) {
-      appendType(t);
-      appendOperator("Wd", Index(1));
-    } else {
-      appendModule(mod->getSwiftModule());
-      appendOperator("y");
-      appendOperator("t");
-      appendOperator("Wd", Index(mod->getCanTypeID(t)));
-    }
+    appendType(t);
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperator("WOd");
     return finalize();
   }
-  std::string mangleOutlinedAssignWithCopyFunction(const CanType t,
-                                                   IRGenModule *mod) {
+  std::string mangleOutlinedAssignWithCopyFunction(CanType t,
+                                                   CanGenericSignature sig) {
     beginMangling();
-    if (!t->hasArchetype()) {
-      appendType(t);
-      appendOperator("Wf", Index(1));
-    } else {
-      appendModule(mod->getSwiftModule());
-      appendOperator("y");
-      appendOperator("t");
-      appendOperator("Wf", Index(mod->getCanTypeID(t)));
-    }
+    appendType(t);
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperator("WOf");
     return finalize();
   }
-  std::string mangleOutlinedDestroyFunction(const CanType t, IRGenModule *mod) {
+  std::string mangleOutlinedDestroyFunction(CanType t,
+                                            CanGenericSignature sig) {
     beginMangling();
-    if (!t->hasArchetype()) {
-      appendType(t);
-      appendOperator("Wh", Index(1));
-    } else {
-      appendModule(mod->getSwiftModule());
-      appendOperator("y");
-      appendOperator("t");
-      appendOperator("Wh", Index(mod->getCanTypeID(t)));
-    }
+    appendType(t);
+    if (sig)
+      appendGenericSignature(sig);
+    appendOperator("WOh");
     return finalize();
   }
 
@@ -356,9 +354,7 @@ public:
   }
 
   SymbolicMangling mangleTypeForReflection(IRGenModule &IGM,
-                                           Type Ty,
-                                           ModuleDecl *Module,
-                                           bool isSingleFieldOfBox);
+                                           Type Ty);
 
   std::string mangleTypeForLLVMTypeName(CanType Ty);
 

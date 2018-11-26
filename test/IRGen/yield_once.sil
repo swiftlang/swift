@@ -4,7 +4,7 @@ import Builtin
 
 sil @marker : $(Builtin.Int32) -> ()
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i8* @test_simple
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @test_simple
 // CHECK-32-SAME:  i8* noalias dereferenceable([[BUFFER_SIZE:16]]))
 // CHECK-64-SAME:  (i8* noalias dereferenceable([[BUFFER_SIZE:32]]))
 sil @test_simple : $@yield_once () -> () {
@@ -42,10 +42,10 @@ unwind:
   // CHECK-NEXT:    unreachable
 }
 
-// CHECK-LABEL:     declare{{( protected)?}} swiftcc void @"$SIet_TC"
+// CHECK-LABEL:     declare{{( dllimport)?}}{{( protected)?}} swiftcc void @"$SIet_TC"
 // CHECK-SAME:      (i8* noalias dereferenceable([[BUFFER_SIZE]]), i1)
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @test_simple_call(i1)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_simple_call(i1)
 sil @test_simple_call : $(Builtin.Int1) -> () {
 entry(%flag : $Builtin.Int1):
   //   Allocate the buffer.

@@ -32,7 +32,7 @@ namespace swift {
 
 namespace serialization {
 
-typedef ArrayRef<std::string> FilenamesTy;
+using FilenamesTy = ArrayRef<std::string>;
 
 class Serializer {
   SmallVector<char, 0> Buffer;

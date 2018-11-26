@@ -140,11 +140,11 @@ private:
   class StringSetIterator {
     llvm::StringSet<>::const_iterator I;
   public:
-    typedef llvm::StringSet<>::const_iterator::value_type value_type;
-    typedef std::input_iterator_tag iterator_category;
-    typedef ptrdiff_t difference_type;
-    typedef value_type &reference;
-    typedef value_type *pointer;
+    using value_type = llvm::StringSet<>::const_iterator::value_type;
+    using iterator_category = std::input_iterator_tag;
+    using difference_type = ptrdiff_t;
+    using reference = value_type &;
+    using pointer = value_type *;
 
     /*implicit*/ StringSetIterator(llvm::StringSet<>::const_iterator base)
        : I(base) {}

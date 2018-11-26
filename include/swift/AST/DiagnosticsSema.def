@@ -42,6 +42,8 @@ NOTE(type_declared_here,none,
      "type declared here", ())
 NOTE(decl_declared_here,none,
      "%0 declared here", (DeclName))
+NOTE(implicit_member_declared_here,none,
+     "%1 '%0' is implicitly declared", (StringRef, StringRef))
 NOTE(extended_type_declared_here,none,
      "extended type declared here", ())
 
@@ -64,8 +66,14 @@ ERROR(could_not_find_tuple_member,none,
 
 ERROR(could_not_find_value_member,none,
       "value of type %0 has no member %1", (Type, DeclName))
+ERROR(could_not_find_value_member_corrected,none,
+      "value of type %0 has no member %1; did you mean %2?",
+      (Type, DeclName, DeclName))
 ERROR(could_not_find_type_member,none,
       "type %0 has no member %1", (Type, DeclName))
+ERROR(could_not_find_type_member_corrected,none,
+      "type %0 has no member %1; did you mean %2?",
+      (Type, DeclName, DeclName))
 
 ERROR(could_not_find_enum_case,none,
       "enum type %0 has no case %1; did you mean %2", (Type, DeclName, DeclName))
@@ -610,6 +618,10 @@ ERROR(reserved_member_name,none,
       " 'foo.%1' expression", (DeclName, StringRef))
 
 ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
+WARNING(invalid_redecl_swift5_warning,none,
+        "redeclaration of %0 is deprecated and will be illegal in Swift 5",
+        (DeclName))
+
 NOTE(invalid_redecl_prev,none,
      "%0 previously declared here", (DeclName))
 
@@ -650,6 +662,9 @@ ERROR(unspaced_unary_operator,none,
 
 ERROR(use_unresolved_identifier,none,
       "use of unresolved %select{identifier|operator}1 %0", (DeclName, bool))
+ERROR(use_unresolved_identifier_corrected,none,
+      "use of unresolved %select{identifier|operator}1 %0; did you mean %2?",
+      (DeclName, bool, DeclName))
 NOTE(confusable_character,none,
       "%select{identifier|operator}0 '%1' contains possibly confused characters; "
       "did you mean to use '%2'?",
@@ -662,10 +677,6 @@ NOTE(note_typo_candidate_implicit_member,none,
      "did you mean the implicitly-synthesized %1 '%0'?", (StringRef, StringRef))
 NOTE(note_remapped_type,none,
      "did you mean to use '%0'?", (StringRef))
-ERROR(identifier_init_failure,none,
-      "could not infer type for %0", (Identifier))
-ERROR(pattern_used_in_type,none,
-      "%0 used within its own type", (Identifier))
 NOTE(note_module_as_type,none,
      "cannot use module %0 as a type", (Identifier))
 
@@ -885,6 +896,9 @@ ERROR(missing_explicit_conversion,none,
 ERROR(missing_address_of,none,
       "passing value of type %0 to an inout parameter requires explicit '&'",
       (Type))
+ERROR(extraneous_address_of,none,
+      "use of extraneous '&'",
+      ())
 ERROR(extra_address_of,none,
       "'&' used with non-inout argument of type %0",
       (Type))
@@ -1404,6 +1418,9 @@ NOTE(type_does_not_inherit_or_conform_requirement,none,
 ERROR(types_not_equal,none,
       "%0 requires the types %1 and %2 be equivalent",
       (Type, Type, Type))
+ERROR(types_not_equal_in_call,none,
+      "%0 requires the types %1 and %2 be equivalent to use %3",
+      (Type, Type, Type, DeclName))
 ERROR(type_does_not_conform_owner,none,
       "%0 requires that %1 conform to %2", (Type, Type, Type))
 NOTE(requirement_implied_by_conditional_conformance,none,
@@ -1437,6 +1454,28 @@ ERROR(objc_generics_cannot_conditionally_conform,none,
       "type %0 cannot conditionally conform to protocol %1 because "
       "the type uses the Objective-C generics model",
       (Type, Type))
+ERROR(objc_protocol_cannot_have_conditional_conformance,none,
+      "type %0 cannot conditionally conform to @objc protocol %1 because "
+      "Objective-C does not support conditional conformances",
+      (Type, Type))
+ERROR(objc_protocol_in_generic_extension,none,
+      "conformance of "
+      "%select{|subclass of a }2%select{class from generic context|generic class}3"
+      " %0 to @objc protocol %1 cannot be in an extension",
+      (Type, Type, bool, bool))
+ERROR(conditional_conformances_cannot_imply_conformances,none,
+      "conditional conformance of type %0 to protocol %1 does not imply conformance to "
+      "inherited protocol %2",
+      (Type, Type, Type))
+NOTE(note_explicitly_state_conditional_conformance_different,none,
+     "did you mean to explicitly state the conformance with different bounds?", ())
+NOTE(note_explicitly_state_conditional_conformance_relaxed,none,
+     "did you mean to explicitly state the conformance with relaxed bounds?", ())
+NOTE(note_explicitly_state_conditional_conformance_same,none,
+     "did you mean to explicitly state the conformance with the same bounds?", ())
+NOTE(note_explicitly_state_conditional_conformance_noneditor,none,
+     "did you mean to explicitly state the conformance like '%0where ...'?",
+     (StringRef))
 ERROR(protocol_has_missing_requirements,none,
       "type %0 cannot conform to protocol %1 because it has requirements that "
       "cannot be satisfied", (Type, Type))
@@ -1921,9 +1960,8 @@ ERROR(override_argument_name_mismatch,none,
       "of overridden %select{method|initializer}0 %2",
       (bool, DeclName, DeclName))
 ERROR(override_ownership_mismatch,none,
-      "cannot override %select{strong|weak|unowned|unowned(unsafe)}0 property "
-      "with %select{strong|weak|unowned|unowned(unsafe)}1 property",
-      (/*ReferenceOwnership*/unsigned, /*ReferenceOwnership*/unsigned))
+      "cannot override %0 property with %1 property",
+      (ReferenceOwnership, ReferenceOwnership))
 ERROR(override_dynamic_self_mismatch,none,
       "cannot override a Self return type with a non-Self return type",
       ())
@@ -1969,10 +2007,18 @@ ERROR(override_mutable_covariant_property,none,
 ERROR(override_mutable_covariant_subscript,none,
       "cannot override mutable subscript of type %0 with covariant type %1",
       (Type, Type))
-ERROR(decl_already_final,none,
+ERROR(static_decl_already_final,none,
       "static declarations are already final", ())
 ERROR(open_decl_cannot_be_final,none,
       "%0 cannot be declared both 'final' and 'open'", (DescriptiveDeclKind))
+ERROR(implicitly_final_cannot_be_open,none,
+      "%select{'let' properties|members of 'final' classes|"
+      "static declarations}0 are implicitly 'final'; use 'public' instead of "
+      "'open'", (unsigned))
+WARNING(implicitly_final_cannot_be_open_swift4,none,
+        "%select{'let' properties|members of 'final' classes|"
+        "static declarations}0 are implicitly 'final'; use 'public' instead of "
+        "'open'", (unsigned))
 
 WARNING(override_swift3_objc_inference,none,
         "override of %0 %1 from extension of %2 depends on deprecated "
@@ -2115,6 +2161,8 @@ ERROR(broken_equatable_requirement,none,
       "Equatable protocol is broken: unexpected requirement", ())
 ERROR(broken_hashable_requirement,none,
       "Hashable protocol is broken: unexpected requirement", ())
+ERROR(broken_hashable_no_hasher,none,
+      "Hashable protocol is broken: Hasher type not found", ())
 ERROR(broken_errortype_requirement,none,
       "Error protocol is broken: unexpected requirement", ())
 ERROR(broken_int_hashable_conformance,none,
@@ -2162,10 +2210,6 @@ ERROR(dynamic_self_non_method,none,
 ERROR(self_in_nominal,none,
       "'Self' is only available in a protocol or as the result of a "
       "method in a class; did you mean '%0'?", (StringRef))
-
-// Duplicate declarations
-ERROR(duplicate_enum_element,none,
-      "duplicate definition of enum element",())
 
 // Property behaviors
 ERROR(property_behavior_not_protocol,none,
@@ -2704,6 +2748,15 @@ NOTE(fix_unqualified_access_top_level_multi,none,
      "use '%0' to reference the %1 in module %2",
      (StringRef, DescriptiveDeclKind, Identifier))
 
+WARNING(warn_deprecated_conditional_conformance_outer_access,none,
+        "use of %0 as reference to %1 in %2 %3 will change in future versions of Swift to reference %4 in %5 %6 "
+        "which comes via a conditional conformance",
+        (DeclName, DescriptiveDeclKind, DescriptiveDeclKind, DeclName,
+        DescriptiveDeclKind, DescriptiveDeclKind, DeclName))
+NOTE(fix_deprecated_conditional_conformance_outer_access,none,
+     "use '%0' to continue to reference the %1",
+     (StringRef, DescriptiveDeclKind, Identifier))
+
 ERROR(unsupported_special_decl_ref, none,
       "referencing %0 as a function value is not implemented", (Identifier))
 
@@ -2858,7 +2911,7 @@ WARNING(expression_unused_result_call,none,
 WARNING(expression_unused_result_operator,none,
         "result of operator %0 is unused", (DeclName))
 WARNING(expression_unused_result_unknown, none,
-        "result of call is unused, but produces %0", (Type))
+        "result of call to %select{function|closure}0 returning %1 is unused", (bool, Type))
 WARNING(expression_unused_result, none,
         "expression of type %0 is unused", (Type))
 WARNING(expression_unused_init_result,none,
@@ -2924,10 +2977,22 @@ ERROR(fallthrough_into_case_with_var_binding,none,
 ERROR(unnecessary_cast_over_optionset,none,
       "unnecessary cast over raw value of %0", (Type))
 
+ERROR(mutability_mismatch_multiple_pattern_list,none,
+      "'%select{var|let}0' pattern binding must match previous "
+      "'%select{var|let}1' pattern binding", (bool, bool))
 ERROR(type_mismatch_multiple_pattern_list,none,
       "pattern variable bound to type %0, expected type %1", (Type, Type))
 ERROR(type_mismatch_fallthrough_pattern_list,none,
       "pattern variable bound to type %0, fallthrough case bound to type %1", (Type, Type))
+
+ERROR(unknown_case_must_be_catchall,none,
+      "'@unknown' is only supported for catch-all cases (\"case _\")", ())
+ERROR(unknown_case_where_clause,none,
+      "'where' cannot be used with '@unknown'", ())
+ERROR(unknown_case_multiple_patterns,none,
+      "'@unknown' cannot be applied to multiple patterns", ())
+ERROR(unknown_case_must_be_last,none,
+      "'@unknown' can only be applied to the last case in a switch", ())
 
 WARNING(where_on_one_item, none,
         "'where' only applies to the second pattern match in this case", ())
@@ -3012,6 +3077,15 @@ WARNING(type_inferred_to_undesirable_type,none,
         "which may be unexpected", (Identifier, Type, bool))
 NOTE(add_explicit_type_annotation_to_silence,none,
      "add an explicit type annotation to silence this warning", ())
+
+WARNING(unowned_assignment_immediate_deallocation,none,
+        "instance will be immediately deallocated because "
+        "%select{variable|property}2 %0 is %1",
+        (Identifier, ReferenceOwnership, /*Is Property*/unsigned))
+NOTE(unowned_assignment_requires_strong,none,
+     "a strong reference is required to prevent the instance from being "
+     "deallocated", ())
+
 ERROR(isa_collection_downcast_pattern_value_unimplemented,none,
       "collection downcast in cast pattern is not implemented; use an explicit "
       "downcast to %0 instead", (Type))
@@ -3157,29 +3231,33 @@ ERROR(tuple_ellipsis,none,
 WARNING(implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional,none,
         "using '!' is not allowed here; treating this as '?' instead", ())
 
+WARNING(implicitly_unwrapped_optional_deprecated_in_this_position,none,
+        "using '!' here is deprecated and will be removed in a future release", ())
+
 ERROR(implicitly_unwrapped_optional_in_illegal_position,none,
         "using '!' is not allowed here; perhaps '?' was intended?", ())
 
 // Ownership
 ERROR(invalid_ownership_type,none,
-      "'%select{strong|weak|unowned|unowned}0' may only be applied to "
-      "class and class-bound protocol types, not %1",
-      (/*ReferenceOwnership*/unsigned, Type))
+      "%0 may only be applied to class and class-bound protocol types, not %1",
+      (ReferenceOwnership, Type))
 ERROR(invalid_ownership_protocol_type,none,
-      "'%select{strong|weak|unowned|unowned}0' must not be applied to "
-      "non-class-bound %1; consider adding a protocol conformance that has a class bound",
-      (/*ReferenceOwnership*/unsigned, Type))
+      "%0 must not be applied to non-class-bound %1; "
+      "consider adding a protocol conformance that has a class bound",
+      (ReferenceOwnership, Type))
+ERROR(invalid_ownership_with_optional,none,
+      "%0 variable cannot have optional type", (ReferenceOwnership))
 ERROR(invalid_weak_ownership_not_optional,none,
       "'weak' variable should have optional type %0", (Type))
 ERROR(invalid_weak_let,none,
       "'weak' must be a mutable variable, because it may change at runtime", ())
 ERROR(ownership_invalid_in_protocols,none,
-      "'%select{strong|weak|unowned|unowned}0' cannot be applied to a property declaration in a protocol",
-      (/*ReferenceOwnership*/unsigned))
+      "%0 cannot be applied to a property declaration in a protocol",
+      (ReferenceOwnership))
 WARNING(ownership_invalid_in_protocols_compat_warning,none,
-      "'%select{strong|weak|unowned|unowned}0' should not be applied to a property declaration "
+      "%0 should not be applied to a property declaration "
       "in a protocol and will be disallowed in future versions",
-      (/*ReferenceOwnership*/unsigned))
+      (ReferenceOwnership))
 
 // required
 ERROR(required_initializer_nonclass,none,
@@ -3567,38 +3645,45 @@ ERROR(dynamic_requires_objc,none,
 //------------------------------------------------------------------------------
 
 ERROR(availability_decl_unavailable, none,
-  "%0 is unavailable", (DeclName))
+      "%select{getter for |setter for |}0%1 is unavailable",
+      (unsigned, DeclName))
 
 #define REPLACEMENT_DECL_KIND_SELECT "select{| instance method| property}"
 ERROR(availability_decl_unavailable_rename, none,
-      "%0 has been %select{renamed to|replaced by}1"
-      "%" REPLACEMENT_DECL_KIND_SELECT "2 '%3'",
-      (DeclName, bool, unsigned, StringRef))
+      "%select{getter for |setter for |}0%1 has been "
+      "%select{renamed to|replaced by}2%" REPLACEMENT_DECL_KIND_SELECT "3 "
+      "'%4'",
+      (unsigned, DeclName, bool, unsigned, StringRef))
 
 ERROR(availability_decl_unavailable_rename_msg, none,
-      "%0 has been %select{renamed to|replaced by}1"
-      "%" REPLACEMENT_DECL_KIND_SELECT "2 '%3': %4",
-      (DeclName, bool, unsigned, StringRef, StringRef))
+      "%select{getter for |setter for |}0%1 has been "
+      "%select{renamed to|replaced by}2%" REPLACEMENT_DECL_KIND_SELECT "3 "
+      "'%4': %5",
+      (unsigned, DeclName, bool, unsigned, StringRef, StringRef))
 
 ERROR(availability_decl_unavailable_msg, none,
-  "%0 is unavailable: %1", (DeclName, StringRef))
+      "%select{getter for |setter for |}0%1 is unavailable: %2",
+      (unsigned, DeclName, StringRef))
 
 ERROR(availability_decl_unavailable_in_swift, none,
-  "%0 is unavailable in Swift", (DeclName))
+      "%select{getter for |setter for |}0%1 is unavailable in Swift",
+      (unsigned, DeclName))
 
 ERROR(availability_decl_unavailable_in_swift_msg, none,
-  "%0 is unavailable in Swift: %1", (DeclName, StringRef))
+      "%select{getter for |setter for |}0%1 is unavailable in Swift: %2",
+      (unsigned, DeclName, StringRef))
 
 NOTE(availability_marked_unavailable, none,
-  "%0 has been explicitly marked unavailable here", (DeclName))
+     "%select{getter for |setter for |}0%1 has been explicitly marked "
+     "unavailable here", (unsigned, DeclName))
 
 NOTE(availability_introduced_in_swift, none,
-     "%0 was introduced in Swift %1",
-    (DeclName, clang::VersionTuple))
+     "%select{getter for |setter for |}0%1 was introduced in Swift %2",
+     (unsigned, DeclName, clang::VersionTuple))
 
 NOTE(availability_obsoleted, none,
-     "%0 was obsoleted in %1 %2",
-    (DeclName, StringRef, clang::VersionTuple))
+     "%select{getter for |setter for |}0%1 was obsoleted in %2 %3",
+     (unsigned, DeclName, StringRef, clang::VersionTuple))
 
 WARNING(availability_deprecated, none,
         "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
@@ -3700,30 +3785,33 @@ WARNING(discardable_result_on_void_never_function, none,
 //------------------------------------------------------------------------------
 
 ERROR(fixed_layout_attr_on_internal_type,
-      none, "'@_fixed_layout' attribute can only be applied to '@_versioned' "
+      none, "'@_fixed_layout' attribute can only be applied to '@usableFromInline' "
       "or public declarations, but %0 is "
       "%select{private|fileprivate|internal|%error|%error}1",
       (DeclName, AccessLevel))
 
-ERROR(versioned_attr_with_explicit_access,
-      none, "'@_versioned' attribute can only be applied to internal "
+ERROR(usable_from_inline_attr_with_explicit_access,
+      none, "'@usableFromInline' attribute can only be applied to internal "
       "declarations, but %0 is %select{private|fileprivate|%error|public|open}1",
       (DeclName, AccessLevel))
 
-ERROR(versioned_attr_in_protocol,none,
-      "'@_versioned' attribute cannot be used in protocols", ())
+WARNING(inlinable_implies_usable_from_inline,none,
+        "'@inlinable' declaration is already '@usableFromInline'",())
 
-ERROR(versioned_dynamic_not_supported,none,
-      "'@_versioned' attribute cannot be applied to 'dynamic' declarations", ())
+ERROR(usable_from_inline_attr_in_protocol,none,
+      "'@usableFromInline' attribute cannot be used in protocols", ())
+
+ERROR(usable_from_inline_dynamic_not_supported,none,
+      "'@usableFromInline' attribute cannot be applied to 'dynamic' declarations", ())
 
 #define FRAGILE_FUNC_KIND \
   "%select{a '@_transparent' function|" \
   "an '@inline(__always)' function|" \
-  "an '@_inlineable' function|" \
+  "an '@inlinable' function|" \
   "a default argument value|" \
   "a property initializer in a '@_fixed_layout' type}"
 
-ERROR(local_type_in_inlineable_function,
+ERROR(local_type_in_inlinable_function,
       none, "type %0 cannot be nested inside " FRAGILE_FUNC_KIND "1",
       (DeclName, unsigned))
 
@@ -3734,25 +3822,25 @@ ERROR(resilience_decl_unavailable,
 
 #undef FRAGILE_FUNC_KIND
 
-NOTE(resilience_decl_declared_here,
+NOTE(resilience_decl_declared_here_public,
      none, "%0 %1 is not public", (DescriptiveDeclKind, DeclName))
 
-NOTE(resilience_decl_declared_here_versioned,
-     none, "%0 %1 is not '@_versioned' or public", (DescriptiveDeclKind, DeclName))
+NOTE(resilience_decl_declared_here,
+     none, "%0 %1 is not '@usableFromInline' or public", (DescriptiveDeclKind, DeclName))
 
-ERROR(class_designated_init_inlineable_resilient,none,
+ERROR(class_designated_init_inlinable_resilient,none,
       "initializer for class %0 is "
-      "'%select{@_transparent|@inline(__always)|@_inlineable|%error}1' and must "
+      "'%select{@_transparent|@inline(__always)|@inlinable|%error}1' and must "
       "delegate to another initializer", (Type, unsigned))
 
 ERROR(attribute_invalid_on_stored_property,
-      none, "'@%0' attribute cannot be applied to stored properties", (StringRef))
+      none, "'%0' attribute cannot be applied to stored properties", (DeclAttribute))
 
-ERROR(inlineable_dynamic_not_supported,
-      none, "'@_inlineable' attribute cannot be applied to 'dynamic' declarations", ())
+ERROR(inlinable_dynamic_not_supported,
+      none, "'@inlinable' attribute cannot be applied to 'dynamic' declarations", ())
 
-ERROR(inlineable_decl_not_public,
-      none, "'@_inlineable' attribute can only be applied to public declarations, "
+ERROR(inlinable_decl_not_public,
+      none, "'@inlinable' attribute can only be applied to public declarations, "
       "but %0 is %select{private|fileprivate|internal|%error|%error}1",
       (DeclBaseName, AccessLevel))
 
@@ -3864,6 +3952,11 @@ NOTE(missing_several_cases,none,
      "do you want to add "
      "%select{missing cases|a default clause}0"
      "?", (bool))
+NOTE(missing_unknown_case,none,
+     "handle unknown values using \"@unknown default\"", ())
+
+NOTE(non_exhaustive_switch_drop_unknown,none,
+     "remove '@unknown' to handle remaining values", ())
 
 NOTE(missing_particular_case,none,
      "add missing case: '%0'", (StringRef))
@@ -3875,9 +3968,7 @@ WARNING(redundant_particular_literal_case,none,
 NOTE(redundant_particular_literal_case_here,none,
      "first occurrence of identical literal pattern is here", ())
 
-// HACK: Downgrades the above to warnings if any of the cases is marked
-// @_downgrade_exhaustivity_check.
-WARNING(non_exhaustive_switch_warn_swift3,none, "switch must be exhaustive", ())
+WARNING(non_exhaustive_switch_warn,none, "switch must be exhaustive", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

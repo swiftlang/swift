@@ -1,4 +1,12 @@
-// RUN: %swift -typecheck -verify -parse-stdlib -target x86_64-apple-macosx10.10 %s
+// RUN: %swift -typecheck -verify -parse-stdlib -module-name Swift -target x86_64-apple-macosx10.10 %s
+
+// Fake declarations of some standard library features for -parse-stdlib.
+precedencegroup AssignmentPrecedence {}
+enum Optional<T> {
+  case none
+  case some(T)
+}
+
 
 @available(OSX, introduced: 10.5, deprecated: 10.8, obsoleted: 10.9,
               message: "you don't want to do that anyway")
@@ -103,4 +111,33 @@ func testMemberAvailability() {
   TestStruct().doThirdThing() // expected-error {{'doThirdThing()' is unavailable}}
   TestStruct().doFourthThing() // expected-error {{'doFourthThing()' is only available on OS X 10.12 or newer}} expected-note {{'if #available'}}
   TestStruct().doDeprecatedThing() // expected-warning {{'doDeprecatedThing()' is deprecated}}
+}
+
+extension TestStruct {
+  struct Data {
+    mutating func mutate() {}
+  }
+
+  var unavailableGetter: Data {
+    @available(macOS, unavailable, message: "bad getter")
+    get { return Data() } // expected-note 2 {{here}}
+    set {}
+  }
+
+  var unavailableSetter: Data {
+    get { return Data() }
+    @available(macOS, obsoleted: 10.5, message: "bad setter")
+    set {} // expected-note 2 {{setter for 'unavailableSetter' was obsoleted in OS X 10.5}}
+  }
+}
+
+func testAccessors() {
+  var t = TestStruct()
+  _ = t.unavailableGetter // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  t.unavailableGetter = .init()
+  t.unavailableGetter.mutate() // expected-error {{getter for 'unavailableGetter' is unavailable}}
+
+  _ = t.unavailableSetter
+  t.unavailableSetter = .init() // expected-error {{setter for 'unavailableSetter' is unavailable: bad setter}}
+  t.unavailableSetter.mutate() // expected-error {{setter for 'unavailableSetter' is unavailable: bad setter}}
 }

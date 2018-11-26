@@ -19,6 +19,7 @@
 #include "IRGenModule.h"
 
 #include "GenericRequirement.h"
+#include "MetadataRequest.h"
 #include "ProtocolInfo.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -109,6 +110,7 @@ static bool isLeafTypeMetadata(CanType type) {
 ///   metadata for the given type, false if it might be a subtype
 bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
                                         IsExact_t isExact,
+                                        MetadataState metadataState,
                                         unsigned source, MetadataPath &&path,
                                         const InterestingKeysCallback &keys) {
 
@@ -118,26 +120,31 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
     // If the type isn't a leaf type, also check it as an inexact match.
     bool hadFulfillment = false;
     if (!isLeafTypeMetadata(type)) {
-      hadFulfillment |= searchTypeMetadata(IGM, type, IsInexact, source,
-                                           MetadataPath(path), keys);
+      hadFulfillment |= searchTypeMetadata(IGM, type, IsInexact, metadataState,
+                                           source, MetadataPath(path), keys);
     }
 
     // Add the fulfillment.
-    hadFulfillment |= addFulfillment({type, nullptr}, source, std::move(path));
+    hadFulfillment |= addFulfillment({type, nullptr},
+                                     source, std::move(path), metadataState);
     return hadFulfillment;
   }
 
-  if (keys.isInterestingType(type)) {
+  // Search the superclass fields.  We can only do this if the metadata
+  // is complete.
+  if (metadataState == MetadataState::Complete &&
+      keys.isInterestingType(type)) {
     if (auto superclassTy = keys.getSuperclassBound(type)) {
-      return searchNominalTypeMetadata(IGM, superclassTy, source,
-                                       std::move(path), keys);
+      return searchNominalTypeMetadata(IGM, superclassTy, metadataState,
+                                       source, std::move(path), keys);
     }
   }
 
   // Inexact metadata will be a problem if we ever try to use this
   // to remember that we already have the metadata for something.
   if (isa<NominalType>(type) || isa<BoundGenericType>(type)) {
-    return searchNominalTypeMetadata(IGM, type, source, std::move(path), keys);
+    return searchNominalTypeMetadata(IGM, type, metadataState,
+                                     source, std::move(path), keys);
   }
 
   // TODO: tuples
@@ -218,7 +225,8 @@ bool FulfillmentMap::searchWitnessTable(
   // If we're not limiting the set of interesting conformances, or if
   // this is an interesting conformance, record it.
   if (!interestingConformances || interestingConformances->count(protocol)) {
-    hadFulfillment |= addFulfillment({type, protocol}, source, std::move(path));
+    hadFulfillment |= addFulfillment({type, protocol}, source,
+                                     std::move(path), MetadataState::Complete);
   }
 
   return hadFulfillment;
@@ -227,6 +235,7 @@ bool FulfillmentMap::searchWitnessTable(
 
 bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
                                                CanType type,
+                                               MetadataState metadataState,
                                                unsigned source,
                                                MetadataPath &&path,
                                          const InterestingKeysCallback &keys) {
@@ -254,10 +263,12 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
 
     // If the fulfilled value is type metadata, refine the path.
     if (!conf) {
+      auto argState = getPresumedMetadataStateForTypeArgument(metadataState);
       MetadataPath argPath = path;
       argPath.addNominalTypeArgumentComponent(reqtIndex);
       hadFulfillment |=
-        searchTypeMetadata(IGM, arg, IsExact, source, std::move(argPath), keys);
+        searchTypeMetadata(IGM, arg, IsExact, argState, source,
+                           std::move(argPath), keys);
       return;
     }
 
@@ -280,13 +291,24 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
 
 /// Testify that there's a fulfillment at the given path.
 bool FulfillmentMap::addFulfillment(FulfillmentKey key,
-                                    unsigned source, MetadataPath &&path) {
+                                    unsigned source,
+                                    MetadataPath &&path,
+                                    MetadataState metadataState) {
   // Only add a fulfillment if we don't have any previous
   // fulfillment for that value or if it 's cheaper than the existing
   // fulfillment.
   auto it = Fulfillments.find(key);
   if (it != Fulfillments.end()) {
-    if (path.cost() >= it->second.Path.cost()) {
+    // If the new fulfillment is worse than the existing one, ignore it.
+    auto existingState = it->second.getState();
+    if (!isAtLeast(metadataState, existingState)) {
+      return false;
+    }
+
+    // Consider cost only if the fulfillments are equivalent in state.
+    // TODO: this is potentially suboptimal, but it generally won't matter.
+    if (metadataState == existingState && 
+        path.cost() >= it->second.Path.cost()) {
       return false;
     }
 
@@ -294,8 +316,18 @@ bool FulfillmentMap::addFulfillment(FulfillmentKey key,
     it->second.Path = std::move(path);
     return true;
   } else {
-    Fulfillments.insert({ key, Fulfillment(source, std::move(path)) });
+    Fulfillments.insert({ key, Fulfillment(source, std::move(path),
+                                           metadataState) });
     return true;
+  }
+}
+
+static StringRef getStateName(MetadataState state) {
+  switch (state) {
+  case MetadataState::Complete: return "complete";
+  case MetadataState::NonTransitiveComplete: return "non-transitive-complete";
+  case MetadataState::LayoutComplete: return "layout-complete";
+  case MetadataState::Abstract: return "abstract";
   }
 }
 
@@ -306,7 +338,8 @@ void FulfillmentMap::dump() const {
     if (auto proto = entry.first.second) {
       out << ", " << proto->getNameStr();
     }
-    out << ") => sources[" << entry.second.SourceIndex
+    out << ") => " << getStateName(entry.second.getState())
+        << " at sources[" << entry.second.SourceIndex
         << "]." << entry.second.Path << "\n";
   }
 }

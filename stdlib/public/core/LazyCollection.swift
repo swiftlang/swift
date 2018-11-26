@@ -29,7 +29,7 @@ public protocol LazyCollectionProtocol: Collection, LazySequenceProtocol {
 
 extension LazyCollectionProtocol {
   // Lazy things are already lazy
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var lazy: LazyCollection<Elements> {
     return elements.lazy
   }
@@ -37,7 +37,7 @@ extension LazyCollectionProtocol {
 
 extension LazyCollectionProtocol where Elements: LazyCollectionProtocol {
   // Lazy things are already lazy
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var lazy: Elements {
     return elements
   }
@@ -52,13 +52,12 @@ extension LazyCollectionProtocol where Elements: LazyCollectionProtocol {
 public struct LazyCollection<Base : Collection> {
   /// Creates an instance with `base` as its underlying Collection
   /// instance.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal init(_base: Base) {
     self._base = _base
   }
 
-  @_versioned
+  @usableFromInline
   internal var _base: Base
 } 
 
@@ -67,7 +66,7 @@ extension LazyCollection: LazyCollectionProtocol {
   public typealias Elements = Base
 
   /// The underlying collection.
-  @_inlineable
+  @inlinable
   public var elements: Elements { return _base }
 }
 
@@ -79,7 +78,7 @@ extension LazyCollection : Sequence {
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @_inlineable
+  @inlinable
   public func makeIterator() -> Iterator {
     return _base.makeIterator()
   }
@@ -90,23 +89,23 @@ extension LazyCollection : Sequence {
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
   ///   of the collection.
-  @_inlineable
+  @inlinable
   public var underestimatedCount: Int { return _base.underestimatedCount }
 
-  @_inlineable
+  @inlinable
   public func _copyToContiguousArray()
      -> ContiguousArray<Base.Iterator.Element> {
     return _base._copyToContiguousArray()
   }
 
-  @_inlineable
+  @inlinable
   public func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Iterator.Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
     return _base._copyContents(initializing: buf)
   }
 
-  @_inlineable
+  @inlinable
   public func _customContainsEquatableElement(
     _ element: Base.Iterator.Element
   ) -> Bool? {
@@ -126,7 +125,7 @@ extension LazyCollection : Collection {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
-  @_inlineable
+  @inlinable
   public var startIndex: Index { return _base.startIndex }
 
   /// The collection's "past the end" position---that is, the position one
@@ -134,14 +133,14 @@ extension LazyCollection : Collection {
   ///
   /// `endIndex` is always reachable from `startIndex` by zero or more
   /// applications of `index(after:)`.
-  @_inlineable
+  @inlinable
   public var endIndex: Index { return _base.endIndex }
 
-  @_inlineable
+  @inlinable
   public var indices: Indices { return _base.indices }
 
   // TODO: swift-3-indexing-model - add docs
-  @_inlineable
+  @inlinable
   public func index(after i: Index) -> Index {
     return _base.index(after: i)
   }
@@ -150,13 +149,13 @@ extension LazyCollection : Collection {
   ///
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
-  @_inlineable
+  @inlinable
   public subscript(position: Index) -> Element {
     return _base[position]
   }
 
   /// A Boolean value indicating whether the collection is empty.
-  @_inlineable
+  @inlinable
   public var isEmpty: Bool {
     return _base.isEmpty
   }
@@ -170,39 +169,52 @@ extension LazyCollection : Collection {
   ///
   /// - Complexity: O(1) if `Self` conforms to `RandomAccessCollection`;
   ///   O(*n*) otherwise.
-  @_inlineable
+  @inlinable
   public var count: Int {
     return _base.count
   }
 
-  // The following requirement enables dispatching for index(of:) when
-  // the element type is Equatable.
+  // The following requirement enables dispatching for firstIndex(of:) and
+  // lastIndex(of:) when the element type is Equatable.
 
   /// Returns `Optional(Optional(index))` if an element was found;
-  /// `nil` otherwise.
+  /// `Optional(nil)` if the element doesn't exist in the collection;
+  /// `nil` if a search was not performed.
   ///
-  /// - Complexity: O(*n*)
-  @_inlineable
+  /// - Complexity: Better than O(*n*)
+  @inlinable
   public func _customIndexOfEquatableElement(
     _ element: Element
   ) -> Index?? {
     return _base._customIndexOfEquatableElement(element)
   }
 
+  /// Returns `Optional(Optional(index))` if an element was found;
+  /// `Optional(nil)` if the element doesn't exist in the collection;
+  /// `nil` if a search was not performed.
+  ///
+  /// - Complexity: Better than O(*n*)
+  @inlinable
+  public func _customLastIndexOfEquatableElement(
+    _ element: Element
+  ) -> Index?? {
+    return _base._customLastIndexOfEquatableElement(element)
+  }
+
   /// Returns the first element of `self`, or `nil` if `self` is empty.
-  @_inlineable
+  @inlinable
   public var first: Element? {
     return _base.first
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @_inlineable
+  @inlinable
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     return _base.index(i, offsetBy: n)
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @_inlineable
+  @inlinable
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
@@ -210,7 +222,7 @@ extension LazyCollection : Collection {
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @_inlineable
+  @inlinable
   public func distance(from start: Index, to end: Index) -> Int {
     return _base.distance(from:start, to: end)
   }
@@ -219,12 +231,12 @@ extension LazyCollection : Collection {
 
 extension LazyCollection : BidirectionalCollection
   where Base : BidirectionalCollection {
-  @_inlineable
+  @inlinable
   public func index(before i: Index) -> Index {
     return _base.index(before: i)
   }
 
-  @_inlineable
+  @inlinable
   public var last: Element? {
     return _base.last
   }
@@ -241,7 +253,7 @@ extension Collection {
   /// Use the `lazy` property when chaining operations to prevent
   /// intermediate operations from allocating storage, or when you only
   /// need a part of the final collection to avoid unnecessary computation.
-  @_inlineable
+  @inlinable
   public var lazy: LazyCollection<Self> {
     return LazyCollection(_base: self)
   }

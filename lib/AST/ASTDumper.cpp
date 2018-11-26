@@ -1556,11 +1556,15 @@ public:
   }
   void visitCaseStmt(CaseStmt *S) {
     printCommon(S, "case_stmt");
+    if (S->hasUnknownAttr())
+      OS << " @unknown";
     for (const auto &LabelItem : S->getCaseLabelItems()) {
       OS << '\n';
       OS.indent(Indent + 2);
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
       PrintWithColorRAII(OS, StmtColor) << "case_label_item";
+      if (LabelItem.isDefault())
+        OS << " default";
       if (auto *CasePattern = LabelItem.getPattern()) {
         OS << '\n';
         printRec(CasePattern);
@@ -2874,12 +2878,13 @@ void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
         }
         PrintWithColorRAII(out, ParenthesisColor) << ')';
       });
+
+      for (auto conformance : normal->getSignatureConformances()) {
+        out << '\n';
+        conformance.dump(out, indent + 2);
+      }
     }
 
-    for (auto conformance : normal->getSignatureConformances()) {
-      out << '\n';
-      conformance.dump(out, indent + 2);
-    }
     for (auto requirement : normal->getConditionalRequirements()) {
       out << '\n';
       out.indent(indent + 2);
@@ -3032,6 +3037,11 @@ namespace {
     void visitNameAliasType(NameAliasType *T, StringRef label) {
       printCommon(label, "name_alias_type");
       printField("decl", T->getDecl()->printRef());
+      if (T->getParent())
+        printRec("parent", T->getParent());
+
+      for (auto arg : T->getInnermostGenericArgs())
+        printRec(arg);
       OS << ")";
     }
 

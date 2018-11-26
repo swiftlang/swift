@@ -27,7 +27,7 @@ namespace api {
 
 // The node kind appearing in the tree that describes the content of the SDK
 enum class SDKNodeKind: uint8_t {
-#define NODE_KIND(NAME) NAME,
+#define NODE_KIND(NAME, VALUE) NAME,
 #include "DigesterEnums.def"
 };
 
@@ -123,6 +123,20 @@ public:
     switch (DiffKind) {
     case NodeAnnotation::GetterToProperty:
     case NodeAnnotation::SetterToProperty:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  bool isStringRepresentableChange() const {
+    switch(DiffKind) {
+    case NodeAnnotation::DictionaryKeyUpdate:
+    case NodeAnnotation::OptionalDictionaryKeyUpdate:
+    case NodeAnnotation::ArrayMemberUpdate:
+    case NodeAnnotation::OptionalArrayMemberUpdate:
+    case NodeAnnotation::SimpleStringRepresentableUpdate:
+    case NodeAnnotation::SimpleOptionalStringRepresentableUpdate:
       return true;
     default:
       return false;
@@ -320,6 +334,21 @@ struct OverloadedFuncInfo: public APIDiffItem {
   }
 };
 
+struct NameCorrectionInfo {
+  StringRef OriginalName;
+  StringRef CorrectedName;
+  StringRef ModuleName;
+  NameCorrectionInfo(StringRef OriginalName, StringRef CorrectedName,
+    StringRef ModuleName): OriginalName(OriginalName),
+    CorrectedName(CorrectedName), ModuleName(ModuleName) {}
+  bool operator<(NameCorrectionInfo Other) const {
+    if (ModuleName != Other.ModuleName)
+      return ModuleName.compare(Other.ModuleName) < 0;
+    else
+      return OriginalName.compare(Other.OriginalName) < 0;
+  }
+};
+
 /// APIDiffItem store is the interface that migrator should communicates with;
 /// Given a key, usually the usr of the system entity under migration, the store
 /// should return a slice of related changes in the same format of
@@ -329,6 +358,7 @@ struct APIDiffItemStore {
   struct Implementation;
   Implementation &Impl;
   static void serialize(llvm::raw_ostream &os, ArrayRef<APIDiffItem*> Items);
+  static void serialize(llvm::raw_ostream &os, ArrayRef<NameCorrectionInfo> Items);
   APIDiffItemStore(const APIDiffItemStore& that) = delete;
   APIDiffItemStore();
   ~APIDiffItemStore();
@@ -347,7 +377,8 @@ namespace json {
 template<>
 struct ScalarEnumerationTraits<ide::api::SDKNodeKind> {
   static void enumeration(Output &out, ide::api::SDKNodeKind &value) {
-#define NODE_KIND(X) out.enumCase(value, #X, ide::api::SDKNodeKind::X);
+#define NODE_KIND(KEY, VALUE)                                                 \
+    out.enumCase(value, #VALUE, ide::api::SDKNodeKind::KEY);
 #include "swift/IDE/DigesterEnums.def"
   }
 };

@@ -14,16 +14,16 @@ func checkHash(
   expected: UInt64,
   file: String = #file, line: UInt = #line
 ) {
-  var hasher = _Hasher(seed: seed)
-  hasher.append(bits: value)
+  var hasher = Hasher(_seed: seed)
+  hasher._combine(value)
   let hash = hasher.finalize()
   expectEqual(
     hash, Int(truncatingIfNeeded: expected),
     file: file, line: line)
 }
 
-HashingTestSuite.test("_Hasher/CustomKeys") {
-  // This assumes _Hasher implements SipHash-1-3.
+HashingTestSuite.test("Hasher/CustomKeys") {
+  // This assumes Hasher implements SipHash-1-3.
   checkHash(for: 0, withSeed: (0, 0), expected: 0xbd60acb658c79e45)
   checkHash(for: 0, withSeed: (0, 1), expected: 0x1ce32b0b44e61175)
   checkHash(for: 0, withSeed: (1, 0), expected: 0x9c44b7c8df2ca74b)
@@ -43,17 +43,17 @@ HashingTestSuite.test("_Hasher/CustomKeys") {
   checkHash(for: .max, withSeed: (.max, .max), expected: 0x5b16b7a8181980c2)
 }
 
-HashingTestSuite.test("_Hasher/DefaultKey") {
+HashingTestSuite.test("Hasher/DefaultKey") {
   let value: UInt64 = 0x0102030405060708
 
   let defaultHash = _hashValue(for: value)
 
-  var defaultHasher = _Hasher()
-  defaultHasher.append(bits: value)
+  var defaultHasher = Hasher()
+  defaultHasher._combine(value)
   expectEqual(defaultHasher.finalize(), defaultHash)
 
-  var customHasher = _Hasher(seed: _Hasher._seed)
-  customHasher.append(bits: value)
+  var customHasher = Hasher(_seed: Hasher._seed)
+  customHasher._combine(value)
   expectEqual(customHasher.finalize(), defaultHash)
 }
 

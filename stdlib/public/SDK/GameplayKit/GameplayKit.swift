@@ -16,7 +16,7 @@ import simd
 
 
 @available(iOS, introduced: 9.0)
-@available(OSX, introduced: 10.11)
+@available(macOS, introduced: 10.11)
 @available(tvOS, introduced: 9.0)
 extension GKPath {
   /// Creates a path from an array of points
@@ -31,7 +31,7 @@ extension GKPath {
 
 
 @available(iOS, introduced: 10.0)
-@available(OSX, introduced: 10.12)
+@available(macOS, introduced: 10.12)
 @available(tvOS, introduced: 10.0)
 extension GKPath {
   /// Creates a path from an array of points
@@ -45,7 +45,7 @@ extension GKPath {
 }
 
 @available(iOS, introduced: 9.0)
-@available(OSX, introduced: 10.11)
+@available(macOS, introduced: 10.11)
 @available(tvOS, introduced: 9.0)
 extension GKPolygonObstacle {
   /// Creates a polygon obstacle with an array of points.
@@ -57,7 +57,7 @@ extension GKPolygonObstacle {
 }
 
 @available(iOS, introduced: 9.0)
-@available(OSX, introduced: 10.11)
+@available(macOS, introduced: 10.11)
 @available(tvOS, introduced: 9.0)
 extension GKEntity {
   /// Gets the component of the indicated class.  Returns nil if entity does not have this component
@@ -79,7 +79,7 @@ internal protocol _SwiftGKStateMachineLike {
 }
 
 @available(iOS, introduced: 9.0)
-@available(OSX, introduced: 10.11)
+@available(macOS, introduced: 10.11)
 @available(tvOS, introduced: 9.0)
 extension GKStateMachine {
   /// Gets the state of the indicated class.  Returns nil if the state machine does not have this state.

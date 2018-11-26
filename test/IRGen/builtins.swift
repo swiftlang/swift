@@ -858,7 +858,7 @@ func testForceTry(_ fn: () -> ()) {
   try! createInt(fn)
 }
 
-// CHECK-LABEL: declare swiftcc void @swift_unexpectedError(%swift.error*
+// CHECK-LABEL: declare{{( dllimport)?}} swiftcc void @swift_unexpectedError(%swift.error*
 
 enum MyError : Error {
   case A, B

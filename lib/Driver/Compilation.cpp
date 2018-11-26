@@ -102,7 +102,12 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          std::unique_ptr<InputArgList> InputArgs,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
                          InputFileList InputsWithTypes,
-                         StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
+                         std::string CompilationRecordPath,
+                         bool OutputCompilationRecordForModuleOnlyBuild,
+                         StringRef ArgsHash,
+                         llvm::sys::TimePoint<> StartTime,
+                         llvm::sys::TimePoint<> LastBuildTime,
+                         size_t FilelistThreshold,
                          unsigned NumberOfParallelCommands,
                          bool EnableIncrementalBuild,
                          bool EnableBatchMode,
@@ -117,17 +122,23 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     Level(Level),
     RawInputArgs(std::move(InputArgs)),
     TranslatedArgs(std::move(TranslatedArgs)),
-    InputFilesWithTypes(std::move(InputsWithTypes)), ArgsHash(ArgsHash),
+    InputFilesWithTypes(std::move(InputsWithTypes)),
+    CompilationRecordPath(CompilationRecordPath),
+    ArgsHash(ArgsHash),
     BuildStartTime(StartTime),
+    LastBuildTime(LastBuildTime),
     NumberOfParallelCommands(NumberOfParallelCommands),
     SkipTaskExecution(SkipTaskExecution),
     EnableIncrementalBuild(EnableIncrementalBuild),
+    OutputCompilationRecordForModuleOnlyBuild(
+        OutputCompilationRecordForModuleOnlyBuild),
     EnableBatchMode(EnableBatchMode),
     BatchSeed(BatchSeed),
     ForceOneBatchRepartition(ForceOneBatchRepartition),
     SaveTemps(SaveTemps),
     ShowDriverTimeCompilation(ShowDriverTimeCompilation),
-    Stats(std::move(StatsReporter)) {
+    Stats(std::move(StatsReporter)),
+    FilelistThreshold(FilelistThreshold) {
 };
 
 static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
@@ -361,7 +372,7 @@ namespace driver {
                              SmallVector<const Job *, N> &Dependents) {
       const CommandOutput &Output = FinishedCmd->getOutput();
       StringRef DependenciesFile =
-        Output.getAdditionalOutputForType(types::TY_SwiftDeps);
+          Output.getAdditionalOutputForType(file_types::TY_SwiftDeps);
 
       if (DependenciesFile.empty()) {
         // If this job doesn't track dependencies, it must always be run.
@@ -582,7 +593,8 @@ namespace driver {
       if (Comp.SkipTaskExecution)
         TQ.reset(new DummyTaskQueue(Comp.NumberOfParallelCommands));
       else
-        TQ.reset(new TaskQueue(Comp.NumberOfParallelCommands));
+        TQ.reset(new TaskQueue(Comp.NumberOfParallelCommands,
+                               Comp.Stats.get()));
       if (Comp.ShowIncrementalBuildDecisions || Comp.Stats)
         IncrementalTracer = &ActualIncrementalTracer;
     }
@@ -602,7 +614,8 @@ namespace driver {
         // FIXME: We can probably do better here!
         Job::Condition Condition = Job::Condition::Always;
         StringRef DependenciesFile =
-          Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps);
+            Cmd->getOutput().getAdditionalOutputForType(
+                file_types::TY_SwiftDeps);
         if (!DependenciesFile.empty()) {
           if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
             DepGraph.addIndependentNode(Cmd);
@@ -950,7 +963,8 @@ namespace driver {
         for (const Job *Cmd : Comp.getJobs()) {
           // Skip files that don't use dependency analysis.
           StringRef DependenciesFile =
-            Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps);
+              Cmd->getOutput().getAdditionalOutputForType(
+                  file_types::TY_SwiftDeps);
           if (DependenciesFile.empty())
             continue;
 
@@ -1152,6 +1166,9 @@ static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
       else {
         // The normal case for non-single-compile jobs.
         for (const Action *A : job->getSource().getInputs()) {
+          // A could be a GeneratePCHJobAction
+          if (!isa<InputAction>(A))
+            continue;
           const auto *IA = cast<InputAction>(A);
           out << IA->getInputArg().getValue() << "\n";
         }
@@ -1187,6 +1204,12 @@ int Compilation::performJobsImpl(bool &abnormalExit) {
     checkForOutOfDateInputs(Diags, InputInfo);
     writeCompilationRecord(CompilationRecordPath, ArgsHash, BuildStartTime,
                            InputInfo);
+
+    if (OutputCompilationRecordForModuleOnlyBuild) {
+      // TODO: Optimize with clonefile(2) ?
+      llvm::sys::fs::copy_file(CompilationRecordPath,
+                               CompilationRecordPath + "~moduleonly");
+    }
   }
 
   abnormalExit = State.hadAnyAbnormalExit();
@@ -1258,7 +1281,7 @@ static bool writeAllSourcesFile(DiagnosticEngine &diags, StringRef path,
   }
 
   for (auto inputPair : inputFiles) {
-    if (!types::isPartOfSwiftCompilation(inputPair.first))
+    if (!file_types::isPartOfSwiftCompilation(inputPair.first))
       continue;
     out << inputPair.second->getValue() << "\n";
   }

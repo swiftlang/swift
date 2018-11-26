@@ -2,8 +2,6 @@
 // RUN: %target-swift-frontend  -parse-as-library -primary-file %s -Osize -sil-verify-all -module-name=test -emit-sil | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
-// XFAIL: plus_zero_runtime
-
 public struct TestOptions: OptionSet {
     public let rawValue: Int
     public init(rawValue: Int) { self.rawValue = rawValue }

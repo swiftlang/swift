@@ -28,7 +28,7 @@
 using namespace swift;
 
 namespace {
-typedef std::pair<Identifier, SourceLoc> AccessPathElem;
+using AccessPathElem = std::pair<Identifier, SourceLoc>;
 } // end unnamed namespace
 
 // Defined out-of-line so that we can see ~ModuleFile.
@@ -200,10 +200,7 @@ FileUnit *SerializedModuleLoader::loadAST(
                        isFramework, loadedModuleFile,
                        &extendedInfo);
   if (loadInfo.status == serialization::Status::Valid) {
-    // In LLDB always use the default resilience strategy, so IRGen can query
-    // the size of resilient types.
-    if (!Ctx.LangOpts.DebuggerSupport)
-      M.setResilienceStrategy(extendedInfo.getResilienceStrategy());
+    M.setResilienceStrategy(extendedInfo.getResilienceStrategy());
 
     // We've loaded the file. Now try to bring it into the AST.
     auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile,

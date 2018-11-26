@@ -387,6 +387,19 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
                                               StringRef name,
                                               bool declarationOnly,
                                               bool errorIfEmptyBody) {
+  // We can't deserialize function bodies after IRGen lowering passes have
+  // happened since other definitions in the module will no longer be in
+  // canonical SIL form.
+  switch (SILMod.getStage()) {
+  case SILStage::Raw:
+  case SILStage::Canonical:
+    break;
+    
+  case SILStage::Lowered:
+    llvm_unreachable("cannot deserialize into a module that has entered "
+                     "Lowered stage");
+  }
+  
   if (FID == 0)
     return nullptr;
   assert(FID <= Funcs.size() && "invalid SILFunction ID");
@@ -890,6 +903,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILOneOperandLayout::readRecord(scratch, RawOpCode, Attr,
                                     TyID, TyCategory, ValID);
     break;
+  case SIL_ONE_OPERAND_EXTRA_ATTR:
+    SILOneOperandExtraAttributeLayout::readRecord(scratch, RawOpCode, Attr,
+                                                  TyID, TyCategory, ValID);
+    break;
   case SIL_ONE_TYPE_ONE_OPERAND:
     SILOneTypeOneOperandLayout::readRecord(scratch, RawOpCode, Attr,
                                            TyID, TyCategory,
@@ -918,6 +935,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILTwoOperandsLayout::readRecord(scratch, RawOpCode, Attr,
                                      TyID, TyCategory, ValID,
                                      TyID2, TyCategory2, ValID2);
+    break;
+  case SIL_TWO_OPERANDS_EXTRA_ATTR:
+    SILTwoOperandsExtraAttributeLayout::readRecord(scratch, RawOpCode, Attr,
+                                                   TyID, TyCategory, ValID,
+                                                   TyID2, TyCategory2, ValID2);
     break;
   case SIL_TAIL_ADDR:
     SILTailAddrLayout::readRecord(scratch, RawOpCode,
@@ -1066,7 +1088,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(ObjCMetatypeToObject)
   ONEOPERAND_ONETYPE_INST(ObjCExistentialMetatypeToObject)
   ONEOPERAND_ONETYPE_INST(ConvertFunction)
-  ONEOPERAND_ONETYPE_INST(ConvertEscapeToNoEscape)
   ONEOPERAND_ONETYPE_INST(ThinFunctionToPointer)
   ONEOPERAND_ONETYPE_INST(PointerToThinFunction)
   ONEOPERAND_ONETYPE_INST(ProjectBlockStorage)
@@ -1080,6 +1101,19 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     getSILType(MF->getType(TyID2),
                                (SILValueCategory)TyCategory2)),
                   TyID);
+    break;
+  }
+  case  SILInstructionKind::ConvertEscapeToNoEscapeInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
+           "Layout should be OneTypeOneOperand.");
+    bool isLifetimeGuaranteed = Attr & 0x01;
+    bool isEscaped = Attr & 0x02;
+    ResultVal = Builder.createConvertEscapeToNoEscape(
+        Loc,
+        getLocalValue(ValID, getSILType(MF->getType(TyID2),
+                                        (SILValueCategory)TyCategory2)),
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory), isEscaped,
+        isLifetimeGuaranteed);
     break;
   }
 
@@ -1667,8 +1701,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILValue op = getLocalValue(
         ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
     auto accessKind = SILAccessKind(Attr & 0x3);
-    auto enforcement = SILAccessEnforcement(Attr >> 2);
-    ResultVal = Builder.createBeginAccess(Loc, op, accessKind, enforcement);
+    auto enforcement = SILAccessEnforcement((Attr >> 2) & 0x3);
+    bool noNestedConflict = Attr >> 4;
+    ResultVal =
+        Builder.createBeginAccess(Loc, op, accessKind, enforcement,
+                                  noNestedConflict);
     break;
   }
   case SILInstructionKind::EndAccessInst: {
@@ -1684,9 +1721,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILValue buffer = getLocalValue(
         ValID2, getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
     auto accessKind = SILAccessKind(Attr & 0x3);
-    auto enforcement = SILAccessEnforcement(Attr >> 2);
-    ResultVal = Builder.createBeginUnpairedAccess(Loc, source, buffer,
-                                                  accessKind, enforcement);
+    auto enforcement = SILAccessEnforcement((Attr >> 2) & 0x03);
+    bool noNestedConflict = Attr >> 4;
+    ResultVal = Builder.createBeginUnpairedAccess(
+        Loc, source, buffer, accessKind, enforcement, noNestedConflict);
     break;
   }
   case SILInstructionKind::EndUnpairedAccessInst: {
@@ -2789,6 +2827,14 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
     wT = SILWitnessTable::create(SILMod, *Linkage, theConformance);
     if (Callback)
       Callback->didDeserialize(MF->getAssociatedModule(), wT);
+  }
+  
+  // We may see multiple shared-linkage definitions of the same witness table
+  // for the same conformance.
+  if (wT->isDefinition() && hasSharedVisibility(*Linkage)
+      && hasSharedVisibility(wT->getLinkage())) {
+    wTableOrOffset.set(wT, /*fully deserialized*/ true);
+    return wT;
   }
 
   assert(wT->isDeclaration() && "Our witness table at this point must be a "

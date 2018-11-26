@@ -50,7 +50,8 @@ IRGenModule::getAddrOfDispatchThunk(SILDeclRef declRef,
   Signature signature = getSignature(fnType);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
-  return createFunction(*this, link, signature);
+  entry = createFunction(*this, link, signature);
+  return entry;
 }
 
 static FunctionPointer lookupMethod(IRGenFunction &IGF,

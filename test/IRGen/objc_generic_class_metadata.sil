@@ -84,12 +84,12 @@ entry(%0: $Subclass, %1: $NSDictionary):
 
 // CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$SSaySo12GenericClassC_SitGMa"
 // CHECK-SAME:    ([[INT]])
-// CHECK:         [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$SSo12GenericClassC_SitMa"([[INT]] 0)
+// CHECK:         [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$SSo12GenericClassC_SitMa"([[INT]] 255)
 // CHECK:         [[TUPLE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
-// CHECK:         call swiftcc %swift.metadata_response @"$SSaMa"([[INT]] 0, %swift.type* [[TUPLE]])
+// CHECK:         call swiftcc %swift.metadata_response @"$SSaMa"([[INT]] %0, %swift.type* [[TUPLE]])
 
 // CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$SSo12GenericClassC_SitMa"
 // CHECK-SAME:    ([[INT]])
-// CHECK:         [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$SSo12GenericClassCMa"([[INT]] 0)
+// CHECK:         [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$SSo12GenericClassCMa"([[INT]] 255)
 // CHECK:         [[CLASS:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
-// CHECK:         call %swift.type* @swift_getTupleTypeMetadata2(%swift.type* [[CLASS]], %swift.type* @"$SSiN",
+// CHECK:         call swiftcc %swift.metadata_response @swift_getTupleTypeMetadata2([[INT]] %0, %swift.type* [[CLASS]], %swift.type* @"$SSiN", i8* null,

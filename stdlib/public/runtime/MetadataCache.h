@@ -116,14 +116,28 @@ struct ConcurrencyControl {
 ///
 ///   /// Perform an enqueue operation.
 ///   /// This only needs to be implemented if enqueue is called on the map.
-///   bool enqueueWithLock(ConcurrencyControl &concurrency, ArgTys...);
-template <class EntryType, bool ProvideDestructor = true>
+///   bool enqueue(ConcurrencyControl &concurrency, ArgTys...);
+///
+///   /// Perform a checkDependency operation.  This only needs to be
+///   /// implemented if checkDependency is called on the map.
+///   MetadataDependency checkDependency(ConcurrencyControl &concurrency,
+///                                      ArgTys...);
+template <class EntryType, bool ProvideDestructor = true,
+          class OptImpl = void>
 class LockingConcurrentMap {
   ConcurrentMap<EntryType, ProvideDestructor, MetadataAllocator> Map;
 
+  StaticOwningPointer<ConcurrencyControl, ProvideDestructor> Concurrency;
+
+protected:
+  using Impl =
+    typename std::conditional<std::is_same<OptImpl, void>::value,
+                              LockingConcurrentMap,
+                              OptImpl>::type;
+  Impl &asImpl() { return static_cast<Impl&>(*this); }
+
   using Status = typename EntryType::Status;
 
-  StaticOwningPointer<ConcurrencyControl, ProvideDestructor> Concurrency;
 public:
   LockingConcurrentMap() : Concurrency(new ConcurrencyControl()) {}
 
@@ -158,12 +172,15 @@ public:
     return { entry, status };
   }
 
+  template <class KeyType>
+  EntryType *find(KeyType key) {
+    return Map.find(key);
+  }
+
   template <class KeyType, class... ArgTys>
   std::pair<EntryType*, Status>
   resumeInitialization(KeyType key, ArgTys &&...args) {
-    auto entry = Map.find(key);
-    assert(entry && "entry doesn't already exist!");
-
+    EntryType *entry = asImpl().resolveExistingEntry(key);
     auto status =
       entry->resumeInitialization(*Concurrency, std::forward<ArgTys>(args)...);
     return { entry, status };
@@ -171,10 +188,40 @@ public:
 
   template <class KeyType, class... ArgTys>
   bool enqueue(KeyType key, ArgTys &&...args) {
+    EntryType *entry = asImpl().resolveExistingEntry(key);
+    return entry->enqueue(*Concurrency, std::forward<ArgTys>(args)...);
+  }
+
+  /// Given that an entry already exists, await it.
+  template <class KeyType, class... ArgTys>
+  Status await(KeyType key, ArgTys &&...args) {
+    EntryType *entry = asImpl().resolveExistingEntry(key);
+    return entry->await(*Concurrency, std::forward<ArgTys>(args)...);
+  }
+
+  /// If an entry already exists, await it; otherwise report failure.
+  template <class KeyType, class... ArgTys>
+  Optional<Status> tryAwaitExisting(KeyType key, ArgTys &&...args) {
+    EntryType *entry = Map.find(key);
+    if (!entry) return None;
+    return entry->await(*Concurrency, std::forward<ArgTys>(args)...);
+  }
+
+  /// Given that an entry already exists, check whether it has an active
+  /// dependency.
+  template <class KeyType, class... ArgTys>
+  MetadataDependency checkDependency(KeyType key, ArgTys &&...args) {
+    EntryType *entry = asImpl().resolveExistingEntry(key);
+    return entry->checkDependency(*Concurrency, std::forward<ArgTys>(args)...);
+  }
+
+  /// A default implementation for resolveEntry that assumes that the
+  /// key type is a lookup key for the map.
+  template <class KeyType>
+  EntryType *resolveExistingEntry(KeyType key) {
     auto entry = Map.find(key);
     assert(entry && "entry doesn't already exist!");
-
-    return entry->enqueue(*Concurrency, std::forward<ArgTys>(args)...);
+    return entry;
   }
 };
 
@@ -282,26 +329,19 @@ public:
   }
 };
 
-// A wrapper around a pointer to a metadata cache entry that provides
-// DenseMap semantics that compare values in the key vector for the metadata
-// instance.
-//
-// This is stored as a pointer to the arguments buffer, so that we can save
-// an offset while looking for the matching argument given a key.
-class KeyDataRef {
-  const void * const *Args;
-  unsigned Length;
-
-  KeyDataRef(const void * const *args, unsigned length)
-    : Args(args), Length(length) {}
+/// A key value as provided to the concurrent map.
+class MetadataCacheKey {
+  const void * const *Data;
+  uint32_t Length;
+  uint32_t Hash;
 
 public:
-  static KeyDataRef forArguments(const void * const *args,
-                                 unsigned numArguments) {
-    return KeyDataRef(args, numArguments);
-  }
+  MetadataCacheKey(const void * const *data, size_t size)
+    : Data(data), Length(size), Hash(computeHash()) {}
+  MetadataCacheKey(const void * const *data, size_t size, uint32_t hash)
+    : Data(data), Length(size), Hash(hash) {}
 
-  bool operator==(KeyDataRef rhs) const {
+  bool operator==(MetadataCacheKey rhs) const {
     // Compare the sizes.
     unsigned asize = size(), bsize = rhs.size();
     if (asize != bsize) return false;
@@ -313,46 +353,49 @@ public:
     return true;
   }
 
-  int compare(KeyDataRef rhs) const {
+  int compare(const MetadataCacheKey &rhs) const {
+    // Compare the hashes.
+    if (auto hashComparison = compareIntegers(Hash, rhs.Hash)) {
+      return hashComparison;
+    }
+
     // Compare the sizes.
-    unsigned asize = size(), bsize = rhs.size();
-    if (asize != bsize) {
-      return (asize < bsize ? -1 : 1);
+    if (auto sizeComparison = compareIntegers(size(), rhs.size())) {
+      return sizeComparison;
     }
 
     // Compare the content.
-    auto abegin = begin(), bbegin = rhs.begin();
-    for (unsigned i = 0; i < asize; ++i) {
-      if (abegin[i] != bbegin[i])
-        return (uintptr_t(abegin[i]) < uintptr_t(bbegin[i]) ? -1 : 1);
+    auto lbegin = begin(), rbegin = rhs.begin();
+    for (unsigned i = 0, e = size(); i != e; ++i) {
+      if (auto ptrComparison = comparePointers(lbegin[i], rbegin[i]))
+        return ptrComparison;
     }
 
+    // Equal.
     return 0;
   }
 
-  size_t hash() {
-    size_t H = 0x56ba80d1 * Length ;
-    for (unsigned i = 0; i < Length; i++) {
-      H = (H >> 10) | (H << ((sizeof(size_t) * 8) - 10));
-      H ^= ((size_t)Args[i]) ^ ((size_t)Args[i] >> 19);
-    }
-    H *= 0x27d4eb2d;
-    return (H >> 10) | (H << ((sizeof(size_t) * 8) - 10));
+  uint32_t hash() const {
+    return Hash;
   }
 
-  const void * const *begin() const { return Args; }
-  const void * const *end() const { return Args + Length; }
+  const void * const *begin() const { return Data; }
+  const void * const *end() const { return Data + Length; }
   unsigned size() const { return Length; }
-};
 
-/// A key value as provided to the concurrent map.
-struct MetadataCacheKey {
-  size_t Hash;
-  KeyDataRef KeyData;
+private:
+  uint32_t computeHash() const {
+    size_t H = 0x56ba80d1 * Length;
+    for (unsigned i = 0; i < Length; i++) {
+      H = (H >> 10) | (H << ((sizeof(size_t) * 8) - 10));
+      H ^= (reinterpret_cast<size_t>(Data[i])
+            ^ (reinterpret_cast<size_t>(Data[i]) >> 19));
+    }
+    H *= 0x27d4eb2d;
 
-  MetadataCacheKey(KeyDataRef data) : Hash(data.hash()), KeyData(data) {}
-  MetadataCacheKey(const void *const *data, size_t size)
-    : MetadataCacheKey(KeyDataRef::forArguments(data, size)) {}
+    // Rotate right by 10 and then truncate to 32 bits.
+    return uint32_t((H >> 10) | (H << ((sizeof(size_t) * 8) - 10)));
+  }
 };
 
 /// A helper class for ConcurrentMap entry types which allows trailing objects
@@ -378,8 +421,8 @@ protected:
   using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
 
 public:
-  template <class... Args>
-  static size_t getExtraAllocationSize(const MetadataCacheKey &key,
+  template <class KeyType, class... Args>
+  static size_t getExtraAllocationSize(const KeyType &key,
                                        Args &&...args) {
     return TrailingObjects::template additionalSizeToAlloc<Objects...>(
         Impl::numTrailingObjects(OverloadToken<Objects>(), key, args...)...);
@@ -390,132 +433,172 @@ public:
   }
 };
 
-class MetadataState {
+using RawPrivateMetadataState = uint8_t;
+enum class PrivateMetadataState : RawPrivateMetadataState {
+  /// The metadata is being allocated.
+  Allocating,
+
+  /// The metadata has been allocated, but is not yet complete for
+  /// external layout: that is, it does not have a size.
+  Abstract,
+
+  /// The metadata has a complete external layout, but may not have
+  /// been fully initialized.
+  LayoutComplete,
+
+  /// The metadata has a complete external layout and has been fully
+  /// initialized, but has not yet satisfied its transitive completeness
+  /// requirements.
+  NonTransitiveComplete,
+
+  /// The metadata is fully complete.  There should no longer be waiters.
+  Complete
+};
+inline bool operator<(PrivateMetadataState lhs, PrivateMetadataState rhs) {
+  return RawPrivateMetadataState(lhs) < RawPrivateMetadataState(rhs);
+}
+inline bool operator<=(PrivateMetadataState lhs, PrivateMetadataState rhs) {
+  return RawPrivateMetadataState(lhs) <= RawPrivateMetadataState(rhs);
+}
+inline bool operator>(PrivateMetadataState lhs, PrivateMetadataState rhs) {
+  return RawPrivateMetadataState(lhs) > RawPrivateMetadataState(rhs);
+}
+inline bool operator>=(PrivateMetadataState lhs, PrivateMetadataState rhs) {
+  return RawPrivateMetadataState(lhs) >= RawPrivateMetadataState(rhs);
+}
+inline bool satisfies(PrivateMetadataState state, MetadataState requirement) {
+  switch (requirement) {
+  case MetadataState::Abstract:
+    return state >= PrivateMetadataState::Abstract;
+  case MetadataState::LayoutComplete:
+    return state >= PrivateMetadataState::LayoutComplete;
+  case MetadataState::NonTransitiveComplete:
+    return state >= PrivateMetadataState::NonTransitiveComplete;
+  case MetadataState::Complete:
+    return state >= PrivateMetadataState::Complete;
+  }
+  swift_runtime_unreachable("unsupported requirement kind");
+}
+
+class PrivateMetadataTrackingInfo {
 public:
-  using RawType = uint8_t;
-
-  enum BasicKind : RawType {
-    /// The metadata is being allocated.
-    Allocating,
-
-    /// The metadata has been allocated, but is not yet complete for
-    /// external layout: that is, it does not have a size.
-    Abstract,
-
-    /// The metadata has a complete external layout, but may not have
-    /// been fully initialized.
-    LayoutComplete,
-
-    /// The metadata has a complete external layout and has been fully
-    /// initialized.  There should no longer be waiters.
-    Complete
-  };
+  using RawType = RawPrivateMetadataState;
 
 private:
   enum : RawType {
-    BasicKindMask = 0x3,
-    HasWaiters = 0x4
+    State_mask =      0x7,
+    HasWaiters_mask = 0x8,
   };
 
-  uint8_t Data;
+  RawType Data;
 
 public:
-  explicit MetadataState(RawType data) : Data(data) {}
-  /*implicit*/ MetadataState(BasicKind kind) : Data(kind) {}
+  explicit constexpr PrivateMetadataTrackingInfo(RawType data)
+    : Data(data) {}
+  explicit constexpr PrivateMetadataTrackingInfo(PrivateMetadataState state)
+    : Data(RawType(state)) {}
 
-  BasicKind getBasicKind() const {
-    return BasicKind(Data & BasicKindMask);
+  static constexpr PrivateMetadataTrackingInfo initial() {
+    return PrivateMetadataTrackingInfo(PrivateMetadataState::Allocating);
+  }
+
+  PrivateMetadataState getState() const {
+    return PrivateMetadataState(Data & State_mask);
   }
 
   /// Does the state mean that we've allocated metadata?
   bool hasAllocatedMetadata() const {
-    return getBasicKind() != Allocating;
+    return getState() != PrivateMetadataState::Allocating;
   }
 
   bool isComplete() const {
-    return getBasicKind() == Complete;
+    return getState() == PrivateMetadataState::Complete;
   }
 
-  bool hasWaiters() const { return Data & HasWaiters; }
-  MetadataState addWaiters() const {
+  bool hasWaiters() const { return Data & HasWaiters_mask; }
+  PrivateMetadataTrackingInfo addWaiters() const {
     assert(!isComplete() && "adding waiters to completed state");
-    return MetadataState(Data | HasWaiters);
+    return PrivateMetadataTrackingInfo(Data | HasWaiters_mask);
   }
-  MetadataState removeWaiters() const {
-    return MetadataState(Data & ~HasWaiters);
+  PrivateMetadataTrackingInfo removeWaiters() const {
+    return PrivateMetadataTrackingInfo(Data & ~HasWaiters_mask);
   }
 
-  MetadataRequest::BasicKind getAccomplishedRequestState() const {
-    switch (getBasicKind()) {
-    case Allocating:
+  MetadataState getAccomplishedRequestState() const {
+    switch (getState()) {
+    case PrivateMetadataState::Allocating:
       swift_runtime_unreachable("cannot call on allocating state");
-    case Abstract:
-      return MetadataRequest::Abstract;
-    case LayoutComplete:
-      return MetadataRequest::LayoutComplete;
-    case Complete:
-      return MetadataRequest::Complete;
+    case PrivateMetadataState::Abstract:
+      return MetadataState::Abstract;
+    case PrivateMetadataState::LayoutComplete:
+      return MetadataState::LayoutComplete;
+    case PrivateMetadataState::NonTransitiveComplete:
+      return MetadataState::NonTransitiveComplete;
+    case PrivateMetadataState::Complete:
+      return MetadataState::Complete;
     }
     swift_runtime_unreachable("bad state");
   }
 
-  static MetadataState forRequestState(MetadataRequest::BasicKind state) {
-    switch (state) {
-    case MetadataRequest::Abstract:
-      return Abstract;
-    case MetadataRequest::LayoutComplete:
-      return LayoutComplete;
-    case MetadataRequest::Complete:
-      return Complete;
-    }
-    swift_runtime_unreachable("bad state");    
-  }
-
-  bool satisfies(MetadataRequest::BasicKind requirement) {
-    switch (requirement) {
-    case MetadataRequest::Abstract:
-      return getBasicKind() >= Abstract;
-    case MetadataRequest::LayoutComplete:
-      return getBasicKind() >= LayoutComplete;
-    case MetadataRequest::Complete:
-      return getBasicKind() >= Complete;
-    }
-    swift_runtime_unreachable("unsupported requirement kind");
+  bool satisfies(MetadataState requirement) {
+    return swift::satisfies(getState(), requirement);
   }
 
   bool shouldWait(MetadataRequest request) {
+    switch (getState()) {
     // Always wait if we're allocating.  Non-blocking requests still need
     // to have an allocation that the downstream consumers can report
     // a dependency on.
-    if (getBasicKind() == Allocating)
+    case PrivateMetadataState::Allocating:
       return true;
 
-    // Otherwise, if it's a non-blocking request, we do not need to block.
-    if (request.isNonBlocking())
+    // We never need to wait if we're complete.  This is the most common
+    // result.
+    case PrivateMetadataState::Complete:
       return false;
 
-    return !satisfies(request.getBasicKind());
+    case PrivateMetadataState::Abstract:
+    case PrivateMetadataState::LayoutComplete:
+    case PrivateMetadataState::NonTransitiveComplete:
+      // Otherwise, if it's a non-blocking request, we do not need to block.
+      return (request.isBlocking() && !satisfies(request.getState()));
+    }
+    swift_runtime_unreachable("bad state");
   }
 
-  RawType getRawValue() const { return Data; }
+  constexpr RawType getRawValue() const { return Data; }
   RawType &getRawValueRef() { return Data; }
 };
 
+/// Reserve the runtime extra space to use for its own tracking.
+struct PrivateMetadataCompletionContext {
+  MetadataCompletionContext Public;
+};
+
 struct MetadataCompletionQueueEntry {
-  /// The metadata whose completion is blocked.
+  /// The owning metadata, i.e. the metadata whose completion is blocked.
   Metadata * const Value;
 
+  /// The completion queue for the blocked metadata.
+  /// Only accessed under the lock for the owning metadata.
+  MetadataCompletionQueueEntry *CompletionQueue = nullptr;
+
   /// The next entry in the completion queue.
-  std::unique_ptr<MetadataCompletionQueueEntry> Next;
+  MetadataCompletionQueueEntry *Next = nullptr;
 
   /// The saved state of the completion function.
-  MetadataCompletionContext CompletionContext;
+  PrivateMetadataCompletionContext CompletionContext;
 
-  Metadata *Dependency = nullptr;
-  MetadataRequest::BasicKind DependencyRequirement = MetadataRequest::Abstract;
+  /// The metadata we're enqueued on and the state we're waiting for it
+  /// to achieve.  These fields are only ever modified under the lock for
+  /// the owning metadata, and only when the metadata is not enqueued
+  /// on another metadata's completion queue.  This latter condition is
+  /// important because it allows these fields to be read outside of the
+  /// lock by the initializing thread of the dependent metadata.
+  MetadataDependency Dependency;
 
   MetadataCompletionQueueEntry(Metadata *value,
-                               const MetadataCompletionContext &context)
+                               const PrivateMetadataCompletionContext &context)
     : Value(value), CompletionContext(context) {}
 };
 
@@ -523,22 +606,30 @@ struct MetadataCompletionQueueEntry {
 ///
 /// \return false if the entry was not added because the dependency
 ///   has already reached the desired requirement
-bool addToMetadataQueue(std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry,
-                        const Metadata *dependency,
-                        MetadataRequest::BasicKind dependencyRequirement);
+bool addToMetadataQueue(MetadataCompletionQueueEntry *queueEntry,
+                        MetadataDependency dependency);
 
+/// Resume completion of the given queue entry, given that it has been
+/// removed from its dependency's metadata queue.
+void resumeMetadataCompletion(MetadataCompletionQueueEntry *queueEntry);
 
-void resumeMetadataCompletion(
-                    std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry);
+/// Check for an unbreakable metadata-dependency cycle.
+void checkMetadataDependencyCycle(const Metadata *start,
+                                  MetadataDependency firstLink,
+                                  MetadataDependency secondLink);
 
-/// A base class offerring a reasonable default implementation for entries
-/// in a generic metadata cache.  Supports variably-sized keys.
+/// A cache entry class which provides the basic mechanisms for two-phase
+/// metadata initialization.  Suitable for more heavyweight metadata kinds
+/// such as generic types and tuples.  Does not provide the lookup-related
+/// members.
 ///
 /// The value type may be an arbitrary type, but it must be contextually
 /// convertible to bool, and it must be default-constructible in a false
 /// state.
 ///
-/// Concrete implementations should provide:
+/// In addition to the lookup members required by ConcurrentMap, concrete
+/// implementations should provide:
+///
 ///   /// A name describing the map; used in debugging diagnostics.
 ///   static const char *getName();
 ///
@@ -554,88 +645,92 @@ void resumeMetadataCompletion(
 ///
 ///   /// Try to initialize the metadata.
 ///   TryInitializeResult tryInitialize(Metadata *metadata,
-///                                     MetadataCompletionContext *context,
-///                                     ExtraArgTys...);
+///                                     PrivateMetadataState state,
+///                                     PrivateMetadataCompletionContext *ctxt);
 template <class Impl, class... Objects>
 class MetadataCacheEntryBase
-    : public ConcurrentMapTrailingObjectsEntry<Impl, const void *, Objects...> {
-  using super =
-             ConcurrentMapTrailingObjectsEntry<Impl, const void *, Objects...>;
-  friend super;
-  using TrailingObjects = typename super::TrailingObjects;
-  friend TrailingObjects;
-
+       : public ConcurrentMapTrailingObjectsEntry<Impl, Objects...> {
+  using super = ConcurrentMapTrailingObjectsEntry<Impl, Objects...>;
 public:
   using ValueType = Metadata *;
   using Status = MetadataResponse;
 
 protected:
-  template<typename T>
-  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
-
-  size_t numTrailingObjects(OverloadToken<const void *>) const {
-    return KeyLength;
-  }
-
-  template <class... Args>
-  static size_t numTrailingObjects(OverloadToken<const void *>,
-                                   const MetadataCacheKey &key,
-                                   Args &&...extraArgs) {
-    return key.KeyData.size();
-  }
-
+  using TrailingObjectsEntry = super;
   using super::asImpl;
 
 private:
-  /// These are set during construction and never changed.
-  const size_t Hash;
-  const uint16_t KeyLength;
-
-  /// What kind of data is stored in the LockedStorage field below?
-  ///
-  /// This is only ever modified under the lock.
-  enum class LSK : uint8_t {
-    AllocatingThread,
-    CompletionQueue,
-  };
-  LSK LockedStorageKind;
-
-  /// The current state of this metadata cache entry.
-  ///
-  /// This has to be stored as a MetadataState::RawType instead of a
-  /// MetadataState because some of our targets don't support interesting
-  /// structs as atomic types.
-  std::atomic<MetadataState::RawType> State;
-
-  /// Valid if State.getBasicKind() >= MetadataState::Abstract.
-  ValueType Value;
-
   /// Additional storage that is only ever accessed under the lock.
   union LockedStorage_t {
     /// The thread that is allocating the entry.
     std::thread::id AllocatingThread;
 
-    /// The completion queue.  This is only ever accessed under the lock.
-    std::unique_ptr<MetadataCompletionQueueEntry> CompletionQueue;
+    /// The completion queue.
+    MetadataCompletionQueueEntry *CompletionQueue;
+
+    /// The metadata's own queue entry.
+    MetadataCompletionQueueEntry *QueueEntry;
 
     LockedStorage_t() {}
     ~LockedStorage_t() {}
   } LockedStorage;
 
+  /// What kind of data is stored in the LockedStorage field below?
+  ///
+  /// This is only ever modified under the lock.
+  enum class LSK : uint8_t {
+    /// We're just storing the allocating thread.  The cache entry will be
+    /// in this state initially, and it will stay in this state until either
+    /// the metadata needs to enqueue itself on another metadata's completion
+    /// queue or another metadata needs to enqueue itself on this metadata's
+    /// completion queue.  It's possible (likely, even) that the cache entry
+    /// will just stay in this state forever, e.g. if it manages to complete
+    /// itself before another metadata needs to wait on it.
+    AllocatingThread,
+
+    /// We're storing a completion queue without having a queue entry
+    /// ourselves.  This can happen if another metadata needs to add itself
+    /// to the completion queue for this metadata during its first attempt
+    /// at initialization.
+    CompletionQueue,
+
+    /// We're storing a queue entry, meaning that the metadata has set itself
+    /// up to be enqueued at least once.  (It's possible that the actual
+    /// enqueuing never actually succeeded.)  The metadata's completion
+    /// queue can be found at LockedStorage.QueueEntry->CompletionQueue.
+    /// 
+    /// The cache entry owns its queue entry, but it must not destroy it
+    /// while it is blocked on another queue.
+    QueueEntry,
+
+    /// We've completed ourselves and are storing nothing.
+    Complete
+  };
+  LSK LockedStorageKind;
+
+  /// The current state of this metadata cache entry.
+  ///
+  /// This has to be stored as a PrivateMetadataTrackingInfo::RawType
+  /// instead of a PrivateMetadataTrackingInfo because some of our
+  /// targets don't support interesting structs as atomic types.
+  std::atomic<PrivateMetadataTrackingInfo::RawType> TrackingInfo;
+
+  // Note that GenericMetadataCacheEntryBase is set up to place fields
+  // into the tail padding of this class.
+
 public:
-  MetadataCacheEntryBase(const MetadataCacheKey &key)
-      : Hash(key.Hash), KeyLength(key.KeyData.size()),
-        State(MetadataState(MetadataState::Allocating).getRawValue()) {
-    LockedStorageKind = LSK::AllocatingThread;
+  MetadataCacheEntryBase()
+      : LockedStorageKind(LSK::AllocatingThread),
+        TrackingInfo(PrivateMetadataTrackingInfo::initial().getRawValue()) {
     LockedStorage.AllocatingThread = std::this_thread::get_id();
-    memcpy(this->template getTrailingObjects<const void*>(),
-           key.KeyData.begin(),
-           KeyLength * sizeof(void*));
   }
 
+  // Note that having an explicit destructor here is important to make this
+  // a non-POD class and allow subclass fields to be allocated in our
+  // tail-padding.
   ~MetadataCacheEntryBase() {
-    if (LockedStorageKind == LSK::CompletionQueue)
-      LockedStorage.CompletionQueue.~unique_ptr();
+    if (LockedStorageKind == LSK::QueueEntry)
+      delete LockedStorage.QueueEntry;
   }
 
   bool isBeingAllocatedByCurrentThread() const {
@@ -643,59 +738,45 @@ public:
            LockedStorage.AllocatingThread == std::this_thread::get_id();
   }
 
-  KeyDataRef getKeyData() const {
-    return KeyDataRef::forArguments(
-                              this->template getTrailingObjects<const void*>(),
-                                    KeyLength);
-  }
-
-  intptr_t getKeyIntValueForDump() const {
-    return Hash;
-  }
-
-  int compareWithKey(const MetadataCacheKey &key) const {
-    // Order by hash first, then by the actual key data.
-    if (auto comparison = compareIntegers(key.Hash, Hash)) {
-      return comparison;
-    } else {
-      return key.KeyData.compare(getKeyData());
-    }
-  }
-
   /// Given that this thread doesn't own the right to initialize the
   /// metadata, await the metadata being in the right state.
   template <class... Args>
   Status await(ConcurrencyControl &concurrency, MetadataRequest request,
                Args &&...extraArgs) {
-    auto state = MetadataState(State.load(std::memory_order_acquire));
+    auto trackingInfo =
+      PrivateMetadataTrackingInfo(TrackingInfo.load(std::memory_order_acquire));
 
-    if (state.shouldWait(request)) {
-      awaitSatisfyingState(concurrency, request, state);
+    if (trackingInfo.shouldWait(request)) {
+      awaitSatisfyingState(concurrency, request, trackingInfo);
     }
 
-    assert(state.hasAllocatedMetadata());
-    return { Value, state.getAccomplishedRequestState() };
+    assert(trackingInfo.hasAllocatedMetadata());
+    return { asImpl().getValue(), trackingInfo.getAccomplishedRequestState() };
   }
 
   /// The expected return type of allocate.
-  using AllocationResult = Status;
+  struct AllocationResult {
+    Metadata *Value;
+    PrivateMetadataState State;
+  };
 
   /// Perform the allocation operation.
   template <class... Args>
   Optional<Status>
-  beginAllocation(ConcurrencyControl &concurrency, Args &&...args) {
+  beginAllocation(ConcurrencyControl &concurrency, MetadataRequest request,
+                  Args &&...args) {
     // Allocate the metadata.
     AllocationResult allocationResult =
       asImpl().allocate(std::forward<Args>(args)...);
 
     // Publish the value.
-    Value = const_cast<ValueType>(allocationResult.Value);
-    auto newState = MetadataState::forRequestState(allocationResult.State);
-    publishMetadataState(concurrency, newState);
+    asImpl().setValue(const_cast<ValueType>(allocationResult.Value));
+    PrivateMetadataState newState = allocationResult.State;
+    publishPrivateMetadataState(concurrency, newState);
 
     // If allocation gave us completed metadata, short-circuit initialization.
-    if (allocationResult.State == MetadataRequest::Complete) {
-      return Status{allocationResult.Value, allocationResult.State};
+    if (allocationResult.State == PrivateMetadataState::Complete) {
+      return Status{allocationResult.Value, MetadataState::Complete};
     }
 
     return None;
@@ -703,88 +784,98 @@ public:
 
   /// Begin initialization immediately after allocation.
   template <class... Args>
-  Status beginInitialization(ConcurrencyControl &concurrency, Args &&...args) {
-    return doInitialization(concurrency, nullptr, std::forward<Args>(args)...);
+  Status beginInitialization(ConcurrencyControl &concurrency,
+                             MetadataRequest request, Args &&...args) {
+    // Note that we ignore the extra arguments; those are just for the
+    // constructor and allocation.
+    return doInitialization(concurrency, nullptr, request);
   }
 
   /// Resume initialization after a previous failure resulted in the
   /// metadata being enqueued on another metadata cache.
-  ///
-  /// We expect the first argument here to be of type
-  /// std::unique_ptr<MetadataCompletionQueueEntry> &&.
-  template <class... Args>
-  Status resumeInitialization(ConcurrencyControl &concurrency, Args &&...args) {
-    return doInitialization(concurrency, std::forward<Args>(args)...);
+  Status resumeInitialization(ConcurrencyControl &concurrency,
+                              MetadataCompletionQueueEntry *queueEntry) {
+    return doInitialization(concurrency, queueEntry,
+                            MetadataRequest(MetadataState::Complete,
+                                            /*non-blocking*/ true));
   }
 
 protected:
   /// The expected return type of tryInitialize.
   struct TryInitializeResult {
-    MetadataRequest::BasicKind NewState;
-    MetadataRequest::BasicKind DependencyRequirement;
-    const Metadata *Dependency;
+    PrivateMetadataState NewState;
+    MetadataDependency Dependency;
   };
 
 private:
   /// Try to complete the metadata.
   ///
   /// This is the initializing thread.  The lock is not held.
-  template <class... Args>
   Status doInitialization(ConcurrencyControl &concurrency,
-                     std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry,
-                          MetadataRequest request,
-                          Args &&...args) {
+                          MetadataCompletionQueueEntry *queueEntry,
+                          MetadataRequest request) {
     // We should always have fully synchronized with any previous threads
     // that were processing the initialization, so a relaxed load is fine
     // here.  (This ordering is achieved by the locking which occurs as part
     // of queuing and dequeuing metadata.)
-    auto curState = MetadataState(State.load(std::memory_order_relaxed));
-    assert(curState.hasAllocatedMetadata());
-    assert(!curState.isComplete());
+    auto curTrackingInfo =
+      PrivateMetadataTrackingInfo(TrackingInfo.load(std::memory_order_relaxed));
+    assert(curTrackingInfo.hasAllocatedMetadata());
+    assert(!curTrackingInfo.isComplete());
 
-    auto value = Value;
+    auto value = asImpl().getValue();
 
     // Figure out the completion context.
-    MetadataCompletionContext scratchContext;
-    MetadataCompletionContext *context;
+    PrivateMetadataCompletionContext scratchContext;
+    PrivateMetadataCompletionContext *context;
     if (queueEntry) {
       context = &queueEntry->CompletionContext;
     } else {
-      memset(&scratchContext, 0, sizeof(MetadataCompletionContext));
+      memset(&scratchContext, 0, sizeof(PrivateMetadataCompletionContext));
       context = &scratchContext;
     }
+
+    bool hasProgressSinceLastEnqueueAttempt = false;
+    MetadataCompletionQueueEntry *claimedQueue = nullptr;
 
     // Try the complete the metadata.  This only loops if initialization
     // has a dependency, but the new dependency is resolved when we go to
     // add ourselves to its queue.
-    bool hasProgress = false;
     while (true) {
       TryInitializeResult tryInitializeResult =
-        asImpl().tryInitialize(value, context, args...);
-      auto newState =
-        MetadataState::forRequestState(tryInitializeResult.NewState);
+        asImpl().tryInitialize(value, curTrackingInfo.getState(), context);
+      auto newState = tryInitializeResult.NewState;
 
-      assert(curState.getBasicKind() <= newState.getBasicKind() &&
+      assert(curTrackingInfo.getState() <= newState &&
              "initialization regressed to an earlier state");
 
       // Publish the new state of the metadata (waking any waiting
       // threads immediately) if we've made any progress.  This seems prudent,
       // but it might mean acquiring the lock multiple times.
-      if (curState.getBasicKind() < newState.getBasicKind()) {
-        hasProgress = true;
-        curState = newState;
-        publishMetadataState(concurrency, newState);
+      if (curTrackingInfo.getState() < newState) {
+        hasProgressSinceLastEnqueueAttempt = true;
+        curTrackingInfo = PrivateMetadataTrackingInfo(newState);
+        publishPrivateMetadataState(concurrency, newState);
       }
 
       // If we don't have a dependency, we're finished.
       if (!tryInitializeResult.Dependency) {
-        assert(newState.isComplete() &&
+        assert(newState == PrivateMetadataState::Complete &&
                "initialization didn't report a dependency but isn't complete");
-        hasProgress = true;
+        assert(hasProgressSinceLastEnqueueAttempt);
+
+        // Claim any satisfied completion-queue entries (i.e. all of them).
+        concurrency.Lock.withLock([&] {
+          claimSatisfiedQueueEntriesWithLock(curTrackingInfo, claimedQueue);
+        });
+
+        // That will destroy the queue entry if we had one, so make sure we
+        // don't try to use it.
+        queueEntry = nullptr;
         break;
       }
 
-      assert(!newState.isComplete() &&
+      assert(newState != PrivateMetadataState::Complete &&
              "completed initialization reported a dependency");
 
       // Otherwise, we need to block this metadata on the dependency's queue.
@@ -792,104 +883,158 @@ private:
       // Create a queue entry if necessary.  Start using its context
       // as the continuation context.
       if (!queueEntry) {
-        queueEntry.reset(
-          new MetadataCompletionQueueEntry(value, scratchContext));
+        queueEntry = new MetadataCompletionQueueEntry(value, scratchContext);
         context = &queueEntry->CompletionContext;
       }
+
+      // Set the dependency on the queue entry.  This has to happen under
+      // the lock to protect against other threads checking for dependency
+      // cycles.
+      concurrency.Lock.withLock([&] {
+        prepareToEnqueueWithLock(queueEntry, tryInitializeResult.Dependency);
+        assert(LockedStorageKind == LSK::QueueEntry);
+
+        // Grab any satisfied queue entries while we have the lock.
+        if (hasProgressSinceLastEnqueueAttempt) {
+          hasProgressSinceLastEnqueueAttempt = false;
+          claimSatisfiedQueueEntriesWithLock(curTrackingInfo, claimedQueue);
+        }
+      });
 
       // Try to block this metadata initialization on that queue.
       // If this succeeds, we can't consider ourselves the initializing
       // thread anymore.  The small amount of notification we do at the
       // end of this function is okay to race with another thread
       // potentially taking over initialization.
-      if (addToMetadataQueue(std::move(queueEntry),
-                             tryInitializeResult.Dependency,
-                             tryInitializeResult.DependencyRequirement))
+      if (addToMetadataQueue(queueEntry, tryInitializeResult.Dependency))
         break;
 
       // If that failed, we should still have ownership of the entry.
       assert(queueEntry);
     }
 
-    // If we made progress, claim all the completion-queue entries that
-    // are now satisfied and try to make progress on them.
-    if (hasProgress) {
-      auto queue = concurrency.Lock.withLock([&] {
-        return claimSatisfiedQueueEntriesWithLock(curState);
-      });
-
-      // Immediately process all the entries we extracted.
-      while (auto cur = std::move(queue)) {
-        queue = std::move(cur->Next);
-        resumeMetadataCompletion(std::move(cur));
-      }
+    // Immediately process all the queue entries we claimed.
+    while (auto cur = claimedQueue) {
+      claimedQueue = cur->Next;
+      resumeMetadataCompletion(cur);
     }
 
     // If we're not actually satisfied by the current state, we might need
     // to block here.
-    if (curState.shouldWait(request)) {
-      awaitSatisfyingState(concurrency, request, curState);
+    if (curTrackingInfo.shouldWait(request)) {
+      awaitSatisfyingState(concurrency, request, curTrackingInfo);
     }
 
-    return { value, curState.getAccomplishedRequestState() };
+    return { value, curTrackingInfo.getAccomplishedRequestState() };
+  }
+
+  /// Prepare to enqueue this metadata on another metadata's completion
+  /// queue, given that we're holding the lock.
+  void prepareToEnqueueWithLock(MetadataCompletionQueueEntry *queueEntry,
+                                MetadataDependency dependency) {
+    assert(dependency);
+    queueEntry->Dependency = dependency;
+
+    switch (LockedStorageKind) {
+    case LSK::QueueEntry:
+      assert(LockedStorage.QueueEntry == queueEntry);
+      return;
+
+    case LSK::CompletionQueue:
+      // Move the existing completion queue to the cache entry.
+      queueEntry->CompletionQueue = LockedStorage.CompletionQueue;
+      LLVM_FALLTHROUGH;
+
+    case LSK::AllocatingThread:
+      LockedStorageKind = LSK::QueueEntry;
+      LockedStorage.QueueEntry = queueEntry;
+      return;
+
+    case LSK::Complete:
+      swift_runtime_unreachable("preparing to enqueue when already complete?");
+    }
+    swift_runtime_unreachable("bad kind");
   }
 
   /// Claim all the satisfied completion queue entries, given that
   /// we're holding the lock.
-  std::unique_ptr<MetadataCompletionQueueEntry>
-  claimSatisfiedQueueEntriesWithLock(MetadataState newState) {
+  void claimSatisfiedQueueEntriesWithLock(PrivateMetadataTrackingInfo newInfo,
+                                  MetadataCompletionQueueEntry *&claimedQueue) {
     // Collect anything in the metadata's queue whose target state has been
     // reached to the queue in result.  Note that we repurpose the Next field
     // in the collected entries.
 
-    std::unique_ptr<MetadataCompletionQueueEntry> result;
-
-    // If we're not even currently storing a completion queue,
-    // there's nothing to do but wake waiting threads.
-    if (LockedStorageKind != LSK::CompletionQueue) {
-      return result;
+    MetadataCompletionQueueEntry **completionQueue;
+    if (LockedStorageKind == LSK::CompletionQueue) {
+      completionQueue = &LockedStorage.CompletionQueue;
+    } else if (LockedStorageKind == LSK::QueueEntry) {
+      completionQueue = &LockedStorage.QueueEntry->CompletionQueue;
+    } else {
+      // If we're not even currently storing a completion queue,
+      // there's nothing to do but wake waiting threads.
+      return;
     }
 
-    auto nextToResume = &result;
-    assert(!*nextToResume && "already items in queue?");
+    // We want to append to the claimed queue, so find the end.
+    auto nextToResume = &claimedQueue;
+    while (auto next = *nextToResume) {
+      nextToResume = &next->Next;
+    }
+    assert(!*nextToResume);
 
-    // Walk the completion queue.
-    auto *nextWaiter = &LockedStorage.CompletionQueue;
-    while (auto waiter = nextWaiter->get()) {
+    // If the new state is complete, we can just claim the entire queue
+    // and destroy the metadata's own queue entry if it exists.
+    if (newInfo.isComplete()) {
+      *nextToResume = *completionQueue;
+      *completionQueue = nullptr;
+
+      if (LockedStorageKind == LSK::QueueEntry) {
+        delete LockedStorage.QueueEntry;
+      }
+
+      // Mark that we're no longer storing a queue.
+      LockedStorageKind = LSK::Complete;
+
+      return;
+    }
+
+    // Otherwise, we have to walk the completion queue looking specifically
+    // for entries that match.
+    auto *nextWaiter = completionQueue;
+    while (auto waiter = *nextWaiter) {
       // If the new state of this entry doesn't satisfy the waiter's
       // requirements, skip over it.
-      if (!newState.satisfies(waiter->DependencyRequirement)) {
+      if (!newInfo.satisfies(waiter->Dependency.Requirement)) {
         nextWaiter = &waiter->Next;
         continue;
       }
 
       // Add the waiter to the end of the next-to-resume queue, and update
       // the end to the waiter's Next field.
-      *nextToResume = std::move(*nextWaiter); // owning pointer to waiter
+      *nextToResume = *nextWaiter;
       nextToResume = &waiter->Next;
 
       // Splice the waiter out of the completion queue.
-      *nextWaiter = std::move(waiter->Next);
+      *nextWaiter = waiter->Next;
 
       assert(!*nextToResume);
     }
-
-    return result;
   }
 
   /// Publish a new metadata state.  Wake waiters if we had any.
-  void publishMetadataState(ConcurrencyControl &concurrency,
-                            MetadataState newState) {
-    assert(newState.hasAllocatedMetadata());
-    assert(!newState.hasWaiters());
+  void publishPrivateMetadataState(ConcurrencyControl &concurrency,
+                                   PrivateMetadataState newState) {
+    auto newInfo = PrivateMetadataTrackingInfo(newState);
+    assert(newInfo.hasAllocatedMetadata());
+    assert(!newInfo.hasWaiters());
 
-    auto oldState = MetadataState(State.exchange(newState.getRawValue(),
-                                                 std::memory_order_release));
-    assert(!oldState.isComplete());
+    auto oldInfo = PrivateMetadataTrackingInfo(
+      TrackingInfo.exchange(newInfo.getRawValue(), std::memory_order_release));
+    assert(!oldInfo.isComplete());
 
     // If we have existing waiters, wake them now, since we no longer
     // remember in State that we have any.
-    if (oldState.hasWaiters()) {
+    if (oldInfo.hasWaiters()) {
       // We need to acquire the lock.  There could be an arbitrary number
       // of threads simultaneously trying to set the has-waiters flag, and we
       // have to make sure they start waiting before we notify the queue.
@@ -899,23 +1044,25 @@ private:
 
   /// Wait for the request to be satisfied by the current state.
   void awaitSatisfyingState(ConcurrencyControl &concurrency,
-                            MetadataRequest request, MetadataState &state) {
+                            MetadataRequest request,
+                            PrivateMetadataTrackingInfo &trackingInfo) {
     concurrency.Lock.withLockOrWait(concurrency.Queue, [&] {
       // Re-load the state now that we have the lock.  If we don't
       // need to wait, we're done.  Otherwise, flag the existence of a
       // waiter; if that fails, start over with the freshly-loaded state.
-      state = MetadataState(State.load(std::memory_order_acquire));
+      trackingInfo = PrivateMetadataTrackingInfo(
+                                  TrackingInfo.load(std::memory_order_acquire));
       while (true) {
-        if (!state.shouldWait(request))
+        if (!trackingInfo.shouldWait(request))
           return true;
 
-        if (state.hasWaiters())
+        if (trackingInfo.hasWaiters())
           break;
 
         // Try to swap in the has-waiters bit.  If this succeeds, we can
         // ahead and wait.
-        if (State.compare_exchange_weak(state.getRawValueRef(),
-                                        state.addWaiters().getRawValue(),
+        if (TrackingInfo.compare_exchange_weak(trackingInfo.getRawValueRef(),
+                                        trackingInfo.addWaiters().getRawValue(),
                                         std::memory_order_relaxed,
                                         std::memory_order_acquire))
           break;
@@ -936,40 +1083,177 @@ private:
   }
 
 public:
-  /// Block a metadata initialization on the completion of this
-  /// initialization.
+  /// Block a metadata initialization on progress in the initialization
+  /// of this metadata.
+  ///
+  /// That is, this cache entry is for metadata Y, and we have been
+  /// handed a queue entry showing a dependency for a metadata X on Y
+  /// reaching state S_Y.  Add the queue entry to the completion queue
+  /// for Y (which is to say, on this cache entry) unless Y has already
+  /// reached state S.  If it has reached that state, return false.
   ///
   /// This is always called from the initializing thread.  The lock is not held.
   bool enqueue(ConcurrencyControl &concurrency,
-               std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry) {
+               MetadataCompletionQueueEntry *queueEntry,
+               MetadataDependency dependency) {
     assert(queueEntry);
     assert(!queueEntry->Next);
+    assert(dependency == queueEntry->Dependency);
 
-    return concurrency.Lock.withLock([&] {
-      auto curState = MetadataState(State.load(std::memory_order_acquire));
-      if (curState.satisfies(queueEntry->DependencyRequirement))
+    MetadataDependency otherDependency;
+    bool success = concurrency.Lock.withLock([&] {
+      auto curInfo = PrivateMetadataTrackingInfo(
+                                  TrackingInfo.load(std::memory_order_acquire));
+      if (curInfo.satisfies(dependency.Requirement))
         return false;
 
       // Note that we don't set the waiters bit because we're not actually
       // blocking any threads.
 
-      // Transition the locked storage to the completion queue.
-      if (LockedStorageKind != LSK::CompletionQueue) {
+      // Ensure that there's a completion queue.
+      MetadataCompletionQueueEntry **completionQueue;
+
+      switch (LockedStorageKind) {
+      case LSK::Complete:
+        swift_runtime_unreachable("enqueuing on complete cache entry?");
+
+      case LSK::AllocatingThread:
         LockedStorageKind = LSK::CompletionQueue;
-        new (&LockedStorage.CompletionQueue)
-          std::unique_ptr<MetadataCompletionQueueEntry>();
+        LockedStorage.CompletionQueue = nullptr;
+        completionQueue = &LockedStorage.CompletionQueue;
+        break;
+
+      case LSK::CompletionQueue:
+        completionQueue = &LockedStorage.CompletionQueue;
+        break;
+
+      case LSK::QueueEntry:
+        otherDependency = LockedStorage.QueueEntry->Dependency;
+        completionQueue = &LockedStorage.QueueEntry->CompletionQueue;
+        break;
       }
 
-      queueEntry->Next = std::move(LockedStorage.CompletionQueue);
-      LockedStorage.CompletionQueue = std::move(queueEntry);
+      queueEntry->Next = *completionQueue;
+      *completionQueue = queueEntry;
       return true;
+    });
+
+    // Diagnose unbreakable dependency cycles.
+    //
+    // Note that we only do this if we find a second dependency link ---
+    // that is, if metadata Y is itself dependent on metadata Z reaching
+    // state S_Z --- but that this will fire even only a cycle of length 1
+    // (i.e. if X == Y) because of course Y will already be showing the
+    // dependency on Y in this case.
+    if (otherDependency) {
+      checkMetadataDependencyCycle(queueEntry->Value, dependency,
+                                   otherDependency);
+    }
+
+    return success;
+  }
+
+  MetadataDependency checkDependency(ConcurrencyControl &concurrency,
+                                     MetadataState requirement) {
+    return concurrency.Lock.withLock([&] {
+      // Load the current state.
+      auto curInfo = PrivateMetadataTrackingInfo(
+                                  TrackingInfo.load(std::memory_order_acquire));
+
+      // If the requirement is satisfied, there no further dependency for now.
+      if (curInfo.satisfies(requirement))
+        return MetadataDependency();
+
+      // Check for an existing dependency.
+      switch (LockedStorageKind) {
+      case LSK::Complete:
+        swift_runtime_unreachable("dependency on complete cache entry?");
+
+      case LSK::AllocatingThread:
+      case LSK::CompletionQueue:
+        return MetadataDependency();
+
+      case LSK::QueueEntry:
+        return LockedStorage.QueueEntry->Dependency;
+      }
     });
   }
 };
 
-template <class EntryType, bool ProvideDestructor = true>
+/// An convenient subclass of MetadataCacheEntryBase which provides
+/// metadata lookup using a variadic key.
+template <class Impl, class... Objects>
+class VariadicMetadataCacheEntryBase :
+         public MetadataCacheEntryBase<Impl, const void *, Objects...> {
+  using super = MetadataCacheEntryBase<Impl, const void *, Objects...>;
+
+protected:
+  using super::asImpl;
+
+  using ValueType = typename super::ValueType;
+
+  using TrailingObjectsEntry = typename super::TrailingObjectsEntry;
+  friend TrailingObjectsEntry;
+
+  using TrailingObjects = typename super::TrailingObjects;
+  friend TrailingObjects;
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+  size_t numTrailingObjects(OverloadToken<const void *>) const {
+    return KeyLength;
+  }
+
+  template <class... Args>
+  static size_t numTrailingObjects(OverloadToken<const void *>,
+                                   const MetadataCacheKey &key,
+                                   Args &&...extraArgs) {
+    return key.size();
+  }
+
+private:
+  // These are arranged to fit into the tail-padding of the superclass.
+
+  /// These are set during construction and never changed.
+  const uint16_t KeyLength;
+  const uint32_t Hash;
+
+  /// Valid if TrackingInfo.getState() >= PrivateMetadataState::Abstract.
+  ValueType Value;
+
+  friend super;
+  ValueType getValue() {
+    return Value;
+  }
+  void setValue(ValueType value) {
+    Value = value;
+  }
+
+public:
+  VariadicMetadataCacheEntryBase(const MetadataCacheKey &key)
+      : KeyLength(key.size()), Hash(key.hash()) {
+    memcpy(this->template getTrailingObjects<const void *>(),
+           key.begin(), key.size() * sizeof(const void *));
+  }
+
+  MetadataCacheKey getKey() const {
+    return MetadataCacheKey(this->template getTrailingObjects<const void*>(),
+                            KeyLength, Hash);
+  }
+
+  intptr_t getKeyIntValueForDump() const {
+    return Hash;
+  }
+
+  int compareWithKey(const MetadataCacheKey &key) const {
+    return key.compare(getKey());
+  }
+};
+
+template <class EntryType, bool ProvideDestructor = true, class OptImpl = void>
 class MetadataCache :
-    public LockingConcurrentMap<EntryType, ProvideDestructor> {
+    public LockingConcurrentMap<EntryType, ProvideDestructor, OptImpl> {
 };
 
 } // namespace swift

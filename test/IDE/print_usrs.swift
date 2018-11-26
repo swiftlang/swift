@@ -83,7 +83,7 @@ class GenericClass {
 
 // CHECK: [[@LINE+1]]:10 s:14swift_ide_test4ProtP{{$}}
 protocol Prot {
-  // CHECK: [[@LINE+1]]:18 s:14swift_ide_test4ProtP5Blarg{{$}}
+  // CHECK: [[@LINE+1]]:18 s:14swift_ide_test4ProtP5BlargQa{{$}}
   associatedtype Blarg
   // CHECK: [[@LINE+1]]:8 s:14swift_ide_test4ProtP8protMethy5BlargQzAFF{{$}}
   func protMeth(_ x: Blarg) -> Blarg

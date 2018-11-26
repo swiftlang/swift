@@ -8,7 +8,7 @@
 
 @_fixed_layout
 public struct Int {
-  @_inlineable
+  @inlinable
   public init() {}
 }
 
@@ -19,20 +19,20 @@ public struct Int {
 // CHECK: sil [serialized] [canonical] @$Ss28userOfSemanticsAnnotatedFuncySiSaySiGF
 // CHECK: function_ref
 // CHECK: apply
-@_inlineable
+@inlinable
 public func userOfSemanticsAnnotatedFunc(_ a: Array<Int>) -> Int {
   return a._getCapacity()
 }
 
 @_fixed_layout
 public struct Array<T> {
-  @_inlineable
+  @inlinable
   public init() {}
 
   // Check that the generic version of a @_semantics function is preserved.
   // CHECK: sil [serialized] [_semantics "array.get_capacity"] [canonical] @$SSa12_getCapacitySiyF : $@convention(method) <T> (Array<T>) -> Int
-  @_inlineable
-  @_versioned
+  @inlinable
+  @usableFromInline
   @_semantics("array.get_capacity")
   internal func _getCapacity() -> Int {
     return Int()

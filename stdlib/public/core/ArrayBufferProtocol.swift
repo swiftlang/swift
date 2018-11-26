@@ -12,7 +12,7 @@
 
 /// The underlying buffer for an ArrayType conforms to
 /// `_ArrayBufferProtocol`.  This buffer does not provide value semantics.
-@_versioned
+@usableFromInline
 internal protocol _ArrayBufferProtocol
   : MutableCollection, RandomAccessCollection {
 
@@ -128,16 +128,14 @@ internal protocol _ArrayBufferProtocol
 
 extension _ArrayBufferProtocol where Indices == Range<Int>{
 
-  @_inlineable
-  @_versioned
+  @inlinable
   internal var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress
   }
 
   // Make sure the compiler does not inline _copyBuffer to reduce code size.
-  @_inlineable
+  @inlinable
   @inline(never)
-  @_versioned
   internal init(copying buffer: Self) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
@@ -147,8 +145,7 @@ extension _ArrayBufferProtocol where Indices == Range<Int>{
     self = Self( _buffer: newBuffer, shiftedToStartIndex: buffer.startIndex)
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
   internal mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newCount: Int,

@@ -213,40 +213,40 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
 
 }
 
-// Make sure that @_versioned entities can be resilient
+// Make sure that @usableFromInline entities can be resilient
 
-@_versioned struct VersionedResilientStruct {
-  @_versioned let x: Int
-  @_versioned let y: Int
+@usableFromInline struct VersionedResilientStruct {
+  @usableFromInline let x: Int
+  @usableFromInline let y: Int
 
-  @_versioned init(x: Int, y: Int) {
+  @usableFromInline init(x: Int, y: Int) {
     self.x = x
     self.y = y
   }
 
-  // Non-inlineable initializer, assigns to self -- treated as a root initializer
+  // Non-inlinable initializer, assigns to self -- treated as a root initializer
 
   // CHECK-LABEL: sil @$S17struct_resilience24VersionedResilientStructV5otherA2C_tcfC : $@convention(method) (@in VersionedResilientStruct, @thin VersionedResilientStruct.Type) -> @out VersionedResilientStruct
   // CHECK:      [[SELF_BOX:%.*]] = alloc_box ${ var VersionedResilientStruct }
   // CHECK-NEXT: [[SELF_UNINIT:%.*]] = mark_uninitialized [rootself] [[SELF_BOX]]
   // CHECK:      return
-  @_versioned init(other: VersionedResilientStruct) {
+  @usableFromInline init(other: VersionedResilientStruct) {
     self = other
   }
 
-  // Inlineable initializer, assigns to self -- treated as a delegating initializer
+  // Inlinable initializer, assigns to self -- treated as a delegating initializer
 
   // CHECK-LABEL: sil [serialized] @$S17struct_resilience24VersionedResilientStructV6other2A2C_tcfC : $@convention(method) (@in VersionedResilientStruct, @thin VersionedResilientStruct.Type) -> @out VersionedResilientStruct
   // CHECK:      [[SELF_BOX:%.*]] = alloc_box ${ var VersionedResilientStruct }
   // CHECK-NEXT: [[SELF_UNINIT:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
   // CHECK:      return
-  @_versioned @_inlineable init(other2: VersionedResilientStruct) {
+  @usableFromInline @inlinable init(other2: VersionedResilientStruct) {
     self = other2
   }
 }
 
 // CHECK-LABEL: sil [transparent] [serialized] @$S17struct_resilience27useVersionedResilientStructyAA0deF0VADF : $@convention(thin) (@in_guaranteed VersionedResilientStruct) -> @out VersionedResilientStruct
-@_versioned
+@usableFromInline
 @_transparent func useVersionedResilientStruct(_ s: VersionedResilientStruct)
     -> VersionedResilientStruct {
   // CHECK:       function_ref @$S17struct_resilience24VersionedResilientStructV1ySivg
@@ -258,9 +258,9 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
   // CHECK:       return
 }
 
-// CHECK-LABEL: sil [serialized] @$S17struct_resilience19inlineableInoutTestyyAA6MySizeVzF : $@convention(thin) (@inout MySize) -> ()
-@_inlineable public func inlineableInoutTest(_ s: inout MySize) {
-  // Inlineable functions can be inlined in other resiliene domains.
+// CHECK-LABEL: sil [serialized] @$S17struct_resilience18inlinableInoutTestyyAA6MySizeVzF : $@convention(thin) (@inout MySize) -> ()
+@inlinable public func inlinableInoutTest(_ s: inout MySize) {
+  // Inlinable functions can be inlined in other resiliene domains.
   //
   // Make sure we use materializeForSet for an inout access of a resilient struct
   // property inside an inlinable function.

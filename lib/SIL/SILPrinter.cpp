@@ -1435,7 +1435,9 @@ public:
     printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+    *this << (CI->isLifetimeGuaranteed() ? "" : "[not_guaranteed] ")
+          << (CI->isEscapedByUser() ? "[escaped] " : "")
+          << getIDAndType(CI->getOperand()) << " to " << CI->getType();
   }
   void visitThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand());
@@ -1832,8 +1834,9 @@ public:
   }
   void visitBeginAccessInst(BeginAccessInst *BAI) {
     *this << '[' << getSILAccessKindName(BAI->getAccessKind()) << "] ["
-          << getSILAccessEnforcementName(BAI->getEnforcement())
-          << "] " << getIDAndType(BAI->getOperand());
+          << getSILAccessEnforcementName(BAI->getEnforcement()) << "] "
+          << (BAI->hasNoNestedConflict() ? "[no_nested_conflict] " : "")
+          << getIDAndType(BAI->getOperand());
   }
   void visitEndAccessInst(EndAccessInst *EAI) {
     *this << (EAI->isAborting() ? "[abort] " : "")
@@ -1841,8 +1844,9 @@ public:
   }
   void visitBeginUnpairedAccessInst(BeginUnpairedAccessInst *BAI) {
     *this << '[' << getSILAccessKindName(BAI->getAccessKind()) << "] ["
-          << getSILAccessEnforcementName(BAI->getEnforcement())
-          << "] " << getIDAndType(BAI->getSource()) << ", "
+          << getSILAccessEnforcementName(BAI->getEnforcement()) << "] "
+          << (BAI->hasNoNestedConflict() ? "[no_nested_conflict] " : "")
+          << getIDAndType(BAI->getSource()) << ", " 
           << getIDAndType(BAI->getBuffer());
   }
   void visitEndUnpairedAccessInst(EndUnpairedAccessInst *EAI) {
@@ -2212,6 +2216,14 @@ void SILBasicBlock::dump() const {
 /// Pretty-print the SILBasicBlock to the designated stream.
 void SILBasicBlock::print(raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
+
+  // Print the debug scope (and compute if we didn't do it already).
+  auto &SM = this->getParent()->getModule().getASTContext().SourceMgr;
+  for (auto &I : *this) {
+    SILPrinter P(Ctx);
+    P.printDebugScope(I.getDebugScope(), SM);
+  }
+
   SILPrinter(Ctx).print(this);
 }
 
@@ -2586,17 +2598,17 @@ printSILDefaultWitnessTables(SILPrintContext &Ctx,
 
 static void
 printSILCoverageMaps(SILPrintContext &Ctx,
-                     const SILModule::CoverageMapListType &CoverageMaps) {
+                     const SILModule::CoverageMapCollectionType &CoverageMaps) {
   if (!Ctx.sortSIL()) {
-    for (const SILCoverageMap &M : CoverageMaps)
-      M.print(Ctx);
+    for (const auto &M : CoverageMaps)
+      M.second->print(Ctx);
     return;
   }
 
   std::vector<const SILCoverageMap *> Maps;
   Maps.reserve(CoverageMaps.size());
-  for (const SILCoverageMap &M : CoverageMaps)
-    Maps.push_back(&M);
+  for (const auto &M : CoverageMaps)
+    Maps.push_back(M.second);
   std::sort(Maps.begin(), Maps.end(),
             [](const SILCoverageMap *LHS, const SILCoverageMap *RHS) -> bool {
               return LHS->getName().compare(RHS->getName()) == -1;
@@ -2654,7 +2666,8 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
     break;
   }
   
-  OS << "\n\nimport Builtin\nimport " << STDLIB_NAME
+  OS << "\n\nimport " << BUILTIN_NAME
+     << "\nimport " << STDLIB_NAME
      << "\nimport " << SWIFT_SHIMS_NAME << "\n\n";
 
   // Print the declarations and types from the associated context (origin module or
@@ -2677,7 +2690,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
       if (!WholeModuleMode && !(D->getDeclContext() == AssociatedDeclContext))
           continue;
       if ((isa<ValueDecl>(D) || isa<OperatorDecl>(D) ||
-           isa<ExtensionDecl>(D)) &&
+           isa<ExtensionDecl>(D) || isa<ImportDecl>(D)) &&
           !D->isImplicit()) {
         if (isa<AccessorDecl>(D))
           continue;
@@ -2692,7 +2705,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printSILVTables(PrintCtx, getVTableList());
   printSILWitnessTables(PrintCtx, getWitnessTableList());
   printSILDefaultWitnessTables(PrintCtx, getDefaultWitnessTableList());
-  printSILCoverageMaps(PrintCtx, getCoverageMapList());
+  printSILCoverageMaps(PrintCtx, getCoverageMaps());
   printSILProperties(PrintCtx, getPropertyList());
   
   OS << "\n\n";
@@ -2854,13 +2867,6 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
       OS << "base_protocol "
          << baseProtoWitness.Requirement->getName() << ": ";
       baseProtoWitness.Witness->printName(OS, Options);
-      break;
-    }
-    case MissingOptional: {
-      // optional requirement 'declref': <<not present>>
-      OS << "optional requirement '"
-         << witness.getMissingOptionalWitness().Witness->getBaseName()
-         << "': <<not present>>";
       break;
     }
     }

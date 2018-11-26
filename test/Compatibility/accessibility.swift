@@ -458,8 +458,8 @@ enum DefaultEnumPrivate {
 }
 public enum PublicEnumPI {
   case A(InternalStruct) // expected-error {{enum case in a public enum uses an internal type}}
-  case B(PrivateStruct, InternalStruct) // expected-error {{enum case in a public enum uses a private type}}
-  case C(InternalStruct, PrivateStruct) // expected-error {{enum case in a public enum uses a private type}}
+  case B(PrivateStruct, InternalStruct) // expected-error {{enum case in a public enum uses a private type}} expected-error {{enum case in a public enum uses an internal type}}
+  case C(InternalStruct, PrivateStruct) // expected-error {{enum case in a public enum uses a private type}} expected-error {{enum case in a public enum uses an internal type}}
 }
 enum DefaultEnumPublic {
   case A(PublicStruct) // no-warning

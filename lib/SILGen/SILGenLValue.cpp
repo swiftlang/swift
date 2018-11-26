@@ -14,23 +14,24 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILGen.h"
+#include "ASTVisitor.h"
 #include "ArgumentSource.h"
 #include "Conversion.h"
+#include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
+#include "SILGen.h"
 #include "Scope.h"
-#include "Initialization.h"
-#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/Support/raw_ostream.h"
-#include "ASTVisitor.h"
 using namespace swift;
 using namespace Lowering;
 
@@ -303,7 +304,7 @@ void LogicalPathComponent::writeback(SILGenFunction &SGF, SILLocation loc,
   RValue rvalue(SGF, loc, getSubstFormalType(), temporary);
 
   // Don't consume cleanups on the base if this isn't final.
-  if (!isFinal) { base = ManagedValue::forUnmanaged(base.getValue()); }
+  if (base && !isFinal) { base = ManagedValue::forUnmanaged(base.getValue()); }
 
   // Clone the component if this isn't final.
   std::unique_ptr<LogicalPathComponent> clonedComponent =
@@ -464,14 +465,16 @@ static SILValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
            "tried to enter access scope without a writeback scope!");
     if (enforcement == SILAccessEnforcement::Dynamic) {
       SGF.B.createBeginUnpairedAccess(loc, addr, unpairedAccesses->Buffer,
-                                      silAccessKind, enforcement);
+                                      silAccessKind, enforcement,
+                                      /*hasNoNestedConflict=*/false);
       unpairedAccesses->NumAccesses++;
     }
     return addr;
   }
 
   // Enter the access.
-  addr = SGF.B.createBeginAccess(loc, addr, silAccessKind, enforcement);
+  addr = SGF.B.createBeginAccess(loc, addr, silAccessKind, enforcement,
+                                 /*hasNoNestedConflict=*/false);
 
   // Push a writeback to end it.
   auto accessedMV = ManagedValue::forLValue(addr);
@@ -495,12 +498,17 @@ SILValue UnenforcedAccess::beginAccess(SILGenFunction &SGF, SILLocation loc,
   if (!SGF.getOptions().VerifyExclusivity)
     return address;
 
-  SILValue base = findAccessedAddressBase(address);
-  if (!base || !isPossibleFormalAccessBase(base))
+  const AccessedStorage &storage = findAccessedStorage(address);
+  if (!storage) {
+    llvm::dbgs() << "Bad memory access source: " << address;
+    llvm_unreachable("Unexpected access source.");
+  }
+  if (!isPossibleFormalAccessBase(storage, &SGF.F))
     return address;
 
   auto BAI =
-      SGF.B.createBeginAccess(loc, address, kind, SILAccessEnforcement::Unsafe);
+    SGF.B.createBeginAccess(loc, address, kind, SILAccessEnforcement::Unsafe,
+                            /*hasNoNestedConflict=*/false);
   beginAccessPtr = BeginAccessPtr(BAI, DeleterCheck());
 
   return BAI;
@@ -1235,9 +1243,6 @@ namespace {
       SILValue buffer =
         SGF.emitTemporaryAllocation(loc, getTypeOfRValue());
 
-      // Postpone cleanup for noescape closures.
-      PostponedCleanup postpone(SGF, true);
-
       // Clone the component without cloning the indices.  We don't actually
       // consume them in writeback().
       std::unique_ptr<LogicalPathComponent> clonedComponent(
@@ -1295,7 +1300,6 @@ namespace {
       // access for stored properties with didSet.
       pushWriteback(SGF, loc, std::move(clonedComponent), base, materialized);
 
-      postpone.end();
       return ManagedValue::forLValue(materialized.temporary.getValue());
     }
 
@@ -3440,10 +3444,16 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc, LValue &&src,
   auto destAddr = dest->getAddressForInPlaceInitialization(*this, loc);
   assert(src.getTypeOfRValue().getSwiftRValueType()
            == destAddr->getType().getSwiftRValueType());
-  
+
   auto srcAddr = emitAddressOfLValue(loc, std::move(src), AccessKind::Read)
                    .getUnmanagedValue();
-  B.createCopyAddr(loc, srcAddr, destAddr, IsNotTake, IsInitialization);
+
+  UnenforcedAccess access;
+  SILValue accessAddress =
+    access.beginAccess(*this, loc, destAddr, SILAccessKind::Modify);
+  B.createCopyAddr(loc, srcAddr, accessAddress, IsNotTake, IsInitialization);
+  access.endAccess(*this);
+
   dest->finishInitialization(*this);
 }
 

@@ -65,16 +65,16 @@ OutputFileMap::getOrCreateOutputMapForSingleOutput() {
 }
 
 void OutputFileMap::dump(llvm::raw_ostream &os, bool Sort) const {
-  typedef std::pair<types::ID, std::string> TypePathPair;
+  using TypePathPair = std::pair<file_types::ID, std::string>;
 
-  auto printOutputPair = [&os] (StringRef InputPath,
-                                const TypePathPair &OutputPair) -> void {
-    os << InputPath << " -> " << types::getTypeName(OutputPair.first) << ": \""
-       << OutputPair.second << "\"\n";
+  auto printOutputPair = [&os](StringRef InputPath,
+                               const TypePathPair &OutputPair) -> void {
+    os << InputPath << " -> " << file_types::getTypeName(OutputPair.first)
+       << ": \"" << OutputPair.second << "\"\n";
   };
 
   if (Sort) {
-    typedef std::pair<StringRef, TypeToPathMap> PathMapPair;
+    using PathMapPair = std::pair<StringRef, TypeToPathMap>;
     std::vector<PathMapPair> Maps;
     for (auto &InputPair : InputToOutputsMap) {
       Maps.emplace_back(InputPair.first(), InputPair.second);
@@ -116,9 +116,9 @@ void OutputFileMap::write(llvm::raw_ostream &os,
     writeQuotedEscaped(os, input);
     os << ":\n";
     for (auto &typeAndOutputPath : *outputMap) {
-      types::ID type = typeAndOutputPath.getFirst();
+      file_types::ID type = typeAndOutputPath.getFirst();
       StringRef output = typeAndOutputPath.getSecond();
-      os << "  " << types::getTypeName(type) << ": ";
+      os << "  " << file_types::getTypeName(type) << ": ";
       writeQuotedEscaped(os, output);
       os << "\n";
     }
@@ -205,16 +205,16 @@ OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
         return constructError("path not a scalar node");
 
       llvm::SmallString<16> KindStorage;
-      types::ID Kind =
-        types::lookupTypeForName(KindNode->getValue(KindStorage));
+      file_types::ID Kind =
+          file_types::lookupTypeForName(KindNode->getValue(KindStorage));
 
       // Ignore unknown types, so that an older swiftc can be used with a newer
       // build system.
-      if (Kind == types::TY_INVALID)
+      if (Kind == file_types::TY_INVALID)
         continue;
 
       llvm::SmallString<128> PathStorage;
-      OutputMap.insert(std::pair<types::ID, std::string>(
+      OutputMap.insert(std::pair<file_types::ID, std::string>(
           Kind, resolvePath(Path, PathStorage)));
     }
 

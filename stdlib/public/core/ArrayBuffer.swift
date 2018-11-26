@@ -21,19 +21,17 @@ import SwiftShims
 internal typealias _ArrayBridgeStorage
   = _BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>
 
-@_versioned
+@usableFromInline
 @_fixed_layout
 internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
 
   /// Create an empty buffer.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal init() {
     _storage = _ArrayBridgeStorage(native: _emptyArrayStorage)
   }
 
-  @_inlineable
-  @_versioned  // FIXME(abi): Used from tests
+  @inlinable
   internal init(nsArray: _NSArrayCore) {
     _sanityCheck(_isClassOrObjCExistential(Element.self))
     _storage = _ArrayBridgeStorage(objC: nsArray)
@@ -43,8 +41,7 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
   ///
   /// - Precondition: The elements actually have dynamic type `U`, and `U`
   ///   is a class or `@objc` existential.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal func cast<U>(toBufferOf _: U.Type) -> _ArrayBuffer<U> {
     _sanityCheck(_isClassOrObjCExistential(Element.self))
     _sanityCheck(_isClassOrObjCExistential(U.self))
@@ -53,8 +50,7 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
 
   /// The spare bits that are set when a native array needs deferred
   /// element type checking.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal var deferredTypeCheckMask: Int { return 1 }
   
   /// Returns an `_ArrayBuffer<U>` containing the same elements,
@@ -62,8 +58,7 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
   ///
   /// - Precondition: `U` is a class or `@objc` existential derived from
   /// `Element`.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal func downcast<U>(
     toBufferWithDeferredTypeCheckOf _: U.Type
   ) -> _ArrayBuffer<U> {
@@ -79,43 +74,38 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
         native: _native._storage, bits: deferredTypeCheckMask))
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
   internal var needsElementTypeCheck: Bool {
     // NSArray's need an element typecheck when the element type isn't AnyObject
     return !_isNativeTypeChecked && !(AnyObject.self is Element.Type)
   }
   
   //===--- private --------------------------------------------------------===//
-  @_inlineable
-  @_versioned
+  @inlinable
   internal init(storage: _ArrayBridgeStorage) {
     _storage = storage
   }
 
-  @_versioned
+  @usableFromInline
   internal var _storage: _ArrayBridgeStorage
 }
 
 extension _ArrayBuffer {
   /// Adopt the storage of `source`.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal init(_buffer source: NativeBuffer, shiftedToStartIndex: Int) {
     _sanityCheck(shiftedToStartIndex == 0, "shiftedToStartIndex must be 0")
     _storage = _ArrayBridgeStorage(native: source._storage)
   }
 
   /// `true`, if the array is native and does not need a deferred type check.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal var arrayPropertyIsNativeTypeChecked: Bool {
     return _isNativeTypeChecked
   }
 
   /// Returns `true` iff this buffer's storage is uniquely-referenced.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal mutating func isUniquelyReferenced() -> Bool {
     if !_isClassOrObjCExistential(Element.self) {
       return _storage.isUniquelyReferenced_native_noSpareBits()
@@ -134,8 +124,7 @@ extension _ArrayBuffer {
 
   /// Returns `true` iff this buffer's storage is either
   /// uniquely-referenced or pinned.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal mutating func isUniquelyReferencedOrPinned() -> Bool {
     if !_isClassOrObjCExistential(Element.self) {
       return _storage.isUniquelyReferencedOrPinned_native_noSpareBits()
@@ -155,8 +144,7 @@ extension _ArrayBuffer {
   /// Convert to an NSArray.
   ///
   /// O(1) if the element type is bridged verbatim, O(*n*) otherwise.
-  @_inlineable
-  @_versioned  // FIXME(abi): Used from tests
+  @inlinable
   internal func _asCocoaArray() -> _NSArrayCore {
     return _fastPath(_isNative) ? _native._asCocoaArray() : _nonNative
   }
@@ -165,8 +153,7 @@ extension _ArrayBuffer {
   /// `_ContiguousArrayBuffer` that can be grown in-place to allow the self
   /// buffer store minimumCapacity elements, returns that buffer.
   /// Otherwise, returns `nil`.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
   -> NativeBuffer? {
     if _fastPath(isUniquelyReferenced()) {
@@ -178,14 +165,12 @@ extension _ArrayBuffer {
     return nil
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
   internal mutating func isMutableAndUniquelyReferenced() -> Bool {
     return isUniquelyReferenced()
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
   internal mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
     return isUniquelyReferencedOrPinned()
   }
@@ -193,8 +178,7 @@ extension _ArrayBuffer {
   /// If this buffer is backed by a `_ContiguousArrayBuffer`
   /// containing the same number of elements as `self`, return it.
   /// Otherwise, return `nil`.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal func requestNativeBuffer() -> NativeBuffer? {
     if !_isClassOrObjCExistential(Element.self) {
       return _native
@@ -206,8 +190,7 @@ extension _ArrayBuffer {
   // checks one element. The reason for this is that the ARC optimizer does not
   // handle loops atm. and so can get blocked by the presence of a loop (over
   // the range). This loop is not necessary for a single element access.
-  @_inlineable
-  @_versioned
+  @inlinable
   @inline(never)
   internal func _typeCheckSlowPath(_ index: Int) {
     if _fastPath(_isNative) {
@@ -224,8 +207,7 @@ extension _ArrayBuffer {
     }
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
   internal func _typeCheck(_ subRange: Range<Int>) {
     if !_isClassOrObjCExistential(Element.self) {
       return
@@ -244,8 +226,7 @@ extension _ArrayBuffer {
   /// Copy the elements in `bounds` from this buffer into uninitialized
   /// memory starting at `target`.  Return a pointer "past the end" of the
   /// just-initialized memory.
-  @_inlineable
-  @_versioned
+  @inlinable
   @discardableResult
   internal func _copyContents(
     subRange bounds: Range<Int>,
@@ -279,8 +260,7 @@ extension _ArrayBuffer {
 
   /// Returns a `_SliceBuffer` containing the given sub-range of elements in
   /// `bounds` from this buffer.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal subscript(bounds: Range<Int>) -> _SliceBuffer<Element> {
     get {
       _typeCheck(bounds)
@@ -332,22 +312,19 @@ extension _ArrayBuffer {
   /// A pointer to the first element.
   ///
   /// - Precondition: The elements are known to be stored contiguously.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal var firstElementAddress: UnsafeMutablePointer<Element> {
     _sanityCheck(_isNative, "must be a native buffer")
     return _native.firstElementAddress
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
   internal var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
     return _fastPath(_isNative) ? firstElementAddress : nil
   }
 
   /// The number of elements the buffer stores.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal var count: Int {
     @inline(__always)
     get {
@@ -365,8 +342,7 @@ extension _ArrayBuffer {
   /// wasNative == _isNative in the absence of inout violations.
   /// Because the optimizer can hoist the original check it might have
   /// been invalidated by illegal user code.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal func _checkInoutAndNativeBounds(_ index: Int, wasNative: Bool) {
     _precondition(
       _isNative == wasNative,
@@ -385,8 +361,7 @@ extension _ArrayBuffer {
   /// wasNativeTypeChecked == _isNativeTypeChecked in the absence of
   /// inout violations.  Because the optimizer can hoist the original
   /// check it might have been invalidated by illegal user code.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal func _checkInoutAndNativeTypeCheckedBounds(
     _ index: Int, wasNativeTypeChecked: Bool
   ) {
@@ -400,14 +375,12 @@ extension _ArrayBuffer {
   }
 
   /// The number of elements the buffer can store without reallocation.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal var capacity: Int {
     return _fastPath(_isNative) ? _native.capacity : _nonNative.count
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
   @inline(__always)
   internal func getElement(_ i: Int, wasNativeTypeChecked: Bool) -> Element {
     if _fastPath(wasNativeTypeChecked) {
@@ -416,8 +389,7 @@ extension _ArrayBuffer {
     return unsafeBitCast(_getElementSlowPath(i), to: Element.self)
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
   @inline(never)
   internal func _getElementSlowPath(_ i: Int) -> AnyObject {
     _sanityCheck(
@@ -445,8 +417,7 @@ extension _ArrayBuffer {
   }
 
   /// Get or set the value of the ith element.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal subscript(i: Int) -> Element {
     get {
       return getElement(i, wasNativeTypeChecked: _isNativeTypeChecked)
@@ -469,8 +440,7 @@ extension _ArrayBuffer {
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.  If no such storage exists, it is
   /// created on-demand.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
@@ -486,8 +456,7 @@ extension _ArrayBuffer {
   /// over the underlying contiguous storage.
   ///
   /// - Precondition: Such contiguous storage exists or the buffer is empty.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal mutating func withUnsafeMutableBufferPointer<R>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
@@ -501,8 +470,7 @@ extension _ArrayBuffer {
   }
   
   /// An object that keeps the elements stored in this buffer alive.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal var owner: AnyObject {
     return _fastPath(_isNative) ? _native._storage : _nonNative
   }
@@ -510,8 +478,7 @@ extension _ArrayBuffer {
   /// An object that keeps the elements stored in this buffer alive.
   ///
   /// - Precondition: This buffer is backed by a `_ContiguousArrayBuffer`.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal var nativeOwner: AnyObject {
     _sanityCheck(_isNative, "Expect a native array")
     return _native._storage
@@ -520,8 +487,7 @@ extension _ArrayBuffer {
   /// A value that identifies the storage used by the buffer.  Two
   /// buffers address the same elements when they have the same
   /// identity and count.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal var identity: UnsafeRawPointer {
     if _isNative {
       return _native.identity
@@ -535,8 +501,7 @@ extension _ArrayBuffer {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal var startIndex: Int {
     return 0
   }
@@ -546,8 +511,7 @@ extension _ArrayBuffer {
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
   /// `index(after:)`.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal var endIndex: Int {
     return count
   }
@@ -558,8 +522,7 @@ extension _ArrayBuffer {
   internal typealias Storage = _ContiguousArrayStorage<Element>
   internal typealias NativeBuffer = _ContiguousArrayBuffer<Element>
 
-  @_inlineable
-  @_versioned
+  @inlinable
   internal var _isNative: Bool {
     if !_isClassOrObjCExistential(Element.self) {
       return true
@@ -569,8 +532,7 @@ extension _ArrayBuffer {
   }
 
   /// `true`, if the array is native and does not need a deferred type check.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal var _isNativeTypeChecked: Bool {
     if !_isClassOrObjCExistential(Element.self) {
       return true
@@ -582,8 +544,7 @@ extension _ArrayBuffer {
   /// Our native representation.
   ///
   /// - Precondition: `_isNative`.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal var _native: NativeBuffer {
     return NativeBuffer(
       _isClassOrObjCExistential(Element.self)
@@ -593,14 +554,12 @@ extension _ArrayBuffer {
   /// Fast access to the native representation.
   ///
   /// - Precondition: `_isNativeTypeChecked`.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal var _nativeTypeChecked: NativeBuffer {
     return NativeBuffer(_storage.nativeInstance_noSpareBits)
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
   internal var _nonNative: _NSArrayCore {
     @inline(__always)
     get {

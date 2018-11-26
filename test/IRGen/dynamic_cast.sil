@@ -17,7 +17,7 @@ struct S {
   var v: Int
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @testUnconditional0(
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testUnconditional0(
 sil @testUnconditional0 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
@@ -37,7 +37,7 @@ bb0(%0 : $*P):
 // CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$S12dynamic_cast1P_pMa"(
 // CHECK:       call %swift.type* @swift_getExistentialTypeMetadata(
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @testUnconditional1(
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testUnconditional1(
 sil @testUnconditional1 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
@@ -54,7 +54,7 @@ bb0(%0 : $*P):
   return %2 : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @testConditional0(
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testConditional0(
 sil @testConditional0 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
@@ -75,7 +75,7 @@ bb2:
   return %2 : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @testConditional1(
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testConditional1(
 sil @testConditional1 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
@@ -96,7 +96,7 @@ bb2:
   return %2 : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @testConditional2(
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testConditional2(
 sil @testConditional2 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align

@@ -10,7 +10,18 @@ class C { func foo() {} }
 struct S { func foo() {} }
 
 // MARK: - Something
-struct Something{}
+struct Something{
+  internal func foo() {
+    #if os(tvOS)
+      let blah = 42
+    #else
+      let blah = 0
+    #endif
+    return blah
+  }
+}
+
+
 
 // RUN: %sourcekitd-test -req=range -pos=2:13 -length 5 %s -- %s | %FileCheck %s -check-prefix=CHECK1
 
@@ -39,6 +50,8 @@ struct Something{}
 // RUN: %sourcekitd-test -req=range -pos=4:1 -end-pos=5:13 %s -- %s | %FileCheck %s -check-prefix=CHECK10
 
 // RUN: %sourcekitd-test -req=range -pos=12:4 -end-pos=12:21 %s -- %s | %FileCheck %s -check-prefix=CHECK11
+
+// RUN: %sourcekitd-test -req=range -pos=14:12 -end-pos=21:4 %s -- %s | %FileCheck %s -check-prefix=CHECK12
 
 // CHECK1-DAG: <kind>source.lang.swift.range.singleexpression</kind>
 // CHECK1-DAG: <content>1 + 2</content>
@@ -87,3 +100,7 @@ struct Something{}
 // CHECK11-DAG: <kind>source.lang.swift.range.invalid</kind>
 // CHECK11-DAG: <content></content>
 // CHECK11-DAG: <type></type>
+
+// CHECK12-DAG: <kind>source.lang.swift.range.invalid</kind>
+// CHECK12-DAG: <content></content>
+// CHECK12-DAG: <type></type>

@@ -387,7 +387,8 @@ namespace {
     bool visitBeginAccessInst(const BeginAccessInst *right) {
       auto left = cast<BeginAccessInst>(LHS);
       return left->getAccessKind() == right->getAccessKind()
-          && left->getEnforcement() == right->getEnforcement();
+          && left->getEnforcement() == right->getEnforcement()
+          && left->hasNoNestedConflict() == right->hasNoNestedConflict();
     }
 
     bool visitEndAccessInst(const EndAccessInst *right) {
@@ -398,7 +399,8 @@ namespace {
     bool visitBeginUnpairedAccessInst(const BeginUnpairedAccessInst *right) {
       auto left = cast<BeginUnpairedAccessInst>(LHS);
       return left->getAccessKind() == right->getAccessKind()
-          && left->getEnforcement() == right->getEnforcement();
+          && left->getEnforcement() == right->getEnforcement()
+          && left->hasNoNestedConflict() == right->hasNoNestedConflict();
     }
 
     bool visitEndUnpairedAccessInst(const EndUnpairedAccessInst *right) {
@@ -1186,6 +1188,20 @@ bool SILInstruction::mayTrap() const {
   default:
     return false;
   }
+}
+
+bool SILInstruction::isMetaInstruction() const {
+  // Every instruction that implements getVarInfo() should be in this list.
+  switch (getKind()) {
+  case SILInstructionKind::AllocBoxInst:
+  case SILInstructionKind::AllocStackInst:
+  case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::DebugValueAddrInst:
+    return true;
+  default:
+    return false;
+  }
+  llvm_unreachable("Instruction not handled in isMetaInstruction()!");
 }
 
 //===----------------------------------------------------------------------===//

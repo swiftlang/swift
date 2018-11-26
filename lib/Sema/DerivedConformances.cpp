@@ -31,6 +31,13 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &tc,
   if (!knownProtocol)
     return false;
 
+  if (*knownProtocol == KnownProtocolKind::Hashable) {
+    // We can always complete a partial Hashable implementation, and we can
+    // synthesize a full Hashable implementation for structs and enums with
+    // Hashable components.
+    return canDeriveHashable(tc, nominal, protocol);
+  }
+
   if (auto *enumDecl = dyn_cast<EnumDecl>(nominal)) {
     switch (*knownProtocol) {
         // The presence of a raw type is an explicit declaration that
@@ -38,12 +45,11 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &tc,
       case KnownProtocolKind::RawRepresentable:
         return enumDecl->hasRawType();
 
-        // Enums without associated values can implicitly derive Equatable and
-        // Hashable conformances.
+        // Enums without associated values can implicitly derive Equatable
+        // conformance.
       case KnownProtocolKind::Equatable:
         return canDeriveEquatable(tc, enumDecl, protocol);
-      case KnownProtocolKind::Hashable:
-        return canDeriveHashable(tc, enumDecl, protocol);
+
         // "Simple" enums without availability attributes can explicitly derive
         // a CaseIterable conformance.
         //
@@ -94,13 +100,11 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &tc,
       return true;
     }
 
-    // Structs can explicitly derive Equatable and Hashable conformance.
+    // Structs can explicitly derive Equatable conformance.
     if (auto structDecl = dyn_cast<StructDecl>(nominal)) {
       switch (*knownProtocol) {
         case KnownProtocolKind::Equatable:
           return canDeriveEquatable(tc, structDecl, protocol);
-        case KnownProtocolKind::Hashable:
-          return canDeriveHashable(tc, structDecl, protocol);
         default:
           return false;
       }
@@ -171,6 +175,13 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 1 && argumentNames[0] == ctx.Id_to)
         return getRequirement(KnownProtocolKind::Encodable);
+    }
+
+    // Hashable.hash(into: inout Hasher)
+    if (name.isCompoundName() && name.getBaseName() == ctx.Id_hash) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 1 && argumentNames[0] == ctx.Id_into)
+        return getRequirement(KnownProtocolKind::Hashable);
     }
 
     return nullptr;
@@ -280,14 +291,10 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
     interfaceType = FunctionType::get({selfParam}, interfaceType,
                                       FunctionType::ExtInfo());
   getterDecl->setInterfaceType(interfaceType);
-  getterDecl->copyFormalAccessAndVersionedAttrFrom(property);
+  getterDecl->copyFormalAccessFrom(property);
   getterDecl->setValidationStarted();
 
-  // If the enum was not imported, the derived conformance is either from the
-  // enum itself or an extension, in which case we will emit the declaration
-  // normally.
-  if (isa<ClangModuleUnit>(parentDC->getModuleScopeContext()))
-    tc.Context.addExternalDecl(getterDecl);
+  tc.Context.addSynthesizedDecl(getterDecl);
 
   return getterDecl;
 }
@@ -307,7 +314,7 @@ DerivedConformance::declareDerivedProperty(TypeChecker &tc, Decl *parentDecl,
                                       /*IsCaptureList*/false, SourceLoc(), name,
                                       propertyContextType, parentDC);
   propDecl->setImplicit();
-  propDecl->copyFormalAccessAndVersionedAttrFrom(typeDecl);
+  propDecl->copyFormalAccessFrom(typeDecl, /*sourceIsParentContext*/true);
   propDecl->setInterfaceType(propertyInterfaceType);
   propDecl->setValidationStarted();
 
@@ -319,9 +326,11 @@ DerivedConformance::declareDerivedProperty(TypeChecker &tc, Decl *parentDecl,
 
   Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);
   propPat->setType(propertyContextType);
+
   propPat = new (C) TypedPattern(propPat,
                                  TypeLoc::withoutLoc(propertyContextType),
                                  /*implicit*/ true);
+  propPat->setType(propertyContextType);
 
   auto pbDecl = PatternBindingDecl::create(C, SourceLoc(),
                                            StaticSpellingKind::None,

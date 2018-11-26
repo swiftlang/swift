@@ -28,7 +28,7 @@ struct Biggish<T: SomeClass> {
 
 sil @make_biggish : $<T: SomeClass> () -> (@owned Biggish<T>)
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %T18yield_once_biggish9SomeClassC*, %T18yield_once_biggish9SomeClassC*, { %T18yield_once_biggish9SomeClassC*, %T18yield_once_biggish9SomeClassC* }* } @test_simple
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %T18yield_once_biggish9SomeClassC*, %T18yield_once_biggish9SomeClassC*, { %T18yield_once_biggish9SomeClassC*, %T18yield_once_biggish9SomeClassC* }* } @test_simple
 // CHECK-32-SAME:  (i8* noalias dereferenceable([[BUFFER_SIZE:16]]), %swift.type* %C)
 // CHECK-64-SAME:  (i8* noalias dereferenceable([[BUFFER_SIZE:32]]), %swift.type* %C)
 sil @test_simple : $@yield_once <C: SomeClass> () -> (@yields @owned Biggish<C>) {
@@ -94,10 +94,10 @@ unwind:
   // CHECK-NEXT:    unreachable
 }
 
-// CHECK-LABEL:     declare{{( protected)?}} swiftcc void @"$S18yield_once_biggish9SomeClassCRbzlIet_TC"
+// CHECK-LABEL:     declare{{( dllimport)?}}{{( protected)?}} swiftcc void @"$S18yield_once_biggish9SomeClassCRbzlIet_TC"
 // CHECK-SAME:      (i8* noalias dereferenceable([[BUFFER_SIZE]]), i1)
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @test_simple_call(i1)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_simple_call(i1)
 sil @test_simple_call : $(Builtin.Int1) -> () {
 entry(%flag : $Builtin.Int1):
   //   Allocate the buffer.

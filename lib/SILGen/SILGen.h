@@ -96,6 +96,11 @@ public:
   /// The most recent conformance...
   NormalProtocolConformance *lastEmittedConformance = nullptr;
 
+  /// Profiler instances for constructors, grouped by associated decl.
+  /// Each profiler is shared by all member initializers for a nominal type.
+  /// Constructors within extensions are profiled separately.
+  llvm::DenseMap<Decl *, SILProfiler *> constructorProfilers;
+
   SILFunction *emitTopLevelFunction(SILLocation Loc);
 
   size_t anonymousSymbolCounter = 0;
@@ -435,7 +440,13 @@ public:
 
   /// Emit a property descriptor for the given storage decl if it needs one.
   void tryEmitPropertyDescriptor(AbstractStorageDecl *decl);
-  
+
+  /// Get or create the shared profiler instance for a type's constructors.
+  /// This takes care to create separate profilers for extensions, which may
+  /// reside in a different file than the one where the base type is defined.
+  SILProfiler *getOrCreateProfilerForConstructors(DeclContext *ctx,
+                                                  ConstructorDecl *cd);
+
 private:
   /// Emit the deallocator for a class that uses the objc allocator.
   void emitObjCAllocatorDestructor(ClassDecl *cd, DestructorDecl *dd);

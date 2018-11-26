@@ -158,18 +158,6 @@ static void indexModule(llvm::MemoryBuffer *Input,
                         IndexingConsumer &IdxConsumer,
                         CompilerInstance &CI,
                         ArrayRef<const char *> Args) {
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
-    trace::SwiftInvocation SwiftArgs;
-    SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
-    SwiftArgs.Args.PrimaryFile = Input->getBufferIdentifier();
-    SwiftArgs.addFile(Input->getBufferIdentifier(), Input->getBuffer());
-    trace::StringPairs OpArgs;
-    OpArgs.push_back(std::make_pair("ModuleName", ModuleName));
-    OpArgs.push_back(std::make_pair("Hash", Hash));
-    TracedOp.start(trace::OperationKind::IndexModule, SwiftArgs, OpArgs);
-  }
-
   ASTContext &Ctx = CI.getASTContext();
   std::unique_ptr<SerializedModuleLoader> Loader;
   ModuleDecl *Mod = nullptr;
@@ -210,23 +198,25 @@ static void indexModule(llvm::MemoryBuffer *Input,
 // IndexSource
 //===----------------------------------------------------------------------===//
 
-void trace::initTraceInfo(trace::SwiftInvocation &SwiftArgs,
-                          StringRef InputFile,
-                          ArrayRef<const char *> Args) {
-  SwiftArgs.Args.Args.assign(Args.begin(), Args.end());
+template <typename Str>
+static void initTraceInfoImpl(trace::SwiftInvocation &SwiftArgs,
+                              StringRef InputFile,
+                              ArrayRef<Str> Args) {
+  llvm::raw_string_ostream OS(SwiftArgs.Args.Arguments);
+  interleave(Args, [&OS](StringRef arg) { OS << arg; }, [&OS] { OS << ' '; });
   SwiftArgs.Args.PrimaryFile = InputFile;
 }
 
-void trace::initTraceFiles(trace::SwiftInvocation &SwiftArgs,
-                           swift::CompilerInstance &CI) {
-  auto &SM = CI.getSourceMgr();
-  auto Ids = CI.getInputBufferIDs();
-  std::for_each(Ids.begin(), Ids.end(),
-                [&] (unsigned Id) {
-                  auto Buf = SM.getLLVMSourceMgr().getMemoryBuffer(Id);
-                  SwiftArgs.addFile(Buf->getBufferIdentifier(),
-                                    Buf->getBuffer());
-                });
+void trace::initTraceInfo(trace::SwiftInvocation &SwiftArgs,
+                          StringRef InputFile,
+                          ArrayRef<const char *> Args) {
+  initTraceInfoImpl(SwiftArgs, InputFile, Args);
+}
+
+void trace::initTraceInfo(trace::SwiftInvocation &SwiftArgs,
+                          StringRef InputFile,
+                          ArrayRef<std::string> Args) {
+  initTraceInfoImpl(SwiftArgs, InputFile, Args);
 }
 
 void SwiftLangSupport::indexSource(StringRef InputFile,
@@ -292,12 +282,11 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
   if (CI.setup(Invocation))
     return;
 
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
+  trace::TracedOperation TracedOp(trace::OperationKind::IndexSource);
+  if (TracedOp.enabled()) {
     trace::SwiftInvocation SwiftArgs;
     trace::initTraceInfo(SwiftArgs, InputFile, Args);
-    trace::initTraceFiles(SwiftArgs, CI);
-    TracedOp.start(trace::OperationKind::IndexSource, SwiftArgs);
+    TracedOp.start(SwiftArgs);
   }
 
   CI.performSema();

@@ -30,6 +30,7 @@
 #include "swift/Subsystems.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/SmallPtrSet.h"
 
 using namespace swift;
 using namespace swift::ide;
@@ -195,7 +196,8 @@ private:
     size_t Colon = Content.find(':'); // FIXME: leading whitespace?
     if (Colon == StringRef::npos) {
       assert(Content.empty());
-      doRenameLabel(Range, RefactoringRangeKind::CallArgumentCombined, NameIndex);
+      doRenameLabel(Range, RefactoringRangeKind::CallArgumentCombined,
+                    NameIndex);
       return;
     }
 
@@ -1586,6 +1588,77 @@ bool RefactoringActionMoveMembersToExtension::performChange() {
   return false;
 }
 
+namespace {
+// A SingleDecl range may not include all decls actually declared in that range:
+// a var decl has accessors that aren't included. This will find those missing
+// decls.
+class FindAllSubDecls : public SourceEntityWalker {
+  llvm::SmallPtrSetImpl<Decl *> &Found;
+  public:
+  FindAllSubDecls(llvm::SmallPtrSetImpl<Decl *> &found)
+    : Found(found) {}
+
+  bool walkToDeclPre(Decl *D, CharSourceRange range) {
+    // Record this Decl, and skip its contents if we've already touched it.
+    if (!Found.insert(D).second)
+      return false;
+
+    if (auto ASD = dyn_cast<AbstractStorageDecl>(D)) {
+      llvm::SmallVector<Decl *, 6> accessors;
+      ASD->getAllAccessorFunctions(accessors);
+      Found.insert(accessors.begin(), accessors.end());
+    }
+    return true;
+  }
+};
+}
+bool RefactoringActionReplaceBodiesWithFatalError::isApplicable(
+  ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+  switch (Info.Kind) {
+  case RangeKind::SingleDecl:
+  case RangeKind::MultiTypeMemberDecl: {
+    llvm::SmallPtrSet<Decl *, 16> Found;
+    for (auto decl : Info.DeclaredDecls) {
+      FindAllSubDecls(Found).walk(decl.VD);
+    }
+    for (auto decl : Found) {
+      auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
+      if (AFD && !AFD->isImplicit())
+        return true;
+    }
+
+    return false;
+ }
+  case RangeKind::SingleExpression:
+  case RangeKind::PartOfExpression:
+  case RangeKind::SingleStatement:
+  case RangeKind::MultiStatement:
+  case RangeKind::Invalid:
+    return false;
+  }
+}
+
+bool RefactoringActionReplaceBodiesWithFatalError::performChange() {
+  const StringRef replacement = "{\nfatalError()\n}";
+  llvm::SmallPtrSet<Decl *, 16> Found;
+  for (auto decl : RangeInfo.DeclaredDecls) {
+    FindAllSubDecls(Found).walk(decl.VD);
+  }
+  for (auto decl : Found) {
+    auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
+    if (!AFD || AFD->isImplicit())
+      continue;
+
+    auto range = AFD->getBodySourceRange();
+    // If we're in replacement mode (i.e. have an edit consumer), we can
+    // rewrite the function body.
+    auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, range);
+    EditConsumer.accept(SM, charRange, replacement);
+
+  }
+  return false;
+}
+
 struct CollapsibleNestedIfInfo {
   IfStmt *OuterIf;
   IfStmt *InnerIf;
@@ -2694,6 +2767,10 @@ static CallExpr *findTrailingClosureTarget(SourceManager &SM,
     return nullptr;
   CallExpr *CE = cast<CallExpr>(Finder.getContexts().back().get<Expr*>());
 
+  if (CE->hasTrailingClosure())
+    // Call expression already has a trailing closure.
+    return nullptr;
+
   // The last arugment is a closure?
   Expr *Args = CE->getArg();
   if (!Args)
@@ -3022,9 +3099,14 @@ collectAvailableRefactorings(SourceFile *SF, RangeConfig Range,
                          Range.getEnd(SF->getASTContext().SourceMgr));
   ResolvedRangeInfo Result = Resolver.resolve();
 
+  bool enableInternalRefactoring = getenv("SWIFT_ENABLE_INTERNAL_REFACTORING_ACTIONS");
+
 #define RANGE_REFACTORING(KIND, NAME, ID)                                     \
   if (RefactoringAction##KIND::isApplicable(Result, DiagEngine))              \
     Scratch.push_back(RefactoringKind::KIND);
+#define INTERNAL_RANGE_REFACTORING(KIND, NAME, ID)                            \
+  if (enableInternalRefactoring)                                              \
+    RANGE_REFACTORING(KIND, NAME, ID)
 #include "swift/IDE/RefactoringKinds.def"
 
   RangeStartMayNeedRename = rangeStartMayNeedRename(Result);

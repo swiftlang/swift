@@ -1,6 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -import-objc-header %S/Inputs/c_functions.h -primary-file %s -emit-ir | %FileCheck %s
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -import-objc-header %S/Inputs/c_functions.h -primary-file %s -emit-ir |  %FileCheck %s --check-prefix=%target-cpu
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -import-objc-header %S/Inputs/c_functions.h -primary-file %s -emit-ir | %FileCheck %s -check-prefix CHECK -check-prefix %target-cpu
 
 // This is deliberately not a SIL test so that we can test SILGen too.
 
@@ -19,14 +18,13 @@ func test_indirect_by_val_alignment() {
   log_a_thing(x)
 }
 
+// We only want to test x86_64.
 // x86_64-LABEL: define hidden swiftcc void  @"$S11c_functions30test_indirect_by_val_alignmentyyF"()
 // x86_64: %indirect-temporary = alloca %TSo7a_thinga, align [[ALIGN:[0-9]+]]
 // x86_64: [[CAST:%.*]] = bitcast %TSo7a_thinga* %indirect-temporary to %struct.a_thing*
 // x86_64: call void @log_a_thing(%struct.a_thing* byval align [[ALIGN]] [[CAST]])
 // x86_64: define internal void @log_a_thing(%struct.a_thing* byval align [[ALIGN]]
 
-
-// We only want to test x86_64.
 // aarch64: define hidden swiftcc void  @"$S11c_functions30test_indirect_by_val_alignmentyyF"()
 // arm64: define hidden swiftcc void  @"$S11c_functions30test_indirect_by_val_alignmentyyF"()
 // armv7k: define hidden swiftcc void  @"$S11c_functions30test_indirect_by_val_alignmentyyF"()

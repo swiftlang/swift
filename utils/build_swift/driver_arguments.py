@@ -448,6 +448,9 @@ def create_argument_parser():
     option('--disable-guaranteed-normal-arguments', store_true,
            help='Disable guaranteed normal arguments')
 
+    option('--enable-stdlibcore-exclusivity-checking', store_true,
+           help='Enable exclusivity checking in stdlibCore')
+
     option('--force-optimized-typechecker', store_true,
            help='Force the type checker to be built with '
                 'optimization')

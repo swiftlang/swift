@@ -111,7 +111,7 @@ void swift_addNewDSOImage(const void *addr) {
 
   record(sections);
 
-  const auto &protocols_section = sections->swift4_protocol_conformances;
+  const auto &protocols_section = sections->swift4_protocols;
   const void *protocols =
       reinterpret_cast<void *>(protocols_section.start);
   if (protocols_section.length)
@@ -141,6 +141,12 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
   info->symbolName = dlinfo.dli_sname;
   info->symbolAddress = dlinfo.dli_saddr;
   return 1;
+}
+
+// This is only used for backward deployment hooks, which we currently only support for
+// MachO. Add a stub here to make sure it still compiles.
+void *swift::lookupSection(const char *segment, const char *section, size_t *outSize) {
+  return nullptr;
 }
 
 #endif // defined(__ELF__)

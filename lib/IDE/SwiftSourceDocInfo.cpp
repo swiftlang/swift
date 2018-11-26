@@ -304,7 +304,8 @@ std::vector<ResolvedLoc> NameMatcher::resolve(ArrayRef<UnresolvedLoc> Locs, Arra
   return Ordered;
 }
 
-static std::vector<CharSourceRange> getLabelRanges(const ParameterList* List, const SourceManager &SM) {
+static std::vector<CharSourceRange> getLabelRanges(const ParameterList* List, 
+                                                   const SourceManager &SM) {
   std::vector<CharSourceRange> LabelRanges;
   for (ParamDecl *Param: *List) {
     if (Param->isImplicit())
@@ -314,13 +315,31 @@ static std::vector<CharSourceRange> getLabelRanges(const ParameterList* List, co
     SourceLoc ParamLoc = Param->getNameLoc();
     size_t NameLength;
     if (NameLoc.isValid()) {
-      LabelRanges.push_back(Lexer::getCharSourceRangeFromSourceRange(SM,
-                                                                     SourceRange(NameLoc, ParamLoc)));
+      LabelRanges.push_back(Lexer::getCharSourceRangeFromSourceRange(
+                                SM, SourceRange(NameLoc, ParamLoc)));
     } else {
       NameLoc = ParamLoc;
       NameLength = Param->getNameStr().size();
       LabelRanges.push_back(CharSourceRange(NameLoc, NameLength));
     }
+  }
+  return LabelRanges;
+}
+
+static std::vector<CharSourceRange> getEnumParamListInfo(SourceManager &SM, 
+                                                         ParameterList *PL) {
+  std::vector<CharSourceRange> LabelRanges;
+  for (ParamDecl *Param: *PL) {
+    if (Param->isImplicit())
+      continue;
+    
+    SourceLoc LabelStart(Param->getTypeLoc().getLoc());
+    SourceLoc LabelEnd(LabelStart);
+    
+    if (Param->getNameLoc().isValid()) {
+      LabelStart = Param->getNameLoc();
+    }
+    LabelRanges.push_back(CharSourceRange(SM, LabelStart, LabelEnd));
   }
   return LabelRanges;
 }
@@ -373,21 +392,10 @@ bool NameMatcher::walkToDeclPre(Decl *D) {
     tryResolve(ASTWalker::ParentTy(D), D->getLoc(), LabelRangeType::NoncollapsibleParam,
                getLabelRanges(SD->getIndices(), getSourceMgr()));
   } else if (EnumElementDecl *EED = dyn_cast<EnumElementDecl>(D)) {
-    if (TupleTypeRepr *TTR = dyn_cast_or_null<TupleTypeRepr>(EED->getArgumentTypeLoc().getTypeRepr())) {
-      size_t ElemIndex = 0;
-      std::vector<CharSourceRange> LabelRanges;
-      for(const TupleTypeReprElement &Elem: TTR->getElements()) {
-        SourceLoc LabelStart(Elem.Type->getStartLoc());
-        SourceLoc LabelEnd(LabelStart);
-
-        auto NameIdentifier = TTR->getElementName(ElemIndex);
-        if (!NameIdentifier.empty()) {
-          LabelStart = TTR->getElementNameLoc(ElemIndex);
-        }
-        LabelRanges.push_back(CharSourceRange(getSourceMgr(), LabelStart, LabelEnd));
-        ++ElemIndex;
-      }
-      tryResolve(ASTWalker::ParentTy(D), D->getLoc(), LabelRangeType::CallArg, LabelRanges);
+    if (auto *ParamList = EED->getParameterList()) {
+      auto LabelRanges = getEnumParamListInfo(getSourceMgr(), ParamList);
+      tryResolve(ASTWalker::ParentTy(D), D->getLoc(), LabelRangeType::CallArg,
+                 LabelRanges);
     } else {
       tryResolve(ASTWalker::ParentTy(D), D->getLoc());
     }

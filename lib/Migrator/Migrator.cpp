@@ -56,7 +56,10 @@ bool migrator::updateCodeAndEmitRemapIfNeeded(
   }
 
   // Phase 2: Syntactic Transformations
-  if (Invocation.getLangOptions().EffectiveLanguageVersion[0] < 4) {
+  // Don't run these passes if we're already in Swift 4.2
+  auto Opts = Invocation.getLangOptions().EffectiveLanguageVersion;
+  bool isFourTwo = Opts.size() == 2 && Opts[0] == 4 && Opts[1] == 2;
+  if (!isFourTwo) {
     auto FailedSyntacticPasses = M.performSyntacticPasses();
     if (FailedSyntacticPasses) {
       return true;

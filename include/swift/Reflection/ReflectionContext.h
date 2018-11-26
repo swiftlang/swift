@@ -38,9 +38,9 @@
 
 #if defined(__APPLE__) && defined(__MACH__)
 #ifndef __LP64__
-typedef const struct mach_header MachHeader;
+using MachHeader = const struct mach_header;
 #else
-typedef const struct mach_header_64 MachHeader;
+using MachHeader = const struct mach_header_64;
 #endif
 #endif
 

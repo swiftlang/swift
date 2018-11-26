@@ -434,30 +434,12 @@ struct GenericSubscriptWitness : GenericSubscriptProtocol {
   subscript<T>(_: T) -> T { get { } set { } }
 }
 
-// CHECK-LABEL: sil private [transparent] @$S17materializeForSet23GenericSubscriptWitnessVyxxcluimytfU_ : $@convention(method) <T> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenericSubscriptWitness, @thick GenericSubscriptWitness.Type) -> () {
-// CHECK:       bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*GenericSubscriptWitness, %3 : $@thick GenericSubscriptWitness.Type):
-// CHECK:         [[BUFFER:%.*]] = project_value_buffer $T in %1 : $*Builtin.UnsafeValueBuffer
-// CHECK-NEXT:    [[INDICES:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*T
-// CHECK:         [[SETTER:%.*]] = function_ref @$S17materializeForSet23GenericSubscriptWitnessVyxxcluis : $@convention(method) <τ_0_0> (@in τ_0_0, @in τ_0_0, @inout GenericSubscriptWitness) -> ()
-// CHECK-NEXT:    apply [[SETTER]]<T>([[INDICES]], [[BUFFER]], %2) : $@convention(method) <τ_0_0> (@in τ_0_0, @in τ_0_0, @inout GenericSubscriptWitness) -> ()
-// CHECK-NEXT:    dealloc_value_buffer $*T in %1 : $*Builtin.UnsafeValueBuffer
-// CHECK-NEXT:    [[RESULT:%.*]] = tuple ()
-// CHECK-NEXT:    return [[RESULT]] : $()
-
-// CHECK-LABEL: sil hidden [transparent] @$S17materializeForSet23GenericSubscriptWitnessVyxxcluim : $@convention(method) <T> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed T, @inout GenericSubscriptWitness) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK:      bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*T, %3 : $*GenericSubscriptWitness):
-// CHECK-NEXT:   [[BUFFER:%.*]] = alloc_value_buffer $T in %1 : $*Builtin.UnsafeValueBuffer
-// CHECK-NEXT:   copy_addr %2 to [initialization] [[BUFFER]] : $*T
-// CHECK-NEXT:   [[VALUE:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*T
-// CHECK-NEXT:   [[SELF:%.*]] = load [trivial] %3 : $*GenericSubscriptWitness
-// CHECK:        [[GETTER:%.*]] = function_ref @$S17materializeForSet23GenericSubscriptWitnessVyxxcluig : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, GenericSubscriptWitness) -> @out τ_0_0
-// CHECK-NEXT:   apply [[GETTER]]<T>([[VALUE]], %2, [[SELF]]) : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, GenericSubscriptWitness) -> @out τ_0_0
-// CHECK-NEXT:   [[VALUE_PTR:%.*]] = address_to_pointer [[VALUE]] : $*T to $Builtin.RawPointer
-// CHECK:        [[CALLBACK:%.*]] = function_ref @$S17materializeForSet23GenericSubscriptWitnessVyxxcluimytfU_
-// CHECK-NEXT:   [[CALLBACK_PTR:%.*]] = thin_function_to_pointer [[CALLBACK]] : $@convention(method) <τ_0_0> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenericSubscriptWitness, @thick GenericSubscriptWitness.Type) -> () to $Builtin.RawPointer
-// CHECK-NEXT:   [[CALLBACK_OPTIONAL:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, [[CALLBACK_PTR]] : $Builtin.RawPointer
-// CHECK-NEXT:   [[RESULT:%.*]] = tuple ([[VALUE_PTR]] : $Builtin.RawPointer, [[CALLBACK_OPTIONAL]] : $Optional<Builtin.RawPointer>)
-// CHECK-NEXT:   return [[RESULT]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// -- materializeForSet for a generic subscript gets open-coded in terms of
+// the concrete getter/setter.
+// CHECK-LABEL: sil private [transparent] @$S17materializeForSet23GenericSubscriptWitnessVAA0dE8ProtocolA2aDPyqd__qd__cluimytfU_TW
+// CHECK:         function_ref @$S17materializeForSet23GenericSubscriptWitnessVyxxcluis
+// CHECK-LABEL: sil private [transparent] [thunk] @$S17materializeForSet23GenericSubscriptWitnessVAA0dE8ProtocolA2aDPyqd__qd__cluimTW
+// CHECK:         function_ref @$S17materializeForSet23GenericSubscriptWitnessVyxxcluig
 
 extension GenericSubscriptProtocol {
   subscript<T>(t: T) -> T { get { } set { } }
@@ -485,7 +467,7 @@ struct InferredRequirementOnSubscript : InferredRequirementOnSubscriptProtocol {
 
 // CHECK-LABEL: sil hidden @$S17materializeForSet30InferredRequirementOnSubscriptVyAA015GenericTypeWithE0VyxGSicAA5MagicRzluis : $@convention(method) <T where T : Magic> (GenericTypeWithRequirement<T>, Int, @inout InferredRequirementOnSubscript) -> ()
 
-// CHECK-LABEL: sil hidden [transparent] @$S17materializeForSet30InferredRequirementOnSubscriptVyAA015GenericTypeWithE0VyxGSicAA5MagicRzluim : $@convention(method) <T where T : Magic> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, Int, @inout InferredRequirementOnSubscript) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK-LABEL: sil private [transparent] [thunk] @$S17materializeForSet30InferredRequirementOnSubscriptVAA0defG8ProtocolA2aDPyAA015GenericTypeWithE0Vyqd__GSicAA5MagicRd__luimTW
 
 // Test for materializeForSet vs static properties of structs.
 
@@ -679,6 +661,25 @@ struct BackwardMutation : BackwardMutationProtocol {
 func doBackwardMutation(m: inout BackwardMutationProtocol) {
   m.value += 1
 }
+
+// materializeForSet for a constrained-extension protocol witness requires
+// open coding.
+
+protocol ConditionalSubscript {
+  subscript(_: Int) -> Self { get set }
+}
+
+struct HasConditionalSubscript<T> {}
+
+extension HasConditionalSubscript: ConditionalSubscript where T: ConditionalSubscript {
+  subscript(_: Int) -> HasConditionalSubscript<T> {
+    get { return self }
+    set { }
+  }
+}
+
+// CHECK-LABEL: sil private [transparent] [thunk] @$S17materializeForSet23HasConditionalSubscriptVyxGAA0eF0A2aERzlAaEPyxSicimTW
+// CHECK:         function_ref @$S17materializeForSet23HasConditionalSubscriptVA2A0eF0RzlEyACyxGSicig
 
 // CHECK-LABEL: sil_vtable DerivedForOverride {
 // CHECK:   #BaseForOverride.valueStored!getter.1: (BaseForOverride) -> () -> Int : @$S17materializeForSet07DerivedB8OverrideC11valueStoredSivg

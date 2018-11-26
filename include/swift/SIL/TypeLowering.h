@@ -938,7 +938,7 @@ private:
 
 namespace llvm {
   template<> struct DenseMapInfo<swift::Lowering::TypeConverter::CachingTypeKey> {
-    typedef swift::Lowering::TypeConverter::CachingTypeKey CachingTypeKey;
+    using CachingTypeKey = swift::Lowering::TypeConverter::CachingTypeKey;
 
     using APCachingKey = swift::Lowering::AbstractionPattern::CachingKey;
     using CachingKeyInfo = DenseMapInfo<APCachingKey>;
@@ -967,7 +967,7 @@ namespace llvm {
   };
 
   template<> struct DenseMapInfo<swift::Lowering::TypeConverter::OverrideKey> {
-    typedef swift::Lowering::TypeConverter::OverrideKey OverrideKey;
+    using OverrideKey = swift::Lowering::TypeConverter::OverrideKey;
 
     using SILDeclRefInfo = DenseMapInfo<swift::SILDeclRef>;
 

@@ -237,8 +237,8 @@ TypeRepr *CloneVisitor::visitSILBoxTypeRepr(SILBoxTypeRepr *type) {
   SmallVector<TypeRepr *, 4> cloneArgs;
   
   for (auto &field : type->getFields())
-    cloneFields.push_back({field.VarOrLetLoc, field.Mutable,
-                           visit(field.FieldType)});
+    cloneFields.push_back({field.getLoc(), field.isMutable(),
+                           visit(field.getFieldType())});
   for (auto *arg : type->getGenericArguments())
     cloneArgs.push_back(visit(arg));
   
@@ -471,10 +471,11 @@ SILBoxTypeRepr *SILBoxTypeRepr::create(ASTContext &C,
                       SourceLoc RBraceLoc,
                       SourceLoc ArgLAngleLoc, ArrayRef<TypeRepr *> GenericArgs,
                       SourceLoc ArgRAngleLoc) {
-  return new (C) SILBoxTypeRepr(GenericParams,
-                                LBraceLoc, C.AllocateCopy(Fields), RBraceLoc,
-                                ArgLAngleLoc, C.AllocateCopy(GenericArgs),
-                                ArgRAngleLoc);
+  auto size = totalSizeToAlloc<Field, TypeRepr*>(Fields.size(),
+                                                 GenericArgs.size());
+  auto mem = C.Allocate(size, alignof(SILBoxTypeRepr));
+  return new (mem) SILBoxTypeRepr(GenericParams, LBraceLoc, Fields, RBraceLoc,
+                                  ArgLAngleLoc, GenericArgs, ArgRAngleLoc);
 }
 
 SourceLoc SILBoxTypeRepr::getStartLocImpl() const {

@@ -24,27 +24,27 @@ extension BidirectionalCollection {
   ///         print(lastNumber)
   ///     }
   ///     // Prints "50"
-  @_inlineable
+  @inlinable
   public var last: Element? {
     return isEmpty ? nil : self[index(before: endIndex)]
   }
 }
 
 //===----------------------------------------------------------------------===//
-// index(of:)/index(where:)
+// firstIndex(of:)/firstIndex(where:)
 //===----------------------------------------------------------------------===//
 
 extension Collection where Element : Equatable {
   /// Returns the first index where the specified value appears in the
   /// collection.
   ///
-  /// After using `index(of:)` to find the position of a particular element in
-  /// a collection, you can use it to access the element by subscripting. This
-  /// example shows how you can modify one of the names in an array of
+  /// After using `firstIndex(of:)` to find the position of a particular element
+  /// in a collection, you can use it to access the element by subscripting.
+  /// This example shows how you can modify one of the names in an array of
   /// students.
   ///
   ///     var students = ["Ben", "Ivy", "Jordell", "Maxime"]
-  ///     if let i = students.index(of: "Maxime") {
+  ///     if let i = students.firstIndex(of: "Maxime") {
   ///         students[i] = "Max"
   ///     }
   ///     print(students)
@@ -53,8 +53,8 @@ extension Collection where Element : Equatable {
   /// - Parameter element: An element to search for in the collection.
   /// - Returns: The first index where `element` is found. If `element` is not
   ///   found in the collection, returns `nil`.
-  @_inlineable
-  public func index(of element: Element) -> Index? {
+  @inlinable
+  public func firstIndex(of element: Element) -> Index? {
     if let result = _customIndexOfEquatableElement(element) {
       return result
     }
@@ -68,6 +68,13 @@ extension Collection where Element : Equatable {
     }
     return nil
   }
+  
+  /// Returns the first index where the specified value appears in the
+  /// collection.
+  @inlinable
+  public func index(of _element: Element) -> Index? {
+    return firstIndex(of: _element)
+  }
 }
 
 extension Collection {
@@ -80,7 +87,7 @@ extension Collection {
   /// begins with the letter "A":
   ///
   ///     let students = ["Kofi", "Abena", "Peter", "Kweku", "Akosua"]
-  ///     if let i = students.index(where: { $0.hasPrefix("A") }) {
+  ///     if let i = students.firstIndex(where: { $0.hasPrefix("A") }) {
   ///         print("\(students[i]) starts with 'A'!")
   ///     }
   ///     // Prints "Abena starts with 'A'!"
@@ -91,8 +98,8 @@ extension Collection {
   /// - Returns: The index of the first element for which `predicate` returns
   ///   `true`. If no elements in the collection satisfy the given predicate,
   ///   returns `nil`.
-  @_inlineable
-  public func index(
+  @inlinable
+  public func firstIndex(
     where predicate: (Element) throws -> Bool
   ) rethrows -> Index? {
     var i = self.startIndex
@@ -103,6 +110,106 @@ extension Collection {
       self.formIndex(after: &i)
     }
     return nil
+  }
+  
+  /// Returns the first index in which an element of the collection satisfies
+  /// the given predicate.
+  @inlinable
+  public func index(
+    where _predicate: (Element) throws -> Bool
+  ) rethrows -> Index? {
+    return try firstIndex(where: _predicate)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// lastIndex(of:)/lastIndex(where:)
+//===----------------------------------------------------------------------===//
+
+extension BidirectionalCollection {
+  /// Returns the last element of the sequence that satisfies the given
+  /// predicate.
+  ///
+  /// This example uses the `last(where:)` method to find the last
+  /// negative number in an array of integers:
+  ///
+  ///     let numbers = [3, 7, 4, -2, 9, -6, 10, 1]
+  ///     if let lastNegative = numbers.last(where: { $0 < 0 }) {
+  ///         print("The last negative number is \(firstNegative).")
+  ///     }
+  ///     // Prints "The last negative number is -6."
+  ///
+  /// - Parameter predicate: A closure that takes an element of the sequence as
+  ///   its argument and returns a Boolean value indicating whether the
+  ///   element is a match.
+  /// - Returns: The last element of the sequence that satisfies `predicate`,
+  ///   or `nil` if there is no element that satisfies `predicate`.
+  @inlinable
+  public func last(
+    where predicate: (Element) throws -> Bool
+  ) rethrows -> Element? {
+    return try lastIndex(where: predicate).map { self[$0] }
+  }
+
+  /// Returns the index of the last element in the collection that matches the
+  /// given predicate.
+  ///
+  /// You can use the predicate to find an element of a type that doesn't
+  /// conform to the `Equatable` protocol or to find an element that matches
+  /// particular criteria. This example finds the index of the last name that
+  /// begins with the letter "A":
+  ///
+  ///     let students = ["Kofi", "Abena", "Peter", "Kweku", "Akosua"]
+  ///     if let i = students.lastIndex(where: { $0.hasPrefix("A") }) {
+  ///         print("\(students[i]) starts with 'A'!")
+  ///     }
+  ///     // Prints "Akosua starts with 'A'!"
+  ///
+  /// - Parameter predicate: A closure that takes an element as its argument
+  ///   and returns a Boolean value that indicates whether the passed element
+  ///   represents a match.
+  /// - Returns: The index of the last element in the collection that matches
+  ///   `predicate`, or `nil` if no elements match.
+  @inlinable
+  public func lastIndex(
+    where predicate: (Element) throws -> Bool
+  ) rethrows -> Index? {
+    var i = endIndex
+    while i != startIndex {
+      formIndex(before: &i)
+      if try predicate(self[i]) {
+        return i
+      }
+    }
+    return nil
+  }
+}
+
+extension BidirectionalCollection where Element : Equatable {
+  /// Returns the last index where the specified value appears in the
+  /// collection.
+  ///
+  /// After using `lastIndex(of:)` to find the position of the last instance of
+  /// a particular element in a collection, you can use it to access the
+  /// element by subscripting. This example shows how you can modify one of
+  /// the names in an array of students.
+  ///
+  ///     var students = ["Ben", "Ivy", "Jordell", "Ben", "Maxime"]
+  ///     if let i = students.lastIndex(of: "Ben") {
+  ///         students[i] = "Benjamin"
+  ///     }
+  ///     print(students)
+  ///     // Prints "["Ben", "Ivy", "Jordell", "Benjamin", "Max"]"
+  ///
+  /// - Parameter element: An element to search for in the collection.
+  /// - Returns: The last index where `element` is found. If `element` is not
+  ///   found in the collection, returns `nil`.
+  @inlinable
+  public func lastIndex(of element: Element) -> Index? {
+    if let result = _customLastIndexOfEquatableElement(element) {
+      return result
+    }
+    return lastIndex(where: { $0 == element })
   }
 }
 
@@ -147,7 +254,7 @@ extension MutableCollection {
   ///   equal to the collection's `endIndex`.
   ///
   /// - Complexity: O(*n*)
-  @_inlineable
+  @inlinable
   public mutating func partition(
     by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index {
@@ -212,7 +319,7 @@ extension MutableCollection where Self : BidirectionalCollection {
   ///   equal to the collection's `endIndex`.
   ///
   /// - Complexity: O(*n*)
-  @_inlineable
+  @inlinable
   public mutating func partition(
     by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index {
@@ -290,7 +397,7 @@ extension Sequence where Element : Comparable {
   ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
   ///
   /// - Returns: A sorted array of the sequence's elements.
-  @_inlineable
+  @inlinable
   public func sorted() -> [Element] {
     var result = ContiguousArray(self)
     result.sort()
@@ -374,7 +481,7 @@ extension Sequence {
   ///   first argument should be ordered before its second argument;
   ///   otherwise, `false`.
   /// - Returns: A sorted array of the sequence's elements.
-  @_inlineable
+  @inlinable
   public func sorted(
     by areInIncreasingOrder:
       (Element, Element) throws -> Bool
@@ -413,7 +520,7 @@ extension MutableCollection
   ///     students.sort(by: >)
   ///     print(students)
   ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
-  @_inlineable
+  @inlinable
   public mutating func sort() {
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
@@ -496,7 +603,7 @@ extension MutableCollection where Self : RandomAccessCollection {
   ///   otherwise, `false`. If `areInIncreasingOrder` throws an error during
   ///   the sort, the elements may be in a different order, but none will be
   ///   lost.
-  @_inlineable
+  @inlinable
   public mutating func sort(
     by areInIncreasingOrder:
       (Element, Element) throws -> Bool

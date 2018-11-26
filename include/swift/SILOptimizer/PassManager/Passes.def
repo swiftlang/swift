@@ -90,6 +90,8 @@ PASS(CapturePropagation, "capture-prop",
      "Captured Constant Propagation")
 PASS(ClosureSpecializer, "closure-specialize",
      "Closure Specialization on Constant Function Arguments")
+PASS(ClosureLifetimeFixup, "closure-lifetime-fixup",
+     "Closure Lifetime Fixup")
 PASS(CodeSinking, "code-sinking",
      "Code Sinking")
 PASS(ComputeDominanceInfo, "compute-dominance-info",
@@ -226,20 +228,22 @@ PASS(LateReleaseHoisting, "late-release-hoisting",
      "Late SIL release Hoisting Preserving Epilogues")
 IRGEN_PASS(LoadableByAddress, "loadable-address",
      "SIL Large Loadable type by-address lowering.")
+PASS(MandatorySILLinker, "mandatory-linker",
+     "Deserialize all referenced SIL functions that are shared or transparent")
+PASS(PerformanceSILLinker, "performance-linker",
+     "Deserialize all referenced SIL functions")
 PASS(RemovePins, "remove-pins",
      "Remove SIL pin/unpin pairs")
 PASS(TempRValueOpt, "temp-rvalue-opt",
      "Remove short-lived immutable temporary copies")
 PASS(SideEffectsDumper, "side-effects-dump",
      "Print Side-Effect Information for all Functions")
-PASS(SILCleanup, "cleanup",
-     "SIL Cleanup Preparation for IRGen")
+PASS(IRGenPrepare, "irgen-prepare",
+     "Cleanup SIL in preparation for IRGen")
 PASS(SILCombine, "sil-combine",
      "Combine SIL Instructions via Peephole Optimization")
 PASS(SILDebugInfoGenerator, "sil-debuginfo-gen",
      "Generate Debug Information with Source Locations into Textual SIL")
-PASS(SILLinker, "linker",
-     "Link all SIL Referenced within the Module via Deserialization")
 PASS(SROA, "sroa",
      "Scalar Replacement of Aggregate Stack Objects")
 PASS(SROABBArgs, "sroa-bb-args",

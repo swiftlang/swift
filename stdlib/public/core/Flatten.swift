@@ -28,14 +28,13 @@
 @_fixed_layout // FIXME(sil-serialize-all)
 public struct FlattenSequence<Base: Sequence> where Base.Element: Sequence {
 
-  @_versioned // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal var _base: Base
 
   /// Creates a concatenation of the elements of the elements of `base`.
   ///
   /// - Complexity: O(1)
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal init(_base: Base) {
     self._base = _base
   }
@@ -44,14 +43,13 @@ public struct FlattenSequence<Base: Sequence> where Base.Element: Sequence {
 extension FlattenSequence {
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct Iterator {
-    @_versioned // FIXME(sil-serialize-all)
+    @usableFromInline // FIXME(sil-serialize-all)
     internal var _base: Base.Iterator
-    @_versioned // FIXME(sil-serialize-all)
+    @usableFromInline // FIXME(sil-serialize-all)
     internal var _inner: Base.Element.Iterator?
 
     /// Construct around a `base` iterator.
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
+    @inlinable // FIXME(sil-serialize-all)
     internal init(_base: Base.Iterator) {
       self._base = _base
     }
@@ -68,7 +66,7 @@ extension FlattenSequence.Iterator: IteratorProtocol {
   ///
   /// - Precondition: `next()` has not been applied to a copy of `self`
   ///   since the copy was made.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public mutating func next() -> Element? {
     repeat {
       if _fastPath(_inner != nil) {
@@ -91,7 +89,7 @@ extension FlattenSequence: Sequence {
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator())
   }
@@ -121,7 +119,7 @@ extension Sequence where Element : Sequence {
   ///
   /// - Returns: A flattened view of the elements of this
   ///   sequence of sequences.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func joined() -> FlattenSequence<Self> {
     return FlattenSequence(_base: self)
   }
@@ -130,7 +128,7 @@ extension Sequence where Element : Sequence {
 extension LazySequenceProtocol where Element : Sequence {
   /// Returns a lazy sequence that concatenates the elements of this sequence of
   /// sequences.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func joined() -> LazySequence<FlattenSequence<Elements>> {
     return FlattenSequence(_base: elements).lazy
   }
@@ -160,11 +158,11 @@ extension LazySequenceProtocol where Element : Sequence {
 @_fixed_layout // FIXME(sil-serialize-all)
 public struct FlattenCollection<Base>
   where Base : Collection, Base.Element : Collection {
-  @_versioned // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal var _base: Base
 
   /// Creates a flattened view of `base`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init(_ base: Base) {
     self._base = base
   }
@@ -175,7 +173,7 @@ extension FlattenCollection {
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct Index {
     /// The position in the outer collection of collections.
-    @_versioned // FIXME(sil-serialize-all)
+    @usableFromInline // FIXME(sil-serialize-all)
     internal let _outer: Base.Index
 
     /// The position in the inner collection at `base[_outer]`, or `nil` if
@@ -184,11 +182,10 @@ extension FlattenCollection {
     /// When `_inner != nil`, `_inner!` is a valid subscript of `base[_outer]`;
     /// when `_inner == nil`, `_outer == base.endIndex` and this index is
     /// `endIndex` of the `FlattenCollection`.
-    @_versioned // FIXME(sil-serialize-all)
+    @usableFromInline // FIXME(sil-serialize-all)
     internal let _inner: Base.Element.Index?
 
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
+    @inlinable // FIXME(sil-serialize-all)
     internal init(_ _outer: Base.Index, _ inner: Base.Element.Index?) {
       self._outer = _outer
       self._inner = inner
@@ -197,7 +194,7 @@ extension FlattenCollection {
 }
 
 extension FlattenCollection.Index : Equatable {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public static func == (
     lhs: FlattenCollection<Base>.Index,
     rhs: FlattenCollection<Base>.Index
@@ -207,7 +204,7 @@ extension FlattenCollection.Index : Equatable {
 }
 
 extension FlattenCollection.Index : Comparable {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public static func < (
     lhs: FlattenCollection<Base>.Index,
     rhs: FlattenCollection<Base>.Index
@@ -232,15 +229,15 @@ extension FlattenCollection.Index : Comparable {
 
 extension FlattenCollection.Index : Hashable
   where Base.Index : Hashable, Base.Element.Index : Hashable {
+  @inlinable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     return _hashValue(for: self)
   }
 
-  public func _hash(into hasher: inout _Hasher) {
-    hasher.append(_outer)
-    if let inner = _inner {
-      hasher.append(inner)
-    }
+  @inlinable // FIXME(sil-serialize-all)
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(_outer)
+    hasher.combine(_inner)
   }
 }
 
@@ -251,7 +248,7 @@ extension FlattenCollection : Sequence {
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator())
   }
@@ -261,7 +258,7 @@ extension FlattenCollection : Sequence {
   // just return zero.
   public var underestimatedCount: Int { return 0 }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func _copyToContiguousArray() -> ContiguousArray<Base.Element.Element> {
     // The default implementation of `_copyToContiguousArray` queries the
     // `count` property, which materializes every inner collection.  This is a
@@ -271,7 +268,7 @@ extension FlattenCollection : Sequence {
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func forEach(
     _ body: (Base.Element.Element) throws -> Void
   ) rethrows {
@@ -286,7 +283,7 @@ extension FlattenCollection : Collection {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var startIndex: Index {
     let end = _base.endIndex
     var outer = _base.startIndex
@@ -306,13 +303,12 @@ extension FlattenCollection : Collection {
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
   /// `index(after:)`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var endIndex: Index {
     return Index(_base.endIndex, nil)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal func _index(after i: Index) -> Index {
     let innerCollection = _base[i._outer]
     let nextInner = innerCollection.index(after: i._inner!)
@@ -332,8 +328,7 @@ extension FlattenCollection : Collection {
     return endIndex
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal func _index(before i: Index) -> Index {
     var prevOuter = i._outer
     if prevOuter == _base.endIndex {
@@ -352,17 +347,17 @@ extension FlattenCollection : Collection {
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func index(after i: Index) -> Index {
     return _index(after: i)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func formIndex(after i: inout Index) {
     i = index(after: i)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func distance(from start: Index, to end: Index) -> Int {
     // The following check makes sure that distance(from:to:) is invoked on the
     // _base at least once, to trigger a _precondition in forward only
@@ -392,16 +387,14 @@ extension FlattenCollection : Collection {
   }
 
   @inline(__always)
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal func _advanceIndex(_ i: inout Index, step: Int) {
     _sanityCheck(-1...1 ~= step, "step should be within the -1...1 range")
     i = step < 0 ? _index(before: i) : _index(after: i)
   }
 
   @inline(__always)
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal func _ensureBidirectional(step: Int) {
     // FIXME: This seems to be the best way of checking whether _base is
     // forward only without adding an extra protocol requirement.
@@ -414,7 +407,7 @@ extension FlattenCollection : Collection {
     }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     var i = i
     let step = n.signum()
@@ -425,12 +418,12 @@ extension FlattenCollection : Collection {
     return i
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func formIndex(_ i: inout Index, offsetBy n: Int) {
     i = index(i, offsetBy: n)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
@@ -449,7 +442,7 @@ extension FlattenCollection : Collection {
     return i
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func formIndex(
     _ i: inout Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Bool {
@@ -465,12 +458,12 @@ extension FlattenCollection : Collection {
   ///
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public subscript(position: Index) -> Base.Element.Element {
     return _base[position._outer][position._inner!]
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public subscript(bounds: Range<Index>) -> SubSequence {
     return Slice(base: self, bounds: bounds)
   }
@@ -483,12 +476,12 @@ extension FlattenCollection : BidirectionalCollection
   // methods that skip over inner collections when random-access
 
   // TODO: swift-3-indexing-model - add docs
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func index(before i: Index) -> Index {
     return _index(before: i)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func formIndex(before i: inout Index) {
     i = index(before: i)
   }
@@ -518,7 +511,7 @@ extension Collection where Element : Collection {
   ///
   /// - Returns: A flattened view of the elements of this
   ///   collection of collections.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func joined() -> FlattenCollection<Self> {
     return FlattenCollection(self)
   }
@@ -527,7 +520,7 @@ extension Collection where Element : Collection {
 extension LazyCollectionProtocol
   where Self : Collection, Element : Collection {
   /// A concatenation of the elements of `self`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func joined() -> LazyCollection<FlattenCollection<Elements>> {
     return FlattenCollection(elements).lazy
   }

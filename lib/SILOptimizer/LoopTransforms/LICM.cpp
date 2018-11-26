@@ -59,8 +59,8 @@ static bool mayWriteTo(AliasAnalysis *AA, WriteSet &MayWrites, LoadInst *LI) {
 /// alias with any memory which is read by \p AI.
 static bool mayWriteTo(AliasAnalysis *AA, SideEffectAnalysis *SEA,
                        WriteSet &MayWrites, ApplyInst *AI) {
-  SideEffectAnalysis::FunctionEffects E;
-  SEA->getEffects(E, AI);
+  FunctionSideEffects E;
+  SEA->getCalleeEffects(E, AI);
   assert(E.getMemBehavior(RetainObserveKind::IgnoreRetains) <=
          SILInstruction::MemoryBehavior::MayRead &&
          "apply should only read from memory");
@@ -495,8 +495,8 @@ void LoopTreeOptimization::analyzeCurrentLoop(
       if (auto *AI = dyn_cast<ApplyInst>(&Inst)) {
         // In contrast to load instructions, we first collect all read-only
         // function calls and add them later to SafeReads.
-        SideEffectAnalysis::FunctionEffects E;
-        SEA->getEffects(E, AI);
+        FunctionSideEffects E;
+        SEA->getCalleeEffects(E, AI);
 
         auto MB = E.getMemBehavior(RetainObserveKind::ObserveRetains);
         if (MB <= SILInstruction::MemoryBehavior::MayRead)

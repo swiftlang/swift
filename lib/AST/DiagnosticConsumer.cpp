@@ -19,6 +19,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
@@ -116,6 +117,20 @@ FileSpecificDiagnosticConsumer::consumerForLocation(SourceManager &SM,
   // FileSpecificDiagnosticConsumer to be set up before the source files are
   // actually loaded.
   if (ConsumersOrderedByRange.empty()) {
+
+    // It's possible to get here while a bridging header PCH is being
+    // attached-to, if there's some sort of AST-reader warning or error, which
+    // happens before CompilerInstance::setUpInputs(), at which point _no_
+    // source buffers are loaded in yet. In that case we return nullptr, rather
+    // than trying to build a nonsensical map (and actually crashing since we
+    // can't find buffers for the inputs).
+    assert(!SubConsumers.empty());
+    if (!SM.getIDForBufferIdentifier(SubConsumers.begin()->first).hasValue()) {
+      assert(llvm::none_of(SubConsumers, [&](const ConsumerPair &pair) {
+            return SM.getIDForBufferIdentifier(pair.first).hasValue();
+          }));
+      return nullptr;
+    }
     auto *mutableThis = const_cast<FileSpecificDiagnosticConsumer*>(this);
     mutableThis->computeConsumersOrderedByRange(SM);
   }

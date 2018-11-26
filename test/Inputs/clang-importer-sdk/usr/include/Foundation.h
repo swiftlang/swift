@@ -1076,6 +1076,10 @@ extern NSString *NSHTTPRequestKey;
 
 @end
 
+@protocol NSIdLoving
+- (void)takesIdViaProtocol:(id _Nonnull)x;
+@end
+
 #define NSTimeIntervalSince1970 978307200.0
 #define NS_DO_SOMETHING 17
 
@@ -1143,8 +1147,8 @@ void install_global_event_handler(_Nullable event_handler handler);
          context: (void*) options;
 @end
 
-__nullable id returnNullableId(void);
-void takeNullableId(__nullable id);
+_Nullable id returnNullableId(void);
+void takeNullableId(_Nullable id);
 
 @interface I
 @end

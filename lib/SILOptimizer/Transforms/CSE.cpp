@@ -874,8 +874,8 @@ bool CSE::canHandle(SILInstruction *Inst) {
     
     // We can CSE function calls which do not read or write memory and don't
     // have any other side effects.
-    SideEffectAnalysis::FunctionEffects Effects;
-    SEA->getEffects(Effects, AI);
+    FunctionSideEffects Effects;
+    SEA->getCalleeEffects(Effects, AI);
 
     // Note that the function also may not contain any retains. And there are
     // functions which are read-none and have a retain, e.g. functions which

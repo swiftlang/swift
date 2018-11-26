@@ -127,11 +127,11 @@ void FrontendOptions::forAllOutputPaths(
   }
 }
 
-const char *
+StringRef
 FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
-    return nullptr;
+    return StringRef();
 
   case ActionType::Parse:
   case ActionType::Typecheck:
@@ -142,7 +142,7 @@ FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
   case ActionType::PrintAST:
   case ActionType::DumpScopeMaps:
   case ActionType::DumpTypeRefinementContexts:
-    return nullptr;
+    return StringRef();
 
   case ActionType::EmitPCH:
     return PCH_EXTENSION;
@@ -162,7 +162,7 @@ FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
   case ActionType::Immediate:
   case ActionType::REPL:
     // These modes have no frontend-generated output.
-    return nullptr;
+    return StringRef();
 
   case ActionType::EmitAssembly:
     return "s";

@@ -34,6 +34,7 @@
 #include "swift/Strings.h"
 #include "../SwiftShims/RuntimeShims.h"
 #include "../SwiftShims/AssertionReporting.h"
+#include "CompatibilityOverride.h"
 #include "Private.h"
 #include "SwiftObject.h"
 #include "WeakReference.h"
@@ -95,6 +96,34 @@ static Class _swift_getObjCClassOfAllocated(const void *object) {
   return class_const_cast(_swift_getClassOfAllocated(object));
 }
 
+/// \brief Fetch the ObjC class object associated with the formal dynamic
+/// type of the given (possibly Objective-C) object.  The formal
+/// dynamic type ignores dynamic subclasses such as those introduced
+/// by KVO.
+///
+/// The object pointer may be a tagged pointer, but cannot be null.
+const ClassMetadata *swift::swift_getObjCClassFromObject(HeapObject *object) {
+  auto classAsMetadata = _swift_getClass(object);
+
+  // Walk up the superclass chain skipping over artifical Swift classes.
+  // If we find a non-Swift class use the result of [object class] instead.
+
+  while (classAsMetadata && classAsMetadata->isTypeMetadata()) {
+    if (!classAsMetadata->isArtificialSubclass())
+      return classAsMetadata;
+    classAsMetadata = classAsMetadata->Superclass;
+  }
+
+  id objcObject = reinterpret_cast<id>(object);
+  Class objcClass = [objcObject class];
+  if (objcObjectIsClass(objcObject)) {
+    // Original object is a class. We want a
+    // metaclass but +class doesn't give that to us.
+    objcClass = object_getClass(objcClass);
+  }
+  classAsMetadata = reinterpret_cast<const ClassMetadata *>(objcClass);
+  return classAsMetadata;
+}
 #endif
 
 /// \brief Fetch the type metadata associated with the formal dynamic
@@ -1037,9 +1066,9 @@ WeakReference *swift::swift_unknownWeakTakeAssign(WeakReference *dest,
 /*****************************************************************************/
 
 #if SWIFT_OBJC_INTEROP
-const void *
-swift::swift_dynamicCastObjCClass(const void *object,
-                                  const ClassMetadata *targetType) {
+static const void *
+swift_dynamicCastObjCClassImpl(const void *object,
+                               const ClassMetadata *targetType) {
   // FIXME: We need to decide if this is really how we want to treat 'nil'.
   if (object == nullptr)
     return nullptr;
@@ -1051,9 +1080,9 @@ swift::swift_dynamicCastObjCClass(const void *object,
   return nullptr;
 }
 
-const void *
-swift::swift_dynamicCastObjCClassUnconditional(const void *object,
-                                             const ClassMetadata *targetType) {
+static const void *
+swift_dynamicCastObjCClassUnconditionalImpl(const void *object,
+                                            const ClassMetadata *targetType) {
   // FIXME: We need to decide if this is really how we want to treat 'nil'.
   if (object == nullptr)
     return nullptr;
@@ -1067,15 +1096,15 @@ swift::swift_dynamicCastObjCClassUnconditional(const void *object,
                            targetType);
 }
 
-const void *
-swift::swift_dynamicCastForeignClass(const void *object,
-                                     const ForeignClassMetadata *targetType) {
+static const void *
+swift_dynamicCastForeignClassImpl(const void *object,
+                                  const ForeignClassMetadata *targetType) {
   // FIXME: Actually compare CFTypeIDs, once they are available in the metadata.
   return object;
 }
 
-const void *
-swift::swift_dynamicCastForeignClassUnconditional(
+static const void *
+swift_dynamicCastForeignClassUnconditionalImpl(
          const void *object,
          const ForeignClassMetadata *targetType) {
   // FIXME: Actual compare CFTypeIDs, once they are available in the metadata.
@@ -1234,35 +1263,35 @@ Class swift::swift_getInitializedObjCClass(Class c) {
   return [c class];
 }
 
-const ClassMetadata *
-swift::swift_dynamicCastObjCClassMetatype(const ClassMetadata *source,
-                                          const ClassMetadata *dest) {
+static const ClassMetadata *
+swift_dynamicCastObjCClassMetatypeImpl(const ClassMetadata *source,
+                                       const ClassMetadata *dest) {
   if ([class_const_cast(source) isSubclassOfClass:class_const_cast(dest)])
     return source;
   return nil;
 }
 
-const ClassMetadata *
-swift::swift_dynamicCastObjCClassMetatypeUnconditional(
-                                                   const ClassMetadata *source,
-                                                   const ClassMetadata *dest) {
+static const ClassMetadata *
+swift_dynamicCastObjCClassMetatypeUnconditionalImpl(const ClassMetadata *source,
+                                                    const ClassMetadata *dest) {
   if ([class_const_cast(source) isSubclassOfClass:class_const_cast(dest)])
     return source;
 
   swift_dynamicCastFailure(source, dest);
 }
+
 #endif
 
-const ClassMetadata *
-swift::swift_dynamicCastForeignClassMetatype(const ClassMetadata *sourceType,
-                                             const ClassMetadata *targetType) {
+static const ClassMetadata *
+swift_dynamicCastForeignClassMetatypeImpl(const ClassMetadata *sourceType,
+                                          const ClassMetadata *targetType) {
   // FIXME: Actually compare CFTypeIDs, once they are available in
   // the metadata.
   return sourceType;
 }
 
-const ClassMetadata *
-swift::swift_dynamicCastForeignClassMetatypeUnconditional(
+static const ClassMetadata *
+swift_dynamicCastForeignClassMetatypeUnconditionalImpl(
   const ClassMetadata *sourceType,
   const ClassMetadata *targetType)
 {
@@ -1557,3 +1586,9 @@ const ClassMetadata *swift::getRootSuperclass() {
   return nullptr;
 #endif
 }
+
+#define OVERRIDE_OBJC COMPATIBILITY_OVERRIDE
+#include "CompatibilityOverride.def"
+
+#define OVERRIDE_FOREIGN COMPATIBILITY_OVERRIDE
+#include "CompatibilityOverride.def"

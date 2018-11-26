@@ -45,8 +45,14 @@ getChildrenMaxResidentSetSize() {
   struct rusage RU;
   ::getrusage(RUSAGE_CHILDREN, &RU);
   int64_t M = static_cast<int64_t>(RU.ru_maxrss);
-  if (M < 0)
+  if (M < 0) {
     M = std::numeric_limits<int64_t>::max();
+  } else {
+#ifndef __APPLE__
+    // Apple systems report bytes; everything else appears to report KB.
+    M <<= 10;
+#endif
+  }
   return M;
 #else
   return 0;
@@ -446,35 +452,6 @@ FrontendStatsTracer::FrontendStatsTracer(
 }
 
 FrontendStatsTracer::FrontendStatsTracer() = default;
-
-FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S)
-    : FrontendStatsTracer(R, S, nullptr, nullptr)
-{}
-
-FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
-                                         const Decl *D)
-    : FrontendStatsTracer(R, S, D, getTraceFormatter<const Decl *>())
-{}
-
-FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
-                                         const ProtocolConformance *P)
-    : FrontendStatsTracer(R, S, P,
-                          getTraceFormatter<const ProtocolConformance *>()) {}
-
-FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
-                                         const Expr *E)
-    : FrontendStatsTracer(R, S, E, getTraceFormatter<const Expr *>())
-{}
-
-FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
-                                         const clang::Decl *D)
-    : FrontendStatsTracer(R, S, D, getTraceFormatter<const clang::Decl *>())
-{}
-
-FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R, StringRef S,
-                                         const SILFunction *F)
-    : FrontendStatsTracer(R, S, F, getTraceFormatter<const SILFunction *>())
-{}
 
 FrontendStatsTracer&
 FrontendStatsTracer::operator=(FrontendStatsTracer&& other)

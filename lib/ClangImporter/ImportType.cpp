@@ -748,7 +748,7 @@ namespace {
       if (!decl)
         return nullptr;
 
-      return decl->getDeclaredInterfaceType();
+      return getAdjustedTypeDeclReferenceType(decl);
     }
 
     /// Retrieve the 'Code' type for a bridged NSError, or nullptr if
@@ -776,15 +776,15 @@ namespace {
     }
 
     /// Retrieve the adjusted type of a reference to the given type declaration.
-    static Type getAdjustedTypeDeclReferenceType(TypeDecl *type) {
+    Type getAdjustedTypeDeclReferenceType(TypeDecl *type) {
       // If the imported declaration is a bridged NSError, dig out
       // the Code nested type. References to the enum type from C
       // code need to map to the code type (which is ABI compatible with C),
       // and the bridged error type is used elsewhere.
       if (auto codeDecl = getBridgedNSErrorCode(type))
-        return codeDecl->getDeclaredInterfaceType();
+        return Impl.getSugaredTypeReference(codeDecl);
 
-      return type->getDeclaredInterfaceType();
+      return Impl.getSugaredTypeReference(type);
     }
 
     ImportResult VisitEnumType(const clang::EnumType *type) {
@@ -999,7 +999,15 @@ namespace {
             if (unboundDecl == Impl.SwiftContext.getDictionaryDecl() ||
                 unboundDecl == Impl.SwiftContext.getSetDecl()) {
               auto &keyType = importedTypeArgs[0];
-              if (!Impl.matchesHashableBound(keyType)) {
+              auto keyStructDecl = keyType->getStructOrBoundGenericStruct();
+              if (!Impl.matchesHashableBound(keyType) ||
+                  // Dictionary and Array conditionally conform to Hashable,
+                  // but the conformance doesn't necessarily apply with the
+                  // imported versions of their type arguments.
+                  // FIXME: Import their non-Hashable type parameters as
+                  // AnyHashable in this context.
+                  keyStructDecl == Impl.SwiftContext.getDictionaryDecl() ||
+                  keyStructDecl == Impl.SwiftContext.getArrayDecl()) {
                 if (auto anyHashable = Impl.SwiftContext.getAnyHashableDecl())
                   keyType = anyHashable->getDeclaredType();
                 else
@@ -2007,9 +2015,6 @@ ImportedType ClangImporter::Implementation::importMethodType(
       continue;
     }
 
-    if (kind == SpecialMethodKind::NSDictionarySubscriptGetter)
-      nonNullArgs.empty();
-
     // Import the parameter type into Swift.
 
     // Check nullability of the parameter.
@@ -2464,6 +2469,25 @@ static Type getNamedProtocolType(ClangImporter::Implementation &impl,
   }
 
   return Type();
+}
+
+Type ClangImporter::Implementation::getSugaredTypeReference(TypeDecl *type) {
+  // For typealiases, build a sugared type.
+  if (auto typealias = dyn_cast<TypeAliasDecl>(type)) {
+    // If this typealias is nested, retrieve the parent type.
+    Type parentType;
+    if (auto nominal =
+          typealias->getDeclContext()
+            ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+      if (!nominal->getGenericSignature())
+        parentType = nominal->getDeclaredInterfaceType();
+    }
+
+    return NameAliasType::get(typealias, parentType, SubstitutionMap(),
+                                   typealias->getUnderlyingTypeLoc().getType());
+  }
+
+  return type->getDeclaredInterfaceType();
 }
 
 Type ClangImporter::Implementation::getNSCopyingType() {

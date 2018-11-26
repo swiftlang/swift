@@ -111,7 +111,7 @@ MetadataLayout &IRGenModule::getMetadataLayout(NominalTypeDecl *decl) {
   auto &entry = MetadataLayouts[decl];
   if (!entry) {
     if (auto theClass = dyn_cast<ClassDecl>(decl)) {
-      if (theClass->isForeign())
+      if (theClass->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
         entry = new ForeignClassMetadataLayout(*this, theClass);
       else
         entry = new ClassMetadataLayout(*this, theClass);
@@ -248,7 +248,11 @@ Address irgen::emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
     }
   }();
 
-  return IGF.emitAddressAtOffset(metadata, offset, IGF.IGM.SizeTy,
+  auto *elementSize = IGF.IGM.SizeTy;
+  if (isa<StructDecl>(decl))
+    elementSize = IGF.IGM.Int32Ty;
+
+  return IGF.emitAddressAtOffset(metadata, offset, elementSize,
                                  IGF.IGM.getPointerAlignment());
 }
 
@@ -452,7 +456,7 @@ ClassMetadataLayout::getFieldOffsetVectorOffset(IRGenFunction &IGF) const {
 
 Size irgen::getClassFieldOffsetOffset(IRGenModule &IGM, ClassDecl *theClass,
                                       VarDecl *field) {
-  if (theClass->isForeign())
+  if (theClass->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
     return Size();
 
   return IGM.getClassMetadataLayout(theClass).getStaticFieldOffset(field);
@@ -564,6 +568,10 @@ StructMetadataLayout::StructMetadataLayout(IRGenModule &IGM, StructDecl *decl)
       super::addFieldOffset(field);
     }
 
+    void noteEndOfFieldOffsets() {
+      super::noteEndOfFieldOffsets();
+    }
+
     void layout() {
       super::layout();
       Layout.TheSize = getMetadataSize();
@@ -594,7 +602,8 @@ StructMetadataLayout::getFieldOffsetVectorOffset() const {
 ForeignClassMetadataLayout::ForeignClassMetadataLayout(IRGenModule &IGM,
                                                        ClassDecl *theClass)
     : MetadataLayout(Kind::ForeignClass), Class(theClass) {
-  assert(theClass->isForeign() && "Not a foreign class");
+  assert(theClass->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
+         "Not a foreign class");
 
   struct Scanner : LayoutScanner<Scanner, ForeignClassMetadataScanner> {
     using super = LayoutScanner;

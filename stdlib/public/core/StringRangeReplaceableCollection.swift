@@ -34,7 +34,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///   - repeatedValue: The character to repeat.
   ///   - count: The number of times to repeat `repeatedValue` in the
   ///     resulting string.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init(repeating repeatedValue: Character, count: Int) {
     self.init(repeating: String(repeatedValue), count: count)
   }
@@ -59,7 +59,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///
   /// - Parameter other: A string instance or another sequence of
   ///   characters.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init<S : Sequence & LosslessStringConvertible>(_ other: S)
   where S.Element == Character {
     self = other.description
@@ -70,7 +70,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   // requirement with something that's not yet available, but not with
   // something that has become unavailable. Without this, the code won't
   // compile as Swift 4.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4, message: "String.init(_:String) is no longer failable")
   public init?(_ other: String, obsoletedInSwift4: () = ()) {
     self.init(other._guts)
@@ -79,26 +79,24 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// The position of the first character in a nonempty string.
   ///
   /// In an empty string, `startIndex` is equal to `endIndex`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var startIndex: Index { return Index(encodedOffset: 0) }
 
   /// A string's "past the end" position---that is, the position one greater
   /// than the last valid subscript argument.
   ///
   /// In an empty string, `endIndex` is equal to `startIndex`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var endIndex: Index { return Index(encodedOffset: _guts.count) }
 
-  @_inlineable
-  @_versioned
+  @inlinable
   @inline(__always)
   internal func _boundsCheck(_ index: Index) {
     _precondition(index.encodedOffset >= 0 && index.encodedOffset < _guts.count,
       "String index is out of bounds")
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
   @inline(__always)
   internal func _boundsCheck(_ range: Range<Index>) {
     _precondition(
@@ -107,8 +105,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
       "String index range is out of bounds")
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
   @inline(__always)
   internal func _boundsCheck(_ range: ClosedRange<Index>) {
     _precondition(
@@ -117,8 +114,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
       "String index range is out of bounds")
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal func _index(atEncodedOffset offset: Int) -> Index {
     return _visitGuts(_guts, args: offset,
       ascii: { ascii, offset in return ascii.characterIndex(atOffset: offset) },
@@ -132,7 +128,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func index(after i: Index) -> Index {
     return _visitGuts(_guts, args: i,
       ascii: { ascii, i in ascii.characterIndex(after: i) },
@@ -145,7 +141,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// - Parameter i: A valid index of the collection. `i` must be greater than
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func index(before i: Index) -> Index {
     return _visitGuts(_guts, args: i,
       ascii: { ascii, i in ascii.characterIndex(before: i) },
@@ -175,7 +171,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///   to `index(before:)`.
   ///
   /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     return _visitGuts(_guts, args: (i, n),
       ascii: { ascii, args in let (i, n) = args
@@ -223,7 +219,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///   the method returns `nil`.
   ///
   /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
@@ -245,7 +241,7 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// - Returns: The distance between `start` and `end`.
   ///
   /// - Complexity: O(*n*), where *n* is the resulting distance.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     return _visitGuts(_guts, args: (start, end),
       ascii: { ascii, args in let (start, end) = args
@@ -262,16 +258,16 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// For example, this code finds the first letter after the first space:
   ///
   ///     let str = "Greetings, friend! How are you?"
-  ///     let firstSpace = str.index(of: " ") ?? str.endIndex
+  ///     let firstSpace = str.firstIndex(of: " ") ?? str.endIndex
   ///     let substr = str[firstSpace...]
-  ///     if let nextCapital = substr.index(where: { $0 >= "A" && $0 <= "Z" }) {
+  ///     if let nextCapital = substr.firstIndex(where: { $0 >= "A" && $0 <= "Z" }) {
   ///         print("Capital after a space: \(str[nextCapital])")
   ///     }
   ///     // Prints "Capital after a space: H"
   ///
   /// - Parameter i: A valid index of the string. `i` must be less than the
   ///   string's end index.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public subscript(i: Index) -> Character {
     return _visitGuts(_guts, args: i,
       ascii: { ascii, i in return ascii.character(at: i) },
@@ -296,7 +292,7 @@ extension String {
   ///
   /// - Parameter characters: A string instance or another sequence of
   ///   characters.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init<S : Sequence>(_ characters: S)
     where S.Iterator.Element == Character {
     self = ""
@@ -315,7 +311,7 @@ extension String {
   ///   to allocate.
   ///
   /// - Complexity: O(*n*)
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ n: Int) {
     _guts.reserveCapacity(n)
   }
@@ -330,7 +326,7 @@ extension String {
   ///     // Prints "Globe 🌍"
   ///
   /// - Parameter c: The character to append to the string.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public mutating func append(_ c: Character) {
     if let small = c._smallUTF16 {
       _guts.append(contentsOf: small)
@@ -340,12 +336,12 @@ extension String {
     }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public mutating func append(contentsOf newElements: String) {
     append(newElements)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public mutating func append(contentsOf newElements: Substring) {
     _guts.append(
       newElements._wholeString._guts,
@@ -355,7 +351,7 @@ extension String {
   /// Appends the characters in the given sequence to the string.
   ///
   /// - Parameter newElements: A sequence of characters.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public mutating func append<S : Sequence>(contentsOf newElements: S)
     where S.Iterator.Element == Character {
     if _fastPath(newElements is _SwiftStringView) {
@@ -383,7 +379,7 @@ extension String {
   ///   `newElements`. If the call to `replaceSubrange(_:with:)` simply
   ///   removes text at the end of the string, the complexity is O(*n*), where
   ///   *n* is equal to `bounds.count`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public mutating func replaceSubrange<C>(
     _ bounds: Range<Index>,
     with newElements: C
@@ -405,7 +401,7 @@ extension String {
   ///     index, this methods appends `newElement` to the string.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the string.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public mutating func insert(_ newElement: Character, at i: Index) {
     let offset = i.encodedOffset
     _guts.replaceSubrange(offset..<offset, with: newElement.utf16)
@@ -425,7 +421,7 @@ extension String {
   ///
   /// - Complexity: O(*n*), where *n* is the combined length of the string and
   ///   `newElements`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public mutating func insert<S : Collection>(
     contentsOf newElements: S, at i: Index
   ) where S.Iterator.Element == Character {
@@ -440,7 +436,7 @@ extension String {
   /// removes the hyphen from the middle of a string.
   ///
   ///     var nonempty = "non-empty"
-  ///     if let i = nonempty.index(of: "-") {
+  ///     if let i = nonempty.firstIndex(of: "-") {
   ///         nonempty.remove(at: i)
   ///     }
   ///     print(nonempty)
@@ -452,7 +448,7 @@ extension String {
   /// - Parameter i: The position of the character to remove. `i` must be a
   ///   valid index of the string that is not equal to the string's end index.
   /// - Returns: The character that was removed.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @discardableResult
   public mutating func remove(at i: Index) -> Character {
     let offset = i.encodedOffset
@@ -463,8 +459,7 @@ extension String {
     return old
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal func _stride(of i: Index) -> Int {
     if case .character(let stride) = i._cache {
       // TODO: should _fastPath the case somehow
@@ -491,7 +486,7 @@ extension String {
   ///   equal to the string's end index.
   /// - Parameter bounds: The range of the elements to remove. The upper and
   ///   lower bounds of `bounds` must be valid indices of the string.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public mutating func removeSubrange(_ bounds: Range<Index>) {
     let start = bounds.lowerBound.encodedOffset
     let end = bounds.upperBound.encodedOffset
@@ -507,7 +502,7 @@ extension String {
   ///   string's allocated storage. Retaining the storage can be a useful
   ///   optimization when you're planning to grow the string again. The
   ///   default value is `false`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
     if keepCapacity {
       _guts.replaceSubrange(0..<_guts.count, with: EmptyCollection())
@@ -520,7 +515,7 @@ extension String {
 extension String {
   // This is needed because of the issue described in SR-4660 which causes
   // source compatibility issues when String becomes a collection
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func max<T : Comparable>(_ x: T, _ y: T) -> T {
     return Swift.max(x,y)
@@ -528,7 +523,7 @@ extension String {
 
   // This is needed because of the issue described in SR-4660 which causes
   // source compatibility issues when String becomes a collection
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func min<T : Comparable>(_ x: T, _ y: T) -> T {
     return Swift.min(x,y)
@@ -547,7 +542,7 @@ extension String {
 // Note that the second overload is declared on a more specific protocol.
 // See: test/stdlib/StringFlatMap.swift for tests.
 extension Sequence {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   public func flatMap(
     _ transform: (Element) throws -> String

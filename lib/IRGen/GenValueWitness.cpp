@@ -118,7 +118,8 @@ namespace {
   /// An implementation of DynamicPackingPHIMapping for Addresses.
   template <> class DynamicPackingPHIMapping<Address>
       : private DynamicPackingPHIMapping<llvm::Value*> {
-    typedef DynamicPackingPHIMapping<llvm::Value*> super;
+    using super = DynamicPackingPHIMapping<llvm::Value *>;
+
   public:
     void collect(IRGenFunction &IGF, Address value) {
       super::collect(IGF, value.getAddress());
@@ -462,7 +463,8 @@ void irgen::getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF, llvm::Value *arg,
          "Self argument is not a type?!");
 
   auto formalType = getFormalTypeInContext(abstractType);
-  IGF.bindLocalTypeDataFromTypeMetadata(formalType, IsExact, arg);
+  IGF.bindLocalTypeDataFromTypeMetadata(formalType, IsExact, arg,
+                                        MetadataState::Complete);
 }
 
 /// Get the next argument and use it as the 'self' type metadata.
@@ -1487,10 +1489,8 @@ void TypeInfo::assignArrayWithTake(IRGenFunction &IGF, Address dest,
   emitAssignArrayWithTakeCall(IGF, T, dest, src, count);
 }
 
-void TypeInfo::collectArchetypeMetadata(
-    IRGenFunction &IGF,
-    llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-    SILType T) const {
+void TypeInfo::collectMetadataForOutlining(OutliningMetadataCollector &c,
+                                           SILType T) const {
   auto canType = T.getSwiftRValueType();
   assert(!canType->is<ArchetypeType>() && "Did not expect an ArchetypeType");
 }

@@ -8,4 +8,4 @@ internal enum Outer {
   @_frozen public enum ButThisIsOK {} // no-warning
 }
 
-@_frozen @_versioned enum NotPublicButVersioned {} // no-warning
+@_frozen @usableFromInline enum NotPublicButVersioned {} // no-warning

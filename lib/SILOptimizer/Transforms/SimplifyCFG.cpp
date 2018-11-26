@@ -1127,7 +1127,7 @@ static bool onlyHasTerminatorAndDebugInsts(SILBasicBlock *BB) {
   TermInst *Terminator = BB->getTerminator();
   SILBasicBlock::iterator Iter = BB->begin();
   while (&*Iter != Terminator) {
-    if (!isDebugInst(&*Iter))
+    if (!(&*Iter)->isDebugInstruction())
       return false;
     Iter++;
   }

@@ -16,6 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
+#include "TypoCorrection.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -25,10 +26,23 @@
 
 using namespace swift;
 
-void LookupResult::filter(const std::function<bool(LookupResultEntry)> &pred) {
+void LookupResult::filter(
+    const std::function<bool(LookupResultEntry, bool)> &pred) {
+  size_t index = 0;
+  size_t originalFirstOuter = IndexOfFirstOuterResult;
   Results.erase(std::remove_if(Results.begin(), Results.end(),
                                [&](LookupResultEntry result) -> bool {
-                                 return !pred(result);
+                                 auto isInner = index < originalFirstOuter;
+                                 index++;
+                                 if (pred(result, !isInner))
+                                   return false;
+
+                                 // Need to remove this, which means, if it is
+                                 // an inner result, the outer results need to
+                                 // shift down.
+                                 if (isInner)
+                                   IndexOfFirstOuterResult--;
+                                 return true;
                                }),
                 Results.end());
 }
@@ -45,6 +59,8 @@ namespace {
 
     /// The vector of found declarations.
     SmallVector<ValueDecl *, 4> FoundDecls;
+    /// The vector of found declarations.
+    SmallVector<ValueDecl *, 4> FoundOuterDecls;
 
     /// The set of known declarations.
     llvm::SmallDenseMap<std::pair<ValueDecl *, DeclContext *>, bool, 4> Known;
@@ -54,7 +70,10 @@ namespace {
                         NameLookupOptions options,
                         bool isMemberLookup)
       : TC(tc), Result(result), DC(dc), Options(options),
-        IsMemberLookup(isMemberLookup) { }
+        IsMemberLookup(isMemberLookup) {
+      if (!TC.Context.LangOpts.EnableAccessControl)
+        Options |= NameLookupFlags::IgnoreAccessControl;
+    }
 
     ~LookupResultBuilder() {
       // If any of the results have a base, we need to remove
@@ -72,25 +91,35 @@ namespace {
 
       // Remove any overridden declarations from the found-declarations set.
       removeOverriddenDecls(FoundDecls);
+      removeOverriddenDecls(FoundOuterDecls);
 
       // Remove any shadowed declarations from the found-declarations set.
       removeShadowedDecls(FoundDecls, DC->getParentModule(), &TC);
+      removeShadowedDecls(FoundOuterDecls, DC->getParentModule(), &TC);
 
       // Filter out those results that have been removed from the
       // found-declarations set.
-      unsigned foundIdx = 0, foundSize = FoundDecls.size();
-      Result.filter([&](LookupResultEntry result) -> bool {
-          // If the current result matches the remaining found declaration,
-          // keep it and move to the next found declaration.
-          if (foundIdx < foundSize &&
-              result.getValueDecl() == FoundDecls[foundIdx]) {
-            ++foundIdx;
-            return true;
-          }
+      unsigned foundIdx = 0, foundSize = FoundDecls.size(),
+               foundOuterSize = FoundOuterDecls.size();
+      Result.filter([&](LookupResultEntry result, bool isOuter) -> bool {
+        unsigned idx = foundIdx;
+        unsigned limit = foundSize;
+        ArrayRef<ValueDecl *> decls = FoundDecls;
+        if (isOuter) {
+          idx = foundIdx - foundSize;
+          limit = foundOuterSize;
+          decls = FoundOuterDecls;
+        }
+        // If the current result matches the remaining found declaration,
+        // keep it and move to the next found declaration.
+        if (idx < limit && result.getValueDecl() == decls[idx]) {
+          ++foundIdx;
+          return true;
+        }
 
-          // Otherwise, this result should be filtered out.
-          return false;
-        });
+        // Otherwise, this result should be filtered out.
+        return false;
+      });
     }
 
     /// Add a new result.
@@ -102,7 +131,11 @@ namespace {
     ///
     /// \param foundInType The type through which we found the
     /// declaration.
-    void add(ValueDecl *found, DeclContext *baseDC, Type foundInType) {
+    ///
+    /// \param isOuter Whether this is an outer result (i.e. a result that isn't
+    /// from the innermost scope with results)
+    void add(ValueDecl *found, DeclContext *baseDC, Type foundInType,
+             bool isOuter) {
       ConformanceCheckOptions conformanceOptions;
       if (Options.contains(NameLookupFlags::KnownPrivate))
         conformanceOptions |= ConformanceCheckFlags::InExpression;
@@ -112,8 +145,11 @@ namespace {
 
       auto addResult = [&](ValueDecl *result) {
         if (Known.insert({{result, baseDC}, false}).second) {
-          Result.add(LookupResultEntry(baseDC, result));
-          FoundDecls.push_back(result);
+          Result.add(LookupResultEntry(baseDC, result), isOuter);
+          if (isOuter)
+            FoundOuterDecls.push_back(result);
+          else
+            FoundDecls.push_back(result);
         }
       };
 
@@ -184,6 +220,16 @@ namespace {
           .second;
       } else if (found->isProtocolRequirement()) {
         witness = concrete->getWitnessDecl(found, &TC);
+
+        // It is possible that a requirement is visible to us, but
+        // not the witness. In this case, just return the requirement;
+        // we will perform virtual dispatch on the concrete type.
+        if (witness &&
+            !Options.contains(NameLookupFlags::IgnoreAccessControl) &&
+            !witness->isAccessibleFrom(DC)) {
+          addResult(found);
+          return;
+        }
       }
 
       // FIXME: the "isa<ProtocolDecl>()" check will be wrong for
@@ -198,21 +244,32 @@ namespace {
   };
 } // end anonymous namespace
 
+static UnqualifiedLookup::Options
+convertToUnqualifiedLookupOptions(NameLookupOptions options) {
+  UnqualifiedLookup::Options newOptions;
+  if (options.contains(NameLookupFlags::KnownPrivate))
+    newOptions |= UnqualifiedLookup::Flags::KnownPrivate;
+  if (options.contains(NameLookupFlags::ProtocolMembers))
+    newOptions |= UnqualifiedLookup::Flags::AllowProtocolMembers;
+  if (options.contains(NameLookupFlags::IgnoreAccessControl))
+    newOptions |= UnqualifiedLookup::Flags::IgnoreAccessControl;
+  if (options.contains(NameLookupFlags::IncludeOuterResults))
+    newOptions |= UnqualifiedLookup::Flags::IncludeOuterResults;
+
+  return newOptions;
+}
+
 LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
                                             SourceLoc loc,
                                             NameLookupOptions options) {
-  UnqualifiedLookup lookup(
-      name, dc, this,
-      options.contains(NameLookupFlags::KnownPrivate),
-      loc,
-      /*IsTypeLookup=*/false,
-      options.contains(NameLookupFlags::ProtocolMembers),
-      options.contains(NameLookupFlags::IgnoreAccessControl));
+  UnqualifiedLookup lookup(name, dc, this, loc,
+                           convertToUnqualifiedLookupOptions(options));
 
   LookupResult result;
   LookupResultBuilder builder(*this, result, dc, options,
                               /*memberLookup*/false);
-  for (const auto &found : lookup.Results) {
+  for (auto idx : indices(lookup.Results)) {
+    const auto &found = lookup.Results[idx];
     // Determine which type we looked through to find this result.
     Type foundInType;
 
@@ -226,7 +283,8 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
       assert(foundInType && "bogus base declaration?");
     }
 
-    builder.add(found.getValueDecl(), found.getDeclContext(), foundInType);
+    builder.add(found.getValueDecl(), found.getDeclContext(), foundInType,
+                /*isOuter=*/idx >= lookup.IndexOfFirstOuterResult);
   }
   return result;
 }
@@ -235,19 +293,17 @@ LookupResult
 TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
                                    SourceLoc loc,
                                    NameLookupOptions options) {
+  auto ulOptions = convertToUnqualifiedLookupOptions(options) |
+                   UnqualifiedLookup::Flags::TypeLookup;
   {
     // Try lookup without ProtocolMembers first.
     UnqualifiedLookup lookup(
-      name, dc, this,
-        options.contains(NameLookupFlags::KnownPrivate),
-        loc,
-        /*IsTypeLookup=*/true,
-        /*AllowProtocolMembers=*/false,
-        options.contains(NameLookupFlags::IgnoreAccessControl));
+        name, dc, this, loc,
+        ulOptions - UnqualifiedLookup::Flags::AllowProtocolMembers);
 
     if (!lookup.Results.empty() ||
         !options.contains(NameLookupFlags::ProtocolMembers)) {
-      return LookupResult(lookup.Results);
+      return LookupResult(lookup.Results, lookup.IndexOfFirstOuterResult);
     }
   }
 
@@ -258,14 +314,10 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
     // is called too early, we start resolving extensions -- even those
     // which do provide not conformances.
     UnqualifiedLookup lookup(
-      name, dc, this,
-        options.contains(NameLookupFlags::KnownPrivate),
-        loc,
-        /*IsTypeLookup=*/true,
-        /*AllowProtocolMembers=*/true,
-        options.contains(NameLookupFlags::IgnoreAccessControl));
+        name, dc, this, loc,
+        ulOptions | UnqualifiedLookup::Flags::AllowProtocolMembers);
 
-    return LookupResult(lookup.Results);
+    return LookupResult(lookup.Results, lookup.IndexOfFirstOuterResult);
   }
 }
 
@@ -296,7 +348,7 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   dc->lookupQualified(type, name, subOptions, this, lookupResults);
 
   for (auto found : lookupResults)
-    builder.add(found, nullptr, type);
+    builder.add(found, nullptr, type, /*isOuter=*/false);
 
   return result;
 }
@@ -484,28 +536,30 @@ enum : unsigned {
   MaxCallEditDistanceFromBestCandidate = 1
 };
 
-static unsigned getCallEditDistance(DeclName argName, DeclName paramName,
+static unsigned getCallEditDistance(DeclName writtenName,
+                                    DeclName correctedName,
                                     unsigned maxEditDistance) {
   // TODO: consider arguments.
   // TODO: maybe ignore certain kinds of missing / present labels for the
   //   first argument label?
   // TODO: word-based rather than character-based?
-  if (argName.getBaseName().getKind() != paramName.getBaseName().getKind()) {
+  if (writtenName.getBaseName().getKind() !=
+        correctedName.getBaseName().getKind()) {
     return UnreasonableCallEditDistance;
   }
 
-  if (argName.getBaseName().getKind() != DeclBaseName::Kind::Normal) {
+  if (writtenName.getBaseName().getKind() != DeclBaseName::Kind::Normal) {
     return 0;
   }
-  assert(argName.getBaseName().getKind() == DeclBaseName::Kind::Normal);
 
-  StringRef argBase = argName.getBaseName().userFacingName();
-  StringRef paramBase = paramName.getBaseName().userFacingName();
+  StringRef writtenBase = writtenName.getBaseName().userFacingName();
+  StringRef correctedBase = correctedName.getBaseName().userFacingName();
 
-  unsigned distance = argBase.edit_distance(paramBase, maxEditDistance);
+  unsigned distance = writtenBase.edit_distance(correctedBase, maxEditDistance);
 
   // Bound the distance to UnreasonableCallEditDistance.
-  if (distance >= maxEditDistance || distance > (paramBase.size() + 2) / 3) {
+  if (distance >= maxEditDistance ||
+      distance > (correctedBase.size() + 2) / 3) {
     return UnreasonableCallEditDistance;
   }
 
@@ -539,34 +593,10 @@ static bool isLocInVarInit(TypeChecker &TC, VarDecl *var, SourceLoc loc) {
   return TC.Context.SourceMgr.rangeContainsTokenLoc(initRange, loc);
 }
 
-namespace {
-  class TypoCorrectionResolver : public DelegatingLazyResolver {
-    TypeChecker &TC() { return static_cast<TypeChecker&>(Principal); }
-    SourceLoc NameLoc;
-  public:
-    TypoCorrectionResolver(TypeChecker &TC, SourceLoc nameLoc)
-      : DelegatingLazyResolver(TC), NameLoc(nameLoc) {}
-
-    void resolveDeclSignature(ValueDecl *VD) override {
-      if (VD->isInvalid() || VD->hasInterfaceType()) return;
-
-      // Don't process a variable if we're within its initializer.
-      if (auto var = dyn_cast<VarDecl>(VD)) {
-        if (isLocInVarInit(TC(), var, NameLoc))
-          return;
-      }
-
-      DelegatingLazyResolver::resolveDeclSignature(VD);
-    }
-  };
-} // end anonymous namespace
-
 void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         Type baseTypeOrNull,
-                                        DeclName targetDeclName,
-                                        SourceLoc nameLoc,
                                         NameLookupOptions lookupOptions,
-                                        LookupResult &result,
+                                        TypoCorrectionResults &corrections,
                                         GenericSignatureBuilder *gsb,
                                         unsigned maxResults) {
   // Disable typo-correction if we won't show the diagnostic anyway or if
@@ -579,19 +609,21 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
   ++NumTypoCorrections;
 
   // Fill in a collection of the most reasonable entries.
-  TopCollection<unsigned, ValueDecl*> entries(maxResults);
+  TopCollection<unsigned, ValueDecl *> entries(maxResults);
   auto consumer = makeDeclConsumer([&](ValueDecl *decl,
                                        DeclVisibilityKind reason) {
     // Never match an operator with an identifier or vice-versa; this is
     // not a plausible typo.
-    if (!isPlausibleTypo(refKind, targetDeclName, decl))
+    if (!isPlausibleTypo(refKind, corrections.WrittenName, decl))
       return;
 
     // Don't suggest a variable within its own initializer.
     if (auto var = dyn_cast<VarDecl>(decl)) {
-      if (isLocInVarInit(*this, var, nameLoc))
+      if (isLocInVarInit(*this, var, corrections.Loc.getBaseNameLoc()))
         return;
     }
+
+    auto candidateName = decl->getFullName();
 
     // Don't waste time computing edit distances that are more than
     // the worst in our collection.
@@ -599,7 +631,8 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
       entries.getMinUninterestingScore(UnreasonableCallEditDistance);
 
     unsigned distance =
-      getCallEditDistance(targetDeclName, decl->getFullName(), maxDistance);
+      getCallEditDistance(corrections.WrittenName, candidateName,
+                          maxDistance);
 
     // Ignore values that are further than a reasonable distance.
     if (distance >= UnreasonableCallEditDistance)
@@ -608,60 +641,129 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
     entries.insert(distance, std::move(decl));
   });
 
-  TypoCorrectionResolver resolver(*this, nameLoc);
   if (baseTypeOrNull) {
-    lookupVisibleMemberDecls(consumer, baseTypeOrNull, DC, &resolver,
+    lookupVisibleMemberDecls(consumer, baseTypeOrNull, DC, this,
                              /*include instance members*/ true, gsb);
   } else {
-    lookupVisibleDecls(consumer, DC, &resolver, /*top level*/ true, nameLoc);
+    lookupVisibleDecls(consumer, DC, this, /*top level*/ true,
+                       corrections.Loc.getBaseNameLoc());
   }
 
   // Impose a maximum distance from the best score.
   entries.filterMaxScoreRange(MaxCallEditDistanceFromBestCandidate);
 
   for (auto &entry : entries)
-    result.add(LookupResultEntry(entry.Value));
+    corrections.Candidates.push_back(entry.Value);
 }
 
-static InFlightDiagnostic
-diagnoseTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl) {
-  if (auto var = dyn_cast<VarDecl>(decl)) {
-    // Suggest 'self' at the use point instead of pointing at the start
-    // of the function.
-    if (var->isSelfParameter())
-      return tc.diagnose(loc.getBaseNameLoc(), diag::note_typo_candidate,
-                         var->getName().str());
-  }
+void
+TypoCorrectionResults::addAllCandidatesToLookup(LookupResult &lookup) const {
+  for (auto candidate : Candidates)
+    lookup.add(LookupResultEntry(candidate), /*isOuter=*/false);
+}
 
+static Decl *findExplicitParentForImplicitDecl(ValueDecl *decl) {
   if (!decl->getLoc().isValid() && decl->getDeclContext()->isTypeContext()) {
     Decl *parentDecl = dyn_cast<ExtensionDecl>(decl->getDeclContext());
     if (!parentDecl) parentDecl = cast<NominalTypeDecl>(decl->getDeclContext());
+    if (parentDecl->getLoc().isValid())
+      return parentDecl;
+  }
 
-    if (parentDecl->getLoc().isValid()) {
-      StringRef kind = (isa<VarDecl>(decl) ? "property" :
-                        isa<ConstructorDecl>(decl) ? "initializer" :
-                        isa<FuncDecl>(decl) ? "method" :
-                        "member");
+  return nullptr;
+}
 
-      return tc.diagnose(parentDecl, diag::note_typo_candidate_implicit_member,
-                         decl->getBaseName().userFacingName(), kind);
+static InFlightDiagnostic
+noteTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl,
+                   bool wasClaimed) {
+  if (auto var = dyn_cast<VarDecl>(decl)) {
+    // Suggest 'self' at the use point instead of pointing at the start
+    // of the function.
+    if (var->isSelfParameter()) {
+      if (wasClaimed) {
+        // We don't need an extra note for this case because the programmer
+        // knows what 'self' refers to.
+        return InFlightDiagnostic();
+      }
+
+      return tc.diagnose(loc.getBaseNameLoc(), diag::note_typo_candidate,
+                         var->getName().str());
     }
   }
 
-  return tc.diagnose(decl, diag::note_typo_candidate,
-                     decl->getBaseName().userFacingName());
+  if (Decl *parentDecl = findExplicitParentForImplicitDecl(decl)) {
+    StringRef kind = (isa<VarDecl>(decl) ? "property" :
+                      isa<ConstructorDecl>(decl) ? "initializer" :
+                      isa<FuncDecl>(decl) ? "method" :
+                      "member");
+
+    return tc.diagnose(parentDecl,
+                       wasClaimed ? diag::implicit_member_declared_here
+                                  : diag::note_typo_candidate_implicit_member,
+                       decl->getBaseName().userFacingName(), kind);
+  }
+
+  if (wasClaimed) {
+    return tc.diagnose(decl, diag::decl_declared_here, decl->getBaseName());
+  } else {
+    return tc.diagnose(decl, diag::note_typo_candidate,
+                       decl->getBaseName().userFacingName());
+  }
 }
 
-void TypeChecker::noteTypoCorrection(DeclName writtenName, DeclNameLoc loc,
-                                     ValueDecl *decl) {
-  auto &&diagnostic = diagnoseTypoCorrection(*this, loc, decl);
+void TypoCorrectionResults::noteAllCandidates() const {
+  for (auto candidate : Candidates) {
+    auto &&diagnostic =
+      noteTypoCorrection(TC, Loc, candidate, ClaimedCorrection);
 
-  DeclName declName = decl->getFullName();
+    // Don't add fix-its if we claimed the correction for the primary
+    // diagnostic.
+    if (!ClaimedCorrection) {
+      SyntacticTypoCorrection correction(WrittenName, Loc,
+                                         candidate->getFullName());
+      correction.addFixits(diagnostic);
+    }
+  }
+}
 
-  if (writtenName.getBaseName() != declName.getBaseName())
-    diagnostic.fixItReplace(loc.getBaseNameLoc(),
-                            declName.getBaseName().userFacingName());
+void SyntacticTypoCorrection::addFixits(InFlightDiagnostic &diagnostic) const {
+  if (WrittenName.getBaseName() != CorrectedName.getBaseName())
+    diagnostic.fixItReplace(Loc.getBaseNameLoc(),
+                            CorrectedName.getBaseName().userFacingName());
 
   // TODO: add fix-its for typo'ed argument labels.  This is trickier
   // because of the reordering rules.
+}
+
+Optional<SyntacticTypoCorrection>
+TypoCorrectionResults::claimUniqueCorrection() {
+  // Look for a unique base name.  We ignore the rest of the name for now
+  // because we don't actually typo-correct any of that.
+  DeclBaseName uniqueCorrectedName;
+  for (auto candidate : Candidates) {
+    auto candidateName = candidate->getBaseName();
+
+    // If this is the first name, record it.
+    if (uniqueCorrectedName.empty())
+      uniqueCorrectedName = candidateName;
+
+    // If this is a different name from the last candidate, we don't have
+    // a unique correction.
+    else if (uniqueCorrectedName != candidateName)
+      return None;
+  }
+
+  // If we didn't find any candidates, we're done.
+  if (uniqueCorrectedName.empty())
+    return None;
+
+  // If the corrected name doesn't differ from the written name in its base
+  // name, it's not simple enough for this (for now).
+  if (WrittenName.getBaseName() == uniqueCorrectedName)
+    return None;
+
+  // Flag that we've claimed the correction.
+  ClaimedCorrection = true;
+
+  return SyntacticTypoCorrection(WrittenName, Loc, uniqueCorrectedName);
 }

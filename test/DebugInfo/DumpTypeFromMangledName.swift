@@ -15,3 +15,11 @@
 func main() {
   struct Patatino {}
 }
+
+extension Collection where Element: Equatable {
+  func split<C: Collection>(separatedBy separator: C) -> [SubSequence]
+    where C.Element == Element {
+      var results = [SubSequence]()
+      return results
+  }
+}

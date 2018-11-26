@@ -675,7 +675,7 @@ private:
                               Node::Kind::GenericSpecializationNotReAbstracted :
                               Node::Kind::GenericSpecialization);
 
-      // Create a node if the specialization is externally inlineable.
+      // Create a node if the specialization is externally inlinable.
       if (Mangled.nextIf("q")) {
         auto kind = Node::Kind::SpecializationIsFragile;
         spec->addChild(Factory.createNode(kind), Factory);
@@ -692,7 +692,7 @@ private:
       auto spec =
           Factory.createNode(Node::Kind::FunctionSignatureSpecialization);
 
-      // Create a node if the specialization is externally inlineable.
+      // Create a node if the specialization is externally inlinable.
       if (Mangled.nextIf("q")) {
         auto kind = Node::Kind::SpecializationIsFragile;
         spec->addChild(Factory.createNode(kind), Factory);

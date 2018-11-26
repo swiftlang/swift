@@ -15,7 +15,7 @@ import Foundation
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[THUNK:%.*]] = function_ref @$SS2iIyByd_S2iIegyd_TR
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[ARG1_COPY]])
-  // CHECK:         [[CONVERT:%.*]] = convert_escape_to_noescape [[BRIDGED]]
+  // CHECK:         [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[BRIDGED]]
   // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:         [[NATIVE:%.*]] = function_ref @$S20objc_blocks_bridging3FooC3foo{{[_0-9a-zA-Z]*}}F : $@convention(method) (@noescape @callee_guaranteed (Int) -> Int, Int, @guaranteed Foo) -> Int
   // CHECK:         apply [[NATIVE]]([[CONVERT]], {{.*}}, [[BORROWED_SELF_COPY]])
@@ -32,7 +32,7 @@ import Foundation
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[THUNK:%.*]] = function_ref @$SSo8NSStringCABIyBya_S2SIeggo_TR
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[BLOCK_COPY]])
-  // CHECK:         [[CONVERT:%.*]] = convert_escape_to_noescape [[BRIDGED]]
+  // CHECK:         [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[BRIDGED]]
   // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:         [[NATIVE:%.*]] = function_ref @$S20objc_blocks_bridging3FooC3bar{{[_0-9a-zA-Z]*}}F : $@convention(method) (@noescape @callee_guaranteed (@guaranteed String) -> @owned String, @guaranteed String, @guaranteed Foo) -> @owned String
   // CHECK:         apply [[NATIVE]]([[CONVERT]], {{%.*}}, [[BORROWED_SELF_COPY]])
@@ -56,7 +56,7 @@ import Foundation
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:         [[THUNK:%.*]] = function_ref @$SSo8NSStringCSgACIyBya_SSSgADIeggo_TR
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[BLOCK_COPY]])
-  // CHECK:         [[CONVERT:%.*]] = convert_escape_to_noescape [[BRIDGED]]
+  // CHECK:         [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[BRIDGED]]
   // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK:         [[NATIVE:%.*]] = function_ref @$S20objc_blocks_bridging3FooC3bas{{[_0-9a-zA-Z]*}}F : $@convention(method) (@noescape @callee_guaranteed (@guaranteed Optional<String>) -> @owned Optional<String>, @guaranteed Optional<String>, @guaranteed Foo) -> @owned Optional<String>
   // CHECK:         apply [[NATIVE]]([[CONVERT]], {{%.*}}, [[BORROWED_SELF_COPY]])
@@ -112,7 +112,7 @@ func callBlocks(_ x: Foo,
 ) -> (Int, String, String?, String?) {
   // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Foo, [[ARG1:%.*]] : @guaranteed $@callee_guaranteed (Int) -> Int, [[ARG2:%.*]] : @guaranteed $@callee_guaranteed (@guaranteed String) -> @owned String, [[ARG3:%.*]] : @guaranteed $@callee_guaranteed (@guaranteed Optional<String>) -> @owned Optional<String>):
   // CHECK: [[CLOSURE_COPY:%.*]] = copy_value [[ARG1]]
-  // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [[CLOSURE_COPY]]
+  // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_COPY]]
   // CHECK: [[F_BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage
   // CHECK: [[F_BLOCK_CAPTURE:%.*]] = project_block_storage [[F_BLOCK_STORAGE]]
   // CHECK: store [[CONVERT]] to [trivial] [[F_BLOCK_CAPTURE]]
@@ -147,7 +147,7 @@ class Test: NSObject {
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SS2iIgyd_SiIegyd_S2iIyByd_SiIeyByd_TR
 // CHECK:         [[BLOCK_COPY:%.*]] = copy_block [[ORIG_BLOCK:%.*]] :
 // CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[BLOCK_COPY]])
-// CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [[CLOSURE]]
+// CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE]]
 // CHECK:         [[RESULT:%.*]] = apply {{%.*}}([[CONVERT]])
 // CHECK:         return [[RESULT]]
 
@@ -170,9 +170,9 @@ func bridgeNonnullBlockResult() {
   nonnullStringBlockResult { return "test" }
 }
 
-// CHECK-LABEL: sil hidden @$S20objc_blocks_bridging19bridgeNoescapeBlock2fnyyyXE_tF
-func bridgeNoescapeBlock(fn: () -> ()) {
-  // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$S20objc_blocks_bridging19bridgeNoescapeBlock2fnyyyXE_tFyyXEfU_
+// CHECK-LABEL: sil hidden @$S20objc_blocks_bridging19bridgeNoescapeBlock2fn5optFnyyyXE_yycSgtF
+func bridgeNoescapeBlock(fn: () -> (), optFn: (() -> ())?) {
+  // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$S20objc_blocks_bridging19bridgeNoescapeBlock2fn5optFnyyyXE_yycSgtFyyXEfU_
   // CHECK: [[CONV_FN:%.*]] = convert_function [[CLOSURE_FN]]
   // CHECK: [[THICK_FN:%.*]] = thin_to_thick_function [[CONV_FN]]
   // CHECK: [[BLOCK_ALLOC:%.*]] = alloc_stack $@block_storage @noescape @callee_guaranteed () -> ()
@@ -212,7 +212,7 @@ func bridgeNoescapeBlock(fn: () -> ()) {
   // CHECK: apply [[FN]]([[NIL_BLOCK]])
   noescapeBlock(nil)
 
-  // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$S20objc_blocks_bridging19bridgeNoescapeBlock2fnyyyXE_tFyyXEfU0_
+  // CHECK: [[CLOSURE_FN:%.*]] = function_ref @$S20objc_blocks_bridging19bridgeNoescapeBlock2fn5optFnyyyXE_yycSgtF
   // CHECK: [[CONV_FN:%.*]] = convert_function [[CLOSURE_FN]]
   // CHECK: [[THICK_FN:%.*]] = thin_to_thick_function [[CONV_FN]]
   // CHECK: [[BLOCK_ALLOC:%.*]] = alloc_stack $@block_storage @noescape @callee_guaranteed () -> ()
@@ -242,12 +242,26 @@ func bridgeNoescapeBlock(fn: () -> ()) {
   // CHECK: apply [[FN]]([[BLOCK]])
   noescapeNonnullBlock(fn)
 
+  noescapeBlock(optFn)
+
   noescapeBlockAlias { }
   noescapeBlockAlias(fn)
   noescapeBlockAlias(nil)
 
   noescapeNonnullBlockAlias { }
   noescapeNonnullBlockAlias(fn)
+}
+
+public func bridgeNoescapeBlock( optFn: ((String?) -> ())?, optFn2: ((String?) -> ())?) {
+  noescapeBlock3(optFn, optFn2, "Foobar")
+}
+
+
+@_silgen_name("_returnOptionalEscape")
+public func returnOptionalEscape() -> (() ->())?
+
+public func bridgeNoescapeBlock() {
+  noescapeBlock(returnOptionalEscape())
 }
 
 class ObjCClass : NSObject {}

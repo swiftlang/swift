@@ -19,8 +19,7 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='DeclModifier',
-                   is_optional=True),
+             Child('Modifiers', kind='ModifierList', is_optional=True),
              Child('TypealiasKeyword', kind='TypealiasToken'),
              Child('Identifier', kind='IdentifierToken'),
              Child('GenericParameterClause', kind='GenericParameterClause',
@@ -40,8 +39,7 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='DeclModifier',
-                   is_optional=True),
+             Child('Modifiers', kind='ModifierList', is_optional=True),
              Child('AssociatedtypeKeyword', kind='AssociatedtypeToken'),
              Child('Identifier', kind='IdentifierToken'),
              Child('InheritanceClause', kind='TypeInheritanceClause',
@@ -84,27 +82,34 @@ DECL_NODES = [
              Child('Output', kind='ReturnClause', is_optional=True),
          ]),
 
-    # else-if-directive-clause -> '#elseif' expr stmt-list
-    Node('ElseifDirectiveClause', kind='Syntax',
-         traits=['WithStatements'],
+    # if-config-clause ->
+    #    ('#if' | '#elseif' | '#else') expr? (stmt-list | switch-case-list)
+    Node('IfConfigClause', kind='Syntax',
          children=[
-             Child('PoundElseif', kind='PoundElseifToken'),
-             Child('Condition', kind='Expr'),
-             Child('Statements', kind='CodeBlockItemList'),
+             Child('PoundKeyword', kind='Token',
+                   token_choices=[
+                       'PoundIfToken',
+                       'PoundElseifToken',
+                       'PoundElseToken',
+                   ]),
+             Child('Condition', kind='Expr',
+                   is_optional=True),
+             Child('Elements', kind='Syntax',
+                   node_choices=[
+                       Child('Statements', kind='CodeBlockItemList'),
+                       Child('SwitchCases', kind='SwitchCaseList'),
+                       Child('Decls', kind='MemberDeclList'),
+                   ]),
          ]),
+
+    Node('IfConfigClauseList', kind='SyntaxCollection',
+         element='IfConfigClause'),
 
     # if-config-decl -> '#if' expr stmt-list else-if-directive-clause-list
     #   else-clause? '#endif'
     Node('IfConfigDecl', kind='Decl',
-         traits=['WithStatements'],
          children=[
-             Child('PoundIf', kind='PoundIfToken'),
-             Child('Condition', kind='Expr'),
-             Child('Statements', kind='CodeBlockItemList'),
-             Child('ElseifDirectiveClauses', kind='ElseifDirectiveClauseList',
-                   is_optional=True),
-             Child('ElseClause', kind='ElseDirectiveClause',
-                   is_optional=True),
+             Child('Clauses', kind='IfConfigClauseList'),
              Child('PoundEndif', kind='PoundEndifToken'),
          ]),
 
@@ -134,9 +139,11 @@ DECL_NODES = [
                        'lazy', 'optional', 'override', 'postfix', 'prefix',
                        'required', 'static', 'unowned', 'weak', 'private',
                        'fileprivate', 'internal', 'public', 'open',
-                       'mutating', 'nonmutating',
+                       'mutating', 'nonmutating', 'indirect',
                    ]),
-             Child('Detail', kind='TokenList', is_optional=True),
+             Child('DetailLeftParen', kind='LeftParenToken', is_optional=True),
+             Child('Detail', kind='IdentifierToken', is_optional=True),
+             Child('DetailRightParen', kind='RightParenToken', is_optional=True),
          ]),
 
     Node('InheritedType', kind='Syntax',
@@ -168,8 +175,7 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='DeclModifier',
-                   is_optional=True),
+             Child('Modifiers', kind='ModifierList', is_optional=True),
              Child('ClassKeyword', kind='ClassToken'),
              Child('Identifier', kind='IdentifierToken'),
              Child('GenericParameterClause', kind='GenericParameterClause',
@@ -193,8 +199,7 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='DeclModifier',
-                   is_optional=True),
+             Child('Modifiers', kind='ModifierList', is_optional=True),
              Child('StructKeyword', kind='StructToken'),
              Child('Identifier', kind='IdentifierToken'),
              Child('GenericParameterClause', kind='GenericParameterClause',
@@ -211,8 +216,7 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='DeclModifier',
-                   is_optional=True),
+             Child('Modifiers', kind='ModifierList', is_optional=True),
              Child('ProtocolKeyword', kind='ProtocolToken'),
              Child('Identifier', kind='IdentifierToken'),
              Child('InheritanceClause', kind='TypeInheritanceClause',
@@ -232,8 +236,7 @@ DECL_NODES = [
          children=[
              Child('Attributes', kind='AttributeList',
                    is_optional=True),
-             Child('AccessLevelModifier', kind='DeclModifier',
-                   is_optional=True),
+             Child('Modifiers', kind='ModifierList', is_optional=True),
              Child('ExtensionKeyword', kind='ExtensionToken'),
              Child('ExtendedType', kind='Type'),
              Child('InheritanceClause', kind='TypeInheritanceClause',
@@ -246,13 +249,26 @@ DECL_NODES = [
     Node('MemberDeclBlock', kind='Syntax', traits=['Braced'],
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
-             Child('Members', kind='DeclList'),
+             Child('Members', kind='MemberDeclList'),
              Child('RightBrace', kind='RightBraceToken'),
          ]),
 
-    # decl-list = decl decl-list?
-    Node('DeclList', kind='SyntaxCollection',
-         element='Decl'),
+    # member-decl-list = member-decl member-decl-list?
+    Node('MemberDeclList', kind='SyntaxCollection',
+         element='MemberDeclListItem'),
+
+    # member-decl = decl ';'?
+    Node('MemberDeclListItem', kind='Syntax',
+         description='''
+         A member declaration of a type consisting of a declaration and an \
+         optional semicolon;
+         ''',
+         children=[
+             Child('Decl', kind='Decl', 
+                   description='The declaration of the type member.'),
+             Child('Semicolon', kind='SemicolonToken', is_optional=True,
+                   description='An optional trailing semicolon.'),
+         ]),
 
     # source-file = code-block-item-list eof
     Node('SourceFile', kind='Syntax',
@@ -281,7 +297,8 @@ DECL_NODES = [
                    token_choices=[
                        'IdentifierToken',
                        'WildcardToken',
-                   ]),
+                   ],
+                   is_optional=True),
              # One of these two names needs be optional, we choose the second
              # name to avoid backtracking.
              Child('SecondName', kind='Token',
@@ -290,8 +307,10 @@ DECL_NODES = [
                        'WildcardToken',
                    ],
                    is_optional=True),
-             Child('Colon', kind='ColonToken'),
-             Child('TypeAnnotation', kind='Type'),
+             Child('Colon', kind='ColonToken',
+                   is_optional=True),
+             Child('Type', kind='Type',
+                   is_optional=True),
              Child('Ellipsis', kind='Token',
                    is_optional=True),
              Child('DefaultArgument', kind='InitializerClause',
@@ -320,7 +339,7 @@ DECL_NODES = [
     #                       | 'weak'
     # mutation-modifier -> 'mutating' | 'nonmutating'
     Node('ModifierList', kind='SyntaxCollection',
-         element='Syntax',
+         element='DeclModifier',
          element_name='Modifier'),
 
     Node('FunctionDecl', kind='Decl', traits=['IdentifiedDecl'],
@@ -333,7 +352,6 @@ DECL_NODES = [
              Child('Identifier', kind='Token',
                    token_choices=[
                        'IdentifierToken',
-                       'OperatorToken',
                        'UnspacedBinaryOperatorToken',
                        'SpacedBinaryOperatorToken',
                        'PrefixOperatorToken',
@@ -404,19 +422,6 @@ DECL_NODES = [
              Child('Accessor', kind='AccessorBlock', is_optional=True),
          ]),
 
-    # else-if-directive-clause-list -> else-if-directive-clause
-    #   else-if-directive-clause-list?
-    Node('ElseifDirectiveClauseList', kind='SyntaxCollection',
-         element='ElseifDirectiveClause'),
-
-    # else-directive-clause -> '#else' stmt-list
-    Node('ElseDirectiveClause', kind='Syntax',
-         traits=['WithStatements'],
-         children=[
-             Child('PoundElse', kind='PoundElseToken'),
-             Child('Statements', kind='CodeBlockItemList'),
-         ]),
-
     # access-level-modifier -> 'private' | 'private' '(' 'set' ')'
     #                        | 'fileprivate' | 'fileprivate' '(' 'set' ')'
     #                        | 'internal' | 'internal' '(' 'set' ')'
@@ -444,6 +449,8 @@ DECL_NODES = [
     Node('ImportDecl', kind='Decl',
          children=[
              Child('Attributes', kind='AttributeList', is_optional=True),
+             Child('Modifiers', kind='ModifierList',
+                   is_optional=True),
              Child('ImportTok', kind='ImportToken'),
              Child('ImportKind', kind='Token', is_optional=True,
                    token_choices=[
@@ -521,13 +528,9 @@ DECL_NODES = [
          children=[
              Child('Identifier', kind='IdentifierToken',
                    description='The name of this case.'),
-             Child('AssociatedValue', kind='TupleType', is_optional=True,
+             Child('AssociatedValue', kind='ParameterClause', is_optional=True,
                    description='The set of associated values of the case.'),
-             Child('EqualsToken', kind='EqualsToken', is_optional=True,
-                   description='''
-                   The equals token, if this case is assigned to a raw value.
-                   '''),
-             Child('RawValue', kind='Expr', is_optional=True,
+             Child('RawValue', kind='InitializerClause', is_optional=True,
                    description='''
                    The raw value of this enum element, if present.
                    '''),
@@ -549,9 +552,13 @@ DECL_NODES = [
          enum.
          ''',
          children=[
-             Child('IndirectKeyword', kind='IndirectToken', is_optional=True,
+             Child('Attributes', kind='AttributeList', is_optional=True,
                    description='''
-                   The `indirect` keyword, if this case is indirect.
+                   The attributes applied to the case declaration.
+                   '''),
+             Child('Modifiers', kind='ModifierList', is_optional=True,
+                   description='''
+                   The declaration modifiers applied to the case declaration.
                    '''),
              Child('CaseKeyword', kind='CaseToken',
                    description='The `case` keyword for this case.'),
@@ -569,11 +576,6 @@ DECL_NODES = [
              Child('Modifiers', kind='ModifierList', is_optional=True,
                    description='''
                    The declaration modifiers applied to the enum declaration.
-                   '''),
-             Child('IndirectKeyword', kind='IndirectToken', is_optional=True,
-                   description='''
-                   The `indirect` keyword that applies to all cases in this \
-                   enum.
                    '''),
              Child('EnumKeyword', kind='EnumToken',
                    description='''
@@ -595,14 +597,174 @@ DECL_NODES = [
                    values for this enum.
                    '''),
              Child('GenericWhereClause', kind='GenericWhereClause',
-                  is_optional=True,
-                  description='''
-                  The `where` clause that applies to the generic parameters of \
-                  this enum.
-                  '''),
+                   is_optional=True,
+                   description='''
+                   The `where` clause that applies to the generic parameters of \
+                   this enum.
+                   '''),
              Child('Members', kind='MemberDeclBlock',
-                  description='''
-                  The cases and other members of this enum.
-                  ''')
+                   description='''
+                   The cases and other members of this enum.
+                   ''')
+         ]),
+
+    # operator-decl -> attribute? modifiers? 'operator' operator 
+    Node('OperatorDecl', kind='Decl', traits=['IdentifiedDecl'],
+         description='A Swift `operator` declaration.',
+         children=[
+             Child('Attributes', kind='AttributeList', is_optional=True,
+                   description='''
+                   The attributes applied to the 'operator' declaration.
+                   '''),
+             Child('Modifiers', kind='ModifierList', is_optional=True,
+                   description='''
+                   The declaration modifiers applied to the 'operator'
+                   declaration.
+                   '''),
+             Child('OperatorKeyword', kind='OperatorToken'),
+             Child('Identifier', kind='Token',
+                   token_choices=[
+                       'UnspacedBinaryOperatorToken',
+                       'SpacedBinaryOperatorToken',
+                       'PrefixOperatorToken',
+                       'PostfixOperatorToken',
+                   ]),
+             Child('InfixOperatorGroup', kind='InfixOperatorGroup',
+                   description='''
+                   Optionally specifiy a precedence group
+                   ''',
+                   is_optional=True),
+         ]),
+
+    # infix-operator-group -> ':' identifier
+    Node('InfixOperatorGroup', kind='Syntax',
+         description='''
+         A clause to specify precedence group in infix operator declaration.
+         ''',
+         children=[
+             Child('Colon', kind='ColonToken'),
+             Child('PrecedenceGroupName', kind='IdentifierToken',
+                   description='''
+                   The name of the precedence group for the operator
+                   '''),
+         ]),
+
+    # precedence-group-decl -> attributes? modifiers? 'precedencegroup'
+    #                            identifier '{' precedence-group-attribute-list
+    #                            '}'
+    Node('PrecedenceGroupDecl', kind='Decl', traits=['IdentifiedDecl'],
+         description='A Swift `precedencegroup` declaration.',
+         children=[
+             Child('Attributes', kind='AttributeList', is_optional=True,
+                   description='''
+                   The attributes applied to the 'precedencegroup' declaration.
+                   '''),
+             Child('Modifiers', kind='ModifierList', is_optional=True,
+                   description='''
+                   The declaration modifiers applied to the 'precedencegroup'
+                   declaration.
+                   '''),
+             Child('PrecedencegroupKeyword', kind='PrecedencegroupToken'),
+             Child('Identifier', kind='IdentifierToken',
+                   description='''
+                   The name of this precedence group.
+                   '''),
+             Child('LeftBrace', kind='LeftBraceToken'),
+             Child('GroupAttributes', kind='PrecedenceGroupAttributeList',
+                   description='''
+                   The characteristics of this precedence group.
+                   '''),
+             Child('RightBrace', kind='RightBraceToken'),
+         ]),
+
+    # precedence-group-attribute-list ->
+    #     (precedence-group-relation | precedence-group-assignment |
+    #      precedence-group-associativity )*
+    Node('PrecedenceGroupAttributeList', kind='SyntaxCollection',
+         element='Syntax',
+         element_choices=[
+             'PrecedenceGroupRelation',
+             'PrecedenceGroupAssignment',
+             'PrecedenceGroupAssociativity'
+         ]),
+
+    # precedence-group-relation ->
+    #     ('higherThan' | 'lowerThan') ':' precedence-group-name-list
+    Node('PrecedenceGroupRelation', kind='Syntax',
+         description='''
+         Specify the new precedence group's relation to existing precedence
+         groups.
+         ''',
+         children=[
+             Child('HigherThanOrLowerThan', kind='IdentifierToken',
+                   text_choices=[
+                      'higherThan', 'lowerThan',
+                   ],
+                   description='''
+                   The relation to specified other precedence groups.
+                   '''),
+             Child('Colon', kind='ColonToken'),
+             Child('OtherNames', kind='PrecedenceGroupNameList',
+                   description='''
+                   The name of other precedence group to which this precedence
+                   group relates.
+                   '''),
+         ]),
+
+    # precedence-group-name-list ->
+    #    identifier (',' identifier)*
+    Node('PrecedenceGroupNameList', kind='SyntaxCollection',
+         element='PrecedenceGroupNameElement'),
+    Node('PrecedenceGroupNameElement', kind='Syntax',
+         children=[
+             Child('Name', kind='IdentifierToken'),
+             Child('TrailingComma', kind='CommaToken',
+                   is_optional=True),
+         ]),
+
+    # precedence-group-assignment ->
+    #     'assignment' ':' ('true' | 'false')
+    Node('PrecedenceGroupAssignment', kind='Syntax',
+         description='''
+         Specifies the precedence of an operator when used in an operation
+         that includes optional chaining.
+         ''',
+         children=[
+             Child('AssignmentKeyword', kind='IdentifierToken',
+                   text_choices=['assignment']),
+             Child('Colon', kind='ColonToken'),
+             Child('Flag', kind='Token',
+                   token_choices=[
+                       'TrueToken',
+                       'FalseToken',
+                   ],
+                   description='''
+                   When true, an operator in the corresponding precedence group
+                   uses the same grouping rules during optional chaining as the
+                   assignment operators from the standard library. Otherwise,
+                   operators in the precedence group follows the same optional
+                   chaining rules as operators that don't perform assignment.
+                   '''),
+         ]),
+
+    # precedence-group-associativity ->
+    #     'associativity' ':' ('left' | 'right' | 'none')
+    Node('PrecedenceGroupAssociativity', kind='Syntax',
+         description='''
+         Specifies how a sequence of operators with the same precedence level
+         are grouped together in the absence of grouping parentheses.
+         ''',
+         children=[
+             Child('AssociativityKeyword', kind='IdentifierToken',
+                   text_choices=['associativity']),
+             Child('Colon', kind='ColonToken'),
+             Child('Value', kind='IdentifierToken',
+                   text_choices=['left', 'right', 'none'],
+                   description='''
+                   Operators that are `left`-associative group left-to-right.
+                   Operators that are `right`-associative group right-to-left.
+                   Operators that are specified with an associativity of `none`
+                   don't associate at all
+                   '''),
          ]),
 ]

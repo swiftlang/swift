@@ -141,6 +141,10 @@ namespace {
 
     unsigned NumInherited = 0;
 
+    // If the class has @objc ancestry, we lay out resiliently-typed fields
+    // as if they were fragile.
+    bool CompletelyFragileLayout = false;
+
     // Does the class metadata require dynamic initialization above and
     // beyond what the runtime can automatically achieve?
     //
@@ -199,7 +203,7 @@ namespace {
       Elements.push_back(Elt);
       if (!addField(Elements.back(), LayoutStrategy::Universal)) {
         // For empty tail allocated elements we still add 1 padding byte.
-        assert(cast<FixedTypeInfo>(Elt.getType()).getFixedStride() == Size(1) &&
+        assert(cast<FixedTypeInfo>(Elt.getTypeForLayout()).getFixedStride() == Size(1) &&
                "empty elements should have stride 1");
         StructFields.push_back(llvm::ArrayType::get(IGM.Int8Ty, 1));
         CurSize += Size(1);
@@ -245,6 +249,10 @@ namespace {
         }
 
         if (superclass->hasClangNode()) {
+          // Perform fragile layout if the class has @objc ancestry.
+          if (!IGM.IRGen.Opts.EnableClassResilience)
+            CompletelyFragileLayout = true;
+
           // If the superclass was imported from Objective-C, its size is
           // not known at compile time. However, since the field offset
           // vector only stores offsets of stored properties defined in
@@ -321,9 +329,22 @@ namespace {
                                   const ClassLayout *abstractLayout) {
       for (VarDecl *var : theClass->getStoredProperties()) {
         SILType type = classType.getFieldType(var, IGM.getSILModule());
-        auto &eltType = IGM.getTypeInfo(type);
+        auto &eltTypeForAccess = IGM.getTypeInfo(type);
 
-        if (!eltType.isFixedSize()) {
+        // For now, the Objective-C runtime cannot support dynamic layout of
+        // classes that contain resilient value types, so we just look through
+        // the resilience boundary and assume fragile layout for class ivars
+        // instead.
+        Optional<CompletelyFragileScope> generateStaticLayoutRAII;
+
+        if (CompletelyFragileLayout &&
+            !isa<FixedTypeInfo>(eltTypeForAccess)) {
+          generateStaticLayoutRAII.emplace(IGM);
+        }
+
+        auto &eltTypeForLayout = IGM.getTypeInfo(type);
+
+        if (!eltTypeForLayout.isFixedSize()) {
           ClassMetadataRequiresDynamicInitialization = true;
           ClassHasFixedSize = false;
 
@@ -335,7 +356,8 @@ namespace {
         assert(!abstractLayout ||
                abstractLayout->getFieldIndex(var) == fieldIndex);
 
-        Elements.push_back(ElementLayout::getIncomplete(eltType));
+        Elements.push_back(ElementLayout::getIncomplete(eltTypeForLayout,
+                                                        eltTypeForAccess));
         AllStoredProperties.push_back(var);
         AllFieldAccesses.push_back(getFieldAccess(abstractLayout, fieldIndex));
       }
@@ -414,7 +436,7 @@ ClassTypeInfo::createLayoutWithTailElems(IRGenModule &IGM,
   // Add the tail elements.
   for (SILType TailTy : tailTypes) {
     const TypeInfo &tailTI = IGM.getTypeInfo(TailTy);
-    builder.addTailElement(ElementLayout::getIncomplete(tailTI));
+    builder.addTailElement(ElementLayout::getIncomplete(tailTI, tailTI));
   }
 
   // Create a name for the new llvm type.
@@ -461,7 +483,7 @@ llvm::Value *IRGenFunction::emitByteOffsetGEP(llvm::Value *base,
                                               llvm::Value *offset,
                                               llvm::Type *objectType,
                                               const llvm::Twine &name) {
-  assert(offset->getType() == IGM.SizeTy);
+  assert(offset->getType() == IGM.SizeTy || offset->getType() == IGM.Int32Ty);
   auto addr = Builder.CreateBitCast(base, IGM.Int8PtrTy);
   addr = Builder.CreateInBoundsGEP(addr, offset);
   return Builder.CreateBitCast(addr, objectType->getPointerTo(), name);
@@ -757,13 +779,15 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
   if (objc) {
     llvm::Value *metadata =
       emitClassHeapMetadataRef(IGF, classType, MetadataValueType::ObjCClass,
+                               MetadataState::Complete,
                                /*allow uninitialized*/ true);
     StackAllocSize = -1;
     return emitObjCAllocObjectCall(IGF, metadata, selfType);
   }
 
   llvm::Value *metadata =
-    emitClassHeapMetadataRef(IGF, classType, MetadataValueType::TypeMetadata);
+    emitClassHeapMetadataRef(IGF, classType, MetadataValueType::TypeMetadata,
+                             MetadataState::Complete);
 
   // FIXME: Long-term, we clearly need a specialized runtime entry point.
   llvm::Value *size, *alignMask;
@@ -1036,7 +1060,7 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
 }
 
 namespace {
-  typedef std::pair<ClassDecl*, ModuleDecl*> CategoryNameKey;
+  using CategoryNameKey = std::pair<ClassDecl*, ModuleDecl*>;
   /// Used to provide unique names to ObjC categories generated by Swift
   /// extensions. The first category for a class in a module gets the module's
   /// name as its key, e.g., NSObject (MySwiftModule). Another extension of the
@@ -1810,9 +1834,8 @@ namespace {
         break;
       }
       case FieldAccess::ConstantIndirect:
-        // Otherwise, swift_initClassMetadata_UniversalStrategy() will point
-        // the Objective-C runtime into the field offset vector of the
-        // instantiated metadata.
+        // Otherwise, swift_initClassMetadata() will point the Objective-C
+        // runtime into the field offset vector of the instantiated metadata.
         offsetPtr
           = llvm::ConstantPointerNull::get(IGM.IntPtrTy->getPointerTo());
         break;
@@ -2313,6 +2336,8 @@ bool irgen::doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
 }
 
 bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, CanType type) {
+  // This needs to be kept up-to-date with getIsaEncodingForType.
+
   if (ClassDecl *theClass = type.getClassOrBoundGenericClass()) {
     return hasKnownSwiftMetadata(IGM, theClass);
   }
@@ -2441,7 +2466,8 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
       // dynamically.
 
       metadata = emitClassHeapMetadataRef(IGF, instanceTy.getSwiftRValueType(),
-                                          MetadataValueType::TypeMetadata);
+                                          MetadataValueType::TypeMetadata,
+                                          MetadataState::Complete);
       auto superField = emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
       metadata = IGF.Builder.CreateLoad(superField);
     } else {
@@ -2449,7 +2475,8 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
       // metadata.
       auto superTy = instanceTy.getSuperclass();
       metadata = emitClassHeapMetadataRef(IGF, superTy.getSwiftRValueType(),
-                                          MetadataValueType::TypeMetadata);
+                                          MetadataValueType::TypeMetadata,
+                                          MetadataState::Complete);
     }
   } else {
     if ((isa<FuncDecl>(methodDecl) && cast<FuncDecl>(methodDecl)->isStatic()) ||

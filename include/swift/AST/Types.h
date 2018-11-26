@@ -373,6 +373,16 @@ protected:
     GenericArgCount : 32
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(NameAliasType, SugarType, 1+16,
+    : NumPadBits,
+
+    /// Whether we have a parent type.
+    HasParent : 1,
+
+    /// The number of substitutions.
+    NumSubstitutions : 16
+  );
+
   } Bits;
 
 protected:
@@ -409,12 +419,12 @@ private:
 public:
   /// getCanonicalType - Return the canonical version of this type, which has
   /// sugar from all levels stripped off.
-  CanType getCanonicalType() {
+  CanType getCanonicalType() const {
     if (isCanonical())
-      return CanType(this);
+      return CanType(const_cast<TypeBase*>(this));
     if (hasCanonicalTypeComputed())
       return CanType(CanonicalType.get<TypeBase*>());
-    return computeCanonicalType();
+    return const_cast<TypeBase*>(this)->computeCanonicalType();
   }
 
   /// getCanonicalType - Stronger canonicalization which folds away equivalent
@@ -536,7 +546,7 @@ public:
   ///
   /// To determine whether there is an opened existential type
   /// anywhere in the type, use \c hasOpenedExistential.
-  bool isOpenedExistential();
+  bool isOpenedExistential() const;
 
   /// Determine whether the type is an opened existential type with Error inside
   bool isOpenedExistentialWithError();
@@ -552,6 +562,11 @@ public:
   /// Erase DynamicSelfType from the given type by replacing it with its
   /// underlying type.
   Type eraseDynamicSelfType();
+
+  /// Given a declaration context, returns a function type with the 'self'
+  /// type curried as the input if the declaration context describes a type.
+  /// Otherwise, returns the type itself.
+  Type addCurriedSelfType(const DeclContext *dc);
 
   /// Map a contextual type to an interface type.
   Type mapTypeOutOfContext();
@@ -672,9 +687,24 @@ public:
   ///
   /// A type is SIL-illegal if it is:
   ///   - an l-value type,
-  ///   - an AST function type (i.e. subclasses of AnyFunctionType), or
+  ///   - a metatype without a representation,
+  ///   - an AST function type (i.e. subclasses of AnyFunctionType),
+  ///   - an optional whose object type is SIL-illegal, or
   ///   - a tuple type with a SIL-illegal element type.
   bool isLegalSILType();
+
+  /// \brief Determine whether this type is a legal formal type.
+  ///
+  /// A type is illegal as a formal type if it is:
+  ///   - an l-value type,
+  ///   - a reference storage type,
+  ///   - a metatype with a representation,
+  ///   - a lowered function type (i.e. SILFunctionType),
+  ///   - an optional whose object type is not a formal type, or
+  ///   - a tuple type with an element that is not a formal type.
+  ///
+  /// These are the types of the Swift type system.
+  bool isLegalFormalType();
 
   /// \brief Check if this type is equal to the empty tuple type.
   bool isVoid();
@@ -762,6 +792,23 @@ public:
   /// Calling `C<String, NSObject>`->getSuperclassForDecl(`A`) will return
   /// `A<Int, NSObject>`.
   Type getSuperclassForDecl(const ClassDecl *classDecl);
+
+  /// \brief Whether this type or its superclasses has some form of generic
+  /// context.
+  ///
+  /// For example, given
+  ///
+  /// class A<X> {}
+  /// class B : A<Int> {}
+  /// struct C<T> {
+  ///   struct Inner {}
+  /// }
+  /// class D {}
+  /// class E: D {}
+  ///
+  /// Calling hasGenericAncestry() on `B` returns `A<Int>`, on `C<T>.Inner`
+  /// returns `C<T>.Inner`, but on `E` it returns null.
+  Type getGenericAncestor();
 
   /// \brief True if this type is the superclass of another type, or a generic
   /// type that could be bound to the superclass.
@@ -1024,6 +1071,9 @@ public:
   void print(raw_ostream &OS,
              const PrintOptions &PO = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &PO) const;
+
+  /// Does this type have grammatically simple syntax?
+  bool hasSimpleTypeRepr() const;
 
   /// Return the name of the type as a string, for use in diagnostics only.
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
@@ -1502,8 +1552,8 @@ protected:
   SugarType(TypeKind K, const ASTContext *ctx,
             RecursiveTypeProperties properties)
       : TypeBase(K, nullptr, properties), Context(ctx) {
-    if (K != TypeKind::NameAlias)
-      assert(ctx != nullptr && "Context for SugarType should not be null");
+    assert(ctx != nullptr &&
+           "Context for SugarType should not be null");
     Bits.SugarType.HasCachedType = false;
   }
 
@@ -1538,22 +1588,88 @@ public:
   }
 };
 
-/// NameAliasType - An alias type is a name for another type, just like a
-/// typedef in C.
-class NameAliasType : public SugarType {
-  friend class TypeAliasDecl;
-  // NameAliasType are never canonical.
-  NameAliasType(TypeAliasDecl *d) 
-    : SugarType(TypeKind::NameAlias, (ASTContext*)nullptr,
-                RecursiveTypeProperties()),
-      TheDecl(d) {}
-  TypeAliasDecl *const TheDecl;
+/// A reference to a type alias that is somehow generic, along with the
+/// set of substitutions to apply to make the type concrete.
+class NameAliasType final
+  : public SugarType, public llvm::FoldingSetNode,
+    llvm::TrailingObjects<NameAliasType, Type, GenericSignature *,
+                          Substitution>
+{
+  TypeAliasDecl *typealias;
+
+  friend class ASTContext;
+  friend TrailingObjects;
+
+  NameAliasType(TypeAliasDecl *typealias, Type parent,
+                     const SubstitutionMap &substitutions, Type underlying,
+                     RecursiveTypeProperties properties);
+
+  unsigned getNumSubstitutions() const {
+    return Bits.NameAliasType.NumSubstitutions;
+  }
+
+  size_t numTrailingObjects(OverloadToken<Type>) const {
+    return Bits.NameAliasType.HasParent ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericSignature *>) const {
+    return getNumSubstitutions() > 0 ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<Substitution>) const {
+    return getNumSubstitutions();
+  }
+
+  /// Retrieve the set of substitutions to be applied to the declaration to
+  /// produce the underlying type.
+  SubstitutionList getSubstitutionList() const {
+    return {getTrailingObjects<Substitution>(), getNumSubstitutions()};
+  }
+
+  /// Retrieve the generic signature used for substitutions.
+  GenericSignature *getGenericSignature() const {
+    return getNumSubstitutions() > 0
+             ? *getTrailingObjects<GenericSignature *>()
+             : nullptr;
+  }
 
 public:
-  TypeAliasDecl *getDecl() const { return TheDecl; }
+  static NameAliasType *get(TypeAliasDecl *typealias, Type parent,
+                                 const SubstitutionMap &substitutions,
+                                 Type underlying);
 
-  using TypeBase::setRecursiveProperties;
-   
+  /// \brief Returns the declaration that declares this type.
+  TypeAliasDecl *getDecl() const {
+    // Avoid requiring the definition of TypeAliasDecl.
+    return typealias;
+  }
+
+  /// Retrieve the parent of this type as written, e.g., the part that was
+  /// written before ".", if provided.
+  Type getParent() const {
+    return Bits.NameAliasType.HasParent ? *getTrailingObjects<Type>()
+                                             : Type();
+  }
+
+  /// Retrieve the substitution map applied to the declaration's underlying
+  /// to produce the described type.
+  SubstitutionMap getSubstitutionMap() const;
+
+  /// Get the innermost generic arguments, which correspond to the generic
+  /// arguments that are directly applied to the typealias declaration in
+  /// produced by \c getDecl().
+  ///
+  /// The result can be empty, if the declaration itself is non-generic but
+  /// the parent is generic.
+  SmallVector<Type, 2> getInnermostGenericArgs() const;
+
+  // Support for FoldingSet.
+  void Profile(llvm::FoldingSetNodeID &id) const;
+
+  static void Profile(llvm::FoldingSetNodeID &id, TypeAliasDecl *typealias,
+                      Type parent, const SubstitutionMap &substitutions,
+                      Type underlying);
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::NameAlias;
@@ -4192,11 +4308,6 @@ public:
   static bool visitAllProtocols(ArrayRef<ProtocolDecl *> protocols,
                                 llvm::function_ref<bool(ProtocolDecl *)> fn);
 
-  /// Compare two protocols to provide them with a stable ordering for
-  /// use in sorting.
-  static int compareProtocols(ProtocolDecl * const* PP1,
-                              ProtocolDecl * const* PP2);
-
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getDecl(), getParent());
   }
@@ -4267,7 +4378,7 @@ public:
   bool requiresClass();
 
   /// True if the class requirement is stated directly via '& AnyObject'.
-  bool hasExplicitAnyObject() {
+  bool hasExplicitAnyObject() const {
     return Bits.ProtocolCompositionType.HasExplicitAnyObject;
   }
 
@@ -5000,7 +5111,7 @@ inline bool TypeBase::isClassExistentialType() {
   return false;
 }
 
-inline bool TypeBase::isOpenedExistential() {
+inline bool TypeBase::isOpenedExistential() const {
   if (!hasOpenedExistential())
     return false;
 
@@ -5254,6 +5365,34 @@ inline TypeBase *TypeBase::getDesugaredType() {
   if (!isa<SugarType>(this))
     return this;
   return cast<SugarType>(this)->getSinglyDesugaredType()->getDesugaredType();
+}
+
+inline bool TypeBase::hasSimpleTypeRepr() const {
+  // NOTE: Please keep this logic in sync with TypeRepr::isSimple().
+  switch (getKind()) {
+  case TypeKind::Function:
+  case TypeKind::GenericFunction:
+    return false;
+
+  case TypeKind::Metatype:
+  case TypeKind::ExistentialMetatype:
+    return !cast<const AnyMetatypeType>(this)->hasRepresentation();
+
+  case TypeKind::Archetype:
+    return !cast<const ArchetypeType>(this)->isOpenedExistential();
+
+  case TypeKind::ProtocolComposition: {
+    // 'Any', 'AnyObject' and single protocol compositions are simple
+    auto composition = cast<const ProtocolCompositionType>(this);
+    auto memberCount = composition->getMembers().size();
+    if (composition->hasExplicitAnyObject())
+      return memberCount == 0;
+    return memberCount <= 1;
+  }
+
+  default:
+    return true;
+  }
 }
 
 } // end namespace swift

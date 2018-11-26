@@ -169,6 +169,8 @@ namespace sil_block {
     SIL_INST_WITNESS_METHOD,
     SIL_SPECIALIZE_ATTR,
     SIL_PROPERTY,
+    SIL_ONE_OPERAND_EXTRA_ATTR,
+    SIL_TWO_OPERANDS_EXTRA_ATTR,
 
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
@@ -404,17 +406,36 @@ namespace sil_block {
   using SILOneOperandLayout = BCRecordLayout<
     SIL_ONE_OPERAND,
     SILInstOpCodeField,
-    BCFixed<4>,          // Optional attributes
+    BCFixed<2>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField
+  >;
+
+  using SILOneOperandExtraAttributeLayout = BCRecordLayout<
+    SIL_ONE_OPERAND_EXTRA_ATTR,
+    SILInstOpCodeField,
+    BCFixed<5>, // Optional attributes
+    TypeIDField, SILTypeCategoryField, ValueIDField
   >;
 
   // SIL instructions with two typed values.
   using SILTwoOperandsLayout = BCRecordLayout<
     SIL_TWO_OPERANDS,
     SILInstOpCodeField,
-    BCFixed<4>,          // Optional attributes
+    BCFixed<2>,          // Optional attributes
+    TypeIDField,
+    SILTypeCategoryField,
+    ValueIDField,
+    TypeIDField,
+    SILTypeCategoryField,
+    ValueIDField
+  >;
+
+  using SILTwoOperandsExtraAttributeLayout = BCRecordLayout<
+    SIL_TWO_OPERANDS_EXTRA_ATTR,
+    SILInstOpCodeField,
+    BCFixed<5>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField,

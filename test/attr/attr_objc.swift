@@ -1657,6 +1657,9 @@ class HasIBOutlet {
 
   @IBOutlet var badOutlet: PlainStruct
   // expected-error@-1 {{@IBOutlet property cannot have non-object type 'PlainStruct'}} {{3-13=}}
+  // expected-error@-2 {{@IBOutlet property has non-optional type 'PlainStruct'}}
+  // expected-note@-3 {{add '?' to form the optional type 'PlainStruct?'}}
+  // expected-note@-4 {{add '!' to form an implicitly unwrapped optional}}
   // CHECK-LABEL: {{^}}  @IBOutlet var badOutlet: PlainStruct
 }
 
@@ -2286,13 +2289,13 @@ class User: NSObject {
   }
 }
 
-// 'dynamic' methods cannot be @_inlineable or @_versioned
+// 'dynamic' methods cannot be @inlinable or @usableFromInline
 class BadClass {
-  @_inlineable @objc dynamic func badMethod1() {}
-  // expected-error@-1 {{'@_inlineable' attribute cannot be applied to 'dynamic' declarations}}
+  @inlinable @objc dynamic func badMethod1() {}
+  // expected-error@-1 {{'@inlinable' attribute cannot be applied to 'dynamic' declarations}}
 
-  @_versioned @objc dynamic func badMethod2() {}
-  // expected-error@-1 {{'@_versioned' attribute cannot be applied to 'dynamic' declarations}}
+  @usableFromInline @objc dynamic func badMethod2() {}
+  // expected-error@-1 {{'@usableFromInline' attribute cannot be applied to 'dynamic' declarations}}
 }
 
 @objc

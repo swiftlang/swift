@@ -105,7 +105,7 @@ private:
 public:
   // The payload types.
 #define TYPE_CHECK_REQUEST_PAYLOAD(PayloadName,...)     \
-  typedef __VA_ARGS__ PayloadName##PayloadType;
+  using PayloadName##PayloadType = __VA_ARGS__;
 
 #include "swift/Sema/TypeCheckRequestPayloads.def"
   
@@ -181,7 +181,7 @@ public:
 /// A callback used to check whether a particular dependency of this
 /// operation has been satisfied. If so, it returns \c false. If not,
 /// the dependency will be recorded and this operation returns \c true.
-typedef llvm::function_ref<bool(TypeCheckRequest)> UnsatisfiedDependency;
+using UnsatisfiedDependency = llvm::function_ref<bool(TypeCheckRequest)>;
 
 // Create requestXXX functions to more easily form type check requests
 // of the appropriate type.

@@ -7,7 +7,7 @@ sil_stage canonical
 
 import Swift
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc i64 @bitcast_different_size1
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i64 @bitcast_different_size1
 
 // OPT-LABEL: define{{.*}}@bitcast_different_size1(i32)
 // OPT:   tail call void asm sideeffect "", "n"(i32 0)

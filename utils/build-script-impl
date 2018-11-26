@@ -2804,13 +2804,14 @@ for host in "${ALL_HOSTS[@]}"; do
                     fi
                 fi
 
-                # Handle test subdirectory clause
+                # Optionally specify a test subdirectory and category filters.
+                # Watchpoint testing is currently disabled: see rdar://38566150.
                 if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
                     LLDB_TEST_SUBDIR_CLAUSE="--test-subdir lang/swift"
-                    LLDB_TEST_CATEGORIES="--skip-category=dwo --skip-category=dsym --skip-category=gmodules -G swiftpr"
+                    LLDB_TEST_CATEGORIES="--skip-category=watchpoint --skip-category=dwo --skip-category=dsym --skip-category=gmodules -G swiftpr"
                 else
                     LLDB_TEST_SUBDIR_CLAUSE=""
-                    LLDB_TEST_CATEGORIES=""
+                    LLDB_TEST_CATEGORIES="--skip-category=watchpoint"
                 fi
 
                 # figure out which C/C++ compiler we should use for building test inferiors.
@@ -2864,7 +2865,7 @@ for host in "${ALL_HOSTS[@]}"; do
                         -E "${DOTEST_EXTRA}"
                 else
                     with_pushd "${results_dir}" \
-                        call env SWIFTCC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
+                        call env SWIFTC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
                         SWIFTLIBS="${swift_build_dir}/lib/swift" \
                         "${LLDB_SOURCE_DIR}"/test/dotest.py \
                         --executable "${lldb_executable}" \
@@ -3482,7 +3483,7 @@ function build_and_test_installable_package() {
             fi
 
             LIT_EXECUTABLE_PATH="${LLVM_SOURCE_DIR}/utils/lit/lit.py"
-            FILECHECK_EXECUTABLE_PATH="$(build_directory_bin ${LOCAL_HOST} llvm)/FileCheck"
+            LLVM_BIN_DIR="$(build_directory_bin ${LOCAL_HOST} llvm)"
             echo "-- Test Installable Package --"
             call rm -rf "${PKG_TESTS_SANDBOX_PARENT}"
             call mkdir -p "${PKG_TESTS_SANDBOX}"
@@ -3490,7 +3491,7 @@ function build_and_test_installable_package() {
                 call tar xzf "${package_for_host}"
 
             with_pushd "${PKG_TESTS_SOURCE_DIR}" \
-                call python "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param filecheck="${FILECHECK_EXECUTABLE_PATH}" --param test-exec-root="${PKG_TESTS_TEMPS}"
+                call python "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param test-exec-root="${PKG_TESTS_TEMPS}" --param llvm-bin-dir="${LLVM_BIN_DIR}"
         fi
     fi
 }

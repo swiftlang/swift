@@ -192,8 +192,8 @@ struct d0100_FooStruct {
 
   class NestedClass {}
 // PASS_COMMON-NEXT: {{^}}  class NestedClass {{{$}}
-// PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
 // PASS_COMMON-NEXT: {{^}}    init(){{$}}
+// PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
   enum NestedEnum {}
@@ -268,8 +268,8 @@ extension d0100_FooStruct {
 
   class ExtNestedClass {}
 // PASS_COMMON-NEXT: {{^}}  class ExtNestedClass {{{$}}
-// PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
 // PASS_COMMON-NEXT: {{^}}    init(){{$}}
+// PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
   enum ExtNestedEnum {
@@ -587,12 +587,13 @@ struct d0200_EscapedIdentifiers {
 // PASS_COMMON-NEXT: {{^}}    case `case`{{$}}
 // PASS_COMMON-NEXT: {{^}}    {{.*}}static func __derived_enum_equals(_ a: d0200_EscapedIdentifiers.`enum`, _ b: d0200_EscapedIdentifiers.`enum`) -> Bool
 // PASS_COMMON-NEXT: {{^}}    var hashValue: Int { get }{{$}}
+// PASS_COMMON-NEXT: {{^}}    func hash(into hasher: inout Hasher)
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
   class `class` {}
 // PASS_COMMON-NEXT: {{^}}  class `class` {{{$}}
-// PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
 // PASS_COMMON-NEXT: {{^}}    init(){{$}}
+// PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
   typealias `protocol` = `class`
@@ -602,8 +603,8 @@ struct d0200_EscapedIdentifiers {
   class `extension` : `class` {}
 // PASS_ONE_LINE_TYPE-DAG: {{^}}  class `extension` : d0200_EscapedIdentifiers.`class` {{{$}}
 // PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  class `extension` : `class` {{{$}}
-// PASS_COMMON: {{^}}    @objc deinit{{$}}
-// PASS_COMMON-NEXT: {{^}}    {{(override )?}}init(){{$}}
+// PASS_COMMON:      {{^}}    {{(override )?}}init(){{$}}
+// PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
   func `func`<`let`: `protocol`, `where`>(
@@ -1015,6 +1016,7 @@ enum d2000_EnumDecl1 {
 // PASS_COMMON-NEXT: {{^}}  case ED1_Second{{$}}
 // PASS_COMMON-NEXT: {{^}}  {{.*}}static func __derived_enum_equals(_ a: d2000_EnumDecl1, _ b: d2000_EnumDecl1) -> Bool
 // PASS_COMMON-NEXT: {{^}}  var hashValue: Int { get }{{$}}
+// PASS_COMMON-NEXT: {{^}}  func hash(into hasher: inout Hasher)
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 
 enum d2100_EnumDecl2 {
@@ -1072,6 +1074,7 @@ enum d2300_EnumDeclWithValues1 : Int {
 // PASS_COMMON-NEXT: {{^}}  case EDV2_Second{{$}}
 // PASS_COMMON-NEXT: {{^}}  typealias RawValue = Int
 // PASS_COMMON-NEXT: {{^}}  var hashValue: Int { get }{{$}}
+// PASS_COMMON-NEXT: {{^}}  func hash(into hasher: inout Hasher)
 // PASS_COMMON-NEXT: {{^}}  init?(rawValue: Int){{$}}
 // PASS_COMMON-NEXT: {{^}}  var rawValue: Int { get }{{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
@@ -1085,6 +1088,7 @@ enum d2400_EnumDeclWithValues2 : Double {
 // PASS_COMMON-NEXT: {{^}}  case EDV3_Second{{$}}
 // PASS_COMMON-NEXT: {{^}}  typealias RawValue = Double
 // PASS_COMMON-NEXT: {{^}}  var hashValue: Int { get }{{$}}
+// PASS_COMMON-NEXT: {{^}}  func hash(into hasher: inout Hasher)
 // PASS_COMMON-NEXT: {{^}}  init?(rawValue: Double){{$}}
 // PASS_COMMON-NEXT: {{^}}  var rawValue: Double { get }{{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
@@ -1375,3 +1379,5 @@ public typealias MyPairI<B> = MyPair<Int, B>
 // PASS_PRINT_AST: public typealias MyPairI<B> = MyPair<Int, B>
 public typealias MyPairAlias<T, U> = MyPair<T, U>
 // PASS_PRINT_AST: public typealias MyPairAlias<T, U> = MyPair<T, U>
+public typealias MyPairAlias2<T: FooProtocol, U> = MyPair<T, U> where U: BarProtocol
+// PASS_PRINT_AST: public typealias MyPairAlias2<T, U> = MyPair<T, U> where T : FooProtocol, U : BarProtocol

@@ -934,10 +934,10 @@ static bool isAddressInitializedAtCall(SILValue addr, SILInstruction *AI,
       if (!DT->properlyDominates(AI, user))
         return false;
     } else {
-      assert(isa<CopyAddrInst>(user) || isa<InitExistentialAddrInst>(user)
-             || isa<OpenExistentialAddrInst>(user)
-             || isa<DeallocStackInst>(user)
-             || isDebugInst(user) && "Unexpected instruction");
+      assert(isa<CopyAddrInst>(user) || isa<InitExistentialAddrInst>(user) ||
+             isa<OpenExistentialAddrInst>(user) ||
+             isa<DeallocStackInst>(user) ||
+             user->isDebugInstruction() && "Unexpected instruction");
     }
   }
   return true;

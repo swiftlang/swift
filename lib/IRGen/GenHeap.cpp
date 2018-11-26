@@ -96,7 +96,7 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
       case ElementLayout::Kind::InitialNonFixedSize:
         // Factor the non-fixed-size field's alignment into the total alignment.
         totalAlign = IGF.Builder.CreateOr(totalAlign,
-                                    elt.getType().getAlignmentMask(IGF, eltTy));
+                                    elt.getTypeForLayout().getAlignmentMask(IGF, eltTy));
         LLVM_FALLTHROUGH;
       case ElementLayout::Kind::Empty:
       case ElementLayout::Kind::Fixed:
@@ -108,7 +108,7 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
         // Start calculating non-fixed offsets from the end of the first fixed
         // field.
         if (i == 0) {
-          totalAlign = elt.getType().getAlignmentMask(IGF, eltTy);
+          totalAlign = elt.getTypeForLayout().getAlignmentMask(IGF, eltTy);
           offset = totalAlign;
           Offsets.push_back(totalAlign);
           break;
@@ -120,7 +120,7 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
         // Start calculating offsets from the last fixed-offset field.
         if (!offset) {
           Size lastFixedOffset = layout.getElement(i-1).getByteOffset();
-          if (auto *fixedType = dyn_cast<FixedTypeInfo>(&prevElt.getType())) {
+          if (auto *fixedType = dyn_cast<FixedTypeInfo>(&prevElt.getTypeForLayout())) {
             // If the last fixed-offset field is also fixed-size, we can
             // statically compute the end of the fixed-offset fields.
             auto fixedEnd = lastFixedOffset + fixedType->getFixedSize();
@@ -133,12 +133,12 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
               = llvm::ConstantInt::get(IGF.IGM.SizeTy,
                                        lastFixedOffset.getValue());
             offset = IGF.Builder.CreateAdd(offset,
-                                     prevElt.getType().getSize(IGF, prevType));
+                                     prevElt.getTypeForLayout().getSize(IGF, prevType));
           }
         }
         
         // Round up to alignment to get the offset.
-        auto alignMask = elt.getType().getAlignmentMask(IGF, eltTy);
+        auto alignMask = elt.getTypeForLayout().getAlignmentMask(IGF, eltTy);
         auto notAlignMask = IGF.Builder.CreateNot(alignMask);
         offset = IGF.Builder.CreateAdd(offset, alignMask);
         offset = IGF.Builder.CreateAnd(offset, notAlignMask);
@@ -147,7 +147,7 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
         
         // Advance by the field's size to start the next field.
         offset = IGF.Builder.CreateAdd(offset,
-                                       elt.getType().getSize(IGF, eltTy));
+                                       elt.getTypeForLayout().getSize(IGF, eltTy));
         totalAlign = IGF.Builder.CreateOr(totalAlign, alignMask);
 
         break;
@@ -224,7 +224,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
     // The type metadata bindings should be at a fixed offset, so we can pass
     // None for NonFixedOffsets. If we didn't, we'd have a chicken-egg problem.
     auto bindingsAddr = layout.getElement(0).project(IGF, structAddr, None);
-    layout.getBindings().restore(IGF, bindingsAddr);
+    layout.getBindings().restore(IGF, bindingsAddr, MetadataState::Complete);
   }
 
   // Figure out the non-fixed offsets.
@@ -237,7 +237,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
     if (field.isPOD())
       continue;
 
-    field.getType().destroy(
+    field.getTypeForAccess().destroy(
         IGF, field.project(IGF, structAddr, offsets), fieldTy,
         true /*Called from metadata constructors: must be outlined*/);
   }
@@ -1796,7 +1796,8 @@ llvm::Value *IRGenFunction::getLocalSelfMetadata() {
   case ObjCMetatype:
     return emitObjCMetadataRefForMetadata(*this, LocalSelf);
   case ObjectReference:
-    return emitDynamicTypeOfOpaqueHeapObject(*this, LocalSelf);
+    return emitDynamicTypeOfOpaqueHeapObject(*this, LocalSelf,
+                                             MetatypeRepresentation::Thick);
   }
 
   llvm_unreachable("Not a valid LocalSelfKind.");
@@ -1916,11 +1917,26 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
 /// Given an opaque class instance pointer, produce the type metadata reference
 /// as a %type*.
 llvm::Value *irgen::emitDynamicTypeOfOpaqueHeapObject(IRGenFunction &IGF,
-                                                      llvm::Value *object) {
+                                                  llvm::Value *object,
+                                                  MetatypeRepresentation repr) {
   object = IGF.Builder.CreateBitCast(object, IGF.IGM.ObjCPtrTy);
-  auto metadata = IGF.Builder.CreateCall(IGF.IGM.getGetObjectTypeFn(),
-                                         object,
-                                         object->getName() + ".Type");
+  llvm::CallInst *metadata;
+  
+  switch (repr) {
+  case MetatypeRepresentation::ObjC:
+    metadata = IGF.Builder.CreateCall(IGF.IGM.getGetObjCClassFromObjectFn(),
+                                      object,
+                                      object->getName() + ".Type");
+    break;
+  case MetatypeRepresentation::Thick:
+    metadata = IGF.Builder.CreateCall(IGF.IGM.getGetObjectTypeFn(),
+                                      object,
+                                      object->getName() + ".Type");
+    break;
+  case MetatypeRepresentation::Thin:
+    llvm_unreachable("class metadata can't be thin");
+  }
+  
   metadata->setDoesNotThrow();
   metadata->setOnlyReadsMemory();
   return metadata;
@@ -1944,18 +1960,18 @@ emitHeapMetadataRefForUnknownHeapObject(IRGenFunction &IGF,
 /// as a %type*.
 llvm::Value *irgen::emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
                                                 llvm::Value *object,
+                                                MetatypeRepresentation repr,
                                                 SILType objectType,
                                                 bool suppressCast) {
-  // If it is known to have swift metadata, just load.
+  // If it is known to have swift metadata, just load. A swift class is both
+  // heap metadata and type metadata.
   if (hasKnownSwiftMetadata(IGF.IGM, objectType.getSwiftRValueType())) {
     return emitLoadOfHeapMetadataRef(IGF, object,
                 getIsaEncodingForType(IGF.IGM, objectType.getSwiftRValueType()),
                 suppressCast);
   }
 
-  // Okay, ask the runtime for the type metadata of this
-  // potentially-ObjC object.
-  return emitDynamicTypeOfOpaqueHeapObject(IGF, object);
+  return emitDynamicTypeOfOpaqueHeapObject(IGF, object, repr);
 }
 
 static ClassDecl *getRootClass(ClassDecl *theClass) {
@@ -1969,6 +1985,10 @@ static ClassDecl *getRootClass(ClassDecl *theClass) {
 /// What isa encoding mechanism does a type have?
 IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
                                          CanType type) {
+  if (!IGM.ObjCInterop) return IsaEncoding::Pointer;
+
+  // This needs to be kept up-to-date with hasKnownSwiftMetadata.
+
   if (auto theClass = type->getClassOrBoundGenericClass()) {
     // We can access the isas of pure Swift classes directly.
     if (getRootClass(theClass)->hasKnownSwiftImplementation())
@@ -1976,6 +1996,21 @@ IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
     // For ObjC or mixed classes, we need to use object_getClass.
     return IsaEncoding::ObjC;
   }
+
+  if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+    // If we have a concrete superclass constraint, just recurse.
+    if (auto superclass = archetype->getSuperclass()) {
+      return getIsaEncodingForType(IGM, superclass->getCanonicalType());
+    }
+
+    // Otherwise, we must just have a class constraint.  Use the
+    // conservative answer.
+    return IsaEncoding::ObjC;
+  }
+
+  // We should never be working with an unopened existential type here.
+  assert(!type->isAnyExistentialType());
+
   // Non-class heap objects should be pure Swift, so we can access their isas
   // directly.
   return IsaEncoding::Pointer;

@@ -792,22 +792,17 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   for (auto &Content : Contents)
     Stamps.push_back(Content.Stamp);
 
+  trace::TracedOperation TracedOp(trace::OperationKind::PerformSema);
   trace::SwiftInvocation TraceInfo;
-
-  if (trace::enabled()) {
-    TraceInfo.Args.PrimaryFile = InvokRef->Impl.Opts.PrimaryFile;
-    TraceInfo.Args.Args = InvokRef->Impl.Opts.Args;
+  if (TracedOp.enabled()) {
+    trace::initTraceInfo(TraceInfo, InvokRef->Impl.Opts.PrimaryFile,
+                         InvokRef->Impl.Opts.Args);
   }
 
   ASTUnitRef ASTRef = new ASTUnit(++ASTUnitGeneration, MgrImpl.Stats);
   for (auto &Content : Contents) {
     if (Content.Snapshot)
       ASTRef->Impl.Snapshots.push_back(Content.Snapshot);
-
-    if (trace::enabled()) {
-      TraceInfo.addFile(Content.Buffer->getBufferIdentifier(),
-                        Content.Buffer->getBuffer());
-    }
   }
   auto &CompIns = ASTRef->Impl.CompInst;
   auto &Consumer = ASTRef->Impl.CollectDiagConsumer;
@@ -828,9 +823,8 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
     return nullptr;
   }
 
-  trace::TracedOperation TracedOp;
-  if (trace::enabled()) {
-    TracedOp.start(trace::OperationKind::PerformSema, TraceInfo);
+  if (TracedOp.enabled()) {
+    TracedOp.start(TraceInfo);
   }
 
   CloseClangModuleFiles scopedCloseFiles(
@@ -878,6 +872,12 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   // processing. This is to avoid unnecessary typechecking that can occur if the
   // TypeResolver is set before.
   ASTRef->Impl.TypeResolver = createLazyResolver(CompIns.getASTContext());
+
+  if (TracedOp.enabled()) {
+    SmallVector<DiagnosticEntryInfo, 8> Diagnostics;
+    Consumer.getAllDiagnostics(Diagnostics);
+    TracedOp.finish(Diagnostics);
+  }
 
   return ASTRef;
 }

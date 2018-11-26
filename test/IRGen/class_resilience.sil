@@ -20,7 +20,7 @@ import resilient_class
 // Perhaps we should not serialize allocating initializers, then this would not
 // be an issue.
 
-// CHECK-LABEL: define {{(protected )?}}swiftcc void @allocResilientOutsideParent()
+// CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc void @allocResilientOutsideParent()
 // CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S15resilient_class22ResilientOutsideParentCMa"(i64 0)
 // CHECK-NEXT: [[META:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT: [[META_ADDR:%.*]] = bitcast %swift.type* [[META]] to i8*

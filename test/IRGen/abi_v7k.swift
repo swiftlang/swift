@@ -175,7 +175,9 @@ func testSingleP(x: SinglePayload) -> Double {
 // CHECK: phi double [ 0.000000e+00, {{.*}} ]
 // CHECK: ret double
 // V7K-LABEL: _$S8test_v7k0A6MultiP
-// V7K: vldr d0
+// V7K:        vldr     d16, [sp{{.*}}]
+// V7K:        vmov.f64 d0, d16
+// V7K:        pop     {{{.*}}}
 // Backend will assign r0, r1 and r2 for input parameters and d0 for return values.
 class Bignum {}
 enum MultiPayload {

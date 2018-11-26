@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
+#include "TypoCorrection.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -147,20 +148,18 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   } else {
     // Resolve the base to a potential archetype.
     // Perform typo correction.
-    LookupResult corrections;
+    TypoCorrectionResults corrections(tc, ref->getIdentifier(),
+                                      DeclNameLoc(ref->getIdLoc()));
     tc.performTypoCorrection(DC, DeclRefKind::Ordinary,
                              MetatypeType::get(baseTy),
-                             ref->getIdentifier(), ref->getIdLoc(),
                              NameLookupFlags::ProtocolMembers,
                              corrections, &builder);
 
-    // Filter out non-types.
-    corrections.filter([](const LookupResultEntry &result) {
-      return isa<TypeDecl>(result.getValueDecl());
-    });
-
     // Check whether we have a single type result.
-    auto singleType = corrections.getSingleTypeResult();
+    auto singleType = cast_or_null<TypeDecl>(
+      corrections.getUniqueCandidateMatching([](ValueDecl *result) {
+        return isa<TypeDecl>(result);
+      }));
 
     // If we don't have a single result, complain and fail.
     if (!singleType) {
@@ -168,9 +167,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
       SourceLoc nameLoc = ref->getIdLoc();
       tc.diagnose(nameLoc, diag::invalid_member_type, name, baseTy)
         .highlight(baseRange);
-      for (const auto &suggestion : corrections)
-        tc.noteTypoCorrection(name, DeclNameLoc(nameLoc),
-                              suggestion.getValueDecl());
+      corrections.noteAllCandidates();
 
       return ErrorType::get(tc.Context);
     }
@@ -1147,13 +1144,14 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
                       bool allowConcreteGenericParams,
                       ExtensionDecl *ext,
                       llvm::function_ref<void(GenericSignatureBuilder &)>
-                        inferRequirements) {
+                        inferRequirements,
+                      bool mustInferRequirements) {
   assert(genericParams && "Missing generic parameters?");
   bool recursivelyVisitGenericParams =
     genericParams->getOuterParameters() && !parentSig;
 
   GenericSignature *sig;
-  if (!ext || ext->getTrailingWhereClause() ||
+  if (!ext || mustInferRequirements || ext->getTrailingWhereClause() ||
       getExtendedTypeGenericDepth(ext) != genericParams->getDepth()) {
     // Collect the generic parameters.
     SmallVector<GenericTypeParamType *, 4> allGenericParams;

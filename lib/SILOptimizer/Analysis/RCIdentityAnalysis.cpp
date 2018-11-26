@@ -524,28 +524,26 @@ void RCIdentityFunctionInfo::getRCUsers(
       if (!VisitedInsts.insert(User).second)
         continue;
 
-      for (auto value : User->getResults()) {
+      if (auto *SVI = dyn_cast<SingleValueInstruction>(User)) {
         // Otherwise attempt to strip off one layer of RC identical instructions
         // from User.
-        SILValue StrippedRCID = stripRCIdentityPreservingInsts(value);
+        SILValue StrippedRCID = stripRCIdentityPreservingInsts(SVI);
 
-        // If StrippedRCID is not V, then we know that User's result is
-        // conservatively not RCIdentical to V.
-        if (StrippedRCID != V) {
-          // If the user is extracting a trivial field of an aggregate structure
-          // that does not overlap with the ref counted part of the aggregate, we
-          // can ignore it.
-          if (isNonOverlappingTrivialAccess(value))
-            continue;
-
-          // Otherwise, it is an RC user that our user wants.
-          Users.push_back(User);
+        // If the User's result has the same RC identity as its operand, V, then
+        // it must still be RC identical to InputValue, so transitively search
+        // for more users.
+        if (StrippedRCID == V) {
+          Worklist.push_back(SVI);
           continue;
         }
-
-        // Otherwise, add the result to our list to continue searching.
-        Worklist.push_back(value);
+        // If the user is extracting a trivial field of an aggregate structure
+        // that does not overlap with the ref counted part of the aggregate, we
+        // can ignore it.
+        if (isNonOverlappingTrivialAccess(SVI))
+          continue;
       }
+      // Otherwise, stop searching and report this RC user.
+      Users.push_back(User);
     }
   }
 }

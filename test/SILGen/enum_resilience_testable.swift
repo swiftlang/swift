@@ -38,7 +38,10 @@
 // CHECK-NEXT:    dealloc_stack [[BOX]]
 // CHECK-NEXT:    br bb6
 // CHECK:       bb5:
-// CHECK-NEXT:    builtin "int_trap"()
+// CHECK-NEXT:    [[METATYPE:%.+]] = value_metatype $@thick Medium.Type, [[BOX]] : $*Medium
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[DIAGNOSE:%.+]] = function_ref @$Ss27_diagnoseUnexpectedEnumCase
+// CHECK-NEXT:    = apply [[DIAGNOSE]]<Medium>([[METATYPE]]) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> Never
 // CHECK-NEXT:    unreachable
 // CHECK:       bb6:
 // CHECK-NOT:    destroy_addr %0

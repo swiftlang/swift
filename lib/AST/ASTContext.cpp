@@ -67,7 +67,6 @@ STATISTIC(NumCollapsedSpecializedProtocolConformances,
 #define SWIFT_GSB_EXPENSIVE_ASSERTIONS 0
 
 LazyResolver::~LazyResolver() = default;
-DelegatingLazyResolver::~DelegatingLazyResolver() = default;
 void ModuleLoader::anchor() {}
 void ClangModuleLoader::anchor() {}
 
@@ -189,12 +188,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
-  /// func _combineHashValues(Int, Int) -> Int
-  FuncDecl *CombineHashValuesDecl = nullptr;
+  /// func _hashValue<H: Hashable>(for: H) -> Int
+  FuncDecl *HashValueForDecl = nullptr;
 
-  /// func _mixInt(Int) -> Int
-  FuncDecl *MixIntDecl = nullptr;
-  
   /// func append(Element) -> void
   FuncDecl *ArrayAppendElementDecl = nullptr;
 
@@ -278,6 +274,7 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// arenas.
   struct Arena {
     llvm::DenseMap<Type, ErrorType *> ErrorTypesWithOriginal;
+    llvm::FoldingSet<NameAliasType> NameAliasTypes;
     llvm::FoldingSet<TupleType> TupleTypes;
     llvm::DenseMap<std::pair<Type,char>, MetatypeType*> MetatypeTypes;
     llvm::DenseMap<std::pair<Type,char>,
@@ -425,7 +422,7 @@ ConstraintCheckerArenaRAII::~ConstraintCheckerArenaRAII() {
 }
 
 static ModuleDecl *createBuiltinModule(ASTContext &ctx) {
-  auto M = ModuleDecl::create(ctx.getIdentifier("Builtin"), ctx);
+  auto M = ModuleDecl::create(ctx.getIdentifier(BUILTIN_NAME), ctx);
   M->addFile(*new (ctx) BuiltinUnit(*M));
   return M;
 }
@@ -989,44 +986,29 @@ FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
   return decl;
 }
 
-FuncDecl *ASTContext::getCombineHashValuesDecl() const {
-  if (Impl.CombineHashValuesDecl)
-    return Impl.CombineHashValuesDecl;
+FuncDecl *ASTContext::getHashValueForDecl() const {
+  if (Impl.HashValueForDecl)
+    return Impl.HashValueForDecl;
 
-  auto resolver = getLazyResolver();
-  auto intType = getIntDecl()->getDeclaredType();
-
-  auto callback = [&](Type inputType, Type resultType) {
-    // Look for the signature (Int, Int) -> Int
-    auto tupleType = dyn_cast<TupleType>(inputType.getPointer());
-    assert(tupleType);
-    return tupleType->getNumElements() == 2 &&
-        tupleType->getElementType(0)->isEqual(intType) &&
-        tupleType->getElementType(1)->isEqual(intType) &&
-        resultType->isEqual(intType);
-  };
-
-  auto decl = lookupLibraryIntrinsicFunc(
-      *this, "_combineHashValues", resolver, callback);
-  Impl.CombineHashValuesDecl = decl;
-  return decl;
-}
-
-FuncDecl *ASTContext::getMixIntDecl() const {
-  if (Impl.MixIntDecl)
-    return Impl.MixIntDecl;
-
-  auto resolver = getLazyResolver();
-  auto intType = getIntDecl()->getDeclaredType();
-
-  auto callback = [&](Type inputType, Type resultType) {
-    // Look for the signature (Int) -> Int
-    return inputType->isEqual(intType) && resultType->isEqual(intType);
-  };
-
-  auto decl = lookupLibraryIntrinsicFunc(*this, "_mixInt", resolver, callback);
-  Impl.MixIntDecl = decl;
-  return decl;
+  SmallVector<ValueDecl *, 1> results;
+  lookupInSwiftModule("_hashValue", results);
+  for (auto result : results) {
+    auto *fd = dyn_cast<FuncDecl>(result);
+    if (!fd)
+      continue;
+    auto paramLists = fd->getParameterLists();
+    if (paramLists.size() != 1 || paramLists[0]->size() != 1)
+      continue;
+    auto paramDecl = paramLists[0]->get(0);
+    if (paramDecl->getArgumentName() != Id_for)
+      continue;
+    auto genericParams = fd->getGenericParams();
+    if (!genericParams || genericParams->size() != 1)
+      continue;
+    Impl.HashValueForDecl = fd;
+    return fd;
+  }
+  return nullptr;
 }
 
 FuncDecl *ASTContext::getArrayAppendElementDecl() const {
@@ -1339,6 +1321,16 @@ void ASTContext::addExternalDecl(Decl *decl) {
   ExternalDefinitions.insert(decl);
 }
 
+void ASTContext::addSynthesizedDecl(Decl *decl) {
+  auto *mod = cast<FileUnit>(decl->getDeclContext()->getModuleScopeContext());
+  if (mod->getKind() == FileUnitKind::ClangModule) {
+    ExternalDefinitions.insert(decl);
+    return;
+  }
+
+  cast<SourceFile>(mod)->SynthesizedDecls.push_back(decl);
+}
+
 void ASTContext::addCleanup(std::function<void(void)> cleanup) {
   Impl.Cleanups.push_back(std::move(cleanup));
 }
@@ -1420,8 +1412,9 @@ ClangModuleLoader *ASTContext::getClangModuleLoader() const {
 static void recordKnownProtocol(ModuleDecl *Stdlib, StringRef Name,
                                 KnownProtocolKind Kind) {
   Identifier ID = Stdlib->getASTContext().getIdentifier(Name);
-  UnqualifiedLookup Lookup(ID, Stdlib, nullptr, /*IsKnownPrivate=*/true,
-                           SourceLoc(), /*IsTypeLookup=*/true);
+  UnqualifiedLookup Lookup(ID, Stdlib, nullptr, SourceLoc(),
+                           UnqualifiedLookup::Flags::KnownPrivate |
+                               UnqualifiedLookup::Flags::TypeLookup);
   if (auto Proto
         = dyn_cast_or_null<ProtocolDecl>(Lookup.getSingleTypeResult()))
     Proto->setKnownProtocolKind(Kind);
@@ -1603,7 +1596,7 @@ static int compareSimilarAssociatedTypes(AssociatedTypeDecl *const *lhs,
                                          AssociatedTypeDecl *const *rhs) {
   auto lhsProto = (*lhs)->getProtocol();
   auto rhsProto = (*rhs)->getProtocol();
-  return ProtocolType::compareProtocols(&lhsProto, &rhsProto);
+  return TypeDecl::compare(lhsProto, rhsProto);
 }
 
 ArrayRef<AssociatedTypeDecl *> AssociatedTypeDecl::getOverriddenDecls() const {
@@ -2885,6 +2878,101 @@ StringRef ASTContext::getSwiftName(KnownFoundationEntity kind) {
 //===----------------------------------------------------------------------===//
 // Type manipulation routines.
 //===----------------------------------------------------------------------===//
+
+NameAliasType::NameAliasType(TypeAliasDecl *typealias, Type parent,
+                                       const SubstitutionMap &substitutions,
+                                       Type underlying,
+                                       RecursiveTypeProperties properties)
+    : SugarType(TypeKind::NameAlias, underlying, properties),
+      typealias(typealias) {
+  // Record the parent (or absence of a parent).
+  if (parent) {
+    Bits.NameAliasType.HasParent = true;
+    *getTrailingObjects<Type>() = parent;
+  } else {
+    Bits.NameAliasType.HasParent = false;
+  }
+
+  // Record the substitutions.
+  if (auto genericSig = substitutions.getGenericSignature()) {
+    SmallVector<Substitution, 4> flatSubs;
+    genericSig->getSubstitutions(substitutions, flatSubs);
+    Bits.NameAliasType.NumSubstitutions = flatSubs.size();
+    std::copy(flatSubs.begin(), flatSubs.end(),
+              getTrailingObjects<Substitution>());
+
+    *getTrailingObjects<GenericSignature *>() = genericSig;
+  } else {
+    Bits.NameAliasType.NumSubstitutions = 0;
+  }
+}
+
+NameAliasType *NameAliasType::get(
+                                        TypeAliasDecl *typealias,
+                                        Type parent,
+                                        const SubstitutionMap &substitutions,
+                                        Type underlying) {
+  // Compute the recursive properties.
+  //
+  auto properties = underlying->getRecursiveProperties();
+  auto storedProperties = properties;
+  if (parent) {
+    properties |= parent->getRecursiveProperties();
+    if (parent->hasTypeVariable())
+      storedProperties |= RecursiveTypeProperties::HasTypeVariable;
+  }
+  auto genericSig = substitutions.getGenericSignature();
+  if (genericSig) {
+    for (Type gp : genericSig->getGenericParams()) {
+      auto substGP = gp.subst(substitutions, SubstFlags::UseErrorType);
+      properties |= substGP->getRecursiveProperties();
+      if (substGP->hasTypeVariable())
+        storedProperties |= RecursiveTypeProperties::HasTypeVariable;
+    }
+  }
+
+  // Figure out which arena this type will go into.
+  auto &ctx = underlying->getASTContext();
+  auto arena = getArena(properties);
+
+  // Profile the type.
+  llvm::FoldingSetNodeID id;
+  NameAliasType::Profile(id, typealias, parent, substitutions, underlying);
+
+  // Did we already record this type?
+  void *insertPos;
+  auto &types = ctx.Impl.getArena(arena).NameAliasTypes;
+  if (auto result = types.FindNodeOrInsertPos(id, insertPos))
+    return result;
+
+  // Build a new type.
+  unsigned numSubstitutions =
+    genericSig ? genericSig->getSubstitutionListSize() : 0;
+  auto size =
+    totalSizeToAlloc<Type, GenericSignature *, Substitution>(
+                        parent ? 1 : 0, genericSig ? 1 : 0, numSubstitutions);
+  auto mem = ctx.Allocate(size, alignof(NameAliasType), arena);
+  auto result = new (mem) NameAliasType(typealias, parent, substitutions,
+                                        underlying, storedProperties);
+  types.InsertNode(result, insertPos);
+  return result;
+}
+
+void NameAliasType::Profile(llvm::FoldingSetNodeID &id) const {
+  Profile(id, getDecl(), getParent(), getSubstitutionMap(),
+          Type(getSinglyDesugaredType()));
+}
+
+void NameAliasType::Profile(
+                           llvm::FoldingSetNodeID &id,
+                           TypeAliasDecl *typealias,
+                           Type parent, const SubstitutionMap &substitutions,
+                           Type underlying) {
+  id.AddPointer(typealias);
+  id.AddPointer(parent.getPointer());
+  substitutions.profile(id);
+  id.AddPointer(underlying.getPointer());
+}
 
 // Simple accessors.
 Type ErrorType::get(const ASTContext &C) { return C.TheErrorType; }

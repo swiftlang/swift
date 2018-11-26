@@ -1393,9 +1393,17 @@ static bool optimizeStaticallyKnownProtocolConformance(
     auto Proto = dyn_cast<ProtocolDecl>(TargetType->getAnyNominal());
     if (Proto) {
       auto Conformance = SM->lookupConformance(SourceType, Proto);
-      if (Conformance.hasValue()) {
-        // SourceType is a non-existential type conforming to a
-        // protocol represented by the TargetType.
+      if (Conformance.hasValue() &&
+          Conformance->getConditionalRequirements().empty()) {
+        // SourceType is a non-existential type with a non-conditional
+        // conformance to a protocol represented by the TargetType.
+        //
+        // Conditional conformances are complicated: they may depend on
+        // information not known until runtime. For instance, if `X: P` where `T
+        // == Int` in `func foo<T>(_: T) { ... X<T>() as? P ... }`, the cast
+        // will succeed for `foo(0)` but not for `foo("string")`. There are many
+        // cases where everything is completely static (`X<Int>() as? P`), but
+        // we don't try to handle that at the moment.
         SILBuilder B(Inst);
         SmallVector<ProtocolConformanceRef, 1> NewConformances;
         NewConformances.push_back(Conformance.getValue());

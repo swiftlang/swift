@@ -14,6 +14,11 @@ function(_report_sdk prefix)
     message(STATUS "  UCRT Version: $ENV{UCRTVersion}")
     message(STATUS "  UCRT SDK Dir: $ENV{UniversalCRTSdkDir}")
     message(STATUS "  VC Dir: $ENV{VCToolsInstallDir}")
+    if("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
+      message(STATUS "  ${CMAKE_BUILD_TYPE} VC++ CRT: MDd")
+    else()
+      message(STATUS "  ${CMAKE_BUILD_TYPE} VC++ CRT: MD")
+    endif()
 
     foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
       swift_windows_include_for_arch(${arch} ${arch}_INCLUDE)
@@ -22,7 +27,6 @@ function(_report_sdk prefix)
       message(STATUS "  ${arch} LIB: ${${arch}_LIB}")
     endforeach()
   else()
-    message(STATUS "  Path: ${SWIFT_SDK_${prefix}_PATH}")
     foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
       message(STATUS "  ${arch} Path: ${SWIFT_SDK_${prefix}_ARCH_${arch}_PATH}")
     endforeach()
@@ -139,28 +143,28 @@ macro(configure_sdk_darwin
 endmacro()
 
 macro(configure_sdk_unix
-    prefix name lib_subdir triple_name arch triple sdkpath)
+    prefix name lib_subdir triple_name architectures triple sdkpath)
   # Note: this has to be implemented as a macro because it sets global
   # variables.
 
-  # Todo: this only supports building an SDK for one target arch only.
   set(SWIFT_SDK_${prefix}_NAME "${name}")
-  set(SWIFT_SDK_${prefix}_PATH "${sdkpath}")
-  set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "${sdkpath}")
   set(SWIFT_SDK_${prefix}_VERSION "don't use")
   set(SWIFT_SDK_${prefix}_BUILD_NUMBER "don't use")
   set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "")
   set(SWIFT_SDK_${prefix}_LIB_SUBDIR "${lib_subdir}")
   set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "")
   set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${triple_name}")
-  set(SWIFT_SDK_${prefix}_ARCHITECTURES "${arch}")
+  set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
   if("${prefix}" STREQUAL "CYGWIN")
     set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "COFF")
   else()
     set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "ELF")
   endif()
 
-  set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE "${triple}")
+  foreach(arch ${architectures})
+    set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "${sdkpath}")
+    set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE "${triple}")
+  endforeach()
 
   # Add this to the list of known SDKs.
   list(APPEND SWIFT_CONFIGURED_SDKS "${prefix}")
@@ -173,10 +177,6 @@ macro(configure_sdk_windows prefix sdk_name environment architectures)
   # variables.
 
   set(SWIFT_SDK_${prefix}_NAME "${sdk_name}")
-  # NOTE: set the path to / to avoid a spurious `--sysroot` from being passed
-  # to the driver -- rely on the `INCLUDE` AND `LIB` environment variables
-  # instead.
-  set(SWIFT_SDK_${prefix}_PATH "/")
   set(SWIFT_SDK_${prefix}_VERSION "NOTFOUND")
   set(SWIFT_SDK_${prefix}_BUILD_NUMBER "NOTFOUND")
   set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "")
@@ -194,6 +194,9 @@ macro(configure_sdk_windows prefix sdk_name environment architectures)
       set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE
           "${arch}-unknown-windows-${environment}")
     endif()
+    # NOTE: set the path to / to avoid a spurious `--sysroot` from being passed
+    # to the driver -- rely on the `INCLUDE` AND `LIB` environment variables
+    # instead.
     set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "/")
   endforeach()
 

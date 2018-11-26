@@ -271,7 +271,7 @@ GenericSignature::getCanonical(TypeArrayView<GenericTypeParamType> params,
     auto prevProto =
       prevReqt.getSecondType()->castTo<ProtocolType>()->getDecl();
     auto proto = reqt.getSecondType()->castTo<ProtocolType>()->getDecl();
-    assert(ProtocolType::compareProtocols(&prevProto, &proto) < 0 &&
+    assert(TypeDecl::compare(prevProto, proto) < 0 &&
            "Out-of-order conformance requirements");
   }
 #endif
@@ -345,17 +345,30 @@ bool GenericSignature::enumeratePairedRequirements(
   auto genericParams = getGenericParams();
   unsigned curGenericParamIdx = 0, numGenericParams = genericParams.size();
 
-  // Figure out which generic parameters are complete.
-  SmallVector<bool, 4> genericParamsAreConcrete(genericParams.size(), false);
+  // Figure out which generic parameters are concrete or same-typed to another
+  // generic parameter.
+  auto genericParamsAreNonCanonical =
+    SmallVector<bool, 4>(genericParams.size(), false);
   for (auto req : reqs) {
     if (req.getKind() != RequirementKind::SameType) continue;
-    if (req.getSecondType()->isTypeParameter()) continue;
-
-    auto gp = req.getFirstType()->getAs<GenericTypeParamType>();
-    if (!gp) continue;
+    
+    GenericTypeParamType *gp;
+    if (auto secondGP = req.getSecondType()->getAs<GenericTypeParamType>()) {
+      // If two generic parameters are same-typed, then the left-hand one
+      // is canonical.
+      gp = secondGP;
+    } else {
+      // If an associated type is same-typed, it doesn't constrain the generic
+      // parameter itself.
+      if (req.getSecondType()->isTypeParameter()) continue;
+      
+      // Otherwise, the generic parameter is concrete.
+      gp = req.getFirstType()->getAs<GenericTypeParamType>();
+      if (!gp) continue;
+    }
 
     unsigned index = GenericParamKey(gp).findIndexIn(genericParams);
-    genericParamsAreConcrete[index] = true;
+    genericParamsAreNonCanonical[index] = true;
   }
 
   /// Local function to 'catch up' to the next dependent type we're going to
@@ -382,7 +395,7 @@ bool GenericSignature::enumeratePairedRequirements(
       if (curGenericParam->getDepth() < stopDepth ||
           (curGenericParam->getDepth() == stopDepth &&
            curGenericParam->getIndex() < stopIndex)) {
-        if (!genericParamsAreConcrete[curGenericParamIdx] &&
+        if (!genericParamsAreNonCanonical[curGenericParamIdx] &&
             fn(curGenericParam, { }))
           return true;
 
@@ -441,7 +454,7 @@ bool GenericSignature::enumeratePairedRequirements(
     // parameter we can't skip, invoke the callback.
     if ((startIdx != endIdx ||
          (isa<GenericTypeParamType>(depTy) &&
-          !genericParamsAreConcrete[
+          !genericParamsAreNonCanonical[
             GenericParamKey(cast<GenericTypeParamType>(depTy))
               .findIndexIn(genericParams)])) &&
         fn(depTy, reqs.slice(startIdx, endIdx-startIdx)))
@@ -807,7 +820,7 @@ bool GenericSignature::isCanonicalTypeInContext(Type type) {
 }
 
 bool GenericSignature::isCanonicalTypeInContext(Type type,
-                                                GenericSignatureBuilder &builder) {
+                                             GenericSignatureBuilder &builder) {
   // If the type isn't independently canonical, it's certainly not canonical
   // in this context.
   if (!type->isCanonical())
@@ -835,7 +848,7 @@ bool GenericSignature::isCanonicalTypeInContext(Type type,
 }
 
 CanType GenericSignature::getCanonicalTypeInContext(Type type,
-                                                    GenericSignatureBuilder &builder) {
+                                             GenericSignatureBuilder &builder) {
   type = type->getCanonicalType();
 
   // All the contextual canonicality rules apply to type parameters, so if the

@@ -227,7 +227,7 @@ MemBehavior MemoryBehaviorVisitor::visitBuiltinInst(BuiltinInst *BI) {
 MemBehavior MemoryBehaviorVisitor::visitTryApplyInst(TryApplyInst *AI) {
   MemBehavior Behavior = MemBehavior::MayHaveSideEffects;
   // Ask escape analysis.
-  if (!EA->canObjectOrContentEscapeTo(V, AI))
+  if (!EA->canEscapeTo(V, AI))
     Behavior = MemBehavior::None;
 
   // Otherwise be conservative and return that we may have side effects.
@@ -237,8 +237,8 @@ MemBehavior MemoryBehaviorVisitor::visitTryApplyInst(TryApplyInst *AI) {
 
 MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
 
-  SideEffectAnalysis::FunctionEffects ApplyEffects;
-  SEA->getEffects(ApplyEffects, AI);
+  FunctionSideEffects ApplyEffects;
+  SEA->getCalleeEffects(ApplyEffects, AI);
 
   MemBehavior Behavior = MemBehavior::None;
 
@@ -290,7 +290,7 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
       Behavior = MemBehavior::MayRead;
 
     // Ask escape analysis.
-    if (!EA->canObjectOrContentEscapeTo(V, AI))
+    if (!EA->canEscapeTo(V, AI))
       Behavior = MemBehavior::None;
   }
   DEBUG(llvm::dbgs() << "  Found apply, returning " << Behavior << '\n');

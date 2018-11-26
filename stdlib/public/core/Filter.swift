@@ -18,17 +18,17 @@
 ///   is a `LazyFilterSequence`.
 @_fixed_layout // FIXME(sil-serialize-all)
 public struct LazyFilterSequence<Base: Sequence> {
-  @_versioned // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal var _base: Base
 
   /// The predicate used to determine which elements produced by
   /// `base` are also produced by `self`.
-  @_versioned // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal let _predicate: (Base.Element) -> Bool
 
   /// Creates an instance consisting of the elements `x` of `base` for
   /// which `isIncluded(x) == true`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public // @testable
   init(_base base: Base, _ isIncluded: @escaping (Base.Element) -> Bool) {
     self._base = base
@@ -47,15 +47,14 @@ extension LazyFilterSequence {
     /// The underlying iterator whose elements are being filtered.
     public var base: Base.Iterator { return _base }
 
-    @_versioned // FIXME(sil-serialize-all)
+    @usableFromInline // FIXME(sil-serialize-all)
     internal var _base: Base.Iterator
-    @_versioned // FIXME(sil-serialize-all)
+    @usableFromInline // FIXME(sil-serialize-all)
     internal let _predicate: (Base.Element) -> Bool
 
     /// Creates an instance that produces the elements `x` of `base`
     /// for which `isIncluded(x) == true`.
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned // FIXME(sil-serialize-all)
+    @inlinable // FIXME(sil-serialize-all)
     internal init(_base: Base.Iterator, _ isIncluded: @escaping (Base.Element) -> Bool) {
       self._base = _base
       self._predicate = isIncluded
@@ -73,7 +72,7 @@ extension LazyFilterSequence.Iterator: IteratorProtocol, Sequence {
   ///
   /// - Precondition: `next()` has not been applied to a copy of `self`
   ///   since the copy was made.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public mutating func next() -> Element? {
     while let n = _base.next() {
       if _predicate(n) {
@@ -89,12 +88,12 @@ extension LazyFilterSequence: LazySequenceProtocol {
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator(), _predicate)
   }
 
-  @_inlineable
+  @inlinable
   public func _customContainsEquatableElement(_ element: Element) -> Bool? {
     // optimization to check the element first matches the predicate
     guard _predicate(element) else { return false }
@@ -113,14 +112,14 @@ extension LazyFilterSequence: LazySequenceProtocol {
 ///   documented complexity.
 @_fixed_layout // FIXME(sil-serialize-all)
 public struct LazyFilterCollection<Base : Collection> {
-  @_versioned // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal var _base: Base
-  @_versioned // FIXME(sil-serialize-all)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal let _predicate: (Base.Element) -> Bool
 
   /// Creates an instance containing the elements of `base` that
   /// satisfy `isIncluded`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public // @testable
   init(_base: Base, _ isIncluded: @escaping (Base.Element) -> Bool) {
     self._base = _base
@@ -137,10 +136,10 @@ extension LazyFilterCollection : LazySequenceProtocol {
   // iterating the collection and evaluating each element, which can be costly,
   // is unexpected, and usually doesn't pay for itself in saving time through
   // preventing intermediate reallocations. (SR-4164)
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var underestimatedCount: Int { return 0 }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func _copyToContiguousArray() -> ContiguousArray<Base.Element> {
 
     // The default implementation of `_copyToContiguousArray` queries the
@@ -153,12 +152,12 @@ extension LazyFilterCollection : LazySequenceProtocol {
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator(), _predicate)
   }
 
-  @_inlineable
+  @inlinable
   public func _customContainsEquatableElement(_ element: Element) -> Bool? {
     guard _predicate(element) else { return false }
     return _base._customContainsEquatableElement(element)
@@ -178,7 +177,7 @@ extension LazyFilterCollection : LazyCollectionProtocol {
   ///
   /// - Complexity: O(*n*), where *n* is the ratio between unfiltered and
   ///   filtered collection counts.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var startIndex: Index {
     var index = _base.startIndex
     while index != _base.endIndex && !_predicate(_base[index]) {
@@ -192,20 +191,20 @@ extension LazyFilterCollection : LazyCollectionProtocol {
   ///
   /// `endIndex` is always reachable from `startIndex` by zero or more
   /// applications of `index(after:)`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var endIndex: Index {
     return _base.endIndex
   }
 
   // TODO: swift-3-indexing-model - add docs
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func index(after i: Index) -> Index {
     var i = i
     formIndex(after: &i)
     return i
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func formIndex(after i: inout Index) {
     // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
     var index = i
@@ -217,8 +216,7 @@ extension LazyFilterCollection : LazyCollectionProtocol {
   }
 
   @inline(__always)
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal func _advanceIndex(_ i: inout Index, step: Int) {
     repeat {
       _base.formIndex(&i, offsetBy: step)
@@ -226,8 +224,7 @@ extension LazyFilterCollection : LazyCollectionProtocol {
   }
 
   @inline(__always)
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal func _ensureBidirectional(step: Int) {
     // FIXME: This seems to be the best way of checking whether _base is
     // forward only without adding an extra protocol requirement.
@@ -240,7 +237,7 @@ extension LazyFilterCollection : LazyCollectionProtocol {
     }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func distance(from start: Index, to end: Index) -> Int {
     // The following line makes sure that distance(from:to:) is invoked on the
     // _base at least once, to trigger a _precondition in forward only
@@ -267,7 +264,7 @@ extension LazyFilterCollection : LazyCollectionProtocol {
     return count
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     var i = i
     let step = n.signum()
@@ -281,12 +278,12 @@ extension LazyFilterCollection : LazyCollectionProtocol {
     return i
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func formIndex(_ i: inout Index, offsetBy n: Int) {
     i = index(i, offsetBy: n)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
@@ -305,7 +302,7 @@ extension LazyFilterCollection : LazyCollectionProtocol {
     return i
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func formIndex(
     _ i: inout Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Bool {
@@ -321,28 +318,34 @@ extension LazyFilterCollection : LazyCollectionProtocol {
   ///
   /// - Precondition: `position` is a valid position in `self` and
   /// `position != endIndex`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public subscript(position: Index) -> Element {
     return _base[position]
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public subscript(bounds: Range<Index>) -> SubSequence {
     return SubSequence(_base: _base[bounds], _predicate)
+  }
+  
+  @inlinable
+  public func _customLastIndexOfEquatableElement(_ element: Element) -> Index?? {
+    guard _predicate(element) else { return .some(nil) }
+    return _base._customLastIndexOfEquatableElement(element)
   }
 }
 
 extension LazyFilterCollection : BidirectionalCollection
   where Base : BidirectionalCollection {
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func index(before i: Index) -> Index {
     var i = i
     formIndex(before: &i)
     return i
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func formIndex(before i: inout Index) {
     // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
     var index = i
@@ -361,7 +364,7 @@ extension LazySequenceProtocol {
   ///   the result is used. No buffering storage is allocated and each
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func filter(
     _ isIncluded: @escaping (Elements.Element) -> Bool
   ) -> LazyFilterSequence<Self.Elements> {
@@ -376,7 +379,7 @@ extension LazyCollectionProtocol {
   ///   the result is used. No buffering storage is allocated and each
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func filter(
     _ isIncluded: @escaping (Elements.Element) -> Bool
   ) -> LazyFilterCollection<Self.Elements> {

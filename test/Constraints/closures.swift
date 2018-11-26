@@ -358,7 +358,7 @@ func someGeneric19997471<T>(_ x: T) {
 func rdar21078316() {
   var foo : [String : String]?
   var bar : [(String, String)]?
-  bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) -> [(String, String)]' expects 1 argument, but 2 were used in closure body}}
+  bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) throws -> [(String, String)]' expects 1 argument, but 2 were used in closure body}}
 }
 
 
@@ -689,4 +689,25 @@ func rdar37790062() {
   _ = S({ bzz(((), (()))) }, { bar() }) // expected-warning {{result of call to 'bzz' is unused}}
   _ = S({ bzz(C1()) }, { bar() }) // expected-warning {{result of call to 'bzz' is unused}}
   _ = S({ faz(C2()) }, { bar() }) // expected-warning {{result of call to 'faz' is unused}}
+}
+
+// <rdar://problem/39489003>
+typealias KeyedItem<K, T> = (key: K, value: T)
+
+protocol Node {
+  associatedtype T
+  associatedtype E
+  associatedtype K
+  var item: E {get set}
+  var children: [(key: K, value: T)] {get set}
+}
+
+extension Node {
+  func getChild(for key:K)->(key: K, value: T) {
+    return children.first(where: { (item:KeyedItem) -> Bool in
+        return item.key == key
+        // expected-error@-1 {{binary operator '==' cannot be applied to operands of type '_' and 'Self.K'}}
+        // expected-note@-2 {{overloads for '==' exist with these partially matching parameter lists:}}
+      })
+  }
 }

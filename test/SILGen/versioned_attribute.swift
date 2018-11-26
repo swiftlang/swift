@@ -1,19 +1,19 @@
 // RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -emit-verbose-sil %s | %FileCheck %s
 
-// Check that @_versioned entities have public linkage.
+// Check that @usableFromInline entities have public linkage.
 // CHECK-LABEL: sil @$S19versioned_attribute25referencedFromTransparentyyF : $@convention(thin) () -> () {
-@_versioned func referencedFromTransparent() {}
+@usableFromInline func referencedFromTransparent() {}
 
 // CHECK-LABEL: sil [serialized] @$S19versioned_attribute23referencesVersionedFuncyycyF : $@convention(thin) () -> @owned @callee_guaranteed () -> () {
-@_inlineable public func referencesVersionedFunc() -> () -> () {
+@inlinable public func referencesVersionedFunc() -> () -> () {
   return referencedFromTransparent
 }
 
-@_versioned class Horse {
+@usableFromInline class Horse {
   var mouth: AnyObject?
 }
 
-@_versioned class GiftHorse {
+@usableFromInline class GiftHorse {
   var mouth: AnyObject?
 
   deinit {}

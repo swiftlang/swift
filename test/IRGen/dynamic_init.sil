@@ -16,7 +16,7 @@ sil @$S12dynamic_init1CCACycACmcfc : $@convention(method) (@owned C) -> @owned C
 sil @$S12dynamic_init1CCfd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject
 sil @$S12dynamic_init1CCfD : $@convention(method) (@owned C) -> ()
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S12dynamic_init15testDynamicInityAA1CCm2cm_tF"
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S12dynamic_init15testDynamicInityAA1CCm2cm_tF"
 sil @$S12dynamic_init15testDynamicInityAA1CCm2cm_tF : $@convention(method) (@thick C.Type) -> () {
 bb0(%0 : $@thick C.Type):
   // CHECK:   [[META:%[0-9]+]] = bitcast %swift.type* %0 to %T12dynamic_init1CC* (%swift.type*)**

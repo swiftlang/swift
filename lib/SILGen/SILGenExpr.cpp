@@ -368,7 +368,6 @@ void SILGenFunction::emitExprInto(Expr *E, Initialization *I,
   // Handle the special case of copying an lvalue.
   if (auto load = dyn_cast<LoadExpr>(E)) {
     FormalEvaluationScope writeback(*this);
-    PostponedCleanup postpone(*this);
     auto lv = emitLValue(load->getSubExpr(), AccessKind::Read);
     emitCopyLValueInto(E, std::move(lv), I);
     return;
@@ -920,7 +919,6 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
   // Any writebacks for this access are tightly scoped.
   FormalEvaluationScope scope(*this);
-  PostponedCleanup postpone(*this);
 
   // If this is a decl that we have an lvalue for, produce and return it.
   ValueDecl *decl = declRef.getDecl();
@@ -1400,7 +1398,6 @@ RValue RValueEmitter::visitStringLiteralExpr(StringLiteralExpr *E,
 RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
   // Any writebacks here are tightly scoped.
   FormalEvaluationScope writeback(SGF);
-  PostponedCleanup postpone(SGF);
   LValue lv = SGF.emitLValue(E->getSubExpr(), AccessKind::Read);
   // We can't load at immediate +0 from the lvalue without deeper analysis,
   // since the access will be immediately ended and might invalidate the value
@@ -2090,8 +2087,9 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   if (srcRepTy != srcTy)
     result = convertFunctionRepresentation(SGF, e, result, srcRepTy, srcTy);
 
-  if (srcTy != destTy)
-    result = SGF.emitTransformedValue(e, result, srcTy, destTy);
+  if (srcTy != destTy) {
+    result = SGF.emitTransformedValue(e, result, srcTy, destTy, SGFContext());
+  }
 
   if (destTy != destRepTy)
     result = convertFunctionRepresentation(SGF, e, result, destTy, destRepTy);
@@ -2574,7 +2572,6 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
 
   // Any writebacks for this access are tightly scoped.
   FormalEvaluationScope scope(SGF);
-  PostponedCleanup postpone(SGF);
 
   LValue lv = SGF.emitLValue(E, AccessKind::Read);
   // We can't load at +0 without further analysis, since the formal access into
@@ -2596,7 +2593,6 @@ visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E, SGFContext C) {
 RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
   // Any writebacks for this access are tightly scoped.
   FormalEvaluationScope scope(SGF);
-  PostponedCleanup postpone(SGF);
 
   LValue lv = SGF.emitLValue(E, AccessKind::Read);
   // We can't load at +0 without further analysis, since the formal access into
@@ -2651,9 +2647,8 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   ResultPlanPtr resultPtr =
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
-  PostponedCleanup postpone(*this);
   return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef, subs,
-                   {}, calleeTypeInfo, ApplyOptions::None, C, postpone);
+                   {}, calleeTypeInfo, ApplyOptions::None, C);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
@@ -2675,9 +2670,8 @@ RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
   ResultPlanPtr resultPlan =
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
-  PostponedCleanup postpone(*this);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, fnRef, subs,
-                   {}, calleeTypeInfo, ApplyOptions::None, C, postpone);
+                   {}, calleeTypeInfo, ApplyOptions::None, C);
 }
 
 static void emitTupleShuffleExprInto(RValueEmitter &emitter,
@@ -3433,7 +3427,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
   auto indexLoweredTy = SGM.Types.getLoweredType(indexTupleTy);
   // Get or create the equals witness
   [&unsafeRawPointerTy, &boolTy, &genericSig, &C, &indexTypes, &equals, &loc,
-   &SGM, &genericEnv, &indexLoweredTy, &hashableProto, &indexes]{
+   &SGM, &genericEnv, &indexLoweredTy, &indexes]{
     // (RawPointer, RawPointer) -> Bool
     SmallVector<SILParameterInfo, 2> params;
     params.push_back({unsafeRawPointerTy,
@@ -3448,7 +3442,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                                /*pseudogeneric*/ false,
                                /*noescape*/ false),
-    SILCoroutineKind::None,
+      SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, /*yields*/ {}, results, None, C);
     
@@ -3486,42 +3480,37 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     auto equalsRef = SILDeclRef(equalsMethod);
     auto equalsTy = subSGF.SGM.Types.getConstantType(equalsRef);
     
-    auto hashableSig = C.getExistentialSignature(
-      hashableProto->getDeclaredType()->getCanonicalType(),
-      SGM.M.getSwiftModule());
-    
     auto isFalseBB = subSGF.createBasicBlock();
     auto i1Ty = SILType::getBuiltinIntegerType(1, C);
     for (unsigned i : indices(indexes)) {
       auto &index = indexes[i];
       
-      auto formalTy = index.FormalType;
-      auto hashable = index.Hashable;
-      if (genericEnv) {
-        formalTy = genericEnv->mapTypeIntoContext(formalTy)->getCanonicalType();
-        hashable = hashable.subst(index.FormalType,
-          [&](Type t) -> Type { return genericEnv->mapTypeIntoContext(t); },
-          LookUpConformanceInSignature(*genericSig));
-      }
+      Type formalTy = index.FormalType;
+      ProtocolConformanceRef hashable = index.Hashable;
+      std::tie(formalTy, hashable)
+        = GenericEnvironment::mapConformanceRefIntoContext(genericEnv,
+                                                           formalTy,
+                                                           hashable);
+      auto formalCanTy = formalTy->getCanonicalType(genericSig);
       
-      // Get the Equatable conformance from the Hashable conformance
-      auto subMap = hashableSig->getSubstitutionMap(
-        Substitution(formalTy, hashable));
-      auto equatable = *subMap
-        .lookupConformance(CanType(hashableSig->getGenericParams()[0]),
-                           equatableProtocol);
+      // Get the Equatable conformance from the Hashable conformance.
+      auto equatable = hashable.getAssociatedConformance(formalTy,
+        GenericTypeParamType::get(0, 0, C),
+        equatableProtocol);
       
       assert(equatable.isAbstract() == hashable.isAbstract());
       if (equatable.isConcrete())
         assert(equatable.getConcrete()->getType()->isEqual(
                   hashable.getConcrete()->getType()));
-      auto equatableSub = Substitution(formalTy,
-                   C.AllocateCopy(ArrayRef<ProtocolConformanceRef>(equatable)));
     
       auto equalsWitness = subSGF.B.createWitnessMethod(loc,
-        formalTy, equatable,
+        formalCanTy, equatable,
         equalsRef, equalsTy);
       
+      auto equatableSub
+        = SubstitutionMap::getProtocolSubstitutions(equatableProtocol,
+                                                    formalCanTy,
+                                                    equatable);
       auto equalsSubstTy = equalsTy.castTo<SILFunctionType>()
         ->substGenericArgs(SGM.M, equatableSub);
       auto equalsInfo = CalleeTypeInfo(equalsSubstTy,
@@ -3554,7 +3543,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         rhsArg = subSGF.emitManagedBufferWithCleanup(rhsBuf);
       }
 
-      auto metaty = CanMetatypeType::get(formalTy,
+      auto metaty = CanMetatypeType::get(formalCanTy,
                                          MetatypeRepresentation::Thick);
       auto metatyValue = ManagedValue::forUnmanaged(subSGF.B.createMetatype(loc,
         SILType::getPrimitiveObjectType(metaty)));
@@ -3563,15 +3552,16 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         auto equalsResultPlan = ResultPlanBuilder::computeResultPlan(subSGF,
           equalsInfo, loc, SGFContext());
         ArgumentScope argScope(subSGF, loc);
-        PostponedCleanup postpone(subSGF);
-        isEqual =
-            subSGF
-                .emitApply(std::move(equalsResultPlan), std::move(argScope),
-                           loc, ManagedValue::forUnmanaged(equalsWitness),
-                           equatableSub, {lhsArg, rhsArg, metatyValue},
-                           equalsInfo, ApplyOptions::None, SGFContext(),
-                           postpone)
-                .getUnmanagedSingleValue(subSGF, loc);
+        SmallVector<Substitution, 1> equatableSubListBuf;
+        equatableProtocol->getGenericSignature()
+          ->getSubstitutions(equatableSub, equatableSubListBuf);
+        isEqual = subSGF
+          .emitApply(std::move(equalsResultPlan), std::move(argScope),
+                     loc, ManagedValue::forUnmanaged(equalsWitness),
+                     C.AllocateCopy(equatableSubListBuf),
+                     {lhsArg, rhsArg, metatyValue},
+                     equalsInfo, ApplyOptions::None, SGFContext())
+          .getUnmanagedSingleValue(subSGF, loc);
       }
       
       branchScope.pop();
@@ -3650,7 +3640,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
 
     SILValue hashCode;
 
-    // TODO: Combine hashes of the indexes using an inout _Hasher
+    // TODO: Combine hashes of the indexes using an inout Hasher
     {
       auto &index = indexes[0];
       
@@ -3699,13 +3689,11 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         auto hashResultPlan = ResultPlanBuilder::computeResultPlan(subSGF,
           hashInfo, loc, SGFContext());
         ArgumentScope argScope(subSGF, loc);
-        PostponedCleanup postpone(subSGF);
         hashCode =
             subSGF
                 .emitApply(std::move(hashResultPlan), std::move(argScope), loc,
                            ManagedValue::forUnmanaged(hashWitness), hashableSub,
-                           {arg}, hashInfo, ApplyOptions::None, SGFContext(),
-                           postpone)
+                           {arg}, hashInfo, ApplyOptions::None, SGFContext())
                 .getUnmanagedSingleValue(subSGF, loc);
       }
     }
@@ -4312,7 +4300,6 @@ computeNewSelfForRebindSelfInConstructorExpr(SILGenFunction &SGF,
   // Get newSelf, forward the cleanup for newSelf and clean everything else
   // up.
   FormalEvaluationScope Scope(SGF);
-  PostponedCleanup postpone(SGF);
   ManagedValue newSelfWithCleanup =
       SGF.emitRValueAsSingleValue(E->getSubExpr());
 
@@ -4866,7 +4853,6 @@ static void emitSimpleAssignment(SILGenFunction &SGF, SILLocation loc,
     if (dest->getType()->isEqual(srcLoad->getSubExpr()->getType())) {
       assert(!dest->getType()->is<TupleType>());
       FormalEvaluationScope writeback(SGF);
-      PostponedCleanup postpone(SGF);
       auto destLV = SGF.emitLValue(dest, AccessKind::Write);
       auto srcLV = SGF.emitLValue(srcLoad->getSubExpr(), AccessKind::Read);
       SGF.emitAssignLValueToLValue(loc, std::move(srcLV), std::move(destLV));
@@ -4888,14 +4874,12 @@ static void emitSimpleAssignment(SILGenFunction &SGF, SILLocation loc,
     }
     
     FormalEvaluationScope writeback(SGF);
-    PostponedCleanup postpone(SGF);
     LValue destLV = SGF.emitLValue(dest, AccessKind::Write);
     SGF.emitAssignToLValue(loc, src, std::move(destLV));
     return;
   }
 
   FormalEvaluationScope writeback(SGF);
-  PostponedCleanup postpone(SGF);
 
   // Produce a flattened queue of LValues.
   SmallVector<Optional<LValue>, 4> destLVs;
@@ -5699,7 +5683,6 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc, LValue &&lv,
 RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E,
                                               SGFContext C) {
   FormalEvaluationScope writeback(SGF);
-  PostponedCleanup postpone(SGF);
 
   auto subExpr = E->getSubExpr();
   auto accessInfo = SGF.getArrayAccessInfo(E->getType(),
@@ -5884,7 +5867,6 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
   if (E->getType()->hasLValueType()) {
     // Emit the l-value, but don't perform an access.
     FormalEvaluationScope scope(*this);
-    PostponedCleanup postpone(*this);
     emitLValue(E, AccessKind::Read);
     return;
   }
@@ -5893,7 +5875,6 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
   // (which could materialize a potentially expensive value with cleanups).
   if (auto *LE = dyn_cast<LoadExpr>(E)) {
     FormalEvaluationScope scope(*this);
-    PostponedCleanup postpone(*this);
     LValue lv = emitLValue(LE->getSubExpr(), AccessKind::Read);
 
     // If loading from the lvalue is guaranteed to have no side effects, we

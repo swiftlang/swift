@@ -142,7 +142,7 @@ extension StringProtocol {
 ///
 /// Can be used to specialize generic functions that would otherwise end up
 /// doing grapheme breaking to vend individual characters.
-@_versioned // FIXME(sil-serialize-all)
+@usableFromInline // FIXME(sil-serialize-all)
 internal protocol _SwiftStringView {
   /// A `String`, having the same contents as `self`, that may be unsuitable for
   /// long-term storage.
@@ -161,13 +161,12 @@ internal protocol _SwiftStringView {
 }
 
 extension _SwiftStringView {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal var _ephemeralContent : String { return _persistentContent }
 }
 
 extension StringProtocol {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public // Used in the Foundation overlay
   var _ephemeralString : String {
     if _fastPath(self is _SwiftStringView) {
@@ -178,18 +177,17 @@ extension StringProtocol {
 }
 
 extension String : _SwiftStringView {
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   internal var _persistentContent : String {
     return self
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var _wholeString : String {
     return self
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var _encodedOffsetRange : Range<Int> {
     return 0..<_guts.count
   }

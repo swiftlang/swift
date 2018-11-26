@@ -293,7 +293,7 @@ public func ${bfunc}(_ lhs: ${T}, _ rhs: ${T}) -> ${T} {
 #if (arch(i386) || arch(x86_64)) && !os(Windows)
 %  else:
 //  lgamma not avaialable on Windows, apparently?
-#if !os(Windows)
+#if !os(Windows) && !os(Android)
 %  end
 @_transparent
 public func lgamma(_ x: ${T}) -> (${T}, Int) {

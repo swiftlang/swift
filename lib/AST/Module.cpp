@@ -190,6 +190,12 @@ void SourceLookupCache::doPopulateCache(Range decls,
       }
     if (auto *NTD = dyn_cast<NominalTypeDecl>(D))
       doPopulateCache(NTD->getMembers(), true);
+
+    // Avoid populating the cache with the members of invalid extension
+    // declarations.  These members can be used to point validation inside of
+    // a malformed context.
+    if (D->isInvalid()) continue;
+
     if (auto *ED = dyn_cast<ExtensionDecl>(D))
       doPopulateCache(ED->getMembers(), true);
   }
@@ -1208,8 +1214,14 @@ void ModuleDecl::collectLinkLibraries(LinkLibraryCallback callback) {
 
 void
 SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {
-  for (auto importPair : Imports)
-    importPair.first.second->collectLinkLibraries(callback);
+
+  const_cast<SourceFile *>(this)->forAllVisibleModules([&](swift::ModuleDecl::ImportedModule import) {
+    swift::ModuleDecl *next = import.second;
+    if (next->getName() == getParentModule()->getName())
+      return;
+
+    next->collectLinkLibraries(callback);
+  });
 }
 
 bool ModuleDecl::walk(ASTWalker &Walker) {

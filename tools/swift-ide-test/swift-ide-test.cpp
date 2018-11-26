@@ -1490,11 +1490,18 @@ static ModuleDecl *getModuleByFullName(ASTContext &Context, StringRef ModuleName
     AccessPath.push_back(
         { Context.getIdentifier(SubModuleName), SourceLoc() });
   }
-  return Context.getModule(AccessPath);
+  ModuleDecl *Result = Context.getModule(AccessPath);
+  if (!Result || Result->failedToLoad())
+    return nullptr;
+  return Result;
 }
 
 static ModuleDecl *getModuleByFullName(ASTContext &Context, Identifier ModuleName) {
-  return Context.getModule(std::make_pair(ModuleName, SourceLoc()));
+  ModuleDecl *Result = Context.getModule(std::make_pair(ModuleName,
+                                                        SourceLoc()));
+  if (!Result || Result->failedToLoad())
+    return nullptr;
+  return Result;
 }
 
 static int doPrintAST(const CompilerInvocation &InitInvok,

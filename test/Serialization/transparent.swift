@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_transparent.swift
 // RUN: llvm-bcanalyzer %t/def_transparent.swiftmodule | %FileCheck %s
-// RUN: %target-swift-frontend -module-name transparent -emit-silgen -sil-link-all -I %t %s | %FileCheck %s -check-prefix=SIL
+// RUN: %target-swift-frontend -module-name transparent -emit-sil -I %t %s | %FileCheck %s -check-prefix=SIL
 
 // CHECK-NOT: UnknownCode
 
@@ -10,28 +10,28 @@ import def_transparent
 
 // SIL-LABEL: sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 // SIL: [[RAW:%.+]] = global_addr @$S11transparent3rawSbvp : $*Bool
-// SIL: [[FUNC:%.+]] = function_ref @$S15def_transparent15testTransparent1xS2b_tF : $@convention(thin) (Bool) -> Bool
-// SIL: [[RESULT:%.+]] = apply [[FUNC]]({{%.+}}) : $@convention(thin) (Bool) -> Bool
-// SIL: store [[RESULT]] to [trivial] [[RAW]] : $*Bool
+// SIL: [[VALUE:%.+]] = integer_literal $Builtin.Int1, 0
+// SIL: [[BOOL:%.+]] = struct $Bool ([[VALUE]] : $Builtin.Int1)
+// SIL: store [[BOOL]] to [[RAW]] : $*Bool
 var raw = testTransparent(x: false)
 
 // SIL: [[TMP:%.+]] = global_addr @$S11transparent3tmps5Int32Vvp : $*Int32
-// SIL: [[FUNC2:%.+]] = function_ref @$S15def_transparent11testBuiltins5Int32VyF : $@convention(thin) () -> Int32
-// SIL: [[RESULT2:%.+]] = apply [[FUNC2]]() : $@convention(thin) () -> Int32
-// SIL: store [[RESULT2]] to [trivial] [[TMP]] : $*Int32
+// SIL: [[VALUE:%.+]] = integer_literal $Builtin.Int32, 300
+// SIL: [[INT:%.+]] = struct $Int32 ([[VALUE]] : $Builtin.Int32)
+// SIL: store [[INT]] to [[TMP]] : $*Int32
 var tmp = testBuiltin()
 
-// SIL-LABEL: sil public_external [transparent] [serialized] [canonical] @$S15def_transparent15testTransparent1xS2b_tF : $@convention(thin) (Bool) -> Bool {
+// SIL-LABEL: sil public_external [transparent] [serialized] @$S15def_transparent15testTransparent1xS2b_tF : $@convention(thin) (Bool) -> Bool {
 // SIL: bb0(%0 : $Bool):
 // SIL: return %0 : $Bool
 
-// SIL-LABEL: sil public_external [transparent] [serialized] [canonical] @$S15def_transparent11testBuiltins5Int32VyF : $@convention(thin) () -> Int32 {
+// SIL-LABEL: sil public_external [transparent] [serialized] @$S15def_transparent11testBuiltins5Int32VyF : $@convention(thin) () -> Int32 {
 // SIL: bb0:
 // SIL: integer_literal $Builtin.Int32, 300
 // SIL: string_literal utf8 "foo"
 // SIL: return %{{.*}} : $Int32
 
-// SIL-LABEL: sil public_external [transparent] [serialized] [canonical] @$S15def_transparent7test_bryyF : $@convention(thin) () -> () {
+// SIL-LABEL: sil public_external [transparent] [serialized] @$S15def_transparent7test_bryyF : $@convention(thin) () -> () {
 // SIL: bb{{.*}}:
 // SIL: cond_br %{{.*}}, bb{{.*}}, bb{{.*}}
 // SIL: bb{{.*}}:
@@ -40,7 +40,7 @@ func wrap_br() {
   test_br()
 }
 
-// SIL-LABEL: sil public_external [serialized] [canonical] @$S15def_transparent9do_switch1uyAA9MaybePairO_tF : $@convention(thin) (@guaranteed MaybePair) -> () {
+// SIL-LABEL: sil public_external [transparent] [serialized] @$S15def_transparent9do_switch1uyAA9MaybePairO_tF : $@convention(thin) (@guaranteed MaybePair) -> () {
 // SIL: bb0(%0 : $MaybePair):
 // SIL: retain_value %0 : $MaybePair
 // SIL: switch_enum %0 : $MaybePair, case #MaybePair.Neither!enumelt: bb[[CASE1:[0-9]+]], case #MaybePair.Left!enumelt.1: bb[[CASE2:[0-9]+]], case #MaybePair.Right!enumelt.1: bb[[CASE3:[0-9]+]], case #MaybePair.Both!enumelt.1: bb[[CASE4:[0-9]+]]
@@ -52,10 +52,10 @@ func test_switch(u: MaybePair) {
   do_switch(u: u)
 }
 
-// SIL-LABEL: sil public_external [transparent] [serialized] [canonical] @$S15def_transparent7WrapperV3ValACs5Int32V_tcfC : $@convention(method) (Int32, @thin Wrapper.Type) -> Wrapper {
-// SIL-LABEL: sil public_external [transparent] [serialized] [canonical] @$S15def_transparent7WrapperV8getValue{{[_0-9a-zA-Z]*}}F : $@convention(method) (Wrapper) -> Int32 {
-// SIL-LABEL: sil public_external [transparent] [serialized] [canonical] @$S15def_transparent7WrapperV10valueAgains5Int32Vvg : $@convention(method) (Wrapper) -> Int32 {
-// SIL-LABEL: sil public_external [transparent] [serialized] [canonical] @$S15def_transparent7WrapperV13getValueAgain{{[_0-9a-zA-Z]*}}F : $@convention(method) (Wrapper) -> Int32 {
+// SIL-LABEL: sil public_external [transparent] [serialized] @$S15def_transparent7WrapperV3ValACs5Int32V_tcfC : $@convention(method) (Int32, @thin Wrapper.Type) -> Wrapper {
+// SIL-LABEL: sil public_external [transparent] [serialized] @$S15def_transparent7WrapperV8getValue{{[_0-9a-zA-Z]*}}F : $@convention(method) (Wrapper) -> Int32 {
+// SIL-LABEL: sil public_external [transparent] [serialized] @$S15def_transparent7WrapperV10valueAgains5Int32Vvg : $@convention(method) (Wrapper) -> Int32 {
+// SIL-LABEL: sil public_external [transparent] [serialized] @$S15def_transparent7WrapperV13getValueAgain{{[_0-9a-zA-Z]*}}F : $@convention(method) (Wrapper) -> Int32 {
 func test_wrapper() {
   var w = Wrapper(Val: 42)
   
@@ -65,7 +65,7 @@ func test_wrapper() {
   print(w.getValueAgain(), terminator: "")
 }
 
-// SIL-LABEL: sil public_external [transparent] [serialized] [canonical] @$S15def_transparent17open_existentials1p2cpyAA1P_p_AA2CP_ptF
+// SIL-LABEL: sil public_external [transparent] [serialized] @$S15def_transparent17open_existentials1p2cpyAA1P_p_AA2CP_ptF
 func test_open_existentials(p: P, cp: CP) {
   // SIL: open_existential_addr immutable_access [[EXIST:%[0-9]+]] : $*P to $*@opened([[N:".*"]]) P
   // SIL: open_existential_ref [[EXIST:%[0-9]+]] : $CP to $@opened([[M:".*"]]) CP

@@ -16,6 +16,7 @@
 
 #include "swift/Runtime/Casting.h"
 #include "../SwiftShims/RuntimeShims.h"
+#include "CompatibilityOverride.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
 #include "Private.h"
@@ -269,8 +270,8 @@ _dynamicCastClassMetatype(const ClassMetadata *sourceType,
 }
 
 /// Dynamically cast a class instance to a Swift class type.
-const void *swift::swift_dynamicCastClass(const void *object,
-                                          const ClassMetadata *targetType) {
+static const void *swift_dynamicCastClassImpl(const void *object,
+                                              const ClassMetadata *targetType) {
 #if SWIFT_OBJC_INTEROP
   assert(!targetType->isPureObjC());
 
@@ -288,9 +289,9 @@ const void *swift::swift_dynamicCastClass(const void *object,
 }
 
 /// Dynamically cast a class object to a Swift class type.
-const void *
-swift::swift_dynamicCastClassUnconditional(const void *object,
-                                           const ClassMetadata *targetType) {
+static const void *
+swift_dynamicCastClassUnconditionalImpl(const void *object,
+                                        const ClassMetadata *targetType) {
   auto value = swift_dynamicCastClass(object, targetType);
   if (value) return value;
 
@@ -994,9 +995,9 @@ _dynamicCastUnknownClassToExistential(const void *object,
 
 /// Perform a dynamic class of some sort of class instance to some
 /// sort of class type.
-const void *
-swift::swift_dynamicCastUnknownClass(const void *object,
-                                     const Metadata *targetType) {
+static const void *
+swift_dynamicCastUnknownClassImpl(const void *object,
+                                  const Metadata *targetType) {
   switch (targetType->getKind()) {
   case MetadataKind::Class: {
     auto targetClassType = static_cast<const ClassMetadata *>(targetType);
@@ -1044,8 +1045,8 @@ swift::swift_dynamicCastUnknownClass(const void *object,
 
 /// Perform a dynamic class of some sort of class instance to some
 /// sort of class type.
-const void *
-swift::swift_dynamicCastUnknownClassUnconditional(const void *object,
+static const void *
+swift_dynamicCastUnknownClassUnconditionalImpl(const void *object,
                                                   const Metadata *targetType) {
   switch (targetType->getKind()) {
   case MetadataKind::Class: {
@@ -1102,9 +1103,9 @@ swift::swift_dynamicCastUnknownClassUnconditional(const void *object,
 /********************************* Metatypes **********************************/
 /******************************************************************************/
 
-const Metadata *
-swift::swift_dynamicCastMetatype(const Metadata *sourceType,
-                                 const Metadata *targetType) {
+static const Metadata *
+swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
+                              const Metadata *targetType) {
   auto origSourceType = sourceType;
 
   switch (targetType->getKind()) {
@@ -1214,9 +1215,9 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
   swift_runtime_unreachable("Unhandled MetadataKind in switch.");
 }
 
-const Metadata *
-swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
-                                              const Metadata *targetType) {
+static const Metadata *
+swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
+                                           const Metadata *targetType) {
   auto origSourceType = sourceType;
 
   switch (targetType->getKind()) {
@@ -2400,10 +2401,10 @@ static bool _dynamicCastTupleToTuple(OpaqueValue *destination,
 
 /// Perform a dynamic cast to an arbitrary type.
 
-bool swift::swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
-                              const Metadata *srcType,
-                              const Metadata *targetType,
-                              DynamicCastFlags flags) {
+static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
+                                  const Metadata *srcType,
+                                  const Metadata *targetType,
+                                  DynamicCastFlags flags) {
   auto unwrapResult = checkDynamicCastFromOptional(dest, src, srcType,
                                                    targetType, flags);
   srcType = unwrapResult.payloadType;
@@ -2958,6 +2959,7 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
         return objc_retain(protocolObj);
       }
     }
+  // Handle bridgable types.
   } else if (auto srcBridgeWitness = findBridgeWitness(srcType)) {
     // Bridge the source value to an object.
     auto srcBridgedObject =
@@ -2968,6 +2970,12 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
       srcType->vw_destroy(src);
 
     return (id)srcBridgedObject;
+  // Handle Errors.
+  } else if (auto srcErrorWitness = findErrorWitness(srcType)) {
+    // Bridge the source value to an NSError.
+    auto box = swift_allocError(srcType, srcErrorWitness, src, consume)
+      .object;
+    return _swift_stdlib_bridgeErrorToNSError((SwiftError*)box);
   }
 
   // Fall back to boxing.
@@ -3245,3 +3253,7 @@ SWIFT_RUNTIME_STDLIB_API
 bool swift_isOptionalType(const Metadata *type) {
   return type->getKind() == MetadataKind::Optional;
 }
+
+#define OVERRIDE_CASTING COMPATIBILITY_OVERRIDE
+#include "CompatibilityOverride.def"
+

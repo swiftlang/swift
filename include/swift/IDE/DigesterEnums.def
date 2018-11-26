@@ -1,9 +1,13 @@
 #ifndef NODE_KIND
-#define NODE_KIND(NAME)
+#define NODE_KIND(NAME, EXTERNAL_NAME)
 #endif
 
 #ifndef NODE_ANNOTATION
 #define NODE_ANNOTATION(NAME)
+#endif
+
+#ifndef NODE_ANNOTATION_CHANGE_KIND
+#define NODE_ANNOTATION_CHANGE_KIND(NAME) NODE_ANNOTATION(NAME)
 #endif
 
 #ifndef DECL_ATTR
@@ -18,6 +22,10 @@
 #define KNOWN_TYPE(NAME)
 #endif
 
+#ifndef KNOWN_PROTOCOL
+#define KNOWN_PROTOCOL(NAME)
+#endif
+
 #ifndef DIFF_ITEM_KIND
 #define DIFF_ITEM_KIND(NAME)
 #endif
@@ -30,46 +38,55 @@
 #define SPECIAL_CASE_ID(NAME)
 #endif
 
-NODE_KIND(Root)
-NODE_KIND(TypeDecl)
-NODE_KIND(TypeNominal)
-NODE_KIND(TypeFunc)
-NODE_KIND(TypeNameAlias)
-NODE_KIND(Function)
-NODE_KIND(Constructor)
-NODE_KIND(Getter)
-NODE_KIND(Setter)
-NODE_KIND(Var)
-NODE_KIND(TypeAlias)
+NODE_KIND(Root, Root)
+NODE_KIND(TypeNominal, TypeNominal)
+NODE_KIND(TypeFunc, TypeFunc)
+NODE_KIND(TypeAlias, TypeNameAlias)
+NODE_KIND(DeclType, TypeDecl)
+NODE_KIND(DeclFunction, Function)
+NODE_KIND(DeclConstructor, Constructor)
+NODE_KIND(DeclGetter, Getter)
+NODE_KIND(DeclSetter, Setter)
+NODE_KIND(DeclVar, Var)
+NODE_KIND(DeclTypeAlias, TypeAlias)
 
 NODE_ANNOTATION(Added)
 NODE_ANNOTATION(Removed)
 NODE_ANNOTATION(Updated)
-NODE_ANNOTATION(RemovingErrorParam)
-NODE_ANNOTATION(ImplicitOptionalToOptional)
-NODE_ANNOTATION(OptionalToImplicitOptional)
-NODE_ANNOTATION(WrapOptional)
-NODE_ANNOTATION(WrapImplicitOptional)
-NODE_ANNOTATION(UnwrapOptional)
-NODE_ANNOTATION(GenericParamUpCast)
-NODE_ANNOTATION(GenericParamDownCast)
-NODE_ANNOTATION(TypeAliasChangeFromInt)
-NODE_ANNOTATION(GetterToProperty)
-NODE_ANNOTATION(SetterToProperty)
 NODE_ANNOTATION(PropertyName)
-NODE_ANNOTATION(TypeRewritten)
 NODE_ANNOTATION(TypeRewrittenLeft)
 NODE_ANNOTATION(TypeRewrittenRight)
-NODE_ANNOTATION(ModernizeEnum)
-NODE_ANNOTATION(UnwrapUnmanaged)
 NODE_ANNOTATION(RemovedDecl)
-NODE_ANNOTATION(Rename)
 NODE_ANNOTATION(RenameOldName)
 NODE_ANNOTATION(RenameNewName)
 NODE_ANNOTATION(NowThrowing)
 NODE_ANNOTATION(NowMutating)
 NODE_ANNOTATION(StaticChange)
 NODE_ANNOTATION(OwnershipChange)
+
+NODE_ANNOTATION_CHANGE_KIND(ImplicitOptionalToOptional)
+NODE_ANNOTATION_CHANGE_KIND(OptionalToImplicitOptional)
+NODE_ANNOTATION_CHANGE_KIND(WrapOptional)
+NODE_ANNOTATION_CHANGE_KIND(WrapImplicitOptional)
+NODE_ANNOTATION_CHANGE_KIND(UnwrapOptional)
+NODE_ANNOTATION_CHANGE_KIND(GetterToProperty)
+NODE_ANNOTATION_CHANGE_KIND(SetterToProperty)
+NODE_ANNOTATION_CHANGE_KIND(TypeRewritten)
+NODE_ANNOTATION_CHANGE_KIND(ModernizeEnum)
+NODE_ANNOTATION_CHANGE_KIND(UnwrapUnmanaged)
+NODE_ANNOTATION_CHANGE_KIND(Rename)
+NODE_ANNOTATION_CHANGE_KIND(DictionaryKeyUpdate)
+NODE_ANNOTATION_CHANGE_KIND(OptionalDictionaryKeyUpdate)
+NODE_ANNOTATION_CHANGE_KIND(ArrayMemberUpdate)
+NODE_ANNOTATION_CHANGE_KIND(OptionalArrayMemberUpdate)
+NODE_ANNOTATION_CHANGE_KIND(SimpleStringRepresentableUpdate)
+NODE_ANNOTATION_CHANGE_KIND(SimpleOptionalStringRepresentableUpdate)
+NODE_ANNOTATION_CHANGE_KIND(RevertDictionaryKeyUpdate)
+NODE_ANNOTATION_CHANGE_KIND(RevertOptionalDictionaryKeyUpdate)
+NODE_ANNOTATION_CHANGE_KIND(RevertArrayMemberUpdate)
+NODE_ANNOTATION_CHANGE_KIND(RevertOptionalArrayMemberUpdate)
+NODE_ANNOTATION_CHANGE_KIND(RevertSimpleStringRepresentableUpdate)
+NODE_ANNOTATION_CHANGE_KIND(RevertSimpleOptionalStringRepresentableUpdate)
 
 DECL_ATTR(deprecated)
 DECL_ATTR(fixedLayout)
@@ -100,6 +117,11 @@ KNOWN_TYPE(ImplicitlyUnwrappedOptional)
 KNOWN_TYPE(Void)
 KNOWN_TYPE(Unmanaged)
 KNOWN_TYPE(Function)
+KNOWN_TYPE(Dictionary)
+KNOWN_TYPE(String)
+KNOWN_TYPE(Array)
+
+KNOWN_PROTOCOL(RawRepresentable)
 
 DIFF_ITEM_KIND(CommonDiffItem)
 DIFF_ITEM_KIND(TypeMemberDiffItem)
@@ -149,7 +171,9 @@ SPECIAL_CASE_ID(ToUIntMax)
 #undef DIFF_ITEM_KEY_KIND
 #undef DIFF_ITEM_KIND
 #undef KNOWN_TYPE
+#undef KNOWN_PROTOCOL
 #undef KEY
 #undef DECL_ATTR
+#undef NODE_ANNOTATION_CHANGE_KIND
 #undef NODE_ANNOTATION
 #undef NODE_KIND

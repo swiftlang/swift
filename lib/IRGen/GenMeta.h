@@ -110,13 +110,6 @@ namespace irgen {
                              llvm::Function *fn,
                              ArrayRef<FieldTypeInfo> fieldTypes);
 
-  /// \brief Initialize the field offset vector within the given class or struct
-  /// metadata.
-  void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
-                                       SILType T,
-                                       llvm::Value *metadata,
-                                       bool isVWTMutable);
-
   /// Adjustment indices for the address points of various metadata.
   /// Size is in words.
   namespace MetadataAdjustmentIndex {

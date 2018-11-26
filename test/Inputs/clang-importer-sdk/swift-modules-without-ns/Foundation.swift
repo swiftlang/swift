@@ -185,12 +185,12 @@ public func _convertErrorToNSError(_ error: Error) -> NSError {
 }
 
 extension _SwiftNewtypeWrapper where Self.RawValue == Error {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func _bridgeToObjectiveC() -> NSError {
     return rawValue as NSError
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public static func _forceBridgeFromObjectiveC(
     _ source: NSError,
     result: inout Self?
@@ -198,7 +198,7 @@ extension _SwiftNewtypeWrapper where Self.RawValue == Error {
     result = Self(rawValue: source)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public static func _conditionallyBridgeFromObjectiveC(
     _ source: NSError,
     result: inout Self?
@@ -207,7 +207,7 @@ extension _SwiftNewtypeWrapper where Self.RawValue == Error {
     return result != nil
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: NSError?
   ) -> Self {

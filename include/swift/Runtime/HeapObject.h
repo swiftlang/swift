@@ -231,6 +231,8 @@ SWIFT_RUNTIME_EXPORT
 size_t swift_retainCount(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
 size_t swift_unownedRetainCount(HeapObject *object);
+SWIFT_RUNTIME_EXPORT
+size_t swift_weakRetainCount(HeapObject *object);
 
 /// Is this pointer a non-null unique reference to an object
 /// that uses Swift reference counting?

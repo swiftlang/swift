@@ -442,13 +442,13 @@ SetTestSuite.test("COW.Fast.ContainsDoesNotReallocate") {
   do {
     var s2: Set<MinimalHashableValue> = []
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    MinimalHashableValue.timesHashValueWasCalled = 0
+    MinimalHashableValue.timesHashIntoWasCalled = 0
     expectFalse(s2.contains(MinimalHashableValue(42)))
 
     // If the set is empty, we shouldn't be computing the hash value of the
     // provided key.
     expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableValue.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashIntoWasCalled)
   }
 }
 
@@ -488,13 +488,13 @@ SetTestSuite.test("COW.Slow.ContainsDoesNotReallocate")
   do {
     var s2: Set<MinimalHashableClass> = []
     MinimalHashableClass.timesEqualEqualWasCalled = 0
-    MinimalHashableClass.timesHashValueWasCalled = 0
+    MinimalHashableClass.timesHashIntoWasCalled = 0
     expectFalse(s2.contains(MinimalHashableClass(42)))
 
     // If the set is empty, we shouldn't be computing the hash value of the
     // provided key.
     expectEqual(0, MinimalHashableClass.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableClass.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableClass.timesHashIntoWasCalled)
   }
 }
 
@@ -599,10 +599,10 @@ SetTestSuite.test("COW.Fast.IndexForMemberDoesNotReallocate") {
 
   // Find an existing key.
   do {
-    var foundIndex1 = s.index(of: 1010)!
+    var foundIndex1 = s.firstIndex(of: 1010)!
     expectEqual(identity1, s._rawIdentifier())
 
-    var foundIndex2 = s.index(of: 1010)!
+    var foundIndex2 = s.firstIndex(of: 1010)!
     expectEqual(foundIndex1, foundIndex2)
 
     expectEqual(1010, s[foundIndex1])
@@ -611,7 +611,7 @@ SetTestSuite.test("COW.Fast.IndexForMemberDoesNotReallocate") {
 
   // Try to find a key that is not present.
   do {
-    var foundIndex1 = s.index(of: 1111)
+    var foundIndex1 = s.firstIndex(of: 1111)
     expectNil(foundIndex1)
     expectEqual(identity1, s._rawIdentifier())
   }
@@ -619,13 +619,13 @@ SetTestSuite.test("COW.Fast.IndexForMemberDoesNotReallocate") {
   do {
     var s2: Set<MinimalHashableValue> = []
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    MinimalHashableValue.timesHashValueWasCalled = 0
-    expectNil(s2.index(of: MinimalHashableValue(42)))
+    MinimalHashableValue.timesHashIntoWasCalled = 0
+    expectNil(s2.firstIndex(of: MinimalHashableValue(42)))
 
     // If the set is empty, we shouldn't be computing the hash value of the
     // provided key.
     expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableValue.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashIntoWasCalled)
   }
 }
 
@@ -635,10 +635,10 @@ SetTestSuite.test("COW.Slow.IndexForMemberDoesNotReallocate") {
 
   // Find an existing key.
   do {
-    var foundIndex1 = s.index(of: TestKeyTy(1010))!
+    var foundIndex1 = s.firstIndex(of: TestKeyTy(1010))!
     expectEqual(identity1, s._rawIdentifier())
 
-    var foundIndex2 = s.index(of: TestKeyTy(1010))!
+    var foundIndex2 = s.firstIndex(of: TestKeyTy(1010))!
     expectEqual(foundIndex1, foundIndex2)
 
     expectEqual(TestKeyTy(1010), s[foundIndex1])
@@ -647,7 +647,7 @@ SetTestSuite.test("COW.Slow.IndexForMemberDoesNotReallocate") {
 
   // Try to find a key that is not present.
   do {
-    var foundIndex1 = s.index(of: TestKeyTy(1111))
+    var foundIndex1 = s.firstIndex(of: TestKeyTy(1111))
     expectNil(foundIndex1)
     expectEqual(identity1, s._rawIdentifier())
   }
@@ -655,13 +655,13 @@ SetTestSuite.test("COW.Slow.IndexForMemberDoesNotReallocate") {
   do {
     var s2: Set<MinimalHashableClass> = []
     MinimalHashableClass.timesEqualEqualWasCalled = 0
-    MinimalHashableClass.timesHashValueWasCalled = 0
-    expectNil(s2.index(of: MinimalHashableClass(42)))
+    MinimalHashableClass.timesHashIntoWasCalled = 0
+    expectNil(s2.firstIndex(of: MinimalHashableClass(42)))
 
     // If the set is empty, we shouldn't be computing the hash value of the
     // provided key.
     expectEqual(0, MinimalHashableClass.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableClass.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableClass.timesHashIntoWasCalled)
   }
 }
 
@@ -671,7 +671,7 @@ SetTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate")
     var s = getCOWFastSet()
     var identity1 = s._rawIdentifier()
 
-    let foundIndex1 = s.index(of: 1010)!
+    let foundIndex1 = s.firstIndex(of: 1010)!
     expectEqual(identity1, s._rawIdentifier())
 
     expectEqual(1010, s[foundIndex1])
@@ -680,7 +680,7 @@ SetTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate")
     expectEqual(1010, removed)
 
     expectEqual(identity1, s._rawIdentifier())
-    expectNil(s.index(of: 1010))
+    expectNil(s.firstIndex(of: 1010))
   }
 
   do {
@@ -691,7 +691,7 @@ SetTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate")
     expectEqual(identity1, s1._rawIdentifier())
     expectEqual(identity1, s2._rawIdentifier())
 
-    var foundIndex1 = s2.index(of: 1010)!
+    var foundIndex1 = s2.firstIndex(of: 1010)!
     expectEqual(1010, s2[foundIndex1])
     expectEqual(identity1, s1._rawIdentifier())
     expectEqual(identity1, s2._rawIdentifier())
@@ -701,7 +701,7 @@ SetTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate")
 
     expectEqual(identity1, s1._rawIdentifier())
     expectNotEqual(identity1, s2._rawIdentifier())
-    expectNil(s2.index(of: 1010))
+    expectNil(s2.firstIndex(of: 1010))
   }
 }
 
@@ -711,7 +711,7 @@ SetTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate")
     var s = getCOWSlowSet()
     var identity1 = s._rawIdentifier()
 
-    let foundIndex1 = s.index(of: TestKeyTy(1010))!
+    let foundIndex1 = s.firstIndex(of: TestKeyTy(1010))!
     expectEqual(identity1, s._rawIdentifier())
 
     expectEqual(TestKeyTy(1010), s[foundIndex1])
@@ -720,7 +720,7 @@ SetTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate")
     expectEqual(TestKeyTy(1010), removed)
 
     expectEqual(identity1, s._rawIdentifier())
-    expectNil(s.index(of: TestKeyTy(1010)))
+    expectNil(s.firstIndex(of: TestKeyTy(1010)))
   }
 
   do {
@@ -731,7 +731,7 @@ SetTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate")
     expectEqual(identity1, s1._rawIdentifier())
     expectEqual(identity1, s2._rawIdentifier())
 
-    var foundIndex1 = s2.index(of: TestKeyTy(1010))!
+    var foundIndex1 = s2.firstIndex(of: TestKeyTy(1010))!
     expectEqual(TestKeyTy(1010), s2[foundIndex1])
     expectEqual(identity1, s1._rawIdentifier())
     expectEqual(identity1, s2._rawIdentifier())
@@ -741,7 +741,7 @@ SetTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate")
 
     expectEqual(identity1, s1._rawIdentifier())
     expectNotEqual(identity1, s2._rawIdentifier())
-    expectNil(s2.index(of: TestKeyTy(1010)))
+    expectNil(s2.firstIndex(of: TestKeyTy(1010)))
   }
 }
 
@@ -1354,17 +1354,17 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.IndexForMember") {
   expectTrue(isCocoaSet(s))
 
   // Find an existing key.
-  var member = s[s.index(of: TestObjCKeyTy(1010))!]
+  var member = s[s.firstIndex(of: TestObjCKeyTy(1010))!]
   expectEqual(TestObjCKeyTy(1010), member)
 
-  member = s[s.index(of: TestObjCKeyTy(2020))!]
+  member = s[s.firstIndex(of: TestObjCKeyTy(2020))!]
   expectEqual(TestObjCKeyTy(2020), member)
 
-  member = s[s.index(of: TestObjCKeyTy(3030))!]
+  member = s[s.firstIndex(of: TestObjCKeyTy(3030))!]
   expectEqual(TestObjCKeyTy(3030), member)
 
   // Try to find a key that does not exist.
-  expectNil(s.index(of: TestObjCKeyTy(4040)))
+  expectNil(s.firstIndex(of: TestObjCKeyTy(4040)))
   expectEqual(identity1, s._rawIdentifier())
 }
 
@@ -1373,17 +1373,17 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.IndexForMember") {
   var identity1 = s._rawIdentifier()
 
   do {
-    var member = s[s.index(of: TestBridgedKeyTy(1010))!]
+    var member = s[s.firstIndex(of: TestBridgedKeyTy(1010))!]
     expectEqual(TestBridgedKeyTy(1010), member)
 
-    member = s[s.index(of: TestBridgedKeyTy(2020))!]
+    member = s[s.firstIndex(of: TestBridgedKeyTy(2020))!]
     expectEqual(TestBridgedKeyTy(2020), member)
 
-    member = s[s.index(of: TestBridgedKeyTy(3030))!]
+    member = s[s.firstIndex(of: TestBridgedKeyTy(3030))!]
     expectEqual(TestBridgedKeyTy(3030), member)
   }
 
-  expectNil(s.index(of: TestBridgedKeyTy(4040)))
+  expectNil(s.firstIndex(of: TestBridgedKeyTy(4040)))
   expectEqual(identity1, s._rawIdentifier())
 }
 
@@ -1649,7 +1649,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
   let identity1 = s._rawIdentifier()
   expectTrue(isCocoaSet(s))
 
-  let foundIndex1 = s.index(of: TestObjCKeyTy(1010))!
+  let foundIndex1 = s.firstIndex(of: TestObjCKeyTy(1010))!
   expectEqual(TestObjCKeyTy(1010), s[foundIndex1])
   expectEqual(identity1, s._rawIdentifier())
 
@@ -1658,7 +1658,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
   expectTrue(isNativeSet(s))
   expectEqual(2, s.count)
   expectEqual(TestObjCKeyTy(1010), removedElement)
-  expectNil(s.index(of: TestObjCKeyTy(1010)))
+  expectNil(s.firstIndex(of: TestObjCKeyTy(1010)))
 }
 
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt")
@@ -1667,7 +1667,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt")
   let identity1 = s._rawIdentifier()
   expectTrue(isNativeSet(s))
 
-  let foundIndex1 = s.index(of: TestBridgedKeyTy(1010))!
+  let foundIndex1 = s.firstIndex(of: TestBridgedKeyTy(1010))!
   expectEqual(1010, s[foundIndex1].value)
   expectEqual(identity1, s._rawIdentifier())
 
@@ -1676,7 +1676,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt")
   expectTrue(isNativeSet(s))
   expectEqual(1010, removedElement.value)
   expectEqual(2, s.count)
-  expectNil(s.index(of: TestBridgedKeyTy(1010)))
+  expectNil(s.firstIndex(of: TestBridgedKeyTy(1010)))
 }
 
 SetTestSuite.test("BridgedFromObjC.Verbatim.Remove") {
@@ -3171,7 +3171,7 @@ SetTestSuite.test("contains") {
 SetTestSuite.test("memberAtIndex") {
   let s1 = Set([1010, 2020, 3030])
 
-  let foundIndex = s1.index(of: 1010)!
+  let foundIndex = s1.firstIndex(of: 1010)!
   expectEqual(1010, s1[foundIndex])
 }
 
@@ -3345,12 +3345,12 @@ SetTestSuite.test("_customContainsEquatableElement") {
   expectFalse(Set<Int>()._customContainsEquatableElement(1010)!)
 }
 
-SetTestSuite.test("index(of:)") {
+SetTestSuite.test("firstIndex(of:)") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
-  let foundIndex1 = s1.index(of: 1010)!
+  let foundIndex1 = s1.firstIndex(of: 1010)!
   expectEqual(1010, s1[foundIndex1])
 
-  expectNil(s1.index(of: 999))
+  expectNil(s1.firstIndex(of: 999))
 }
 
 SetTestSuite.test("popFirst") {
@@ -3381,10 +3381,10 @@ SetTestSuite.test("removeAt") {
   // Test removing from the startIndex, the middle, and the end of a set.
   for i in 1...3 {
     var s = Set<Int>([1010, 2020, 3030])
-    let removed = s.remove(at: s.index(of: i*1010)!)
+    let removed = s.remove(at: s.firstIndex(of: i*1010)!)
     expectEqual(i*1010, removed)
     expectEqual(2, s.count)
-    expectNil(s.index(of: i*1010))
+    expectNil(s.firstIndex(of: i*1010))
     let origKeys: [Int] = [1010, 2020, 3030]
     expectEqual(origKeys.filter { $0 != (i*1010) }, [Int](s).sorted())
   }

@@ -28,7 +28,7 @@ class BigClass {
 sil_vtable TestClass {}
 sil_vtable BigClass {}
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @simple_promote
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @simple_promote
 // CHECK: %reference.raw = alloca %[[C:[a-zA-Z0-9_]+]], align 8
 // CHECK-NEXT: [[MR:%[0-9]+]] = call swiftcc %swift.metadata_response @"$S17class_stack_alloc9TestClassCMa"([[INT]] 0)
 // CHECK-NEXT: [[M:%.*]] = extractvalue %swift.metadata_response [[MR]], 0
@@ -52,7 +52,7 @@ bb0:
 // A stack promotion limit of 48 bytes allows that one of the two alloc_refs
 // can be allocated on the stack.
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @exceed_limit
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @exceed_limit
 // CHECK: alloca {{.*}}TestClass
 // CHECK: alloca {{.*}}TestStruct
 // CHECK-NOT: alloca
@@ -80,7 +80,7 @@ bb0:
   return %r : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @promoted_with_devirtualized_release
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @promoted_with_devirtualized_release
 // CHECK: %reference.raw = alloca %[[C:[a-zA-Z0-9_]+]], align 8
 // CHECK-NEXT: [[MR:%[0-9]+]] = call swiftcc %swift.metadata_response @"$S17class_stack_alloc9TestClassCMa"([[INT]] 0)
 // CHECK-NEXT: [[M:%.*]] = extractvalue %swift.metadata_response [[MR]], 0
@@ -104,7 +104,7 @@ bb0:
   return %r : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @promoted_with_inlined_devirtualized_release
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @promoted_with_inlined_devirtualized_release
 // CHECK: %reference.raw = alloca %[[C:[a-zA-Z0-9_]+]], align 8
 // CHECK-NEXT: [[MR:%[0-9]+]] = call swiftcc %swift.metadata_response @"$S17class_stack_alloc9TestClassCMa"([[INT]] 0)
 // CHECK-NEXT: [[M:%.*]] = extractvalue %swift.metadata_response [[MR]], 0
@@ -126,7 +126,7 @@ bb0:
   return %r : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @not_promoted_with_inlined_devirtualized_release
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @not_promoted_with_inlined_devirtualized_release
 // CHECK: [[O:%[0-9]+]] = call {{.*}} @swift_allocObject
 // CHECK-NEXT: [[BC:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to
 // CHECK-NEXT: call {{.*}} @swift_setDeallocating {{.*}}({{.*}} [[BC]])

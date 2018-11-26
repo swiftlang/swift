@@ -207,9 +207,10 @@ ManagedValue SILGenBuilder::createConvertFunction(SILLocation loc,
   return cloner.clone(result);
 }
 
-ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(SILLocation loc,
-                                                          ManagedValue fn,
-                                                          SILType resultTy) {
+ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
+    SILLocation loc, ManagedValue fn, SILType resultTy,
+    bool isEscapedByUser) {
+
   auto fnType = fn.getType().castTo<SILFunctionType>();
   auto resultFnType = resultTy.castTo<SILFunctionType>();
 
@@ -220,10 +221,9 @@ ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(SILLocation loc,
              SILFunctionTypeRepresentation::Thick &&
          !fnType->isNoEscape() && resultFnType->isNoEscape() &&
          "Expect a escaping to noescape conversion");
-
-  SILValue fnValue = fn.ensurePlusOne(SGF, loc).forward(SGF);
-  SILValue result = createConvertEscapeToNoEscape(loc, fnValue, resultTy);
-  getSILGenFunction().enterPostponedCleanup(fnValue);
+  SILValue fnValue = fn.getValue();
+  SILValue result = createConvertEscapeToNoEscape(
+      loc, fnValue, resultTy, isEscapedByUser, false);
   return ManagedValue::forTrivialObjectRValue(result);
 }
 
@@ -660,7 +660,7 @@ ManagedValue SILGenBuilder::createOptionalSome(SILLocation loc,
                                                ManagedValue arg) {
   CleanupCloner cloner(*this, arg);
   auto &argTL = SGF.getTypeLowering(arg.getType());
-  SILType optionalType = arg.getType().wrapAnyOptionalType(getFunction());
+  SILType optionalType = SILType::getOptionalType(arg.getType());
   if (argTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
     SILValue someValue =
         createOptionalSome(loc, arg.forward(SGF), optionalType);

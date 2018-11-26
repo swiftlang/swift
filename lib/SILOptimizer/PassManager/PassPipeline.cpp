@@ -88,8 +88,10 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   P.addNoReturnFolding();
   P.addMarkUninitializedFixup();
   P.addDefiniteInitialization();
+  P.addClosureLifetimeFixup();
   P.addOwnershipModelEliminator();
   P.addMandatoryInlining();
+  P.addMandatorySILLinker();
   P.addPredictableMemoryOptimizations();
 
   // Diagnostic ConstantPropagation must be rerun on deserialized functions
@@ -222,6 +224,10 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   // Split up operations on stack-allocated aggregates (struct, tuple).
   P.addSROA();
 
+  // Re-run predictable memory optimizations, since previous optimization
+  // passes sometimes expose oppotunities here.
+  P.addPredictableMemoryOptimizations();
+
   // Promote stack allocations to values.
   P.addMem2Reg();
 
@@ -314,7 +320,7 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
 
 static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("Performance Debug Serialization");
-  P.addSILLinker();
+  P.addPerformanceSILLinker();
 }
 
 static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
@@ -324,7 +330,7 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // we do not spend time optimizing them.
   P.addDeadFunctionElimination();
   // Start by cloning functions from stdlib.
-  P.addSILLinker();
+  P.addPerformanceSILLinker();
 
   // Cleanup after SILGen: remove trivial copies to temporaries.
   P.addTempRValueOpt();
@@ -344,7 +350,7 @@ static void addHighLevelEarlyLoopOptPipeline(SILPassPipelinePlan &P) {
 static void addMidModulePassesStackPromotePassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("MidModulePasses+StackPromote");
   P.addDeadFunctionElimination();
-  P.addSILLinker();
+  P.addPerformanceSILLinker();
   P.addDeadObjectElimination();
   P.addGlobalPropertyOpt();
 
@@ -456,7 +462,7 @@ SILPassPipelinePlan
 SILPassPipelinePlan::getLoweringPassPipeline() {
   SILPassPipelinePlan P;
   P.startPipeline("Address Lowering");
-  P.addSILCleanup();
+  P.addIRGenPrepare();
   P.addAddressLowering();
 
   return P;

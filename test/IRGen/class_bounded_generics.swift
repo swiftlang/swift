@@ -1,8 +1,6 @@
-
-// RUN: %target-swift-frontend -module-name class_bounded_generics -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -module-name class_bounded_generics -enable-objc-interop -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s -DINT=i%target-ptrsize
 
 // REQUIRES: CPU=x86_64
-// XFAIL: linux
 
 protocol ClassBound : class {
   func classBoundMethod()

@@ -41,8 +41,13 @@ using namespace swift;
 Witness::Witness(ValueDecl *decl, SubstitutionList substitutions,
                  GenericEnvironment *syntheticEnv,
                  SubstitutionList reqToSynthesizedEnvSubs) {
-  auto &ctx = decl->getASTContext();
+  if (!syntheticEnv && substitutions.empty() &&
+      reqToSynthesizedEnvSubs.empty()) {
+    storage = decl;
+    return;
+  }
 
+  auto &ctx = decl->getASTContext();
   auto declRef = ConcreteDeclRef(ctx, decl, substitutions);
   auto storedMem = ctx.Allocate(sizeof(StoredWitness), alignof(StoredWitness));
   auto stored = new (storedMem)
@@ -197,6 +202,13 @@ DeclContext *ProtocolConformance::getDeclContext() const {
 /// Retrieve the state of this conformance.
 ProtocolConformanceState ProtocolConformance::getState() const {
   CONFORMANCE_SUBCLASS_DISPATCH(getState, ())
+}
+
+ConformanceEntryKind ProtocolConformance::getSourceKind() const {
+  CONFORMANCE_SUBCLASS_DISPATCH(getSourceKind, ())
+}
+NormalProtocolConformance *ProtocolConformance::getImplyingConformance() const {
+  CONFORMANCE_SUBCLASS_DISPATCH(getImplyingConformance, ())
 }
 
 bool
@@ -1181,8 +1193,7 @@ DeclContext::getLocalProtocols(
 
   // Sort if required.
   if (sorted) {
-    llvm::array_pod_sort(result.begin(), result.end(),
-                         &ProtocolType::compareProtocols);
+    llvm::array_pod_sort(result.begin(), result.end(), TypeDecl::compare);
   }
 
   return result;

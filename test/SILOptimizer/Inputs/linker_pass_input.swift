@@ -2,7 +2,8 @@
 @_silgen_name("unknown")
 public func unknown() -> ()
 
-@_inlineable
+@inline(never)
+@inlinable
 public func doSomething() {
   unknown()
 }
@@ -16,12 +17,12 @@ public func doSomething3<T>(_ a:T) {
   unknown()
 }
 
-@_versioned struct A {
-  @_versioned init() {}
+@usableFromInline struct A {
+  @usableFromInline init() {}
 }
 
 @inline(never)
-@_inlineable
+@inlinable
 public func callDoSomething3() {
   doSomething3(A())
 }

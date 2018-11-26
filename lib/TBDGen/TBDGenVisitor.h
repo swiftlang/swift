@@ -100,6 +100,8 @@ public:
 
   void visitVarDecl(VarDecl *VD);
 
+  void visitEnumDecl(EnumDecl *ED);
+
   void visitDecl(Decl *D) {}
 };
 } // end namespace tbdgen

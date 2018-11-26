@@ -205,7 +205,7 @@ SyntaxModelContext::~SyntaxModelContext() {
 
 namespace {
 
-typedef ASTWalker::ParentTy ASTNodeType;
+using ASTNodeType = ASTWalker::ParentTy;
 
 struct StructureElement {
   SyntaxStructureNode StructureNode;
@@ -286,7 +286,7 @@ private:
   bool handleAttrs(const DeclAttributes &Attrs);
   bool handleAttrs(const TypeAttributes &Attrs);
 
-  typedef std::pair<const DeclAttribute *, SourceRange> DeclAttributeAndRange;
+  using DeclAttributeAndRange = std::pair<const DeclAttribute *, SourceRange>;
 
   bool handleSpecialDeclAttribute(const DeclAttribute *Decl,
                                   ArrayRef<Token> Toks);
