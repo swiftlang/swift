@@ -341,9 +341,9 @@ public final class _ExecutionContext {
       debugLog(
         "Device \(deviceId) has type \(deviceType) and name \(deviceName)."
       )
-			if deviceType == "CPU" && deviceName == localCPUDeviceName {
-				foundCPU = true
-			}
+      if deviceType == "CPU", deviceName == localCPUDeviceName {
+        foundCPU = true
+      }
       deviceNames[deviceType] = deviceName
     }
     guard foundCPU else {

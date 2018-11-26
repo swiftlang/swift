@@ -10,49 +10,54 @@ import StdlibUnittest
 
 typealias CTFServer = OpaquePointer
 
-@usableFromInline
-func debugLog(_ message: @autoclosure () -> String,
-              file: StaticString = #file,
-              line: UInt = #line) {
-  if _RuntimeConfig.printsDebugLog {
-    print("[\(file):\(line)] \(message())")
-    // This helps dump more log before a crash.
-    fflush(stdout)
-  }
-}
-
-
 private class TestCluster {
-  var num_tasks:Int = 0
+  var taskCount: Int = 0
   var servers: [CTFServer] = []
-  public var serverDef:String = ""
+  var serverDef: String = ""
 
-  public init(num_tasks: Int) {
-    self.num_tasks = num_tasks
+  init(taskCount: Int) {
+    self.taskCount = taskCount
     self.serverDef = startServers()
   }
 
   deinit {
     // TODO: There is no clean way to shutdown GrpcServers yet.
   }
+  
+  func debugLog(_ message: @autoclosure () -> String,
+                file: StaticString = #file,
+                line: UInt = #line) {
+    if _RuntimeConfig.printsDebugLog {
+      print("[\(file):\(line)] \(message())")
+      // This helps dump more log before a crash.
+      fflush(stdout)
+    }
+  }
 
-  private func getServerDef(tasks: String, task_index: Int) -> String {
+  /// Create and return a text representation of a ServerDef proto.
+  /// 
+  /// - Parameters:
+  ///   - forTasksConfig: Text representation of tasks config.
+  ///   - withTaskIndex: The task index for this server def.
+  ///
+  func createServerDef(forTasksConfig: String, withTaskIndex: Int) -> String {
     return  """
       cluster {
         job {
           name: "localhost"
-          \(tasks)
+          \(forTasksConfig)
         }
       }
       job_name: "localhost"
-      task_index: \(task_index)
+      task_index: \(withTaskIndex)
       protocol: "grpc"
       """
   }
 
-  private func getTasks() -> String {
+  /// Create and return a text representation of the tasks config.
+  func createTasksConfig() -> String {
     var tasks = ""
-    for i in 0..<num_tasks {
+    for i in 0..<taskCount {
       let port = TF_PickUnusedPortOrDie()
       let task = """
           tasks {
@@ -60,26 +65,27 @@ private class TestCluster {
             value: "localhost:\(port)"
           }
       """
-      debugLog("Picking port \(port) for \(i)...");
+      debugLog("Picking port \(port) for \(i)...")
       tasks += task
     }
     return tasks;
   }
 
-  private func startServers() -> String {
-    let tasks = getTasks()
+  /// Start GRPC servers for the testing with a remote session.
+  func startServers() -> String {
+    let tasks = createTasksConfig()
     let status = TF_NewStatus()
     // Start everything except the 0-th task, which will
     // be started when we set TFE_ContextSetServerDef.
-    for i in 1..<num_tasks {
-      debugLog("Starting task \(i)...");
-      let serverDefText = getServerDef(tasks: tasks, task_index: i)
+    for i in 1..<taskCount {
+      debugLog("Starting task \(i)...")
+      let serverDefText = createServerDef(forTasksConfig: tasks, withTaskIndex: i)
       let serverDef = TFE_GetServerDef(serverDefText, status)
       checkOk(status)
       let server = TF_NewServer(
           serverDef!.pointee.data, serverDef!.pointee.length, status)
       checkOk(status)
-      TF_ServerStart(server, status)
+      TF_ServerStart(server!, status)
       checkOk(status)
       servers.append(server!)
       let target = TF_ServerTarget(server!)
@@ -87,11 +93,11 @@ private class TestCluster {
     }
     TF_DeleteStatus(status)
     // Return the server def for task 0 for use in compiler runtime.
-    return getServerDef(tasks: tasks, task_index: 0)
+    return createServerDef(forTasksConfig: tasks, withTaskIndex: 0)
   }
 }
 
-public func runAllTestsWithRemoteSession(num_tasks: Int = 2) {
+public func runAllTestsWithRemoteSession(taskCount: Int = 2) {
   // This only works if we use the TFEager API.
   _RuntimeConfig.usesTFEagerAPI = true
 
@@ -103,7 +109,7 @@ public func runAllTestsWithRemoteSession(num_tasks: Int = 2) {
   InitTensorFlowRuntime(/* enable_debug_logging */ 1, /* verbose_level */ 0)
   _RuntimeConfig.tensorFlowRuntimeInitialized = true
 
-  let testCluster = TestCluster(num_tasks: num_tasks)
+  let testCluster = TestCluster(taskCount: taskCount)
   _RuntimeConfig.session = .remote(grpcAddress: testCluster.serverDef)
   runAllTests()
 }
