@@ -265,7 +265,9 @@ function(_add_variant_c_compile_flags)
     # Emulate /GR-.
     # TODO(compnerd) when moving up to VS 2017 15.3 and newer, we can disable
     # RTTI again
-    if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+    if(SWIFT_COMPILER_IS_MSVC_LIKE)
+      list(APPEND result /GR-)
+    else()
       list(APPEND result -frtti)
       list(APPEND result -Xclang;-fno-rtti-data)
     endif()
