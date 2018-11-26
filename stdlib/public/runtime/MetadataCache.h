@@ -353,9 +353,9 @@ public:
 
 /// A key value as provided to the concurrent map.
 class MetadataCacheKey {
-  const TypeContextDescriptor *Description;
   const void * const *Data;
-  uint32_t Length;
+  uint16_t NumKeyParameters;
+  uint16_t NumWitnessTables;
   uint32_t Hash;
 
   /// Compare two witness tables, which may involving checking the
@@ -387,69 +387,68 @@ class MetadataCacheKey {
   }
 
   /// Compare the content from two keys.
-  static int compareContent(
-             const TypeContextDescriptor *description,
-             const void * const *adata,
-             const void * const *bdata,
-             unsigned size) {
-    auto genericContext = description->getGenericContext();
-    if (!genericContext) {
-      assert(size == 0);
-      return 0;
+  static int compareContent(const void * const *adata,
+                            const void * const *bdata,
+                            unsigned numKeyParameters,
+                            unsigned numWitnessTables) {
+    // Compare generic arguments for key parameters.
+    for (unsigned i = 0; i != numKeyParameters; ++i) {
+      if (auto result = comparePointers(*adata++, *bdata++))
+        return result;
     }
 
-    // Compare generic parameters.
-    for (const auto &gp : genericContext->getGenericParams()) {
-      if (gp.hasKeyArgument()) {
-        assert(size > 0);
-        --size;
-        if (auto result = comparePointers(*adata++, *bdata++))
-          return result;
-      }
+    // Compare witness tables.
+    for (unsigned i = 0; i != numWitnessTables; ++i) {
+      if (auto result =
+              compareWitnessTables((const WitnessTable *)*adata++,
+                                   (const WitnessTable *)*bdata++))
+        return result;
     }
 
-    // Compare generic requirements.
-    for (const auto &req : genericContext->getGenericRequirements()) {
-      if (req.Flags.hasKeyArgument()) {
-        assert(size > 0);
-        --size;
-        if (req.getKind() == GenericRequirementKind::Protocol) {
-          if (auto result =
-                  compareWitnessTables((const WitnessTable *)*adata++,
-                                       (const WitnessTable *)*bdata++))
-            return result;
-        } else {
-          if (auto result = comparePointers(*adata++, *bdata++))
-            return result;
-        }
-      }
-    }
-
-    assert(size == 0);
     return 0;
   }
 
 public:
   MetadataCacheKey(const TypeContextDescriptor *description,
                    const void * const *data, size_t size)
-    : Description(description), Data(data), Length(size),
-      Hash(computeHash()) {}
-  MetadataCacheKey(const TypeContextDescriptor *description,
-                   const void * const *data, size_t size, uint32_t hash)
-    : Description(description), Data(data), Length(size), Hash(hash) {}
+      : Data(data), NumKeyParameters(0), NumWitnessTables(0) {
+    // Count up the # of key parameters and # of witness tables.
+    if (auto genericContext = description->getGenericContext()) {
+      // Find key generic parameters.
+      for (const auto &gp : genericContext->getGenericParams()) {
+        if (gp.hasKeyArgument())
+          ++NumKeyParameters;
+      }
+
+      // Find witness tables.
+      for (const auto &req : genericContext->getGenericRequirements()) {
+        if (req.Flags.hasKeyArgument() &&
+            req.getKind() == GenericRequirementKind::Protocol)
+          ++NumWitnessTables;
+      }
+    }
+
+    assert(size == NumKeyParameters + NumWitnessTables);
+
+    Hash = computeHash();
+  }
+
+  MetadataCacheKey(const void * const *data, uint16_t numKeyParams,
+                   uint16_t numWitnessTables, uint32_t hash)
+    : Data(data), NumKeyParameters(numKeyParams),
+      NumWitnessTables(numWitnessTables), Hash(hash) {}
 
   bool operator==(MetadataCacheKey rhs) const {
-    assert(Description == rhs.Description);
-
     // Compare the hashes.
     if (hash() != rhs.hash()) return false;
 
     // Compare the sizes.
-    unsigned asize = size(), bsize = rhs.size();
-    if (asize != bsize) return false;
+    if (NumKeyParameters != rhs.NumKeyParameters) return false;
+    if (NumWitnessTables != rhs.NumWitnessTables) return false;
 
     // Compare the content.
-    return compareContent(Description, begin(), rhs.begin(), asize) == 0;
+    return compareContent(begin(), rhs.begin(), NumKeyParameters,
+                          NumWitnessTables) == 0;
   }
 
   int compare(const MetadataCacheKey &rhs) const {
@@ -458,43 +457,41 @@ public:
       return hashComparison;
     }
 
-    // Compare the sizes.
-    if (auto sizeComparison = compareIntegers(size(), rhs.size())) {
-      return sizeComparison;
+    // Compare the # of key parameters.
+    if (auto keyParamsComparison =
+            compareIntegers(NumKeyParameters, rhs.NumKeyParameters)) {
+      return keyParamsComparison;
+    }
+
+    // Compare the # of witness tables.
+    if (auto witnessTablesComparison =
+            compareIntegers(NumWitnessTables, rhs.NumWitnessTables)) {
+      return witnessTablesComparison;
     }
 
     // Compare the content.
-    return compareContent(Description, begin(), rhs.begin(), size());
+    return compareContent(begin(), rhs.begin(), NumKeyParameters,
+                          NumWitnessTables);
   }
 
-  const TypeContextDescriptor *description() const { return Description; }
+  uint16_t numKeyParameters() const { return NumKeyParameters; }
+  uint16_t numWitnessTables() const { return NumWitnessTables; }
 
   uint32_t hash() const {
     return Hash;
   }
 
   const void * const *begin() const { return Data; }
-  const void * const *end() const { return Data + Length; }
-  unsigned size() const { return Length; }
+  const void * const *end() const { return Data + size(); }
+  unsigned size() const { return NumKeyParameters + NumWitnessTables; }
 
 private:
   uint32_t computeHash() const {
-    size_t H = 0x56ba80d1 * Length;
-    auto addValue = [&](const void *ptr) {
+    size_t H = 0x56ba80d1 * NumKeyParameters;
+    for (unsigned index = 0; index != NumKeyParameters; ++index) {
       H = (H >> 10) | (H << ((sizeof(size_t) * 8) - 10));
-      H ^= (reinterpret_cast<size_t>(ptr)
-            ^ (reinterpret_cast<size_t>(ptr) >> 19));
-    };
-
-    // Hash only the generic arguments; the witness tables need a deeper
-    // comparison.
-    if (auto genericContext = Description->getGenericContext()) {
-      unsigned index = 0;
-      for (const auto &gp : genericContext->getGenericParams()) {
-        if (gp.hasKeyArgument()) {
-          addValue(Data[index++]);
-        }
-      }
+      H ^= (reinterpret_cast<size_t>(Data[index])
+            ^ (reinterpret_cast<size_t>(Data[index]) >> 19));
     }
 
     H *= 0x27d4eb2d;
@@ -1354,7 +1351,7 @@ protected:
   using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
 
   size_t numTrailingObjects(OverloadToken<const void *>) const {
-    return KeyLength;
+    return NumKeyParameters + NumWitnessTables;
   }
 
   template <class... Args>
@@ -1368,10 +1365,9 @@ private:
   // These are arranged to fit into the tail-padding of the superclass.
 
   /// These are set during construction and never changed.
-  const uint16_t KeyLength;
+  const uint16_t NumKeyParameters;
+  const uint16_t NumWitnessTables;
   const uint32_t Hash;
-
-  const TypeContextDescriptor *Description;
 
   /// Valid if TrackingInfo.getState() >= PrivateMetadataState::Abstract.
   ValueType Value;
@@ -1386,15 +1382,16 @@ private:
 
 public:
   VariadicMetadataCacheEntryBase(const MetadataCacheKey &key)
-    : KeyLength(key.size()), Hash(key.hash()), Description(key.description()) {
+      : NumKeyParameters(key.numKeyParameters()),
+        NumWitnessTables(key.numWitnessTables()),
+        Hash(key.hash()) {
     memcpy(this->template getTrailingObjects<const void *>(),
            key.begin(), key.size() * sizeof(const void *));
   }
 
   MetadataCacheKey getKey() const {
-    return MetadataCacheKey(Description,
-                            this->template getTrailingObjects<const void*>(),
-                            KeyLength, Hash);
+    return MetadataCacheKey(this->template getTrailingObjects<const void*>(),
+                            NumKeyParameters, NumWitnessTables, Hash);
   }
 
   intptr_t getKeyIntValueForDump() const {
