@@ -2053,8 +2053,8 @@ static MetadataAllocator &getResilientMetadataAllocator() {
 }
 
 ClassMetadata *
-swift::swift_relocateClassMetadata(ClassDescriptor *description,
-                                   ResilientClassMetadataPattern *pattern) {
+swift::swift_relocateClassMetadata(const ClassDescriptor *description,
+                                   const ResilientClassMetadataPattern *pattern) {
   auto bounds = description->getMetadataBounds();
 
   auto metadata = reinterpret_cast<ClassMetadata *>(
@@ -2724,7 +2724,7 @@ swift::swift_updateClassMetadata(ClassMetadata *self,
 
 #ifndef NDEBUG
 static bool isAncestorOf(const ClassMetadata *metadata,
-                         ClassDescriptor *description) {
+                         const ClassDescriptor *description) {
   auto ancestor = metadata;
   while (ancestor && ancestor->isTypeMetadata()) {
     if (ancestor->getDescription() == description)
@@ -2736,9 +2736,9 @@ static bool isAncestorOf(const ClassMetadata *metadata,
 #endif
 
 void *
-swift::swift_lookUpClassMethod(ClassMetadata *metadata,
-                               MethodDescriptor *method,
-                               ClassDescriptor *description) {
+swift::swift_lookUpClassMethod(const ClassMetadata *metadata,
+                               const MethodDescriptor *method,
+                               const ClassDescriptor *description) {
   assert(metadata->isTypeMetadata());
 
   assert(isAncestorOf(metadata, description));
@@ -2751,7 +2751,7 @@ swift::swift_lookUpClassMethod(ClassMetadata *metadata,
   assert(index < methods.size());
 
   auto vtableOffset = vtable->getVTableOffset(description) + index;
-  auto *words = reinterpret_cast<void **>(metadata);
+  auto *words = reinterpret_cast<void * const *>(metadata);
 
   return *(words + vtableOffset);
 }
