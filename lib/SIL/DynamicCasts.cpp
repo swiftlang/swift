@@ -107,13 +107,10 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
   if (!SourceNominalTy)
     return DynamicCastFeasibility::MaySucceed;
 
-  // If we are casting a protocol, then the cast will fail
-  // as we have not found any conformances and protocols cannot
-  // be extended currently.
-  // NOTE: If we allow protocol extensions in the future, this
-  // conditional statement should be removed.
-  if (isa<ProtocolType>(source)) {
-    return DynamicCastFeasibility::WillFail;
+  // Protocol types may conform to their own protocols (or other protocols)
+  // in the future.
+  if (source->isAnyExistentialType()) {
+    return DynamicCastFeasibility::MaySucceed;
   }
 
   // If it is a class and it can be proven that this class and its
@@ -491,7 +488,9 @@ swift::classifyDynamicCast(ModuleDecl *M,
           sourceFunction.getResult() == targetFunction.getResult())
         return DynamicCastFeasibility::WillSucceed;
 
-      return DynamicCastFeasibility::WillFail;
+      // Be conservative about function type relationships we may add in
+      // the future.
+      return DynamicCastFeasibility::MaySucceed;
     }
   }
 
