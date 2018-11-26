@@ -2136,11 +2136,19 @@ function(_add_swift_executable_single name)
   # Find the names of dependency library targets.
   #
   # We don't add the ${ARCH} to the target suffix because we want to link
-  # against fat libraries.
-  _list_add_string_suffix(
-      "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
-      "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}"
-      SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS)
+  # against fat libraries.  This only works for the Darwin targets as MachO is
+  # the only format with the fat libraries.
+  if(${SWIFTEXE_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+    _list_add_string_suffix(
+        "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
+        "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}"
+        SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS)
+  else()
+    _list_add_string_suffix(
+        "${SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES}"
+        "-${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
+        SWIFTEXE_SINGLE_LINK_FAT_LIBRARIES_TARGETS)
+  endif()
 
   handle_swift_sources(
       dependency_target
