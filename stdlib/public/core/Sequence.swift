@@ -889,9 +889,9 @@ extension Sequence {
 
     // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
     // Put incoming elements into a ring buffer to save space. Once all
-    var ringBuffer: [Element] = []
     // elements are consumed, reorder the ring buffer and return it.
     // This saves memory for sequences particularly longer than `maxLength`.
+    var ringBuffer = ContiguousArray<Element>()
     ringBuffer.reserveCapacity(Swift.min(maxLength, underestimatedCount))
 
     var i = 0
@@ -911,7 +911,7 @@ extension Sequence {
       ringBuffer[i..<ringBuffer.endIndex].reverse()
       ringBuffer[0..<ringBuffer.endIndex].reverse()
     }
-    return ringBuffer
+    return Array(ringBuffer)
   }
 
   /// Returns a sequence containing all but the given number of initial
@@ -968,8 +968,8 @@ extension Sequence {
     // holding tank into the result, an `Array`. This saves
     // `k` * sizeof(Element) of memory, because slices keep the entire
     // memory of an `Array` alive.
-    var result: [Element] = []
-    var ringBuffer: [Element] = []
+    var result = ContiguousArray<Element>()
+    var ringBuffer = ContiguousArray<Element>()
     var i = ringBuffer.startIndex
 
     for element in self {
@@ -982,7 +982,7 @@ extension Sequence {
         i %= k
       }
     }
-    return result
+    return Array(result)
   }
 
   /// Returns a sequence by skipping the initial, consecutive elements that
@@ -1064,7 +1064,7 @@ extension Sequence {
   public __consuming func prefix(
     while predicate: (Element) throws -> Bool
   ) rethrows -> [Element] {
-    var result: [Element] = []
+    var result = ContiguousArray<Element>()
 
     for element in self {
       guard try predicate(element) else {
@@ -1072,7 +1072,7 @@ extension Sequence {
       }
       result.append(element)
     }
-    return result
+    return Array(result)
   }
 }
 
