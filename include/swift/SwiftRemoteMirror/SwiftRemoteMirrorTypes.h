@@ -108,9 +108,9 @@ typedef enum swift_layout_kind {
 
   // References to other objects in the heap.
   SWIFT_STRONG_REFERENCE,
-#define REF_STORAGE(Name, name, NAME) \
-  SWIFT_##NAME##_REFERENCE,
-#include "swift/AST/ReferenceStorage.def"
+  SWIFT_UNOWNED_REFERENCE,
+  SWIFT_WEAK_REFERENCE,
+  SWIFT_UNMANAGED_REFERENCE,
 
   // Layouts of heap objects. These are only ever returned from
   // swift_reflection_infoFor{Instance,Metadata}(), and not
