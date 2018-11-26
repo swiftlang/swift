@@ -81,13 +81,13 @@ private class TestCluster {
       let serverDefText = createServerDef(forTasksConfig: tasks, withTaskIndex: i)
       let serverDef = TFE_GetServerDef(serverDefText, status)
       checkOk(status)
-      let server = TF_NewServer(
+      let server: CTFServer! = TF_NewServer(
           serverDef!.pointee.data, serverDef!.pointee.length, status)
       checkOk(status)
-      TF_ServerStart(server!, status)
+      TF_ServerStart(server, status)
       checkOk(status)
-      servers.append(server!)
-      let target = TF_ServerTarget(server!)
+      servers.append(server)
+      let target = TF_ServerTarget(server)
       debugLog("Started task \(i) at \(String(cString: target!))")
     }
     TF_DeleteStatus(status)
