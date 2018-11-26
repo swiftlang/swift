@@ -111,9 +111,6 @@ public let Flatten = [
   BenchmarkInfo(name: "Flatten.Array.Tuple4.lazy.map.joined",
     runFunction: run_FlattenArrayTuple4_lazy_map_joined, tags: t,
 		setUpFunction: sat4),
-  BenchmarkInfo(name: "Flatten.Array.Tuple4.lazy.for-in",
-    runFunction: run_FlattenArrayTuple4_lazy_forin, tags: t,
-		setUpFunction: sat4),
   BenchmarkInfo(name: "Flatten.LazySeq.Tuple4.flatMap",
     runFunction: run_FlattenLazySeqTuple4_flatMap, tags: t),
   BenchmarkInfo(name: "Flatten.LazySeq.Tuple4.map.joined",
@@ -287,20 +284,20 @@ let flatSize = size * 4
 let lastElement = size + 3
 
 typealias Tuple4 = (Int, Int, Int, Int)
-func tuple4(_ i: Int) -> Tuple4 { return (i, i + 1, i + 2, i + 3) }
+func tuple4(_ i: Int) -> Tuple4 { return (i, i &+ 1, i &+ 2, i &+ 3) }
 let arrayTuple4 = (1...size).map(tuple4)
 let sequenceTuple4 = (1...size).lazy.map(tuple4)
 
-func array4(_ i: Int) -> [Int] { return [i, i + 1, i + 2, i + 3] }
+func array4(_ i: Int) -> [Int] { return [i, i &+ 1, i &+ 2, i &+ 3] }
 let arrayArray4 = (1...size).map(array4)
 let sequenceArray4 = (1...size).lazy.map(array4)
 
-func c(_ i: Int) -> UInt8 { return UInt8(i % 256) } // clamp
+func c(_ i: Int) -> UInt8 { return UInt8(truncatingIfNeeded: i) } // clamp
 let arrayColorVals = (1...size).map {
-  ColorVal(r: c($0), g: c($0 + 1), b: c($0 + 2), a: c($0 + 3))
+  ColorVal(r: c($0), g: c($0 &+ 1), b: c($0 &+ 2), a: c($0 &+ 3))
 }
 let arrayColorRefs = (1...size).map {
-  ColorRef(r: c($0), g: c($0 + 1), b: c($0 + 2), a: c($0 + 3))
+  ColorRef(r: c($0), g: c($0 &+ 1), b: c($0 &+ 2), a: c($0 &+ 3))
 }
 let lastBlue = c(size + 2)
 
@@ -313,15 +310,26 @@ final class ColorRef {
   }
 }
 
-// Helper for materializing Sequence.
-// It counts the length and retains the last element.
-struct CountLast<T> {
-  var count: Int = 0
-  var last: T? = nil
-  static func collect(_ cl: inout CountLast, _ element: T){
-    cl.count += 1
-    cl.last = element
+protocol Initializable {
+  init()
+}
+extension UInt8: Initializable {}
+extension Int: Initializable {}
+
+// Helper function to fully materialize Sequence into preallocated buffer.
+// Cheats by knowing `flatSize` in advance. But demonstrates the power of
+// inlining the Sequence initializer.
+func materializeSequence<S: Sequence>(_ s: S) -> [S.Element]
+  where S.Element: Initializable {
+  var a = ContiguousArray<S.Element>(repeating: S.Element(), count: flatSize)
+  a.withUnsafeMutableBufferPointer { buffer in
+    var i = 0
+    _ = s.reduce(into:buffer) {
+      $0[i] = $1
+      i &+= 1
+    }
   }
+  return Array(a)
 }
 
 // Byte swizzling Sequence and Collection conformances for Color types
@@ -497,8 +505,8 @@ public func run_FlattenArrayTuple4UnsafeInitSeq(_ N: Int) {
       }
     }
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastElement))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastElement))
   }
 }
 
@@ -531,8 +539,8 @@ public func run_FlattenArrayTuple4_lazy_flatMap(_ N: Int) {
 
     let f = input.flatMap { [$0.0, $0.1, $0.2, $0.3] }
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastElement))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastElement))
   }
 }
 
@@ -543,27 +551,8 @@ public func run_FlattenArrayTuple4_lazy_map_joined(_ N: Int) {
 
     let f = input.map({ [$0.0, $0.1, $0.2, $0.3] }).joined()
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastElement))
-  }
-}
-
-@inline(never)
-public func run_FlattenArrayTuple4_lazy_forin(_ N: Int) {
-  for _ in 1...N {
-    let input = arrayTuple4.lazy
-
-    var f: [Int] = []
-
-    for (x, y, z, w) in input {
-      f.append(x)
-      f.append(y)
-      f.append(z)
-      f.append(w)
-    }
-
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastElement))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastElement))
   }
 }
 
@@ -574,8 +563,8 @@ public func run_FlattenLazySeqTuple4_flatMap(_ N: Int) {
 
     let f = input.flatMap { [$0.0, $0.1, $0.2, $0.3] }
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastElement))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastElement))
   }
 }
 
@@ -586,8 +575,8 @@ public func run_FlattenLazySeqTuple4_map_joined(_ N: Int) {
 
     let f = input.map({ [$0.0, $0.1, $0.2, $0.3] }).joined()
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastElement))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastElement))
   }
 }
 
@@ -605,8 +594,8 @@ public func run_FlattenLazySeqTuple4_forin(_ N: Int) {
       f.append(w)
     }
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastElement))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastElement))
   }
 }
 
@@ -617,8 +606,8 @@ public func run_FlattenAnySeqLazySeqTuple4_flatMap(_ N: Int) {
 
     let f = input.flatMap { [$0.0, $0.1, $0.2, $0.3] }
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastElement))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastElement))
   }
 }
 
@@ -629,8 +618,8 @@ public func run_FlattenAnySeqLazySeqTuple4_map_joined(_ N: Int) {
 
     let f = input.map({ [$0.0, $0.1, $0.2, $0.3] }).joined()
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastElement))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastElement))
   }
 }
 
@@ -648,8 +637,8 @@ public func run_FlattenAnySeqLazySeqTuple4_forin(_ N: Int) {
       f.append(w)
     }
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastElement))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastElement))
   }
 }
 
@@ -699,8 +688,8 @@ public func run_FlattenArrayArray4_lazy_flatMap(_ N: Int) {
 
     let f = input.flatMap { $0 }
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastElement))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastElement))
   }
 }
 
@@ -711,8 +700,8 @@ public func run_FlattenArrayArray4_lazy_joined(_ N: Int) {
 
     let f = input.joined()
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastElement))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastElement))
   }
 }
 
@@ -723,8 +712,8 @@ public func run_FlattenLazySeqArray4_flatMap(_ N: Int) {
 
     let f = input.flatMap { $0 }
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastElement))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastElement))
   }
 }
 
@@ -735,8 +724,8 @@ public func run_FlattenLazySeqArray4_joined(_ N: Int) {
 
     let f = input.joined()
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastElement))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastElement))
   }
 }
 
@@ -753,8 +742,8 @@ public func run_FlattenLazySeqArray4_forin(_ N: Int) {
       }
     }
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastElement))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastElement))
   }
 }
 
@@ -798,8 +787,8 @@ public func run_FlattenColorVal_flatMapSwizSeq(_ N: Int) {
 
     let f = input.flatMap { $0.sequence }
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -810,8 +799,8 @@ public func run_FlattenColorVal_map_joinedArray(_ N: Int) {
 
     let f = input.map({ [$0.a, $0.r, $0.g, $0.b] }).joined()
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -822,8 +811,8 @@ public func run_FlattenColorVal_map_joinedContArr(_ N: Int) {
 
     let f = input.map({ ContiguousArray([$0.a, $0.r, $0.g, $0.b]) }).joined()
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -834,8 +823,8 @@ public func run_FlattenColorVal_map_joinedSwizCol(_ N: Int) {
 
     let f = input.map({ $0.collection }).joined()
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -846,8 +835,8 @@ public func run_FlattenColorVal_map_joinedSwizSeq(_ N: Int) {
 
     let f = input.map({ $0.sequence }).joined()
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -858,8 +847,8 @@ public func run_FlattenColorVal_lazy_flatMapArray(_ N: Int) {
 
     let f = input.lazy.flatMap { [$0.a, $0.r, $0.g, $0.b] }
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -870,8 +859,8 @@ public func run_FlattenColorVal_lazy_flatMapContArr(_ N: Int) {
 
     let f = input.lazy.flatMap { ContiguousArray([$0.a, $0.r, $0.g, $0.b]) }
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -882,8 +871,8 @@ public func run_FlattenColorVal_lazy_flatMapSwizCol(_ N: Int) {
 
     let f = input.lazy.flatMap { $0.collection }
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -894,8 +883,8 @@ public func run_FlattenColorVal_lazy_flatMapSwizSeq(_ N: Int) {
 
     let f = input.lazy.flatMap { $0.sequence }
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -906,8 +895,8 @@ public func run_FlattenColorVal_lazy_map_joinedArray(_ N: Int) {
 
     let f = input.lazy.map({ [$0.a, $0.r, $0.g, $0.b] }).joined()
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -918,8 +907,8 @@ public func run_FlattenColorVal_lazy_map_joinedContArr(_ N: Int) {
 
     let f = input.lazy.map({ ContiguousArray([$0.a, $0.r, $0.g, $0.b]) }).joined()
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -930,8 +919,8 @@ public func run_FlattenColorVal_lazy_map_joinedSwizCol(_ N: Int) {
 
     let f = input.lazy.map({ $0.collection }).joined()
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -942,8 +931,8 @@ public func run_FlattenColorVal_lazy_map_joinedSwizSeq(_ N: Int) {
 
     let f = input.lazy.map({ $0.sequence }).joined()
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -1028,8 +1017,8 @@ public func run_FlattenColorValUnsafeUInt32InitSeq(_ N: Int) {
       }
     }
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -1044,8 +1033,8 @@ public func run_FlattenColorValUnsafeColorValInitSeq(_ N: Int) {
     let f = input.map { c in ColorVal(r: c.a, g: c.r, b: c.g, a: c.b) }
         .withUnsafeBytes(Array.init)
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -1148,8 +1137,8 @@ public func run_FlattenColorRef_flatMapSwizSeq(_ N: Int) {
 
     let f = input.flatMap { $0.sequence }
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -1160,8 +1149,8 @@ public func run_FlattenColorRef_map_joinedArray(_ N: Int) {
 
     let f = input.map({ [$0.a, $0.r, $0.g, $0.b] }).joined()
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -1172,8 +1161,8 @@ public func run_FlattenColorRef_map_joinedContArr(_ N: Int) {
 
     let f = input.map({ ContiguousArray([$0.a, $0.r, $0.g, $0.b]) }).joined()
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -1184,8 +1173,8 @@ public func run_FlattenColorRef_map_joinedSwizCol(_ N: Int) {
 
     let f = input.map({ $0.collection }).joined()
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -1196,8 +1185,8 @@ public func run_FlattenColorRef_map_joinedSwizSeq(_ N: Int) {
 
     let f = input.map({ $0.sequence }).joined()
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -1208,8 +1197,8 @@ public func run_FlattenColorRef_lazy_flatMapArray(_ N: Int) {
 
     let f = input.lazy.flatMap { [$0.a, $0.r, $0.g, $0.b] }
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -1220,8 +1209,8 @@ public func run_FlattenColorRef_lazy_flatMapContArr(_ N: Int) {
 
     let f = input.lazy.flatMap { ContiguousArray([$0.a, $0.r, $0.g, $0.b]) }
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -1232,8 +1221,8 @@ public func run_FlattenColorRef_lazy_flatMapSwizCol(_ N: Int) {
 
     let f = input.lazy.flatMap { $0.collection }
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -1244,8 +1233,8 @@ public func run_FlattenColorRef_lazy_flatMapSwizSeq(_ N: Int) {
 
     let f = input.lazy.flatMap { $0.sequence }
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -1256,8 +1245,8 @@ public func run_FlattenColorRef_lazy_map_joinedArray(_ N: Int) {
 
     let f = input.lazy.map({ [$0.a, $0.r, $0.g, $0.b] }).joined()
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -1268,8 +1257,8 @@ public func run_FlattenColorRef_lazy_map_joinedContArr(_ N: Int) {
 
     let f = input.lazy.map({ ContiguousArray([$0.a, $0.r, $0.g, $0.b]) }).joined()
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -1280,8 +1269,8 @@ public func run_FlattenColorRef_lazy_map_joinedSwizCol(_ N: Int) {
 
     let f = input.lazy.map({ $0.collection }).joined()
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 
@@ -1292,8 +1281,8 @@ public func run_FlattenColorRef_lazy_map_joinedSwizSeq(_ N: Int) {
 
     let f = input.lazy.map({ $0.sequence }).joined()
 
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, lastBlue))
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, lastBlue))
   }
 }
 

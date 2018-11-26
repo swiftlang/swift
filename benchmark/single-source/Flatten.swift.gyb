@@ -155,13 +155,14 @@ Tuple4 = [
 """),
 ]
 
-SeqT4 = Tuple4[0:3]  # skip Reserve and Unsafe, input is just a Sequence
+FuncT4 = Tuple4[0:2]  # just the functional Sequences
+SafeT4 = Tuple4[0:3]  # skip Reserve and Unsafe, as input is just a Sequence
 
 FlattenTuple4 = (
   [('Flatten.Array.Tuple4.' + n, c) for (n, c) in Tuple4] +
-  [('Flatten.Array.Tuple4.lazy.' + n, c) for (n, c) in SeqT4] +
-  [('Flatten.LazySeq.Tuple4.' + n, c) for (n, c) in SeqT4] +
-  [('Flatten.AnySeq.LazySeq.Tuple4.' + n, c) for (n, c) in SeqT4]
+  [('Flatten.Array.Tuple4.lazy.' + n, c) for (n, c) in FuncT4] +
+  [('Flatten.LazySeq.Tuple4.' + n, c) for (n, c) in SafeT4] +
+  [('Flatten.AnySeq.LazySeq.Tuple4.' + n, c) for (n, c) in SafeT4]
 )
 
 Array4 = [
@@ -342,20 +343,20 @@ let flatSize = size * 4
 let lastElement = size + 3
 
 typealias Tuple4 = (Int, Int, Int, Int)
-func tuple4(_ i: Int) -> Tuple4 { return (i, i + 1, i + 2, i + 3) }
+func tuple4(_ i: Int) -> Tuple4 { return (i, i &+ 1, i &+ 2, i &+ 3) }
 let arrayTuple4 = (1...size).map(tuple4)
 let sequenceTuple4 = (1...size).lazy.map(tuple4)
 
-func array4(_ i: Int) -> [Int] { return [i, i + 1, i + 2, i + 3] }
+func array4(_ i: Int) -> [Int] { return [i, i &+ 1, i &+ 2, i &+ 3] }
 let arrayArray4 = (1...size).map(array4)
 let sequenceArray4 = (1...size).lazy.map(array4)
 
-func c(_ i: Int) -> UInt8 { return UInt8(i % 256) } // clamp
+func c(_ i: Int) -> UInt8 { return UInt8(truncatingIfNeeded: i) } // clamp
 let arrayColorVals = (1...size).map {
-  ColorVal(r: c($0), g: c($0 + 1), b: c($0 + 2), a: c($0 + 3))
+  ColorVal(r: c($0), g: c($0 &+ 1), b: c($0 &+ 2), a: c($0 &+ 3))
 }
 let arrayColorRefs = (1...size).map {
-  ColorRef(r: c($0), g: c($0 + 1), b: c($0 + 2), a: c($0 + 3))
+  ColorRef(r: c($0), g: c($0 &+ 1), b: c($0 &+ 2), a: c($0 &+ 3))
 }
 let lastBlue = c(size + 2)
 
@@ -368,15 +369,26 @@ final class ColorRef {
   }
 }
 
-// Helper for materializing Sequence.
-// It counts the length and retains the last element.
-struct CountLast<T> {
-  var count: Int = 0
-  var last: T? = nil
-  static func collect(_ cl: inout CountLast, _ element: T){
-    cl.count += 1
-    cl.last = element
+protocol Initializable {
+  init()
+}
+extension UInt8: Initializable {}
+extension Int: Initializable {}
+
+// Helper function to fully materialize Sequence into preallocated buffer.
+// Cheats by knowing `flatSize` in advance. But demonstrates the power of
+// inlining the Sequence initializer.
+func materializeSequence<S: Sequence>(_ s: S) -> [S.Element]
+  where S.Element: Initializable {
+  var a = ContiguousArray<S.Element>(repeating: S.Element(), count: flatSize)
+  a.withUnsafeMutableBufferPointer { buffer in
+    var i = 0
+    _ = s.reduce(into:buffer) {
+      $0[i] = $1
+      i &+= 1
+    }
   }
+  return Array(a)
 }
 
 // Byte swizzling Sequence and Collection conformances for Color types
@@ -461,17 +473,14 @@ ${Code}
 %  #// When in doubt about correctness of implementation, debug with:
 %  #// print(Array(f.suffix(4))) // expect: [3, 0, 1, 2]
 %  if 'Seq' in Name or 'lazy' in Name or 'joined.' in Name:
-%  #// Materialize the Sequence by reducing into CountLast.
-%  #// Avoiding memory allocation overhead, it's functionally equivalent to:
-%  #// let fa = Array(f)
-%  #// CheckResults((fa.count, fa.last!) == (flatSize, lastElement))
-    let cl = f.reduce(into: CountLast(), CountLast.collect)
-    CheckResults((cl.count, cl.last!) == (flatSize, last${
+%  #// Materialize the Sequence using unsafe helper function.
+    let fa = materializeSequence(f)
+    CheckResults((fa.count, fa.last!) == (flatSize, last${
       'Blue' if 'Color' in Name else 'Element' }))
-%   else:
+%  else:
     CheckResults((f.count, f.last!) == (flatSize, last${
       'Blue' if 'Color' in Name else 'Element' }))
-%   end
+%  end
   }
 }
 
