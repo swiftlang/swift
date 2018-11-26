@@ -5095,6 +5095,7 @@ namespace  {
 namespace {
 using FunctionTypeAndDecl = std::pair<AnyFunctionType *, ValueDecl *>;
 
+/// Collect function (or subscript) members with the given \p name on \p baseTy.
 void collectPossibleCalleesByQualifiedLookup(
     DeclContext &DC, Type baseTy, DeclBaseName name,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
@@ -5127,6 +5128,8 @@ void collectPossibleCalleesByQualifiedLookup(
   }
 }
 
+/// Collect function (or subscript) members with the given \p name on
+/// \p baseExpr expression.
 void collectPossibleCalleesByQualifiedLookup(
     DeclContext &DC, Expr *baseExpr, DeclBaseName name,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
@@ -5142,6 +5145,7 @@ void collectPossibleCalleesByQualifiedLookup(
   collectPossibleCalleesByQualifiedLookup(DC, baseTy, name, candidates);
 }
 
+/// For the given \c callExpr, collect possible callee types and declarations.
 bool collectPossibleCalleesForApply(
     DeclContext &DC, ApplyExpr *callExpr,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
@@ -5187,6 +5191,8 @@ bool collectPossibleCalleesForApply(
   return !candidates.empty();
 }
 
+/// For the given \c subscriptExpr, collect possible callee types and
+/// declarations.
 bool collectPossibleCalleesForSubscript(
     DeclContext &DC, SubscriptExpr *subscriptExpr,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
@@ -5204,6 +5210,9 @@ bool collectPossibleCalleesForSubscript(
   return !candidates.empty();
 }
 
+/// Get index of \p CCExpr in \p Args. \p Args is usually a \c TupleExpr,
+/// \c ParenExpr, or a \c TupleShuffleExpr.
+/// \returns \c true if success, \c false if \p CCExpr is not a part of \p Args.
 bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
                        unsigned &Position, bool &HasName) {
   if (auto TSE = dyn_cast<TupleShuffleExpr>(Args))
@@ -5287,6 +5296,7 @@ class CodeCompletionTypeContextAnalyzer {
     PossibleNames.push_back(name);
   }
 
+  /// Collect context information at call argument position.
   bool collectArgumentExpectation(DeclContext &DC, Expr *E, Expr *CCExpr) {
     // Collect parameter lists for possible func decls.
     SmallVector<FunctionTypeAndDecl, 2> Candidates;
@@ -5300,7 +5310,7 @@ class CodeCompletionTypeContextAnalyzer {
         return false;
       Arg = subscriptExpr->getIndex();
     }
-    PossibleCallees.append(Candidates.begin(), Candidates.end());
+    PossibleCallees.assign(Candidates.begin(), Candidates.end());
 
     // Determine the position of code completion token in call argument.
     unsigned Position;
