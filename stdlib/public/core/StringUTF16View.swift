@@ -510,7 +510,7 @@ extension String.UTF16View {
       }
 
       while true {
-        let len = _utf8ScalarLength(utf8[readIdx])
+        let len = _utf8ScalarLength(utf8[_unchecked: readIdx])
         let utf16Len = len == 4 ? 2 : 1
         utf16I &+= utf16Len
 
